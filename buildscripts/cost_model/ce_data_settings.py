@@ -32,17 +32,24 @@ from datetime import datetime
 import random
 from typing import Sequence
 import config
-from random_generator import RangeGenerator, RandomDistribution, ArrayRandomDistribution, DataType, DistributionType
+from random_generator import (
+    RangeGenerator,
+    RandomDistribution,
+    ArrayRandomDistribution,
+    DataType,
+    DistributionType,
+)
 
-__all__ = ['database_config', 'data_generator_config']
+__all__ = ["database_config", "data_generator_config"]
 
 ################################################################################
 # Data distributions
 ################################################################################
 
 
-def add_distribution(distr_set: Sequence[RandomDistribution], distr_type: DistributionType,
-                     rg: RangeGenerator):
+def add_distribution(
+    distr_set: Sequence[RandomDistribution], distr_type: DistributionType, rg: RangeGenerator
+):
     distr = None
     if distr_type == DistributionType.UNIFORM:
         distr = RandomDistribution.uniform(rg)
@@ -99,26 +106,43 @@ for range_gen in int_ranges_2:
 int_distributions.append(
     RandomDistribution.mixed(
         children=[int_distributions[0], int_distributions_offset[0], int_distributions[4]],
-        weight=[1, 1, 1]))
+        weight=[1, 1, 1],
+    )
+)
 
 int_distributions.append(
     RandomDistribution.mixed(
         children=[int_distributions[1], int_distributions[4], int_distributions[7]],
-        weight=[1, 1, 1]))
+        weight=[1, 1, 1],
+    )
+)
 
 int_distributions.append(
     RandomDistribution.mixed(
         children=[
-            int_distributions[1], int_distributions_offset[1], int_distributions[3],
-            int_distributions[2], int_distributions_offset[2]
-        ], weight=[1, 1, 1, 1, 1]))
+            int_distributions[1],
+            int_distributions_offset[1],
+            int_distributions[3],
+            int_distributions[2],
+            int_distributions_offset[2],
+        ],
+        weight=[1, 1, 1, 1, 1],
+    )
+)
 
 int_distributions.append(
     RandomDistribution.mixed(
         children=[
-            int_distributions[2], int_distributions[3], int_distributions[6],
-            int_distributions_offset[1], int_distributions_offset[2], int_distributions_offset[5]
-        ], weight=[1, 1, 1, 1, 1, 1]))
+            int_distributions[2],
+            int_distributions[3],
+            int_distributions[6],
+            int_distributions_offset[1],
+            int_distributions_offset[2],
+            int_distributions_offset[5],
+        ],
+        weight=[1, 1, 1, 1, 1, 1],
+    )
+)
 
 #############################
 # Double number distributions
@@ -131,7 +155,7 @@ dbl_ranges = [
     # 10K unique doubles with different distances
     RangeGenerator(DataType.DOUBLE, 0.0, 1000.0, 0.1),
     RangeGenerator(DataType.DOUBLE, 0.0, 100000.0, 10),
-    RangeGenerator(DataType.DOUBLE, 0.0, 10000000.0, 1000)
+    RangeGenerator(DataType.DOUBLE, 0.0, 10000000.0, 1000),
 ]
 
 dbl_distributions = []
@@ -143,7 +167,9 @@ for range_gen in dbl_ranges:
 dbl_distributions.append(
     RandomDistribution.mixed(
         children=[dbl_distributions[0], dbl_distributions[3], dbl_distributions[10]],
-        weight=[1, 1, 1]))
+        weight=[1, 1, 1],
+    )
+)
 
 dbl_distributions.append(
     RandomDistribution.mixed(
@@ -152,7 +178,10 @@ dbl_distributions.append(
             dbl_distributions[4],
             RandomDistribution.normal(RangeGenerator(DataType.DOUBLE, 500.0, 600.0, 0.1)),
             RandomDistribution.normal(RangeGenerator(DataType.DOUBLE, 3000200.0, 5000100.0, 3030)),
-        ], weight=[1, 1, 1, 1]))
+        ],
+        weight=[1, 1, 1, 1],
+    )
+)
 
 #############################
 # Date distributions
@@ -176,25 +205,33 @@ add_distribution(dt_distributions, DistributionType.UNIFORM, range_dtt_1y)
 add_distribution(dt_distributions, DistributionType.NORMAL, range_dtt_10y_1)
 
 dt_distributions.append(
-    RandomDistribution.mixed([
-        RandomDistribution.uniform(range_dtt_1y),
-        RandomDistribution.uniform(range_dtt_1m_1),
-        RandomDistribution.uniform(range_dtt_1m_2),
-        RandomDistribution.uniform(range_dtt_1m_3)
-    ], [1, 1, 1, 1]))
+    RandomDistribution.mixed(
+        [
+            RandomDistribution.uniform(range_dtt_1y),
+            RandomDistribution.uniform(range_dtt_1m_1),
+            RandomDistribution.uniform(range_dtt_1m_2),
+            RandomDistribution.uniform(range_dtt_1m_3),
+        ],
+        [1, 1, 1, 1],
+    )
+)
 
 dt_distributions.append(
-    RandomDistribution.mixed([
-        RandomDistribution.uniform(range_dtt_10y_1),
-        RandomDistribution.uniform(range_dtt_10y_2),
-        RandomDistribution.uniform(range_dtt_20y)
-    ], [1, 1, 1]))
+    RandomDistribution.mixed(
+        [
+            RandomDistribution.uniform(range_dtt_10y_1),
+            RandomDistribution.uniform(range_dtt_10y_2),
+            RandomDistribution.uniform(range_dtt_20y),
+        ],
+        [1, 1, 1],
+    )
+)
 
 #######################
 # String distributions
 
-PRINTED_CHAR_MIN_CODE = ord('0')
-PRINTED_CHAR_MAX_CODE = ord('~')
+PRINTED_CHAR_MIN_CODE = ord("0")
+PRINTED_CHAR_MAX_CODE = ord("~")
 
 ascii_printable_chars = [
     chr(code) for code in range(PRINTED_CHAR_MIN_CODE, PRINTED_CHAR_MAX_CODE + 1)
@@ -203,19 +240,25 @@ ascii_printable_chars = [
 
 def next_char(char: str, distance: int, min_char_code: int, max_char_code: int):
     char_code = ord(char)
-    assert (min_char_code <= char_code <= max_char_code
-            ), f'char_code "{char_code}" is out of range ({min_char_code}, {max_char_code})'
+    assert (
+        min_char_code <= char_code <= max_char_code
+    ), f'char_code "{char_code}" is out of range ({min_char_code}, {max_char_code})'
     number_of_chars = max_char_code - min_char_code + 1
     new_char_code = ((char_code - min_char_code + distance) % number_of_chars) + min_char_code
-    assert (min_char_code <= new_char_code <=
-            max_char_code), f'new char code "{new_char_code}" is out of range'
+    assert (
+        min_char_code <= new_char_code <= max_char_code
+    ), f'new char code "{new_char_code}" is out of range'
     return chr(new_char_code)
 
 
-def generate_str_by_distance(num_strings: int, seed_str: str, distance_distr_0: RandomDistribution,
-                             distance_distr_1: RandomDistribution,
-                             distance_distr_2: RandomDistribution,
-                             distance_distr_3: RandomDistribution):
+def generate_str_by_distance(
+    num_strings: int,
+    seed_str: str,
+    distance_distr_0: RandomDistribution,
+    distance_distr_1: RandomDistribution,
+    distance_distr_2: RandomDistribution,
+    distance_distr_3: RandomDistribution,
+):
     """
     Generate a set of unique strings with different string distances.
 
@@ -234,14 +277,18 @@ def generate_str_by_distance(num_strings: int, seed_str: str, distance_distr_0: 
     cur_str = seed_str
     str_set.add(cur_str)
     for i in range(1, num_strings):
-        new_str = next_char(cur_str[0], distances_0[i], PRINTED_CHAR_MIN_CODE,
-                            PRINTED_CHAR_MAX_CODE)
-        new_str += next_char(cur_str[1], distances_1[i], PRINTED_CHAR_MIN_CODE,
-                             PRINTED_CHAR_MAX_CODE)
-        new_str += next_char(cur_str[2], distances_2[i], PRINTED_CHAR_MIN_CODE,
-                             PRINTED_CHAR_MAX_CODE)
-        new_str += next_char(cur_str[3], distances_3[i], PRINTED_CHAR_MIN_CODE,
-                             PRINTED_CHAR_MAX_CODE)
+        new_str = next_char(
+            cur_str[0], distances_0[i], PRINTED_CHAR_MIN_CODE, PRINTED_CHAR_MAX_CODE
+        )
+        new_str += next_char(
+            cur_str[1], distances_1[i], PRINTED_CHAR_MIN_CODE, PRINTED_CHAR_MAX_CODE
+        )
+        new_str += next_char(
+            cur_str[2], distances_2[i], PRINTED_CHAR_MIN_CODE, PRINTED_CHAR_MAX_CODE
+        )
+        new_str += next_char(
+            cur_str[3], distances_3[i], PRINTED_CHAR_MIN_CODE, PRINTED_CHAR_MAX_CODE
+        )
         str_set.add(new_str)
         cur_str = new_str
     return list(str_set)
@@ -262,17 +309,17 @@ d4 = RandomDistribution.uniform(range_int_20_30)
 # Sets of strings where characters at different positions have different distances
 string_sets = {}
 # 250 unique strings
-string_sets['set_1112_250'] = generate_str_by_distance(250, 'xxxx', d1, d1, d1, d2)
-string_sets['set_2221_250'] = generate_str_by_distance(250, 'azay', d2, d2, d3, d1)
-string_sets['set_5555_250'] = generate_str_by_distance(250, 'axbz', d4, d4, d4, d4)
+string_sets["set_1112_250"] = generate_str_by_distance(250, "xxxx", d1, d1, d1, d2)
+string_sets["set_2221_250"] = generate_str_by_distance(250, "azay", d2, d2, d3, d1)
+string_sets["set_5555_250"] = generate_str_by_distance(250, "axbz", d4, d4, d4, d4)
 # 1000 unique strings
-string_sets['set_1112_1000'] = generate_str_by_distance(1000, 'xxxx', d1, d1, d1, d2)
-string_sets['set_2221_1000'] = generate_str_by_distance(1000, 'azay', d2, d2, d3, d1)
-string_sets['set_5555_1000'] = generate_str_by_distance(1000, 'axbz', d4, d4, d4, d4)
+string_sets["set_1112_1000"] = generate_str_by_distance(1000, "xxxx", d1, d1, d1, d2)
+string_sets["set_2221_1000"] = generate_str_by_distance(1000, "azay", d2, d2, d3, d1)
+string_sets["set_5555_1000"] = generate_str_by_distance(1000, "axbz", d4, d4, d4, d4)
 # 10000 unique strings
-string_sets['set_1112_10000'] = generate_str_by_distance(10000, 'xxxx', d1, d1, d1, d2)
-string_sets['set_2221_10000'] = generate_str_by_distance(10000, 'azay', d2, d2, d3, d1)
-string_sets['set_5555_10000'] = generate_str_by_distance(10000, 'axbz', d4, d4, d4, d4)
+string_sets["set_1112_10000"] = generate_str_by_distance(10000, "xxxx", d1, d1, d1, d2)
+string_sets["set_2221_10000"] = generate_str_by_distance(10000, "azay", d2, d2, d3, d1)
+string_sets["set_5555_10000"] = generate_str_by_distance(10000, "axbz", d4, d4, d4, d4)
 
 # Weights with different variance. For instance if the smallest weight is 1, and the biggest weight is 5
 # then some values in a choice distribution will be picked with at most 5 times higher probability.
@@ -285,18 +332,23 @@ weight_range_s = RangeGenerator(DataType.INTEGER, 95, 101, 1)
 weight_range_l = RangeGenerator(DataType.INTEGER, 25, 101, 2)
 
 weights = {}
-weights['weight_unif_s'] = RandomDistribution.uniform(weight_range_s)
-weights['weight_unif_l'] = RandomDistribution.uniform(weight_range_l)
+weights["weight_unif_s"] = RandomDistribution.uniform(weight_range_s)
+weights["weight_unif_l"] = RandomDistribution.uniform(weight_range_l)
 
-#weights['weight_norm_s'] = RandomDistribution.normal(weight_range_s)
-#weights['weight_norm_l'] = RandomDistribution.normal(weight_range_l)
+# weights['weight_norm_s'] = RandomDistribution.normal(weight_range_s)
+# weights['weight_norm_l'] = RandomDistribution.normal(weight_range_l)
 
-#weights['chi2_s'] = RandomDistribution.noncentral_chisquare(weight_range_s)
-#weights['chi2_l'] = RandomDistribution.noncentral_chisquare(weight_range_l)
+# weights['chi2_s'] = RandomDistribution.noncentral_chisquare(weight_range_s)
+# weights['chi2_l'] = RandomDistribution.noncentral_chisquare(weight_range_l)
 
 
-def add_choice_distr(distr_set: Sequence[RandomDistribution], str_set: Sequence[str],
-                     weight_distr: RandomDistribution, v_name: str, w_name: str):
+def add_choice_distr(
+    distr_set: Sequence[RandomDistribution],
+    str_set: Sequence[str],
+    weight_distr: RandomDistribution,
+    v_name: str,
+    w_name: str,
+):
     distr = RandomDistribution.choice(str_set, weight_distr.generate(len(str_set)), v_name, w_name)
     distr_set.append(distr)
 
@@ -318,8 +370,11 @@ arr_len_dist_m = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 90,
 arr_len_dist_l = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 900, 1100, 10))
 
 
-def add_array_distr(distr_set: Sequence[RandomDistribution], lengths_distr: RandomDistribution,
-                    value_distr: RandomDistribution):
+def add_array_distr(
+    distr_set: Sequence[RandomDistribution],
+    lengths_distr: RandomDistribution,
+    value_distr: RandomDistribution,
+):
     distr_set.append(ArrayRandomDistribution(lengths_distr, value_distr))
 
 
@@ -343,24 +398,30 @@ add_array_distr(arr_distributions, arr_len_dist_l, str_distributions[-1])
 
 # 30% scalars, 70% arrays
 arr_distributions.append(
-    RandomDistribution.mixed([int_distributions[0], arr_distributions[0]], [0.3, 0.7]))
+    RandomDistribution.mixed([int_distributions[0], arr_distributions[0]], [0.3, 0.7])
+)
 arr_distributions.append(
-    RandomDistribution.mixed([int_distributions[-1], arr_distributions[-1]], [0.3, 0.7]))
+    RandomDistribution.mixed([int_distributions[-1], arr_distributions[-1]], [0.3, 0.7])
+)
 # 70% scalars, 30% arrays
 arr_distributions.append(
-    RandomDistribution.mixed([int_distributions[0], arr_distributions[0]], [0.7, 0.3]))
+    RandomDistribution.mixed([int_distributions[0], arr_distributions[0]], [0.7, 0.3])
+)
 arr_distributions.append(
-    RandomDistribution.mixed([int_distributions[-1], arr_distributions[-1]], [0.7, 0.3]))
+    RandomDistribution.mixed([int_distributions[-1], arr_distributions[-1]], [0.7, 0.3])
+)
 
 arr_zero_size = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 0, 1, 1))
 arr_empty_distr = ArrayRandomDistribution(arr_zero_size, int_distributions[0])
 
 # 20% empty arrays
 arr_distributions.append(
-    RandomDistribution.mixed([arr_empty_distr, arr_distributions[2]], [0.2, 0.8]))
+    RandomDistribution.mixed([arr_empty_distr, arr_distributions[2]], [0.2, 0.8])
+)
 # 80% empty arrays
 arr_distributions.append(
-    RandomDistribution.mixed([arr_empty_distr, arr_distributions[2]], [0.8, 0.2]))
+    RandomDistribution.mixed([arr_empty_distr, arr_distributions[2]], [0.8, 0.2])
+)
 
 ###############################
 # Mixed data type distributions
@@ -380,8 +441,9 @@ mix_distributions.append(RandomDistribution.mixed(children=int_str_mix_2, weight
 mix_distributions.append(RandomDistribution.mixed(children=int_str_mix_2, weight=[0.9, 0.1]))
 
 # Doubles and strings
-dbl_ascii_range = RangeGenerator(DataType.DOUBLE, float(PRINTED_CHAR_MIN_CODE),
-                                 float(PRINTED_CHAR_MAX_CODE), 0.01)
+dbl_ascii_range = RangeGenerator(
+    DataType.DOUBLE, float(PRINTED_CHAR_MIN_CODE), float(PRINTED_CHAR_MAX_CODE), 0.01
+)
 ascii_double_range_distr = RandomDistribution.normal(dbl_ascii_range)
 
 dbl_str_mix_1 = [ascii_double_range_distr, str_distributions[1]]
@@ -399,7 +461,8 @@ mix_distributions.append(RandomDistribution.mixed(children=dbl_str_mix_3, weight
 
 dbl_str_dt_mix_1 = [ascii_double_range_distr, str_distributions[4], dt_distributions[0]]
 mix_distributions.append(
-    RandomDistribution.mixed(children=dbl_str_dt_mix_1, weight=[0.5, 0.5, 0.5]))
+    RandomDistribution.mixed(children=dbl_str_dt_mix_1, weight=[0.5, 0.5, 0.5])
+)
 
 str_dt_mix_1 = [str_distributions[0], dt_distributions[-1]]
 mix_distributions.append(RandomDistribution.mixed(children=str_dt_mix_1, weight=[0.5, 0.5]))
@@ -418,46 +481,70 @@ mix_distributions.append(RandomDistribution.mixed(children=str_dt_mix_2, weight=
 collection_cardinalities = [500]
 
 field_templates = [
-    config.FieldTemplate(name=f'{str(dist)}', data_type=config.DataType.INTEGER, distribution=dist,
-                         indexed=False) for dist in int_distributions
+    config.FieldTemplate(
+        name=f"{str(dist)}", data_type=config.DataType.INTEGER, distribution=dist, indexed=False
+    )
+    for dist in int_distributions
 ]
 field_templates += [
-    config.FieldTemplate(name=f'{str(dist)}', data_type=config.DataType.STRING, distribution=dist,
-                         indexed=False) for dist in str_distributions
+    config.FieldTemplate(
+        name=f"{str(dist)}", data_type=config.DataType.STRING, distribution=dist, indexed=False
+    )
+    for dist in str_distributions
 ]
 field_templates += [
-    config.FieldTemplate(name=f'{str(dist)}', data_type=config.DataType.ARRAY, distribution=dist,
-                         indexed=False) for dist in arr_distributions
+    config.FieldTemplate(
+        name=f"{str(dist)}", data_type=config.DataType.ARRAY, distribution=dist, indexed=False
+    )
+    for dist in arr_distributions
 ]
 field_templates += [
-    config.FieldTemplate(name=f'{str(dist)}', data_type=config.DataType.DOUBLE, distribution=dist,
-                         indexed=False) for dist in dbl_distributions
+    config.FieldTemplate(
+        name=f"{str(dist)}", data_type=config.DataType.DOUBLE, distribution=dist, indexed=False
+    )
+    for dist in dbl_distributions
 ]
 field_templates += [
-    config.FieldTemplate(name=f'{str(dist)}', data_type=config.DataType.DATE, distribution=dist,
-                         indexed=False) for dist in dt_distributions
+    config.FieldTemplate(
+        name=f"{str(dist)}", data_type=config.DataType.DATE, distribution=dist, indexed=False
+    )
+    for dist in dt_distributions
 ]
 field_templates += [
-    config.FieldTemplate(name=f'{str(dist)}', data_type=config.DataType.MIXDATA, distribution=dist,
-                         indexed=False) for dist in mix_distributions
+    config.FieldTemplate(
+        name=f"{str(dist)}", data_type=config.DataType.MIXDATA, distribution=dist, indexed=False
+    )
+    for dist in mix_distributions
 ]
 
-ce_data = config.CollectionTemplate(name="ce_data", fields=field_templates, compound_indexes=[],
-                                    cardinalities=collection_cardinalities)
+ce_data = config.CollectionTemplate(
+    name="ce_data",
+    fields=field_templates,
+    compound_indexes=[],
+    cardinalities=collection_cardinalities,
+)
 
 ################################################################################
 # Database settings
 ################################################################################
 
 database_config = config.DatabaseConfig(
-    connection_string='mongodb://localhost', database_name='ce_accuracy_test', dump_path=Path(
-        '..', '..', 'jstests', 'query_golden', 'libs', 'data'),
-    restore_from_dump=config.RestoreMode.NEVER, dump_on_exit=False)
+    connection_string="mongodb://localhost",
+    database_name="ce_accuracy_test",
+    dump_path=Path("..", "..", "jstests", "query_golden", "libs", "data"),
+    restore_from_dump=config.RestoreMode.NEVER,
+    dump_on_exit=False,
+)
 
 ################################################################################
 # Data Generator settings
 ################################################################################
 
 data_generator_config = config.DataGeneratorConfig(
-    enabled=True, create_indexes=False, batch_size=10000, collection_templates=[ce_data],
-    write_mode=config.WriteMode.REPLACE, collection_name_with_card=True)
+    enabled=True,
+    create_indexes=False,
+    batch_size=10000,
+    collection_templates=[ce_data],
+    write_mode=config.WriteMode.REPLACE,
+    collection_name_with_card=True,
+)

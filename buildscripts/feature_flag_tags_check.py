@@ -76,16 +76,19 @@ def main(diff_file, ent_path):
     tests_missing_fcv_tag = get_tests_missing_fcv_tag(tests_with_feature_flag_tag)
 
     if tests_missing_fcv_tag:
-        print(f"Found tests missing `{REQUIRES_FCV_TAG_LATEST}` tag:\n" +
-              "\n".join(tests_missing_fcv_tag))
+        print(
+            f"Found tests missing `{REQUIRES_FCV_TAG_LATEST}` tag:\n"
+            + "\n".join(tests_missing_fcv_tag)
+        )
         sys.exit(1)
     sys.exit(0)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--diff-file-name", type=str,
-                        help="Name of the file containing the git diff")
+    parser.add_argument(
+        "--diff-file-name", type=str, help="Name of the file containing the git diff"
+    )
     parser.add_argument("--enterprise-path", type=str, help="Path to the enterprise module")
     args = parser.parse_args()
     main(args.diff_file_name, args.enterprise_path)

@@ -1,4 +1,5 @@
 """Tests for jepsen report generator."""
+
 import unittest
 import textwrap
 import random
@@ -115,34 +116,36 @@ Everything looks good! ヽ(‘ー`)ノ
 """)
 
         return {
-            'expected':
-                ParserOutput({
-                    'success': successful_tests,
-                    'unknown': indeterminate_tests,
-                    'crashed': crashed_tests,
-                    'failed': failed_tests,
-                }), 'corpus':
-                    corpus
+            "expected": ParserOutput(
+                {
+                    "success": successful_tests,
+                    "unknown": indeterminate_tests,
+                    "crashed": crashed_tests,
+                    "failed": failed_tests,
+                }
+            ),
+            "corpus": corpus,
         }
 
     def test_parser(self):
         """Test with embedded corpus."""
         out = parse(_CORPUS)
-        self.assertEqual(len(out['success']), 28)
-        self.assertEqual(len(out['unknown']), 0)
-        self.assertEqual(len(out['crashed']), 2)
-        self.assertEqual(len(out['failed']), 0)
+        self.assertEqual(len(out["success"]), 28)
+        self.assertEqual(len(out["unknown"]), 0)
+        self.assertEqual(len(out["crashed"]), 2)
+        self.assertEqual(len(out["failed"]), 0)
 
     def test_parser2(self):
         """Test with jepsen.log file."""
-        with open(os.path.join(os.path.dirname(__file__),
-                               "test_jepsen_report_corpus.log.txt")) as fh:
+        with open(
+            os.path.join(os.path.dirname(__file__), "test_jepsen_report_corpus.log.txt")
+        ) as fh:
             corpus = fh.read().splitlines()
         out = parse(corpus)
-        self.assertEqual(len(out['success']), 29)
-        self.assertEqual(len(out['unknown']), 0)
-        self.assertEqual(len(out['crashed']), 1)
-        self.assertEqual(len(out['failed']), 0)
+        self.assertEqual(len(out["success"]), 29)
+        self.assertEqual(len(out["unknown"]), 0)
+        self.assertEqual(len(out["crashed"]), 1)
+        self.assertEqual(len(out["failed"]), 0)
 
     def test_generated_corpus(self):
         """Generate 100 corpuses and test them."""
@@ -151,25 +154,25 @@ Everything looks good! ヽ(‘ー`)ノ
 
     def _test_generated_corpus(self):
         gen = self._corpus_generator()
-        corpus = gen['corpus'].splitlines()
+        corpus = gen["corpus"].splitlines()
         out = parse(corpus)
-        self.assertDictEqual(out, gen['expected'])
+        self.assertDictEqual(out, gen["expected"])
 
-    @patch('buildscripts.jepsen_report._try_find_log_file')
-    @patch('buildscripts.jepsen_report._get_log_lines')
-    @patch('buildscripts.jepsen_report._put_report')
+    @patch("buildscripts.jepsen_report._try_find_log_file")
+    @patch("buildscripts.jepsen_report._get_log_lines")
+    @patch("buildscripts.jepsen_report._put_report")
     def test_main(self, mock_put_report, mock_get_log_lines, mock_try_find_log_file):
         """Test main function."""
         gen = self._corpus_generator()
-        corpus = gen['corpus'].splitlines()
+        corpus = gen["corpus"].splitlines()
         mock_get_log_lines.return_value = corpus
 
         def _try_find_log_file(_store, _test):
             if _try_find_log_file.counter == 0:
                 _try_find_log_file.counter += 1
                 with open(
-                        os.path.join(
-                            os.path.dirname(__file__), "test_jepsen_report_corpus.log.txt")) as fh:
+                    os.path.join(os.path.dirname(__file__), "test_jepsen_report_corpus.log.txt")
+                ) as fh:
                     return fh.read()
             return ""
 
@@ -177,19 +180,24 @@ Everything looks good! ヽ(‘ー`)ノ
         mock_try_find_log_file.side_effect = _try_find_log_file
 
         runner = CliRunner()
-        result = runner.invoke(main,
-                               ["--start_time=0", "--end_time=10", "--elapsed=10", "test.log"])
-        num_tests = len(gen['expected']['success']) + len(gen['expected']['unknown']) + len(
-            gen['expected']['crashed']) + len(gen['expected']['failed'])
-        num_fails = num_tests - len(gen['expected']['success'])
+        result = runner.invoke(
+            main, ["--start_time=0", "--end_time=10", "--elapsed=10", "test.log"]
+        )
+        num_tests = (
+            len(gen["expected"]["success"])
+            + len(gen["expected"]["unknown"])
+            + len(gen["expected"]["crashed"])
+            + len(gen["expected"]["failed"])
+        )
+        num_fails = num_tests - len(gen["expected"]["success"])
 
         callee_dict = mock_put_report.call_args[0][0]
-        self.assertEqual(callee_dict['failures'], num_fails)
-        self.assertEqual(len(callee_dict['results']), num_tests)
-        mock_get_log_lines.assert_called_once_with('test.log')
-        if gen['expected']['crashed']:
+        self.assertEqual(callee_dict["failures"], num_fails)
+        self.assertEqual(len(callee_dict["results"]), num_tests)
+        mock_get_log_lines.assert_called_once_with("test.log")
+        if gen["expected"]["crashed"]:
             self.assertEqual(result.exit_code, 2)
-        elif gen['expected']['unknown'] or gen['expected']['failure']:
+        elif gen["expected"]["unknown"] or gen["expected"]["failure"]:
             self.assertEqual(result.exit_code, 1)
         else:
             self.assertEqual(result.exit_code, 0)

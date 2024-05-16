@@ -318,11 +318,12 @@ class Suite(object):
         for iteration in range(num_iterations):
             # Summarize each execution as a bulleted list of results.
             bulleter_sb = []
-            summary = self._summarize_report(reports[iteration], start_times[iteration],
-                                             end_times[iteration], bulleter_sb)
+            summary = self._summarize_report(
+                reports[iteration], start_times[iteration], end_times[iteration], bulleter_sb
+            )
             combined_summary = _summary.combine(combined_summary, summary)
 
-            for (i, line) in enumerate(bulleter_sb):
+            for i, line in enumerate(bulleter_sb):
                 # Only bullet first line, indent others.
                 prefix = "* " if i == 0 else "  "
                 sb.append(prefix + line)
@@ -335,8 +336,12 @@ class Suite(object):
         Also append a summary of that execution onto the string builder 'sb'.
         """
 
-        return self._summarize_report(self._reports[iteration], self._test_start_times[iteration],
-                                      self._test_end_times[iteration], sb)
+        return self._summarize_report(
+            self._reports[iteration],
+            self._test_start_times[iteration],
+            self._test_end_times[iteration],
+            sb,
+        )
 
     def _summarize_report(self, report, start_time, end_time, sb):
         """Return the summary information of the execution.
@@ -364,11 +369,14 @@ class Suite(object):
             sb.append("All %d test(s) passed in %0.2f seconds." % (num_run, time_taken))
             return _summary.Summary(num_run, time_taken, num_run, 0, 0, 0)
 
-        summary = _summary.Summary(num_run, time_taken, report.num_succeeded, num_skipped,
-                                   num_failed, report.num_errored)
+        summary = _summary.Summary(
+            num_run, time_taken, report.num_succeeded, num_skipped, num_failed, report.num_errored
+        )
 
-        sb.append("%d test(s) ran in %0.2f seconds"
-                  " (%d succeeded, %d were skipped, %d failed, %d errored)" % summary)
+        sb.append(
+            "%d test(s) ran in %0.2f seconds"
+            " (%d succeeded, %d were skipped, %d failed, %d errored)" % summary
+        )
 
         test_names = []
 
@@ -376,8 +384,14 @@ class Suite(object):
             sb.append("The following tests failed (with exit code):")
             for test_info in itertools.chain(report.get_failed(), report.get_interrupted()):
                 test_names.append(test_info.test_file)
-                sb.append("    %s (%d %s)" % (test_info.test_file, test_info.return_code,
-                                              translate_exit_code(test_info.return_code)))
+                sb.append(
+                    "    %s (%d %s)"
+                    % (
+                        test_info.test_file,
+                        test_info.return_code,
+                        translate_exit_code(test_info.return_code),
+                    )
+                )
 
                 for exception_extractor in test_info.exception_extractors:
                     for log_line in exception_extractor.get_exception():
@@ -395,8 +409,10 @@ class Suite(object):
 
         if num_failed > 0 or report.num_errored > 0:
             test_names.sort(key=_report.test_order)
-            sb.append("If you're unsure where to begin investigating these errors, "
-                      "consider looking at tests in the following order:")
+            sb.append(
+                "If you're unsure where to begin investigating these errors, "
+                "consider looking at tests in the following order:"
+            )
             for test_name in test_names:
                 sb.append("    %s" % (test_name))
 
@@ -407,7 +423,8 @@ class Suite(object):
         """Log summary of all suites."""
         sb = []
         sb.append(
-            "Summary of all suites: %d suites ran in %0.2f seconds" % (len(suites), time_taken))
+            "Summary of all suites: %d suites ran in %0.2f seconds" % (len(suites), time_taken)
+        )
         for suite in suites:
             suite_sb = []
             suite.summarize(suite_sb)

@@ -3,6 +3,7 @@
 The API also provides methods to access specific fields present in the mongodb/mongo
 configuration file.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -37,8 +38,8 @@ def parse_evergreen_file(path, evergreen_binary="evergreen"):
             prev_environ = os.environ.copy()
             if sys.platform in ("win32", "cygwin"):
                 LOGGER.info(f"Previous os.environ={os.environ} before updating 'USERPROFILE'")
-                if 'HOME' in os.environ:
-                    os.environ['USERPROFILE'] = os.environ['HOME']
+                if "HOME" in os.environ:
+                    os.environ["USERPROFILE"] = os.environ["HOME"]
                 else:
                     LOGGER.warn(
                         "'HOME' enviorment variable unset. This will likely cause us to be unable to find evergreen binary."
@@ -221,8 +222,7 @@ class Task(object):
             return [command_vars.get("suite", self.generated_task_name)]
         if self.is_initialize_multiversion_tasks_task:
             return [
-                suite
-                for suite in self.initialize_multiversion_tasks_command.get("vars", {}).keys()
+                suite for suite in self.initialize_multiversion_tasks_command.get("vars", {}).keys()
             ]
 
         raise ValueError(f"{self.name} task does not run a resmoke.py test suite")
@@ -289,10 +289,12 @@ class Variant(object):
                 # A task in conf_dict may be a task_group, containing a list of tasks.
                 for task_in_group in task_group_map.get(task_name).tasks:
                     self.tasks.append(
-                        VariantTask(task_map.get(task_in_group), task.get("distros", run_on), self))
+                        VariantTask(task_map.get(task_in_group), task.get("distros", run_on), self)
+                    )
             else:
                 self.tasks.append(
-                    VariantTask(task_map.get(task["name"]), task.get("distros", run_on), self))
+                    VariantTask(task_map.get(task["name"]), task.get("distros", run_on), self)
+                )
         self.distro_names = set(run_on)
         for task in self.tasks:
             self.distro_names.update(task.run_on)
@@ -328,7 +330,7 @@ class Variant(object):
 
     def is_enterprise_build(self) -> bool:
         """Determine if the build variant is configured for enterprise builds."""
-        pattern = r'--enableEnterpriseTests\s*=?\s*off'
+        pattern = r"--enableEnterpriseTests\s*=?\s*off"
         return not re.search(pattern, str(self.raw))
 
     @property

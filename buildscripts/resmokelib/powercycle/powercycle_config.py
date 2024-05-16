@@ -1,4 +1,5 @@
 """Powercycle tasks config."""
+
 import yaml
 
 from buildscripts.resmokelib.powercycle import powercycle, powercycle_constants
@@ -22,8 +23,9 @@ class PowercycleTaskConfig:
 
         self.fcv = task_yaml.get("fcv", None)
         self.repl_set = task_yaml.get("repl_set", None)
-        self.mongod_options = task_yaml.get("mongod_options",
-                                            powercycle_constants.DEFAULT_MONGOD_OPTIONS)
+        self.mongod_options = task_yaml.get(
+            "mongod_options", powercycle_constants.DEFAULT_MONGOD_OPTIONS
+        )
 
     def __str__(self):
         """Return as dict."""
@@ -36,7 +38,8 @@ def get_task_config(task_name, is_remote):
 
     if is_remote:
         config_location = powercycle.abs_path(
-            f"{powercycle_constants.REMOTE_DIR}/{POWERCYCLE_TASKS_CONFIG}")
+            f"{powercycle_constants.REMOTE_DIR}/{POWERCYCLE_TASKS_CONFIG}"
+        )
     else:
         config_location = powercycle.abs_path(POWERCYCLE_TASKS_CONFIG)
 
@@ -48,6 +51,8 @@ def get_task_config(task_name, is_remote):
         if single_task_yaml["name"] == task_name:
             return PowercycleTaskConfig(single_task_yaml)
 
-    raise Exception(f"Task with name '{task_name}' is not found"
-                    f" in powercycle tasks configuration file '{POWERCYCLE_TASKS_CONFIG}'."
-                    f" Please add a task there with the appropriate name.")
+    raise Exception(
+        f"Task with name '{task_name}' is not found"
+        f" in powercycle tasks configuration file '{POWERCYCLE_TASKS_CONFIG}'."
+        f" Please add a task there with the appropriate name."
+    )

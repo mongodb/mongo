@@ -66,8 +66,9 @@ class LinearModel:
 
 
 # pylint: disable=invalid-name
-def estimate(fit, X: np.ndarray, y: np.ndarray, test_size: float,
-             trace: bool = False) -> LinearModel:
+def estimate(
+    fit, X: np.ndarray, y: np.ndarray, test_size: float, trace: bool = False
+) -> LinearModel:
     """Estimate cost model parameters."""
 
     if len(X) == 0:
@@ -78,7 +79,7 @@ def estimate(fit, X: np.ndarray, y: np.ndarray, test_size: float,
     X_training, X_test, y_training, y_test = train_test_split(X, y, test_size=test_size)
 
     if trace:
-        print(f'Training size: {len(X_training)}, test size: {len(X_test)}')
+        print(f"Training size: {len(X_training)}, test size: {len(X_test)}")
         print(X_training)
         print(y_training)
 
@@ -94,5 +95,6 @@ def estimate(fit, X: np.ndarray, y: np.ndarray, test_size: float,
     evs = explained_variance_score(y_test, y_predict)
     corrcoef = np.corrcoef(np.transpose(X[:, 1:]), y)
 
-    return LinearModel(coef=coef[1:], intercept=coef[0], mse=mse, r2=r2, evs=evs,
-                       corrcoef=corrcoef[0, 1:])
+    return LinearModel(
+        coef=coef[1:], intercept=coef[0], mse=mse, r2=r2, evs=evs, corrcoef=corrcoef[0, 1:]
+    )

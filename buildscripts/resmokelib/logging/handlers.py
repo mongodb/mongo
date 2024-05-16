@@ -71,8 +71,10 @@ class ExceptionExtractor:
                 self.exception_detected = True
                 if self.current_exception_is_truncated:
                     self.current_exception.appendleft(
-                        "[LAST Part of Exception]" if self.truncate ==
-                        Truncate.FIRST else "[FIRST Part of Exception]")
+                        "[LAST Part of Exception]"
+                        if self.truncate == Truncate.FIRST
+                        else "[FIRST Part of Exception]"
+                    )
 
     def get_exception(self):
         """Get the exception as a list of strings if it exists."""
@@ -214,8 +216,9 @@ class BufferedHandler(logging.Handler):
     def _flush_buffer_with_lock(self, buf, close_called):
         """Ensure all logging output has been flushed."""
 
-        raise NotImplementedError("_flush_buffer_with_lock must be implemented by BufferedHandler"
-                                  " subclasses")
+        raise NotImplementedError(
+            "_flush_buffer_with_lock must be implemented by BufferedHandler" " subclasses"
+        )
 
     def close(self):
         """Flush the buffer and tidies up any resources used by this handler."""
@@ -269,11 +272,12 @@ class HTTPHandler(object):
             retry = urllib3_retry.Retry(
                 backoff_factor=0.1,  # Enable backoff starting at 0.1s.
                 allowed_methods=False,  # Support all HTTP verbs.
-                status_forcelist=retry_status)
+                status_forcelist=retry_status,
+            )
 
             adapter = requests.adapters.HTTPAdapter(max_retries=retry)
-            self.session.mount('http://', adapter)
-            self.session.mount('https://', adapter)
+            self.session.mount("http://", adapter)
+            self.session.mount("https://", adapter)
 
         self.url_root = url_root
 
@@ -313,8 +317,14 @@ class HTTPHandler(object):
                     # that defined InsecureRequestWarning.
                     pass
 
-            response = self.session.post(url, data=data, headers=headers, timeout=timeout_secs,
-                                         auth=self.auth_handler, verify=True)
+            response = self.session.post(
+                url,
+                data=data,
+                headers=headers,
+                timeout=timeout_secs,
+                auth=self.auth_handler,
+                verify=True,
+            )
 
         response.raise_for_status()
 

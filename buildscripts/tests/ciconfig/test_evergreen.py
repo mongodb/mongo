@@ -88,39 +88,48 @@ class TestTask(unittest.TestCase):
 
     def test_suite_to_resmoke_args_map_for_non_gen_task(self):
         suite_and_task = "jstestfuzz"
-        task_commands = [{
-            "func": "run tests",
-            "vars": {"resmoke_args": "--arg=val"},
-        }]
+        task_commands = [
+            {
+                "func": "run tests",
+                "vars": {"resmoke_args": "--arg=val"},
+            }
+        ]
         task_dict = {"name": suite_and_task, "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertEqual({suite_and_task: f"--suites={suite_and_task} --arg=val"},
-                         task.suite_to_resmoke_args_map)
+        self.assertEqual(
+            {suite_and_task: f"--suites={suite_and_task} --arg=val"}, task.suite_to_resmoke_args_map
+        )
 
     def test_suite_to_resmoke_args_map_for_gen_task(self):
         suite = "jsCore"
-        task_commands = [{
-            "func": "generate resmoke tasks",
-            "vars": {"resmoke_args": "--installDir=/bin"},
-        }]
+        task_commands = [
+            {
+                "func": "generate resmoke tasks",
+                "vars": {"resmoke_args": "--installDir=/bin"},
+            }
+        ]
         task_dict = {"name": f"{suite}_gen", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertEqual({suite: f"--suites={suite} --installDir=/bin"},
-                         task.suite_to_resmoke_args_map)
+        self.assertEqual(
+            {suite: f"--suites={suite} --installDir=/bin"}, task.suite_to_resmoke_args_map
+        )
 
     def test_suite_to_resmoke_args_map_for_gen_task_with_suite(self):
         suite = "core"
-        task_commands = [{
-            "func": "generate resmoke tasks",
-            "vars": {"suite": suite, "resmoke_args": "--installDir=/bin"},
-        }]
+        task_commands = [
+            {
+                "func": "generate resmoke tasks",
+                "vars": {"suite": suite, "resmoke_args": "--installDir=/bin"},
+            }
+        ]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertEqual({suite: f"--suites={suite} --installDir=/bin"},
-                         task.suite_to_resmoke_args_map)
+        self.assertEqual(
+            {suite: f"--suites={suite} --installDir=/bin"}, task.suite_to_resmoke_args_map
+        )
 
     def test_suite_to_resmoke_args_map_for_initialize_multiversion_tasks_task(self):
         task_commands = [
@@ -143,20 +152,17 @@ class TestTask(unittest.TestCase):
         task_dict = {"name": "multiversion_sanity_check_gen", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertEqual({
-            "multiversion_sanity_check_last_continuous_new_new_old":
-                "--suites=multiversion_sanity_check_last_continuous_new_new_old --installDir=/bin",
-            "multiversion_sanity_check_last_continuous_new_old_new":
-                "--suites=multiversion_sanity_check_last_continuous_new_old_new --installDir=/bin",
-            "multiversion_sanity_check_last_continuous_old_new_new":
-                "--suites=multiversion_sanity_check_last_continuous_old_new_new --installDir=/bin",
-            "multiversion_sanity_check_last_lts_new_new_old":
-                "--suites=multiversion_sanity_check_last_lts_new_new_old --installDir=/bin",
-            "multiversion_sanity_check_last_lts_new_old_new":
-                "--suites=multiversion_sanity_check_last_lts_new_old_new --installDir=/bin",
-            "multiversion_sanity_check_last_lts_old_new_new":
-                "--suites=multiversion_sanity_check_last_lts_old_new_new --installDir=/bin",
-        }, task.suite_to_resmoke_args_map)
+        self.assertEqual(
+            {
+                "multiversion_sanity_check_last_continuous_new_new_old": "--suites=multiversion_sanity_check_last_continuous_new_new_old --installDir=/bin",
+                "multiversion_sanity_check_last_continuous_new_old_new": "--suites=multiversion_sanity_check_last_continuous_new_old_new --installDir=/bin",
+                "multiversion_sanity_check_last_continuous_old_new_new": "--suites=multiversion_sanity_check_last_continuous_old_new_new --installDir=/bin",
+                "multiversion_sanity_check_last_lts_new_new_old": "--suites=multiversion_sanity_check_last_lts_new_new_old --installDir=/bin",
+                "multiversion_sanity_check_last_lts_new_old_new": "--suites=multiversion_sanity_check_last_lts_new_old_new --installDir=/bin",
+                "multiversion_sanity_check_last_lts_old_new_new": "--suites=multiversion_sanity_check_last_lts_old_new_new --installDir=/bin",
+            },
+            task.suite_to_resmoke_args_map,
+        )
 
     def test_is_run_tests_task(self):
         task_commands = [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}]
@@ -176,10 +182,12 @@ class TestTask(unittest.TestCase):
 
     def test_is_generate_resmoke_task(self):
         task_name = "core"
-        task_commands = [{
-            "func": "generate resmoke tasks",
-            "vars": {"task": task_name, "resmoke_args": "--installDir=/bin"}
-        }]
+        task_commands = [
+            {
+                "func": "generate resmoke tasks",
+                "vars": {"task": task_name, "resmoke_args": "--installDir=/bin"},
+            }
+        ]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
@@ -188,9 +196,9 @@ class TestTask(unittest.TestCase):
         self.assertFalse(task.is_initialize_multiversion_tasks_task)
 
     def test_generate_resmoke_tasks_command(self):
-        task_commands = [{
-            "func": "generate resmoke tasks", "vars": {"resmoke_args": "--installDir=/bin"}
-        }]
+        task_commands = [
+            {"func": "generate resmoke tasks", "vars": {"resmoke_args": "--installDir=/bin"}}
+        ]
         task_dict = {"name": "jsCore_gen", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
@@ -212,10 +220,12 @@ class TestTask(unittest.TestCase):
             },
             {"func": "generate resmoke tasks"},
         ]
-        task = _evergreen.Task({
-            "name": "multiversion_sanity_check_gen",
-            "commands": task_commands,
-        })
+        task = _evergreen.Task(
+            {
+                "name": "multiversion_sanity_check_gen",
+                "commands": task_commands,
+            }
+        )
 
         self.assertTrue(task.is_initialize_multiversion_tasks_task)
         self.assertTrue(task.is_generate_resmoke_task)
@@ -236,10 +246,12 @@ class TestTask(unittest.TestCase):
             },
             {"func": "generate resmoke tasks"},
         ]
-        task = _evergreen.Task({
-            "name": "multiversion_sanity_check_gen",
-            "commands": task_commands,
-        })
+        task = _evergreen.Task(
+            {
+                "name": "multiversion_sanity_check_gen",
+                "commands": task_commands,
+            }
+        )
 
         self.assertDictEqual(task_commands[0], task.initialize_multiversion_tasks_command)
         self.assertEqual("multiversion_sanity_check", task.generated_task_name)
@@ -297,10 +309,12 @@ class TestTask(unittest.TestCase):
     def test_generate_resmoke_tasks_command_with_suite(self):
         task_name = "jsCore_gen"
         suite_name = "core"
-        task_commands = [{
-            "func": "generate resmoke tasks",
-            "vars": {"suite": suite_name, "resmoke_args": "--installDir=/bin"}
-        }]
+        task_commands = [
+            {
+                "func": "generate resmoke tasks",
+                "vars": {"suite": suite_name, "resmoke_args": "--installDir=/bin"},
+            }
+        ]
         task_dict = {"name": task_name, "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
@@ -308,58 +322,71 @@ class TestTask(unittest.TestCase):
         self.assertEqual("jsCore", task.generated_task_name)
 
     def test_get_suite_names_from_non_gen_task_name(self):
-        task = _evergreen.Task({
-            "name": "task_name",
-            "commands": [{"func": "run tests"}],
-        })
+        task = _evergreen.Task(
+            {
+                "name": "task_name",
+                "commands": [{"func": "run tests"}],
+            }
+        )
 
         self.assertEqual(["task_name"], task.get_suite_names())
 
     def test_get_suite_names_from_non_gen_task_suite_var(self):
-        task = _evergreen.Task({
-            "name": "task_name",
-            "commands": [{
-                "func": "run tests",
-                "vars": {"suite": "suite_var"},
-            }],
-        })
+        task = _evergreen.Task(
+            {
+                "name": "task_name",
+                "commands": [
+                    {
+                        "func": "run tests",
+                        "vars": {"suite": "suite_var"},
+                    }
+                ],
+            }
+        )
 
         self.assertEqual(["suite_var"], task.get_suite_names())
 
     def test_get_suite_names_from_gen_task_name(self):
-        task = _evergreen.Task({
-            "name": "task_name_gen",
-            "commands": [{"func": "generate resmoke tasks"}],
-        })
+        task = _evergreen.Task(
+            {
+                "name": "task_name_gen",
+                "commands": [{"func": "generate resmoke tasks"}],
+            }
+        )
 
         self.assertEqual(["task_name"], task.get_suite_names())
 
     def test_get_suite_names_from_gen_task_suite_var(self):
-        task = _evergreen.Task({
-            "name": "task_name_gen",
-            "commands": [{
-                "func": "generate resmoke tasks",
-                "vars": {"suite": "suite_var"},
-            }],
-        })
+        task = _evergreen.Task(
+            {
+                "name": "task_name_gen",
+                "commands": [
+                    {
+                        "func": "generate resmoke tasks",
+                        "vars": {"suite": "suite_var"},
+                    }
+                ],
+            }
+        )
 
         self.assertEqual(["suite_var"], task.get_suite_names())
 
     def test_get_suite_names_from_init_multiversion_task(self):
-        task = _evergreen.Task({
-            "name":
-                "task_name_multiversion_gen",
-            "commands": [
-                {
-                    "func": "initialize multiversion tasks",
-                    "vars": {
-                        "suite_last_continuous": "last_continuous",
-                        "suite_last_lts": "last_lts",
+        task = _evergreen.Task(
+            {
+                "name": "task_name_multiversion_gen",
+                "commands": [
+                    {
+                        "func": "initialize multiversion tasks",
+                        "vars": {
+                            "suite_last_continuous": "last_continuous",
+                            "suite_last_lts": "last_lts",
+                        },
                     },
-                },
-                {"func": "generate resmoke tasks"},
-            ],
-        })
+                    {"func": "generate resmoke tasks"},
+                ],
+            }
+        )
 
         self.assertEqual(["suite_last_continuous", "suite_last_lts"], task.get_suite_names())
 
@@ -386,8 +413,14 @@ class TestTaskGroup(unittest.TestCase):
 
     def test_from_list(self):
         task_group_dict = {
-            "name": "my_group", "max_hosts": 3, "tasks": ["task1", "task2"], "setup_task": [],
-            "teardown_task": [], "setup_group": [], "teardown_group": [], "timeout": []
+            "name": "my_group",
+            "max_hosts": 3,
+            "tasks": ["task1", "task2"],
+            "setup_task": [],
+            "teardown_task": [],
+            "setup_group": [],
+            "teardown_group": [],
+            "timeout": [],
         }
         task_group = _evergreen.TaskGroup(task_group_dict)
 
@@ -447,14 +480,18 @@ class TestVariant(unittest.TestCase):
 
     def test_expansion(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
-        self.assertEqual("--param=value --ubuntu --enableEnterpriseTests=off",
-                         variant_ubuntu.expansion("test_flags"))
+        self.assertEqual(
+            "--param=value --ubuntu --enableEnterpriseTests=off",
+            variant_ubuntu.expansion("test_flags"),
+        )
         self.assertEqual(None, variant_ubuntu.expansion("not_a_valid_expansion_name"))
 
     def test_expansions(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
-        self.assertEqual({"test_flags": "--param=value --ubuntu --enableEnterpriseTests=off"},
-                         variant_ubuntu.expansions)
+        self.assertEqual(
+            {"test_flags": "--param=value --ubuntu --enableEnterpriseTests=off"},
+            variant_ubuntu.expansions,
+        )
 
     def test_modules(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
@@ -484,8 +521,9 @@ class TestVariant(unittest.TestCase):
 
     def test_test_flags(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
-        self.assertEqual("--param=value --ubuntu --enableEnterpriseTests=off",
-                         variant_ubuntu.test_flags)
+        self.assertEqual(
+            "--param=value --ubuntu --enableEnterpriseTests=off", variant_ubuntu.test_flags
+        )
 
         variant_osx = self.conf.get_variant("osx-108")
         self.assertIsNone(variant_osx.test_flags)
@@ -501,7 +539,11 @@ class TestVariant(unittest.TestCase):
         variant_ubuntu = self.conf.get_variant("ubuntu")
         self.assertEqual(5, len(variant_ubuntu.tasks))
         for task_name in [
-                "compile", "passing_test", "failing_test", "timeout_test", "resmoke_task"
+            "compile",
+            "passing_test",
+            "failing_test",
+            "timeout_test",
+            "resmoke_task",
         ]:
             task = variant_ubuntu.get_task(task_name)
             self.assertIsNotNone(task)
@@ -510,41 +552,44 @@ class TestVariant(unittest.TestCase):
 
         # Check combined_suite_to_resmoke_args_map when test_flags is set on the variant.
         resmoke_task = variant_ubuntu.get_task("resmoke_task")
-        self.assertEqual({
-            "resmoke_task":
-                "--suites=resmoke_task --storageEngine=wiredTiger --param=value --ubuntu --enableEnterpriseTests=off"
-        }, resmoke_task.combined_suite_to_resmoke_args_map)
+        self.assertEqual(
+            {
+                "resmoke_task": "--suites=resmoke_task --storageEngine=wiredTiger --param=value --ubuntu --enableEnterpriseTests=off"
+            },
+            resmoke_task.combined_suite_to_resmoke_args_map,
+        )
 
         # Check combined_suite_to_resmoke_args_map when the task doesn't have resmoke_args.
         passing_task = variant_ubuntu.get_task("passing_test")
-        self.assertEqual({
-            "passing_test":
-                "--suites=passing_test --param=value --ubuntu --enableEnterpriseTests=off"
-        }, passing_task.combined_suite_to_resmoke_args_map)
+        self.assertEqual(
+            {
+                "passing_test": "--suites=passing_test --param=value --ubuntu --enableEnterpriseTests=off"
+            },
+            passing_task.combined_suite_to_resmoke_args_map,
+        )
 
         # Check combined_suite_to_resmoke_args_map when test_flags is not set on the variant.
         variant_debian = self.conf.get_variant("debian")
         resmoke_task = variant_debian.get_task("resmoke_task")
-        self.assertEqual({"resmoke_task": "--suites=resmoke_task --storageEngine=wiredTiger"},
-                         resmoke_task.combined_suite_to_resmoke_args_map)
+        self.assertEqual(
+            {"resmoke_task": "--suites=resmoke_task --storageEngine=wiredTiger"},
+            resmoke_task.combined_suite_to_resmoke_args_map,
+        )
 
         # Check combined_suite_to_resmoke_args_map for "initialize multiversion tasks" task.
         variant_debian = self.conf.get_variant("debian")
         resmoke_task = variant_debian.get_task("resmoke_multiversion_task_gen")
-        self.assertEqual({
-            "multiversion_sanity_check_last_continuous_new_new_old":
-                "--suites=multiversion_sanity_check_last_continuous_new_new_old --storageEngine=wiredTiger",
-            "multiversion_sanity_check_last_continuous_new_old_new":
-                "--suites=multiversion_sanity_check_last_continuous_new_old_new --storageEngine=wiredTiger",
-            "multiversion_sanity_check_last_continuous_old_new_new":
-                "--suites=multiversion_sanity_check_last_continuous_old_new_new --storageEngine=wiredTiger",
-            "multiversion_sanity_check_last_lts_new_new_old":
-                "--suites=multiversion_sanity_check_last_lts_new_new_old --storageEngine=wiredTiger",
-            "multiversion_sanity_check_last_lts_new_old_new":
-                "--suites=multiversion_sanity_check_last_lts_new_old_new --storageEngine=wiredTiger",
-            "multiversion_sanity_check_last_lts_old_new_new":
-                "--suites=multiversion_sanity_check_last_lts_old_new_new --storageEngine=wiredTiger",
-        }, resmoke_task.combined_suite_to_resmoke_args_map)
+        self.assertEqual(
+            {
+                "multiversion_sanity_check_last_continuous_new_new_old": "--suites=multiversion_sanity_check_last_continuous_new_new_old --storageEngine=wiredTiger",
+                "multiversion_sanity_check_last_continuous_new_old_new": "--suites=multiversion_sanity_check_last_continuous_new_old_new --storageEngine=wiredTiger",
+                "multiversion_sanity_check_last_continuous_old_new_new": "--suites=multiversion_sanity_check_last_continuous_old_new_new --storageEngine=wiredTiger",
+                "multiversion_sanity_check_last_lts_new_new_old": "--suites=multiversion_sanity_check_last_lts_new_new_old --storageEngine=wiredTiger",
+                "multiversion_sanity_check_last_lts_new_old_new": "--suites=multiversion_sanity_check_last_lts_new_old_new --storageEngine=wiredTiger",
+                "multiversion_sanity_check_last_lts_old_new_new": "--suites=multiversion_sanity_check_last_lts_old_new_new --storageEngine=wiredTiger",
+            },
+            resmoke_task.combined_suite_to_resmoke_args_map,
+        )
 
         # Check for tasks included in task_groups
         variant_amazon = self.conf.get_variant("amazon")

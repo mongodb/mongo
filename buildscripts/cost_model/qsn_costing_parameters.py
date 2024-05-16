@@ -33,7 +33,7 @@ import execution_tree as sbe
 from workload_execution import QueryParameters
 import pandas as pd
 
-Node = TypeVar('Node')
+Node = TypeVar("Node")
 
 
 def parse_explain(explain: dict[str, any]) -> (qsn.Node, sbe.Node):
@@ -82,10 +82,18 @@ class ParametersBuilder:
 
     def buildDataFrame(self) -> pd.DataFrame:
         return pd.DataFrame(
-            self.rows, columns=[
-                'stage', 'execution_time', 'n_processed', 'seeks', 'note', 'keys_length_in_bytes',
-                'average_document_size_in_bytes', 'number_of_fields'
-            ])
+            self.rows,
+            columns=[
+                "stage",
+                "execution_time",
+                "n_processed",
+                "seeks",
+                "note",
+                "keys_length_in_bytes",
+                "average_document_size_in_bytes",
+                "number_of_fields",
+            ],
+        )
 
     def _process(self, qsn_node: qsn.Node, sbe_tree: sbe.Node, params: QueryParameters):
         processor = self._get_processor(qsn_node.node_type)
@@ -96,27 +104,43 @@ class ParametersBuilder:
     def _get_processor(self, stage: str):
         return self.processors.get(stage, self.default_processor)
 
-    def _process_generic(self, stage: str, node_id: int, sbe_tree: sbe.Node,
-                         params: QueryParameters):
+    def _process_generic(
+        self, stage: str, node_id: int, sbe_tree: sbe.Node, params: QueryParameters
+    ):
         nodes: list[sbe.Node] = find_nodes(sbe_tree, lambda node: node.plan_node_id == node_id)
         if len(nodes) == 0:
             raise ValueError(f"Cannot find sbe nodes of {stage}")
         return ParametersBuilder._build_row(
-            stage, params, execution_time=sum([node.get_execution_time() for node in nodes]),
-            n_processed=max([node.n_processed for node in nodes]), seeks=sum(
-                [node.seeks for node in nodes if node.seeks]))
+            stage,
+            params,
+            execution_time=sum([node.get_execution_time() for node in nodes]),
+            n_processed=max([node.n_processed for node in nodes]),
+            seeks=sum([node.seeks for node in nodes if node.seeks]),
+        )
 
     @staticmethod
-    def _build_row(stage: str, params: QueryParameters, execution_time: int = None,
-                   n_processed: int = None, seeks: int = None):
+    def _build_row(
+        stage: str,
+        params: QueryParameters,
+        execution_time: int = None,
+        n_processed: int = None,
+        seeks: int = None,
+    ):
         return [
-            stage, execution_time, n_processed, seeks, params.note, params.keys_length_in_bytes,
-            params.average_document_size_in_bytes, params.number_of_fields
+            stage,
+            execution_time,
+            n_processed,
+            seeks,
+            params.note,
+            params.keys_length_in_bytes,
+            params.average_document_size_in_bytes,
+            params.number_of_fields,
         ]
 
 
 if __name__ == "__main__":
     import json
+
     explain = """
     {
     "explainVersion": "2",
@@ -745,7 +769,7 @@ if __name__ == "__main__":
     qsn_tree.print()
     sbe_tree.print()
 
-    params = QueryParameters(10, 2000, 'rooted-or')
+    params = QueryParameters(10, 2000, "rooted-or")
     builder = ParametersBuilder()
     builder.process(explainJson, params)
     df = builder.buildDataFrame()

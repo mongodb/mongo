@@ -61,7 +61,7 @@
 		"[python]": {
 			"editor.formatOnSaveMode": "file",
 			"editor.formatOnSave": true,
-			"editor.defaultFormatter": "eeyore.yapf"
+			"editor.defaultFormatter": "charliermarsh.ruff",
 		},
 		"[starlark]": {
 			"editor.defaultFormatter": "BazelBuild.vscode-bazel"
@@ -74,7 +74,7 @@
 			"ms-python.python",
 			"xaver.clang-format",
 			"cs128.cs128-clang-tidy",
-			"eeyore.yapf",
+			"charliermarsh.ruff",
 			"ms-python.pylint",
 			"ms-python.mypy-type-checker",
 			"esbenp.prettier-vscode"

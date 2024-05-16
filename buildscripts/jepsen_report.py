@@ -1,4 +1,5 @@
 """Generate Evergreen reports from the Jepsen list-append workload."""
+
 import json
 import re
 import sys
@@ -147,20 +148,26 @@ def parse(text: List[str]) -> ParserOutput:  # noqa: D406
             target.append(line)
 
     assert success_table_matches == len(
-        successful_tests), "Mismatch in success_table_matches and length of successful_tests"
+        successful_tests
+    ), "Mismatch in success_table_matches and length of successful_tests"
     assert unknown_table_matches == len(
-        indeterminate_tests), "Mismatch in unknown_table_matches and length of indeterminate_tests"
+        indeterminate_tests
+    ), "Mismatch in unknown_table_matches and length of indeterminate_tests"
     assert crash_table_matches == len(
-        crashed_tests), "Mismatch in crash_table_matches and length of crashed_tests"
+        crashed_tests
+    ), "Mismatch in crash_table_matches and length of crashed_tests"
     assert fail_table_matches == len(
-        failed_tests), "Mismatch in fail_table_matches and length of failed_tests"
+        failed_tests
+    ), "Mismatch in fail_table_matches and length of failed_tests"
 
-    return ParserOutput({
-        'success': successful_tests,
-        'unknown': indeterminate_tests,
-        'crashed': crashed_tests,
-        'failed': failed_tests,
-    })
+    return ParserOutput(
+        {
+            "success": successful_tests,
+            "unknown": indeterminate_tests,
+            "crashed": crashed_tests,
+            "failed": failed_tests,
+        }
+    )
 
 
 def _try_find_log_file(store: Optional[str], test_name) -> str:
@@ -175,45 +182,80 @@ def _try_find_log_file(store: Optional[str], test_name) -> str:
         return ""
 
 
-def report(out: ParserOutput, start_time: int, end_time: int, elapsed: int,
-           store: Optional[str]) -> Report:
+def report(
+    out: ParserOutput, start_time: int, end_time: int, elapsed: int, store: Optional[str]
+) -> Report:
     """Given ParserOutput, return report.json as a dict."""
 
     results = []
     failures = 0
-    for test_name in out['success']:
+    for test_name in out["success"]:
         log_raw = _try_find_log_file(store, test_name)
         start_time, end_time, elapsed_time = _calc_time_from_log(log_raw)
         results.append(
-            Result(status='pass', exit_code=0, test_file=test_name, start=start_time, end=end_time,
-                   elapsed=elapsed_time, log_raw=log_raw))
+            Result(
+                status="pass",
+                exit_code=0,
+                test_file=test_name,
+                start=start_time,
+                end=end_time,
+                elapsed=elapsed_time,
+                log_raw=log_raw,
+            )
+        )
 
-    for test_name in out['failed']:
+    for test_name in out["failed"]:
         log_raw = _try_find_log_file(store, test_name)
         start_time, end_time, elapsed_time = _calc_time_from_log(log_raw)
         failures += 1
         results.append(
-            Result(status='fail', exit_code=1, test_file=test_name, start=start_time, end=end_time,
-                   elapsed=elapsed_time, log_raw=log_raw))
+            Result(
+                status="fail",
+                exit_code=1,
+                test_file=test_name,
+                start=start_time,
+                end=end_time,
+                elapsed=elapsed_time,
+                log_raw=log_raw,
+            )
+        )
 
-    for test_name in out['crashed']:
+    for test_name in out["crashed"]:
         log_raw = "Log files are unavailable for crashed tests because Jepsen does not save them separately. You may be able to find the exception and stack trace in the task log"
         failures += 1
         results.append(
-            Result(status='fail', exit_code=1, test_file=test_name, start=start_time, end=end_time,
-                   elapsed=elapsed, log_raw=log_raw))
+            Result(
+                status="fail",
+                exit_code=1,
+                test_file=test_name,
+                start=start_time,
+                end=end_time,
+                elapsed=elapsed,
+                log_raw=log_raw,
+            )
+        )
 
-    for test_name in out['unknown']:
+    for test_name in out["unknown"]:
         log_raw = _try_find_log_file(store, test_name)
         start_time, end_time, elapsed_time = _calc_time_from_log(log_raw)
         failures += 1
         results.append(
-            Result(status='fail', exit_code=1, test_file=test_name, start=start_time, end=end_time,
-                   elapsed=elapsed_time, log_raw=log_raw))
-    return Report({
-        "failures": failures,
-        "results": results,
-    })
+            Result(
+                status="fail",
+                exit_code=1,
+                test_file=test_name,
+                start=start_time,
+                end=end_time,
+                elapsed=elapsed_time,
+                log_raw=log_raw,
+            )
+        )
+    return Report(
+        {
+            "failures": failures,
+            "results": results,
+        }
+    )
 
 
 def _get_log_lines(filename: str) -> List[str]:
@@ -230,26 +272,38 @@ def _put_report(report_: Report) -> None:
 @click.option("--start_time", type=int, required=True)
 @click.option("--end_time", type=int, required=True)
 @click.option("--elapsed", type=int, required=True)
-@click.option("--emit_status_files", type=bool, is_flag=True, default=False,
-              help="If true, emit status files for marking Evergreen tasks as system fails")
-@click.option("--store", type=str, default=None,
-              help="Path to folder containing jepsen 'store' directory")
+@click.option(
+    "--emit_status_files",
+    type=bool,
+    is_flag=True,
+    default=False,
+    help="If true, emit status files for marking Evergreen tasks as system fails",
+)
+@click.option(
+    "--store", type=str, default=None, help="Path to folder containing jepsen 'store' directory"
+)
 @click.argument("filename", type=str)
-def main(filename: str, start_time: str, end_time: str, elapsed: str, emit_status_files: bool,
-         store: Optional[str]):
+def main(
+    filename: str,
+    start_time: str,
+    end_time: str,
+    elapsed: str,
+    emit_status_files: bool,
+    store: Optional[str],
+):
     """Generate Evergreen reports from the Jepsen list-append workload."""
 
     out = parse(_get_log_lines(filename))
     _put_report(report(out, start_time, end_time, elapsed, store))
 
     exit_code = 255
-    if out['crashed']:
+    if out["crashed"]:
         exit_code = 2
         if emit_status_files:
             with open("jepsen_system_fail.txt", "w") as fh:
                 fh.write(str(exit_code))
     else:
-        if out['unknown'] or out['failed']:
+        if out["unknown"] or out["failed"]:
             exit_code = 1
         else:
             exit_code = 0

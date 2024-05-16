@@ -1,4 +1,5 @@
 """A service for working with multiversion testing."""
+
 from __future__ import annotations
 
 import re
@@ -13,7 +14,7 @@ import yaml
 # These values must match the include paths for artifacts.tgz in evergreen.yml.
 MONGO_VERSION_YAML = ".resmoke_mongo_version.yml"
 RELEASES_YAML = ".resmoke_mongo_release_values.yml"
-VERSION_RE = re.compile(r'^[0-9]+\.[0-9]+')
+VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+")
 LOGGER = structlog.getLogger(__name__)
 
 
@@ -122,7 +123,7 @@ class MongoVersion(BaseModel):
         :param yaml_file: Path to yaml file.
         :return: MongoVersion read from file.
         """
-        mongo_version_yml_file = open(yaml_file, 'r')
+        mongo_version_yml_file = open(yaml_file, "r")
         return cls(**yaml.safe_load(mongo_version_yml_file))
 
     def get_version(self) -> Version:
@@ -130,7 +131,8 @@ class MongoVersion(BaseModel):
         version_match = VERSION_RE.match(self.mongo_version)
         if version_match is None:
             raise ValueError(
-                f"Could not determine version from mongo version string '{self.mongo_version}'")
+                f"Could not determine version from mongo version string '{self.mongo_version}'"
+            )
         return Version(version_match.group(0))
 
 
@@ -148,8 +150,9 @@ class MongoReleases(BaseModel):
     feature_compatibility_versions: List[str] = Field(alias="featureCompatibilityVersions")
     long_term_support_releases: List[str] = Field(alias="longTermSupportReleases")
     eol_versions: List[str] = Field(alias="eolVersions")
-    generate_fcv_lower_bound_override: Optional[str] = Field(None,
-                                                             alias="generateFCVLowerBoundOverride")
+    generate_fcv_lower_bound_override: Optional[str] = Field(
+        None, alias="generateFCVLowerBoundOverride"
+    )
 
     @classmethod
     def from_yaml_file(cls, yaml_file: str) -> MongoReleases:
@@ -160,16 +163,18 @@ class MongoReleases(BaseModel):
         :return: MongoReleases read from file.
         """
 
-        with open(yaml_file, 'r') as mongo_releases_file:
+        with open(yaml_file, "r") as mongo_releases_file:
             yaml_contents = mongo_releases_file.read()
         safe_load_result = yaml.safe_load(yaml_contents)
         try:
             return cls(**safe_load_result)
         except:
-            LOGGER.info("MongoReleases.from_yaml_file() failed\n"
-                        f"yaml_file = {yaml_file}\n"
-                        f"yaml_contents = {yaml_contents}\n"
-                        f"safe_load_result = {safe_load_result}")
+            LOGGER.info(
+                "MongoReleases.from_yaml_file() failed\n"
+                f"yaml_file = {yaml_file}\n"
+                f"yaml_contents = {yaml_contents}\n"
+                f"safe_load_result = {safe_load_result}"
+            )
             raise
 
     def get_fcv_versions(self) -> List[Version]:
@@ -212,11 +217,11 @@ class MultiversionService:
         last_lts = lts[bisect_left(lts, latest) - 1]
 
         # All FCVs greater than last LTS, up to latest.
-        requires_fcv_tag_list = fcvs[bisect_right(fcvs, last_lts):bisect_right(fcvs, latest)]
+        requires_fcv_tag_list = fcvs[bisect_right(fcvs, last_lts) : bisect_right(fcvs, latest)]
         requires_fcv_tag_list_continuous = [latest]
 
         # All FCVs less than latest.
-        fcvs_less_than_latest = fcvs[:bisect_left(fcvs, latest)]
+        fcvs_less_than_latest = fcvs[: bisect_left(fcvs, latest)]
 
         return VersionConstantValues(
             latest=latest,

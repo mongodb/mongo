@@ -183,6 +183,9 @@ extend-exclude = [
 ]
 extend-include = ["*/SConscript"]
 
+line-length = 100
+target-version = "py310"
+
 [tool.ruff.lint]
 ignore = [
     "E402", # module-import-not-at-top-of-file
@@ -210,13 +213,12 @@ ignore = [
 exclude = [
     # allow-list: incrementally remove as each is formatted and locked down
     "bazel/*",
-    "buildscripts/*",
+    "buildscripts/idl/*",
     "evergreen/*",
     "jstests/*",
     "site_scons/*",
     "src/*",
     ]
-
 
 [build-system]
 requires = ["poetry-core"]

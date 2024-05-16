@@ -2,10 +2,10 @@
 
 Mongot is a MongoDB-specific process written as a wrapper around Lucene. Using Lucene, mongot indexes MongoDB databases to provide our customers with full text search capabilities.
 
-Customers have the option of running mongot on Atlas or locally using a special "local-dev" binary of mongot. The local-dev binary allows mongot and mongod to speak directly on the localhost, rather than via proprietary network proxies configured by the Atlas Data Plane. 
+Customers have the option of running mongot on Atlas or locally using a special "local-dev" binary of mongot. The local-dev binary allows mongot and mongod to speak directly on the localhost, rather than via proprietary network proxies configured by the Atlas Data Plane.
 
 A resmoke suite's yml definition can enable launching mongot(s) enabled via the launch_mongot option on the ReplicaSetFixture and providing a keyfile. If enabled, the ReplicaSetFixture launches a local-dev version of mongot per mongod node. The mongot replicates directly from the co-located
-mongod via a $changeStream. 
+mongod via a $changeStream.
 """
 
 import os
@@ -28,7 +28,8 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
     def __init__(self, logger, job_num, fixturelib, dbpath_prefix=None, mongot_options=None):
         interface.Fixture.__init__(self, logger, job_num, fixturelib)
         self.mongot_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongot_options, {}))
+            self.fixturelib.default_if_none(mongot_options, {})
+        )
         # Default to command line options if the YAML configuration is not passed in.
         self.mongot_executable = self.fixturelib.default_if_none(self.config.MONGOT_EXECUTABLE)
         self.port = self.mongot_options["port"]
@@ -43,9 +44,12 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
         launcher = MongotLauncher(self.fixturelib)
         # Second return val is the port, which we ignore because we explicitly generated the port number in MongoDFixture
         # initialization and save to MongotFixture in above initialization function.
-        mongot, _ = launcher.launch_mongot_program(self.logger, self.job_num,
-                                                   executable=self.mongot_executable,
-                                                   mongot_options=self.mongot_options)
+        mongot, _ = launcher.launch_mongot_program(
+            self.logger,
+            self.job_num,
+            executable=self.mongot_executable,
+            mongot_options=self.mongot_options,
+        )
 
         try:
             msg = f"Starting mongot on port { self.port } ...\n{ mongot.as_command() }"
@@ -68,11 +72,10 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
         """:return: pids owned by this fixture if any."""
         out = [x.pid for x in [self.mongot] if x is not None]
         if not out:
-            self.logger.debug('Mongot not running when gathering mongot fixture pid.')
+            self.logger.debug("Mongot not running when gathering mongot fixture pid.")
         return out
 
     def _do_teardown(self, mode=None):
-
         if self.config.NOOP_MONGO_D_S_PROCESSES:
             self.logger.info(
                 "This is running against an External System Under Test setup with `docker-compose.yml` -- skipping teardown."
@@ -86,14 +89,19 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
         if mode == interface.TeardownMode.ABORT:
             self.logger.info(
                 "Attempting to send SIGABRT from resmoke to mongot on port %d with pid %d...",
-                self.port, self.mongot.pid)
+                self.port,
+                self.mongot.pid,
+            )
         else:
-            self.logger.info("Stopping mongot on port %d with pid %d...", self.port,
-                             self.mongot.pid)
+            self.logger.info(
+                "Stopping mongot on port %d with pid %d...", self.port, self.mongot.pid
+            )
         if not self.is_running():
             exit_code = self.mongot.poll()
-            msg = ("mongot on port {:d} was expected to be running, but wasn't. "
-                   "Process exited with code {:d}.").format(self.port, exit_code)
+            msg = (
+                "mongot on port {:d} was expected to be running, but wasn't. "
+                "Process exited with code {:d}."
+            ).format(self.port, exit_code)
             self.logger.warning(msg)
             raise self.fixturelib.ServerFailure(msg)
 
@@ -104,11 +112,16 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
         if exit_code == 143 or (mode is not None and exit_code == -(mode.value)):
             self.logger.info("Successfully stopped the mongot on port {:d}.".format(self.port))
         else:
-            self.logger.warning("Stopped the mongot on port {:d}. "
-                                "Process exited with code {:d}.".format(self.port, exit_code))
+            self.logger.warning(
+                "Stopped the mongot on port {:d}. " "Process exited with code {:d}.".format(
+                    self.port, exit_code
+                )
+            )
             raise self.fixturelib.ServerFailure(
                 "mongot on port {:d} with pid {:d} exited with code {:d}".format(
-                    self.port, self.mongot.pid, exit_code))
+                    self.port, self.mongot.pid, exit_code
+                )
+            )
 
     def is_running(self):
         """Return true if the mongot is still operating."""
@@ -124,8 +137,13 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
             self.logger.warning("The mongot fixture has not been set up yet.")
             return []
 
-        info = interface.NodeInfo(full_name=self.logger.full_name, name=self.logger.name,
-                                  port=self.port, pid=self.mongot.pid, router_port=self.router_port)
+        info = interface.NodeInfo(
+            full_name=self.logger.full_name,
+            name=self.logger.name,
+            port=self.port,
+            pid=self.mongot.pid,
+            router_port=self.router_port,
+        )
         return [info]
 
     def get_internal_connection_string(self):
@@ -149,7 +167,8 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
             if exit_code is not None:
                 raise self.fixturelib.ServerFailure(
                     "Could not connect to mongot on port {}, process ended"
-                    " unexpectedly with code {}.".format(self.port, exit_code))
+                    " unexpectedly with code {}.".format(self.port, exit_code)
+                )
 
             try:
                 # By connecting to the host and port that mongot is listening from,
@@ -162,7 +181,9 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
                 if remaining <= 0.0:
                     raise self.fixturelib.ServerFailure(
                         "Failed to connect to mongot on port {} after {} seconds".format(
-                            self.port, MongoTFixture.AWAIT_READY_TIMEOUT_SECS))
+                            self.port, MongoTFixture.AWAIT_READY_TIMEOUT_SECS
+                        )
+                    )
 
                 self.logger.info("Waiting to connect to mongot on port %d.", self.port)
                 time.sleep(0.1)  # Wait a little bit before trying again.
@@ -178,8 +199,9 @@ class MongotLauncher(object):
         self.fixturelib = fixturelib
         self.config = fixturelib.get_config()
 
-    def launch_mongot_program(self, logger, job_num, executable=None, process_kwargs=None,
-                              mongot_options=None):
+    def launch_mongot_program(
+        self, logger, job_num, executable=None, process_kwargs=None, mongot_options=None
+    ):
         """
         Return a Process instance that starts a mongot with arguments constructed from 'mongot_options'.
 
@@ -187,16 +209,18 @@ class MongotLauncher(object):
         @param executable - The mongot executable to run.
         @param process_kwargs - A dict of key-value pairs to pass to the process.
         @param mongot_options - A HistoryDict describing the various options to pass to the mongot.
-        
-        Currently, this will launch a mongot with --port, --mongodHostAndPort, and --keyFile commandline 
-        options. To support launching mongot with more startup options, those new options would need to 
-        be added to mongot_options in MongoTFixture initialization or, if mongod needs to share/know the 
+
+        Currently, this will launch a mongot with --port, --mongodHostAndPort, and --keyFile commandline
+        options. To support launching mongot with more startup options, those new options would need to
+        be added to mongot_options in MongoTFixture initialization or, if mongod needs to share/know the
         mongot startup option (like in the case of keyFile), in MongoDFixture::setup_mongot().
         """
 
-        executable = self.fixturelib.default_if_none(executable,
-                                                     self.config.DEFAULT_MONGOD_EXECUTABLE)
+        executable = self.fixturelib.default_if_none(
+            executable, self.config.DEFAULT_MONGOD_EXECUTABLE
+        )
         mongot_options = self.fixturelib.default_if_none(mongot_options, {}).copy()
 
-        return self.fixturelib.mongot_program(logger, job_num, executable, process_kwargs,
-                                              mongot_options)
+        return self.fixturelib.mongot_program(
+            logger, job_num, executable, process_kwargs, mongot_options
+        )

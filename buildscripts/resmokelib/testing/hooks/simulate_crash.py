@@ -65,8 +65,9 @@ class SimulateCrash(bghook.BGHook):
         for node in nodes_to_copy:
             node.mongod.pause()
 
-            self.logger.info("Starting to copy data files. DBPath: {}".format(
-                node.get_dbpath_prefix()))
+            self.logger.info(
+                "Starting to copy data files. DBPath: {}".format(node.get_dbpath_prefix())
+            )
 
             try:
                 for tup in os.walk(node.get_dbpath_prefix(), followlinks=True):
@@ -79,9 +80,11 @@ class SimulateCrash(bghook.BGHook):
                             continue
                         fqfn = "/".join([tup[0], filename])
                         self.copy_file(
-                            node.get_dbpath_prefix(), fqfn,
-                            node.get_dbpath_prefix() + "/simulateCrashes/{}".format(
-                                self.backup_num))
+                            node.get_dbpath_prefix(),
+                            fqfn,
+                            node.get_dbpath_prefix()
+                            + "/simulateCrashes/{}".format(self.backup_num),
+                        )
             finally:
                 node.mongod.resume()
 
@@ -91,12 +94,12 @@ class SimulateCrash(bghook.BGHook):
         in_fd = os.open(fqfn, os.O_RDONLY)
         in_bytes = os.stat(in_fd).st_size
 
-        rel = fqfn[len(root):]
+        rel = fqfn[len(root) :]
         os.makedirs(new_root + "/journal", exist_ok=True)
         out_fd = os.open(new_root + rel, os.O_WRONLY | os.O_CREAT)
 
         total_bytes_sent = 0
-        while (total_bytes_sent < in_bytes):
+        while total_bytes_sent < in_bytes:
             bytes_sent = os.sendfile(out_fd, in_fd, total_bytes_sent, in_bytes - total_bytes_sent)
             if bytes_sent == 0:
                 raise ValueError("Unexpectedly reached EOF copying file")
@@ -109,19 +112,34 @@ class SimulateCrash(bghook.BGHook):
         """Start a standalone node to validate all collections on the copied data files."""
         for node in self.fixture.nodes:
             path = node.get_dbpath_prefix() + "/simulateCrashes/{}".format(self.backup_num)
-            self.logger.info("Starting to validate. DBPath: {} Port: {}".format(
-                path, self.validate_port))
+            self.logger.info(
+                "Starting to validate. DBPath: {} Port: {}".format(path, self.validate_port)
+            )
 
-            mdb = process.Process(self.logger, [
-                node.mongod_executable, "--dbpath", path, "--port",
-                str(self.validate_port), "--setParameter", "enableTestCommands=1", "--setParameter",
-                "testingDiagnosticsEnabled=1"
-            ])
+            mdb = process.Process(
+                self.logger,
+                [
+                    node.mongod_executable,
+                    "--dbpath",
+                    path,
+                    "--port",
+                    str(self.validate_port),
+                    "--setParameter",
+                    "enableTestCommands=1",
+                    "--setParameter",
+                    "testingDiagnosticsEnabled=1",
+                ],
+            )
             mdb.start()
 
-            client = pymongo.MongoClient(host="localhost", port=self.validate_port, connect=True,
-                                         connectTimeoutMS=300000, serverSelectionTimeoutMS=300000,
-                                         directConnection=True)
+            client = pymongo.MongoClient(
+                host="localhost",
+                port=self.validate_port,
+                connect=True,
+                connectTimeoutMS=300000,
+                serverSelectionTimeoutMS=300000,
+                directConnection=True,
+            )
             is_valid = validate(client, self.logger, self.acceptable_err_codes)
 
             mdb.stop()
@@ -139,8 +157,10 @@ class SimulateCrash(bghook.BGHook):
         self._background_job.join()
 
         if self._background_job.err is not None and test_report.wasSuccessful():
-            self.logger.error("Encountered an error inside the hook after all tests passed: %s.",
-                              self._background_job.err)
+            self.logger.error(
+                "Encountered an error inside the hook after all tests passed: %s.",
+                self._background_job.err,
+            )
             raise self._background_job.err
         else:
             self.logger.info("Reached end of cycle in the hook, killing background thread.")

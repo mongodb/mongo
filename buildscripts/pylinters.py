@@ -28,6 +28,7 @@ _LINTERS = [
     # TODO: pyright
 ]
 
+
 def lint(file_names: list[str]):
     """Lint files command entry point."""
 
@@ -41,15 +42,13 @@ def lint(file_names: list[str]):
 
     if any_failed:
         print("ERROR: Code Style does not match coding style")
-        print(
-            "To fix formatting errors, run `buildscripts/pylinters.py fix`."
-        )
+        print("To fix formatting errors, run `buildscripts/pylinters.py fix`.")
         sys.exit(1)
 
 
 def fix_func(file_names: list[str]):
     """Fix a list of files with linters if possible."""
-    
+
     lint_runner = runner.LintRunner()
     linter_instances = runner.find_linters(_LINTERS, {})
 
@@ -69,17 +68,20 @@ def main():
     """Execute Main entry point."""
 
     parser = argparse.ArgumentParser(
-        description='PyLinter frontend; see more details at https://wiki.corp.mongodb.com/x/1vP5BQ')
+        description="PyLinter frontend; see more details at https://wiki.corp.mongodb.com/x/1vP5BQ"
+    )
 
-    parser.add_argument('-v', "--verbose", action='store_true', help="Enable verbose logging")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
 
     sub = parser.add_subparsers(title="Linter subcommands", help="sub-command help")
 
-    parser_lint = sub.add_parser('lint', help='Lint files and exit with nonzero status if any violations are found')
+    parser_lint = sub.add_parser(
+        "lint", help="Lint files and exit with nonzero status if any violations are found"
+    )
     parser_lint.add_argument("file_names", nargs="*", help="Globs of files to check")
     parser_lint.set_defaults(func=lint)
 
-    parser_fix = sub.add_parser('fix', help='Fix files if possible')
+    parser_fix = sub.add_parser("fix", help="Fix files if possible")
     parser_fix.add_argument("file_names", nargs="*", help="Globs of files to check")
     parser_fix.set_defaults(func=fix_func)
 

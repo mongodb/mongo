@@ -86,8 +86,8 @@ class CostModelCoefficients:
 
 def to_camel_case(string):
     """Convert a snake_case string to camelCase one."""
-    words = string.split('_')
-    return words[0] + ''.join(w.capitalize() for w in words[1:])
+    words = string.split("_")
+    return words[0] + "".join(w.capitalize() for w in words[1:])
 
 
 @dataclass
@@ -108,12 +108,12 @@ class BenchmarkTask:
 
     def print(self):
         """Prints the task."""
-        print('Cost Model Coefficients Overrides:')
-        print(f'\tA: {self.cost_model_a.to_dict()}')
-        print(f'\tB: {self.cost_model_b.to_dict()}')
-        print(f'threshold: {self.threshold}')
-        print(f'collection: {self.collection_name}')
-        print(f'pipeline: {self.pipeline}')
+        print("Cost Model Coefficients Overrides:")
+        print(f"\tA: {self.cost_model_a.to_dict()}")
+        print(f"\tB: {self.cost_model_b.to_dict()}")
+        print(f"threshold: {self.threshold}")
+        print(f"collection: {self.collection_name}")
+        print(f"pipeline: {self.pipeline}")
 
 
 @dataclass
@@ -130,20 +130,20 @@ class BenchmarkResult:
 
     def print(self):
         """Print the results."""
-        print('## Benchmark Task')
+        print("## Benchmark Task")
         self.task.print()
-        print('\n## Result')
-        print(f'Means: A: {self.variant_a.mean:,.2f}, B: {self.variant_b.mean:,.2f}.')
+        print("\n## Result")
+        print(f"Means: A: {self.variant_a.mean:,.2f}, B: {self.variant_b.mean:,.2f}.")
         print(f"t-test's p-value: {self.pvalue}.")
         if self.pvalue < self.task.threshold:
-            print('The means are significantly different.')
+            print("The means are significantly different.")
         else:
-            print('The means are not significantly different.')
+            print("The means are not significantly different.")
 
-        print('\n### A\n')
+        print("\n### A\n")
         self.variant_a.print()
 
-        print('\n### B\n')
+        print("\n### B\n")
         self.variant_b.print()
 
 
@@ -161,9 +161,9 @@ class ExperimentResult:
         if index is None:
             index = len(self.explain) // 2
 
-        print('ABT Physical Tree')
+        print("ABT Physical Tree")
         self.physical_tree[index].print()
-        print('\nSBE Execution Tree')
+        print("\nSBE Execution Tree")
         self.execution_tree[index].print()
 
 
@@ -176,7 +176,7 @@ async def benchmark(config: BenchmarkConfig, database: DatabaseInstance, task: B
     value (usually 0.05 or 0.01) we can say that the Null hypothesis is proven and there is
     no significant difference in the execution times.
     """
-    async with get_database_parameter(database, 'internalCostModelCoefficients') as db_param:
+    async with get_database_parameter(database, "internalCostModelCoefficients") as db_param:
         await db_param.set(json.dumps(task.cost_model_a.to_dict()))
         result_a = await run(config, database, task.collection_name, task.pipeline)
 
@@ -191,20 +191,22 @@ async def benchmark(config: BenchmarkConfig, database: DatabaseInstance, task: B
 
     ttest_result = stats.ttest_ind(execution_times_a, execution_times_b, equal_var=False)
 
-    return BenchmarkResult(task=task, variant_a=variant_a, variant_b=variant_b,
-                           pvalue=ttest_result.pvalue)
+    return BenchmarkResult(
+        task=task, variant_a=variant_a, variant_b=variant_b, pvalue=ttest_result.pvalue
+    )
 
 
 def make_variant(explain: Sequence[dict[str, any]]) -> ExperimentResult:
     """Make one variant of the A/B test."""
-    pt = [physical_tree.build(e['queryPlanner']['winningPlan']['queryPlan']) for e in explain]
-    et = [execution_tree.build_execution_tree(e['executionStats']) for e in explain]
+    pt = [physical_tree.build(e["queryPlanner"]["winningPlan"]["queryPlan"]) for e in explain]
+    et = [execution_tree.build_execution_tree(e["executionStats"]) for e in explain]
     mean = sum(et.total_execution_time for et in et) / len(et)
     return ExperimentResult(explain=explain, physical_tree=pt, execution_tree=et, mean=mean)
 
 
-async def run(config: BenchmarkConfig, database: DatabaseInstance, collection: str,
-              pipeline: Pipeline):
+async def run(
+    config: BenchmarkConfig, database: DatabaseInstance, collection: str, pipeline: Pipeline
+):
     """Run one variant of the A/B test."""
 
     # warmup
@@ -214,10 +216,10 @@ async def run(config: BenchmarkConfig, database: DatabaseInstance, collection: s
     result = []
     for _ in range(config.runs):
         explain = await database.explain(collection, pipeline)
-        if explain['ok'] == 1:
+        if explain["ok"] == 1:
             result.append(explain)
         else:
-            logging.warn('Query execution failed: %s', explain)
+            logging.warn("Query execution failed: %s", explain)
     return result
 
 
@@ -230,14 +232,18 @@ async def smoke_test():
     await database.enable_cascades(True)
     cost_model_a = CostModelCoefficients(index_scan_incremental_cost=0.0001)
     cost_model_b = CostModelCoefficients(index_scan_incremental_cost=0.9)
-    task = BenchmarkTask(collection_name='c_str_05_45000',
-                         pipeline=[{'$match': {'choice1': 'hello', 'choice2': 'gaussian'}}],
-                         cost_model_a=cost_model_a, cost_model_b=cost_model_b, threshold=0.05)
+    task = BenchmarkTask(
+        collection_name="c_str_05_45000",
+        pipeline=[{"$match": {"choice1": "hello", "choice2": "gaussian"}}],
+        cost_model_a=cost_model_a,
+        cost_model_b=cost_model_b,
+        threshold=0.05,
+    )
 
     res = await benchmark(config, database, task)
     res.print()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.run_until_complete(smoke_test())

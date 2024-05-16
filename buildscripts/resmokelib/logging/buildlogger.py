@@ -107,8 +107,9 @@ class _LogsSplitter(object):
 class _BaseBuildloggerHandler(handlers.BufferedHandler):
     """Base class of the buildlogger handler for global logs and handler for test logs."""
 
-    def __init__(self, build_config, endpoint, capacity=_SEND_AFTER_LINES,
-                 interval_secs=_SEND_AFTER_SECS):
+    def __init__(
+        self, build_config, endpoint, capacity=_SEND_AFTER_LINES, interval_secs=_SEND_AFTER_SECS
+    ):
         """Initialize the buildlogger handler with the build id and credentials."""
 
         handlers.BufferedHandler.__init__(self, capacity, interval_secs)
@@ -174,11 +175,13 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
                     new_max_size = response_data["max_size"]
                     if self.max_size and new_max_size >= self.max_size:
                         BUILDLOGGER_FALLBACK.exception(
-                            "Received an HTTP 413 code, but already had max_size set")
+                            "Received an HTTP 413 code, but already had max_size set"
+                        )
                         return 0
                     BUILDLOGGER_FALLBACK.warning(
                         "Received an HTTP 413 code, updating the request max_size to %s",
-                        new_max_size)
+                        new_max_size,
+                    )
                     self.max_size = new_max_size
                     return self._append_logs(log_lines_chunk)
             BUILDLOGGER_FALLBACK.error("Encountered an HTTP error: %s", err)
@@ -206,8 +209,8 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
             # writing the messages to the fallback logkeeper to avoid putting additional pressure on
             # the Evergreen database.
             BUILDLOGGER_FALLBACK.warning(
-                "Failed to flush all log output (%d messages) to logkeeper.",
-                len(self.retry_buffer))
+                "Failed to flush all log output (%d messages) to logkeeper.", len(self.retry_buffer)
+            )
 
             # We set a flag to indicate that we failed to flush all log output to logkeeper so
             # resmoke.py can exit with a special return code.
@@ -219,8 +222,14 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
 class BuildloggerTestHandler(_BaseBuildloggerHandler):
     """Buildlogger handler for the test logs."""
 
-    def __init__(self, build_config, build_id, test_id, capacity=_SEND_AFTER_LINES,
-                 interval_secs=_SEND_AFTER_SECS):
+    def __init__(
+        self,
+        build_config,
+        build_id,
+        test_id,
+        capacity=_SEND_AFTER_LINES,
+        interval_secs=_SEND_AFTER_SECS,
+    ):
         """Initialize the buildlogger handler with the credentials, build id, and test id."""
         endpoint = APPEND_TEST_LOGS_ENDPOINT % {
             "build_id": build_id,
@@ -232,10 +241,12 @@ class BuildloggerTestHandler(_BaseBuildloggerHandler):
     def _finish_test(self, failed=False):
         """Send a POST request to the APPEND_TEST_LOGS_ENDPOINT with the test status."""
         self.post(
-            self.endpoint, headers={
+            self.endpoint,
+            headers={
                 "X-Sendlogs-Test-Done": "true",
                 "X-Sendlogs-Test-Failed": "true" if failed else "false",
-            })
+            },
+        )
 
     def close(self):
         """Close the buildlogger handler."""
@@ -249,8 +260,9 @@ class BuildloggerTestHandler(_BaseBuildloggerHandler):
 class BuildloggerGlobalHandler(_BaseBuildloggerHandler):
     """Buildlogger handler for the global logs."""
 
-    def __init__(self, build_config, build_id, capacity=_SEND_AFTER_LINES,
-                 interval_secs=_SEND_AFTER_SECS):
+    def __init__(
+        self, build_config, build_id, capacity=_SEND_AFTER_LINES, interval_secs=_SEND_AFTER_SECS
+    ):
         """Initialize the buildlogger handler with the credentials and build id."""
         endpoint = APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": build_id}
         _BaseBuildloggerHandler.__init__(self, build_config, endpoint, capacity, interval_secs)
@@ -269,8 +281,10 @@ class BuildloggerServer(object):
         tmp_globals = {}
         self.config = {}
         exec(
-            compile(open(_BUILDLOGGER_CONFIG, "rb").read(), _BUILDLOGGER_CONFIG, 'exec'),
-            tmp_globals, self.config)
+            compile(open(_BUILDLOGGER_CONFIG, "rb").read(), _BUILDLOGGER_CONFIG, "exec"),
+            tmp_globals,
+            self.config,
+        )
 
         # Rename "slavename" to "username" if present.
         if "slavename" in self.config and "username" not in self.config:
@@ -290,35 +304,46 @@ class BuildloggerServer(object):
         builder = "%s_%s" % (self.config["builder"], suffix)
         build_num = int(self.config["build_num"])
 
-        handler = handlers.HTTPHandler(url_root=_config.BUILDLOGGER_URL, username=username,
-                                       password=password, should_retry=True)
+        handler = handlers.HTTPHandler(
+            url_root=_config.BUILDLOGGER_URL,
+            username=username,
+            password=password,
+            should_retry=True,
+        )
 
         response = handler.post(
-            CREATE_BUILD_ENDPOINT, data={
+            CREATE_BUILD_ENDPOINT,
+            data={
                 "builder": builder,
                 "buildnum": build_num,
                 "task_id": _config.EVERGREEN_TASK_ID,
                 "execution": _config.EVERGREEN_EXECUTION,
-            })
+            },
+        )
 
         return response["id"]
 
     @_log_on_error
     def new_test_id(self, build_id, test_filename, test_command):
         """Return a new test id for sending test logs to."""
-        handler = handlers.HTTPHandler(url_root=_config.BUILDLOGGER_URL,
-                                       username=self.config["username"],
-                                       password=self.config["password"], should_retry=True)
+        handler = handlers.HTTPHandler(
+            url_root=_config.BUILDLOGGER_URL,
+            username=self.config["username"],
+            password=self.config["password"],
+            should_retry=True,
+        )
 
         endpoint = CREATE_TEST_ENDPOINT % {"build_id": build_id}
         response = handler.post(
-            endpoint, data={
+            endpoint,
+            data={
                 "test_filename": test_filename,
                 "command": test_command,
                 "phase": self.config.get("build_phase", "unknown"),
                 "task_id": _config.EVERGREEN_TASK_ID,
                 "execution": _config.EVERGREEN_EXECUTION,
-            })
+            },
+        )
 
         return response["id"]
 

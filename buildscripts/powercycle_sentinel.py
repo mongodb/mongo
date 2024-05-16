@@ -3,6 +3,7 @@
 
 Error out when any powercycle task on the same buildvariant runs for more than 2 hours.
 """
+
 import logging
 import os
 import sys
@@ -52,8 +53,11 @@ def watch_tasks(task_ids: List[str], evg_api: EvergreenApi, watch_interval_secs:
         for task in powercycle_tasks:
             if task.finish_time:
                 watch_task_ids.remove(task.task_id)
-            elif task.start_time and (datetime.now(timezone.utc) - task.start_time
-                                      ).total_seconds() > POWERCYCLE_TASK_EXEC_TIMEOUT_SECS:
+            elif (
+                task.start_time
+                and (datetime.now(timezone.utc) - task.start_time).total_seconds()
+                > POWERCYCLE_TASK_EXEC_TIMEOUT_SECS
+            ):
                 long_running_task_ids.append(task.task_id)
                 watch_task_ids.remove(task.task_id)
         if watch_task_ids:
@@ -92,13 +96,17 @@ def main(expansions_file: str = "expansions.yml") -> None:
 
     while evg_api.task_by_id(gen_task_id).is_active():
         LOGGER.info(
-            f"Waiting for '{gen_task_name}' task to generate powercycle tasks:\n{gen_task_url}")
+            f"Waiting for '{gen_task_name}' task to generate powercycle tasks:\n{gen_task_url}"
+        )
         time.sleep(WATCH_INTERVAL_SECS)
 
     build_tasks = evg_api.tasks_by_build(build_id)
     powercycle_task_ids = [
-        task.task_id for task in build_tasks
-        if not task.display_only and task.task_id != current_task_id and task.task_id != gen_task_id
+        task.task_id
+        for task in build_tasks
+        if not task.display_only
+        and task.task_id != current_task_id
+        and task.task_id != gen_task_id
         and "powercycle" in task.task_id
     ]
     LOGGER.info(f"Watching powercycle tasks:\n{get_links(powercycle_task_ids)}")
@@ -111,9 +119,10 @@ def main(expansions_file: str = "expansions.yml") -> None:
         )
         LOGGER.error(
             "Hopefully hosts from the tasks are still in run at the time you are seeing this "
-            "and the Build team is able to check them to diagnose the issue.")
+            "and the Build team is able to check them to diagnose the issue."
+        )
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

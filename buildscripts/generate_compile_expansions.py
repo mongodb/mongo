@@ -59,9 +59,11 @@ def generate_scons_cache_expansions():
                 scons_cache_mode = "nolinked"
 
             if os.getenv("USE_SCONS_CACHE") not in (None, False, "false", ""):
-                expansions[
-                    "scons_cache_args"] = "--cache={0} --cache-signature-mode=validate --cache-dir={1} --cache-show".format(
-                        scons_cache_mode, shlex.quote(default_cache_path))
+                expansions["scons_cache_args"] = (
+                    "--cache={0} --cache-signature-mode=validate --cache-dir={1} --cache-show".format(
+                        scons_cache_mode, shlex.quote(default_cache_path)
+                    )
+                )
     return expansions
 
 

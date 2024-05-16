@@ -52,41 +52,89 @@ _BM_REPORT_2 = {
 }
 
 _BM_REPORT_WITH_INSTRUCTIONS_1 = {
-    "name": "BM_Name1/arg1/arg with space", "run_type": "iteration", "repetition_index": 0,
-    "threads": 1, "iterations": 1000, "real_time": 1204, "cpu_time": 1305, "bytes_per_second": 1406,
-    "items_per_second": 1507, "custom_counter_1": 1608, "instructions_per_iteration": 101
+    "name": "BM_Name1/arg1/arg with space",
+    "run_type": "iteration",
+    "repetition_index": 0,
+    "threads": 1,
+    "iterations": 1000,
+    "real_time": 1204,
+    "cpu_time": 1305,
+    "bytes_per_second": 1406,
+    "items_per_second": 1507,
+    "custom_counter_1": 1608,
+    "instructions_per_iteration": 101,
 }
 
 _BM_REPORT_WITH_INSTRUCTIONS_2 = {
-    "name": "BM_Name1/arg1/arg with space", "run_type": "iteration", "repetition_index": 0,
-    "threads": 2, "iterations": 1000, "real_time": 1202, "cpu_time": 1303, "bytes_per_second": 1404,
-    "items_per_second": 1505, "custom_counter_1": 1606, "instructions_per_iteration": 100
+    "name": "BM_Name1/arg1/arg with space",
+    "run_type": "iteration",
+    "repetition_index": 0,
+    "threads": 2,
+    "iterations": 1000,
+    "real_time": 1202,
+    "cpu_time": 1303,
+    "bytes_per_second": 1404,
+    "items_per_second": 1505,
+    "custom_counter_1": 1606,
+    "instructions_per_iteration": 100,
 }
 
 _BM_REPORT_WITH_INSTRUCTIONS_MEAN = {
-    "name": "BM_Name1/arg1/arg with space_mean", "run_type": "aggregate", "repetition_index": 0,
-    "threads": 2, "iterations": 1000, "real_time": 1202, "cpu_time": 1303, "bytes_per_second": 1404,
-    "items_per_second": 1505, "custom_counter_1": 1606, "instructions_per_iteration": 100,
-    "aggregate_name": "mean"
+    "name": "BM_Name1/arg1/arg with space_mean",
+    "run_type": "aggregate",
+    "repetition_index": 0,
+    "threads": 2,
+    "iterations": 1000,
+    "real_time": 1202,
+    "cpu_time": 1303,
+    "bytes_per_second": 1404,
+    "items_per_second": 1505,
+    "custom_counter_1": 1606,
+    "instructions_per_iteration": 100,
+    "aggregate_name": "mean",
 }
 
 _BM_REPORT_WITH_CYCLES_1 = {
-    "name": "BM_Name1/arg1/arg with space", "run_type": "iteration", "repetition_index": 0,
-    "threads": 1, "iterations": 1000, "real_time": 1204, "cpu_time": 1305, "bytes_per_second": 1406,
-    "items_per_second": 1507, "custom_counter_1": 1608, "cycles_per_iteration": 101
+    "name": "BM_Name1/arg1/arg with space",
+    "run_type": "iteration",
+    "repetition_index": 0,
+    "threads": 1,
+    "iterations": 1000,
+    "real_time": 1204,
+    "cpu_time": 1305,
+    "bytes_per_second": 1406,
+    "items_per_second": 1507,
+    "custom_counter_1": 1608,
+    "cycles_per_iteration": 101,
 }
 
 _BM_REPORT_WITH_CYCLES_2 = {
-    "name": "BM_Name1/arg1/arg with space", "run_type": "iteration", "repetition_index": 0,
-    "threads": 2, "iterations": 1000, "real_time": 1202, "cpu_time": 1303, "bytes_per_second": 1404,
-    "items_per_second": 1505, "custom_counter_1": 1606, "cycles_per_iteration": 100
+    "name": "BM_Name1/arg1/arg with space",
+    "run_type": "iteration",
+    "repetition_index": 0,
+    "threads": 2,
+    "iterations": 1000,
+    "real_time": 1202,
+    "cpu_time": 1303,
+    "bytes_per_second": 1404,
+    "items_per_second": 1505,
+    "custom_counter_1": 1606,
+    "cycles_per_iteration": 100,
 }
 
 _BM_REPORT_WITH_CYCLES_MEAN = {
-    "name": "BM_Name1/arg1/arg with space_mean", "run_type": "aggregate", "repetition_index": 0,
-    "threads": 2, "iterations": 1000, "real_time": 1202, "cpu_time": 1303, "bytes_per_second": 1404,
-    "items_per_second": 1505, "custom_counter_1": 1606, "cycles_per_iteration": 100,
-    "aggregate_name": "mean"
+    "name": "BM_Name1/arg1/arg with space_mean",
+    "run_type": "aggregate",
+    "repetition_index": 0,
+    "threads": 2,
+    "iterations": 1000,
+    "real_time": 1202,
+    "cpu_time": 1303,
+    "bytes_per_second": 1404,
+    "items_per_second": 1505,
+    "custom_counter_1": 1606,
+    "cycles_per_iteration": 100,
+    "aggregate_name": "mean",
 }
 
 _BM_MEAN_REPORT = {
@@ -129,26 +177,26 @@ _BM_MULTITHREAD_MEDIAN_REPORT = {
 }
 
 _BM_FULL_REPORT = {
-    "context":
-        _BM_CONTEXT, "benchmarks": [
-            _BM_REPORT_1,
-            _BM_REPORT_2,
-            _BM_MEAN_REPORT,
-            _BM_MULTITHREAD_REPORT,
-            _BM_MULTITHREAD_MEDIAN_REPORT,
-        ]
+    "context": _BM_CONTEXT,
+    "benchmarks": [
+        _BM_REPORT_1,
+        _BM_REPORT_2,
+        _BM_MEAN_REPORT,
+        _BM_MULTITHREAD_REPORT,
+        _BM_MULTITHREAD_MEDIAN_REPORT,
+    ],
 }
 
 _BM_FULL_REPORT_WITH_DUPS = {
-    "context":
-        _BM_CONTEXT, "benchmarks": [
-            _BM_REPORT_1,
-            _BM_REPORT_1,
-            _BM_REPORT_2,
-            _BM_MEAN_REPORT,
-            _BM_MULTITHREAD_REPORT,
-            _BM_MULTITHREAD_MEDIAN_REPORT,
-        ]
+    "context": _BM_CONTEXT,
+    "benchmarks": [
+        _BM_REPORT_1,
+        _BM_REPORT_1,
+        _BM_REPORT_2,
+        _BM_MEAN_REPORT,
+        _BM_MULTITHREAD_REPORT,
+        _BM_MULTITHREAD_MEDIAN_REPORT,
+    ],
 }
 
 # 12/31/2999 @ 11:59pm (UTC)
@@ -159,7 +207,6 @@ _END_TIME = 32503680000
 
 
 class GenerateAndCheckPerfResultsFixture(unittest.TestCase):
-
     # Mock the hook's parent class because we're testing only functionality of this hook and
     # not anything related to or inherit from the parent class.
     @mock.patch("buildscripts.resmokelib.testing.hooks.interface.Hook", autospec=True)
@@ -200,7 +247,8 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
         self.assertEqual(name_obj.base_name, "BM_Name/arg name:100")
 
         name_obj = self.bm_threads_report.parse_bm_name(
-            {"name": "BM_Name/arg name:100/threads:10_mean", "aggregate_name": "mean"})
+            {"name": "BM_Name/arg name:100/threads:10_mean", "aggregate_name": "mean"}
+        )
         self.assertEqual(name_obj.thread_count, "10")
         self.assertEqual(name_obj.statistic_type, "mean")
         self.assertEqual(name_obj.base_name, "BM_Name/arg name:100")
@@ -216,7 +264,8 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
         self.assertEqual(name_obj.base_name, "BM_Name")
 
         name_obj = self.bm_threads_report.parse_bm_name(
-            {"name": "BM_Name/1/eeee_mean", "aggregate_name": "mean"})
+            {"name": "BM_Name/1/eeee_mean", "aggregate_name": "mean"}
+        )
         self.assertEqual(name_obj.thread_count, "1")
         self.assertEqual(name_obj.statistic_type, "mean")
         self.assertEqual(name_obj.base_name, "BM_Name/1/eeee")
@@ -232,17 +281,20 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
         self.assertEqual(name_obj.base_name, "BM_baseline_match_simple/0")
 
         name_obj = self.bm_threads_report.parse_bm_name(
-            {"name": "BM_baseline_match_simple/0_mean", "aggregate_name": "mean"})
+            {"name": "BM_baseline_match_simple/0_mean", "aggregate_name": "mean"}
+        )
         self.assertEqual(name_obj.thread_count, "1")
         self.assertEqual(name_obj.statistic_type, "mean")
         self.assertEqual(name_obj.base_name, "BM_baseline_match_simple/0")
 
     def test_generate_multithread_cedar_metrics(self):
         self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_MULTITHREAD_REPORT), _BM_MULTITHREAD_REPORT)
+            self.bm_threads_report.parse_bm_name(_BM_MULTITHREAD_REPORT), _BM_MULTITHREAD_REPORT
+        )
         self.bm_threads_report.add_report(
             self.bm_threads_report.parse_bm_name(_BM_MULTITHREAD_MEDIAN_REPORT),
-            _BM_MULTITHREAD_MEDIAN_REPORT)
+            _BM_MULTITHREAD_MEDIAN_REPORT,
+        )
         self.assertEqual(len(self.bm_threads_report.thread_benchmark_map.keys()), 1)
 
         cedar_metrics = self.bm_threads_report.generate_cedar_metrics()
@@ -255,11 +307,14 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
 
     def test_generate_single_thread_cedar_metrics(self):
         self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_REPORT_1), _BM_REPORT_1)
+            self.bm_threads_report.parse_bm_name(_BM_REPORT_1), _BM_REPORT_1
+        )
         self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_REPORT_2), _BM_REPORT_2)
+            self.bm_threads_report.parse_bm_name(_BM_REPORT_2), _BM_REPORT_2
+        )
         self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_MEAN_REPORT), _BM_MEAN_REPORT)
+            self.bm_threads_report.parse_bm_name(_BM_MEAN_REPORT), _BM_MEAN_REPORT
+        )
         self.assertEqual(len(self.bm_threads_report.thread_benchmark_map.keys()), 1)
 
         cedar_metrics = self.bm_threads_report.generate_cedar_metrics()
@@ -273,13 +328,16 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
     def test_generate_cedar_report_with_instructions(self):
         self.bm_threads_report.add_report(
             self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_INSTRUCTIONS_1),
-            _BM_REPORT_WITH_INSTRUCTIONS_1)
+            _BM_REPORT_WITH_INSTRUCTIONS_1,
+        )
         self.bm_threads_report.add_report(
             self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_INSTRUCTIONS_2),
-            _BM_REPORT_WITH_INSTRUCTIONS_2)
+            _BM_REPORT_WITH_INSTRUCTIONS_2,
+        )
         self.bm_threads_report.add_report(
             self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_INSTRUCTIONS_MEAN),
-            _BM_REPORT_WITH_INSTRUCTIONS_MEAN)
+            _BM_REPORT_WITH_INSTRUCTIONS_MEAN,
+        )
         self.assertEqual(len(self.bm_threads_report.thread_benchmark_map.keys()), 1)
 
         cedar_metrics = self.bm_threads_report.generate_cedar_metrics()
@@ -292,14 +350,15 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
 
     def test_generate_cedar_report_with_cycles(self):
         self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_CYCLES_1),
-            _BM_REPORT_WITH_CYCLES_1)
+            self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_CYCLES_1), _BM_REPORT_WITH_CYCLES_1
+        )
         self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_CYCLES_2),
-            _BM_REPORT_WITH_CYCLES_2)
+            self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_CYCLES_2), _BM_REPORT_WITH_CYCLES_2
+        )
         self.bm_threads_report.add_report(
             self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_CYCLES_MEAN),
-            _BM_REPORT_WITH_CYCLES_MEAN)
+            _BM_REPORT_WITH_CYCLES_MEAN,
+        )
         self.assertEqual(len(self.bm_threads_report.thread_benchmark_map.keys()), 1)
 
         cedar_metrics = self.bm_threads_report.generate_cedar_metrics()
@@ -314,64 +373,112 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
 class TestCheckPerfResultTestCase(unittest.TestCase):
     def test_all_metrics_pass(self):
         thresholds_to_check: List[cbr.IndividualMetricThreshold] = [
-            cbr.IndividualMetricThreshold(metric_name="latency", thread_level=1,
-                                          test_name="fake-test", value=10, bound_direction="upper")
+            cbr.IndividualMetricThreshold(
+                metric_name="latency",
+                thread_level=1,
+                test_name="fake-test",
+                value=10,
+                bound_direction="upper",
+            )
         ]
         reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
-            cbr.ReportedMetric(test_name="fake-test", thread_level=1, metric_name="latency"):
-                CedarMetric(name="latency", type="LATENCY", value=1)
+            cbr.ReportedMetric(
+                test_name="fake-test", thread_level=1, metric_name="latency"
+            ): CedarMetric(name="latency", type="LATENCY", value=1)
         }
         test_case = cbr.CheckPerfResultTestCase(
-            logging.getLogger("hook_logger"), "my-test", None, None, None, thresholds_to_check,
-            reported_metrics)
+            logging.getLogger("hook_logger"),
+            "my-test",
+            None,
+            None,
+            None,
+            thresholds_to_check,
+            reported_metrics,
+        )
 
         # We want to make sure this can run without any exceptions.
         test_case.run_test()
 
     def test_a_metric_fails(self):
         thresholds_to_check: List[cbr.IndividualMetricThreshold] = [
-            cbr.IndividualMetricThreshold(metric_name="latency", thread_level=1,
-                                          test_name="fake-test", value=10, bound_direction="upper")
+            cbr.IndividualMetricThreshold(
+                metric_name="latency",
+                thread_level=1,
+                test_name="fake-test",
+                value=10,
+                bound_direction="upper",
+            )
         ]
         reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
-            cbr.ReportedMetric(test_name="fake-test", thread_level=1, metric_name="latency"):
-                CedarMetric(name="latency", type="LATENCY", value=11)
+            cbr.ReportedMetric(
+                test_name="fake-test", thread_level=1, metric_name="latency"
+            ): CedarMetric(name="latency", type="LATENCY", value=11)
         }
         test_case = cbr.CheckPerfResultTestCase(
-            logging.getLogger("hook_logger"), "my-test", None, None, None, thresholds_to_check,
-            reported_metrics)
+            logging.getLogger("hook_logger"),
+            "my-test",
+            None,
+            None,
+            None,
+            thresholds_to_check,
+            reported_metrics,
+        )
 
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
             test_case.run_test()
 
     def test_metric_doesnt_exist(self):
         thresholds_to_check: List[cbr.IndividualMetricThreshold] = [
-            cbr.IndividualMetricThreshold(metric_name="latency", thread_level=1,
-                                          test_name="fake-test", value=10, bound_direction="upper")
+            cbr.IndividualMetricThreshold(
+                metric_name="latency",
+                thread_level=1,
+                test_name="fake-test",
+                value=10,
+                bound_direction="upper",
+            )
         ]
         reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
-            cbr.ReportedMetric(test_name="fake-test", thread_level=1, metric_name="instructions"):
-                CedarMetric(name="instructions", type="LATENCY", value=1)
+            cbr.ReportedMetric(
+                test_name="fake-test", thread_level=1, metric_name="instructions"
+            ): CedarMetric(name="instructions", type="LATENCY", value=1)
         }
         test_case = cbr.CheckPerfResultTestCase(
-            logging.getLogger("hook_logger"), "my-test", None, None, None, thresholds_to_check,
-            reported_metrics)
+            logging.getLogger("hook_logger"),
+            "my-test",
+            None,
+            None,
+            None,
+            thresholds_to_check,
+            reported_metrics,
+        )
 
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
             test_case.run_test()
 
     def test_thread_level_doesnt_exist(self):
         thresholds_to_check: List[cbr.IndividualMetricThreshold] = [
-            cbr.IndividualMetricThreshold(metric_name="latency", thread_level=1,
-                                          test_name="fake-test", value=10, bound_direction="upper")
+            cbr.IndividualMetricThreshold(
+                metric_name="latency",
+                thread_level=1,
+                test_name="fake-test",
+                value=10,
+                bound_direction="upper",
+            )
         ]
         reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
-            cbr.ReportedMetric(test_name="fake-test", thread_level=12, metric_name="latency"):
-                CedarMetric(name="latency", type="LATENCY", value=1)
+            cbr.ReportedMetric(
+                test_name="fake-test", thread_level=12, metric_name="latency"
+            ): CedarMetric(name="latency", type="LATENCY", value=1)
         }
         test_case = cbr.CheckPerfResultTestCase(
-            logging.getLogger("hook_logger"), "my-test", None, None, None, thresholds_to_check,
-            reported_metrics)
+            logging.getLogger("hook_logger"),
+            "my-test",
+            None,
+            None,
+            None,
+            thresholds_to_check,
+            reported_metrics,
+        )
 
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
             test_case.run_test()

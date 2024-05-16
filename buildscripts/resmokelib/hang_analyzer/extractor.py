@@ -1,4 +1,5 @@
 """Extracts `mongo-debugsymbols.tgz` in an idempotent manner for performance."""
+
 import concurrent.futures
 import glob
 import gzip
@@ -22,7 +23,10 @@ from opentelemetry.trace.status import StatusCode
 from buildscripts.resmokelib.hang_analyzer.dumper import Dumper
 from buildscripts.resmokelib.setup_multiversion.download import DownloadError
 from buildscripts.resmokelib.run import compare_start_time
-from buildscripts.resmokelib.setup_multiversion.setup_multiversion import _DownloadOptions, SetupMultiversion
+from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
+    _DownloadOptions,
+    SetupMultiversion,
+)
 from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 from buildscripts.resmokelib.utils.otel_thread_pool_executor import OtelThreadPoolExecutor
@@ -30,13 +34,14 @@ from buildscripts.resmokelib.utils.otel_utils import get_default_current_span
 from buildscripts.resmokelib.symbolizer import Symbolizer
 from evergreen.task import Task, Artifact
 
-_DEBUG_FILE_BASE_NAMES = ['mongo', 'mongod', 'mongos']
+_DEBUG_FILE_BASE_NAMES = ["mongo", "mongod", "mongos"]
 TOOLCHAIN_ROOT = "/opt/mongodbtoolchain/v4"
 TRACER = trace.get_tracer("resmoke")
 
 
-def run_with_retries(root_logger: Logger, func: Callable[..., bool], timeout_secs: int,
-                     retry_secs: int, **kwargs) -> bool:
+def run_with_retries(
+    root_logger: Logger, func: Callable[..., bool], timeout_secs: int, retry_secs: int, **kwargs
+) -> bool:
     start_time = time.time()
     while True:
         try:
@@ -49,7 +54,8 @@ def run_with_retries(root_logger: Logger, func: Callable[..., bool], timeout_sec
         time_difference = time.time() - start_time
         if time_difference > timeout_secs:
             root_logger.error(
-                f"Timeout hit for function {func.__name__} after {time_difference} seconds.")
+                f"Timeout hit for function {func.__name__} after {time_difference} seconds."
+            )
             return False
 
         root_logger.error(f"Failed to run {func.__name__}, retrying in {retry_secs} seconds...")
@@ -57,8 +63,9 @@ def run_with_retries(root_logger: Logger, func: Callable[..., bool], timeout_sec
 
 
 @TRACER.start_as_current_span("core_analyzer.download_core_dumps")
-def download_core_dumps(root_logger: Logger, task: Task, download_dir: str, debugger: Dumper,
-                        multiversion_versions: set) -> bool:
+def download_core_dumps(
+    root_logger: Logger, task: Task, download_dir: str, debugger: Dumper, multiversion_versions: set
+) -> bool:
     root_logger.info("Looking for core dumps")
     artifacts = task.artifacts
     core_dumps_found = 0
@@ -74,10 +81,12 @@ def download_core_dumps(root_logger: Logger, task: Task, download_dir: str, debu
         extract_path = os.path.join(core_dumps_dir, extracted_name)
 
         with TRACER.start_as_current_span(
-                "core_analyzer.download_core_dump", attributes={
-                    "core_dump_file_name": file_name,
-                    "core_dump_file_url": artifact.url,
-                }) as core_dump_span:
+            "core_analyzer.download_core_dump",
+            attributes={
+                "core_dump_file_name": file_name,
+                "core_dump_file_url": artifact.url,
+            },
+        ) as core_dump_span:
             attempts = 0
             core_dump_span.set_status(StatusCode.OK)
             try:
@@ -93,17 +102,20 @@ def download_core_dumps(root_logger: Logger, task: Task, download_dir: str, debu
                     root_logger.info(f"Extracting core dump: {file_name}")
                     if os.path.exists(extract_path):
                         os.remove(extract_path)
-                    with gzip.open(file_name, 'rb') as f_in:
-                        with open(extract_path, 'wb') as f_out:
+                    with gzip.open(file_name, "rb") as f_in:
+                        with open(extract_path, "wb") as f_out:
                             shutil.copyfileobj(f_in, f_out)
 
-                    core_dump_span.set_attributes({
-                        "core_dump_compressed_size": os.path.getsize(file_name),
-                        "core_dump_extracted_size": os.path.getsize(extract_path),
-                        "core_dump_download_attempts": attempts,
-                    })
+                    core_dump_span.set_attributes(
+                        {
+                            "core_dump_compressed_size": os.path.getsize(file_name),
+                            "core_dump_extracted_size": os.path.getsize(extract_path),
+                            "core_dump_download_attempts": attempts,
+                        }
+                    )
                     root_logger.info(
-                        f"Done extracting core dump {extracted_name} to {extract_path}")
+                        f"Done extracting core dump {extracted_name} to {extract_path}"
+                    )
                     os.remove(file_name)
 
                     _, bin_version = debugger.get_binary_from_core_dump(extract_path)
@@ -116,53 +128,71 @@ def download_core_dumps(root_logger: Logger, task: Task, download_dir: str, debu
             except Exception as ex:
                 root_logger.error(
                     "An error occured while trying to download and extract core dump %s",
-                    extracted_name)
+                    extracted_name,
+                )
                 root_logger.error(ex)
                 core_dump_span.set_status(StatusCode.ERROR, "Failed to download core dump.")
-                core_dump_span.set_attributes({
-                    "core_dump_download_attempts": attempts,
-                    "core_dump_error": ex,
-                })
+                core_dump_span.set_attributes(
+                    {
+                        "core_dump_download_attempts": attempts,
+                        "core_dump_error": ex,
+                    }
+                )
 
-    core_dump_directory_size = sum(f.stat().st_size for f in Path("./").glob('**/*') if f.is_file())
-    current_span.set_attributes({
-        "core_dumps_dir": core_dumps_dir,
-        "core_dump_directory_size": core_dump_directory_size,
-    })
+    core_dump_directory_size = sum(f.stat().st_size for f in Path("./").glob("**/*") if f.is_file())
+    current_span.set_attributes(
+        {
+            "core_dumps_dir": core_dumps_dir,
+            "core_dump_directory_size": core_dump_directory_size,
+        }
+    )
 
     if not core_dumps_found:
         root_logger.error("No core dumps found")
         current_span.set_status(StatusCode.ERROR, description="No core dumps found")
-        current_span.set_attributes({
-            "core_dumps_error": "No core dumps found",
-        })
+        current_span.set_attributes(
+            {
+                "core_dumps_error": "No core dumps found",
+            }
+        )
         return False
 
     return True
 
 
 @TRACER.start_as_current_span("core_analyzer.download_multiversion_artifact")
-def download_multiversion_artifact(root_logger: Logger, version_id: str, variant: str,
-                                   download_options: _DownloadOptions, download_dir: str, name: str,
-                                   bin_version: str = None) -> bool:
+def download_multiversion_artifact(
+    root_logger: Logger,
+    version_id: str,
+    variant: str,
+    download_options: _DownloadOptions,
+    download_dir: str,
+    name: str,
+    bin_version: str = None,
+) -> bool:
     current_span = get_default_current_span(
-        {"downloaded_artifact_type": name, "version": bin_version if bin_version else "current"})
+        {"downloaded_artifact_type": name, "version": bin_version if bin_version else "current"}
+    )
     try:
         root_logger.info("Downloading %s", name)
-        multiversion_setup = SetupMultiversion(download_options=download_options,
-                                               ignore_failed_push=True,
-                                               link_dir=os.path.abspath(download_dir))
+        multiversion_setup = SetupMultiversion(
+            download_options=download_options,
+            ignore_failed_push=True,
+            link_dir=os.path.abspath(download_dir),
+        )
         urlinfo = multiversion_setup.get_urls(version=version_id, buildvariant_name=variant)
         if bin_version:
             install_dir = os.path.abspath(os.path.join(download_dir, bin_version, "install"))
             os.makedirs(install_dir, exist_ok=True)
             multiversion_setup.download_and_extract_from_urls(
-                urlinfo.urls, bin_suffix=bin_version, install_dir=install_dir, skip_symlinks=False)
+                urlinfo.urls, bin_suffix=bin_version, install_dir=install_dir, skip_symlinks=False
+            )
         else:
             install_dir = os.path.abspath(os.path.join(download_dir, "install"))
             os.makedirs(install_dir, exist_ok=True)
             multiversion_setup.download_and_extract_from_urls(
-                urlinfo.urls, bin_suffix=None, install_dir=install_dir, skip_symlinks=True)
+                urlinfo.urls, bin_suffix=None, install_dir=install_dir, skip_symlinks=True
+            )
         root_logger.info("Downloaded %s", name)
         return True
     except Exception as ex:
@@ -178,13 +208,19 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
     @TRACER.start_as_current_span("core_analyzer.post_install_gdb_optimization.add_index")
     def add_index(file_path: str):
         """Generate and add gdb-index to ELF binary."""
-        current_span = get_default_current_span({
-            "file": file_path, "add_index_status": "success",
-            "add_index_original_file_size": os.path.getsize(file_path)
-        })
+        current_span = get_default_current_span(
+            {
+                "file": file_path,
+                "add_index_status": "success",
+                "add_index_original_file_size": os.path.getsize(file_path),
+            }
+        )
         start_time = time.time()
-        process = subprocess.run([f"{TOOLCHAIN_ROOT}/bin/llvm-dwarfdump", "-r", "0", file_path],
-                                 capture_output=True, text=True)
+        process = subprocess.run(
+            [f"{TOOLCHAIN_ROOT}/bin/llvm-dwarfdump", "-r", "0", file_path],
+            capture_output=True,
+            text=True,
+        )
 
         # it is normal for non debug binaries to fail this command
         # there also can be some python files in the bin dir that will fail
@@ -196,10 +232,12 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
         regex = re.search("version = 0x([0-9]{4}),", process.stdout)
         if not regex:
             current_span.set_status(StatusCode.ERROR, "Could not find dwarf version in file.")
-            current_span.set_attributes({
-                "add_index_status": "failed",
-                "add_index_error": "Could not find dwarf version in file",
-            })
+            current_span.set_attributes(
+                {
+                    "add_index_status": "failed",
+                    "add_index_error": "Could not find dwarf version in file",
+                }
+            )
             raise RuntimeError(f"Could not find dwarf version in file {file_path}")
 
         version = int(regex.group(1))
@@ -209,91 +247,141 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
         try:
             # logic copied from https://sourceware.org/gdb/onlinedocs/gdb/Index-Files.html
             if version == 5:
-                subprocess.run([
-                    f"{TOOLCHAIN_ROOT}/bin/gdb", "--batch-silent", "--quiet", "--nx",
-                    "--eval-command", f"save gdb-index -dwarf-5 {target_dir}", file_path
-                ], check=True)
-                subprocess.run([
-                    f"{TOOLCHAIN_ROOT}/bin/objcopy", "--dump-section",
-                    f".debug_str={file_path}.debug_str.new", file_path
-                ])
+                subprocess.run(
+                    [
+                        f"{TOOLCHAIN_ROOT}/bin/gdb",
+                        "--batch-silent",
+                        "--quiet",
+                        "--nx",
+                        "--eval-command",
+                        f"save gdb-index -dwarf-5 {target_dir}",
+                        file_path,
+                    ],
+                    check=True,
+                )
+                subprocess.run(
+                    [
+                        f"{TOOLCHAIN_ROOT}/bin/objcopy",
+                        "--dump-section",
+                        f".debug_str={file_path}.debug_str.new",
+                        file_path,
+                    ]
+                )
                 with open(f"{file_path}.debug_str", "r") as file1:
                     with open(f"{file_path}.debug_str.new", "a") as file2:
                         file2.write(file1.read())
-                subprocess.run([
-                    f"{TOOLCHAIN_ROOT}/bin/objcopy", "--add-section",
-                    f".debug_names={file_path}.debug_names", "--set-section-flags",
-                    ".debug_names=readonly", "--update-section",
-                    f".debug_str={file_path}.debug_str.new", file_path, file_path
-                ], check=True)
+                subprocess.run(
+                    [
+                        f"{TOOLCHAIN_ROOT}/bin/objcopy",
+                        "--add-section",
+                        f".debug_names={file_path}.debug_names",
+                        "--set-section-flags",
+                        ".debug_names=readonly",
+                        "--update-section",
+                        f".debug_str={file_path}.debug_str.new",
+                        file_path,
+                        file_path,
+                    ],
+                    check=True,
+                )
                 os.remove(f"{file_path}.debug_str.new")
                 os.remove(f"{file_path}.debug_str")
                 os.remove(f"{file_path}.debug_names")
 
             elif version == 4:
-                subprocess.run([
-                    f"{TOOLCHAIN_ROOT}/bin/gdb", "--batch-silent", "--quiet", "--nx",
-                    "--eval-command", f"save gdb-index {target_dir}", file_path
-                ], check=True)
-                subprocess.run([
-                    f"{TOOLCHAIN_ROOT}/bin/objcopy", "--add-section",
-                    f".gdb_index={file_path}.gdb-index", "--set-section-flags",
-                    ".gdb_index=readonly", file_path, file_path
-                ], check=True)
+                subprocess.run(
+                    [
+                        f"{TOOLCHAIN_ROOT}/bin/gdb",
+                        "--batch-silent",
+                        "--quiet",
+                        "--nx",
+                        "--eval-command",
+                        f"save gdb-index {target_dir}",
+                        file_path,
+                    ],
+                    check=True,
+                )
+                subprocess.run(
+                    [
+                        f"{TOOLCHAIN_ROOT}/bin/objcopy",
+                        "--add-section",
+                        f".gdb_index={file_path}.gdb-index",
+                        "--set-section-flags",
+                        ".gdb_index=readonly",
+                        file_path,
+                        file_path,
+                    ],
+                    check=True,
+                )
                 os.remove(f"{file_path}.gdb-index")
             else:
                 current_span.set_status(StatusCode.ERROR, f"Unsupported dwarf version: {version}")
-                current_span.set_attributes({
-                    "add_index_status": "failed",
-                    "add_index_error": "Does not support dwarf version",
-                })
+                current_span.set_attributes(
+                    {
+                        "add_index_status": "failed",
+                        "add_index_error": "Does not support dwarf version",
+                    }
+                )
                 raise RuntimeError(f"Does not support dwarf version {version}")
         except Exception as ex:
             root_looger.exception("Failed to add gdb index to %s", file_path)
             current_span.set_status(StatusCode.ERROR, "Failed to add gdb index")
-            current_span.set_attributes({
-                "add_index_status": "failed",
-                "add_index_error": ex,
-            })
+            current_span.set_attributes(
+                {
+                    "add_index_status": "failed",
+                    "add_index_error": ex,
+                }
+            )
             return
 
         current_span.set_attribute("add_index_changed_file_size", os.path.getsize(file_path))
 
-        root_looger.debug("Finished creating gdb-index for %s in %s", file_path,
-                          (time.time() - start_time))
+        root_looger.debug(
+            "Finished creating gdb-index for %s in %s", file_path, (time.time() - start_time)
+        )
 
     @TRACER.start_as_current_span("core_analyzer.post_install_gdb_optimization.recalc_debuglink")
     def recalc_debuglink(file_path: str):
         """
         Recalcuate the debuglink for ELF binaries.
-        
+
         After creating the index file in a separate debug file, the debuglink CRC
         is no longer valid, this will simply recreate the debuglink and therefore
         update the CRC to match.
         """
         current_span = get_default_current_span(
-            {"file": file_path, "recalc_debuglink_status": "success"})
+            {"file": file_path, "recalc_debuglink_status": "success"}
+        )
 
-        process = subprocess.run([f"{TOOLCHAIN_ROOT}/bin/eu-readelf", "-S", file_path],
-                                 capture_output=True, text=True)
+        process = subprocess.run(
+            [f"{TOOLCHAIN_ROOT}/bin/eu-readelf", "-S", file_path], capture_output=True, text=True
+        )
         if process.returncode != 0 or ".gnu_debuglink" not in process.stdout:
             current_span.set_attribute("recalc_debuglink_status", "skipped")
             return
         try:
             subprocess.run(
                 [f"{TOOLCHAIN_ROOT}/bin/objcopy", "--remove-section", ".gnu_debuglink", file_path],
-                check=True)
-            subprocess.run([
-                f"{TOOLCHAIN_ROOT}/bin/objcopy", "--add-gnu-debuglink",
-                f"{os.path.abspath(file_path)}.debug", file_path
-            ], check=True)
+                check=True,
+            )
+            subprocess.run(
+                [
+                    f"{TOOLCHAIN_ROOT}/bin/objcopy",
+                    "--add-gnu-debuglink",
+                    f"{os.path.abspath(file_path)}.debug",
+                    file_path,
+                ],
+                check=True,
+            )
         except Exception as ex:
             root_looger.exception("Failed to recalculate debuglink")
             current_span.set_status(StatusCode.ERROR, "Failed to recalculate debuglink")
-            current_span.set_attributes({
-                "recalc_debuglink_status": "failed",
-                "recalc_debuglink_error": ex,
-            })
+            current_span.set_attributes(
+                {
+                    "recalc_debuglink_status": "failed",
+                    "recalc_debuglink_error": ex,
+                }
+            )
             return
 
         root_looger.debug("Finished recalculating the debuglink for %s", file_path)
@@ -307,7 +395,8 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
 
     with OtelThreadPoolExecutor() as executor:
         with TRACER.start_as_current_span(
-                "core_analyzer.post_install_gdb_optimization.add_indexes") as current_span:
+            "core_analyzer.post_install_gdb_optimization.add_indexes"
+        ) as current_span:
             futures = []
             current_span.set_status(StatusCode.OK)
             for file_path in lib_files:
@@ -319,7 +408,8 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
             concurrent.futures.wait(futures)
 
         with TRACER.start_as_current_span(
-                "core_analyzer.post_install_gdb_optimization.recalc_debuglink"):
+            "core_analyzer.post_install_gdb_optimization.recalc_debuglink"
+        ):
             futures = []
             current_span = get_default_current_span()
             for file_path in lib_files:
@@ -333,9 +423,16 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
 
 
 @TRACER.start_as_current_span("core_analyzer.download_task_artifacts")
-def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str, debugger: Dumper,
-                            multiversion_dir: str, execution: Optional[int] = None,
-                            retry_secs: int = 10, download_timeout_secs: int = 30 * 60) -> bool:
+def download_task_artifacts(
+    root_logger: Logger,
+    task_id: str,
+    download_dir: str,
+    debugger: Dumper,
+    multiversion_dir: str,
+    execution: Optional[int] = None,
+    retry_secs: int = 10,
+    download_timeout_secs: int = 30 * 60,
+) -> bool:
     if os.path.exists(download_dir):
         # quick sanity check to ensure we don't delete a repo
         if os.path.exists(os.path.join(download_dir, ".git")):
@@ -384,28 +481,53 @@ def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str
     with OtelThreadPoolExecutor() as executor:
         futures = []
         futures.append(
-            executor.submit(run_with_retries, root_logger=root_logger, func=download_core_dumps,
-                            timeout_secs=download_timeout_secs, retry_secs=retry_secs,
-                            task=task_info, download_dir=download_dir, debugger=debugger,
-                            multiversion_versions=multiversion_versions))
+            executor.submit(
+                run_with_retries,
+                root_logger=root_logger,
+                func=download_core_dumps,
+                timeout_secs=download_timeout_secs,
+                retry_secs=retry_secs,
+                task=task_info,
+                download_dir=download_dir,
+                debugger=debugger,
+                multiversion_versions=multiversion_versions,
+            )
+        )
         futures.append(
-            executor.submit(run_with_retries, func=download_multiversion_artifact,
-                            timeout_secs=download_timeout_secs, retry_secs=retry_secs,
-                            root_logger=root_logger, version_id=version_id, variant=variant,
-                            download_options=binary_download_options, download_dir=download_dir,
-                            name="binaries"))
+            executor.submit(
+                run_with_retries,
+                func=download_multiversion_artifact,
+                timeout_secs=download_timeout_secs,
+                retry_secs=retry_secs,
+                root_logger=root_logger,
+                version_id=version_id,
+                variant=variant,
+                download_options=binary_download_options,
+                download_dir=download_dir,
+                name="binaries",
+            )
+        )
         futures.append(
-            executor.submit(run_with_retries, func=download_multiversion_artifact,
-                            timeout_secs=download_timeout_secs, retry_secs=retry_secs,
-                            root_logger=root_logger, version_id=version_id, variant=variant,
-                            download_options=debugsymbols_download_options,
-                            download_dir=download_dir, name="debugsymbols"))
+            executor.submit(
+                run_with_retries,
+                func=download_multiversion_artifact,
+                timeout_secs=download_timeout_secs,
+                retry_secs=retry_secs,
+                root_logger=root_logger,
+                version_id=version_id,
+                variant=variant,
+                download_options=debugsymbols_download_options,
+                download_dir=download_dir,
+                name="debugsymbols",
+            )
+        )
 
         for future in concurrent.futures.as_completed(futures):
             if not future.result():
                 current_span.set_status(StatusCode.ERROR, "Errors occured while fetching artifacts")
-                current_span.set_attribute("download_task_artifacts_error",
-                                           "Errors occured while fetching artifacts")
+                current_span.set_attribute(
+                    "download_task_artifacts_error", "Errors occured while fetching artifacts"
+                )
                 root_logger.error("Errors occured while fetching artifacts")
                 all_downloaded = False
                 break
@@ -421,27 +543,45 @@ def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str
                 version_id = version_downloads["evg_version_id"]
                 variant = version_downloads["evg_build_variant"]
                 futures.append(
-                    executor.submit(run_with_retries, func=download_multiversion_artifact,
-                                    timeout_secs=download_timeout_secs, retry_secs=retry_secs,
-                                    root_logger=root_logger, version_id=version_id, variant=variant,
-                                    download_options=binary_download_options,
-                                    download_dir=multiversion_dir, name=f"binaries-{version}",
-                                    bin_version=version))
+                    executor.submit(
+                        run_with_retries,
+                        func=download_multiversion_artifact,
+                        timeout_secs=download_timeout_secs,
+                        retry_secs=retry_secs,
+                        root_logger=root_logger,
+                        version_id=version_id,
+                        variant=variant,
+                        download_options=binary_download_options,
+                        download_dir=multiversion_dir,
+                        name=f"binaries-{version}",
+                        bin_version=version,
+                    )
+                )
                 futures.append(
-                    executor.submit(run_with_retries, func=download_multiversion_artifact,
-                                    timeout_secs=download_timeout_secs, retry_secs=retry_secs,
-                                    root_logger=root_logger, version_id=version_id, variant=variant,
-                                    download_options=debugsymbols_download_options,
-                                    download_dir=multiversion_dir, name=f"debugsymbols-{version}",
-                                    bin_version=version))
+                    executor.submit(
+                        run_with_retries,
+                        func=download_multiversion_artifact,
+                        timeout_secs=download_timeout_secs,
+                        retry_secs=retry_secs,
+                        root_logger=root_logger,
+                        version_id=version_id,
+                        variant=variant,
+                        download_options=debugsymbols_download_options,
+                        download_dir=multiversion_dir,
+                        name=f"debugsymbols-{version}",
+                        bin_version=version,
+                    )
+                )
 
             for future in concurrent.futures.as_completed(futures):
                 if not future.result():
-                    current_span.set_status(StatusCode.ERROR,
-                                            "Errors occured while fetching old version artifacts")
+                    current_span.set_status(
+                        StatusCode.ERROR, "Errors occured while fetching old version artifacts"
+                    )
                     current_span.set_attribute(
                         "download_task_artifacts_error",
-                        "Errors occured while fetching old version artifacts")
+                        "Errors occured while fetching old version artifacts",
+                    )
                     root_logger.error("Errors occured while fetching old version artifacts")
                     all_downloaded = False
                     break
@@ -455,8 +595,9 @@ def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str
     return all_downloaded
 
 
-def download_debug_symbols(root_logger, symbolizer: Symbolizer, retry_secs: int = 10,
-                           download_timeout_secs: int = 10 * 60):
+def download_debug_symbols(
+    root_logger, symbolizer: Symbolizer, retry_secs: int = 10, download_timeout_secs: int = 10 * 60
+):
     """
     Extract debug symbols. Idempotent.
 
@@ -472,7 +613,8 @@ def download_debug_symbols(root_logger, symbolizer: Symbolizer, retry_secs: int 
 
     if len(sym_files) >= len(_DEBUG_FILE_BASE_NAMES):
         root_logger.info(
-            "Skipping downloading debug symbols as there are already symbol files present")
+            "Skipping downloading debug symbols as there are already symbol files present"
+        )
         return
 
     while True:
@@ -483,21 +625,26 @@ def download_debug_symbols(root_logger, symbolizer: Symbolizer, retry_secs: int 
         except (tarfile.ReadError, DownloadError):
             root_logger.warn(
                 "Debug symbols unavailable after %s secs, retrying in %s secs, waiting for a total of %s secs",
-                compare_start_time(time.time()), retry_secs, download_timeout_secs)
+                compare_start_time(time.time()),
+                retry_secs,
+                download_timeout_secs,
+            )
         time.sleep(retry_secs)
 
         if compare_start_time(time.time()) > download_timeout_secs:
             root_logger.warn(
-                'Debug-symbols archive-file does not exist after %s secs; '
-                'Hang-Analyzer may not complete successfully.', download_timeout_secs)
+                "Debug-symbols archive-file does not exist after %s secs; "
+                "Hang-Analyzer may not complete successfully.",
+                download_timeout_secs,
+            )
             break
 
 
 def _get_symbol_files():
     out = []
-    for ext in ['debug', 'dSYM', 'pdb']:
+    for ext in ["debug", "dSYM", "pdb"]:
         for file in _DEBUG_FILE_BASE_NAMES:
-            haystack = build_hygienic_bin_path(child='{file}.{ext}'.format(file=file, ext=ext))
+            haystack = build_hygienic_bin_path(child="{file}.{ext}".format(file=file, ext=ext))
             for needle in glob.glob(haystack):
                 out.append((needle, os.path.join(os.getcwd(), os.path.basename(needle))))
     return out

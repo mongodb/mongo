@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import Optional
 import bson.json_util as json
 
-__all__ = ['Node', 'build_execution_tree']
+__all__ = ["Node", "build_execution_tree"]
 
 
 @dataclass
@@ -62,126 +62,134 @@ class Node:
 
 def build_execution_tree(execution_stats: dict[str, any]) -> Node:
     """Build SBE executioon tree from 'executionStats' field of query explain."""
-    assert execution_stats['executionSuccess']
-    return process_stage(execution_stats['executionStages'])
+    assert execution_stats["executionSuccess"]
+    return process_stage(execution_stats["executionStages"])
 
 
 def process_stage(stage: dict[str, any]) -> Node:
     """Parse the given SBE stage."""
     processors = {
-        'filter': process_filter,
-        'cfilter': process_filter,
-        'traverse': process_traverse,
-        'project': process_inner_node,
-        'limit': process_inner_node,
-        'ixscan_generic': process_seek,
-        'scan': process_seek,
-        'coscan': process_leaf_node,
-        'nlj': process_nlj,
-        'hj': process_hash_join_node,
-        'mj': process_hash_join_node,
-        'seek': process_seek,
-        'ixseek': process_seek,
-        'limitskip': process_inner_node,
-        'group': process_inner_node,
-        'union': process_union_node,
-        'unique': process_unique_node,
-        'unwind': process_unwind_node,
-        'branch': process_branch_node,
+        "filter": process_filter,
+        "cfilter": process_filter,
+        "traverse": process_traverse,
+        "project": process_inner_node,
+        "limit": process_inner_node,
+        "ixscan_generic": process_seek,
+        "scan": process_seek,
+        "coscan": process_leaf_node,
+        "nlj": process_nlj,
+        "hj": process_hash_join_node,
+        "mj": process_hash_join_node,
+        "seek": process_seek,
+        "ixseek": process_seek,
+        "limitskip": process_inner_node,
+        "group": process_inner_node,
+        "union": process_union_node,
+        "unique": process_unique_node,
+        "unwind": process_unwind_node,
+        "branch": process_branch_node,
     }
 
-    processor = processors.get(stage['stage'])
+    processor = processors.get(stage["stage"])
     if processor is None:
         print(json.dumps(stage, indent=4))
-        raise ValueError(f'Unknown stage: {stage}')
+        raise ValueError(f"Unknown stage: {stage}")
 
     return processor(stage)
 
 
 def process_filter(stage: dict[str, any]) -> Node:
     """Process filter stage."""
-    input_stage = process_stage(stage['inputStage'])
-    return Node(**get_common_fields(stage), n_processed=stage['numTested'], children=[input_stage])
+    input_stage = process_stage(stage["inputStage"])
+    return Node(**get_common_fields(stage), n_processed=stage["numTested"], children=[input_stage])
 
 
 def process_traverse(stage: dict[str, any]) -> Node:
     """Process traverse, not used by Bonsai."""
-    outer_stage = process_stage(stage['outerStage'])
-    inner_stage = process_stage(stage['innerStage'])
-    return Node(**get_common_fields(stage), n_processed=stage['nReturned'],
-                children=[outer_stage, inner_stage])
+    outer_stage = process_stage(stage["outerStage"])
+    inner_stage = process_stage(stage["innerStage"])
+    return Node(
+        **get_common_fields(stage),
+        n_processed=stage["nReturned"],
+        children=[outer_stage, inner_stage],
+    )
 
 
 def process_hash_join_node(stage: dict[str, any]) -> Node:
     """Process hj node."""
-    outer_stage = process_stage(stage['outerStage'])
-    inner_stage = process_stage(stage['innerStage'])
+    outer_stage = process_stage(stage["outerStage"])
+    inner_stage = process_stage(stage["innerStage"])
     n_processed = outer_stage.n_returned + inner_stage.n_returned
-    return Node(**get_common_fields(stage), n_processed=n_processed,
-                children=[outer_stage, inner_stage])
+    return Node(
+        **get_common_fields(stage), n_processed=n_processed, children=[outer_stage, inner_stage]
+    )
 
 
 def process_nlj(stage: dict[str, any]) -> Node:
     """Process nlj stage."""
-    outer_stage = process_stage(stage['outerStage'])
-    inner_stage = process_stage(stage['innerStage'])
-    n_processed = stage['totalDocsExamined']
-    return Node(**get_common_fields(stage), n_processed=n_processed,
-                children=[outer_stage, inner_stage])
+    outer_stage = process_stage(stage["outerStage"])
+    inner_stage = process_stage(stage["innerStage"])
+    n_processed = stage["totalDocsExamined"]
+    return Node(
+        **get_common_fields(stage), n_processed=n_processed, children=[outer_stage, inner_stage]
+    )
 
 
 def process_inner_node(stage: dict[str, any]) -> Node:
     """Process SBE stage with one input stage."""
-    input_stage = process_stage(stage['inputStage'])
-    return Node(**get_common_fields(stage), n_processed=input_stage.n_returned,
-                children=[input_stage])
+    input_stage = process_stage(stage["inputStage"])
+    return Node(
+        **get_common_fields(stage), n_processed=input_stage.n_returned, children=[input_stage]
+    )
 
 
 def process_leaf_node(stage: dict[str, any]) -> Node:
     """Process SBE stage without input stages."""
-    return Node(**get_common_fields(stage), n_processed=stage['nReturned'], children=[])
+    return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=[])
 
 
 def process_seek(stage: dict[str, any]) -> Node:
     """Process seek stage."""
-    return Node(**get_common_fields(stage), n_processed=stage['numReads'], children=[])
+    return Node(**get_common_fields(stage), n_processed=stage["numReads"], children=[])
 
 
 def process_union_node(stage: dict[str, any]) -> Node:
     """Process union stage."""
-    children = [process_stage(child) for child in stage['inputStages']]
-    return Node(**get_common_fields(stage), n_processed=stage['nReturned'], children=children)
+    children = [process_stage(child) for child in stage["inputStages"]]
+    return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=children)
 
 
 def process_unwind_node(stage: dict[str, any]) -> Node:
     """Process unwind stage."""
-    input_stage = process_stage(stage['inputStage'])
-    return Node(**get_common_fields(stage), n_processed=input_stage.n_returned,
-                children=[input_stage])
+    input_stage = process_stage(stage["inputStage"])
+    return Node(
+        **get_common_fields(stage), n_processed=input_stage.n_returned, children=[input_stage]
+    )
 
 
 def process_unique_node(stage: dict[str, any]) -> Node:
     """Process unique stage."""
-    input_stage = process_stage(stage['inputStage'])
-    n_processed = stage['dupsTested']
+    input_stage = process_stage(stage["inputStage"])
+    n_processed = stage["dupsTested"]
     return Node(**get_common_fields(stage), n_processed=n_processed, children=[input_stage])
 
 
 def process_branch_node(stage: dict[str, any]) -> Node:
     """Process unique stage."""
-    then_stage = process_stage(stage['thenStage'])
-    else_stage = process_stage(stage['elseStage'])
+    then_stage = process_stage(stage["thenStage"])
+    else_stage = process_stage(stage["elseStage"])
     n_processed = then_stage.n_returned + else_stage.n_returned
-    return Node(**get_common_fields(stage), n_processed=n_processed,
-                children=[then_stage, else_stage])
+    return Node(
+        **get_common_fields(stage), n_processed=n_processed, children=[then_stage, else_stage]
+    )
 
 
 def get_common_fields(json_stage: dict[str, any]) -> dict[str, any]:
     """Exctract common field from json representation of SBE stage."""
     return {
-        'stage': json_stage['stage'],
-        'plan_node_id': json_stage['planNodeId'],
-        'total_execution_time': json_stage['executionTimeNanos'],
-        'n_returned': json_stage['nReturned'],
-        'seeks': json_stage.get('seeks'),
+        "stage": json_stage["stage"],
+        "plan_node_id": json_stage["planNodeId"],
+        "total_execution_time": json_stage["executionTimeNanos"],
+        "n_returned": json_stage["nReturned"],
+        "seeks": json_stage.get("seeks"),
     }

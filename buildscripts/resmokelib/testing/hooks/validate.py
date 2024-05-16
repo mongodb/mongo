@@ -15,9 +15,11 @@ class ValidateCollections(jsfile.PerClusterDataConsistencyHook):
     IS_BACKGROUND = False
 
     def __init__(  # pylint: disable=super-init-not-called
-            self, hook_logger, fixture, shell_options=None):
+        self, hook_logger, fixture, shell_options=None
+    ):
         """Initialize ValidateCollections."""
         description = "Full collection validation"
         js_filename = os.path.join("jstests", "hooks", "run_validate_collections.js")
         jsfile.JSHook.__init__(  # pylint: disable=non-parent-init-called
-            self, hook_logger, fixture, js_filename, description, shell_options=shell_options)
+            self, hook_logger, fixture, js_filename, description, shell_options=shell_options
+        )

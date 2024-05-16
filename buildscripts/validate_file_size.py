@@ -16,7 +16,8 @@ def main():
             print(
                 f"WARNING! {file_name} is {file_size_in_bytes} bytes, exceeding threshold"
                 f" {FILE_SIZE_THRESHOLD_IN_BYTES} bytes, file upload may fail due to network issues, or Evergreen"
-                f" may reject very large yaml sizes")
+                f" may reject very large yaml sizes"
+            )
         else:
             print(
                 f"{file_name} is {file_size_in_bytes} bytes, below threshold {FILE_SIZE_THRESHOLD_IN_BYTES} bytes"
@@ -25,5 +26,5 @@ def main():
         print(f"{file_path} does not exist")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

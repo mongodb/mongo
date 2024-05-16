@@ -1,4 +1,5 @@
 """Options used for building process."""
+
 import re
 
 
@@ -18,7 +19,8 @@ class PathOptions:
 
         if not self._compiled_shared_library_file_patterns:
             self._compiled_shared_library_file_patterns = tuple(
-                map(re.compile, self._shared_library_file_patterns))
+                map(re.compile, self._shared_library_file_patterns)
+            )
         return self._compiled_shared_library_file_patterns
 
     def is_shared_library_file(self, path: str) -> bool:

@@ -18,8 +18,9 @@ def main():
 
     parser = optparse.OptionParser(description=__doc__)
     parser.add_option("--yamlFile", dest="yaml_file", default=None, help="YAML file to read")
-    parser.add_option("--yamlKey", dest="yaml_key", default=None,
-                      help="Top level YAML key to provide the value")
+    parser.add_option(
+        "--yamlKey", dest="yaml_key", default=None, help="Top level YAML key to provide the value"
+    )
 
     (options, _) = parser.parse_args()
     if not options.yaml_file:

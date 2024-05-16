@@ -12,15 +12,25 @@ class BulkWriteClusterTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     REGISTERED_NAME = "bulk_write_cluster_js_test"
 
-    def __init__(self, logger: logging.Logger, js_filenames: list[str],
-                 shell_executable: Optional[str] = None, shell_options: Optional[dict] = None):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        js_filenames: list[str],
+        shell_executable: Optional[str] = None,
+        shell_options: Optional[dict] = None,
+    ):
         """Initialize the BulkWriteClusterTestCase."""
 
         assert len(js_filenames) == 1
         jsrunnerfile.JSRunnerFileTestCase.__init__(
-            self, logger, "BulkWriteCluster Test", js_filenames[0],
+            self,
+            logger,
+            "BulkWriteCluster Test",
+            js_filenames[0],
             test_runner_file="jstests/libs/bulk_write_passthrough_runner.js",
-            shell_executable=shell_executable, shell_options=shell_options)
+            shell_executable=shell_executable,
+            shell_options=shell_options,
+        )
 
     @property
     def js_filename(self):

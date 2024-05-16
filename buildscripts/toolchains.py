@@ -15,23 +15,23 @@ from typing import Optional, Set, Sequence, Tuple, Union
 import yaml
 
 __all__ = [
-    'DEFAULT_DATA_FILE',
-    'Toolchain',
-    'ToolchainConfig',
-    'ToolchainDataException',
-    'ToolchainReleaseName',
-    'ToolchainVersionName',
-    'Toolchains',
+    "DEFAULT_DATA_FILE",
+    "Toolchain",
+    "ToolchainConfig",
+    "ToolchainDataException",
+    "ToolchainReleaseName",
+    "ToolchainVersionName",
+    "Toolchains",
 ]
 
-DEFAULT_DATA_FILE: pathlib.Path = pathlib.Path(__file__).parent / '../etc/toolchains.yaml'
+DEFAULT_DATA_FILE: pathlib.Path = pathlib.Path(__file__).parent / "../etc/toolchains.yaml"
 
 
 class ToolchainVersionName(str, enum.Enum):
     """Represents a "named" toolchain version, such as "stable" or "testing"."""
 
-    STABLE = 'stable'
-    TESTING = 'testing'
+    STABLE = "stable"
+    TESTING = "testing"
 
     # pylint: disable=invalid-str-returned
     def __str__(self) -> str:
@@ -41,9 +41,9 @@ class ToolchainVersionName(str, enum.Enum):
 class ToolchainReleaseName(str, enum.Enum):
     """Represents a "named" toolchain release, such as "rollback" or "current"."""
 
-    ROLLBACK = 'rollback'
-    CURRENT = 'current'
-    LATEST = 'latest'
+    ROLLBACK = "rollback"
+    CURRENT = "current"
+    LATEST = "latest"
 
     # pylint: disable=invalid-str-returned
     def __str__(self) -> str:
@@ -54,34 +54,34 @@ class ToolchainDistroName(Tuple[str, ...], enum.Enum):
     """Represents a distribution for which the toolchain is built."""
 
     AMAZON1_2012 = (
-        'amazon1-2012',
-        'linux-64-amzn',
+        "amazon1-2012",
+        "linux-64-amzn",
     )
-    AMAZON1_2018 = ('amazon1-2018', )
-    AMAZON2 = ('amazon2', )
-    ARCHLINUX = ('archlinux', )
-    CENTOS6 = ('centos6', )
-    DEBIAN8 = ('debian81', )
-    DEBIAN9 = ('debian92', )
-    DEBIAN10 = ('debian10', )
-    DEBIAN11 = ('debian11', )
-    DEBIAN12 = ('debian12', )
-    MACOS1012 = ('macos-1012', )
-    MACOS1014 = ('macos-1014', )
-    MACOS1100 = ('macos-1100', )
-    RHEL6 = ('rhel6', 'rhel62', 'rhel67')
-    RHEL7 = ('rhel7', 'rhel70', 'rhel71', 'rhel72', 'rhel76', 'ubi7')
-    RHEL8 = ('rhel8', 'rhel80', 'rhel81', 'rhel82', 'rhel83', 'rhel84', 'ubi8')
-    SUSE12 = ('suse12', 'suse12-sp5')
-    SUSE15 = ('suse15', 'suse15-sp0', 'suse15-sp2')
-    UBUNTU1404 = ('ubuntu1404', )
-    UBUNTU1604 = ('ubuntu1604', )
-    UBUNTU1804 = ('ubuntu1804', )
-    UBUNTU2004 = ('ubuntu2004', )
-    DEFAULT = ('default', )
+    AMAZON1_2018 = ("amazon1-2018",)
+    AMAZON2 = ("amazon2",)
+    ARCHLINUX = ("archlinux",)
+    CENTOS6 = ("centos6",)
+    DEBIAN8 = ("debian81",)
+    DEBIAN9 = ("debian92",)
+    DEBIAN10 = ("debian10",)
+    DEBIAN11 = ("debian11",)
+    DEBIAN12 = ("debian12",)
+    MACOS1012 = ("macos-1012",)
+    MACOS1014 = ("macos-1014",)
+    MACOS1100 = ("macos-1100",)
+    RHEL6 = ("rhel6", "rhel62", "rhel67")
+    RHEL7 = ("rhel7", "rhel70", "rhel71", "rhel72", "rhel76", "ubi7")
+    RHEL8 = ("rhel8", "rhel80", "rhel81", "rhel82", "rhel83", "rhel84", "ubi8")
+    SUSE12 = ("suse12", "suse12-sp5")
+    SUSE15 = ("suse15", "suse15-sp0", "suse15-sp2")
+    UBUNTU1404 = ("ubuntu1404",)
+    UBUNTU1604 = ("ubuntu1604",)
+    UBUNTU1804 = ("ubuntu1804",)
+    UBUNTU2004 = ("ubuntu2004",)
+    DEFAULT = ("default",)
 
     @classmethod
-    def from_str(cls, text: str) -> 'ToolchainDistroName':
+    def from_str(cls, text: str) -> "ToolchainDistroName":
         """Return the enumeration object matching a given string."""
 
         for distro in cls:
@@ -98,14 +98,14 @@ class ToolchainDistroName(Tuple[str, ...], enum.Enum):
 class ToolchainArchName(Tuple[str, ...], enum.Enum):
     """Represents an architecture for which the toolchain is built."""
 
-    ARM64 = ('arm64', 'aarch64')
-    PPC64LE = ('ppc64le', 'power8')
-    S390X = ('s390x', 'zSeries')
-    X86_64 = ('x86_64', )
-    DEFAULT = ('', )
+    ARM64 = ("arm64", "aarch64")
+    PPC64LE = ("ppc64le", "power8")
+    S390X = ("s390x", "zSeries")
+    X86_64 = ("x86_64",)
+    DEFAULT = ("",)
 
     @classmethod
-    def from_str(cls, text: str) -> 'ToolchainArchName':
+    def from_str(cls, text: str) -> "ToolchainArchName":
         """Return the enumeratrion object matching a given string."""
 
         for arch in cls:
@@ -140,12 +140,11 @@ class ToolchainPlatform:
         self._arch_span: Tuple[int, int] = self._find_arch_span()
 
     def _split_distro_id(self, start: int = 0) -> Tuple[str, str]:
-        return self._distro_id[start:].split('-', 1)[0], self._distro_id[start:].split('.')[0]
+        return self._distro_id[start:].split("-", 1)[0], self._distro_id[start:].split(".")[0]
 
     def _find_distro_length(self) -> int:
         for distro in ToolchainDistroName:
             for name in distro.value:
-
                 if not name:
                     continue
 
@@ -159,19 +158,19 @@ class ToolchainPlatform:
 
         for arch in ToolchainArchName:
             for name in arch.value:
-
                 if not name:
                     continue
 
                 iter_start = self._distro_length + 1
                 while iter_start < len(self._distro_id):
-
                     if name.lower() in self._split_distro_id(self._distro_length):
                         arch_span = (iter_start, len(name))
 
                     iter_start += len(name)
-                    if iter_start < len(self._distro_id) and self._distro_id[iter_start] in ('-',
-                                                                                             '.'):
+                    if iter_start < len(self._distro_id) and self._distro_id[iter_start] in (
+                        "-",
+                        ".",
+                    ):
                         iter_start += 1
 
         if arch_span is None:
@@ -210,7 +209,8 @@ class ToolchainPlatform:
                     self._arch = ToolchainArchName.X86_64
             else:
                 self._arch = ToolchainArchName.from_str(
-                    self.distro_id[arch_span[0]:arch_span[0] + arch_span[1]])
+                    self.distro_id[arch_span[0] : arch_span[0] + arch_span[1]]
+                )
 
         return self._arch
 
@@ -221,9 +221,9 @@ class ToolchainPlatform:
         if self._tag is None:
             arch_span: Tuple[int, int] = self._arch_span
             if arch_span[0] + arch_span[1] + 1 < len(self._distro_id):
-                self._tag = self._distro_id[arch_span[0] + arch_span[1] + 1:]
+                self._tag = self._distro_id[arch_span[0] + arch_span[1] + 1 :]
             else:
-                self._tag = ''
+                self._tag = ""
 
         if self._tag:
             return self._tag
@@ -249,11 +249,12 @@ class ToolchainConfig:
         """Construct a toolchain configuration from a data file."""
 
         try:
-            with open(data_file.absolute(), 'r', encoding='utf-8') as yaml_stream:
+            with open(data_file.absolute(), "r", encoding="utf-8") as yaml_stream:
                 self._data = yaml.safe_load(yaml_stream)
         except yaml.YAMLError as parent_exc:
             raise ToolchainDataException(
-                f"Could not read toolchain data file: `{data_file}'") from parent_exc
+                f"Could not read toolchain data file: `{data_file}'"
+            ) from parent_exc
 
         self._platform: ToolchainPlatform = platform
 
@@ -261,14 +262,14 @@ class ToolchainConfig:
     def base_path(self) -> pathlib.Path:
         """Return the base (installed) path for toolchain releases."""
 
-        return pathlib.Path(self._data['toolchains']['base_path'])
+        return pathlib.Path(self._data["toolchains"]["base_path"])
 
     @property
     def all_releases(self) -> Dict[str, Dict[str, str]]:
         """Return all known releases in the data file."""
 
         try:
-            return self._data['toolchains']['releases']
+            return self._data["toolchains"]["releases"]
         except (KeyError, TypeError):
             return {}
 
@@ -288,16 +289,18 @@ class ToolchainConfig:
                 platform_section = self.all_releases[str(self._platform)]
             elif f"{self._platform.distro}.{self._platform.arch}" in self.all_releases:
                 platform_section = self.all_releases[
-                    f"{self._platform.distro}.{self._platform.arch}"]
+                    f"{self._platform.distro}.{self._platform.arch}"
+                ]
             elif f"{self._platform.distro}.{self._platform.tag}" in self.all_releases:
                 platform_section = self.all_releases[
-                    f"{self._platform.distro}.{self._platform.tag}"]
+                    f"{self._platform.distro}.{self._platform.tag}"
+                ]
             elif f"{self._platform.distro}" in self.all_releases:
                 platform_section = self.all_releases[f"{self._platform.distro}"]
 
         if not platform_section:
             try:
-                platform_section = self.all_releases['default']
+                platform_section = self.all_releases["default"]
             except KeyError:
                 return {}
 
@@ -307,29 +310,34 @@ class ToolchainConfig:
     def versions(self) -> List[str]:
         """Return all known versions in the data file."""
 
-        return self._data['toolchains']['versions']
+        return self._data["toolchains"]["versions"]
 
     @property
     def aliases(self) -> Dict[str, str]:
         """Return all known version aliases in the data file."""
 
-        return self._data['toolchains']['version_aliases']
+        return self._data["toolchains"]["version_aliases"]
 
     @property
     def revisions_dir(self) -> Optional[pathlib.Path]:
         """Return the legacy revisions directory for toolchain releases."""
 
-        warnings.warn(("This is legacy toolchain usage. "
-                       f"Call {self.__class__.__name__}.releases_dir() instead."),
-                      DeprecationWarning, stacklevel=2)
+        warnings.warn(
+            (
+                "This is legacy toolchain usage. "
+                f"Call {self.__class__.__name__}.releases_dir() instead."
+            ),
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
-        return self.base_path.joinpath('revisions')
+        return self.base_path.joinpath("revisions")
 
     @property
     def releases_dir(self) -> pathlib.Path:
         """Return the directory where toolchain releases are installed."""
 
-        return self.base_path.joinpath('releases')
+        return self.base_path.joinpath("releases")
 
     def search_releases(self, release_name: str) -> Optional[str]:
         """Search configured releases for a given release name."""
@@ -385,7 +393,8 @@ class Toolchain:
                 version = self._config.aliases[version]
             except KeyError:
                 raise ValueError(
-                    f"Toolchain version `{version}' not defined in data file") from None
+                    f"Toolchain version `{version}' not defined in data file"
+                ) from None
 
         return install_path / version
 
@@ -415,8 +424,10 @@ class Toolchains(Mapping[Union[ToolchainReleaseName, str], Toolchain]):
 
         if release_dirs:
             return [
-                path.name for path in sorted(release_dirs, key=lambda path: path.stat().st_mtime,
-                                             reverse=True)
+                path.name
+                for path in sorted(
+                    release_dirs, key=lambda path: path.stat().st_mtime, reverse=True
+                )
             ]
 
         return []
@@ -435,11 +446,10 @@ class Toolchains(Mapping[Union[ToolchainReleaseName, str], Toolchain]):
         """Return a list of all configured toolchain releases."""
 
         configured: Set[Union[str, None]] = {
-            self._config.search_releases(name.value)
-            for name in ToolchainReleaseName
+            self._config.search_releases(name.value) for name in ToolchainReleaseName
         }
 
-        configured.add(self._config.search_releases('default'))
+        configured.add(self._config.search_releases("default"))
 
         return [release for release in configured if release is not None]
 
@@ -455,7 +465,7 @@ class Toolchains(Mapping[Union[ToolchainReleaseName, str], Toolchain]):
 
         latest_symlink: Optional[pathlib.Path] = None
         try:
-            latest_symlink = self._config.releases_dir.joinpath('latest')
+            latest_symlink = self._config.releases_dir.joinpath("latest")
         except AttributeError:
             latest_symlink = None
 
@@ -523,18 +533,22 @@ class _FormatterClass:
     here for NicerHelpFormatter to inherit from it and prevent the error.
     """
 
-    def __call__(self, _: str) -> argparse.HelpFormatter:
-        ...
+    def __call__(self, _: str) -> argparse.HelpFormatter: ...
 
 
 # pylint: disable=protected-access
 class NicerHelpFormatter(argparse.HelpFormatter, _FormatterClass):
     """A HelpFormatter with nicer output than the default."""
 
-    def __init__(self, prog: str, indent_increment: int = 2, max_help_position: int = 32,
-                 width=None) -> None:
-        super().__init__(prog=prog, indent_increment=indent_increment,
-                         max_help_position=max_help_position, width=width)
+    def __init__(
+        self, prog: str, indent_increment: int = 2, max_help_position: int = 32, width=None
+    ) -> None:
+        super().__init__(
+            prog=prog,
+            indent_increment=indent_increment,
+            max_help_position=max_help_position,
+            width=width,
+        )
 
     def __call__(self, prog: str) -> argparse.HelpFormatter:
         return NicerHelpFormatter(prog)
@@ -550,7 +564,7 @@ class NicerHelpFormatter(argparse.HelpFormatter, _FormatterClass):
             return ""
         if not action.option_strings:
             default = self._get_default_metavar_for_optional(action)
-            metavar, = self._metavar_formatter(action, default)(1)
+            (metavar,) = self._metavar_formatter(action, default)(1)
             return metavar
 
         parts: List[str] = []
@@ -566,10 +580,11 @@ class NicerHelpFormatter(argparse.HelpFormatter, _FormatterClass):
 
             return f"{' '.join(parts)} {args_string}"
 
-        return ' '.join(parts)
+        return " ".join(parts)
 
     def _iter_indented_subactions(
-            self, action: argparse.Action) -> Generator[argparse.Action, None, None]:
+        self, action: argparse.Action
+    ) -> Generator[argparse.Action, None, None]:
         if isinstance(action, (argparse._SubParsersAction, DictChoiceAction)):
             try:
                 get_subactions = action._get_subactions
@@ -582,8 +597,9 @@ class NicerHelpFormatter(argparse.HelpFormatter, _FormatterClass):
             for subaction in super()._iter_indented_subactions(action):
                 yield subaction
 
-    def _metavar_formatter(self, action: argparse.Action,
-                           default_metavar: str) -> Callable[[int], Tuple[str, ...]]:
+    def _metavar_formatter(
+        self, action: argparse.Action, default_metavar: str
+    ) -> Callable[[int], Tuple[str, ...]]:
         if action.metavar is not None:
             result = action.metavar
         elif action.choices is not None:
@@ -599,7 +615,7 @@ class NicerHelpFormatter(argparse.HelpFormatter, _FormatterClass):
         def _format(tuple_size: int) -> Tuple[str, ...]:
             if isinstance(result, tuple):
                 return result
-            return (result, ) * tuple_size
+            return (result,) * tuple_size
 
         return _format
 
@@ -610,7 +626,6 @@ class DictChoiceAction(argparse._StoreAction):
 
     class _ChoicesPseudoAction(argparse.Action):
         def __init__(self, name: str, aliases: List[str], help: Optional[str] = None) -> None:
-
             metavar = dest = name
             if aliases:
                 metavar += f" {' | '.join(aliases)}"
@@ -621,22 +636,41 @@ class DictChoiceAction(argparse._StoreAction):
 
             super().__init__(option_strings=[], dest=dest, help=help, metavar=metavar)
 
-        def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace,
-                     values: Union[str, Sequence[Any], None],
-                     option_string: Optional[str] = None) -> None:
-
+        def __call__(
+            self,
+            parser: argparse.ArgumentParser,
+            namespace: argparse.Namespace,
+            values: Union[str, Sequence[Any], None],
+            option_string: Optional[str] = None,
+        ) -> None:
             parser.print_help()
             parser.exit()
 
-    def __init__(self, option_strings: List[str], dest: str, nargs: Optional[int] = None,
-                 const: Optional[Any] = None, default: Optional[Any] = None,
-                 type: Optional[type] = None, choices: Optional[Dict[str, str]] = None,
-                 required: bool = False, help: Optional[str] = None,
-                 metavar: Optional[str] = None) -> None:
-
-        super().__init__(option_strings=option_strings, dest=dest, nargs=nargs, const=const,
-                         default=default, type=type, choices=choices, required=required, help=help,
-                         metavar=metavar)
+    def __init__(
+        self,
+        option_strings: List[str],
+        dest: str,
+        nargs: Optional[int] = None,
+        const: Optional[Any] = None,
+        default: Optional[Any] = None,
+        type: Optional[type] = None,
+        choices: Optional[Dict[str, str]] = None,
+        required: bool = False,
+        help: Optional[str] = None,
+        metavar: Optional[str] = None,
+    ) -> None:
+        super().__init__(
+            option_strings=option_strings,
+            dest=dest,
+            nargs=nargs,
+            const=const,
+            default=default,
+            type=type,
+            choices=choices,
+            required=required,
+            help=help,
+            metavar=metavar,
+        )
         self.choices: Dict[str, str] = {}
         if choices:
             self.choices = choices
@@ -652,27 +686,45 @@ class DictChoiceAction(argparse._StoreAction):
 class NicerArgumentParser(argparse.ArgumentParser):
     """An argument parser with nicer help output."""
 
-    def __init__(self, prog: Optional[str] = None, usage: Optional[str] = None,
-                 description: Optional[str] = None, epilog: Optional[str] = None,
-                 parents: Optional[List[argparse.ArgumentParser]] = None, prefix_chars: str = '-',
-                 fromfile_prefix_chars: Optional[str] = None,
-                 argument_default: Optional[Any] = None, conflict_handler: str = 'error',
-                 add_help: bool = True, allow_abbrev: bool = True) -> None:
+    def __init__(
+        self,
+        prog: Optional[str] = None,
+        usage: Optional[str] = None,
+        description: Optional[str] = None,
+        epilog: Optional[str] = None,
+        parents: Optional[List[argparse.ArgumentParser]] = None,
+        prefix_chars: str = "-",
+        fromfile_prefix_chars: Optional[str] = None,
+        argument_default: Optional[Any] = None,
+        conflict_handler: str = "error",
+        add_help: bool = True,
+        allow_abbrev: bool = True,
+    ) -> None:
         """Initialize a NicerParser."""
 
-        super().__init__(prog=prog, usage=usage, description=description, epilog=epilog,
-                         parents=parents if parents else [], formatter_class=NicerHelpFormatter,
-                         prefix_chars=prefix_chars, fromfile_prefix_chars=fromfile_prefix_chars,
-                         argument_default=argument_default, conflict_handler=conflict_handler,
-                         add_help=add_help, allow_abbrev=allow_abbrev)
-        self._optionals.title = 'Options'
-        self._positionals.title = 'Queries'
+        super().__init__(
+            prog=prog,
+            usage=usage,
+            description=description,
+            epilog=epilog,
+            parents=parents if parents else [],
+            formatter_class=NicerHelpFormatter,
+            prefix_chars=prefix_chars,
+            fromfile_prefix_chars=fromfile_prefix_chars,
+            argument_default=argument_default,
+            conflict_handler=conflict_handler,
+            add_help=add_help,
+            allow_abbrev=allow_abbrev,
+        )
+        self._optionals.title = "Options"
+        self._positionals.title = "Queries"
 
     def format_help(self) -> str:
         formatter = self._get_formatter()
         formatter.add_text(self.description)
-        formatter.add_usage(self.usage, self._actions, self._mutually_exclusive_groups,
-                            prefix='Usage:\n  ')
+        formatter.add_usage(
+            self.usage, self._actions, self._mutually_exclusive_groups, prefix="Usage:\n  "
+        )
 
         for action_group in self._action_groups:
             formatter.start_section(action_group.title)
@@ -685,94 +737,165 @@ class NicerArgumentParser(argparse.ArgumentParser):
         return formatter.format_help()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = NicerArgumentParser(
-        description='Tool for querying information about mongodbtoolchain.', add_help=False)
+        description="Tool for querying information about mongodbtoolchain.", add_help=False
+    )
 
-    parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS,
-                        help='Show this help message and exit')
-    parser.add_argument('-f', '--from-file', help='Specify a toolchain data file', metavar='FILE',
-                        type=str, default=str(DEFAULT_DATA_FILE))
-    parser.add_argument('-d', '--distro-id', help='Evergreen distro_id', type=str, required=True)
-    parser.add_argument('-a', '--arch', help='Host architecture', type=str)
+    parser.add_argument(
+        "-h",
+        "--help",
+        action="help",
+        default=argparse.SUPPRESS,
+        help="Show this help message and exit",
+    )
+    parser.add_argument(
+        "-f",
+        "--from-file",
+        help="Specify a toolchain data file",
+        metavar="FILE",
+        type=str,
+        default=str(DEFAULT_DATA_FILE),
+    )
+    parser.add_argument("-d", "--distro-id", help="Evergreen distro_id", type=str, required=True)
+    parser.add_argument("-a", "--arch", help="Host architecture", type=str)
 
-    subparsers = parser.add_subparsers(title='Commands', dest='command', required=True)
+    subparsers = parser.add_subparsers(title="Commands", dest="command", required=True)
 
     show_parser = subparsers.add_parser(
-        'show', description='Shows general toolchain collection info.', add_help=False,
-        help='Show general toolchain collection info')
-    config_parser = subparsers.add_parser('config',
-                                          description='Shows toolchain configuration info.',
-                                          add_help=False, help='Show toolchain configuration info')
-    platform_parser = subparsers.add_parser('platform',
-                                            description='Shows component parts of a distro_id.',
-                                            add_help=False, help='Show parts of a distro_id')
-    toolchain_parser = subparsers.add_parser('toolchain',
-                                             description='Shows specific toolchain info.',
-                                             add_help=False, help='Show specific toolchain info')
+        "show",
+        description="Shows general toolchain collection info.",
+        add_help=False,
+        help="Show general toolchain collection info",
+    )
+    config_parser = subparsers.add_parser(
+        "config",
+        description="Shows toolchain configuration info.",
+        add_help=False,
+        help="Show toolchain configuration info",
+    )
+    platform_parser = subparsers.add_parser(
+        "platform",
+        description="Shows component parts of a distro_id.",
+        add_help=False,
+        help="Show parts of a distro_id",
+    )
+    toolchain_parser = subparsers.add_parser(
+        "toolchain",
+        description="Shows specific toolchain info.",
+        add_help=False,
+        help="Show specific toolchain info",
+    )
 
-    show_parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS,
-                             help='Show this help message and exit')
     show_parser.add_argument(
-        'query', action=DictChoiceAction, type=str, choices={
-            'available': 'All installed toolchains',
-            'configured': 'Toolchains configured for the distro_id',
-            'latest': 'The most recent installed toolchain',
-        })
+        "-h",
+        "--help",
+        action="help",
+        default=argparse.SUPPRESS,
+        help="Show this help message and exit",
+    )
+    show_parser.add_argument(
+        "query",
+        action=DictChoiceAction,
+        type=str,
+        choices={
+            "available": "All installed toolchains",
+            "configured": "Toolchains configured for the distro_id",
+            "latest": "The most recent installed toolchain",
+        },
+    )
 
-    config_parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS,
-                               help='Show this help message and exit')
     config_parser.add_argument(
-        'query', action=DictChoiceAction, type=str, choices={
-            'base_path': 'Toolchain base execution path',
-            'releases': 'All defined release names',
-            'versions': 'All defined version names',
-            'aliases': 'All defined aliases for version names',
-        })
+        "-h",
+        "--help",
+        action="help",
+        default=argparse.SUPPRESS,
+        help="Show this help message and exit",
+    )
+    config_parser.add_argument(
+        "query",
+        action=DictChoiceAction,
+        type=str,
+        choices={
+            "base_path": "Toolchain base execution path",
+            "releases": "All defined release names",
+            "versions": "All defined version names",
+            "aliases": "All defined aliases for version names",
+        },
+    )
 
-    platform_parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS,
-                                 help='Show this help message and exit')
     platform_parser.add_argument(
-        'query', action=DictChoiceAction, type=str, choices={
-            'distro': 'Show the "distro" component of the distro_id',
-            'arch': 'Show the "arch" component of the distro_id',
-            'tag': 'Show the information tag component of the distro_id',
-        })
+        "-h",
+        "--help",
+        action="help",
+        default=argparse.SUPPRESS,
+        help="Show this help message and exit",
+    )
+    platform_parser.add_argument(
+        "query",
+        action=DictChoiceAction,
+        type=str,
+        choices={
+            "distro": 'Show the "distro" component of the distro_id',
+            "arch": 'Show the "arch" component of the distro_id',
+            "tag": "Show the information tag component of the distro_id",
+        },
+    )
 
-    toolchain_parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS,
-                                  help='Show this help message and exit')
-    toolchain_parser.add_argument('-v', '--toolchain-version', help='Toolchain version', type=str,
-                                  default=str(ToolchainVersionName.STABLE))
-    toolchain_parser.add_argument('-r', '--release', help="Toolchain release", type=str,
-                                  default=str(ToolchainReleaseName.CURRENT))
     toolchain_parser.add_argument(
-        'query', action=DictChoiceAction, type=str, choices={
-            'install_path': 'Toolchain installation path',
-            'exec_path': 'Toolchain execution path',
-        })
+        "-h",
+        "--help",
+        action="help",
+        default=argparse.SUPPRESS,
+        help="Show this help message and exit",
+    )
+    toolchain_parser.add_argument(
+        "-v",
+        "--toolchain-version",
+        help="Toolchain version",
+        type=str,
+        default=str(ToolchainVersionName.STABLE),
+    )
+    toolchain_parser.add_argument(
+        "-r",
+        "--release",
+        help="Toolchain release",
+        type=str,
+        default=str(ToolchainReleaseName.CURRENT),
+    )
+    toolchain_parser.add_argument(
+        "query",
+        action=DictChoiceAction,
+        type=str,
+        choices={
+            "install_path": "Toolchain installation path",
+            "exec_path": "Toolchain execution path",
+        },
+    )
 
     parsed_args = parser.parse_args()
     obj: Optional[object] = None
 
     # Set up the objects required for each command
     toolchain_platform = ToolchainPlatform(distro_id=parsed_args.distro_id, arch=parsed_args.arch)
-    if parsed_args.command == 'platform':
+    if parsed_args.command == "platform":
         obj = toolchain_platform
-    elif parsed_args.command in ('show', 'config', 'toolchain'):
+    elif parsed_args.command in ("show", "config", "toolchain"):
         try:
             toolchain_config = ToolchainConfig(
-                pathlib.Path(parsed_args.from_file), platform=toolchain_platform)
+                pathlib.Path(parsed_args.from_file), platform=toolchain_platform
+            )
         except ToolchainDataException as exc:
             print(exc, file=sys.stderr)
             sys.exit(1)
 
         toolchains = Toolchains(config=toolchain_config)
 
-        if parsed_args.command == 'show':
+        if parsed_args.command == "show":
             obj = toolchains
-        elif parsed_args.command == 'config':
+        elif parsed_args.command == "config":
             obj = toolchain_config
-        elif parsed_args.command == 'toolchain':
+        elif parsed_args.command == "toolchain":
             obj = toolchains[parsed_args.release]
     else:
         print(f"Unknown command: {parsed_args.command}", file=sys.stderr)
@@ -782,7 +905,7 @@ if __name__ == '__main__':
     output: Any
     attribute = getattr(obj, parsed_args.query)
     if callable(attribute):
-        if attribute.__name__ == 'exec_path':
+        if attribute.__name__ == "exec_path":
             output = attribute(parsed_args.toolchain_version)
         else:
             output = attribute()
@@ -794,7 +917,7 @@ if __name__ == '__main__':
         if isinstance(output, (tuple, list)):
             output = str.join(" ", output)
         elif isinstance(output, dict):
-            output = '\n'.join([f"{k}: {v}" for k, v in output.items()])
+            output = "\n".join([f"{k}: {v}" for k, v in output.items()])
         elif not isinstance(output, str):
             output = str(output)
 

@@ -1,4 +1,5 @@
 """Generate mongod.conf and mongos.conf using config fuzzer."""
+
 import json
 import os.path
 import shutil
@@ -28,23 +29,25 @@ class GenerateFuzzConfig(Subcommand):
         filename = "mongod.conf"
         output_file = os.path.join(self._output_path, filename)
         user_param = utils.dump_yaml({})
-        set_parameters, wt_engine_config, wt_coll_config, \
-        wt_index_config = mongo_fuzzer_configs.fuzz_mongod_set_parameters(self._mongod_mode,
-                                                                          self._seed,
-                                                                          user_param)
+        set_parameters, wt_engine_config, wt_coll_config, wt_index_config = (
+            mongo_fuzzer_configs.fuzz_mongod_set_parameters(
+                self._mongod_mode, self._seed, user_param
+            )
+        )
         set_parameters = utils.load_yaml(set_parameters)
         set_parameters["mirrorReads"] = json.dumps(set_parameters["mirrorReads"])
         # This is moved from Jepsen mongod.conf to have only one setParameter key value pair.
         set_parameters["enableTestCommands"] = True
         set_parameters["testingDiagnosticsEnabled"] = True
         conf = {
-            "setParameter": set_parameters, "storage": {
+            "setParameter": set_parameters,
+            "storage": {
                 "wiredTiger": {
                     "engineConfig": {"configString": wt_engine_config},
                     "collectionConfig": {"configString": wt_coll_config},
-                    "indexConfig": {"configString": wt_index_config}
+                    "indexConfig": {"configString": wt_index_config},
                 }
-            }
+            },
         }
         if self._template_path is not None:
             try:
@@ -53,7 +56,7 @@ class GenerateFuzzConfig(Subcommand):
                 pass
 
         fuzz_config = utils.dump_yaml(conf)
-        with open(output_file, 'a') as file:
+        with open(output_file, "a") as file:
             file.write(fuzz_config)
             file.write("\n")
 
@@ -62,7 +65,8 @@ class GenerateFuzzConfig(Subcommand):
         output_file = os.path.join(self._output_path, filename)
         user_param = utils.dump_yaml({})
         set_parameters = mongo_fuzzer_configs.fuzz_mongos_set_parameters(
-            self._mongos_mode, self._seed, user_param)
+            self._mongos_mode, self._seed, user_param
+        )
         set_parameters = utils.load_yaml(set_parameters)
         conf = {"setParameter": set_parameters}
         if self._template_path is not None:
@@ -75,7 +79,7 @@ class GenerateFuzzConfig(Subcommand):
                 return
 
         fuzz_config = utils.dump_yaml(conf)
-        with open(output_file, 'a') as file:
+        with open(output_file, "a") as file:
             file.write(fuzz_config)
             file.write("\n")
 
@@ -100,21 +104,38 @@ class GenerateFuzzConfigPlugin(PluginInterface):
         :return: None
         """
         parser = subparsers.add_parser(_COMMAND, help=_HELP)
-        parser.add_argument("--template", '-t', type=str, required=False,
-                            help="Path to templates to append config-fuzzer-generated parameters.")
-        parser.add_argument("--output", '-o', type=str, required=True,
-                            help="Path to the output file.")
         parser.add_argument(
-            "--fuzzMongodConfigs", dest="fuzz_mongod_configs",
+            "--template",
+            "-t",
+            type=str,
+            required=False,
+            help="Path to templates to append config-fuzzer-generated parameters.",
+        )
+        parser.add_argument(
+            "--output", "-o", type=str, required=True, help="Path to the output file."
+        )
+        parser.add_argument(
+            "--fuzzMongodConfigs",
+            dest="fuzz_mongod_configs",
             help="Randomly chooses mongod parameters that were not specified. Use 'stress' to fuzz "
             "all configs including stressful storage configurations that may significantly "
             "slow down the server. Use 'normal' to only fuzz non-stressful configurations. ",
-            metavar="MODE", choices=('normal', 'stress'))
-        parser.add_argument("--fuzzMongosConfigs", dest="fuzz_mongos_configs",
-                            help="Randomly chooses mongos parameters that were not specified",
-                            metavar="MODE", choices=('normal', ))
-        parser.add_argument("--configFuzzSeed", dest="config_fuzz_seed", metavar="PATH",
-                            help="Sets the seed used by mongod and mongos config fuzzers")
+            metavar="MODE",
+            choices=("normal", "stress"),
+        )
+        parser.add_argument(
+            "--fuzzMongosConfigs",
+            dest="fuzz_mongos_configs",
+            help="Randomly chooses mongos parameters that were not specified",
+            metavar="MODE",
+            choices=("normal",),
+        )
+        parser.add_argument(
+            "--configFuzzSeed",
+            dest="config_fuzz_seed",
+            metavar="PATH",
+            help="Sets the seed used by mongod and mongos config fuzzers",
+        )
 
     def parse(self, subcommand, parser, parsed_args, **kwargs):
         """
@@ -130,6 +151,10 @@ class GenerateFuzzConfigPlugin(PluginInterface):
         if subcommand != _COMMAND:
             return None
 
-        return GenerateFuzzConfig(parsed_args.template, parsed_args.output,
-                                  parsed_args.fuzz_mongod_configs, parsed_args.fuzz_mongos_configs,
-                                  parsed_args.config_fuzz_seed)
+        return GenerateFuzzConfig(
+            parsed_args.template,
+            parsed_args.output,
+            parsed_args.fuzz_mongod_configs,
+            parsed_args.fuzz_mongos_configs,
+            parsed_args.config_fuzz_seed,
+        )

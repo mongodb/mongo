@@ -72,7 +72,9 @@ class BGHook(interface.Hook):
 
         self._test_num = 0
         # The number of tests we execute before restarting the background hook.
-        self._tests_per_cycle = self.DEFAULT_TESTS_PER_CYCLE if tests_per_cycle is None else tests_per_cycle
+        self._tests_per_cycle = (
+            self.DEFAULT_TESTS_PER_CYCLE if tests_per_cycle is None else tests_per_cycle
+        )
         self._loop_delay_ms = loop_delay_ms
 
     def run_action(self):

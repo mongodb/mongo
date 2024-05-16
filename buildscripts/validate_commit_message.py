@@ -27,6 +27,7 @@
 # it in the license file.
 #
 """Validate that the commit message is ok."""
+
 import argparse
 import logging
 import os
@@ -72,7 +73,7 @@ COMMON_LINT_PATTERN = r"(?P<lint>Fix\slint)"
 COMMON_IMPORT_PATTERN = r"(?P<imported>Import\s(wiredtiger|tools):\s.*)"
 """Common Import pattern format."""
 
-COMMON_REVERT_IMPORT_PATTERN = (r"Revert\s+[\"\']?(?P<imported>Import\s(wiredtiger|tools):\s.*)")
+COMMON_REVERT_IMPORT_PATTERN = r"Revert\s+[\"\']?(?P<imported>Import\s(wiredtiger|tools):\s.*)"
 """Common revert Import pattern format."""
 
 COMMON_PRIVATE_PATTERN = r"""
@@ -97,10 +98,10 @@ def new_patch_description(pattern: str) -> str:
     :param pattern: The pattern to wrap.
     :return: A pattern to match the new format for the patch description.
     """
-    return (r"""^((?P<commitqueue>Commit\sQueue\sMerge:)\s')"""
-            f"{pattern}"
-            # r"""('\s(?P<into>into\s'((?P<owner>[^/]+))/((?P<repo>[^:]+)):((?P<branch>[^']+))'))"""
-            )
+    return (
+        r"""^((?P<commitqueue>Commit\sQueue\sMerge:)\s')""" f"{pattern}"
+        # r"""('\s(?P<into>into\s'((?P<owner>[^/]+))/((?P<repo>[^:]+)):((?P<branch>[^']+))'))"""
+    )
 
 
 def old_patch_description(pattern: str) -> str:
@@ -215,7 +216,8 @@ class CommitMessageValidationOrchestrator:
                             error_msg="Reference to a internal Jira Ticket",
                             branch=project,
                             commit_message=message,
-                        ))
+                        )
+                    )
                     return False
             return True
         elif any(private_pattern.match(message) for private_pattern in PRIVATE_PATTERNS):
@@ -224,7 +226,8 @@ class CommitMessageValidationOrchestrator:
                     error_msg="Reference to a private project",
                     branch=project,
                     commit_message=message,
-                ))
+                )
+            )
             return False
         else:
             print(
@@ -232,7 +235,8 @@ class CommitMessageValidationOrchestrator:
                     error_msg="Commit without a ticket",
                     branch=project,
                     commit_message=message,
-                ))
+                )
+            )
             return False
 
     def validate_commit_messages(self, version_id: str) -> int:
@@ -257,7 +261,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     """Execute Main function to validate commit messages."""
     parser = argparse.ArgumentParser(
         usage="Validate the commit message. "
-        "It validates the latest message when no arguments are provided.")
+        "It validates the latest message when no arguments are provided."
+    )
     parser.add_argument(
         "version_id",
         metavar="version id",
@@ -271,7 +276,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     args = parser.parse_args(argv)
     evg_api = RetryingEvergreenApi.get_api(
-        config_file=os.path.expanduser(args.evg_config_file), log_on_error=True)
+        config_file=os.path.expanduser(args.evg_config_file), log_on_error=True
+    )
     jira_auth = JiraAuth()
     jira_client = JiraClient(JIRA_SERVER, jira_auth)
     orchestrator = CommitMessageValidationOrchestrator(evg_api, jira_client)

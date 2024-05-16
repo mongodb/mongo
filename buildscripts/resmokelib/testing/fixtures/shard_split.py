@@ -14,7 +14,7 @@ from buildscripts.resmokelib.testing.fixtures.fixturelib import with_naive_retry
 
 def _is_replica_set_fixture(fixture):
     """Determine whether the passed in fixture is a ReplicaSetFixture."""
-    return hasattr(fixture, 'replset_name')
+    return hasattr(fixture, "replset_name")
 
 
 def _teardown_and_clean_fixture(fixture):
@@ -36,22 +36,23 @@ class ShardSplitFixture(interface.MultiClusterFixture):
     AWAIT_REPL_TIMEOUT_FOREVER_MINS = 24 * 60
 
     def __init__(
-            self,
-            logger,
-            job_num,
-            fixturelib,
-            common_mongod_options=None,
-            per_mongod_options=None,
-            dbpath_prefix=None,
-            preserve_dbpath=False,
-            num_nodes_per_replica_set=2,
-            auth_options=None,
-            replset_config_options=None,
-            mixed_bin_versions=None,
+        self,
+        logger,
+        job_num,
+        fixturelib,
+        common_mongod_options=None,
+        per_mongod_options=None,
+        dbpath_prefix=None,
+        preserve_dbpath=False,
+        num_nodes_per_replica_set=2,
+        auth_options=None,
+        replset_config_options=None,
+        mixed_bin_versions=None,
     ):
         """Initialize ShardSplitFixture with different options for the replica set processes."""
-        interface.MultiClusterFixture.__init__(self, logger, job_num, fixturelib,
-                                               dbpath_prefix=dbpath_prefix)
+        interface.MultiClusterFixture.__init__(
+            self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix
+        )
         self.__lock = threading.Lock()
 
         self.common_mongod_options = self.fixturelib.default_if_none(common_mongod_options, {})
@@ -60,10 +61,14 @@ class ShardSplitFixture(interface.MultiClusterFixture):
         self.preserve_dbpath = preserve_dbpath
         self.auth_options = auth_options
         self.replset_config_options = self.fixturelib.default_if_none(replset_config_options, {})
-        self.mixed_bin_versions = self.fixturelib.default_if_none(mixed_bin_versions,
-                                                                  self.config.MIXED_BIN_VERSIONS)
-        self.num_nodes_per_replica_set = num_nodes_per_replica_set if num_nodes_per_replica_set \
+        self.mixed_bin_versions = self.fixturelib.default_if_none(
+            mixed_bin_versions, self.config.MIXED_BIN_VERSIONS
+        )
+        self.num_nodes_per_replica_set = (
+            num_nodes_per_replica_set
+            if num_nodes_per_replica_set
             else self.config.NUM_REPLSET_NODES
+        )
         # The default shard split timeout (10 seconds) is not long enough for some test cases
         # which have slow system performances may cause the shard split operation to be long.
         if "set_parameters" not in self.common_mongod_options:
@@ -84,20 +89,31 @@ class ShardSplitFixture(interface.MultiClusterFixture):
 
         self.fixtures.append(
             self.fixturelib.make_fixture(
-                "ReplicaSetFixture", self.logger, self.job_num, mongod_options=mongod_options,
-                preserve_dbpath=self.preserve_dbpath, num_nodes=self.num_nodes_per_replica_set,
-                auth_options=self.auth_options, replset_config_options=self.replset_config_options,
-                mixed_bin_versions=self.mixed_bin_versions, replicaset_logging_prefix=donor_rs_name,
-                all_nodes_electable=True, replset_name=donor_rs_name))
+                "ReplicaSetFixture",
+                self.logger,
+                self.job_num,
+                mongod_options=mongod_options,
+                preserve_dbpath=self.preserve_dbpath,
+                num_nodes=self.num_nodes_per_replica_set,
+                auth_options=self.auth_options,
+                replset_config_options=self.replset_config_options,
+                mixed_bin_versions=self.mixed_bin_versions,
+                replicaset_logging_prefix=donor_rs_name,
+                all_nodes_electable=True,
+                replset_name=donor_rs_name,
+            )
+        )
 
         # Ensure that all nodes are only ever run on the same deterministic set of ports, this
         # makes it easier to reroute in the jstest overrides
         self._port_index = 0
-        self._ports = [[node.port for node in self.get_donor_rs().nodes],
-                       [
-                           self.fixturelib.get_next_port(self.job_num)
-                           for _ in range(self.num_nodes_per_replica_set)
-                       ]]
+        self._ports = [
+            [node.port for node in self.get_donor_rs().nodes],
+            [
+                self.fixturelib.get_next_port(self.job_num)
+                for _ in range(self.num_nodes_per_replica_set)
+            ],
+        ]
 
     def pids(self):
         """:return: pids owned by this fixture if any."""
@@ -106,7 +122,7 @@ class ShardSplitFixture(interface.MultiClusterFixture):
             for fixture in self.fixtures:
                 out.extend(fixture.pids())
         if not out:
-            self.logger.debug('No fixtures when gathering pids.')
+            self.logger.debug("No fixtures when gathering pids.")
         return out
 
     def setup(self):
@@ -143,8 +159,11 @@ class ShardSplitFixture(interface.MultiClusterFixture):
         # self.fixtures. Tearing down may take a long time, so taking the lock during that process
         # might result in hangs in other functions which need to take the lock.
         for fixture in reversed(self.fixtures):
-            type_name = f"replica set '{fixture.replset_name}'" if _is_replica_set_fixture(
-                fixture) else f"standalone on port {fixture.port}"
+            type_name = (
+                f"replica set '{fixture.replset_name}'"
+                if _is_replica_set_fixture(fixture)
+                else f"standalone on port {fixture.port}"
+            )
             teardown_handler.teardown(fixture, type_name, mode=mode)
 
         if teardown_handler.was_successful():
@@ -201,11 +220,14 @@ class ShardSplitFixture(interface.MultiClusterFixture):
             return self.fixtures[1:]
 
     def _create_client(self, fixture, **kwargs):
-        return fixture.mongo_client(username=self.auth_options["username"],
-                                    password=self.auth_options["password"],
-                                    authSource=self.auth_options["authenticationDatabase"],
-                                    authMechanism=self.auth_options["authenticationMechanism"],
-                                    uuidRepresentation='standard', **kwargs)
+        return fixture.mongo_client(
+            username=self.auth_options["username"],
+            password=self.auth_options["password"],
+            authSource=self.auth_options["authenticationDatabase"],
+            authMechanism=self.auth_options["authenticationMechanism"],
+            uuidRepresentation="standard",
+            **kwargs,
+        )
 
     def add_recipient_nodes(self, recipient_set_name, recipient_tag_name=None):
         """Build recipient nodes, and reconfig them into the donor as non-voting members."""
@@ -220,24 +242,33 @@ class ShardSplitFixture(interface.MultiClusterFixture):
             self._port_index ^= 1  # Toggle the set of mongod ports between index 0 and 1
             for i in range(self.num_nodes_per_replica_set):
                 mongod_logger = self.fixturelib.new_fixture_node_logger(
-                    "MongoDFixture", self.job_num, f"{recipient_set_name}:node{i}")
+                    "MongoDFixture", self.job_num, f"{recipient_set_name}:node{i}"
+                )
 
                 mongod_options = self.common_mongod_options.copy()
                 # Even though these nodes are not starting in a replica set, we structure their
                 # files on disk as if they were already part of the new recipient set. This makes
                 # logging and cleanup easier.
-                mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, recipient_set_name,
-                                                        "node{}".format(i))
+                mongod_options["dbpath"] = os.path.join(
+                    self._dbpath_prefix, recipient_set_name, "node{}".format(i)
+                )
                 mongod_options["set_parameters"] = mongod_options.get(
-                    "set_parameters", self.fixturelib.make_historic({})).copy()
+                    "set_parameters", self.fixturelib.make_historic({})
+                ).copy()
                 mongod_options["serverless"] = True
                 mongod_port = self._ports[self._port_index][i]
 
                 self.fixtures.append(
                     self.fixturelib.make_fixture(
-                        "MongoDFixture", mongod_logger, self.job_num, mongod_options=mongod_options,
-                        dbpath_prefix=self.dbpath_prefix, preserve_dbpath=self.preserve_dbpath,
-                        port=mongod_port))
+                        "MongoDFixture",
+                        mongod_logger,
+                        self.job_num,
+                        mongod_options=mongod_options,
+                        dbpath_prefix=self.dbpath_prefix,
+                        preserve_dbpath=self.preserve_dbpath,
+                        port=mongod_port,
+                    )
+                )
 
         recipient_nodes = self.get_recipient_nodes()
         for recipient_node in recipient_nodes:
@@ -259,8 +290,11 @@ class ShardSplitFixture(interface.MultiClusterFixture):
                 # retry.
                 recipient_host = recipient_node.get_internal_connection_string()
                 recipient_entry = {
-                    "host": recipient_host, "votes": 0, "priority": 0, "hidden": True,
-                    "tags": {recipient_tag_name: str(ObjectId())}
+                    "host": recipient_host,
+                    "votes": 0,
+                    "priority": 0,
+                    "hidden": True,
+                    "tags": {recipient_tag_name: str(ObjectId())},
                 }
                 member_exists = False
                 for index, member in enumerate(repl_members):
@@ -280,11 +314,14 @@ class ShardSplitFixture(interface.MultiClusterFixture):
             repl_config["members"] = repl_members
 
             self.logger.info(
-                f"Reconfiguring donor replica set to add non-voting recipient nodes: {repl_config}")
-            client.admin.command({
-                "replSetReconfig": repl_config,
-                "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
-            })
+                f"Reconfiguring donor replica set to add non-voting recipient nodes: {repl_config}"
+            )
+            client.admin.command(
+                {
+                    "replSetReconfig": repl_config,
+                    "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000,
+                }
+            )
 
         with_naive_retry(lambda: reconfig_add_node_rs(donor_client))
         # Wait for recipient nodes to become secondaries
@@ -298,8 +335,9 @@ class ShardSplitFixture(interface.MultiClusterFixture):
         start = time.time()
         recipient_nodes = self.get_recipient_nodes()
         for recipient_node in recipient_nodes:
-            recipient_client = self._create_client(recipient_node,
-                                                   read_preference=pymongo.ReadPreference.SECONDARY)
+            recipient_client = self._create_client(
+                recipient_node, read_preference=pymongo.ReadPreference.SECONDARY
+            )
             while True:
                 now = time.time()
                 if (now - start) >= timeout_secs:
@@ -308,7 +346,8 @@ class ShardSplitFixture(interface.MultiClusterFixture):
                     raise self.fixturelib.ServerFailure(msg)
 
                 self.logger.info(
-                    f"Waiting for secondary on port {recipient_node.port} to become available.")
+                    f"Waiting for secondary on port {recipient_node.port} to become available."
+                )
                 try:
                     is_secondary = recipient_client.admin.command("isMaster")["secondary"]
                     if is_secondary:
@@ -340,8 +379,9 @@ class ShardSplitFixture(interface.MultiClusterFixture):
         def reconfig_rs(client):
             repl_config = client.admin.command({"replSetGetConfig": 1})["config"]
             repl_members = [
-                member for member in repl_config["members"]
-                if not 'tags' in member or not recipient_tag_name in member["tags"]
+                member
+                for member in repl_config["members"]
+                if not "tags" in member or not recipient_tag_name in member["tags"]
             ]
 
             if "recipientConfig" in repl_config:
@@ -360,11 +400,14 @@ class ShardSplitFixture(interface.MultiClusterFixture):
             repl_config["members"] = repl_members
 
             self.logger.info(
-                f"Reconfiguring donor '{donor_rs_name}' to remove recipient nodes: {repl_config}")
-            donor_client.admin.command({
-                "replSetReconfig": repl_config,
-                "maxTimeMS": self.AWAIT_READY_TIMEOUT_SECS * 60 * 1000
-            })
+                f"Reconfiguring donor '{donor_rs_name}' to remove recipient nodes: {repl_config}"
+            )
+            donor_client.admin.command(
+                {
+                    "replSetReconfig": repl_config,
+                    "maxTimeMS": self.AWAIT_READY_TIMEOUT_SECS * 60 * 1000,
+                }
+            )
 
         with_naive_retry(func=lambda: reconfig_rs(donor_client))
 
@@ -375,17 +418,26 @@ class ShardSplitFixture(interface.MultiClusterFixture):
     def replace_donor_with_recipient(self, recipient_set_name):
         """Replace the current donor with the newly initiated recipient."""
         self.logger.info(
-            f"Making new donor replica set '{recipient_set_name}' from existing recipient nodes.")
+            f"Making new donor replica set '{recipient_set_name}' from existing recipient nodes."
+        )
         mongod_options = self.common_mongod_options.copy()
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, recipient_set_name)
         mongod_options["serverless"] = True
         new_donor_rs = self.fixturelib.make_fixture(
-            "ReplicaSetFixture", self.logger, self.job_num, mongod_options=mongod_options,
-            preserve_dbpath=self.preserve_dbpath, num_nodes=self.num_nodes_per_replica_set,
-            auth_options=self.auth_options, replset_config_options=self.replset_config_options,
+            "ReplicaSetFixture",
+            self.logger,
+            self.job_num,
+            mongod_options=mongod_options,
+            preserve_dbpath=self.preserve_dbpath,
+            num_nodes=self.num_nodes_per_replica_set,
+            auth_options=self.auth_options,
+            replset_config_options=self.replset_config_options,
             mixed_bin_versions=self.mixed_bin_versions,
-            replicaset_logging_prefix=recipient_set_name, all_nodes_electable=True,
-            replset_name=recipient_set_name, existing_nodes=self.get_recipient_nodes())
+            replicaset_logging_prefix=recipient_set_name,
+            all_nodes_electable=True,
+            replset_name=recipient_set_name,
+            existing_nodes=self.get_recipient_nodes(),
+        )
 
         new_donor_rs.get_primary()  # Await an election of a new donor primary
 

@@ -42,14 +42,19 @@ def main():
     """
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('-o', nargs='?', type=argparse.FileType('w'), default=sys.stdout,
-                        help='output file (default sys.stdout)')
-    parser.add_argument('template_file', help='Cheetah template file')
-    parser.add_argument('template_arg', nargs='*', default=[], help='Cheetah template args')
+    parser.add_argument(
+        "-o",
+        nargs="?",
+        type=argparse.FileType("w"),
+        default=sys.stdout,
+        help="output file (default sys.stdout)",
+    )
+    parser.add_argument("template_file", help="Cheetah template file")
+    parser.add_argument("template_arg", nargs="*", default=[], help="Cheetah template args")
     opts = parser.parse_args()
 
-    opts.o.write(str(Template(file=opts.template_file, namespaces=[{'args': opts.template_arg}])))
+    opts.o.write(str(Template(file=opts.template_file, namespaces=[{"args": opts.template_arg}])))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

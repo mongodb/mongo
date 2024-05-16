@@ -50,15 +50,19 @@ class RunCommand(object):
 
     def execute(self):
         """Execute 'cmd' and return err_code and output."""
-        self._process = subprocess.Popen(self._cmd_list(), stdout=subprocess.PIPE,
-                                         stderr=subprocess.STDOUT, **self._preexec_kargs)
+        self._process = subprocess.Popen(
+            self._cmd_list(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            **self._preexec_kargs,
+        )
         output, _ = self._process.communicate()
         error_code = self._process.returncode
         return error_code, output
 
     def execute_with_output(self):
         """Execute the command, return result as a string."""
-        return subprocess.check_output(self._cmd_list()).decode('utf-8')
+        return subprocess.check_output(self._cmd_list()).decode("utf-8")
 
     def execute_save_output(self):
         """Execute the command, save result in 'self.output_file' and return returncode."""
@@ -70,9 +74,13 @@ class RunCommand(object):
         """Start to execute the command."""
         # Do not propagate interrupts to the child process.
         with fileops.get_file_handle(self.output_file, self.append_file) as file_handle:
-            self._process = subprocess.Popen(self._cmd_list(), stdin=subprocess.PIPE,
-                                             stdout=file_handle, stderr=subprocess.STDOUT,
-                                             **self._preexec_kargs)
+            self._process = subprocess.Popen(
+                self._cmd_list(),
+                stdin=subprocess.PIPE,
+                stdout=file_handle,
+                stderr=subprocess.STDOUT,
+                **self._preexec_kargs,
+            )
 
     def send_to_process(self, string=None):
         """Send 'string' to a running processs and return stdout, stderr."""

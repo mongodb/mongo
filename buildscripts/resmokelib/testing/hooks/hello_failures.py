@@ -29,16 +29,18 @@ class HelloDelays(interface.Hook):
 
     def before_test(self, test, test_report):
         """Each test will call this before it executes."""
-        print('before_test hook starts injecting Hello failures')
+        print("before_test hook starts injecting Hello failures")
         hook_test_case = jsfile.DynamicJSTestCase.create_before_test(
-            test.logger, test, self, self.js_filename, self.shell_options)
+            test.logger, test, self, self.js_filename, self.shell_options
+        )
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 
     def after_test(self, test, test_report):
         """Each test will call this after it executes."""
-        print('Cleanup hook is starting to remove Hello fail injections')
+        print("Cleanup hook is starting to remove Hello fail injections")
         hook_test_case = jsfile.DynamicJSTestCase.create_after_test(
-            test.logger, test, self, self.cleanup_js_filename, self.shell_options)
+            test.logger, test, self, self.cleanup_js_filename, self.shell_options
+        )
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)

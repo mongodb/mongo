@@ -24,10 +24,10 @@ def scons_to_bazel_target(scons_target: str) -> str:
     bazel_target = f"//src/{scons_target}"
     # Replace last / with :
     last_slash_idx = bazel_target.rfind("/")
-    bazel_target = bazel_target[:last_slash_idx] + ":" + bazel_target[last_slash_idx + 1:]
+    bazel_target = bazel_target[:last_slash_idx] + ":" + bazel_target[last_slash_idx + 1 :]
     # Remove suffix
     if "." in bazel_target:
-        bazel_target = bazel_target[:bazel_target.rfind(".")]
+        bazel_target = bazel_target[: bazel_target.rfind(".")]
     return bazel_target
 
 
@@ -77,33 +77,52 @@ def log_subprocess_run(*args, **kwargs) -> subprocess.CompletedProcess:
 def get_bazel_args(compiler_type: str, extra_args: list[str]) -> list[str]:
     # Do an actual run since dry-runs cannot create configure test entries which are needed for
     # getting the command line flags from dry runs later in the execution of this script.
-    log_subprocess_run([
-        sys.executable,
-        "buildscripts/scons.py",
-        *extra_args,
-        *([] if compiler_type is None else
-          [f"--variables-files=etc/scons/mongodbtoolchain_stable_{compiler_type}.vars"]),
-        "VERBOSE=1",
-        "ICECC=",
-        "CCACHE=",
-        "--ninja=disabled",
-        "BAZEL_BUILD_ENABLED=1",
-        "$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp",
-    ], env={**os.environ.copy(), **bazel_env_settings}, stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE, check=True, text=True)
+    log_subprocess_run(
+        [
+            sys.executable,
+            "buildscripts/scons.py",
+            *extra_args,
+            *(
+                []
+                if compiler_type is None
+                else [f"--variables-files=etc/scons/mongodbtoolchain_stable_{compiler_type}.vars"]
+            ),
+            "VERBOSE=1",
+            "ICECC=",
+            "CCACHE=",
+            "--ninja=disabled",
+            "BAZEL_BUILD_ENABLED=1",
+            "$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp",
+        ],
+        env={**os.environ.copy(), **bazel_env_settings},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+        text=True,
+    )
     with open("build/scons/bazel/bazel_command", "r") as bazel_command_file:
         # strip off "bazel build"
         return bazel_command_file.read().split(" ")[2:]
 
 
-def bazel_compile_commands(bazel_bin: str, bazel_targets: list[str],
-                           bazel_args: list[str]) -> list[str]:
+def bazel_compile_commands(
+    bazel_bin: str, bazel_targets: list[str], bazel_args: list[str]
+) -> list[str]:
     debug_targets = " ".join([f"{target}_with_debug" for target in bazel_targets])
-    proc = log_subprocess_run([
-        bazel_bin, "aquery", f"mnemonic(\"CppCompile\", set({debug_targets}))",
-        "--include_artifacts=false", *bazel_args
-    ], env={**os.environ.copy(), **bazel_env_settings}, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, check=True, text=True)
+    proc = log_subprocess_run(
+        [
+            bazel_bin,
+            "aquery",
+            f'mnemonic("CppCompile", set({debug_targets}))',
+            "--include_artifacts=false",
+            *bazel_args,
+        ],
+        env={**os.environ.copy(), **bazel_env_settings},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+        text=True,
+    )
 
     compile_lines_parts = []
 
@@ -157,21 +176,35 @@ def bazel_compile_commands(bazel_bin: str, bazel_targets: list[str],
     return bazel_output_files
 
 
-def bazel_linker_commands(bazel_bin: str, bazel_targets: list[str], target_type_map: dict[str, str],
-                          bazel_args: list[str], link_static: bool) -> list[str]:
-    debug_targets = " ".join([
-        f"{target}_shared_with_debug"
-        if target_type_map[target] == "library" and not link_static else f"{target}_with_debug"
-        for target in bazel_targets
-    ])
-    proc = log_subprocess_run([
-        bazel_bin,
-        "aquery",
-        f"mnemonic(\"CppLink\", set({debug_targets}))",
-        "--include_artifacts=false",
-        *bazel_args,
-    ], env={**os.environ.copy(), **bazel_env_settings}, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, check=True, text=True)
+def bazel_linker_commands(
+    bazel_bin: str,
+    bazel_targets: list[str],
+    target_type_map: dict[str, str],
+    bazel_args: list[str],
+    link_static: bool,
+) -> list[str]:
+    debug_targets = " ".join(
+        [
+            f"{target}_shared_with_debug"
+            if target_type_map[target] == "library" and not link_static
+            else f"{target}_with_debug"
+            for target in bazel_targets
+        ]
+    )
+    proc = log_subprocess_run(
+        [
+            bazel_bin,
+            "aquery",
+            f'mnemonic("CppLink", set({debug_targets}))',
+            "--include_artifacts=false",
+            *bazel_args,
+        ],
+        env={**os.environ.copy(), **bazel_env_settings},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+        text=True,
+    )
 
     link_lines_parts = []
 
@@ -220,36 +253,67 @@ def bazel_linker_commands(bazel_bin: str, bazel_targets: list[str], target_type_
     return linker_output_paths
 
 
-def scons_commands(scons_targets: list[str], compiler_type: str, compile_output_paths: set[str],
-                   linker_output_paths: set[str], extra_args: list[str]):
-    log_subprocess_run([
-        sys.executable,
-        "buildscripts/scons.py",
-        *extra_args,
-        *([] if compiler_type is None else
-          [f"--variables-files=etc/scons/mongodbtoolchain_stable_{compiler_type}.vars"]),
-        "VERBOSE=1",
-        "ICECC=",
-        "CCACHE=",
-        "--ninja=disabled",
-        "BAZEL_BUILD_ENABLED=0",
-        "$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp",
-    ], env={**os.environ.copy(), **bazel_env_settings}, stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE, check=True, text=True)
-    proc = log_subprocess_run([
-        sys.executable, "buildscripts/scons.py", *extra_args,
-        *([] if compiler_type is None else
-          [f"--variables-files=etc/scons/mongodbtoolchain_stable_{compiler_type}.vars"]),
-        "VERBOSE=1", "ICECC=", "CCACHE=", "--ninja=disabled", "BAZEL_BUILD_ENABLED=0", "--dry-run",
-        *scons_targets
-    ], env={**os.environ.copy(), **bazel_env_settings}, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, check=True, text=True)
+def scons_commands(
+    scons_targets: list[str],
+    compiler_type: str,
+    compile_output_paths: set[str],
+    linker_output_paths: set[str],
+    extra_args: list[str],
+):
+    log_subprocess_run(
+        [
+            sys.executable,
+            "buildscripts/scons.py",
+            *extra_args,
+            *(
+                []
+                if compiler_type is None
+                else [f"--variables-files=etc/scons/mongodbtoolchain_stable_{compiler_type}.vars"]
+            ),
+            "VERBOSE=1",
+            "ICECC=",
+            "CCACHE=",
+            "--ninja=disabled",
+            "BAZEL_BUILD_ENABLED=0",
+            "$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp",
+        ],
+        env={**os.environ.copy(), **bazel_env_settings},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+        text=True,
+    )
+    proc = log_subprocess_run(
+        [
+            sys.executable,
+            "buildscripts/scons.py",
+            *extra_args,
+            *(
+                []
+                if compiler_type is None
+                else [f"--variables-files=etc/scons/mongodbtoolchain_stable_{compiler_type}.vars"]
+            ),
+            "VERBOSE=1",
+            "ICECC=",
+            "CCACHE=",
+            "--ninja=disabled",
+            "BAZEL_BUILD_ENABLED=0",
+            "--dry-run",
+            *scons_targets,
+        ],
+        env={**os.environ.copy(), **bazel_env_settings},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+        text=True,
+    )
 
     with open("./build/scons-compile-commands", "w") as output_file:
         # Use -fno-omit-frame-pointer and /D_CRT_SECURE_NO_WARNINGS to identify compile commands since they're present on all compilations and will
         # not be removed in the lifetime of the hybrid build system.
         compile_commands = [
-            output_line for output_line in proc.stdout.split("\n")
+            output_line
+            for output_line in proc.stdout.split("\n")
             if ("-fno-omit-frame-pointer" in output_line and "-o" in output_line)
             or "/D_CRT_SECURE_NO_WARNINGS" in output_line
         ]
@@ -261,8 +325,9 @@ def scons_commands(scons_targets: list[str], compiler_type: str, compile_output_
         ]
 
         # Sort by output path
-        compile_commands = sorted(compile_commands,
-                                  key=lambda compile_command: compile_command.split(" ")[2])
+        compile_commands = sorted(
+            compile_commands, key=lambda compile_command: compile_command.split(" ")[2]
+        )
 
         compile_commands = [
             " ".join(compile_command.split(" ")) for compile_command in compile_commands
@@ -270,16 +335,21 @@ def scons_commands(scons_targets: list[str], compiler_type: str, compile_output_
 
         for compile_command in compile_commands:
             # Skip over any lines with inputs not used in the Bazel compilation
-            src_path = compile_command.split(" ")[3].replace(
-                "\\", "/") if platform.system() == "Windows" else compile_command.split(" ")[-1]
+            src_path = (
+                compile_command.split(" ")[3].replace("\\", "/")
+                if platform.system() == "Windows"
+                else compile_command.split(" ")[-1]
+            )
             if src_path not in compile_output_paths:
                 continue
             print(compile_command, file=output_file)
 
     with open("./build/scons-link-commands", "w") as output_file:
         link_commands = [
-            output_line for output_line in proc.stdout.split("\n") if
-            ("-Wl," in output_line and "-o" in output_line) or "/LARGEADDRESSAWARE" in output_line
+            output_line
+            for output_line in proc.stdout.split("\n")
+            if ("-Wl," in output_line and "-o" in output_line)
+            or "/LARGEADDRESSAWARE" in output_line
         ]
 
         # Remove binary name since it's not present in Bazel
@@ -305,14 +375,18 @@ def scons_commands(scons_targets: list[str], compiler_type: str, compile_output_
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--compiler_type", type=str,
-                        help="compiler type override, use for running locally", default=None)
+    parser.add_argument(
+        "--compiler_type",
+        type=str,
+        help="compiler type override, use for running locally",
+        default=None,
+    )
     parser.add_argument("--extra_args", type=str, help="list of args to pass to scons", default="")
     parser.add_argument(
-        "scons_targets", nargs="+", help=
-        "List of SCons targets to compare with their Bazel equivalents. Remove the build/*config/ prefix. "
-        +
-        "Example: for build/fast/mongo/platform/visibility_test1 pass in mongo/platform/visibility_test1"
+        "scons_targets",
+        nargs="+",
+        help="List of SCons targets to compare with their Bazel equivalents. Remove the build/*config/ prefix. "
+        + "Example: for build/fast/mongo/platform/visibility_test1 pass in mongo/platform/visibility_test1",
     )
 
     args = parser.parse_args()
@@ -332,8 +406,9 @@ def main():
         basename = os.path.basename(scons_target)
         if basename.endswith((".a", ".lib", ".dylib", ".dll", ".so")):
             target_type = "library"
-        elif (basename.endswith(".exe") and platform.system() == "Windows") or ("." not in (
-                basename and platform.system() != "Windows")):
+        elif (basename.endswith(".exe") and platform.system() == "Windows") or (
+            "." not in (basename and platform.system() != "Windows")
+        ):
             target_type = "binary"
         else:
             print("malformed target:", scons_target)
@@ -345,8 +420,10 @@ def main():
     link_static = "--//bazel/config:linkstatic=True" in bazel_args
 
     scons_targets = [
-        "$BUILD_DIR/" + normalize_link_mode_ext(
-            platformize_scons_target(scons_target), link_static).replace("\\", "/")
+        "$BUILD_DIR/"
+        + normalize_link_mode_ext(platformize_scons_target(scons_target), link_static).replace(
+            "\\", "/"
+        )
         for scons_target in args.scons_targets
     ]
     bazel_targets = [scons_to_bazel_target(scons_target) for scons_target in args.scons_targets]
@@ -354,8 +431,9 @@ def main():
     print("Bazel targets:", bazel_targets)
     print("SCons targets:", scons_targets)
 
-    bazel_bin_dir = os.getenv("TMPDIR") if os.getenv("TMPDIR") else os.path.expanduser(
-        "~/.local/bin")
+    bazel_bin_dir = (
+        os.getenv("TMPDIR") if os.getenv("TMPDIR") else os.path.expanduser("~/.local/bin")
+    )
     if not os.path.exists(bazel_bin_dir):
         os.makedirs(bazel_bin_dir)
 
@@ -363,20 +441,22 @@ def main():
     print("Bazel bin:", bazel_bin_dir)
 
     compile_output_paths = bazel_compile_commands(bazel_bin, bazel_targets, bazel_args)
-    linker_output_paths = bazel_linker_commands(bazel_bin, bazel_targets, target_type_map,
-                                                bazel_args, link_static)
-    scons_commands(scons_targets, args.compiler_type, compile_output_paths, linker_output_paths,
-                   extra_args)
+    linker_output_paths = bazel_linker_commands(
+        bazel_bin, bazel_targets, target_type_map, bazel_args, link_static
+    )
+    scons_commands(
+        scons_targets, args.compiler_type, compile_output_paths, linker_output_paths, extra_args
+    )
 
-    with open("./build/merged_diff.md", 'w') as output_file:
+    with open("./build/merged_diff.md", "w") as output_file:
         output_file.write(" ".join(sys.argv) + "\n\n")
         for file_name in [
-                "scons-compile-commands",
-                "bazel-compile-commands",
-                "scons-link-commands",
-                "bazel-link-commands",
+            "scons-compile-commands",
+            "bazel-compile-commands",
+            "scons-link-commands",
+            "bazel-link-commands",
         ]:
-            with open(f"./build/{file_name}", 'r') as input_file:
+            with open(f"./build/{file_name}", "r") as input_file:
                 output_file.write(f"{file_name}:\n\n")
                 print(f"{file_name}:\n\n")
                 output_file.write("```\n")
@@ -387,5 +467,5 @@ def main():
                 output_file.write("\n```\n\n\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -25,8 +25,9 @@ class TestFindTestsInGitDiff(unittest.TestCase):
 
     def test_get_tests_missing_fcv_tag_have_tag(self):
         tests = ["dummy_jstest_file.js"]
-        with patch.object(feature_flag_tags_check.jscomment, "get_tags",
-                          return_value=[self.requires_fcv_tag]):
+        with patch.object(
+            feature_flag_tags_check.jscomment, "get_tags", return_value=[self.requires_fcv_tag]
+        ):
             result = feature_flag_tags_check.get_tests_missing_fcv_tag(tests)
         self.assertCountEqual([], result)
 

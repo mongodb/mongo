@@ -28,12 +28,13 @@ MAXIMUM_CODE = 9999999  # JIRA Ticket + XX
 codes = []  # type: ignore
 
 # Each AssertLocation identifies the C++ source location of an assertion
-AssertLocation = namedtuple("AssertLocation", ['sourceFile', 'byteOffset', 'lines', 'code'])
+AssertLocation = namedtuple("AssertLocation", ["sourceFile", "byteOffset", "lines", "code"])
 
 list_files = False  # pylint: disable=invalid-name
 
 _CODE_PATTERNS = [
-    re.compile(p + r'\s*(?P<code>\d+)', re.MULTILINE) for p in [
+    re.compile(p + r"\s*(?P<code>\d+)", re.MULTILINE)
+    for p in [
         # All the asserts and their optional variant suffixes
         r"(?:f|i|m|msg|t|u)(?:assert)"
         r"(?:ed)?"
@@ -56,20 +57,22 @@ _CODE_PATTERNS = [
     ]
 ]
 
-_DIR_EXCLUDE_RE = re.compile(r'(\..*'
-                             r'|pcre2.*'
-                             r'|32bit.*'
-                             r'|mongodb-.*'
-                             r'|debian.*'
-                             r'|mongo-cxx-driver.*'
-                             r'|.*gotools.*'
-                             r'|.*mozjs.*'
-                             r')')
+_DIR_EXCLUDE_RE = re.compile(
+    r"(\..*"
+    r"|pcre2.*"
+    r"|32bit.*"
+    r"|mongodb-.*"
+    r"|debian.*"
+    r"|mongo-cxx-driver.*"
+    r"|.*gotools.*"
+    r"|.*mozjs.*"
+    r")"
+)
 
-_FILE_INCLUDE_RE = re.compile(r'.*\.(cpp|c|h|py|idl)')
+_FILE_INCLUDE_RE = re.compile(r".*\.(cpp|c|h|py|idl)")
 
 
-def get_all_source_files(prefix='.'):
+def get_all_source_files(prefix="."):
     """Return source files."""
 
     def walk(path):
@@ -92,8 +95,8 @@ def foreach_source_file(callback, src_root):
     """Invoke a callback on the text of each source file."""
     for source_file in get_all_source_files(prefix=src_root):
         if list_files:
-            print('scanning file: ' + source_file)
-        with open(source_file, 'r', encoding='utf-8') as fh:
+            print("scanning file: " + source_file)
+        with open(source_file, "r", encoding="utf-8") as fh:
             callback(source_file, fh.read())
 
 
@@ -106,8 +109,9 @@ def parse_source_files(callback, src_root):
                 # Note that this will include the text of the full match but will report the
                 # position of the beginning of the code portion rather than the beginning of the
                 # match. This is to position editors on the spot that needs to change.
-                loc = AssertLocation(source_file, match.start('code'), match.group(0),
-                                     match.group('code'))
+                loc = AssertLocation(
+                    source_file, match.start("code"), match.group(0), match.group("code")
+                )
                 callback(loc)
 
     foreach_source_file(scan_for_codes, src_root)
@@ -134,7 +138,7 @@ def get_line_and_column_for_position(loc, _file_cache=None):
 def is_terminated(lines):
     """Determine if assert is terminated, from .cpp/.h source lines as text."""
     code_block = " ".join(lines)
-    return ';' in code_block or code_block.count('(') - code_block.count(')') <= 0
+    return ";" in code_block or code_block.count("(") - code_block.count(")") <= 0
 
 
 def get_next_code(seen, server_ticket=0):
@@ -171,7 +175,7 @@ def check_error_codes():
     return len(errors) == 0
 
 
-def read_error_codes(src_root='src/mongo'):
+def read_error_codes(src_root="src/mongo"):
     """Define callback, call parse_source_files() with callback, save matches to global codes list."""
     seen = {}
     errors = []
@@ -261,16 +265,16 @@ def replace_bad_codes(errors, next_code_generator):
 
         ln = line_num - 1
 
-        with open(source_file, 'r+') as fh:
+        with open(source_file, "r+") as fh:
             print("LINE_%d_BEFORE:%s" % (line_num, fh.readlines()[ln].rstrip()))
 
             fh.seek(0)
             text = fh.read()
-            assert text[byte_offset] == '0'
+            assert text[byte_offset] == "0"
             fh.seek(0)
             fh.write(text[:byte_offset])
             fh.write(str(next(next_code_generator)))
-            fh.write(text[byte_offset + 1:])
+            fh.write(text[byte_offset + 1 :])
             fh.seek(0)
 
             print("LINE_%d_AFTER :%s" % (line_num, fh.readlines()[ln].rstrip()))
@@ -285,7 +289,7 @@ def coerce_to_number(ticket_value):
     if isinstance(ticket_value, int):
         return ticket_value
 
-    ticket_re = re.compile(r'(?:SERVER-)?(\d+)', re.IGNORECASE)
+    ticket_re = re.compile(r"(?:SERVER-)?(\d+)", re.IGNORECASE)
     matches = ticket_re.fullmatch(ticket_value)
     if not matches:
         print("Unknown ticket number. Input: " + ticket_value)
@@ -297,16 +301,37 @@ def coerce_to_number(ticket_value):
 def main():
     """Validate error codes."""
     parser = OptionParser(description=__doc__.strip())
-    parser.add_option("--fix", dest="replace", action="store_true", default=False,
-                      help="Fix zero codes in source files [default: %default]")
-    parser.add_option("-q", "--quiet", dest="quiet", action="store_true", default=False,
-                      help="Suppress output on success [default: %default]")
-    parser.add_option("--list-files", dest="list_files", action="store_true", default=False,
-                      help="Print the name of each file as it is scanned [default: %default]")
     parser.add_option(
-        "--ticket", dest="ticket", type="str", action="store", default=None,
+        "--fix",
+        dest="replace",
+        action="store_true",
+        default=False,
+        help="Fix zero codes in source files [default: %default]",
+    )
+    parser.add_option(
+        "-q",
+        "--quiet",
+        dest="quiet",
+        action="store_true",
+        default=False,
+        help="Suppress output on success [default: %default]",
+    )
+    parser.add_option(
+        "--list-files",
+        dest="list_files",
+        action="store_true",
+        default=False,
+        help="Print the name of each file as it is scanned [default: %default]",
+    )
+    parser.add_option(
+        "--ticket",
+        dest="ticket",
+        type="str",
+        action="store",
+        default=None,
         help="Generate error codes for a given SERVER ticket number. Inputs can be of"
-        " the form: `--ticket=12345` or `--ticket=SERVER-12345`.")
+        " the form: `--ticket=12345` or `--ticket=SERVER-12345`.",
+    )
     options, extra = parser.parse_args()
     if extra:
         parser.error(f"Unrecognized arguments: {' '.join(extra)}")

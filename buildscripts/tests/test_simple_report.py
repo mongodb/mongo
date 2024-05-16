@@ -1,4 +1,5 @@
 """Simple_report test."""
+
 import unittest
 import random
 import textwrap
@@ -43,8 +44,8 @@ class TestSimpleReport(unittest.TestCase):
         runner = CliRunner()
         result = runner.invoke(
             buildscripts.simple_report.main,
-            ["--test-name", "potato", "--log-file", "test.log", "--exit-code",
-             str(exit_code)])
+            ["--test-name", "potato", "--log-file", "test.log", "--exit-code", str(exit_code)],
+        )
         report = mock_put_report.call_args[0][0]
         results = mock_put_report.call_args[0][0]["results"]
         if exit_code == 0:
@@ -67,14 +68,15 @@ TO BE TRUNCATED
 TO BE TRUNCATED
 scons: done reading SConscript files.
 scons: Building targets ...
-interesting part"""))
+interesting part""")
+        )
 
         with patch("builtins.open", mock_open(read_data=data)) as _mock_file:
             runner = CliRunner()
             result = runner.invoke(
                 buildscripts.simple_report.main,
-                ["--test-name", "potato", "--log-file", "test.log", "--exit-code",
-                 str(exit_code)])
+                ["--test-name", "potato", "--log-file", "test.log", "--exit-code", str(exit_code)],
+            )
         report = mock_put_report.call_args[0][0]
         results = mock_put_report.call_args[0][0]["results"]
         self.assertEqual(results[0]["status"], "pass")
@@ -92,14 +94,15 @@ interesting part"""))
 *NOT* TO BE TRUNCATED
 *NOT* TO BE TRUNCATED
 *NOT* TO BE TRUNCATED
-interesting part"""))
+interesting part""")
+        )
 
         with patch("builtins.open", mock_open(read_data=data)) as _mock_file:
             runner = CliRunner()
             result = runner.invoke(
                 buildscripts.simple_report.main,
-                ["--test-name", "potato", "--log-file", "test.log", "--exit-code",
-                 str(exit_code)])
+                ["--test-name", "potato", "--log-file", "test.log", "--exit-code", str(exit_code)],
+            )
         report = mock_put_report.call_args[0][0]
         results = mock_put_report.call_args[0][0]["results"]
         self.assertEqual(results[0]["status"], "pass")

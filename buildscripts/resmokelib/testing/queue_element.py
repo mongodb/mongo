@@ -3,8 +3,9 @@
 from typing import Union
 
 
-def queue_elem_factory(testcase, test_config,
-                       suite_options) -> Union['QueueElemRepeatTime', 'QueueElem']:
+def queue_elem_factory(
+    testcase, test_config, suite_options
+) -> Union["QueueElemRepeatTime", "QueueElem"]:
     """
     Create the appropriate queue element based on suite_options given.
 

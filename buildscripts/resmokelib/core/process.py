@@ -49,17 +49,20 @@ if sys.platform == "win32":
         job_object = win32job.CreateJobObject(None, "")
 
         # Get the limit and job state information of the newly-created job object.
-        job_info = win32job.QueryInformationJobObject(job_object,
-                                                      win32job.JobObjectExtendedLimitInformation)
+        job_info = win32job.QueryInformationJobObject(
+            job_object, win32job.JobObjectExtendedLimitInformation
+        )
 
         # Set up the job object so that closing the last handle to the job object
         # will terminate all associated processes and destroy the job object itself.
-        job_info["BasicLimitInformation"]["LimitFlags"] |= \
-                win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        job_info["BasicLimitInformation"]["LimitFlags"] |= (
+            win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        )
 
         # Update the limits of the job object.
-        win32job.SetInformationJobObject(job_object, win32job.JobObjectExtendedLimitInformation,
-                                         job_info)
+        win32job.SetInformationJobObject(
+            job_object, win32job.JobObjectExtendedLimitInformation, job_info
+        )
 
         return job_object
 
@@ -88,19 +91,23 @@ class Process(object):
         self.args = args
 
         self.env = utils.default_if_none(env, os.environ.copy())
-        if not self.env.get('RESMOKE_PARENT_PROCESS'):
-            self.env['RESMOKE_PARENT_PROCESS'] = os.environ.get('RESMOKE_PARENT_PROCESS',
-                                                                str(os.getpid()))
-        if not self.env.get('RESMOKE_PARENT_CTIME'):
-            self.env['RESMOKE_PARENT_CTIME'] = os.environ.get('RESMOKE_PARENT_CTIME',
-                                                              str(psutil.Process().create_time()))
+        if not self.env.get("RESMOKE_PARENT_PROCESS"):
+            self.env["RESMOKE_PARENT_PROCESS"] = os.environ.get(
+                "RESMOKE_PARENT_PROCESS", str(os.getpid())
+            )
+        if not self.env.get("RESMOKE_PARENT_CTIME"):
+            self.env["RESMOKE_PARENT_CTIME"] = os.environ.get(
+                "RESMOKE_PARENT_CTIME", str(psutil.Process().create_time())
+            )
         if env_vars is not None:
             self.env.update(env_vars)
 
         # If we are running against an External System Under Test & this is a `mongo{d,s}` process, we make this process a NOOP.
         # `mongo{d,s}` processes are not running locally for an External System Under Test.
-        self.NOOP = _config.NOOP_MONGO_D_S_PROCESSES and os.path.basename(
-            self.args[0]) in ["mongod", "mongos"]
+        self.NOOP = _config.NOOP_MONGO_D_S_PROCESSES and os.path.basename(self.args[0]) in [
+            "mongod",
+            "mongos",
+        ]
 
         # The `pid` attribute is assigned after the local process is started. If this process is a NOOP, we assign it a dummy value.
         self.pid = 1 if self.NOOP else None
@@ -132,10 +139,9 @@ class Process(object):
         # thread, or concurrently from multiple threads -- from causing another subprocess to wait
         # for the completion of the newly spawned child process. Closing other file descriptors
         # isn't supported on Windows when stdout and stderr are redirected.
-        close_fds = (sys.platform != "win32")
+        close_fds = sys.platform != "win32"
 
         with _POPEN_LOCK:
-
             # Record unittests directly since resmoke doesn't not interact with them and they can finish
             # too quickly for the recorder to have a chance at attaching.
             recorder_args = []
@@ -144,27 +150,44 @@ class Process(object):
                 # Only use the process name since we have to be able to correlate the recording name
                 # with the binary name easily.
                 recorder_output_file = "{process}-{t}.undo".format(
-                    process=os.path.basename(self.args[0]), t=now_str)
+                    process=os.path.basename(self.args[0]), t=now_str
+                )
                 recorder_args = [_config.UNDO_RECORDER_PATH, "-o", recorder_output_file]
 
-            self._process = subprocess.Popen(recorder_args + self.args, bufsize=buffer_size,
-                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                             close_fds=close_fds, env=self.env,
-                                             creationflags=creation_flags, cwd=self._cwd)
+            self._process = subprocess.Popen(
+                recorder_args + self.args,
+                bufsize=buffer_size,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                close_fds=close_fds,
+                env=self.env,
+                creationflags=creation_flags,
+                cwd=self._cwd,
+            )
             self.pid = self._process.pid
 
-            if _config.UNDO_RECORDER_PATH is not None and (not self.args[0].endswith("_test")) and (
-                    "mongod" in self.args[0] or "mongos" in self.args[0]):
+            if (
+                _config.UNDO_RECORDER_PATH is not None
+                and (not self.args[0].endswith("_test"))
+                and ("mongod" in self.args[0] or "mongos" in self.args[0])
+            ):
                 now_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
                 recorder_output_file = "{logger}-{process}-{pid}-{t}.undo".format(
-                    logger=self.logger.name.replace('/', '-'),
-                    process=os.path.basename(self.args[0]), pid=self.pid, t=now_str)
+                    logger=self.logger.name.replace("/", "-"),
+                    process=os.path.basename(self.args[0]),
+                    pid=self.pid,
+                    t=now_str,
+                )
                 recorder_args = [
-                    _config.UNDO_RECORDER_PATH, "-p",
-                    str(self.pid), "-o", recorder_output_file
+                    _config.UNDO_RECORDER_PATH,
+                    "-p",
+                    str(self.pid),
+                    "-o",
+                    recorder_output_file,
                 ]
-                self._recorder = subprocess.Popen(recorder_args, bufsize=buffer_size, env=self.env,
-                                                  creationflags=creation_flags)
+                self._recorder = subprocess.Popen(
+                    recorder_args, bufsize=buffer_size, env=self.env, creationflags=creation_flags
+                )
 
         self._stdout_pipe = pipe.LoggerPipe(self.logger, logging.INFO, self._process.stdout)
         self._stderr_pipe = pipe.LoggerPipe(self.logger, logging.ERROR, self._process.stderr)
@@ -192,8 +215,11 @@ class Process(object):
             mode = fixture_interface.TeardownMode.TERMINATE
 
         if sys.platform == "win32":
-            if mode != fixture_interface.TeardownMode.KILL and self.args and self.args[0].find(
-                    "mongod") != -1:
+            if (
+                mode != fixture_interface.TeardownMode.KILL
+                and self.args
+                and self.args[0].find("mongod") != -1
+            ):
                 self._request_clean_shutdown_on_windows()
             else:
                 self._terminate_on_windows()
@@ -206,8 +232,9 @@ class Process(object):
                 elif mode == fixture_interface.TeardownMode.ABORT:
                     self._process.send_signal(mode.value)
                 else:
-                    raise errors.ProcessError("Process wrapper given unrecognized teardown mode: " +
-                                              mode.value)
+                    raise errors.ProcessError(
+                        "Process wrapper given unrecognized teardown mode: " + mode.value
+                    )
 
             except OSError as err:
                 # ESRCH (errno=3) is received when the process has already died.
@@ -242,18 +269,20 @@ class Process(object):
             if status is not None and status != win32event.WAIT_OBJECT_0:
                 self.logger.info(
                     f"Failed to cleanly exit the program, calling TerminateProcess() on PID:"
-                    f" {str(self._process.pid)}")
+                    f" {str(self._process.pid)}"
+                )
                 self._terminate_on_windows()
 
         return_code = self._process.wait(timeout)
 
         if self._recorder is not None:
-            self.logger.info('Saving the UndoDB recording; it may take a few minutes...')
+            self.logger.info("Saving the UndoDB recording; it may take a few minutes...")
             recorder_return = self._recorder.wait(timeout)
             if recorder_return != 0:
                 raise errors.ServerFailure(
                     "UndoDB live-record did not terminate correctly. This is likely a bug with UndoDB. "
-                    "Please record the logs and notify the #server-testing Slack channel")
+                    "Please record the logs and notify the #server-testing Slack channel"
+                )
 
         if self._stdout_pipe:
             self._stdout_pipe.wait_until_finished()
@@ -311,7 +340,8 @@ class Process(object):
             _windows_mongo_signal_handle = None
             try:
                 _windows_mongo_signal_handle = win32event.OpenEvent(
-                    win32event.EVENT_MODIFY_STATE, False, "Global\\Mongo_" + str(self._process.pid))
+                    win32event.EVENT_MODIFY_STATE, False, "Global\\Mongo_" + str(self._process.pid)
+                )
 
                 if not _windows_mongo_signal_handle:
                     # The process has already died.

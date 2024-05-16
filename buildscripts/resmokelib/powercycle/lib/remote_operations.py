@@ -36,8 +36,8 @@ class SSHOperation(object):
 def posix_path(path):
     """Return posix path, used on Windows since scp requires posix style paths."""
     # If path is already quoted, we need to remove the quotes before calling
-    path_quote = "\'" if path.startswith("\'") else ""
-    path_quote = "\"" if path.startswith("\"") else path_quote
+    path_quote = "'" if path.startswith("'") else ""
+    path_quote = '"' if path.startswith('"') else path_quote
     if path_quote:
         path = path[1:-1]
     drive, new_path = os.path.splitdrive(path)
@@ -49,8 +49,17 @@ def posix_path(path):
 class RemoteOperations(object):
     """Class to support remote operations."""
 
-    def __init__(self, user_host, ssh_connection_options=None, ssh_options=None, scp_options=None,
-                 shell_binary="/bin/bash", use_shell=False, ignore_ret=False, access_retry_count=5):
+    def __init__(
+        self,
+        user_host,
+        ssh_connection_options=None,
+        ssh_options=None,
+        scp_options=None,
+        shell_binary="/bin/bash",
+        use_shell=False,
+        ignore_ret=False,
+        access_retry_count=5,
+    ):
         """Initialize RemoteOperations."""
 
         self.user_host = user_host
@@ -71,8 +80,9 @@ class RemoteOperations(object):
         if not self.use_shell:
             cmd = shlex.split(cmd)
         # Use a common pipe for stdout & stderr for logging.
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                   shell=self.use_shell)
+        process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=self.use_shell
+        )
         buff_stdout, _ = process.communicate()
         buff = buff_stdout.decode("utf-8", "replace")
         print("Result of command:")
@@ -90,15 +100,19 @@ class RemoteOperations(object):
             if attempt_num > retry_count:
                 print("Exhausted all retry attempts.")
                 break
-            print("Remote attempt {} unsuccessful, retrying in {} seconds".format(
-                attempt_num, self.retry_sleep))
+            print(
+                "Remote attempt {} unsuccessful, retrying in {} seconds".format(
+                    attempt_num, self.retry_sleep
+                )
+            )
             time.sleep(self.retry_sleep)
         return ret, buff
 
     def _remote_access(self):
         """Check if a remote session is possible."""
-        cmd = "ssh {} {} {} date".format(self.ssh_connection_options, self.ssh_options,
-                                         self.user_host)
+        cmd = "ssh {} {} {} date".format(
+            self.ssh_connection_options, self.ssh_options, self.user_host
+        )
         return self._call_retries(cmd, self.access_retry_count)
 
     def _perform_operation(self, cmd, retry, retry_count):
@@ -125,8 +139,9 @@ class RemoteOperations(object):
         return message.startswith("ssh:")
 
     # pylint: disable=inconsistent-return-statements
-    def operation(self, operation_type, operation_param, operation_dir=None, retry=False,
-                  retry_count=5):
+    def operation(
+        self, operation_type, operation_param, operation_dir=None, retry=False, retry_count=5
+    ):
         """Execute Main entry for remote operations. Returns (code, output).
 
         'operation_type' supports remote shell and copy operations.
@@ -154,18 +169,23 @@ class RemoteOperations(object):
                 # See https://stackoverflow.com/questions/8254120/
                 #   how-to-escape-a-single-quote-in-single-quote-string-in-bash
                 operation_param = "{}".format(operation_param.replace("'", r"\'"))
-                operation_param = "{}".format(operation_param.replace("\"", r"\""))
+                operation_param = "{}".format(operation_param.replace('"', r"\""))
                 dollar = "$"
-            cmd = "ssh {} {} {} {} -c \"{}'{}'\"".format(self.ssh_connection_options,
-                                                         self.ssh_options, self.user_host,
-                                                         self.shell_binary, dollar, operation_param)
+            cmd = "ssh {} {} {} {} -c \"{}'{}'\"".format(
+                self.ssh_connection_options,
+                self.ssh_options,
+                self.user_host,
+                self.shell_binary,
+                dollar,
+                operation_param,
+            )
 
         elif operation_type == "copy_to":
             cmd = "scp -r {} {} ".format(self.ssh_connection_options, self.scp_options)
             # To support spaces in the filename or directory, we quote them one at a time.
             for copy_file in operation_param:
                 # Quote file on Posix.
-                quote = "\"" if not _IS_WINDOWS else ""
+                quote = '"' if not _IS_WINDOWS else ""
                 cmd += "{quote}{file}{quote} ".format(quote=quote, file=posix_path(copy_file))
             operation_dir = operation_dir if operation_dir else ""
             cmd += " {}:{}".format(self.user_host, posix_path(operation_dir))
@@ -180,14 +200,16 @@ class RemoteOperations(object):
             # Note - this is a method which scp does not support directly.
             for copy_file in operation_param:
                 copy_file = posix_path(copy_file)
-                cmd = "scp -r {} {} {}:".format(self.ssh_connection_options, self.scp_options,
-                                                self.user_host)
+                cmd = "scp -r {} {} {}:".format(
+                    self.ssh_connection_options, self.scp_options, self.user_host
+                )
                 # Quote (on Posix), and escape the file if there are spaces.
                 # Note - we do not support other non-ASCII characters in a file name.
-                quote = "\"" if not _IS_WINDOWS else ""
+                quote = '"' if not _IS_WINDOWS else ""
                 if " " in copy_file:
-                    copy_file = re.escape("{quote}{file}{quote}".format(
-                        quote=quote, file=copy_file))
+                    copy_file = re.escape(
+                        "{quote}{file}{quote}".format(quote=quote, file=copy_file)
+                    )
                 cmd += "{} {}".format(copy_file, posix_path(operation_dir))
 
         else:
@@ -209,15 +231,18 @@ class RemoteOperations(object):
 
     def shell(self, operation_param, operation_dir=None):
         """Provide helper for remote shell operations."""
-        return self.operation(operation_type="shell", operation_param=operation_param,
-                              operation_dir=operation_dir)
+        return self.operation(
+            operation_type="shell", operation_param=operation_param, operation_dir=operation_dir
+        )
 
     def copy_to(self, operation_param, operation_dir=None):
         """Provide helper for remote copy_to operations."""
-        return self.operation(operation_type="copy_to", operation_param=operation_param,
-                              operation_dir=operation_dir)
+        return self.operation(
+            operation_type="copy_to", operation_param=operation_param, operation_dir=operation_dir
+        )
 
     def copy_from(self, operation_param, operation_dir=None):
         """Provide helper for remote copy_from operations."""
-        return self.operation(operation_type="copy_from", operation_param=operation_param,
-                              operation_dir=operation_dir)
+        return self.operation(
+            operation_type="copy_from", operation_param=operation_param, operation_dir=operation_dir
+        )

@@ -1,4 +1,5 @@
 """Unit tests for buildscripts/resmokelib/utils/evergreen_conn.py."""
+
 import unittest
 
 from mock import patch
@@ -48,8 +49,12 @@ class TestGetBuildvariantName(unittest.TestCase):
         major_minor_version = "4.0"
 
         buildvariant_name = evergreen_conn.get_buildvariant_name(
-            config=self.config, edition=edition, platform=platform, architecture=architecture,
-            major_minor_version=major_minor_version)
+            config=self.config,
+            edition=edition,
+            platform=platform,
+            architecture=architecture,
+            major_minor_version=major_minor_version,
+        )
         self.assertEqual(buildvariant_name, "macos-4.0")
 
     def test_any_version(self):
@@ -59,8 +64,12 @@ class TestGetBuildvariantName(unittest.TestCase):
         major_minor_version = "any"
 
         buildvariant_name = evergreen_conn.get_buildvariant_name(
-            config=self.config, edition=edition, platform=platform, architecture=architecture,
-            major_minor_version=major_minor_version)
+            config=self.config,
+            edition=edition,
+            platform=platform,
+            architecture=architecture,
+            major_minor_version=major_minor_version,
+        )
         self.assertEqual(buildvariant_name, "macos-any")
 
     def test_buildvariant_not_found(self):
@@ -70,35 +79,45 @@ class TestGetBuildvariantName(unittest.TestCase):
         major_minor_version = "any"
 
         buildvariant_name = evergreen_conn.get_buildvariant_name(
-            config=self.config, edition=edition, platform=platform, architecture=architecture,
-            major_minor_version=major_minor_version)
+            config=self.config,
+            edition=edition,
+            platform=platform,
+            architecture=architecture,
+            major_minor_version=major_minor_version,
+        )
         self.assertEqual(buildvariant_name, "")
 
 
 class TestGetGenericBuildvariantName(unittest.TestCase):
     def setUp(self):
         raw_yaml = {
-            "evergreen_buildvariants": [{
-                "name": "generic-buildvariant-name",
-                "edition": evergreen_conn.GENERIC_EDITION,
-                "platform": evergreen_conn.GENERIC_PLATFORM,
-                "architecture": evergreen_conn.GENERIC_ARCHITECTURE,
-                "versions": ["3.4", "3.6", "4.0"],
-            }, ]
+            "evergreen_buildvariants": [
+                {
+                    "name": "generic-buildvariant-name",
+                    "edition": evergreen_conn.GENERIC_EDITION,
+                    "platform": evergreen_conn.GENERIC_PLATFORM,
+                    "architecture": evergreen_conn.GENERIC_ARCHITECTURE,
+                    "versions": ["3.4", "3.6", "4.0"],
+                },
+            ]
         }
         self.config = SetupMultiversionConfig(raw_yaml)
 
     def test_buildvariant_found(self):
         major_minor_version = "4.0"
         generic_buildvariant_name = evergreen_conn.get_generic_buildvariant_name(
-            config=self.config, major_minor_version=major_minor_version)
+            config=self.config, major_minor_version=major_minor_version
+        )
         self.assertEqual(generic_buildvariant_name, "generic-buildvariant-name")
 
     def test_buildvarinat_not_found(self):
         major_minor_version = "4.2"
-        self.assertRaises(evergreen_conn.EvergreenConnError,
-                          evergreen_conn.get_generic_buildvariant_name, self.config,
-                          major_minor_version)
+        self.assertRaises(
+            evergreen_conn.EvergreenConnError,
+            evergreen_conn.get_generic_buildvariant_name,
+            self.config,
+            major_minor_version,
+        )
 
 
 class TestGetEvergreenProjectAndVersion(unittest.TestCase):
@@ -148,9 +167,13 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
     def test_buildvariant_not_found(self, mock_evg_api, mock_version):
         buildvariant_name = "test"
         mock_version.build_variants_map = {"not-test": "build_id"}
-        self.assertRaises(evergreen_conn.EvergreenConnError,
-                          evergreen_conn.get_compile_artifact_urls, mock_evg_api, mock_version,
-                          buildvariant_name)
+        self.assertRaises(
+            evergreen_conn.EvergreenConnError,
+            evergreen_conn.get_compile_artifact_urls,
+            mock_evg_api,
+            mock_version,
+            buildvariant_name,
+        )
 
     @patch("evergreen.task.Artifact")
     @patch("evergreen.task.Task")
@@ -158,16 +181,20 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
     @patch("evergreen.build.Build")
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi")
-    def test_urls_found(self, mock_evg_api, mock_version, mock_build, mock_compile_task,
-                        mock_push_task, mock_artifact):
-
+    def test_urls_found(
+        self,
+        mock_evg_api,
+        mock_version,
+        mock_build,
+        mock_compile_task,
+        mock_push_task,
+        mock_artifact,
+    ):
         mock_compile_task.project_identifier = "dummy project id"
 
         expected_urls = {
-            "Binaries":
-                "https://mciuploads.s3.amazonaws.com/mongodb-mongo-master/ubuntu1804/90f767adbb1901d007ee4dd8714f53402d893669/binaries/mongo-mongodb_mongo_master_ubuntu1804_90f767adbb1901d007ee4dd8714f53402d893669_20_11_30_03_14_30.tgz",
-            "project_identifier":
-                "dummy project id"
+            "Binaries": "https://mciuploads.s3.amazonaws.com/mongodb-mongo-master/ubuntu1804/90f767adbb1901d007ee4dd8714f53402d893669/binaries/mongo-mongodb_mongo_master_ubuntu1804_90f767adbb1901d007ee4dd8714f53402d893669_20_11_30_03_14_30.tgz",
+            "project_identifier": "dummy project id",
         }
         mock_evg_api.build_by_id.return_value = mock_build
         mock_artifact.name = "Binaries"
@@ -190,19 +217,23 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
     @patch("evergreen.build.Build")
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi")
-    def test_child_urls_found(self, mock_evg_api, mock_version, mock_build, mock_compile_task,
-                              mock_push_task, mock_child_task, mock_compile_artifact,
-                              mock_child_task_artifact):
-
+    def test_child_urls_found(
+        self,
+        mock_evg_api,
+        mock_version,
+        mock_build,
+        mock_compile_task,
+        mock_push_task,
+        mock_child_task,
+        mock_compile_artifact,
+        mock_child_task_artifact,
+    ):
         mock_compile_task.project_identifier = "dummy project id"
 
         expected_urls = {
-            "Binaries":
-                "https://mciuploads.s3.amazonaws.com/mongodb-mongo-master/ubuntu1804/90f767adbb1901d007ee4dd8714f53402d893669/binaries/mongo-mongodb_mongo_master_ubuntu1804_90f767adbb1901d007ee4dd8714f53402d893669_20_11_30_03_14_30.tgz",
-            "Symbols":
-                "yeet_skeert",
-            "project_identifier":
-                "dummy project id",
+            "Binaries": "https://mciuploads.s3.amazonaws.com/mongodb-mongo-master/ubuntu1804/90f767adbb1901d007ee4dd8714f53402d893669/binaries/mongo-mongodb_mongo_master_ubuntu1804_90f767adbb1901d007ee4dd8714f53402d893669_20_11_30_03_14_30.tgz",
+            "Symbols": "yeet_skeert",
+            "project_identifier": "dummy project id",
         }
         mock_evg_api.build_by_id.return_value = mock_build
         mock_evg_api.task_by_id.return_value = mock_child_task
@@ -230,8 +261,9 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
     @patch("evergreen.build.Build")
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi")
-    def test_push_task_failed(self, mock_evg_api, mock_version, mock_build, mock_compile_task,
-                              mock_push_task):
+    def test_push_task_failed(
+        self, mock_evg_api, mock_version, mock_build, mock_compile_task, mock_push_task
+    ):
         mock_evg_api.build_by_id.return_value = mock_build
         mock_compile_task.display_name = "compile"
         mock_compile_task.status = "success"

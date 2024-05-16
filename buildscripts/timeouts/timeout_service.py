@@ -1,4 +1,5 @@
 """Service for determining task timeouts."""
+
 from typing import Any, Dict, NamedTuple, Optional
 
 import inject
@@ -90,7 +91,8 @@ class TimeoutService:
             return TimeoutEstimate.no_timeouts()
 
         hook_overhead = self.get_task_hook_overhead(
-            timeout_params.suite_name, timeout_params.is_asan, total_num_tests, historic_stats)
+            timeout_params.suite_name, timeout_params.is_asan, total_num_tests, historic_stats
+        )
         total_runtime += hook_overhead
 
         if num_tests_missing_historic_data > 0:
@@ -103,8 +105,13 @@ class TimeoutService:
 
         return TimeoutEstimate(max_test_runtime=max_runtime, expected_task_runtime=total_runtime)
 
-    def get_task_hook_overhead(self, suite_name: str, is_asan: bool, test_count: int,
-                               historic_stats: Optional[HistoricTaskData]) -> float:
+    def get_task_hook_overhead(
+        self,
+        suite_name: str,
+        is_asan: bool,
+        test_count: int,
+        historic_stats: Optional[HistoricTaskData],
+    ) -> float:
         """
         Add how much overhead task-level hooks each suite should account for.
 
@@ -125,8 +132,12 @@ class TimeoutService:
 
         clean_every_n_cadence = self._get_clean_every_n_cadence(suite_name, is_asan)
         avg_clean_every_n_runtime = historic_stats.get_avg_hook_runtime(CLEAN_EVERY_N_HOOK)
-        LOGGER.debug("task hook overhead", cadence=clean_every_n_cadence,
-                     runtime=avg_clean_every_n_runtime, is_asan=is_asan)
+        LOGGER.debug(
+            "task hook overhead",
+            cadence=clean_every_n_cadence,
+            runtime=avg_clean_every_n_runtime,
+            is_asan=is_asan,
+        )
         if avg_clean_every_n_runtime != 0:
             n_expected_runs = test_count / clean_every_n_cadence
             return n_expected_runs * avg_clean_every_n_runtime
@@ -141,21 +152,27 @@ class TimeoutService:
         """
         try:
             LOGGER.info(
-                "Getting historic runtime information", evg_project=timeout_params.evg_project,
-                build_variant=timeout_params.build_variant, task_name=timeout_params.task_name)
+                "Getting historic runtime information",
+                evg_project=timeout_params.evg_project,
+                build_variant=timeout_params.build_variant,
+                task_name=timeout_params.task_name,
+            )
             evg_stats = HistoricTaskData.from_s3(
-                timeout_params.evg_project, timeout_params.task_name, timeout_params.build_variant)
+                timeout_params.evg_project, timeout_params.task_name, timeout_params.build_variant
+            )
             if not evg_stats:
                 LOGGER.warning("No historic runtime information available")
                 return None
-            LOGGER.info("Found historic runtime information",
-                        evg_stats=evg_stats.historic_test_results)
+            LOGGER.info(
+                "Found historic runtime information", evg_stats=evg_stats.historic_test_results
+            )
             return evg_stats
         except Exception:  # pylint: disable=broad-except
             # If we have any trouble getting the historic runtime information, log the issue, but
             # don't fall back to default timeouts instead of failing.
-            LOGGER.warning("Error querying history runtime information from evergreen",
-                           exc_info=True)
+            LOGGER.warning(
+                "Error querying history runtime information from evergreen", exc_info=True
+            )
             return None
 
     @staticmethod
@@ -200,8 +217,9 @@ class TimeoutService:
         :param hook_name: Name of hook to query.
         :return: Configuration for hook, if it exists.
         """
-        hooks_config = self.resmoke_proxy.read_suite_config(suite_name).get("executor",
-                                                                            {}).get("hooks")
+        hooks_config = (
+            self.resmoke_proxy.read_suite_config(suite_name).get("executor", {}).get("hooks")
+        )
         if hooks_config:
             for hook in hooks_config:
                 if hook.get("class") == hook_name:

@@ -5,8 +5,7 @@ import shlex
 
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib.discovery import DiscoveryPlugin
-from buildscripts.resmokelib.generate_fcv_constants import \
-    GenerateFCVConstantsPlugin
+from buildscripts.resmokelib.generate_fcv_constants import GenerateFCVConstantsPlugin
 from buildscripts.resmokelib.generate_fuzz_config import GenerateFuzzConfigPlugin
 from buildscripts.resmokelib.hang_analyzer import HangAnalyzerPlugin
 from buildscripts.resmokelib.hang_analyzer.core_analyzer import CoreAnalyzerPlugin
@@ -32,11 +31,18 @@ def get_parser(usage=None):
     """Get the resmoke parser."""
     parser = argparse.ArgumentParser(usage=usage)
     subparsers = parser.add_subparsers(dest="command")
-    parser.add_argument("--configDir", dest="config_dir", metavar="CONFIG_DIR",
-                        help="Directory to search for resmoke configuration files")
     parser.add_argument(
-        "--jstestsDir", dest="jstests_dir", metavar="CONFIG_DIR",
-        help="Directory to search for jstests files existence while suite validation")
+        "--configDir",
+        dest="config_dir",
+        metavar="CONFIG_DIR",
+        help="Directory to search for resmoke configuration files",
+    )
+    parser.add_argument(
+        "--jstestsDir",
+        dest="jstests_dir",
+        metavar="CONFIG_DIR",
+        help="Directory to search for jstests files existence while suite validation",
+    )
 
     # Add sub-commands.
     for plugin in _PLUGINS:
@@ -68,7 +74,7 @@ def parse_command_line(sys_args, usage=None, **kwargs):
     raise RuntimeError(f"Resmoke configuration has invalid subcommand: {subcommand}. Try '--help'")
 
 
-def set_run_options(argstr=''):
+def set_run_options(argstr=""):
     """Populate the config module variables for the 'run' subcommand with the default options."""
-    parser, parsed_args = parse(['run'] + shlex.split(argstr))
+    parser, parsed_args = parse(["run"] + shlex.split(argstr))
     configure_resmoke.validate_and_update_config(parser, parsed_args)

@@ -9,7 +9,7 @@ type_b return_b_function() {
 }
 """
 
-with open('b.cpp') as f:
+with open("b.cpp") as f:
     content = f.read()
     if content != EXPECTED_B_CPP:
         print(f'Actual:\n"""{content}"""')

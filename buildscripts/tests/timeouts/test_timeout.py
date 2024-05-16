@@ -1,4 +1,5 @@
 """Unit tests for timeout.py."""
+
 import unittest
 
 from buildscripts.timeouts import timeout as under_test
@@ -19,14 +20,17 @@ class CalculateTimeoutTest(unittest.TestCase):
     def test_scaling_factor(self):
         avg_runtime = 30
         scaling_factor = 10
-        self.assertEqual(avg_runtime * scaling_factor + 60,
-                         under_test.calculate_timeout(avg_runtime, scaling_factor))
+        self.assertEqual(
+            avg_runtime * scaling_factor + 60,
+            under_test.calculate_timeout(avg_runtime, scaling_factor),
+        )
 
 
 class TimeoutEstimateTest(unittest.TestCase):
     def test_too_high_a_timeout_raises_errors(self):
         timeout_est = under_test.TimeoutEstimate(
-            max_test_runtime=5, expected_task_runtime=under_test.MAX_EXPECTED_TIMEOUT)
+            max_test_runtime=5, expected_task_runtime=under_test.MAX_EXPECTED_TIMEOUT
+        )
 
         with self.assertRaises(ValueError):
             timeout_est.generate_timeout_cmd(is_patch=True, repeat_factor=1)
@@ -49,8 +53,9 @@ class TimeoutEstimateTest(unittest.TestCase):
 
 class TestGenerateTimeoutCmd(unittest.TestCase):
     def test_evg_config_does_not_fails_if_test_timeout_too_high_on_mainline(self):
-        timeout = under_test.TimeoutEstimate(max_test_runtime=under_test.MAX_EXPECTED_TIMEOUT + 1,
-                                             expected_task_runtime=None)
+        timeout = under_test.TimeoutEstimate(
+            max_test_runtime=under_test.MAX_EXPECTED_TIMEOUT + 1, expected_task_runtime=None
+        )
 
         time_cmd = timeout.generate_timeout_cmd(is_patch=False, repeat_factor=1)
 
@@ -58,7 +63,8 @@ class TestGenerateTimeoutCmd(unittest.TestCase):
 
     def test_evg_config_does_not_fails_if_task_timeout_too_high_on_mainline(self):
         timeout = under_test.TimeoutEstimate(
-            expected_task_runtime=under_test.MAX_EXPECTED_TIMEOUT + 1, max_test_runtime=None)
+            expected_task_runtime=under_test.MAX_EXPECTED_TIMEOUT + 1, max_test_runtime=None
+        )
 
         time_cmd = timeout.generate_timeout_cmd(is_patch=False, repeat_factor=1)
 

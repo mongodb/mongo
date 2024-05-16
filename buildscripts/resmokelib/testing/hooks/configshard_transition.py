@@ -16,15 +16,17 @@ from buildscripts.resmokelib.testing.retry import retryable_codes as retryable_n
 class ContinuousConfigShardTransition(interface.Hook):
     DESCRIPTION = (
         "Continuous config shard transition (transitions in/out of config shard mode at regular"
-        " intervals)")
+        " intervals)"
+    )
 
     IS_BACKGROUND = True
 
     STOPS_FIXTURE = False
 
     def __init__(self, hook_logger, fixture, auth_options=None, random_balancer_on=True):
-        interface.Hook.__init__(self, hook_logger, fixture,
-                                ContinuousConfigShardTransition.DESCRIPTION)
+        interface.Hook.__init__(
+            self, hook_logger, fixture, ContinuousConfigShardTransition.DESCRIPTION
+        )
         self._fixture = fixture
         self._transition_thread = None
         self._auth_options = auth_options
@@ -39,8 +41,9 @@ class ContinuousConfigShardTransition(interface.Hook):
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 
-        self._transition_thread = _TransitionThread(self.logger, lifecycle, self._fixture,
-                                                    self._auth_options, self._random_balancer_on)
+        self._transition_thread = _TransitionThread(
+            self.logger, lifecycle, self._fixture, self._auth_options, self._random_balancer_on
+        )
         self.logger.info("Starting the transition thread.")
         self._transition_thread.start()
 
@@ -130,7 +133,8 @@ class _TransitionThread(threading.Thread):
                 if not self.__lifecycle.poll_for_idle_request():
                     wait_secs = random.choice(self.TRANSITION_INTERVALS)
                     self.logger.info(
-                        f"Waiting {wait_secs} seconds before transition to config shard.")
+                        f"Waiting {wait_secs} seconds before transition to config shard."
+                    )
                     self.__lifecycle.wait_for_action_interval(wait_secs)
 
                 # Always end in config shard mode so the shard list at test startup is the
@@ -215,27 +219,26 @@ class _TransitionThread(threading.Thread):
 
     def _get_collections_with_chunks_on_config(self):
         return list(
-            self._client.config.collections.aggregate([
-                {
-                    "$lookup": {
-                        "from":
-                            "chunks",
-                        "localField":
-                            "uuid",
-                        "foreignField":
-                            "uuid",
-                        "as":
-                            "chunksOnConfig",
-                        "pipeline": [
-                            {"$match": {"shard": "config"}},
-                            # History can be very large because we randomize migrations, so
-                            # exclude it to reduce log spam.
-                            {"$project": {"history": 0}}
-                        ]
-                    }
-                },
-                {"$match": {"chunksOnConfig": {"$ne": []}}}
-            ]))
+            self._client.config.collections.aggregate(
+                [
+                    {
+                        "$lookup": {
+                            "from": "chunks",
+                            "localField": "uuid",
+                            "foreignField": "uuid",
+                            "as": "chunksOnConfig",
+                            "pipeline": [
+                                {"$match": {"shard": "config"}},
+                                # History can be very large because we randomize migrations, so
+                                # exclude it to reduce log spam.
+                                {"$project": {"history": 0}},
+                            ],
+                        }
+                    },
+                    {"$match": {"chunksOnConfig": {"$ne": []}}},
+                ]
+            )
+        )
 
     def _move_collection_all_from_config(self, collections):
         for collection in collections:
@@ -252,8 +255,9 @@ class _TransitionThread(threading.Thread):
 
     def _drain_config_for_ongoing_transition(self, transition_result):
         colls_with_chunks_on_config = self._get_collections_with_chunks_on_config()
-        self.logger.info("Collections with chunks on config server: " +
-                         str(colls_with_chunks_on_config))
+        self.logger.info(
+            "Collections with chunks on config server: " + str(colls_with_chunks_on_config)
+        )
         try:
             if not self._random_balancer_on:
                 # Chunk migration will not move the chunk for an
@@ -273,9 +277,11 @@ class _TransitionThread(threading.Thread):
             latest_status = self._client.admin.command({"balancerStatus": 1})
         except pymongo.errors.OperationFailure as balancerStatusErr:
             if balancerStatusErr.code in set(retryable_network_errs):
-                self.logger.info("Network error when running balancerStatus after "
-                                 "receiving ShardNotFound error on transition to dedicated, will "
-                                 "retry. err: " + str(balancerStatusErr))
+                self.logger.info(
+                    "Network error when running balancerStatus after "
+                    "receiving ShardNotFound error on transition to dedicated, will "
+                    "retry. err: " + str(balancerStatusErr)
+                )
                 prev_round_interrupted = False
                 return None, prev_round_interrupted
 
@@ -283,8 +289,10 @@ class _TransitionThread(threading.Thread):
                 raise balancerStatusErr
 
             prev_round_interrupted = True
-            self.logger.info("Ignoring 'Interrupted' error when running balancerStatus "
-                             "after receiving ShardNotFound error on transition to dedicated.")
+            self.logger.info(
+                "Ignoring 'Interrupted' error when running balancerStatus "
+                "after receiving ShardNotFound error on transition to dedicated."
+            )
             return None, prev_round_interrupted
 
         return latest_status, prev_round_interrupted
@@ -313,30 +321,39 @@ class _TransitionThread(threading.Thread):
                         self.logger.info(
                             "Detected change in repl set term while waiting for a balancer round "
                             "before transitioning to dedicated CSRS. last term: %d, new term: %d",
-                            last_balancer_status["term"], latest_status["term"])
+                            last_balancer_status["term"],
+                            latest_status["term"],
+                        )
                         last_balancer_status = latest_status
                         time.sleep(1)
                         continue
 
-                    if last_balancer_status["numBalancerRounds"] >= latest_status[
-                            "numBalancerRounds"]:
+                    if (
+                        last_balancer_status["numBalancerRounds"]
+                        >= latest_status["numBalancerRounds"]
+                    ):
                         self.logger.info(
                             "Waiting for a balancer round before transition to dedicated. "
                             "Last round: %d, latest round: %d",
                             last_balancer_status["numBalancerRounds"],
-                            latest_status["numBalancerRounds"])
+                            latest_status["numBalancerRounds"],
+                        )
                         time.sleep(1)
                         continue
 
                     self.logger.info(
-                        "Done waiting for a balancer round before transition to dedicated")
+                        "Done waiting for a balancer round before transition to dedicated"
+                    )
                     self._should_wait_for_balancer_round = False
 
                 res = self._client.admin.command({"transitionToDedicatedConfigServer": 1})
 
                 if res["state"] == "completed":
-                    self.logger.info("Completed transition to %s in %0d ms", self.DEDICATED,
-                                     (time.time() - start_time) * 1000)
+                    self.logger.info(
+                        "Completed transition to %s in %0d ms",
+                        self.DEDICATED,
+                        (time.time() - start_time) * 1000,
+                    )
                     return True
                 elif res["state"] == "started":
                     if self._client.config.chunks.count_documents({"shard": "config"}) == 0:
@@ -348,22 +365,29 @@ class _TransitionThread(threading.Thread):
                 time.sleep(1)
 
                 if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
-                    msg = "Could not transition to dedicated config server. with last response: " + str(
-                        res)
+                    msg = (
+                        "Could not transition to dedicated config server. with last response: "
+                        + str(res)
+                    )
                     self.logger.error(msg)
                     raise errors.ServerFailure(msg)
             except pymongo.errors.OperationFailure as err:
                 # Some workloads add and remove shards so removing the config shard may fail transiently.
-                if err.code in [self._ILLEGAL_OPERATION
-                                ] and err.errmsg and "would remove the last shard" in err.errmsg:
+                if (
+                    err.code in [self._ILLEGAL_OPERATION]
+                    and err.errmsg
+                    and "would remove the last shard" in err.errmsg
+                ):
                     # Abort the transition attempt and make the hook try again later.
                     return False
 
                 # Some suites run with forced failovers, if transitioning fails with a retryable
                 # network error, we should retry.
                 if err.code in set(retryable_network_errs):
-                    self.logger.info("Network error when transitioning to dedicated config server, "
-                                     "will retry. err: " + str(err))
+                    self.logger.info(
+                        "Network error when transitioning to dedicated config server, "
+                        "will retry. err: " + str(err)
+                    )
                     time.sleep(1)
                     prev_round_interrupted = False
                     continue
@@ -374,9 +398,10 @@ class _TransitionThread(threading.Thread):
                 # the transition to dedicated is retried, it will fail because the shard "config"
                 # will no longer exist.
                 if err.code in [self._SHARD_NOT_FOUND]:
-                    latest_status, prev_round_interrupted = self._get_balancer_status_on_shard_not_found(
-                        prev_round_interrupted)
-                    if (latest_status is None):
+                    latest_status, prev_round_interrupted = (
+                        self._get_balancer_status_on_shard_not_found(prev_round_interrupted)
+                    )
+                    if latest_status is None:
                         # The balancerStatus request was interrupted, so we retry the transition
                         # request. We will fail with ShardNotFound again, and will retry this check
                         # again.
@@ -386,12 +411,15 @@ class _TransitionThread(threading.Thread):
                     if last_balancer_status is None:
                         last_balancer_status = latest_status
 
-                    if (last_balancer_status["term"] != latest_status["term"]
-                            or prev_round_interrupted):
+                    if (
+                        last_balancer_status["term"] != latest_status["term"]
+                        or prev_round_interrupted
+                    ):
                         self.logger.info(
                             "Did not find entry for 'config' in config.shards after detecting a "
                             "change in repl set term or after transition was interrutped. Assuming "
-                            "transition to dedicated finished on previous transition request.")
+                            "transition to dedicated finished on previous transition request."
+                        )
                         return True
 
                 if not self._is_expected_transition_error_code(err.code):
@@ -410,8 +438,10 @@ class _TransitionThread(threading.Thread):
                 # Some suites run with forced failovers, if transitioning fails with a retryable
                 # network error, we should retry.
                 if err.code in set(retryable_network_errs):
-                    self.logger.info("Network error when transitioning from dedicated config "
-                                     "server, will retry. err: " + str(err))
+                    self.logger.info(
+                        "Network error when transitioning from dedicated config "
+                        "server, will retry. err: " + str(err)
+                    )
                     time.sleep(1)
                     continue
 
@@ -419,10 +449,15 @@ class _TransitionThread(threading.Thread):
                 # transition, addShard will fail because it will not be able to connect. The error
                 # code return is not retryable (it is OperationFailed), so we check the specific
                 # error message as well.
-                if err.code in [self._OPERATION_FAILED
-                                ] and err.errmsg and "Connection refused" in err.errmsg:
-                    self.logger.info("Connection refused when transitioning from dedicated config "
-                                     "server, will retry. err: " + str(err))
+                if (
+                    err.code in [self._OPERATION_FAILED]
+                    and err.errmsg
+                    and "Connection refused" in err.errmsg
+                ):
+                    self.logger.info(
+                        "Connection refused when transitioning from dedicated config "
+                        "server, will retry. err: " + str(err)
+                    )
                     time.sleep(1)
                     continue
 

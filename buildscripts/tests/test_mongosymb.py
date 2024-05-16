@@ -1,4 +1,5 @@
 """Unit tests for buildscripts/mongosymb.py."""
+
 import unittest
 
 from buildscripts import mongosymb as under_test

@@ -21,8 +21,8 @@ class RuffChecker(base.LinterBase):
         """Get the command to run a check."""
         if not files:
             return ["check"]
-        
-        files = ' '.join(files)
+
+        files = " ".join(files)
         return ["check", files]
 
     def get_fix_cmd_args(self, files: list[str]) -> list[str]:
@@ -30,6 +30,6 @@ class RuffChecker(base.LinterBase):
 
         if not files:
             return ["check", "--fix"]
-        
-        files = ' '.join(files)
+
+        files = " ".join(files)
         return ["check", "--fix", files]

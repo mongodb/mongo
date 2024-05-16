@@ -1,4 +1,5 @@
 """Helper functions to interact with evergreen."""
+
 import os
 import pathlib
 from collections import deque
@@ -76,20 +77,25 @@ def get_evergreen_api(evergreen_config=None):
 
     LOGGER.error(
         "Could not connect to Evergreen with any .evergreen.yml files available on this system",
-        config_file_candidates=possible_configs)
+        config_file_candidates=possible_configs,
+    )
     raise last_ex
 
 
-def get_buildvariant_name(config: SetupMultiversionConfig, edition, platform, architecture,
-                          major_minor_version):
+def get_buildvariant_name(
+    config: SetupMultiversionConfig, edition, platform, architecture, major_minor_version
+):
     """Return Evergreen buildvariant name."""
 
     buildvariant_name = ""
     evergreen_buildvariants = config.evergreen_buildvariants
 
     for buildvariant in evergreen_buildvariants:
-        if (buildvariant.edition == edition and buildvariant.platform == platform
-                and buildvariant.architecture == architecture):
+        if (
+            buildvariant.edition == edition
+            and buildvariant.platform == platform
+            and buildvariant.architecture == architecture
+        ):
             versions = buildvariant.versions
             if major_minor_version in versions:
                 buildvariant_name = buildvariant.name
@@ -109,8 +115,9 @@ def get_patch_module_diffs(evg_api: RetryingEvergreenApi, version_id):
     except requests.exceptions.HTTPError as err:
         err_res = err.response
         if err_res.status_code == 400:
-            LOGGER.debug("Not a patch build task, skipping applying patch",
-                         version_id_of_task=version_id)
+            LOGGER.debug(
+                "Not a patch build task, skipping applying patch", version_id_of_task=version_id
+            )
             return None
         else:
             raise
@@ -130,12 +137,20 @@ def get_patch_module_diffs(evg_api: RetryingEvergreenApi, version_id):
 def get_generic_buildvariant_name(config: SetupMultiversionConfig, major_minor_version):
     """Return Evergreen buildvariant name for generic platform."""
 
-    LOGGER.info("Falling back to generic architecture.", edition=GENERIC_EDITION,
-                platform=GENERIC_PLATFORM, architecture=GENERIC_ARCHITECTURE)
+    LOGGER.info(
+        "Falling back to generic architecture.",
+        edition=GENERIC_EDITION,
+        platform=GENERIC_PLATFORM,
+        architecture=GENERIC_ARCHITECTURE,
+    )
 
     generic_buildvariant_name = get_buildvariant_name(
-        config=config, edition=GENERIC_EDITION, platform=GENERIC_PLATFORM,
-        architecture=GENERIC_ARCHITECTURE, major_minor_version=major_minor_version)
+        config=config,
+        edition=GENERIC_EDITION,
+        platform=GENERIC_PLATFORM,
+        architecture=GENERIC_ARCHITECTURE,
+        major_minor_version=major_minor_version,
+    )
 
     if not generic_buildvariant_name:
         raise EvergreenConnError("Generic architecture buildvariant not found.")
@@ -151,7 +166,8 @@ def get_evergreen_version(evg_api: RetryingEvergreenApi, evg_ref: str) -> Option
     evg_refs = [evg_ref]
     # Evergreen reference as {project_name}_{commit_hash}
     evg_refs.extend(
-        f"{proj.replace('-', '_')}_{evg_ref}" for proj in multiversionconstants.EVERGREEN_PROJECTS)
+        f"{proj.replace('-', '_')}_{evg_ref}" for proj in multiversionconstants.EVERGREEN_PROJECTS
+    )
 
     for ref in evg_refs:
         try:
@@ -159,8 +175,10 @@ def get_evergreen_version(evg_api: RetryingEvergreenApi, evg_ref: str) -> Option
         except HTTPError:
             continue
         else:
-            LOGGER.debug("Found evergreen version.",
-                         evergreen_version=f"{EVERGREEN_HOST}/version/{evg_version.version_id}")
+            LOGGER.debug(
+                "Found evergreen version.",
+                evergreen_version=f"{EVERGREEN_HOST}/version/{evg_version.version_id}",
+            )
             return evg_version
 
     return None
@@ -171,8 +189,9 @@ def get_evergreen_versions(evg_api: RetryingEvergreenApi, evg_project: str) -> I
     return evg_api.versions_by_project(evg_project)
 
 
-def get_compile_artifact_urls(evg_api: RetryingEvergreenApi, evg_version: Version,
-                              buildvariant_name, ignore_failed_push=False):
+def get_compile_artifact_urls(
+    evg_api: RetryingEvergreenApi, evg_version: Version, buildvariant_name, ignore_failed_push=False
+):
     """Return compile urls from buildvariant in Evergreen version."""
     try:
         build_id = evg_version.build_variants_map[buildvariant_name]
@@ -202,8 +221,9 @@ def get_compile_artifact_urls(evg_api: RetryingEvergreenApi, evg_version: Versio
 class _MultiversionTasks(object):
     """Tasks relevant for multiversion setup."""
 
-    def __init__(self, symbols: Union[Task, None], binary: Union[Task, None],
-                 push: Union[Task, None]):
+    def __init__(
+        self, symbols: Union[Task, None], binary: Union[Task, None], push: Union[Task, None]
+    ):
         """Init function."""
         self.symbols_task = symbols
         self.binary_task = binary
@@ -220,9 +240,11 @@ def _get_multiversion_urls(tasks_wrapper: _MultiversionTasks):
     required_tasks = [binary, push] if push is not None else [binary]
 
     if all(task and task.status == "success" for task in required_tasks):
-        LOGGER.info("Required evergreen task(s) were successful.",
-                    required_tasks=f"{required_tasks}",
-                    task_id=f"{EVERGREEN_HOST}/task/{required_tasks[0].task_id}")
+        LOGGER.info(
+            "Required evergreen task(s) were successful.",
+            required_tasks=f"{required_tasks}",
+            task_id=f"{EVERGREEN_HOST}/task/{required_tasks[0].task_id}",
+        )
         evg_artifacts = binary.artifacts
         for artifact in evg_artifacts:
             compile_artifact_urls[artifact.name] = artifact.url
@@ -231,24 +253,29 @@ def _get_multiversion_urls(tasks_wrapper: _MultiversionTasks):
             for artifact in symbols.artifacts:
                 compile_artifact_urls[artifact.name] = artifact.url
         elif symbols and symbols.task_id:
-            LOGGER.warning("debug symbol archive was unsuccessful",
-                           archive_symbols_task=f"{EVERGREEN_HOST}/task/{symbols.task_id}")
+            LOGGER.warning(
+                "debug symbol archive was unsuccessful",
+                archive_symbols_task=f"{EVERGREEN_HOST}/task/{symbols.task_id}",
+            )
 
         # Tack on the project id for generating a friendly decompressed name for the artifacts.
         compile_artifact_urls["project_identifier"] = binary.project_identifier
 
     elif all(task for task in required_tasks):
-        LOGGER.warning("Required Evergreen task(s) were not successful.",
-                       required_tasks=f"{required_tasks}",
-                       task_id=f"{EVERGREEN_HOST}/task/{required_tasks[0].task_id}")
+        LOGGER.warning(
+            "Required Evergreen task(s) were not successful.",
+            required_tasks=f"{required_tasks}",
+            task_id=f"{EVERGREEN_HOST}/task/{required_tasks[0].task_id}",
+        )
     else:
         LOGGER.error("There are no `compile` and/or 'push' tasks in the evergreen build")
 
     return compile_artifact_urls
 
 
-def _filter_successful_tasks(evg_api: RetryingEvergreenApi,
-                             evg_tasks: Deque[Union[Task, str]]) -> _MultiversionTasks:
+def _filter_successful_tasks(
+    evg_api: RetryingEvergreenApi, evg_tasks: Deque[Union[Task, str]]
+) -> _MultiversionTasks:
     """
     We want to filter successful tasks in order by variant then by dependent tasks to find the compile tasks.
 
@@ -272,15 +299,19 @@ def _filter_successful_tasks(evg_api: RetryingEvergreenApi,
 
         # Only set the compile task if there isn't one already, otherwise
         # newer tasks like "archive_dist_test_debug" take precedence.
-        if evg_task.display_name in (
-                "compile", "archive_dist_test",
-                "archive_dist_test_future_git_tag_multiversion") and compile_task is None:
+        if (
+            evg_task.display_name
+            in ("compile", "archive_dist_test", "archive_dist_test_future_git_tag_multiversion")
+            and compile_task is None
+        ):
             compile_task = evg_task
         elif evg_task.display_name == "push":
             push_task = evg_task
-        elif evg_task.display_name in ("archive_dist_test_debug",
-                                       "archive_dist_test_debug_future_git_tag_multiversion"
-                                       ) and archive_symbols_task is None:
+        elif (
+            evg_task.display_name
+            in ("archive_dist_test_debug", "archive_dist_test_debug_future_git_tag_multiversion")
+            and archive_symbols_task is None
+        ):
             archive_symbols_task = evg_task
         if compile_task and push_task and archive_symbols_task:
             break

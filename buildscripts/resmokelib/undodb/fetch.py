@@ -1,4 +1,5 @@
 """Subcommand for fetching UndoDB recordings from Evergreen."""
+
 import os
 from typing import List, Optional
 import subprocess

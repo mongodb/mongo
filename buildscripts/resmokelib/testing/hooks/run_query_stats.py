@@ -22,13 +22,13 @@ class RunQueryStats(Hook):
         Args:
             hook_logger: the logger instance for this hook.
             fixture: the target fixture (replica sets or a sharded cluster).
-            allow_feature_not_supported: absorb 'QueryFeatureNotAllowed' errors when calling 
+            allow_feature_not_supported: absorb 'QueryFeatureNotAllowed' errors when calling
                 $queryStats. This is to support fuzzer suites that may manipulate the FCV.
         """
         description = "Read query stats data after each test."
         super().__init__(hook_logger, fixture, description)
         self.client = self.fixture.mongo_client()
-        self.hmac_key = binary.Binary(("0" * 32).encode('utf-8'), 8)
+        self.hmac_key = binary.Binary(("0" * 32).encode("utf-8"), 8)
         self.allow_feature_not_supported = allow_feature_not_supported
 
     def verify_query_stats(self, querystats_spec):
@@ -41,15 +41,18 @@ class RunQueryStats(Hook):
                     assert "asOf" in operation
         except pymongo.errors.OperationFailure as err:
             if self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES:
-                self.logger.info("Encountered an error while running $queryStats. "
-                                 "$queryStats will not be run for this test.")
+                self.logger.info(
+                    "Encountered an error while running $queryStats. "
+                    "$queryStats will not be run for this test."
+                )
             else:
                 raise err
 
     def after_test(self, test, test_report):
         self.verify_query_stats({})
         self.verify_query_stats(
-            {"transformIdentifiers": {"algorithm": "hmac-sha-256", "hmacKey": self.hmac_key}})
+            {"transformIdentifiers": {"algorithm": "hmac-sha-256", "hmacKey": self.hmac_key}}
+        )
 
     def before_test(self, test, test_report):
         try:
@@ -58,7 +61,9 @@ class RunQueryStats(Hook):
             self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="1%")
         except pymongo.errors.OperationFailure as err:
             if self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES:
-                self.logger.info("Encountered an error while configuring the query stats store. "
-                                 "Query stats will not be collected for this test.")
+                self.logger.info(
+                    "Encountered an error while configuring the query stats store. "
+                    "Query stats will not be collected for this test."
+                )
             else:
                 raise err

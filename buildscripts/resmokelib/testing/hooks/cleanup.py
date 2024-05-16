@@ -24,7 +24,9 @@ class CleanEveryN(interface.Hook):
         if "detect_leaks=1" in os.getenv("ASAN_OPTIONS", ""):
             self.logger.info(
                 "ASAN_OPTIONS environment variable set to detect leaks, so restarting"
-                " the fixture after each test instead of after every %d.", n)
+                " the fixture after each test instead of after every %d.",
+                n,
+            )
             n = 1
 
         self.n = n  # pylint: disable=invalid-name
@@ -47,8 +49,9 @@ class CleanEveryNTestCase(interface.DynamicTestCase):
     def run_test(self):
         """Execute test hook."""
         try:
-            self.logger.info("%d tests have been run against the fixture, stopping it...",
-                             self._hook.tests_run)
+            self.logger.info(
+                "%d tests have been run against the fixture, stopping it...", self._hook.tests_run
+            )
             self._hook.tests_run = 0
 
             self.fixture.teardown()

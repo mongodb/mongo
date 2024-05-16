@@ -1,4 +1,5 @@
 """The unittest.TestCase for Server Discovery and Monitoring JSON tests."""
+
 import os
 import os.path
 from typing import Optional
@@ -14,8 +15,12 @@ class SDAMJsonTestCase(interface.ProcessTestCase):
     REGISTERED_NAME = "sdam_json_test"
     TEST_DIR = os.path.normpath("src/mongo/client/sdam/json_tests/sdam_tests")
 
-    def __init__(self, logger: logging.Logger, json_test_files: list[str],
-                 program_options: Optional[dict] = None):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        json_test_files: list[str],
+        program_options: Optional[dict] = None,
+    ):
         """Initialize the TestCase with the executable to run."""
         assert len(json_test_files) == 1
         interface.ProcessTestCase.__init__(self, logger, "SDAM Json Test", json_test_files[0])

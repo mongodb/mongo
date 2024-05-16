@@ -57,8 +57,9 @@ class TestLoggers(unittest.TestCase):
         loggers.BUILDLOGGER_SERVER.get_test_log_url.return_value = "dummy_url"
 
         mock_parent = MagicMock()
-        (logger, url) = loggers.new_test_logger("dummy_shortname", "dummy_basename",
-                                                "dummy_command", mock_parent, 88, 99, MagicMock())
+        (logger, url) = loggers.new_test_logger(
+            "dummy_shortname", "dummy_basename", "dummy_command", mock_parent, 88, 99, MagicMock()
+        )
         self.assertEqual(logger.handlers[0], mock_handler)
         self.assertEqual(logger.parent, mock_parent)
         self.assertEqual(url, "dummy_url")

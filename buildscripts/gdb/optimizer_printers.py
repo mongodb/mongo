@@ -27,7 +27,7 @@ def eval_print_fn(val, print_fn):
     # replace them with a single EOL character so that GDB prints multi-line
     # explains nicely.
     pp_result = print_fn(val)
-    pp_str = str(pp_result).replace("\"", "").replace("\\n", "\n")
+    pp_str = str(pp_result).replace('"', "").replace("\\n", "\n")
     return pp_str
 
 
@@ -177,8 +177,8 @@ class FixedArityNodePrinter(object):
 class Vector(object):
     def __init__(self, vec):
         self.vec = vec
-        self.start = vec['_M_impl']['_M_start']
-        self.finish = vec['_M_impl']['_M_finish']
+        self.start = vec["_M_impl"]["_M_start"]
+        self.finish = vec["_M_impl"]["_M_finish"]
 
     def __iter__(self):
         item = self.start
@@ -193,8 +193,9 @@ class Vector(object):
 
     def get(self, index):
         if index > self.count() - 1:
-            raise gdb.GdbError("Invalid Vector access at index {} with size {}".format(
-                index, self.count()))
+            raise gdb.GdbError(
+                "Invalid Vector access at index {} with size {}".format(index, self.count())
+            )
         item = self.start + index
         return item.dereference()
 
@@ -325,7 +326,8 @@ class ConstantPrinter(object):
 
     def to_string(self):
         return "Constant[{}]".format(
-            ConstantPrinter.print_sbe_value(self.val["_tag"], self.val["_val"]))
+            ConstantPrinter.print_sbe_value(self.val["_tag"], self.val["_val"])
+        )
 
 
 class VariablePrinter(object):
@@ -608,8 +610,9 @@ class FieldProjectionMapPrinter(object):
             res += "<root>: " + str(root_proj) + ", "
 
         # Python reformats the string with embedded "=" characters, avoid that by replacing here.
-        res += str(self.val["_fieldProjections"]).replace("=", ":").replace("{", "(").replace(
-            "}", ")")
+        res += (
+            str(self.val["_fieldProjections"]).replace("=", ":").replace("{", "(").replace("}", ")")
+        )
         res += "}"
         return res
 
@@ -623,7 +626,8 @@ class PhysicalScanNodePrinter(FixedArityNodePrinter):
 
     def to_string(self):
         return "PhysicalScan[{}, {}]".format(
-            str(self.val["_fieldProjectionMap"]), str(self.val["_scanDefName"]))
+            str(self.val["_fieldProjectionMap"]), str(self.val["_scanDefName"])
+        )
 
 
 class ValueScanNodePrinter(FixedArityNodePrinter):
@@ -634,8 +638,9 @@ class ValueScanNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 1, "ValueScan")
 
     def to_string(self):
-        return "ValueScan[hasRID={},arraySize={}]".format(self.val["_hasRID"],
-                                                          self.val["_arraySize"])
+        return "ValueScan[hasRID={},arraySize={}]".format(
+            self.val["_hasRID"], self.val["_arraySize"]
+        )
 
 
 class CoScanNodePrinter(FixedArityNodePrinter):
@@ -655,8 +660,11 @@ class IndexScanNodePrinter(FixedArityNodePrinter):
 
     def to_string(self):
         return "IndexScan[{{{}}}, scanDef={}, indexDef={}, interval={}]".format(
-            self.val["_fieldProjectionMap"], self.val["_scanDefName"], self.val["_indexDefName"],
-            self.val["_indexInterval"]).replace("\n", "")
+            self.val["_fieldProjectionMap"],
+            self.val["_scanDefName"],
+            self.val["_indexDefName"],
+            self.val["_indexInterval"],
+        ).replace("\n", "")
 
 
 class SeekNodePrinter(FixedArityNodePrinter):
@@ -667,9 +675,11 @@ class SeekNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 2, "Seek")
 
     def to_string(self):
-        return "Seek[rid_projection: {}, {}, scanDef: {}]".format(self.val["_ridProjectionName"],
-                                                                  self.val["_fieldProjectionMap"],
-                                                                  self.val["_scanDefName"])
+        return "Seek[rid_projection: {}, {}, scanDef: {}]".format(
+            self.val["_ridProjectionName"],
+            self.val["_fieldProjectionMap"],
+            self.val["_scanDefName"],
+        )
 
 
 class MemoLogicalDelegatorNodePrinter(FixedArityNodePrinter):
@@ -691,8 +701,9 @@ class MemoPhysicalDelegatorNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 0, "MemoPhysicalDelegator")
 
     def to_string(self):
-        return "MemoPhysicalDelegator[group: {}, index: {}]".format(self.val["_nodeId"]["_groupId"],
-                                                                    self.val["_nodeId"]["_index"])
+        return "MemoPhysicalDelegator[group: {}, index: {}]".format(
+            self.val["_nodeId"]["_groupId"], self.val["_nodeId"]["_index"]
+        )
 
 
 class ResidualRequirementPrinter(object):
@@ -805,8 +816,13 @@ class BinaryJoinNodePrinter(FixedArityNodePrinter):
 
     def to_string(self):
         correlated = print_correlated_projections(self.val["_correlatedProjectionNames"])
-        return "BinaryJoin[type=" + str(strip_namespace(
-            self.val["_joinType"])) + ", " + correlated + "]"
+        return (
+            "BinaryJoin[type="
+            + str(strip_namespace(self.val["_joinType"]))
+            + ", "
+            + correlated
+            + "]"
+        )
 
 
 def print_eq_join_condition(leftKeys, rightKeys):
@@ -842,8 +858,9 @@ class MergeJoinNodePrinter(FixedArityNodePrinter):
 
         # Manually add the collation ops.
         collationOps = Vector(self.val["_collation"])
-        collationChild = "Collation[" + ", ".join(str(collation)
-                                                  for collation in collationOps) + "]"
+        collationChild = (
+            "Collation[" + ", ".join(str(collation) for collation in collationOps) + "]"
+        )
         self.add_child(collationChild)
 
         # Manually add the child which prints the sets of keys.
@@ -858,7 +875,8 @@ class MergeJoinNodePrinter(FixedArityNodePrinter):
 def print_collation_req(req):
     spec = Vector(req["_spec"])
     return ", ".join(
-        str(entry["first"]) + ": " + strip_namespace(entry["second"]) for entry in spec)
+        str(entry["first"]) + ": " + strip_namespace(entry["second"]) for entry in spec
+    )
 
 
 class SortedMergeNodePrinter(DynamicArityNodePrinter):
@@ -883,8 +901,13 @@ class NestedLoopJoinNodePrinter(FixedArityNodePrinter):
 
     def to_string(self):
         correlated = print_correlated_projections(self.val["_correlatedProjectionNames"])
-        return "NestedLoopJoin[type=" + strip_namespace(
-            self.val["_joinType"]) + ", " + correlated + "]"
+        return (
+            "NestedLoopJoin[type="
+            + strip_namespace(self.val["_joinType"])
+            + ", "
+            + correlated
+            + "]"
+        )
 
 
 class UnwindNodePrinter(FixedArityNodePrinter):
@@ -911,8 +934,13 @@ class SpoolProducerNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 4, "SpoolProducer")
 
     def to_string(self):
-        return "SpoolProducer[" + strip_namespace(self.val["_type"]) + ", id:" + str(
-            self.val["_spoolId"]) + "]"
+        return (
+            "SpoolProducer["
+            + strip_namespace(self.val["_type"])
+            + ", id:"
+            + str(self.val["_spoolId"])
+            + "]"
+        )
 
 
 class SpoolConsumerNodePrinter(FixedArityNodePrinter):
@@ -923,8 +951,13 @@ class SpoolConsumerNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 1, "SpoolConsumer")
 
     def to_string(self):
-        return "SpoolConsumer[" + strip_namespace(self.val["_type"]) + ", id:" + str(
-            self.val["_spoolId"]) + "]"
+        return (
+            "SpoolConsumer["
+            + strip_namespace(self.val["_type"])
+            + ", id:"
+            + str(self.val["_spoolId"])
+            + "]"
+        )
 
 
 class CollationNodePrinter(FixedArityNodePrinter):
@@ -948,8 +981,13 @@ class LimitSkipNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 1, "LimitSkip")
 
     def to_string(self):
-        return "LimitSkip[limit: " + str(self.val["_property"]["_limit"]) + ", skip: " + str(
-            self.val["_property"]["_skip"]) + "]"
+        return (
+            "LimitSkip[limit: "
+            + str(self.val["_property"]["_limit"])
+            + ", skip: "
+            + str(self.val["_property"]["_skip"])
+            + "]"
+        )
 
 
 class ExchangeNodePrinter(FixedArityNodePrinter):
@@ -960,10 +998,13 @@ class ExchangeNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 2, "Exchange")
 
     def to_string(self):
-        return "Exchange[type: " + str(
-            self.val["_distribution"]["_distributionAndProjections"]
-            ["_type"]) + ", projections: " + str(
-                self.val["_distribution"]["_distributionAndProjections"]["_projectionNames"]) + "]"
+        return (
+            "Exchange[type: "
+            + str(self.val["_distribution"]["_distributionAndProjections"]["_type"])
+            + ", projections: "
+            + str(self.val["_distribution"]["_distributionAndProjections"]["_projectionNames"])
+            + "]"
+        )
 
 
 class ReferencesPrinter(DynamicArityNodePrinter):
@@ -994,8 +1035,11 @@ class PolyValuePrinter(object):
 
         # Check if the tag is out of range for the set of types that we know about.
         if self.tag > len(self.type_set.split(",")):
-            raise gdb.GdbError("Unknown PolyValue tag: {} (max: {}), did you add a new one?".format(
-                self.tag, str(self.type_set)))
+            raise gdb.GdbError(
+                "Unknown PolyValue tag: {} (max: {}), did you add a new one?".format(
+                    self.tag, str(self.type_set)
+                )
+            )
 
     @staticmethod
     def display_hint():
@@ -1003,8 +1047,9 @@ class PolyValuePrinter(object):
         return None
 
     def cast_control_block(self, target_type):
-        return self.control_block.dereference().address.cast(
-            target_type.pointer()).dereference()["_t"]
+        return (
+            self.control_block.dereference().address.cast(target_type.pointer()).dereference()["_t"]
+        )
 
     def get_dynamic_type(self):
         # Build up the dynamic type for the particular variant of this PolyValue instance. This is
@@ -1025,9 +1070,12 @@ class PolyValuePrinter(object):
             return "Unknown PolyValue tag: {}, did you add a new one?".format(self.tag)
         # GDB automatically formats types with children, remove the extra characters to get the
         # output that we want.
-        return str(self.cast_control_block(dynamic_type)).replace(" = ", "").replace("{",
-                                                                                     "").replace(
-                                                                                         "}", "")
+        return (
+            str(self.cast_control_block(dynamic_type))
+            .replace(" = ", "")
+            .replace("{", "")
+            .replace("}", "")
+        )
 
 
 class AtomPrinter(object):
@@ -1075,9 +1123,12 @@ class DisjunctionPrinter(ConjunctionPrinter):
 
 
 def bool_expr_type(T):
-    return (f"{OPTIMIZER_NS}::algebra::PolyValue<" + f"{OPTIMIZER_NS}::BoolExpr<{T}>::Atom, " +
-            f"{OPTIMIZER_NS}::BoolExpr<{T}>::Conjunction, " +
-            f"{OPTIMIZER_NS}::BoolExpr<{T}>::Disjunction>")
+    return (
+        f"{OPTIMIZER_NS}::algebra::PolyValue<"
+        + f"{OPTIMIZER_NS}::BoolExpr<{T}>::Atom, "
+        + f"{OPTIMIZER_NS}::BoolExpr<{T}>::Conjunction, "
+        + f"{OPTIMIZER_NS}::BoolExpr<{T}>::Disjunction>"
+    )
 
 
 def register_optimizer_printers(pp):
@@ -1085,8 +1136,12 @@ def register_optimizer_printers(pp):
 
     # IntervalRequirement printer.
     pp.add("Interval", f"{OPTIMIZER_NS}::IntervalRequirement", False, IntervalPrinter)
-    pp.add("CompoundInterval", f"{OPTIMIZER_NS}::CompoundIntervalRequirement", False,
-           CompoundIntervalPrinter)
+    pp.add(
+        "CompoundInterval",
+        f"{OPTIMIZER_NS}::CompoundIntervalRequirement",
+        False,
+        CompoundIntervalPrinter,
+    )
 
     # IntervalReqExpr::Node printer.
     pp.add(
@@ -1110,12 +1165,20 @@ def register_optimizer_printers(pp):
     pp.add("Memo", f"{OPTIMIZER_NS}::cascades::Memo", False, MemoPrinter)
 
     # ResidualRequirement printer.
-    pp.add("ResidualRequirement", f"{OPTIMIZER_NS}::ResidualRequirement", False,
-           ResidualRequirementPrinter)
+    pp.add(
+        "ResidualRequirement",
+        f"{OPTIMIZER_NS}::ResidualRequirement",
+        False,
+        ResidualRequirementPrinter,
+    )
 
     # CandidateIndexEntry printer.
-    pp.add("CandidateIndexEntry", f"{OPTIMIZER_NS}::CandidateIndexEntry", False,
-           CandidateIndexEntryPrinter)
+    pp.add(
+        "CandidateIndexEntry",
+        f"{OPTIMIZER_NS}::CandidateIndexEntry",
+        False,
+        CandidateIndexEntryPrinter,
+    )
 
     # BoolExpr<ResidualRequirement> is handled by the PolyValue printer, but still need to add
     # printers for each of the possible bool expr types.
@@ -1123,14 +1186,23 @@ def register_optimizer_printers(pp):
     bool_exprs = ["ResidualRequirement"]
     for bool_type in bool_expr_types:
         for expr in bool_exprs:
-            pp.add(bool_type, f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::{expr}>::{bool_type}",
-                   False, getattr(sys.modules[__name__], bool_type + "Printer"))
+            pp.add(
+                bool_type,
+                f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::{expr}>::{bool_type}",
+                False,
+                getattr(sys.modules[__name__], bool_type + "Printer"),
+            )
 
     # Utility types within the optimizer.
-    pp.add("StrongStringAlias", f"{OPTIMIZER_NS}::StrongStringAlias", True,
-           StrongStringAliasPrinter)
-    pp.add("FieldProjectionMap", f"{OPTIMIZER_NS}::FieldProjectionMap", False,
-           FieldProjectionMapPrinter)
+    pp.add(
+        "StrongStringAlias", f"{OPTIMIZER_NS}::StrongStringAlias", True, StrongStringAliasPrinter
+    )
+    pp.add(
+        "FieldProjectionMap",
+        f"{OPTIMIZER_NS}::FieldProjectionMap",
+        False,
+        FieldProjectionMapPrinter,
+    )
 
     pp.add("ScanParams", f"{OPTIMIZER_NS}::ScanParams", False, ScanParamsPrinter)
 
@@ -1201,9 +1273,13 @@ def register_optimizer_printers(pp):
         "ExpressionBinder",
     ]
     for abt_type in abt_type_set:
-        pp.add(abt_type, f"{OPTIMIZER_NS}::{abt_type}", False,
-               getattr(sys.modules[__name__], abt_type + "Printer"))
+        pp.add(
+            abt_type,
+            f"{OPTIMIZER_NS}::{abt_type}",
+            False,
+            getattr(sys.modules[__name__], abt_type + "Printer"),
+        )
 
     # Add the generic PolyValue printer which determines the exact type at runtime and attempts to
     # invoke the printer for that type.
-    pp.add('PolyValue', OPTIMIZER_NS + "::algebra::PolyValue", True, PolyValuePrinter)
+    pp.add("PolyValue", OPTIMIZER_NS + "::algebra::PolyValue", True, PolyValuePrinter)

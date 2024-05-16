@@ -13,7 +13,7 @@ import psutil
 
 from buildscripts.resmokelib import core
 
-_IS_WINDOWS = (sys.platform == "win32")
+_IS_WINDOWS = sys.platform == "win32"
 
 if _IS_WINDOWS:
     import win32event
@@ -34,8 +34,11 @@ def call(args, logger, timeout_seconds=None, pinfo=None, check=True) -> int:
     try:
         ret = process.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
-        logger.error("Killing %s processes with PIDs %s because time limit expired", pinfo.name,
-                     str(pinfo.pidv))
+        logger.error(
+            "Killing %s processes with PIDs %s because time limit expired",
+            pinfo.name,
+            str(pinfo.pidv),
+        )
         process.kill()
         process.wait()
         logger_pipe.wait_until_finished()
@@ -63,7 +66,7 @@ def find_program(prog, paths):
 def callo(args, logger):
     """Call subprocess on args string."""
     logger.info("%s", str(args))
-    return subprocess.check_output(args).decode('utf-8', 'replace')
+    return subprocess.check_output(args).decode("utf-8", "replace")
 
 
 def signal_python(logger, pname, pid):

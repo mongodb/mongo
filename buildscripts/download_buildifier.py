@@ -5,7 +5,9 @@ import stat
 import urllib.request
 
 BUILDIFIER_VERSION = "v6.4.0"
-RELEASE_URL = f"https://mdb-build-public.s3.amazonaws.com/bazel-buildifier-binaries/{BUILDIFIER_VERSION}/"
+RELEASE_URL = (
+    f"https://mdb-build-public.s3.amazonaws.com/bazel-buildifier-binaries/{BUILDIFIER_VERSION}/"
+)
 
 
 def determine_platform():
@@ -42,14 +44,18 @@ def main():
         raise RuntimeError("There are no published arm windows releases for buildifier.")
 
     parser = argparse.ArgumentParser(
-        prog='DownloadBuildifier',
-        description='This downloads buildifier, it is intended for use in evergreen.'
-        'This is our temperary solution to get bazel linting while we determine a '
-        'long-term solution for getting buildifier on evergreen/development hosts.')
+        prog="DownloadBuildifier",
+        description="This downloads buildifier, it is intended for use in evergreen."
+        "This is our temperary solution to get bazel linting while we determine a "
+        "long-term solution for getting buildifier on evergreen/development hosts.",
+    )
 
-    parser.add_argument("--download-location", "-f",
-                        help="Name of directory to download the buildifier binary to.",
-                        default="./")
+    parser.add_argument(
+        "--download-location",
+        "-f",
+        help="Name of directory to download the buildifier binary to.",
+        default="./",
+    )
 
     args = parser.parse_args()
 

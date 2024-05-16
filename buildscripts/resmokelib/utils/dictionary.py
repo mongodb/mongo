@@ -1,4 +1,5 @@
 """Utility functions for working with Dict-type structures."""
+
 from typing import MutableMapping
 
 

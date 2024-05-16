@@ -1,4 +1,5 @@
 """Tools for detecting changes in a commit."""
+
 import os
 from itertools import chain
 from typing import Any, Dict, Iterable, Set, Optional, List
@@ -56,16 +57,16 @@ def _modified_files_for_diff(diff: DiffIndex, log: Any) -> Set:
     :param log: Logger for logging.
     :return: Set of files that were modified in diff.
     """
-    modified_files = _paths_for_iter(diff, 'M')
+    modified_files = _paths_for_iter(diff, "M")
     log.debug("modified files", files=modified_files)
 
-    added_files = _paths_for_iter(diff, 'A')
+    added_files = _paths_for_iter(diff, "A")
     log.debug("added files", files=added_files)
 
-    renamed_files = _paths_for_iter(diff, 'R')
+    renamed_files = _paths_for_iter(diff, "R")
     log.debug("renamed files", files=renamed_files)
 
-    deleted_files = _paths_for_iter(diff, 'D')
+    deleted_files = _paths_for_iter(diff, "D")
     log.debug("deleted files", files=deleted_files)
 
     return modified_files.union(added_files).union(renamed_files).union(deleted_files)
@@ -101,8 +102,9 @@ def find_changed_files(repo: Repo, revision_map: Optional[RevisionMap] = None) -
     }
 
 
-def find_changed_files_in_repos(repos: Iterable[Repo],
-                                revision_map: Optional[RevisionMap] = None) -> Set[str]:
+def find_changed_files_in_repos(
+    repos: Iterable[Repo], revision_map: Optional[RevisionMap] = None
+) -> Set[str]:
     """
     Find the changed files.
 

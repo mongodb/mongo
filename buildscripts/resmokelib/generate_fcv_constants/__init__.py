@@ -1,4 +1,5 @@
 """Generate FCV constants for consumption by non-C++ integration tests."""
+
 import argparse
 
 from buildscripts.resmokelib import configure_resmoke
@@ -29,6 +30,7 @@ class GenerateFCVConstants(Subcommand):
         self._setup_logging()
 
         import buildscripts.resmokelib.multiversionconstants
+
         buildscripts.resmokelib.multiversionconstants.log_constants(self._exec_logger)
 
 

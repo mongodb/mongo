@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate multiple powercycle tasks to run in evergreen."""
+
 from collections import namedtuple
 from typing import Any, List, Tuple, Set
 
@@ -11,17 +12,20 @@ from buildscripts.util.fileops import write_file
 from buildscripts.util.read_config import read_config_file
 from buildscripts.util.taskname import name_generated_task
 
-Config = namedtuple("config", [
-    "current_task_name",
-    "task_names",
-    "num_tasks",
-    "timeout_params",
-    "remote_credentials_vars",
-    "set_up_ec2_instance_vars",
-    "run_powercycle_vars",
-    "build_variant",
-    "distro",
-])
+Config = namedtuple(
+    "config",
+    [
+        "current_task_name",
+        "task_names",
+        "num_tasks",
+        "timeout_params",
+        "remote_credentials_vars",
+        "set_up_ec2_instance_vars",
+        "run_powercycle_vars",
+        "build_variant",
+        "distro",
+    ],
+)
 
 
 def make_config(expansions_file: Any) -> Config:
@@ -51,8 +55,17 @@ def make_config(expansions_file: Any) -> Config:
     build_variant = expansions.get("build_variant")
     distro = expansions.get("distro_id")
 
-    return Config(current_task_name, task_names, num_tasks, timeout_params, remote_credentials_vars,
-                  set_up_ec2_instance_vars, run_powercycle_vars, build_variant, distro)
+    return Config(
+        current_task_name,
+        task_names,
+        num_tasks,
+        timeout_params,
+        remote_credentials_vars,
+        set_up_ec2_instance_vars,
+        run_powercycle_vars,
+        build_variant,
+        distro,
+    )
 
 
 def get_setup_commands() -> Tuple[List[FunctionCall], Set[TaskDependency]]:
@@ -80,8 +93,9 @@ def get_skip_compile_setup_commands() -> Tuple[List[FunctionCall], set]:
 @click.command()
 @click.argument("expansions_file", type=str, default="expansions.yml")
 @click.argument("output_file", type=str, default="powercycle_tasks.json")
-def main(expansions_file: str = "expansions.yml",
-         output_file: str = "powercycle_tasks.json") -> None:
+def main(
+    expansions_file: str = "expansions.yml", output_file: str = "powercycle_tasks.json"
+) -> None:
     """Generate multiple powercycle tasks to run in evergreen."""
 
     config = make_config(expansions_file)
@@ -94,28 +108,37 @@ def main(expansions_file: str = "expansions.yml",
         else:
             commands, task_dependency = get_setup_commands()
 
-        commands.extend([
-            FunctionCall("set up remote credentials", config.remote_credentials_vars),
-            BuiltInCommand("timeout.update", config.timeout_params),
-            FunctionCall("set up EC2 instance", config.set_up_ec2_instance_vars),
-            FunctionCall("run powercycle test", config.run_powercycle_vars),
-        ])
+        commands.extend(
+            [
+                FunctionCall("set up remote credentials", config.remote_credentials_vars),
+                BuiltInCommand("timeout.update", config.timeout_params),
+                FunctionCall("set up EC2 instance", config.set_up_ec2_instance_vars),
+                FunctionCall("run powercycle test", config.run_powercycle_vars),
+            ]
+        )
 
-        sub_tasks.update({
-            Task(
-                name_generated_task(task_name, index, config.num_tasks, config.build_variant),
-                commands, task_dependency)
-            for index in range(config.num_tasks)
-        })
+        sub_tasks.update(
+            {
+                Task(
+                    name_generated_task(task_name, index, config.num_tasks, config.build_variant),
+                    commands,
+                    task_dependency,
+                )
+                for index in range(config.num_tasks)
+            }
+        )
 
     build_variant.display_task(
-        config.current_task_name.replace("_gen", ""), sub_tasks, distros=[config.distro],
-        execution_existing_tasks={ExistingTask(config.current_task_name)})
+        config.current_task_name.replace("_gen", ""),
+        sub_tasks,
+        distros=[config.distro],
+        execution_existing_tasks={ExistingTask(config.current_task_name)},
+    )
     shrub_project = ShrubProject.empty()
     shrub_project.add_build_variant(build_variant)
 
     write_file(output_file, shrub_project.json())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

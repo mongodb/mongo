@@ -15,12 +15,15 @@ class CheckRoutingTableConsistency(jsfile.PerClusterDataConsistencyHook):
         """Initialize CheckRoutingTableConsistency."""
 
         if not isinstance(fixture, shardedcluster.ShardedClusterFixture) and not isinstance(
-                fixture, multi_sharded_cluster.MultiShardedClusterFixture):
+            fixture, multi_sharded_cluster.MultiShardedClusterFixture
+        ):
             raise ValueError(
                 f"'fixture' must be an instance of ShardedClusterFixture or MultiShardedClusterFixture, but got"
-                f" {fixture.__class__.__name__}")
+                f" {fixture.__class__.__name__}"
+            )
 
         description = "Inspect collection and chunk metadata in config server"
         js_filename = os.path.join("jstests", "hooks", "run_check_routing_table_consistency.js")
-        super().__init__(hook_logger, fixture, js_filename, description,
-                         shell_options=shell_options)
+        super().__init__(
+            hook_logger, fixture, js_filename, description, shell_options=shell_options
+        )

@@ -9,7 +9,6 @@ from buildscripts.resmokelib.utils import jscomment
 
 class TestJstestTags(unittest.TestCase):
     def test_jstest_tags(self):
-
         default_on_feature_flags = get_all_feature_flags_turned_on_by_default()
 
         disallowed_tags = {f"{flag}_incompatible" for flag in default_on_feature_flags}

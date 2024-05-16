@@ -7,13 +7,17 @@ import shlex
 def __lldb_init_module(debugger, *_args):
     """Register custom commands."""
     debugger.HandleCommand(
-        "command script add -o -f lldb_commands.PrintGlobalServiceContext mongodb-service-context")
+        "command script add -o -f lldb_commands.PrintGlobalServiceContext mongodb-service-context"
+    )
     debugger.HandleCommand(
-        "command script add -o -f lldb_commands.PrintGlobalServiceContext mongodb-dump-locks")
+        "command script add -o -f lldb_commands.PrintGlobalServiceContext mongodb-dump-locks"
+    )
     debugger.HandleCommand(
-        "command script add -o -f lldb_commands.BreakpointOnAssert mongodb-breakpoint-assert")
+        "command script add -o -f lldb_commands.BreakpointOnAssert mongodb-breakpoint-assert"
+    )
     debugger.HandleCommand(
-        "command script add -o -f lldb_commands.MongoDBFindBreakpoint mongodb-find-breakpoint")
+        "command script add -o -f lldb_commands.MongoDBFindBreakpoint mongodb-find-breakpoint"
+    )
     debugger.HandleCommand("command script add -o -f lldb_commands.DumpGSC mongodb-gsc")
     debugger.HandleCommand("command alias mongodb-help help")
 
@@ -42,13 +46,14 @@ def BreakpointOnAssert(debugger, command, _exec_ctx, _result, _internal_dict):  
 
     arg_strs = shlex.split(command)
 
-    parser = argparse.ArgumentParser(description='Set a breakpoint on a usassert code.')
-    parser.add_argument('code', metavar='N', type=int, help='uassert code')
+    parser = argparse.ArgumentParser(description="Set a breakpoint on a usassert code.")
+    parser.add_argument("code", metavar="N", type=int, help="uassert code")
     args = parser.parse_args(arg_strs)
 
     debugger.HandleCommand(
-        "breakpoint set -n mongo::uassertedWithLocation -c \"(int)status._error.px->code == %s\"" %
-        args.code)
+        'breakpoint set -n mongo::uassertedWithLocation -c "(int)status._error.px->code == %s"'
+        % args.code
+    )
 
 
 def MongoDBFindBreakpoint(debugger, _command, exec_ctx, _result, _internal_dict):  # pylint: disable=invalid-name
@@ -90,17 +95,20 @@ def DumpGSC(_debugger, _command, exec_ctx, _result, _internal_dict):  # pylint: 
     for child in range(decoration_info.num_children):
         di = decoration_info.children[child]
         constructor = di.GetChildMemberWithName("constructor").__str__()
-        index = di.GetChildMemberWithName("descriptor").GetChildMemberWithName(
-            "_index").GetValueAsUnsigned()
+        index = (
+            di.GetChildMemberWithName("descriptor")
+            .GetChildMemberWithName("_index")
+            .GetValueAsUnsigned()
+        )
 
         type_name = constructor
-        type_name = type_name[0:len(type_name) - 1]
-        type_name = type_name[0:type_name.rindex(">")]
-        type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
+        type_name = type_name[0 : len(type_name) - 1]
+        type_name = type_name[0 : type_name.rindex(">")]
+        type_name = type_name[type_name.index("constructAt<") :].replace("constructAt<", "")
 
         # If the type is a pointer type, strip the * at the end.
-        if type_name.endswith('*'):
-            type_name = type_name[0:len(type_name) - 1]
+        if type_name.endswith("*"):
+            type_name = type_name[0 : len(type_name) - 1]
         type_name = type_name.rstrip()
 
         type_t = exec_ctx.target.FindTypes(type_name).GetTypeAtIndex(0)

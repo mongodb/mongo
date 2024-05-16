@@ -34,9 +34,9 @@ from contextlib import asynccontextmanager
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import DatabaseConfig, RestoreMode
 
-__all__ = ['DatabaseInstance', 'Pipeline']
+__all__ = ["DatabaseInstance", "Pipeline"]
 """MongoDB Aggregate's Pipeline"""
-Pipeline = NewType('Pipeline', Sequence[Mapping[str, Any]])
+Pipeline = NewType("Pipeline", Sequence[Mapping[str, Any]])
 
 
 class DatabaseInstance:
@@ -50,8 +50,9 @@ class DatabaseInstance:
 
     def __enter__(self):
         if self.config.restore_from_dump == RestoreMode.ALWAYS or (
-                self.config.restore_from_dump == RestoreMode.ONLY_NEW
-                and self.config.database_name not in self.client.list_database_names()):
+            self.config.restore_from_dump == RestoreMode.ONLY_NEW
+            and self.config.database_name not in self.client.list_database_names()
+        ):
             self.restore()
         return self
 
@@ -66,68 +67,83 @@ class DatabaseInstance:
 
     def restore(self):
         """Restore the database from the 'self.dump_directory'."""
-        subprocess.run(['mongorestore', '--nsInclude', f'{self.config.database_name}.*', '--drop'],
-                       shell=True, check=True, cwd=self.config.dump_path)
+        subprocess.run(
+            ["mongorestore", "--nsInclude", f"{self.config.database_name}.*", "--drop"],
+            shell=True,
+            check=True,
+            cwd=self.config.dump_path,
+        )
 
     def dump(self):
         """Dump the database into 'self.dump_directory'."""
-        subprocess.run(['mongodump', '--db', self.config.database_name], cwd=self.config.dump_path,
-                       check=True)
+        subprocess.run(
+            ["mongodump", "--db", self.config.database_name], cwd=self.config.dump_path, check=True
+        )
 
     async def set_parameter(self, name: str, value: any) -> None:
         """Set MongoDB Parameter."""
-        await self.client.admin.command({'setParameter': 1, name: value})
+        await self.client.admin.command({"setParameter": 1, name: value})
 
     async def get_parameter(self, name: str) -> any:
-        return (await self.client.admin.command({'getParameter': 1, name: 1}))[name]
+        return (await self.client.admin.command({"getParameter": 1, name: 1}))[name]
 
     async def enable_sbe(self, state: bool) -> None:
         """Enable new query execution engine. Throw pymongo.errors.OperationFailure in case of failure."""
-        await self.set_parameter('internalQueryFrameworkControl',
-                                 'trySbeEngine' if state else 'forceClassicEngine')
+        await self.set_parameter(
+            "internalQueryFrameworkControl", "trySbeEngine" if state else "forceClassicEngine"
+        )
 
     async def enable_cascades(self, state: bool) -> None:
         """Enable new query optimizer. Requires featureFlagCommonQueryFramework set to True."""
 
         # Set FeatureCompatibilityVersion compatible with featureFlagCommonQueryFramework.
-        version = (await self.client.admin.command(
-            {'getParameter': 1,
-             'featureFlagCommonQueryFramework': 1}))['featureFlagCommonQueryFramework']['version']
+        version = (
+            await self.client.admin.command(
+                {"getParameter": 1, "featureFlagCommonQueryFramework": 1}
+            )
+        )["featureFlagCommonQueryFramework"]["version"]
         await self.client.admin.command(
-            {'setFeatureCompatibilityVersion': version, 'confirm': True})
+            {"setFeatureCompatibilityVersion": version, "confirm": True}
+        )
 
         await self.client.admin.command(
-            {'configureFailPoint': 'enableExplainInBonsai', 'mode': 'alwaysOn'})
-        await self.set_parameter('internalQueryFrameworkControl',
-                                 'forceBonsai' if state else 'trySbeEngine')
+            {"configureFailPoint": "enableExplainInBonsai", "mode": "alwaysOn"}
+        )
+        await self.set_parameter(
+            "internalQueryFrameworkControl", "forceBonsai" if state else "trySbeEngine"
+        )
 
     async def explain(self, collection_name: str, pipeline: Pipeline) -> dict[str, any]:
         """Return explain for the given pipeline."""
         return await self.database.command(
-            'explain', {'aggregate': collection_name, 'pipeline': pipeline, 'cursor': {}},
-            verbosity='executionStats')
+            "explain",
+            {"aggregate": collection_name, "pipeline": pipeline, "cursor": {}},
+            verbosity="executionStats",
+        )
 
     async def hide_index(self, collection_name: str, index_name: str) -> None:
         """Hide the given index from the query optimizer."""
         await self.database.command(
-            {'collMod': collection_name, 'index': {'name': index_name, 'hidden': True}})
+            {"collMod": collection_name, "index": {"name": index_name, "hidden": True}}
+        )
 
     async def unhide_index(self, collection_name: str, index_name: str) -> None:
         """Make the given index visible for the query optimizer."""
         await self.database.command(
-            {'collMod': collection_name, 'index': {'name': index_name, 'hidden': False}})
+            {"collMod": collection_name, "index": {"name": index_name, "hidden": False}}
+        )
 
     async def hide_all_indexes(self, collection_name: str) -> None:
         """Hide all indexes of the given collection from the query optimizer."""
         for index in self.database[collection_name].list_indexes():
-            if index['name'] != '_id_':
-                await self.hide_index(collection_name, index['name'])
+            if index["name"] != "_id_":
+                await self.hide_index(collection_name, index["name"])
 
     async def unhide_all_indexes(self, collection_name: str) -> None:
         """Make all indexes of the given collection visible fpr the query optimizer."""
         for index in self.database[collection_name].list_indexes():
-            if index['name'] != '_id_':
-                await self.unhide_index(collection_name, index['name'])
+            if index["name"] != "_id_":
+                await self.unhide_index(collection_name, index["name"])
 
     async def drop_collection(self, collection_name: str) -> None:
         """Drop collection."""
@@ -144,12 +160,12 @@ class DatabaseInstance:
 
     async def get_stats(self, collection_name: str):
         """Get collection statistics."""
-        return await self.database.command('collstats', collection_name)
+        return await self.database.command("collstats", collection_name)
 
     async def get_average_document_size(self, collection_name: str) -> float:
         """Get average document size for the given collection."""
         stats = await self.get_stats(collection_name)
-        avg_size = stats.get('avgObjSize')
+        avg_size = stats.get("avgObjSize")
         return avg_size if avg_size is not None else 0
 
 

@@ -2,13 +2,13 @@
 
 A hook to set the given cluster server parameter on a replica set fixture.
 """
+
 from time import sleep
 
 from buildscripts.resmokelib.testing.hooks import interface
 
 
 class ClusterParameter(interface.Hook):
-
     IS_BACKGROUND = False
 
     def __init__(self, hook_logger, rs_fixture, key=None, value=None):
@@ -23,7 +23,8 @@ class ClusterParameter(interface.Hook):
         """Calls setClusterParameter to set the specified parameter on the fixture before running the suite."""
         client = self._fixture.get_primary().mongo_client()
         self._original_value = client.get_database("admin").command(
-            {"getClusterParameter": self._key})["clusterParameters"][0]
+            {"getClusterParameter": self._key}
+        )["clusterParameters"][0]
         # There are extra parameters in the response that aren't part of the original value so
         # they must be removed.
         del self._original_value["_id"]
@@ -43,4 +44,5 @@ class ClusterParameter(interface.Hook):
         }
         client.get_database("admin").command(command_request)
         self.logger.info(
-            f"Successfully called setClusterParameter to restor original value of {self._key}")
+            f"Successfully called setClusterParameter to restor original value of {self._key}"
+        )

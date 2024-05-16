@@ -46,12 +46,14 @@ class NormalizeTestFileTest(unittest.TestCase):
     def test_windows_file_is_normalized(self):
         windows_file = "test\\found\\under\\windows.exe"
         self.assertEqual(
-            testname_utils.normalize_test_file(windows_file), "test/found/under/windows")
+            testname_utils.normalize_test_file(windows_file), "test/found/under/windows"
+        )
 
     def test_windows_file_with_non_exe_ext(self):
         windows_file = "test\\found\\under\\windows.sh"
         self.assertEqual(
-            testname_utils.normalize_test_file(windows_file), "test/found/under/windows.sh")
+            testname_utils.normalize_test_file(windows_file), "test/found/under/windows.sh"
+        )
 
     def test_unix_files_are_not_changed(self):
         unix_file = "test/found/under/unix"

@@ -1,4 +1,5 @@
 """Functions to read configuration files."""
+
 import yaml
 
 

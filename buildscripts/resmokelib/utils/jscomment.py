@@ -29,7 +29,7 @@ def get_tags(pathname):
       */
     """
 
-    with io.open(pathname, 'r', encoding='utf-8') as fp:
+    with io.open(pathname, "r", encoding="utf-8") as fp:
         match = _JSTEST_TAGS_RE.match(fp.read())
         if match:
             try:
@@ -40,20 +40,29 @@ def get_tags(pathname):
                     raise TypeError("Expected a list of string tags, but got '%s'" % (tags))
 
                 for tag in tags:
-                    if '//' in tag:
-                        raise ValueError(("Found a JS line comment '%s'. "\
-                            "Use '#' YAML style comments instead in a tags array %s")
-                            % (tag, pathname))
+                    if "//" in tag:
+                        raise ValueError(
+                            (
+                                "Found a JS line comment '%s'. "
+                                "Use '#' YAML style comments instead in a tags array %s"
+                            )
+                            % (tag, pathname)
+                        )
 
-                    if ' ' in tag:
-                        raise ValueError(("Found an empty space in tag '%s'. "\
-                            "This is not permitted and may indicate a missing comma in %s")
-                            % (tag, pathname))
+                    if " " in tag:
+                        raise ValueError(
+                            (
+                                "Found an empty space in tag '%s'. "
+                                "This is not permitted and may indicate a missing comma in %s"
+                            )
+                            % (tag, pathname)
+                        )
 
                 return tags
             except yaml.YAMLError as err:
                 raise ValueError(
-                    "File '%s' contained invalid tags (expected YAML): %s" % (pathname, err))
+                    "File '%s' contained invalid tags (expected YAML): %s" % (pathname, err)
+                )
 
     return []
 

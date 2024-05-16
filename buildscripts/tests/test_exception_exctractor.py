@@ -61,10 +61,17 @@ class TestExceptionExtractor(unittest.TestCase):
         assert not exception_extractor.get_exception()
 
     def test_successful_extraction_truncate_first(self):
-        logs = ["START"] + ["not captured"
-                            ] + ["captured"] * (under_test.MAX_EXCEPTION_LENGTH - 1) + ["END"]
-        expected_exception = ["[LAST Part of Exception]"
-                              ] + ["captured"] * (under_test.MAX_EXCEPTION_LENGTH - 1) + ["END"]
+        logs = (
+            ["START"]
+            + ["not captured"]
+            + ["captured"] * (under_test.MAX_EXCEPTION_LENGTH - 1)
+            + ["END"]
+        )
+        expected_exception = (
+            ["[LAST Part of Exception]"]
+            + ["captured"] * (under_test.MAX_EXCEPTION_LENGTH - 1)
+            + ["END"]
+        )
         exception_extractor = self.get_exception_extractor()
         for log in logs:
             exception_extractor.process_log_line(log)
@@ -73,10 +80,17 @@ class TestExceptionExtractor(unittest.TestCase):
         assert exception_extractor.get_exception() == expected_exception
 
     def test_successful_extraction_truncate_last(self):
-        logs = ["START"] + ["captured"] * (under_test.MAX_EXCEPTION_LENGTH - 1) + ["not captured"
-                                                                                   ] + ["END"]
-        expected_exception = ["[FIRST Part of Exception]"
-                              ] + ["START"] + ["captured"] * (under_test.MAX_EXCEPTION_LENGTH - 1)
+        logs = (
+            ["START"]
+            + ["captured"] * (under_test.MAX_EXCEPTION_LENGTH - 1)
+            + ["not captured"]
+            + ["END"]
+        )
+        expected_exception = (
+            ["[FIRST Part of Exception]"]
+            + ["START"]
+            + ["captured"] * (under_test.MAX_EXCEPTION_LENGTH - 1)
+        )
         exception_extractor = self.get_exception_extractor(under_test.Truncate.LAST)
         for log in logs:
             exception_extractor.process_log_line(log)

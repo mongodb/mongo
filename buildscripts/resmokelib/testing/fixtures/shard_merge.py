@@ -8,17 +8,33 @@ class ShardMergeFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
     """Fixture which provides JSTests with a set of replica sets to run tenant migration against."""
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-locals
-            self, logger, job_num, fixturelib, common_mongod_options=None, per_mongod_options=None,
-            dbpath_prefix=None, preserve_dbpath=False, num_replica_sets=1,
-            num_nodes_per_replica_set=2, start_initial_sync_node=False,
-            write_concern_majority_journal_default=None, auth_options=None,
-            replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
-            use_replica_set_connection_string=None, linear_chain=False, mixed_bin_versions=None,
-            default_read_concern=None, default_write_concern=None):
+        self,
+        logger,
+        job_num,
+        fixturelib,
+        common_mongod_options=None,
+        per_mongod_options=None,
+        dbpath_prefix=None,
+        preserve_dbpath=False,
+        num_replica_sets=1,
+        num_nodes_per_replica_set=2,
+        start_initial_sync_node=False,
+        write_concern_majority_journal_default=None,
+        auth_options=None,
+        replset_config_options=None,
+        voting_secondaries=True,
+        all_nodes_electable=False,
+        use_replica_set_connection_string=None,
+        linear_chain=False,
+        mixed_bin_versions=None,
+        default_read_concern=None,
+        default_write_concern=None,
+    ):
         """Initialize ShardMergeFixture with different options for the replica set processes."""
 
-        interface.MultiClusterFixture.__init__(self, logger, job_num, fixturelib,
-                                               dbpath_prefix=dbpath_prefix)
+        interface.MultiClusterFixture.__init__(
+            self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix
+        )
 
         self.common_mongod_options = self.fixturelib.default_if_none(common_mongod_options, {})
         self.per_mongod_options = self.fixturelib.default_if_none(per_mongod_options, {})
@@ -32,16 +48,21 @@ class ShardMergeFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         self.use_replica_set_connection_string = use_replica_set_connection_string
         self.default_read_concern = default_read_concern
         self.default_write_concern = default_write_concern
-        self.mixed_bin_versions = self.fixturelib.default_if_none(mixed_bin_versions,
-                                                                  self.config.MIXED_BIN_VERSIONS)
+        self.mixed_bin_versions = self.fixturelib.default_if_none(
+            mixed_bin_versions, self.config.MIXED_BIN_VERSIONS
+        )
         self.mixed_bin_versions_config = self.mixed_bin_versions
 
         # Use the values given from the command line if they exist for linear_chain and num_nodes.
-        linear_chain_option = self.fixturelib.default_if_none(self.config.LINEAR_CHAIN,
-                                                              linear_chain)
+        linear_chain_option = self.fixturelib.default_if_none(
+            self.config.LINEAR_CHAIN, linear_chain
+        )
         self.linear_chain = linear_chain_option if linear_chain_option else linear_chain
-        self.num_nodes_per_replica_set = num_nodes_per_replica_set if num_nodes_per_replica_set \
+        self.num_nodes_per_replica_set = (
+            num_nodes_per_replica_set
+            if num_nodes_per_replica_set
             else self.config.NUM_REPLSET_NODES
+        )
         self.num_replica_sets = num_replica_sets if num_replica_sets else self.config.NUM_REPLSETS
         if self.num_replica_sets < 2:
             raise ValueError("num_replica_sets must be greater or equal to 2")
@@ -58,14 +79,21 @@ class ShardMergeFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
 
                 self.replica_sets.append(
                     self.fixturelib.make_fixture(
-                        "ReplicaSetFixture", self.logger, self.job_num,
-                        mongod_options=mongod_options, preserve_dbpath=self.preserve_dbpath,
-                        num_nodes=self.num_nodes_per_replica_set, auth_options=self.auth_options,
+                        "ReplicaSetFixture",
+                        self.logger,
+                        self.job_num,
+                        mongod_options=mongod_options,
+                        preserve_dbpath=self.preserve_dbpath,
+                        num_nodes=self.num_nodes_per_replica_set,
+                        auth_options=self.auth_options,
                         replset_config_options=self.replset_config_options,
                         mixed_bin_versions=self.mixed_bin_versions,
                         replicaset_logging_prefix=rs_name,
                         use_replica_set_connection_string=self.use_replica_set_connection_string,
-                        all_nodes_electable=self.all_nodes_electable, replset_name=rs_name))
+                        all_nodes_electable=self.all_nodes_electable,
+                        replset_name=rs_name,
+                    )
+                )
 
         # The ReplicaSetFixture for the replica set that starts out owning the data (i.e. the
         # replica set that driver should connect to when running commands).
@@ -77,7 +105,7 @@ class ShardMergeFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         for replica_set in self.replica_sets:
             out.extend(replica_set.pids())
         if not out:
-            self.logger.debug('No replica sets when gathering multi replicaset fixture pids.')
+            self.logger.debug("No replica sets when gathering multi replicaset fixture pids.")
         return out
 
     def setup(self):
@@ -160,32 +188,51 @@ class ShardMergeFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         primary_client = interface.build_client(primary, self.auth_options)
 
         try:
-            primary_client.admin.command({
-                "createRole": "tenantMigrationDonorRole", "privileges": [{
-                    "resource": {"cluster": True}, "actions": ["runTenantMigration"]
-                }, {"resource": {"db": "admin", "collection": "system.keys"}, "actions": ["find"]}],
-                "roles": []
-            })
+            primary_client.admin.command(
+                {
+                    "createRole": "tenantMigrationDonorRole",
+                    "privileges": [
+                        {"resource": {"cluster": True}, "actions": ["runTenantMigration"]},
+                        {
+                            "resource": {"db": "admin", "collection": "system.keys"},
+                            "actions": ["find"],
+                        },
+                    ],
+                    "roles": [],
+                }
+            )
         except:
             self.logger.exception(
-                "Error creating tenant migration donor role on primary on port %d of replica" +
-                " set '%s'.", primary.port, rs.replset_name)
+                "Error creating tenant migration donor role on primary on port %d of replica"
+                + " set '%s'.",
+                primary.port,
+                rs.replset_name,
+            )
             raise
 
         try:
-            primary_client.admin.command({
-                "createRole": "tenantMigrationRecipientRole",
-                "privileges": [{
-                    "resource": {"cluster": True},
-                    "actions": ["listDatabases", "useUUID", "advanceClusterTime"]
-                }, {"resource": {"db": "", "collection": ""}, "actions": ["listCollections"]},
-                               {
-                                   "resource": {"anyResource": True},
-                                   "actions": ["dbStats", "collStats", "find", "listIndexes"]
-                               }], "roles": []
-            })
+            primary_client.admin.command(
+                {
+                    "createRole": "tenantMigrationRecipientRole",
+                    "privileges": [
+                        {
+                            "resource": {"cluster": True},
+                            "actions": ["listDatabases", "useUUID", "advanceClusterTime"],
+                        },
+                        {"resource": {"db": "", "collection": ""}, "actions": ["listCollections"]},
+                        {
+                            "resource": {"anyResource": True},
+                            "actions": ["dbStats", "collStats", "find", "listIndexes"],
+                        },
+                    ],
+                    "roles": [],
+                }
+            )
         except:
             self.logger.exception(
-                "Error creating tenant migration recipient role on primary on port %d of replica" +
-                " set '%s'.", primary.port, rs.replset_name)
+                "Error creating tenant migration recipient role on primary on port %d of replica"
+                + " set '%s'.",
+                primary.port,
+                rs.replset_name,
+            )
             raise

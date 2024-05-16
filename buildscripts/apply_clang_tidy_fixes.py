@@ -7,16 +7,17 @@ import hashlib
 def get_replacements_for_file(filepath: str, file_data: dict, fixes: dict):
     # we cant reliably make any changes unless we can use the md5 to make
     # sure the offsets are going to match up.
-    if file_data.get('md5'):
+    if file_data.get("md5"):
         for byte_offset in file_data:
-            if byte_offset != 'md5':
-                if file_data['md5'] in fixes:
-                    fixes[file_data['md5']]['replacements'].extend(file_data[byte_offset].get(
-                        'replacements', []))
+            if byte_offset != "md5":
+                if file_data["md5"] in fixes:
+                    fixes[file_data["md5"]]["replacements"].extend(
+                        file_data[byte_offset].get("replacements", [])
+                    )
                 else:
-                    fixes[file_data['md5']] = {
-                        'replacements': file_data[byte_offset].get('replacements', []),
-                        'filepath': filepath,
+                    fixes[file_data["md5"]] = {
+                        "replacements": file_data[byte_offset].get("replacements", []),
+                        "filepath": filepath,
                     }
 
 
@@ -38,8 +39,8 @@ def main():
         current_md5 = None
         file_bytes = None
 
-        if os.path.exists(fixes[recorded_md5]['filepath']):
-            with open(fixes[recorded_md5]['filepath'], 'rb') as fin:
+        if os.path.exists(fixes[recorded_md5]["filepath"]):
+            with open(fixes[recorded_md5]["filepath"], "rb") as fin:
                 file_bytes = fin.read()
                 current_md5 = hashlib.md5(file_bytes).hexdigest()
 
@@ -53,18 +54,21 @@ def main():
 
         # perform the swap replacement of the binary data
         file_bytes = bytearray(file_bytes)
-        fixes[recorded_md5]['replacements'].sort(key=lambda r: r['Offset'])
+        fixes[recorded_md5]["replacements"].sort(key=lambda r: r["Offset"])
         adjustments = 0
-        for replacement in fixes[recorded_md5]['replacements']:
-            file_bytes[replacement['Offset'] + adjustments:replacement['Offset'] + adjustments +
-                       replacement['Length']] = replacement['ReplacementText'].encode()
+        for replacement in fixes[recorded_md5]["replacements"]:
+            file_bytes[
+                replacement["Offset"] + adjustments : replacement["Offset"]
+                + adjustments
+                + replacement["Length"]
+            ] = replacement["ReplacementText"].encode()
 
-            if replacement['Length'] != len(replacement['ReplacementText']):
-                adjustments += len(replacement['ReplacementText']) - replacement['Length']
+            if replacement["Length"] != len(replacement["ReplacementText"]):
+                adjustments += len(replacement["ReplacementText"]) - replacement["Length"]
 
-        with open(fixes[recorded_md5]['filepath'], 'wb') as fout:
+        with open(fixes[recorded_md5]["filepath"], "wb") as fout:
             fout.write(bytes(file_bytes))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

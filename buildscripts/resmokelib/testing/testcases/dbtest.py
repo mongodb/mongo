@@ -14,8 +14,13 @@ class DBTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "db_test"
 
-    def __init__(self, logger: logging.Logger, dbtest_suites: list[str],
-                 dbtest_executable: Optional[str] = None, dbtest_options: Optional[dict] = None):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        dbtest_suites: list[str],
+        dbtest_executable: Optional[str] = None,
+        dbtest_options: Optional[dict] = None,
+    ):
         """Initialize the DBTestCase with the dbtest suite to run."""
 
         assert len(dbtest_suites) == 1
@@ -52,8 +57,12 @@ class DBTestCase(interface.ProcessTestCase):
         shutil.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
 
     def _make_process(self):
-        return core.programs.dbtest_program(self.logger, executable=self.dbtest_executable,
-                                            suites=[self.dbtest_suite], **self.dbtest_options)
+        return core.programs.dbtest_program(
+            self.logger,
+            executable=self.dbtest_executable,
+            suites=[self.dbtest_suite],
+            **self.dbtest_options,
+        )
 
     @staticmethod
     def _get_dbpath_prefix():

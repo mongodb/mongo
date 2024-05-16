@@ -17,8 +17,9 @@ class FixtureTestCase(interface.TestCase):  # pylint: disable=abstract-method
 
     def __init__(self, logger, job_name, phase):
         """Initialize the FixtureTestCase."""
-        interface.TestCase.__init__(self, logger, "Fixture test", "{}_fixture_{}".format(
-            job_name, phase), dynamic=True)
+        interface.TestCase.__init__(
+            self, logger, "Fixture test", "{}_fixture_{}".format(job_name, phase), dynamic=True
+        )
         self.job_name = job_name
 
 
@@ -30,8 +31,9 @@ class FixtureSetupTestCase(FixtureTestCase):
 
     def __init__(self, logger, fixture, job_name, times_set_up):
         """Initialize the FixtureSetupTestCase."""
-        specific_phase = "{phase}_{times_set_up}".format(phase=self.PHASE,
-                                                         times_set_up=times_set_up)
+        specific_phase = "{phase}_{times_set_up}".format(
+            phase=self.PHASE, times_set_up=times_set_up
+        )
         FixtureTestCase.__init__(self, logger, job_name, specific_phase)
         self.fixture = fixture
 
@@ -43,10 +45,14 @@ class FixtureSetupTestCase(FixtureTestCase):
             self.fixture.setup()
             self.logger.info("Waiting for %s to be ready.", self.fixture)
             self.fixture.await_ready()
-            if (not isinstance(self.fixture, (fixture_interface.NoOpFixture, ExternalFixture))
-                    # Replica set with --configsvr cannot run refresh unless it is part of a sharded cluster.
-                    and not (isinstance(self.fixture, ReplicaSetFixture)
-                             and "configsvr" in self.fixture.mongod_options)):
+            if (
+                not isinstance(self.fixture, (fixture_interface.NoOpFixture, ExternalFixture))
+                # Replica set with --configsvr cannot run refresh unless it is part of a sharded cluster.
+                and not (
+                    isinstance(self.fixture, ReplicaSetFixture)
+                    and "configsvr" in self.fixture.mongod_options
+                )
+            ):
                 mongo_client = self.fixture.mongo_client(ReadPreference.PRIMARY)
                 # Read from the CSRS primary to gossip the most recent configTime to the mongos.
                 # This ensures that the latest state of the sessions collection can be seen
@@ -99,8 +105,9 @@ class FixtureAbortTestCase(FixtureTestCase):
 
     def __init__(self, logger, fixture, job_name, times_set_up):
         """Initialize the FixtureAbortTestCase."""
-        specific_phase = "{phase}_{times_set_up}".format(phase=self.PHASE,
-                                                         times_set_up=times_set_up)
+        specific_phase = "{phase}_{times_set_up}".format(
+            phase=self.PHASE, times_set_up=times_set_up
+        )
         FixtureTestCase.__init__(self, logger, job_name, specific_phase)
         self.fixture = fixture
 

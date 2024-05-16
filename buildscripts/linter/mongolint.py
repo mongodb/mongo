@@ -10,30 +10,30 @@ import sys
 
 _RE_LINT = re.compile("//.*NOLINT")
 _RE_COMMENT_STRIP = re.compile("//.*")
-_RE_GENERIC_FCV_COMMENT = re.compile(r'\(Generic FCV reference\):')
+_RE_GENERIC_FCV_COMMENT = re.compile(r"\(Generic FCV reference\):")
 GENERIC_FCV = [
-    r'::kLatest',
-    r'::kLastContinuous',
-    r'::kLastLTS',
-    r'::kUpgradingFromLastLTSToLatest',
-    r'::kUpgradingFromLastContinuousToLatest',
-    r'::kDowngradingFromLatestToLastLTS',
-    r'::kDowngradingFromLatestToLastContinuous',
-    r'\.isUpgradingOrDowngrading',
-    r'->isUpgradingOrDowngrading',
-    r'::kDowngradingFromLatestToLastContinuous',
-    r'::kUpgradingFromLastLTSToLastContinuous',
+    r"::kLatest",
+    r"::kLastContinuous",
+    r"::kLastLTS",
+    r"::kUpgradingFromLastLTSToLatest",
+    r"::kUpgradingFromLastContinuousToLatest",
+    r"::kDowngradingFromLatestToLastLTS",
+    r"::kDowngradingFromLatestToLastContinuous",
+    r"\.isUpgradingOrDowngrading",
+    r"->isUpgradingOrDowngrading",
+    r"::kDowngradingFromLatestToLastContinuous",
+    r"::kUpgradingFromLastLTSToLastContinuous",
 ]
-_RE_GENERIC_FCV_REF = re.compile(r'(' + '|'.join(GENERIC_FCV) + r')\b')
-_RE_FEATURE_FLAG_IGNORE_FCV_CHECK_REF = re.compile(r'isEnabledAndIgnoreFCVUnsafe\(\)')
-_RE_FEATURE_FLAG_IGNORE_FCV_CHECK_COMMENT = re.compile(r'\(Ignore FCV check\)')
-_RE_HEADER = re.compile(r'\.(h|hpp)$')
+_RE_GENERIC_FCV_REF = re.compile(r"(" + "|".join(GENERIC_FCV) + r")\b")
+_RE_FEATURE_FLAG_IGNORE_FCV_CHECK_REF = re.compile(r"isEnabledAndIgnoreFCVUnsafe\(\)")
+_RE_FEATURE_FLAG_IGNORE_FCV_CHECK_COMMENT = re.compile(r"\(Ignore FCV check\)")
+_RE_HEADER = re.compile(r"\.(h|hpp)$")
 
 
 class Linter:
     """Simple C++ Linter."""
 
-    _license_header = '''\
+    _license_header = """\
 /**
  *    Copyright (C) {year}-present MongoDB, Inc.
  *
@@ -61,7 +61,7 @@ class Linter:
  *    delete this exception statement from your version. If you delete this
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
- */'''.splitlines()
+ */""".splitlines()
 
     def __init__(self, file_name, raw_lines):
         """Create new linter."""
@@ -104,10 +104,12 @@ class Linter:
 
     def _check_newlines(self):
         """Check that each source file ends with a newline character."""
-        if self.raw_lines and self.raw_lines[-1][-1:] != '\n':
+        if self.raw_lines and self.raw_lines[-1][-1:] != "\n":
             self._error(
-                len(self.raw_lines), 'mongo/final_newline',
-                'Files must end with a newline character.')
+                len(self.raw_lines),
+                "mongo/final_newline",
+                "Files must end with a newline character.",
+            )
 
     def _check_and_strip_comments(self):
         in_multi_line_comment = False
@@ -145,9 +147,9 @@ class Linter:
 
             self.clean_lines.append(clean_line)
 
-    def _license_error(self, linenum, msg, category='legal/license'):
-        style_url = 'https://github.com/mongodb/mongo/wiki/Server-Code-Style'
-        self._error(linenum, category, '{} See {}'.format(msg, style_url))
+    def _license_error(self, linenum, msg, category="legal/license"):
+        style_url = "https://github.com/mongodb/mongo/wiki/Server-Code-Style"
+        self._error(linenum, category, "{} See {}".format(msg, style_url))
         return (False, linenum)
 
     def _check_for_server_side_public_license(self):
@@ -157,22 +159,26 @@ class Linter:
         for linenum, lic_line in enumerate(self._license_header):
             src_line = next(src_iter, None)
             if src_line is None:
-                self._license_error(linenum, 'Missing or incomplete license header.')
+                self._license_error(linenum, "Missing or incomplete license header.")
                 return linenum
-            lic_re = re.escape(lic_line).replace(r'\{year\}', r'\d{4}')
+            lic_re = re.escape(lic_line).replace(r"\{year\}", r"\d{4}")
             if not re.fullmatch(lic_re, src_line):
                 self._license_error(
-                    linenum, 'Incorrect license header.\n'
-                    '  Expected: "{}"\n'
-                    '  Received: "{}"\n'.format(lic_line, src_line))
+                    linenum,
+                    "Incorrect license header.\n" '  Expected: "{}"\n' '  Received: "{}"\n'.format(
+                        lic_line, src_line
+                    ),
+                )
                 return linenum
 
         # Warn if SSPL appears in Enterprise code, which has a different license.
         expect_sspl_license = "enterprise" not in self.file_name
         if not expect_sspl_license:
-            self._license_error(linenum,
-                                'Incorrect license header found. Expected Enterprise license.',
-                                category='legal/enterprise_license')
+            self._license_error(
+                linenum,
+                "Incorrect license header found. Expected Enterprise license.",
+                category="legal/enterprise_license",
+            )
             return linenum
         return linenum
 
@@ -183,9 +189,11 @@ class Linter:
             i = bisect.bisect_right(self.generic_fcv_comments, linenum)
             if not i or self.generic_fcv_comments[i - 1] < (linenum - 10):
                 self._error(
-                    linenum, 'mongodb/fcv',
-                    'Please add a comment containing "(Generic FCV reference):" within 10 lines ' +
-                    'before the generic FCV reference.')
+                    linenum,
+                    "mongodb/fcv",
+                    'Please add a comment containing "(Generic FCV reference):" within 10 lines '
+                    + "before the generic FCV reference.",
+                )
 
     def _check_for_feature_flag_ignore_fcv(self, linenum):
         line = self.clean_lines[linenum]
@@ -194,16 +202,18 @@ class Linter:
             i = bisect.bisect_right(self.feature_flag_ignore_fcv_check_comments, linenum)
             if not i or self.feature_flag_ignore_fcv_check_comments[i - 1] < (linenum - 10):
                 self._error(
-                    linenum, 'mongodb/fcv',
-                    'Please add a comment containing "(Ignore FCV check)":" within 10 lines ' +
-                    'before the isEnabledAndIgnoreFCVUnsafe() function call explaining why ' +
-                    'the FCV check is ignored.')
+                    linenum,
+                    "mongodb/fcv",
+                    'Please add a comment containing "(Ignore FCV check)":" within 10 lines '
+                    + "before the isEnabledAndIgnoreFCVUnsafe() function call explaining why "
+                    + "the FCV check is ignored.",
+                )
 
     def _error(self, linenum, category, message):
         if linenum in self.nolint_suppression:
             return
 
-        norm_file_name = self.file_name.replace('\\', '/')
+        norm_file_name = self.file_name.replace("\\", "/")
 
         # Custom clang-tidy check tests purposefully produce errors for
         # tests to find. They should be ignored.
@@ -217,18 +227,20 @@ class Linter:
 
             # The following files are in the src/mongo/ directory but technically belong
             # in src/third_party/ because their copyright does not belong to MongoDB.
-            files_to_ignore = set([
-                'src/mongo/scripting/mozjs/PosixNSPR.cpp',
-                'src/mongo/shell/linenoise.cpp',
-                'src/mongo/shell/linenoise.h',
-                'src/mongo/shell/mk_wcwidth.cpp',
-                'src/mongo/shell/mk_wcwidth.h',
-                'src/mongo/util/md5.cpp',
-                'src/mongo/util/md5.h',
-                'src/mongo/util/md5main.cpp',
-                'src/mongo/util/net/ssl_stream.cpp',
-                'src/mongo/util/scopeguard.h',
-            ])
+            files_to_ignore = set(
+                [
+                    "src/mongo/scripting/mozjs/PosixNSPR.cpp",
+                    "src/mongo/shell/linenoise.cpp",
+                    "src/mongo/shell/linenoise.h",
+                    "src/mongo/shell/mk_wcwidth.cpp",
+                    "src/mongo/shell/mk_wcwidth.h",
+                    "src/mongo/util/md5.cpp",
+                    "src/mongo/util/md5.h",
+                    "src/mongo/util/md5main.cpp",
+                    "src/mongo/util/net/ssl_stream.cpp",
+                    "src/mongo/util/scopeguard.h",
+                ]
+            )
 
             for file_to_ignore in files_to_ignore:
                 if file_to_ignore in norm_file_name:
@@ -241,7 +253,7 @@ class Linter:
 
 def lint_file(file_name):
     """Lint file and print errors to console."""
-    with io.open(file_name, encoding='utf-8') as file_stream:
+    with io.open(file_name, encoding="utf-8") as file_stream:
         raw_lines = file_stream.readlines()
 
     linter = Linter(file_name, raw_lines)
@@ -251,11 +263,11 @@ def lint_file(file_name):
 def main():
     # type: () -> int
     """Execute Main Entry point."""
-    parser = argparse.ArgumentParser(description='MongoDB Simple C++ Linter.')
+    parser = argparse.ArgumentParser(description="MongoDB Simple C++ Linter.")
 
-    parser.add_argument('file', type=str, help="C++ input file")
+    parser.add_argument("file", type=str, help="C++ input file")
 
-    parser.add_argument('-v', '--verbose', action='count', help="Enable verbose tracing")
+    parser.add_argument("-v", "--verbose", action="count", help="Enable verbose tracing")
 
     args = parser.parse_args()
 
@@ -273,5 +285,5 @@ def main():
         return 2
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

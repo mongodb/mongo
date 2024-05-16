@@ -22,7 +22,7 @@ class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
 
     def setup(self):
         """Start the yes processes."""
-        for (i, process) in enumerate(self.__processes):
+        for i, process in enumerate(self.__processes):
             process = self._make_process(i)
 
             self.logger.info("Starting yes process...\n%s", process.as_command())
@@ -32,8 +32,9 @@ class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
             self.__processes[i] = process
 
     def _make_process(self, index):
-        logger = self.fixturelib.new_fixture_node_logger(self.__class__.__name__, self.job_num,
-                                                         "yes{:d}".format(index))
+        logger = self.fixturelib.new_fixture_node_logger(
+            self.__class__.__name__, self.job_num, "yes{:d}".format(index)
+        )
         return self.fixturelib.generic_program(logger, ["yes", self.__message])
 
     def _do_teardown(self, mode=None):
@@ -42,7 +43,8 @@ class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
 
         if not running_at_start:
             self.logger.info(
-                "yes processes were expected to be running in _do_teardown(), but weren't.")
+                "yes processes were expected to be running in _do_teardown(), but weren't."
+            )
         else:
             self.logger.info("Stopping all yes processes...")
 
@@ -58,7 +60,10 @@ class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
                 if running_at_start:
                     self.logger.info(
                         "Successfully terminated the yes process with pid %d, exited with code"
-                        " %d.", process.pid, exit_code)
+                        " %d.",
+                        process.pid,
+                        exit_code,
+                    )
 
         if running_at_start:
             self.logger.info("Successfully stopped all yes processes.")

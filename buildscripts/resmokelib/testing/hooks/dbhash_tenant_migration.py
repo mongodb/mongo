@@ -15,9 +15,11 @@ class CheckTenantMigrationDBHash(jsfile.DataConsistencyHook):
     IS_BACKGROUND = False
 
     def __init__(  # pylint: disable=super-init-not-called
-            self, hook_logger, fixture, shell_options=None):
+        self, hook_logger, fixture, shell_options=None
+    ):
         """Initialize CheckTenantMigrationDBHash."""
         description = "Check dbhashes of donor and recipient primaries"
         js_filename = os.path.join("jstests", "hooks", "run_check_tenant_migration_dbhash.js")
         jsfile.JSHook.__init__(  # pylint: disable=non-parent-init-called
-            self, hook_logger, fixture, js_filename, description, shell_options=shell_options)
+            self, hook_logger, fixture, js_filename, description, shell_options=shell_options
+        )

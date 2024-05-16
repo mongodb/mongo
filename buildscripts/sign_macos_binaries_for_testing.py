@@ -2,7 +2,7 @@
 Signs all of the known testing binaries with insecure development entitlements.
 
 Specifically the `Get Task Allow` is what we are looking for.
-Adding the `Get Task Allow` entitlement allows us to attach to 
+Adding the `Get Task Allow` entitlement allows us to attach to
 the mongo processes and get core dumps/debug in any way we need.
 You can view some more documentation on this topic here:
 https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_security_cs_debugger#discussion
@@ -12,7 +12,10 @@ import os
 import subprocess
 import sys
 
-from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import LOCAL_BIN_DIR, MULTIVERSION_BIN_DIR
+from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import (
+    LOCAL_BIN_DIR,
+    MULTIVERSION_BIN_DIR,
+)
 
 
 def main():
@@ -35,11 +38,19 @@ def main():
                 continue
 
             print(f"Signing {binary}")
-            subprocess.run([
-                "/usr/bin/codesign", "-s", "-", "-f", "--entitlements", entitlements_file,
-                binary_path
-            ], check=True)
+            subprocess.run(
+                [
+                    "/usr/bin/codesign",
+                    "-s",
+                    "-",
+                    "-f",
+                    "--entitlements",
+                    entitlements_file,
+                    binary_path,
+                ],
+                check=True,
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -91,8 +91,9 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
 
     AWAIT_READY_TIMEOUT_SECS = 300
 
-    def __init__(self, logger: Logger, job_num: int, fixturelib: 'FixtureLib',
-                 dbpath_prefix: str = None):
+    def __init__(
+        self, logger: Logger, job_num: int, fixturelib: "FixtureLib", dbpath_prefix: str = None
+    ):
         """Initialize the fixture with a logger instance."""
 
         self.fixturelib = fixturelib
@@ -109,8 +110,9 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         self.job_num = job_num
 
         dbpath_prefix = self.fixturelib.default_if_none(self.config.DBPATH_PREFIX, dbpath_prefix)
-        dbpath_prefix = self.fixturelib.default_if_none(dbpath_prefix,
-                                                        self.config.DEFAULT_DBPATH_PREFIX)
+        dbpath_prefix = self.fixturelib.default_if_none(
+            dbpath_prefix, self.config.DEFAULT_DBPATH_PREFIX
+        )
         self._dbpath_prefix = os.path.join(dbpath_prefix, "job{}".format(self.job_num))
 
     def pids(self):
@@ -181,12 +183,13 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         expected by the mongo::ConnectionString class.
         """
         raise NotImplementedError(
-            "get_internal_connection_string must be implemented by Fixture subclasses")
+            "get_internal_connection_string must be implemented by Fixture subclasses"
+        )
 
     def get_shell_connection_url(self):
         """Return the connection string to be used by the mongo shell process executing a jstest.
 
-        Defaults to returning the driver connection url, but can be overriden to provide 
+        Defaults to returning the driver connection url, but can be overriden to provide
         shell-specific options (such as using a gRPC port).
         https://docs.mongodb.com/manual/reference/connection-string/
         """
@@ -198,10 +201,12 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         https://docs.mongodb.com/manual/reference/connection-string/
         """
         raise NotImplementedError(
-            "get_driver_connection_url must be implemented by Fixture subclasses")
+            "get_driver_connection_url must be implemented by Fixture subclasses"
+        )
 
-    def mongo_client(self, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000,
-                     **kwargs):
+    def mongo_client(
+        self, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000, **kwargs
+    ):
         """Return a pymongo.MongoClient connecting to this fixture with specified 'read_preference'.
 
         The PyMongo driver will wait up to 'timeout_millis' milliseconds
@@ -225,8 +230,9 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
             if self.config.SHELL_TLS_CERTIFICATE_KEY_FILE:
                 kwargs["tlsCertificateKeyFile"] = self.config.SHELL_TLS_CERTIFICATE_KEY_FILE
 
-        return pymongo.MongoClient(host=self.get_driver_connection_url(),
-                                   read_preference=read_preference, **kwargs)
+        return pymongo.MongoClient(
+            host=self.get_driver_connection_url(), read_preference=read_preference, **kwargs
+        )
 
     def __str__(self):
         return "%s (Job #%d)" % (self.__class__.__name__, self.job_num)
@@ -259,7 +265,7 @@ class _DockerComposeInterface:
             "_all_mongo_d_s_t_instances must be implemented by Fixture subclasses that support `docker-compose.yml` generation."
         )
 
-    def all_processes(self) -> List['Process']:
+    def all_processes(self) -> List["Process"]:
         """
         Return a list of all `mongo{d,s,t}` `Process` instances in the fixture.
 
@@ -267,7 +273,8 @@ class _DockerComposeInterface:
         """
         if not self.config.DOCKER_COMPOSE_BUILD_IMAGES:
             raise DockerComposeException(
-                "This method is reserved for `--dockerComposeBuildImages` only.")
+                "This method is reserved for `--dockerComposeBuildImages` only."
+            )
 
         processes = []
 
@@ -301,7 +308,8 @@ class MultiClusterFixture(Fixture):
     def get_independent_clusters(self):
         """Return a list of the independent clusters (fixtures) that participate in this fixture."""
         raise NotImplementedError(
-            "get_independent_clusters must be implemented by MultiClusterFixture subclasses")
+            "get_independent_clusters must be implemented by MultiClusterFixture subclasses"
+        )
 
 
 class ReplFixture(Fixture):
@@ -343,7 +351,8 @@ class ReplFixture(Fixture):
                 remaining = deadline - time.time()
                 if remaining <= 0.0:
                     message = "Failed to connect to {} within {} minutes".format(
-                        self.get_driver_connection_url(), ReplFixture.AWAIT_REPL_TIMEOUT_MINS)
+                        self.get_driver_connection_url(), ReplFixture.AWAIT_REPL_TIMEOUT_MINS
+                    )
                     self.logger.error(message)
                     raise self.fixturelib.ServerFailure(message)
             except pymongo.errors.WTimeoutError:
@@ -352,7 +361,8 @@ class ReplFixture(Fixture):
                 raise self.fixturelib.ServerFailure(message)
             except pymongo.errors.PyMongoError as err:
                 message = "Write operation on {} failed: {}".format(
-                    self.get_driver_connection_url(), err)
+                    self.get_driver_connection_url(), err
+                )
                 raise self.fixturelib.ServerFailure(message)
 
 
@@ -447,12 +457,12 @@ def create_fixture_table(fixture):
         columns[key] = []
         for node in info:
             attr = getattr(node, key)
-            str_value = str(attr) if attr is not None else '-'
+            str_value = str(attr) if attr is not None else "-"
             columns[key].append(str_value)
             longest[key] = max(longest[key], len(str_value))
 
     # Filter out columns where no row has a value
-    columns = {k: v for k, v in columns.items() if not all(x == '-' for x in v)}
+    columns = {k: v for k, v in columns.items() if not all(x == "-" for x in v)}
 
     def horizontal_separator():
         row = ""
@@ -490,12 +500,15 @@ def build_client(node, auth_options=None, read_preference=pymongo.ReadPreference
     """Authenticate client for the 'authenticationDatabase' and return the client."""
     if auth_options is not None:
         return node.mongo_client(
-            username=auth_options["username"], password=auth_options["password"],
+            username=auth_options["username"],
+            password=auth_options["password"],
             authSource=auth_options["authenticationDatabase"],
-            authMechanism=auth_options["authenticationMechanism"], read_preference=read_preference)
+            authMechanism=auth_options["authenticationMechanism"],
+            read_preference=read_preference,
+        )
     else:
         return node.mongo_client(read_preference=read_preference)
 
 
 # Represents a row in a node info table.
-NodeInfo = namedtuple('NodeInfo', ['full_name', 'name', 'port', 'pid', 'router_port'])
+NodeInfo = namedtuple("NodeInfo", ["full_name", "name", "port", "pid", "router_port"])

@@ -1,4 +1,5 @@
 """Cedar report."""
+
 from dataclasses import dataclass
 from typing import Union, List
 
@@ -33,6 +34,11 @@ class CedarTestReport:
     def as_dict(self) -> dict:
         """Return dictionary representation."""
         return {
-            "info": {"test_name": self.test_name, "args": {"thread_level": self.thread_level, }},
+            "info": {
+                "test_name": self.test_name,
+                "args": {
+                    "thread_level": self.thread_level,
+                },
+            },
             "metrics": [metric.as_dict() for metric in self.metrics],
         }

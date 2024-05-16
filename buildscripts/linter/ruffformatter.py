@@ -20,14 +20,14 @@ class RuffFormatter(base.LinterBase):
         """Get the command to run a check."""
         if not files:
             return ["format", "--check"]
-        
-        files = ' '.join(files)
+
+        files = " ".join(files)
         return ["format", "--check", files]
 
     def get_fix_cmd_args(self, files: list[str]) -> list[str]:
         """Get the command to run a fix."""
         if not files:
             return ["format"]
-        
-        files = ' '.join(files)
+
+        files = " ".join(files)
         return ["format", files]

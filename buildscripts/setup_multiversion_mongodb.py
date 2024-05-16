@@ -9,4 +9,5 @@ if __name__ == "__main__":
         "\n"
         "The latter ensures the tool is in the global PATH. See installation instructions for `pipx`\n"
         "here if you don't have it:\n"
-        "https://github.com/pypa/pipx#on-linux-install-via-pip-requires-pip-190-or-later")
+        "https://github.com/pypa/pipx#on-linux-install-via-pip-requires-pip-190-or-later"
+    )

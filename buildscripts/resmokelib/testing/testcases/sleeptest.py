@@ -16,8 +16,9 @@ class SleepTestCase(interface.TestCase):
 
         sleep_duration_secs = int(sleep_duration_secs)
 
-        interface.TestCase.__init__(self, logger, "Sleep",
-                                    "{:d} seconds".format(sleep_duration_secs))
+        interface.TestCase.__init__(
+            self, logger, "Sleep", "{:d} seconds".format(sleep_duration_secs)
+        )
 
         self.__sleep_duration_secs = sleep_duration_secs
 

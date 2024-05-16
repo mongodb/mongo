@@ -15,13 +15,13 @@ import pprint
 import unittest
 import yaml
 
-_COMPARE_FIELDS_SERVER_PARAMETERS = ['default', 'set_at', 'validator', 'test_only']
-_COMPARE_FIELDS_CONFIGS = ['arg_vartype', 'requires', 'hidden', 'redact']
+_COMPARE_FIELDS_SERVER_PARAMETERS = ["default", "set_at", "validator", "test_only"]
+_COMPARE_FIELDS_CONFIGS = ["arg_vartype", "requires", "hidden", "redact"]
 
 
 class ComparisonType(str, Enum):
-    CONFIGS = 'configs'
-    SERVER_PARAMETERS = 'server_parameters'
+    CONFIGS = "configs"
+    SERVER_PARAMETERS = "server_parameters"
 
 
 class PropertyDiff:
@@ -43,7 +43,8 @@ def build_diff_fn(compare_fields: list) -> callable:
         for field in compare_fields:
             if prop_base.get(field) != prop_inc.get(field):
                 change_diffs[field] = PropertyDiff(
-                    str(prop_base.get(field, "")), str(prop_inc.get(field, "")))
+                    str(prop_base.get(field, "")), str(prop_inc.get(field, ""))
+                )
         return change_diffs
 
     return diff_fn
@@ -81,7 +82,6 @@ class ComputeDiffsFromIncrementedVersionHandler:
         self.properties_diff = PropertiesDiffs(base_properties, {}, {})
 
     def _compare_and_partition(self, yaml_props: dict, yaml_file_name: str) -> None:
-
         for yaml_key, yaml_val in yaml_props.items():
             compare_key = (yaml_key, yaml_file_name)
 
@@ -123,17 +123,18 @@ def load_yaml(dirs: list, exclusions: list, idl_yaml_handlers: list) -> None:
                         break
 
             for name in filenames:
-                if not name.endswith('.idl'):
+                if not name.endswith(".idl"):
                     continue
 
-                with io.open(os.path.join(dirpath, name), 'r', encoding='utf-8') as idl_yaml_stream:
+                with io.open(os.path.join(dirpath, name), "r", encoding="utf-8") as idl_yaml_stream:
                     idl_yaml = yaml.safe_load(idl_yaml_stream)
                     for handler in idl_yaml_handlers:
                         handler.handle(idl_yaml, name)
 
 
-def get_properties_diffs(mode: ComparisonType, base_version_dirs: list, inc_version_dirs: list,
-                         exclude: list) -> PropertiesDiffs:
+def get_properties_diffs(
+    mode: ComparisonType, base_version_dirs: list, inc_version_dirs: list, exclude: list
+) -> PropertiesDiffs:
     """Returns a PropertiesDiffs object containing the changes between properties in base_version_dirs and inc_version_dirs."""
 
     compare_fields = []
@@ -142,22 +143,22 @@ def get_properties_diffs(mode: ComparisonType, base_version_dirs: list, inc_vers
     elif mode == ComparisonType.CONFIGS:
         compare_fields = _COMPARE_FIELDS_CONFIGS
     else:
-        raise Exception(f'Unknown option {mode}')
+        raise Exception(f"Unknown option {mode}")
 
     diff_fn = build_diff_fn(compare_fields)
 
     base_handler = BuildBasePropertiesForComparisonHandler(mode)
     load_yaml(base_version_dirs, exclude, [base_handler])
 
-    increment_handler = ComputeDiffsFromIncrementedVersionHandler(mode, base_handler.properties,
-                                                                  diff_fn)
+    increment_handler = ComputeDiffsFromIncrementedVersionHandler(
+        mode, base_handler.properties, diff_fn
+    )
     load_yaml(inc_version_dirs, exclude, [increment_handler])
 
     return increment_handler.properties_diff
 
 
 def output_diffs(mode: ComparisonType, diff: PropertiesDiffs) -> None:
-
     pp = pprint.PrettyPrinter()
 
     mode_format = ""
@@ -166,53 +167,61 @@ def output_diffs(mode: ComparisonType, diff: PropertiesDiffs) -> None:
     elif mode == ComparisonType.SERVER_PARAMETERS:
         mode_format = "server parameter"
     else:
-        raise Exception(f'Unknown option {mode}')
+        raise Exception(f"Unknown option {mode}")
 
     for sp, val in diff.added.items():
-        if not val.get('test_only'):
-            print(f'Added {mode_format} {str(sp)}')
+        if not val.get("test_only"):
+            print(f"Added {mode_format} {str(sp)}")
             pp.pprint(val)
             print()
 
     for sp, val in diff.removed.items():
-        if not val.get('test_only'):
-            print(f'Removed {mode_format} {str(sp)}')
+        if not val.get("test_only"):
+            print(f"Removed {mode_format} {str(sp)}")
             pp.pprint(val)
             print()
 
     for sp, val in diff.modified.items():
-        if not val.get('test_only'):
-            print(f'Modified {mode_format} {str(sp)}')
+        if not val.get("test_only"):
+            print(f"Modified {mode_format} {str(sp)}")
             for property_name, delta in val.items():
-                print(f'<{property_name}> changed from [{delta.base}] to [{delta.inc}]')
+                print(f"<{property_name}> changed from [{delta.base}] to [{delta.inc}]")
             print()
 
 
 def main():
-
     arg_parser = argparse.ArgumentParser(prog="Core Server IDL Parameter/Config Diff")
 
     arg_parser.add_argument(
-        'mode', choices=[ComparisonType.SERVER_PARAMETERS.value, ComparisonType.CONFIGS.value])
+        "mode", choices=[ComparisonType.SERVER_PARAMETERS.value, ComparisonType.CONFIGS.value]
+    )
     arg_parser.add_argument(
-        '-b', '--base_version_dirs',
-        help='A colon-separated list of paths to the base version for comparison', required=True)
+        "-b",
+        "--base_version_dirs",
+        help="A colon-separated list of paths to the base version for comparison",
+        required=True,
+    )
 
     arg_parser.add_argument(
-        '-i', '--incremented_version_dirs',
-        help='A colon-separated list of paths to the incremented version for comparison',
-        required=True)
+        "-i",
+        "--incremented_version_dirs",
+        help="A colon-separated list of paths to the incremented version for comparison",
+        required=True,
+    )
     arg_parser.add_argument(
-        '-e', '--exclude_dirs',
-        help='A colon-separated list of directory path strings to exclude from comparison, ' +
-        'e.g. a path /foo/bar/dir will be excluded by an argument of any of foo/bar/dir, bar/dir,' +
-        'foo, or bar, or dir ', required=False)
+        "-e",
+        "--exclude_dirs",
+        help="A colon-separated list of directory path strings to exclude from comparison, "
+        + "e.g. a path /foo/bar/dir will be excluded by an argument of any of foo/bar/dir, bar/dir,"
+        + "foo, or bar, or dir ",
+        required=False,
+    )
 
     args = arg_parser.parse_args()
 
-    incremented_version_dirs = str.split(args.incremented_version_dirs, ':')
-    base_version_dirs = str.split(args.base_version_dirs, ':')
-    exclude = set(args.exclude_dirs.split(':')) if args.exclude_dirs else set()
+    incremented_version_dirs = str.split(args.incremented_version_dirs, ":")
+    base_version_dirs = str.split(args.base_version_dirs, ":")
+    exclude = set(args.exclude_dirs.split(":")) if args.exclude_dirs else set()
     mode = ComparisonType(args.mode)
 
     diffs = get_properties_diffs(mode, base_version_dirs, incremented_version_dirs, exclude)
@@ -256,14 +265,14 @@ class TestBuildBasePropertiesForComparisonHandler(unittest.TestCase):
         fixture = BuildBasePropertiesForComparisonHandler(ComparisonType.SERVER_PARAMETERS)
         fixture.handle(yaml_obj, filename)
 
-        #should filter out configs, but parse server parameters
+        # should filter out configs, but parse server parameters
         self.assertIsNone(fixture.properties.get(("net.compression.compressors", filename)))
         self.assertIsNotNone(fixture.properties[("changeStreamOptions", filename)])
 
         fixture = BuildBasePropertiesForComparisonHandler(ComparisonType.CONFIGS)
         fixture.handle(yaml_obj, filename)
 
-        #should filter out server parameters, but parse configs
+        # should filter out server parameters, but parse configs
         self.assertIsNone(fixture.properties.get(("changeStreamOptions", filename)))
         self.assertIsNotNone(fixture.properties.get(("net.compression.compressors", filename)))
 
@@ -327,8 +336,9 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
 
         inc_yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
-        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.CONFIGS, {},
-                                                                self.config_diff_function)
+        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.CONFIGS, {}, self.config_diff_function
+        )
         inc_fixture.handle(inc_yaml_obj, filename)
 
         properties_diffs = inc_fixture.properties_diff
@@ -338,8 +348,9 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
         self.assertIsNone(properties_diffs.added.get(("testOptions", filename)))
         self.assertIsNone(properties_diffs.added.get(("helloMorld", filename)))
 
-        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.SERVER_PARAMETERS,
-                                                                {}, self.parameter_diff_function)
+        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.SERVER_PARAMETERS, {}, self.parameter_diff_function
+        )
         inc_fixture.handle(inc_yaml_obj, filename)
 
         properties_diffs = inc_fixture.properties_diff
@@ -374,8 +385,9 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
 
         inc_yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
-        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.CONFIGS, {},
-                                                                self.config_diff_function)
+        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.CONFIGS, {}, self.config_diff_function
+        )
         inc_fixture.handle(inc_yaml_obj, filename)
 
         properties_diffs = inc_fixture.properties_diff
@@ -385,8 +397,9 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
         self.assertTrue(len(properties_diffs.removed) == 0)
         self.assertTrue(len(properties_diffs.modified) == 0)
 
-        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.SERVER_PARAMETERS,
-                                                                {}, self.parameter_diff_function)
+        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.SERVER_PARAMETERS, {}, self.parameter_diff_function
+        )
         inc_fixture.handle(inc_yaml_obj, filename)
 
         properties_diffs = inc_fixture.properties_diff
@@ -407,9 +420,9 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
 
         inc_yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
-        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.CONFIGS,
-                                                                get_base_data(),
-                                                                self.config_diff_function)
+        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.CONFIGS, get_base_data(), self.config_diff_function
+        )
         inc_fixture.handle(inc_yaml_obj, filename)
 
         properties_diffs = inc_fixture.properties_diff
@@ -421,9 +434,9 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
         self.assertTrue(len(properties_diffs.added) == 0)
         self.assertTrue(len(properties_diffs.modified) == 0)
 
-        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.SERVER_PARAMETERS,
-                                                                get_base_data(),
-                                                                self.parameter_diff_function)
+        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.SERVER_PARAMETERS, get_base_data(), self.parameter_diff_function
+        )
         inc_fixture.handle(inc_yaml_obj, filename)
 
         properties_diffs = inc_fixture.properties_diff
@@ -474,8 +487,9 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
         """
         inc_yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
-        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.CONFIGS, {},
-                                                                build_diff_fn(['default']))
+        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.CONFIGS, {}, build_diff_fn(["default"])
+        )
         inc_fixture.handle(inc_yaml_obj, filename)
 
         properties_diffs = inc_fixture.properties_diff
@@ -484,8 +498,9 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
         self.assertTrue(len(properties_diffs.removed) == 0)
         self.assertTrue(len(properties_diffs.modified) == 0)
 
-        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.SERVER_PARAMETERS,
-                                                                {}, build_diff_fn(['set_at']))
+        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.SERVER_PARAMETERS, {}, build_diff_fn(["set_at"])
+        )
         inc_fixture.handle(inc_yaml_obj, filename)
 
         properties_diffs = inc_fixture.properties_diff
@@ -540,11 +555,13 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
         diff_fn = build_diff_fn(_COMPARE_FIELDS_CONFIGS)
 
         config_base_properties_handler = BuildBasePropertiesForComparisonHandler(
-            ComparisonType.CONFIGS)
+            ComparisonType.CONFIGS
+        )
         config_base_properties_handler.handle(document_yaml, filename)
 
         config_inc_properties_handler = ComputeDiffsFromIncrementedVersionHandler(
-            ComparisonType.CONFIGS, config_base_properties_handler.properties, diff_fn)
+            ComparisonType.CONFIGS, config_base_properties_handler.properties, diff_fn
+        )
         config_inc_properties_handler.handle(document_inc_yaml, filename)
 
         property_diff = config_inc_properties_handler.properties_diff
@@ -554,11 +571,13 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
         diff_fn = build_diff_fn(_COMPARE_FIELDS_SERVER_PARAMETERS)
 
         sp_base_properties_handler = BuildBasePropertiesForComparisonHandler(
-            ComparisonType.SERVER_PARAMETERS)
+            ComparisonType.SERVER_PARAMETERS
+        )
         sp_base_properties_handler.handle(document_yaml, filename)
 
         sp_inc_properties_handler = ComputeDiffsFromIncrementedVersionHandler(
-            ComparisonType.SERVER_PARAMETERS, sp_base_properties_handler.properties, diff_fn)
+            ComparisonType.SERVER_PARAMETERS, sp_base_properties_handler.properties, diff_fn
+        )
         sp_inc_properties_handler.handle(document_inc_yaml, filename)
 
         property_diff = sp_inc_properties_handler.properties_diff
@@ -644,37 +663,45 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
         diff_fn = build_diff_fn(_COMPARE_FIELDS_CONFIGS)
 
         config_base_properties_handler = BuildBasePropertiesForComparisonHandler(
-            ComparisonType.CONFIGS)
+            ComparisonType.CONFIGS
+        )
         config_base_properties_handler.handle(document_yaml, filename)
 
         config_inc_properties_handler = ComputeDiffsFromIncrementedVersionHandler(
-            ComparisonType.CONFIGS, config_base_properties_handler.properties, diff_fn)
+            ComparisonType.CONFIGS, config_base_properties_handler.properties, diff_fn
+        )
         config_inc_properties_handler.handle(document_inc_yaml, filename)
 
         property_diff = config_inc_properties_handler.properties_diff
 
         self.assertEqual(
-            property_diff.modified.get(("asdf", filename)).get("arg_vartype").base, "String")
+            property_diff.modified.get(("asdf", filename)).get("arg_vartype").base, "String"
+        )
         self.assertEqual(
-            property_diff.modified.get(("asdf", filename)).get("arg_vartype").inc, "int")
+            property_diff.modified.get(("asdf", filename)).get("arg_vartype").inc, "int"
+        )
         self.assertIsNone(property_diff.modified.get(("zxcv", filename)))
 
         diff_fn = build_diff_fn(_COMPARE_FIELDS_SERVER_PARAMETERS)
 
         sp_base_properties_handler = BuildBasePropertiesForComparisonHandler(
-            ComparisonType.SERVER_PARAMETERS)
+            ComparisonType.SERVER_PARAMETERS
+        )
         sp_base_properties_handler.handle(document_yaml, filename)
 
         sp_inc_properties_handler = ComputeDiffsFromIncrementedVersionHandler(
-            ComparisonType.SERVER_PARAMETERS, sp_base_properties_handler.properties, diff_fn)
+            ComparisonType.SERVER_PARAMETERS, sp_base_properties_handler.properties, diff_fn
+        )
         sp_inc_properties_handler.handle(document_inc_yaml, filename)
 
         property_diff = sp_inc_properties_handler.properties_diff
 
         self.assertEqual(
-            property_diff.modified.get(("testOptions", filename)).get("set_at").base, "cluster")
+            property_diff.modified.get(("testOptions", filename)).get("set_at").base, "cluster"
+        )
         self.assertEqual(
-            property_diff.modified.get(("testOptions", filename)).get("set_at").inc, "runtime")
+            property_diff.modified.get(("testOptions", filename)).get("set_at").inc, "runtime"
+        )
         self.assertIsNone(property_diff.modified.get(("testParameter", filename)))
 
 

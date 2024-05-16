@@ -32,7 +32,7 @@ import shlex
 import shutil
 import zipfile
 import tempfile
-from subprocess import (Popen, PIPE, STDOUT)
+from subprocess import Popen, PIPE, STDOUT
 
 
 def main(argv):
@@ -48,9 +48,9 @@ def main(argv):
             args.append(arg)
 
     opts = parse_options(args)
-    if opts.archive_format in ('tar', 'tgz'):
+    if opts.archive_format in ("tar", "tgz"):
         make_tar_archive(opts)
-    elif opts.archive_format == 'zip':
+    elif opts.archive_format == "zip":
         make_zip_archive(opts)
     else:
         raise ValueError('Unsupported archive format "%s"' % opts.archive_format)
@@ -81,11 +81,11 @@ def make_tar_archive(opts):
     purposes of compressing, are removed.
     """
     tar_options = "cvf"
-    if opts.archive_format == 'tgz':
+    if opts.archive_format == "tgz":
         tar_options += "z"
 
     # clean and create a temp directory to copy files to
-    enclosing_archive_directory = tempfile.mkdtemp(prefix='archive_', dir=os.path.abspath('build'))
+    enclosing_archive_directory = tempfile.mkdtemp(prefix="archive_", dir=os.path.abspath("build"))
     output_tarfile = os.path.join(os.getcwd(), opts.output_filename)
 
     tar_command = ["tar", tar_options, output_tarfile]
@@ -126,8 +126,9 @@ def make_zip_archive(opts):
     archive = open_zip_archive_for_write(opts.output_filename)
     try:
         for input_filename in opts.input_filenames:
-            archive.add(input_filename, arcname=get_preferred_filename(
-                input_filename, opts.transformations))
+            archive.add(
+                input_filename, arcname=get_preferred_filename(input_filename, opts.transformations)
+            )
     finally:
         archive.close()
 
@@ -135,40 +136,52 @@ def make_zip_archive(opts):
 def parse_options(args):
     """Parse program options."""
     parser = optparse.OptionParser()
-    parser.add_option('-o', dest='output_filename', default=None,
-                      help='Name of the archive to output.', metavar='FILE')
     parser.add_option(
-        '--format', dest='archive_format', default=None, choices=('zip', 'tar', 'tgz'),
-        help=('Format of archive to create.  '
-              'If omitted, use the suffix of the output filename to decide.'))
-    parser.add_option('--transform', action='append', dest='transformations', default=[])
+        "-o",
+        dest="output_filename",
+        default=None,
+        help="Name of the archive to output.",
+        metavar="FILE",
+    )
+    parser.add_option(
+        "--format",
+        dest="archive_format",
+        default=None,
+        choices=("zip", "tar", "tgz"),
+        help=(
+            "Format of archive to create.  "
+            "If omitted, use the suffix of the output filename to decide."
+        ),
+    )
+    parser.add_option("--transform", action="append", dest="transformations", default=[])
 
     (opts, input_filenames) = parser.parse_args(args)
     opts.input_filenames = []
 
     for input_filename in input_filenames:
-        if input_filename.startswith('@'):
-            opts.input_filenames.extend(open(input_filename[1:], 'r').read().split())
+        if input_filename.startswith("@"):
+            opts.input_filenames.extend(open(input_filename[1:], "r").read().split())
         else:
             opts.input_filenames.append(input_filename)
 
     if opts.output_filename is None:
-        parser.error('-o switch is required')
+        parser.error("-o switch is required")
 
     if opts.archive_format is None:
-        if opts.output_filename.endswith('.zip'):
-            opts.archive_format = 'zip'
-        elif opts.output_filename.endswith('tar.gz') or opts.output_filename.endswith('.tgz'):
-            opts.archive_format = 'tgz'
-        elif opts.output_filename.endswith('.tar'):
-            opts.archive_format = 'tar'
+        if opts.output_filename.endswith(".zip"):
+            opts.archive_format = "zip"
+        elif opts.output_filename.endswith("tar.gz") or opts.output_filename.endswith(".tgz"):
+            opts.archive_format = "tgz"
+        elif opts.output_filename.endswith(".tar"):
+            opts.archive_format = "tar"
         else:
             parser.error(
-                'Could not deduce archive format from output filename "%s"' % opts.output_filename)
+                'Could not deduce archive format from output filename "%s"' % opts.output_filename
+            )
 
     try:
         opts.transformations = [
-            xform.replace(os.path.altsep or os.path.sep, os.path.sep).split('=', 1)
+            xform.replace(os.path.altsep or os.path.sep, os.path.sep).split("=", 1)
             for xform in opts.transformations
         ]
     except Exception as err:  # pylint: disable=broad-except
@@ -189,7 +202,7 @@ def open_zip_archive_for_write(filename):
             """Add filename to zip."""
             return self.write(filename, arcname)
 
-    return WrappedZipFile(filename, 'w', zipfile.ZIP_DEFLATED)
+    return WrappedZipFile(filename, "w", zipfile.ZIP_DEFLATED)
 
 
 def get_preferred_filename(input_filename, transformations):
@@ -203,10 +216,10 @@ def get_preferred_filename(input_filename, transformations):
         match_lower = match.lower()
         input_filename_lower = input_filename.lower()
         if input_filename_lower.startswith(match_lower):
-            return replace + input_filename[len(match):]
+            return replace + input_filename[len(match) :]
     return input_filename
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(sys.argv)
     sys.exit(0)

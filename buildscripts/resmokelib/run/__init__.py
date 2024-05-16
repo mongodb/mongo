@@ -84,8 +84,9 @@ class TestRunner(Subcommand):
         flush_success = logging.flush.stop_thread()
         if not flush_success:
             self._resmoke_logger.error(
-                'Failed to flush all logs within a reasonable amount of time, '
-                'treating logs as incomplete')
+                "Failed to flush all logs within a reasonable amount of time, "
+                "treating logs as incomplete"
+            )
 
         if not flush_success or logging.buildlogger.is_log_output_incomplete():
             self._exit_on_incomplete_logging()
@@ -97,12 +98,16 @@ class TestRunner(Subcommand):
             # or cause a JIRA ticket to be created.
             self._resmoke_logger.info(
                 "We failed to flush all log output to logkeeper but all tests passed, so"
-                " ignoring.")
+                " ignoring."
+            )
         else:
             exit_code = errors.LoggerRuntimeConfigError.EXIT_CODE
             self._resmoke_logger.info(
                 "Exiting with code %d rather than requested code %d because we failed to flush all"
-                " log output to logkeeper.", exit_code, self._exit_code)
+                " log output to logkeeper.",
+                exit_code,
+                self._exit_code,
+            )
             self._exit_code = exit_code
 
         # Force exit the process without cleaning up or calling the finally block
@@ -147,8 +152,9 @@ class TestRunner(Subcommand):
         suites_by_test = self._find_suites_by_test(suites)
         for test in sorted(suites_by_test):
             suite_names = suites_by_test[test]
-            self._resmoke_logger.info("%s will be run by the following suite(s): %s", test,
-                                      suite_names)
+            self._resmoke_logger.info(
+                "%s will be run by the following suite(s): %s", test, suite_names
+            )
 
     def list_tags(self):
         """
@@ -169,8 +175,9 @@ class TestRunner(Subcommand):
                 for single_tag_block in splitted_tags_block:
                     tag_name, doc = list_tags.get_tag_doc(single_tag_block)
 
-                    if tag_name and (tag_name not in tag_docs
-                                     or len(doc) > len(tag_docs[tag_name])):
+                    if tag_name and (
+                        tag_name not in tag_docs or len(doc) > len(tag_docs[tag_name])
+                    ):
                         tag_docs[tag_name] = doc
 
                     if suite_name in config.SUITE_FILES:  # pylint: disable=unsupported-membership-test
@@ -186,8 +193,11 @@ class TestRunner(Subcommand):
     def generate_multiversion_exclude_tags(self):
         """Generate multiversion exclude tags file."""
         generate_multiversion_exclude_tags.generate_exclude_yaml(
-            config.MULTIVERSION_BIN_VERSION, config.EXCLUDE_TAGS_FILE_PATH, config.EXPANSIONS_FILE,
-            self._resmoke_logger)
+            config.MULTIVERSION_BIN_VERSION,
+            config.EXCLUDE_TAGS_FILE_PATH,
+            config.EXPANSIONS_FILE,
+            self._resmoke_logger,
+        )
 
     @staticmethod
     def _find_suites_by_test(suites: List[Suite]):
@@ -220,24 +230,30 @@ class TestRunner(Subcommand):
         if config.REQUIRES_WORKLOAD_CONTAINER_SETUP:
             self._setup_workload_container()
 
-        self._resmoke_logger.info("verbatim resmoke.py invocation: %s",
-                                  " ".join([shlex.quote(arg) for arg in sys.argv]))
+        self._resmoke_logger.info(
+            "verbatim resmoke.py invocation: %s", " ".join([shlex.quote(arg) for arg in sys.argv])
+        )
         self._check_for_mongo_processes()
 
         if config.EVERGREEN_TASK_DOC:
-            self._resmoke_logger.info("Evergreen task documentation:\n%s",
-                                      config.EVERGREEN_TASK_DOC)
+            self._resmoke_logger.info(
+                "Evergreen task documentation:\n%s", config.EVERGREEN_TASK_DOC
+            )
         elif config.EVERGREEN_TASK_NAME:
             self._resmoke_logger.info("Evergreen task documentation is absent for this task.")
-            task_name = utils.get_task_name_without_suffix(config.EVERGREEN_TASK_NAME,
-                                                           config.EVERGREEN_VARIANT_NAME)
+            task_name = utils.get_task_name_without_suffix(
+                config.EVERGREEN_TASK_NAME, config.EVERGREEN_VARIANT_NAME
+            )
             self._resmoke_logger.info(
                 "If you are familiar with the functionality of %s task, "
-                "please consider adding documentation for it in %s", task_name,
-                os.path.join(config.CONFIG_DIR, "evg_task_doc", "evg_task_doc.yml"))
+                "please consider adding documentation for it in %s",
+                task_name,
+                os.path.join(config.CONFIG_DIR, "evg_task_doc", "evg_task_doc.yml"),
+            )
 
         self._log_local_resmoke_invocation()
         from buildscripts.resmokelib import multiversionconstants
+
         multiversionconstants.log_constants(self._resmoke_logger)
 
         suites = None
@@ -278,14 +294,21 @@ class TestRunner(Subcommand):
         # Currently, you can only run one suite at a time from within a workload container
         suite = self._get_suites()[0]
         if "jstestfuzz/out/*.js" in suite.get_selector_config().get("roots", []) and not any(
-                filename.endswith(".js") for filename in os.listdir(jstestfuzz_tests_dir)):
-            subprocess.run([
-                "./src/scripts/npm_run.sh",
-                "jstestfuzz",
-                "--",
-                "--jsTestsDir",
-                jstests_dir,
-            ], cwd=jstestfuzz_repo_dir, stdout=sys.stdout, stderr=sys.stderr, check=True)
+            filename.endswith(".js") for filename in os.listdir(jstestfuzz_tests_dir)
+        ):
+            subprocess.run(
+                [
+                    "./src/scripts/npm_run.sh",
+                    "jstestfuzz",
+                    "--",
+                    "--jsTestsDir",
+                    jstests_dir,
+                ],
+                cwd=jstestfuzz_repo_dir,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                check=True,
+            )
 
     def _run_suite(self, suite: Suite):
         """Run a test suite."""
@@ -322,17 +345,17 @@ class TestRunner(Subcommand):
         params_str = ""
         set_parameters = yaml.safe_load(set_parameters)
         for param in set_parameters:
-            curr_params_str = (param + ": " + str(set_parameters[param]))
+            curr_params_str = param + ": " + str(set_parameters[param])
             # The param should be in both min and max in the case that the param has a min or a max.
-            if (param in param_limits
-                    and "min" in param_limits[param]) and (param in param_limits
-                                                           and "max" in param_limits[param]):
+            if (param in param_limits and "min" in param_limits[param]) and (
+                param in param_limits and "max" in param_limits[param]
+            ):
                 curr_params_str += ", min: " + str(param_limits[param]["min"])
                 curr_params_str += ", max: " + str(param_limits[param]["max"])
 
             if param in param_limits and "choices" in param_limits[param]:
                 curr_params_str += ", options: " + str(param_limits[param]["choices"])
-            params_str += (curr_params_str + "\n")
+            params_str += curr_params_str + "\n"
         return params_str
 
     def _log_fuzzed_wired_tiger_config_str(self):
@@ -349,18 +372,21 @@ class TestRunner(Subcommand):
         debug_mode.realloc_exact: true
         debug_mode.rollback_error: 0
         debug_mode.slow_checkpoint: false
-        eviction_checkpoint_target: 4, min: 1, max: 99 
+        eviction_checkpoint_target: 4, min: 1, max: 99
         """
         from buildscripts.resmokelib.config_fuzzer_wt_limits import config_fuzzer_params
 
         # check_limit_dict checks if a parameter is in a dictionary that may have the parameter's mins and maxes (limits).
         def check_limit_dict(limit_dict, param_name):
-            limit_substr = ''
-            if (param_name in limit_dict):
+            limit_substr = ""
+            if param_name in limit_dict:
                 if "min" in limit_dict[curr_param_name] and "max" in limit_dict[param_name]:
-                    limit_substr += ", min: " + str(
-                        limit_dict[param_name]["min"]) + ", max: " + str(
-                            limit_dict[param_name]["max"])
+                    limit_substr += (
+                        ", min: "
+                        + str(limit_dict[param_name]["min"])
+                        + ", max: "
+                        + str(limit_dict[param_name]["max"])
+                    )
                 if "choices" in limit_dict[param_name]:
                     limit_substr += ", options: " + str(wt_table_params[curr_param_name]["choices"])
             return limit_substr
@@ -368,21 +394,21 @@ class TestRunner(Subcommand):
         wt_table_params = config_fuzzer_params["wt_table"]
         wt_params = config_fuzzer_params["wt"]
         wt_engine_config_str = []
-        curr_param_name = ''
-        current_word = ''
-        curr_paren_word = ''
+        curr_param_name = ""
+        current_word = ""
+        curr_paren_word = ""
 
         prev_word_closing_paren = False
         # Parsing the WiredTiger configuration string, accounting for when there is one-level nested arguments.
         for char in str(config.WT_ENGINE_CONFIG):
-            if char == '(':
-                curr_paren_word = current_word[:len(current_word) - 2]
-                current_word = ''
-            elif char == '=':
+            if char == "(":
+                curr_paren_word = current_word[: len(current_word) - 2]
+                current_word = ""
+            elif char == "=":
                 curr_param_name = current_word
                 current_word += ": "
-            elif char in (',', ')'):
-                limit_substr = ''
+            elif char in (",", ")"):
+                limit_substr = ""
 
                 # Checks both the wt_table_params and wt_params to see if the current parameters has limits in either of these limit dictionaries.
                 # check_limit_dict returns an empty string if there are no limits found in a dictionary, so we can append results from
@@ -390,19 +416,20 @@ class TestRunner(Subcommand):
                 limit_substr += check_limit_dict(wt_table_params, curr_param_name)
                 limit_substr += check_limit_dict(wt_params, curr_param_name)
                 if not prev_word_closing_paren:
-                    if curr_paren_word != '':
-                        wt_engine_config_str.append(curr_paren_word + "." + current_word.strip() +
-                                                    limit_substr)
+                    if curr_paren_word != "":
+                        wt_engine_config_str.append(
+                            curr_paren_word + "." + current_word.strip() + limit_substr
+                        )
                     else:
                         wt_engine_config_str.append(current_word.strip() + limit_substr)
 
-                if char == ')':
+                if char == ")":
                     prev_word_closing_paren = True
-                    curr_paren_word = ''
+                    curr_paren_word = ""
                 else:
                     prev_word_closing_paren = False
 
-                current_word = ''
+                current_word = ""
             else:
                 current_word += char
         if current_word:
@@ -410,7 +437,7 @@ class TestRunner(Subcommand):
 
         # Blank line for readability
         wt_engine_config_str.append("")
-        wt_engine_config_str = '\n'.join(wt_engine_config_str)
+        wt_engine_config_str = "\n".join(wt_engine_config_str)
         self._resmoke_logger.info("Fuzzed wiredTigerConnectionString: \n%s", wt_engine_config_str)
 
     def _log_local_resmoke_invocation(self):
@@ -445,9 +472,11 @@ class TestRunner(Subcommand):
         # The suite names should be in the evergreen functions in this case
         if task is None:
             for current_task in evg_conf.tasks:
-                func = current_task.find_func_command("run tests") \
-                    or current_task.find_func_command("generate resmoke tasks") \
+                func = (
+                    current_task.find_func_command("run tests")
+                    or current_task.find_func_command("generate resmoke tasks")
                     or current_task.find_func_command("run benchmark tests")
+                )
                 if func and get_dict_value(func, ["vars", "suite"]) == suite_name:
                     task = current_task
                     break
@@ -476,7 +505,8 @@ class TestRunner(Subcommand):
         local_args = to_local_args()
         local_args = strip_fuzz_config_params(local_args)
         local_resmoke_invocation = (
-            f"{os.path.join('buildscripts', 'resmoke.py')} {' '.join(local_args)}")
+            f"{os.path.join('buildscripts', 'resmoke.py')} {' '.join(local_args)}"
+        )
 
         if config.FUZZ_MONGOD_CONFIGS:
             local_resmoke_invocation += f" --fuzzMongodConfigs={config.FUZZ_MONGOD_CONFIGS}"
@@ -491,14 +521,15 @@ class TestRunner(Subcommand):
             default_tag_file = config.DEFAULTS["exclude_tags_file_path"]
             local_resmoke_invocation += f" --tagFile={default_tag_file}"
 
-        resmoke_env_options = ''
-        if os.path.exists('resmoke_env_options.txt'):
-            with open('resmoke_env_options.txt') as fin:
+        resmoke_env_options = ""
+        if os.path.exists("resmoke_env_options.txt"):
+            with open("resmoke_env_options.txt") as fin:
                 resmoke_env_options = fin.read().strip()
 
         local_resmoke_invocation = f"{resmoke_env_options} {local_resmoke_invocation}"
-        self._resmoke_logger.info("resmoke.py invocation for local usage: %s",
-                                  local_resmoke_invocation)
+        self._resmoke_logger.info(
+            "resmoke.py invocation for local usage: %s", local_resmoke_invocation
+        )
 
         lines = []
 
@@ -558,15 +589,15 @@ class TestRunner(Subcommand):
     def _check_for_mongo_processes(self):
         """Check for existing mongo processes as they could interfere with running the tests."""
 
-        if config.AUTO_KILL == 'off' or config.SHELL_CONN_STRING is not None:
+        if config.AUTO_KILL == "off" or config.SHELL_CONN_STRING is not None:
             return
 
         rogue_procs = []
         # Iterate over all running process
         for proc in psutil.process_iter():
             try:
-                parent_resmoke_pid = proc.environ().get('RESMOKE_PARENT_PROCESS')
-                parent_resmoke_ctime = proc.environ().get('RESMOKE_PARENT_CTIME')
+                parent_resmoke_pid = proc.environ().get("RESMOKE_PARENT_PROCESS")
+                parent_resmoke_ctime = proc.environ().get("RESMOKE_PARENT_CTIME")
                 if not parent_resmoke_pid:
                     continue
                 if psutil.pid_exists(int(parent_resmoke_pid)):
@@ -586,11 +617,13 @@ class TestRunner(Subcommand):
         if rogue_procs:
             msg = "detected existing mongo processes. Please clean up these processes as they may affect tests:"
 
-            if config.AUTO_KILL == 'on':
-                msg += textwrap.dedent("""\
+            if config.AUTO_KILL == "on":
+                msg += textwrap.dedent(
+                    """\
 
                     Congratulations, you have selected auto kill mode:
-                    HASTA LA VISTA MONGO""" + r"""
+                    HASTA LA VISTA MONGO"""
+                    + r"""
                                           ______
                                          <((((((\\\
                                          /      . }\
@@ -606,14 +639,17 @@ class TestRunner(Subcommand):
                             \ '\ /     \  |     |  _/       /
                              \  \       \ |     | /        /
                               \  \      \        /
-                    """)
+                    """
+                )
                 print(f"WARNING: {msg}")
             else:
                 self._resmoke_logger.error("ERROR: %s", msg)
 
             for proc in rogue_procs:
-                if config.AUTO_KILL == 'on':
-                    proc_msg = f"    Target acquired: pid: {str(proc.pid).ljust(5)} name: {proc.exe()}"
+                if config.AUTO_KILL == "on":
+                    proc_msg = (
+                        f"    Target acquired: pid: {str(proc.pid).ljust(5)} name: {proc.exe()}"
+                    )
                     try:
                         proc.kill()
                     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as exc:
@@ -623,10 +659,11 @@ class TestRunner(Subcommand):
                     print(proc_msg)
 
                 else:
-                    self._resmoke_logger.error("    pid: %s name: %s",
-                                               str(proc.pid).ljust(5), proc.exe())
+                    self._resmoke_logger.error(
+                        "    pid: %s name: %s", str(proc.pid).ljust(5), proc.exe()
+                    )
 
-            if config.AUTO_KILL == 'on':
+            if config.AUTO_KILL == "on":
                 print("I'll be back...\n")
             else:
                 raise errors.ResmokeError(
@@ -634,7 +671,8 @@ class TestRunner(Subcommand):
                 Failing because existing mongo processes detected.
                 You can use --autoKillResmokeMongo=on to automatically kill the processes,
                 or --autoKillResmokeMongo=off to ignore them.
-                """))
+                """)
+                )
 
     def _log_resmoke_summary(self, suites):
         """Log a summary of the resmoke run."""
@@ -645,8 +683,9 @@ class TestRunner(Subcommand):
     def _log_suite_summary(self, suite: Suite):
         """Log a summary of the suite run."""
         self._resmoke_logger.info("=" * 80)
-        self._resmoke_logger.info("Summary of %s suite: %s", suite.get_display_name(),
-                                  self._get_suite_summary(suite))
+        self._resmoke_logger.info(
+            "Summary of %s suite: %s", suite.get_display_name(), self._get_suite_summary(suite)
+        )
 
     @TRACER.start_as_current_span("run.__init__._execute_suite")
     def _execute_suite(self, suite: Suite) -> bool:
@@ -663,15 +702,18 @@ class TestRunner(Subcommand):
             self._exec_logger.info("Skipping %s, no tests to run", suite.test_kind)
             suite.return_code = 0
             execute_suite_span.set_status(StatusCode.OK)
-            execute_suite_span.set_attributes({
-                Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
-                Suite.METRIC_NAMES.RETURN_STATUS: "skipped",
-            })
+            execute_suite_span.set_attributes(
+                {
+                    Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
+                    Suite.METRIC_NAMES.RETURN_STATUS: "skipped",
+                }
+            )
             return False
         executor_config = suite.get_executor_config()
         try:
             executor = testing.executor.TestSuiteExecutor(
-                self._exec_logger, suite, archive_instance=self._archive, **executor_config)
+                self._exec_logger, suite, archive_instance=self._archive, **executor_config
+            )
             # If this is a "docker compose build", we just build the docker compose images for
             # this resmoke configuration and exit.
             if config.DOCKER_COMPOSE_BUILD_IMAGES:
@@ -680,44 +722,62 @@ class TestRunner(Subcommand):
             else:
                 executor.run()
         except (errors.UserInterrupt, errors.LoggerRuntimeConfigError) as err:
-            self._exec_logger.error("Encountered an error when running %ss of suite %s: %s",
-                                    suite.test_kind, suite.get_display_name(), err)
+            self._exec_logger.error(
+                "Encountered an error when running %ss of suite %s: %s",
+                suite.test_kind,
+                suite.get_display_name(),
+                err,
+            )
             suite.return_code = err.EXIT_CODE
-            return_status = "user_interrupt" if isinstance(
-                err, errors.UserInterrupt) else "logger_runtime_config"
+            return_status = (
+                "user_interrupt"
+                if isinstance(err, errors.UserInterrupt)
+                else "logger_runtime_config"
+            )
             execute_suite_span.set_status(StatusCode.ERROR, description=return_status)
-            execute_suite_span.set_attributes({
-                Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
-                Suite.METRIC_NAMES.RETURN_STATUS: return_status,
-            })
+            execute_suite_span.set_attributes(
+                {
+                    Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
+                    Suite.METRIC_NAMES.RETURN_STATUS: return_status,
+                }
+            )
             return True
         except OSError as err:
             self._exec_logger.error("Encountered an OSError: %s", err)
             suite.return_code = 74  # Exit code for OSError on POSIX systems.
             return_status = "os_error"
             execute_suite_span.set_status(StatusCode.ERROR, description=return_status)
-            execute_suite_span.set_attributes({
-                Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
-                Suite.METRIC_NAMES.RETURN_STATUS: return_status,
-                Suite.METRIC_NAMES.ERRORNO: err.errno
-            })
+            execute_suite_span.set_attributes(
+                {
+                    Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
+                    Suite.METRIC_NAMES.RETURN_STATUS: return_status,
+                    Suite.METRIC_NAMES.ERRORNO: err.errno,
+                }
+            )
             return True
         except:  # pylint: disable=bare-except
-            self._exec_logger.exception("Encountered an error when running %ss of suite %s.",
-                                        suite.test_kind, suite.get_display_name())
+            self._exec_logger.exception(
+                "Encountered an error when running %ss of suite %s.",
+                suite.test_kind,
+                suite.get_display_name(),
+            )
             suite.return_code = 2
             return_status = "unknown_error"
             execute_suite_span.set_status(StatusCode.ERROR, description=return_status)
-            execute_suite_span.set_attributes({
-                Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
-                Suite.METRIC_NAMES.RETURN_STATUS: return_status,
-            })
+            execute_suite_span.set_attributes(
+                {
+                    Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
+                    Suite.METRIC_NAMES.RETURN_STATUS: return_status,
+                }
+            )
             return False
         execute_suite_span.set_status(StatusCode.OK)
-        execute_suite_span.set_attributes({
-            Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
-            Suite.METRIC_NAMES.RETURN_STATUS: "success",
-        })
+        execute_suite_span.set_attributes(
+            {
+                Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
+                Suite.METRIC_NAMES.RETURN_STATUS: "success",
+            }
+        )
         return False
 
     def _shuffle_tests(self, suite: Suite):
@@ -725,8 +785,12 @@ class TestRunner(Subcommand):
         random.seed(config.RANDOM_SEED)
         if not config.SHUFFLE:
             return
-        self._exec_logger.info("Shuffling order of tests for %ss in suite %s. The seed is %d.",
-                               suite.test_kind, suite.get_display_name(), config.RANDOM_SEED)
+        self._exec_logger.info(
+            "Shuffling order of tests for %ss in suite %s. The seed is %d.",
+            suite.test_kind,
+            suite.get_display_name(),
+            config.RANDOM_SEED,
+        )
         random.shuffle(suite.tests)
 
     # pylint: disable=inconsistent-return-statements
@@ -744,17 +808,21 @@ class TestRunner(Subcommand):
         except errors.TestExcludedFromSuiteError as err:
             self._resmoke_logger.error(
                 "Cannot run excluded test in suite config. Use '--force-excluded-tests' to override: %s",
-                str(err))
+                str(err),
+            )
             self.exit(1)
         return []
 
     def _log_suite_config(self, suite: Suite):
         sb = [
             "YAML configuration of suite {}".format(suite.get_display_name()),
-            utils.dump_yaml({"test_kind": suite.get_test_kind_config()}), "",
-            utils.dump_yaml({"selector": suite.get_selector_config()}), "",
-            utils.dump_yaml({"executor": suite.get_executor_config()}), "",
-            utils.dump_yaml({"logging": config.LOGGING_CONFIG})
+            utils.dump_yaml({"test_kind": suite.get_test_kind_config()}),
+            "",
+            utils.dump_yaml({"selector": suite.get_selector_config()}),
+            "",
+            utils.dump_yaml({"executor": suite.get_executor_config()}),
+            "",
+            utils.dump_yaml({"logging": config.LOGGING_CONFIG}),
         ]
         self._resmoke_logger.info("\n".join(sb))
 
@@ -773,8 +841,11 @@ class TestRunner(Subcommand):
         """Set up the archival feature if enabled in the cli options."""
         if config.ARCHIVE_FILE:
             self._archive = utils.archival.Archival(
-                archival_json_file=config.ARCHIVE_FILE, limit_size_mb=config.ARCHIVE_LIMIT_MB,
-                limit_files=config.ARCHIVE_LIMIT_TESTS, logger=self._exec_logger)
+                archival_json_file=config.ARCHIVE_FILE,
+                limit_size_mb=config.ARCHIVE_LIMIT_MB,
+                limit_files=config.ARCHIVE_LIMIT_TESTS,
+                logger=self._exec_logger,
+            )
 
     def _exit_archival(self):
         """Finish up archival tasks before exit if enabled in the cli options."""
@@ -802,7 +873,9 @@ class TestRunnerEvg(TestRunner):
         tag_name="resource_intensive",
         evergreen_aware=False,
         suite_options=config.SuiteOptions.ALL_INHERITED._replace(  # type: ignore
-            num_jobs=1))
+            num_jobs=1
+        ),
+    )
 
     @staticmethod
     def _make_evergreen_aware_tags(tag_name):
@@ -823,9 +896,13 @@ class TestRunnerEvg(TestRunner):
                     tags_format.append("{tag_name}|{task_name}|{variant_name}|{distro_id}")
 
         return [
-            tag.format(tag_name=tag_name, task_name=config.EVERGREEN_TASK_NAME,
-                       variant_name=config.EVERGREEN_VARIANT_NAME,
-                       distro_id=config.EVERGREEN_DISTRO_ID) for tag in tags_format
+            tag.format(
+                tag_name=tag_name,
+                task_name=config.EVERGREEN_TASK_NAME,
+                variant_name=config.EVERGREEN_VARIANT_NAME,
+                distro_id=config.EVERGREEN_DISTRO_ID,
+            )
+            for tag in tags_format
         ]
 
     @classmethod
@@ -860,10 +937,10 @@ class TestRunnerEvg(TestRunner):
                 suites.append(suite)
                 continue
 
-            for (tag_desc, tag_combo) in self._make_tag_combinations():
+            for tag_desc, tag_combo in self._make_tag_combinations():
                 suite_options_list = []
 
-                for (tag_info, enabled) in tag_combo:
+                for tag_info, enabled in tag_combo:
                     if tag_info.evergreen_aware:
                         tags = self._make_evergreen_aware_tags(tag_info.tag_name)
                         include_tags = {"$anyOf": tags}
@@ -874,7 +951,8 @@ class TestRunnerEvg(TestRunner):
                         suite_options = tag_info.suite_options._replace(include_tags=include_tags)
                     else:
                         suite_options = config.SuiteOptions.ALL_INHERITED._replace(
-                            include_tags={"$not": include_tags})
+                            include_tags={"$not": include_tags}
+                        )
 
                     suite_options_list.append(suite_options)
 
@@ -911,8 +989,14 @@ class RunPlugin(PluginInterface):
         :param kwargs: additional args
         :return: None or a Subcommand
         """
-        if subcommand in ('find-suites', 'list-suites', 'list-tags', 'run',
-                          'generate-multiversion-exclude-tags', 'generate-matrix-suites'):
+        if subcommand in (
+            "find-suites",
+            "list-suites",
+            "list-tags",
+            "run",
+            "generate-multiversion-exclude-tags",
+            "generate-matrix-suites",
+        ):
             configure_resmoke.validate_and_update_config(parser, parsed_args)
             if config.EVERGREEN_TASK_ID is not None:
                 return TestRunnerEvg(subcommand, **kwargs)
@@ -925,420 +1009,734 @@ class RunPlugin(PluginInterface):
         """Create and add the parser for the Run subcommand."""
         parser = subparsers.add_parser("run", help="Runs the specified tests.")
 
-        parser.set_defaults(dry_run="off", shuffle="auto", stagger_jobs="off",
-                            majority_read_concern="on")
-
-        parser.add_argument("test_files", metavar="TEST_FILES", nargs="*",
-                            help="Explicit test files to run")
-
-        parser.add_argument(
-            "--suites", dest="suite_files", metavar="SUITE1,SUITE2",
-            help=("Comma separated list of YAML files that each specify the configuration"
-                  " of a suite. If the file is located in the resmokeconfig/suites/"
-                  " directory, then the basename without the .yml extension can be"
-                  " specified, e.g. 'core'. If a list of files is passed in as"
-                  " positional arguments, they will be run using the suites'"
-                  " configurations."))
-
-        parser.add_argument(
-            "--autoKillResmokeMongo", dest="auto_kill", choices=['on', 'error',
-                                                                 'off'], default='on',
-            help=("When resmoke starts up, existing mongo processes created from resmoke "
-                  " could cause issues when running tests. This option causes resmoke to kill"
-                  " the existing processes and continue running the test, or if 'error' option"
-                  " is used, prints the offending processes and fails the test."))
-
-        parser.add_argument("--installDir", dest="install_dir", metavar="INSTALL_DIR",
-                            help="Directory to search for MongoDB binaries")
-
-        parser.add_argument(
-            "--alwaysUseLogFiles", dest="always_use_log_files", action="store_true",
-            help=("Logs server output to a file located in the db path and prevents the"
-                  " cleaning of dbpaths after testing. Note that conflicting options"
-                  " passed in from test files may cause an error."))
-
-        parser.add_argument(
-            "--basePort", dest="base_port", metavar="PORT",
-            help=("The starting port number to use for mongod and mongos processes"
-                  " spawned by resmoke.py or the tests themselves. Each fixture and Job"
-                  " allocates a contiguous range of ports."))
-
-        parser.add_argument("--continueOnFailure", action="store_true", dest="continue_on_failure",
-                            help="Executes all tests in all suites, even if some of them fail.")
-
-        parser.add_argument("--dbtest", dest="dbtest_executable", metavar="PATH",
-                            help="The path to the dbtest executable for resmoke to use.")
-
-        parser.add_argument(
-            "--excludeWithAnyTags", action="append", dest="exclude_with_any_tags",
-            metavar="TAG1,TAG2",
-            help=("Comma separated list of tags. Any jstest that contains any of the"
-                  " specified tags will be excluded from any suites that are run."
-                  " The tag '{}' is implicitly part of this list.".format(config.EXCLUDED_TAG)))
-
-        parser.add_argument(
-            "--force-excluded-tests", dest="force_excluded_tests", action="store_true",
-            help=("Allows running tests in a suite config's excluded test roots"
-                  " when passed as positional arg(s)."))
-
-        parser.add_argument("--genny", dest="genny_executable", metavar="PATH",
-                            help="The path to the genny executable for resmoke to use.")
-
-        parser.add_argument(
-            "--includeWithAnyTags", action="append", dest="include_with_any_tags",
-            metavar="TAG1,TAG2",
-            help=("Comma separated list of tags. For the jstest portion of the suite(s),"
-                  " only tests which have at least one of the specified tags will be"
-                  " run."))
-
-        parser.add_argument(
-            "--dockerComposeBuildImages", dest="docker_compose_build_images",
-            metavar="IMAGE1,IMAGE2,IMAGE3", help=
-            ("Comma separated list of base images to build for running resmoke against an External System Under Test:"
-             " (1) `workload`: Your mongo repo with a python development environment setup."
-             " (2) `mongo-binaries`: The `mongo`, `mongod`, `mongos` binaries to run tests with."
-             " (3) `config`: The target suite's `docker-compose.yml` file, startup scripts & configuration."
-             " All three images are needed to successfully setup an External System Under Test."
-             " This will not run any tests. It will just build the images and generate"
-             " the `docker-compose.yml` configuration to set up the External System Under Test for the desired suite."
-             ))
-
-        parser.add_argument(
-            "--dockerComposeBuildEnv", dest="docker_compose_build_env",
-            choices=["local", "evergreen"], default="local", help=
-            ("Set the environment where this `--dockerComposeBuildImages` is happening -- defaults to: `local`."
-             ))
-
-        parser.add_argument(
-            "--dockerComposeTag", dest="docker_compose_tag", metavar="TAG", default="development",
-            help=("The `tag` name to use for images built during a `--dockerComposeBuildImages`."))
-
-        parser.add_argument(
-            "--externalSUT", dest="external_sut", action="store_true", default=False, help=
-            ("This option should only be used when running resmoke against an External System Under Test."
-             " The External System Under Test should be setup via the command generated after"
-             " running: `buildscripts/resmoke.py run --suite [suite_name] ... --dockerComposeBuildImages"
-             " config,workload,mongo-binaries`."))
-
-        parser.add_argument(
-            "--sanityCheck", action="store_true", dest="sanity_check", help=
-            "Truncate the test queue to 1 item, just in order to verify the suite is properly set up."
+        parser.set_defaults(
+            dry_run="off", shuffle="auto", stagger_jobs="off", majority_read_concern="on"
         )
 
         parser.add_argument(
-            "--includeWithAllTags", action="append", dest="include_with_all_tags",
-            metavar="TAG1,TAG2",
-            help=("Comma separated list of tags. For the jstest portion of the suite(s),"
-                  "tests that have all of the specified tags will be run."))
-
-        parser.add_argument("-n", action="store_const", const="tests", dest="dry_run",
-                            help="Outputs the tests that would be run.")
+            "test_files", metavar="TEST_FILES", nargs="*", help="Explicit test files to run"
+        )
 
         parser.add_argument(
-            "--recordWith", dest="undo_recorder_path", metavar="PATH",
+            "--suites",
+            dest="suite_files",
+            metavar="SUITE1,SUITE2",
+            help=(
+                "Comma separated list of YAML files that each specify the configuration"
+                " of a suite. If the file is located in the resmokeconfig/suites/"
+                " directory, then the basename without the .yml extension can be"
+                " specified, e.g. 'core'. If a list of files is passed in as"
+                " positional arguments, they will be run using the suites'"
+                " configurations."
+            ),
+        )
+
+        parser.add_argument(
+            "--autoKillResmokeMongo",
+            dest="auto_kill",
+            choices=["on", "error", "off"],
+            default="on",
+            help=(
+                "When resmoke starts up, existing mongo processes created from resmoke "
+                " could cause issues when running tests. This option causes resmoke to kill"
+                " the existing processes and continue running the test, or if 'error' option"
+                " is used, prints the offending processes and fails the test."
+            ),
+        )
+
+        parser.add_argument(
+            "--installDir",
+            dest="install_dir",
+            metavar="INSTALL_DIR",
+            help="Directory to search for MongoDB binaries",
+        )
+
+        parser.add_argument(
+            "--alwaysUseLogFiles",
+            dest="always_use_log_files",
+            action="store_true",
+            help=(
+                "Logs server output to a file located in the db path and prevents the"
+                " cleaning of dbpaths after testing. Note that conflicting options"
+                " passed in from test files may cause an error."
+            ),
+        )
+
+        parser.add_argument(
+            "--basePort",
+            dest="base_port",
+            metavar="PORT",
+            help=(
+                "The starting port number to use for mongod and mongos processes"
+                " spawned by resmoke.py or the tests themselves. Each fixture and Job"
+                " allocates a contiguous range of ports."
+            ),
+        )
+
+        parser.add_argument(
+            "--continueOnFailure",
+            action="store_true",
+            dest="continue_on_failure",
+            help="Executes all tests in all suites, even if some of them fail.",
+        )
+
+        parser.add_argument(
+            "--dbtest",
+            dest="dbtest_executable",
+            metavar="PATH",
+            help="The path to the dbtest executable for resmoke to use.",
+        )
+
+        parser.add_argument(
+            "--excludeWithAnyTags",
+            action="append",
+            dest="exclude_with_any_tags",
+            metavar="TAG1,TAG2",
+            help=(
+                "Comma separated list of tags. Any jstest that contains any of the"
+                " specified tags will be excluded from any suites that are run."
+                " The tag '{}' is implicitly part of this list.".format(config.EXCLUDED_TAG)
+            ),
+        )
+
+        parser.add_argument(
+            "--force-excluded-tests",
+            dest="force_excluded_tests",
+            action="store_true",
+            help=(
+                "Allows running tests in a suite config's excluded test roots"
+                " when passed as positional arg(s)."
+            ),
+        )
+
+        parser.add_argument(
+            "--genny",
+            dest="genny_executable",
+            metavar="PATH",
+            help="The path to the genny executable for resmoke to use.",
+        )
+
+        parser.add_argument(
+            "--includeWithAnyTags",
+            action="append",
+            dest="include_with_any_tags",
+            metavar="TAG1,TAG2",
+            help=(
+                "Comma separated list of tags. For the jstest portion of the suite(s),"
+                " only tests which have at least one of the specified tags will be"
+                " run."
+            ),
+        )
+
+        parser.add_argument(
+            "--dockerComposeBuildImages",
+            dest="docker_compose_build_images",
+            metavar="IMAGE1,IMAGE2,IMAGE3",
+            help=(
+                "Comma separated list of base images to build for running resmoke against an External System Under Test:"
+                " (1) `workload`: Your mongo repo with a python development environment setup."
+                " (2) `mongo-binaries`: The `mongo`, `mongod`, `mongos` binaries to run tests with."
+                " (3) `config`: The target suite's `docker-compose.yml` file, startup scripts & configuration."
+                " All three images are needed to successfully setup an External System Under Test."
+                " This will not run any tests. It will just build the images and generate"
+                " the `docker-compose.yml` configuration to set up the External System Under Test for the desired suite."
+            ),
+        )
+
+        parser.add_argument(
+            "--dockerComposeBuildEnv",
+            dest="docker_compose_build_env",
+            choices=["local", "evergreen"],
+            default="local",
+            help=(
+                "Set the environment where this `--dockerComposeBuildImages` is happening -- defaults to: `local`."
+            ),
+        )
+
+        parser.add_argument(
+            "--dockerComposeTag",
+            dest="docker_compose_tag",
+            metavar="TAG",
+            default="development",
+            help=("The `tag` name to use for images built during a `--dockerComposeBuildImages`."),
+        )
+
+        parser.add_argument(
+            "--externalSUT",
+            dest="external_sut",
+            action="store_true",
+            default=False,
+            help=(
+                "This option should only be used when running resmoke against an External System Under Test."
+                " The External System Under Test should be setup via the command generated after"
+                " running: `buildscripts/resmoke.py run --suite [suite_name] ... --dockerComposeBuildImages"
+                " config,workload,mongo-binaries`."
+            ),
+        )
+
+        parser.add_argument(
+            "--sanityCheck",
+            action="store_true",
+            dest="sanity_check",
+            help="Truncate the test queue to 1 item, just in order to verify the suite is properly set up.",
+        )
+
+        parser.add_argument(
+            "--includeWithAllTags",
+            action="append",
+            dest="include_with_all_tags",
+            metavar="TAG1,TAG2",
+            help=(
+                "Comma separated list of tags. For the jstest portion of the suite(s),"
+                "tests that have all of the specified tags will be run."
+            ),
+        )
+
+        parser.add_argument(
+            "-n",
+            action="store_const",
+            const="tests",
+            dest="dry_run",
+            help="Outputs the tests that would be run.",
+        )
+
+        parser.add_argument(
+            "--recordWith",
+            dest="undo_recorder_path",
+            metavar="PATH",
             help="Record execution of mongo, mongod and mongos processes;"
-            "specify the path to UndoDB's 'live-record' binary")
+            "specify the path to UndoDB's 'live-record' binary",
+        )
 
         # TODO: add support for --dryRun=commands
         parser.add_argument(
-            "--dryRun", action="store", dest="dry_run", choices=("off", "tests"), metavar="MODE",
-            help=("Instead of running the tests, outputs the tests that would be run"
-                  " (if MODE=tests). Defaults to MODE=%(default)s."))
+            "--dryRun",
+            action="store",
+            dest="dry_run",
+            choices=("off", "tests"),
+            metavar="MODE",
+            help=(
+                "Instead of running the tests, outputs the tests that would be run"
+                " (if MODE=tests). Defaults to MODE=%(default)s."
+            ),
+        )
 
         parser.add_argument(
-            "-j", "--jobs", type=int, dest="jobs", metavar="JOBS",
-            help=("The number of Job instances to use. Each instance will receive its"
-                  " own MongoDB deployment to dispatch tests to."))
+            "-j",
+            "--jobs",
+            type=int,
+            dest="jobs",
+            metavar="JOBS",
+            help=(
+                "The number of Job instances to use. Each instance will receive its"
+                " own MongoDB deployment to dispatch tests to."
+            ),
+        )
 
         parser.set_defaults(logger_file="console")
 
         parser.add_argument(
-            "--shellSeed", action="store", dest="shell_seed", default=None,
-            help=("Sets the seed for replset and sharding fixtures to use. "
-                  "This only works when only one test is input into resmoke."))
-
-        parser.add_argument(
-            "--mongocryptdSetParameters", dest="mongocryptd_set_parameters", action="append",
-            metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-            help=("Passes one or more --setParameter options to all mongocryptd processes"
-                  " started by resmoke.py. The argument is specified as bracketed YAML -"
-                  " i.e. JSON with support for single quoted and unquoted keys."))
-
-        parser.add_argument("--numClientsPerFixture", type=int, dest="num_clients_per_fixture",
-                            help="Number of clients running tests per fixture.")
-
-        parser.add_argument(
-            "--useTenantClient", default=False, dest="use_tenant_client", action="store_true", help=
-            "Use tenant client. If set, each client will be constructed with a generated tenant id."
+            "--shellSeed",
+            action="store",
+            dest="shell_seed",
+            default=None,
+            help=(
+                "Sets the seed for replset and sharding fixtures to use. "
+                "This only works when only one test is input into resmoke."
+            ),
         )
 
         parser.add_argument(
-            "--shellConnString", dest="shell_conn_string", metavar="CONN_STRING",
+            "--mongocryptdSetParameters",
+            dest="mongocryptd_set_parameters",
+            action="append",
+            metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
+            help=(
+                "Passes one or more --setParameter options to all mongocryptd processes"
+                " started by resmoke.py. The argument is specified as bracketed YAML -"
+                " i.e. JSON with support for single quoted and unquoted keys."
+            ),
+        )
+
+        parser.add_argument(
+            "--numClientsPerFixture",
+            type=int,
+            dest="num_clients_per_fixture",
+            help="Number of clients running tests per fixture.",
+        )
+
+        parser.add_argument(
+            "--useTenantClient",
+            default=False,
+            dest="use_tenant_client",
+            action="store_true",
+            help="Use tenant client. If set, each client will be constructed with a generated tenant id.",
+        )
+
+        parser.add_argument(
+            "--shellConnString",
+            dest="shell_conn_string",
+            metavar="CONN_STRING",
             help="Overrides the default fixture and connects with a mongodb:// connection"
             " string to an existing MongoDB cluster instead. This is useful for"
             " connecting to a MongoDB deployment started outside of resmoke.py including"
-            " one running in a debugger.")
+            " one running in a debugger.",
+        )
 
         parser.add_argument(
-            "--shellPort", dest="shell_port", metavar="PORT",
+            "--shellPort",
+            dest="shell_port",
+            metavar="PORT",
             help="Convenience form of --shellConnString for connecting to an"
             " existing MongoDB cluster with the URL mongodb://localhost:[PORT]."
-            " This is useful for connecting to a server running in a debugger.")
-
-        parser.add_argument("--shellGRPC", dest="shell_grpc", action="store_true",
-                            help="Whether to use gRPC by default when connecting via the shell.")
-
-        parser.add_argument("--shellTls", dest="shell_tls_enabled", action="store_true",
-                            help="Whether to use TLS when connecting.")
-
-        parser.add_argument("--shellTlsCertificateKeyFile", dest="shell_tls_certificate_key_file",
-                            metavar="SHELL_TLS_CERTIFICATE_KEY_FILE",
-                            help="The TLS certificate to use when connecting.")
-
-        parser.add_argument("--repeat", "--repeatSuites", type=int, dest="repeat_suites",
-                            metavar="N",
-                            help="Repeats the given suite(s) N times, or until one fails.")
+            " This is useful for connecting to a server running in a debugger.",
+        )
 
         parser.add_argument(
-            "--repeatTests", type=int, dest="repeat_tests", metavar="N",
+            "--shellGRPC",
+            dest="shell_grpc",
+            action="store_true",
+            help="Whether to use gRPC by default when connecting via the shell.",
+        )
+
+        parser.add_argument(
+            "--shellTls",
+            dest="shell_tls_enabled",
+            action="store_true",
+            help="Whether to use TLS when connecting.",
+        )
+
+        parser.add_argument(
+            "--shellTlsCertificateKeyFile",
+            dest="shell_tls_certificate_key_file",
+            metavar="SHELL_TLS_CERTIFICATE_KEY_FILE",
+            help="The TLS certificate to use when connecting.",
+        )
+
+        parser.add_argument(
+            "--repeat",
+            "--repeatSuites",
+            type=int,
+            dest="repeat_suites",
+            metavar="N",
+            help="Repeats the given suite(s) N times, or until one fails.",
+        )
+
+        parser.add_argument(
+            "--repeatTests",
+            type=int,
+            dest="repeat_tests",
+            metavar="N",
             help="Repeats the tests inside each suite N times. This applies to tests"
             " defined in the suite configuration as well as tests defined on the command"
-            " line.")
+            " line.",
+        )
 
         parser.add_argument(
-            "--repeatTestsMax", type=int, dest="repeat_tests_max", metavar="N",
+            "--repeatTestsMax",
+            type=int,
+            dest="repeat_tests_max",
+            metavar="N",
             help="Repeats the tests inside each suite no more than N time when"
             " --repeatTestsSecs is specified. This applies to tests defined in the suite"
-            " configuration as well as tests defined on the command line.")
+            " configuration as well as tests defined on the command line.",
+        )
 
         parser.add_argument(
-            "--repeatTestsMin", type=int, dest="repeat_tests_min", metavar="N",
+            "--repeatTestsMin",
+            type=int,
+            dest="repeat_tests_min",
+            metavar="N",
             help="Repeats the tests inside each suite at least N times when"
             " --repeatTestsSecs is specified. This applies to tests defined in the suite"
-            " configuration as well as tests defined on the command line.")
+            " configuration as well as tests defined on the command line.",
+        )
 
         parser.add_argument(
-            "--repeatTestsSecs", type=float, dest="repeat_tests_secs", metavar="SECONDS",
+            "--repeatTestsSecs",
+            type=float,
+            dest="repeat_tests_secs",
+            metavar="SECONDS",
             help="Repeats the tests inside each suite this amount of time. Note that"
             " this option is mutually exclusive with --repeatTests. This applies to"
             " tests defined in the suite configuration as well as tests defined on the"
-            " command line.")
+            " command line.",
+        )
 
         parser.add_argument(
-            "--seed", type=int, dest="seed", metavar="SEED",
-            help=("Seed for the random number generator. Useful in combination with the"
-                  " --shuffle option for producing a consistent test execution order."))
-
-        parser.add_argument("--mongo", dest="mongo_executable", metavar="PATH",
-                            help="The path to the mongo shell executable for resmoke.py to use.")
-
-        parser.add_argument(
-            "--shuffle", action="store_const", const="on", dest="shuffle",
-            help=("Randomizes the order in which tests are executed. This is equivalent"
-                  " to specifying --shuffleMode=on."))
+            "--seed",
+            type=int,
+            dest="seed",
+            metavar="SEED",
+            help=(
+                "Seed for the random number generator. Useful in combination with the"
+                " --shuffle option for producing a consistent test execution order."
+            ),
+        )
 
         parser.add_argument(
-            "--shuffleMode", action="store", dest="shuffle", choices=("on", "off", "auto"),
+            "--mongo",
+            dest="mongo_executable",
+            metavar="PATH",
+            help="The path to the mongo shell executable for resmoke.py to use.",
+        )
+
+        parser.add_argument(
+            "--shuffle",
+            action="store_const",
+            const="on",
+            dest="shuffle",
+            help=(
+                "Randomizes the order in which tests are executed. This is equivalent"
+                " to specifying --shuffleMode=on."
+            ),
+        )
+
+        parser.add_argument(
+            "--shuffleMode",
+            action="store",
+            dest="shuffle",
+            choices=("on", "off", "auto"),
             metavar="ON|OFF|AUTO",
-            help=("Controls whether to randomize the order in which tests are executed."
-                  " Defaults to auto when not supplied. auto enables randomization in"
-                  " all cases except when the number of jobs requested is 1."))
+            help=(
+                "Controls whether to randomize the order in which tests are executed."
+                " Defaults to auto when not supplied. auto enables randomization in"
+                " all cases except when the number of jobs requested is 1."
+            ),
+        )
 
         parser.add_argument(
-            "--executor", dest="executor_file",
+            "--executor",
+            dest="executor_file",
             help="OBSOLETE: Superceded by --suites; specify --suites=SUITE path/to/test"
-            " to run a particular test under a particular suite configuration.")
-
-        parser.add_argument(
-            "--linearChain", action="store", dest="linear_chain", choices=("on", "off"),
-            metavar="ON|OFF", help="Enable or disable linear chaining for tests using "
-            "ReplicaSetFixture.")
-
-        parser.add_argument(
-            "--backupOnRestartDir", action="store", type=str, dest="backup_on_restart_dir",
-            metavar="DIRECTORY", help=
-            "Every time a mongod restarts on existing data files, the data files will be backed up underneath the input directory."
+            " to run a particular test under a particular suite configuration.",
         )
 
         parser.add_argument(
-            "--replayFile", action="store", type=str, dest="replay_file", metavar="FILE", help=
-            "Run the tests listed in the input file. This is an alternative to passing test files as positional arguments on the command line. Each line in the file must be a path to a test file relative to the current working directory. A short-hand for `resmoke run --replay_file foo` is `resmoke run @foo`."
+            "--linearChain",
+            action="store",
+            dest="linear_chain",
+            choices=("on", "off"),
+            metavar="ON|OFF",
+            help="Enable or disable linear chaining for tests using " "ReplicaSetFixture.",
         )
 
         parser.add_argument(
-            "--mrlog", action="store_const", const="mrlog", dest="mrlog", help=
-            "Pipe output through the `mrlog` binary for converting logv2 logs to human readable logs."
+            "--backupOnRestartDir",
+            action="store",
+            type=str,
+            dest="backup_on_restart_dir",
+            metavar="DIRECTORY",
+            help="Every time a mongod restarts on existing data files, the data files will be backed up underneath the input directory.",
         )
 
         parser.add_argument(
-            "--userFriendlyOutput", action="store", type=str, dest="user_friendly_output",
-            metavar="FILE", help=
-            "Have resmoke redirect all output to FILE. Additionally, stdout will contain lines that typically indicate that the test is making progress, or an error has happened. If `mrlog` is in the path it will be used. `tee` and `egrep` must be in the path."
+            "--replayFile",
+            action="store",
+            type=str,
+            dest="replay_file",
+            metavar="FILE",
+            help="Run the tests listed in the input file. This is an alternative to passing test files as positional arguments on the command line. Each line in the file must be a path to a test file relative to the current working directory. A short-hand for `resmoke run --replay_file foo` is `resmoke run @foo`.",
         )
 
         parser.add_argument(
-            "--runAllFeatureFlagTests", dest="run_all_feature_flag_tests", action="store_true",
-            help=
-            "Run MongoDB servers with all feature flags enabled and only run tests tags with these feature flags"
+            "--mrlog",
+            action="store_const",
+            const="mrlog",
+            dest="mrlog",
+            help="Pipe output through the `mrlog` binary for converting logv2 logs to human readable logs.",
         )
 
         parser.add_argument(
-            "--runNoFeatureFlagTests", dest="run_no_feature_flag_tests", action="store_true",
-            help=("Do not run any tests tagged with enabled feature flags."
-                  " This argument has precedence over --runAllFeatureFlagTests"
-                  "; used for multiversion suites"))
+            "--userFriendlyOutput",
+            action="store",
+            type=str,
+            dest="user_friendly_output",
+            metavar="FILE",
+            help="Have resmoke redirect all output to FILE. Additionally, stdout will contain lines that typically indicate that the test is making progress, or an error has happened. If `mrlog` is in the path it will be used. `tee` and `egrep` must be in the path.",
+        )
 
-        parser.add_argument("--additionalFeatureFlags", dest="additional_feature_flags",
-                            action="append", metavar="featureFlag1, featureFlag2, ...",
-                            help="Additional feature flags")
+        parser.add_argument(
+            "--runAllFeatureFlagTests",
+            dest="run_all_feature_flag_tests",
+            action="store_true",
+            help="Run MongoDB servers with all feature flags enabled and only run tests tags with these feature flags",
+        )
 
-        parser.add_argument("--additionalFeatureFlagsFile", dest="additional_feature_flags_file",
-                            action="store", metavar="FILE",
-                            help="The path to a file with feature flags, delimited by newlines.")
+        parser.add_argument(
+            "--runNoFeatureFlagTests",
+            dest="run_no_feature_flag_tests",
+            action="store_true",
+            help=(
+                "Do not run any tests tagged with enabled feature flags."
+                " This argument has precedence over --runAllFeatureFlagTests"
+                "; used for multiversion suites"
+            ),
+        )
 
-        parser.add_argument("--maxTestQueueSize", type=int, dest="max_test_queue_size",
-                            help=argparse.SUPPRESS)
+        parser.add_argument(
+            "--additionalFeatureFlags",
+            dest="additional_feature_flags",
+            action="append",
+            metavar="featureFlag1, featureFlag2, ...",
+            help="Additional feature flags",
+        )
 
-        parser.add_argument("--tagFile", action="append", dest="tag_files", metavar="TAG_FILES",
-                            help="One or more YAML files that associate tests and tags.")
+        parser.add_argument(
+            "--additionalFeatureFlagsFile",
+            dest="additional_feature_flags_file",
+            action="store",
+            metavar="FILE",
+            help="The path to a file with feature flags, delimited by newlines.",
+        )
+
+        parser.add_argument(
+            "--maxTestQueueSize", type=int, dest="max_test_queue_size", help=argparse.SUPPRESS
+        )
+
+        parser.add_argument(
+            "--tagFile",
+            action="append",
+            dest="tag_files",
+            metavar="TAG_FILES",
+            help="One or more YAML files that associate tests and tags.",
+        )
 
         configure_resmoke.add_otel_args(parser)
 
         mongodb_server_options = parser.add_argument_group(
             title=_MONGODB_SERVER_OPTIONS_TITLE,
-            description=("Options related to starting a MongoDB cluster that are forwarded from"
-                         " resmoke.py to the fixture."))
+            description=(
+                "Options related to starting a MongoDB cluster that are forwarded from"
+                " resmoke.py to the fixture."
+            ),
+        )
 
         mongodb_server_options.add_argument(
-            "--mongod", dest="mongod_executable", metavar="PATH",
-            help="The path to the mongod executable for resmoke.py to use.")
+            "--mongod",
+            dest="mongod_executable",
+            metavar="PATH",
+            help="The path to the mongod executable for resmoke.py to use.",
+        )
 
         mongodb_server_options.add_argument(
-            "--mongos", dest="mongos_executable", metavar="PATH",
-            help="The path to the mongos executable for resmoke.py to use.")
+            "--mongos",
+            dest="mongos_executable",
+            metavar="PATH",
+            help="The path to the mongos executable for resmoke.py to use.",
+        )
 
         mongodb_server_options.add_argument(
-            "--mongodSetParameters", dest="mongod_set_parameters", action="append",
+            "--mongodSetParameters",
+            dest="mongod_set_parameters",
+            action="append",
             metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-            help=("Passes one or more --setParameter options to all mongod processes"
-                  " started by resmoke.py. The argument is specified as bracketed YAML -"
-                  " i.e. JSON with support for single quoted and unquoted keys."))
+            help=(
+                "Passes one or more --setParameter options to all mongod processes"
+                " started by resmoke.py. The argument is specified as bracketed YAML -"
+                " i.e. JSON with support for single quoted and unquoted keys."
+            ),
+        )
 
         mongodb_server_options.add_argument(
-            "--mongosSetParameters", dest="mongos_set_parameters", action="append",
+            "--mongosSetParameters",
+            dest="mongos_set_parameters",
+            action="append",
             metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-            help=("Passes one or more --setParameter options to all mongos processes"
-                  " started by resmoke.py. The argument is specified as bracketed YAML -"
-                  " i.e. JSON with support for single quoted and unquoted keys."))
+            help=(
+                "Passes one or more --setParameter options to all mongos processes"
+                " started by resmoke.py. The argument is specified as bracketed YAML -"
+                " i.e. JSON with support for single quoted and unquoted keys."
+            ),
+        )
 
         mongodb_server_options.add_argument(
-            "--dbpathPrefix", dest="dbpath_prefix", metavar="PATH",
-            help=("The directory which will contain the dbpaths of any mongod's started"
-                  " by resmoke.py or the tests themselves."))
+            "--dbpathPrefix",
+            dest="dbpath_prefix",
+            metavar="PATH",
+            help=(
+                "The directory which will contain the dbpaths of any mongod's started"
+                " by resmoke.py or the tests themselves."
+            ),
+        )
 
         mongodb_server_options.add_argument(
-            "--majorityReadConcern", action="store", dest="majority_read_concern", choices=("on",
-                                                                                            "off"),
-            metavar="ON|OFF", help=("Enable or disable majority read concern support."
-                                    " Defaults to %(default)s."))
+            "--majorityReadConcern",
+            action="store",
+            dest="majority_read_concern",
+            choices=("on", "off"),
+            metavar="ON|OFF",
+            help=("Enable or disable majority read concern support." " Defaults to %(default)s."),
+        )
 
         mongodb_server_options.add_argument(
-            "--enableEnterpriseTests", action="store", dest="enable_enterprise_tests", default="on",
-            choices=("on", "off"), metavar="ON|OFF",
-            help=("Enable or disable enterprise tests. Defaults to 'on'."))
-
-        mongodb_server_options.add_argument("--flowControl", action="store", dest="flow_control",
-                                            choices=("on", "off"), metavar="ON|OFF",
-                                            help=("Enable or disable flow control."))
-
-        mongodb_server_options.add_argument("--flowControlTicketOverride", type=int, action="store",
-                                            dest="flow_control_tickets", metavar="TICKET_OVERRIDE",
-                                            help=("Number of tickets available for flow control."))
-
-        mongodb_server_options.add_argument("--storageEngine", dest="storage_engine",
-                                            metavar="ENGINE",
-                                            help="The storage engine used by dbtests and jstests.")
+            "--enableEnterpriseTests",
+            action="store",
+            dest="enable_enterprise_tests",
+            default="on",
+            choices=("on", "off"),
+            metavar="ON|OFF",
+            help=("Enable or disable enterprise tests. Defaults to 'on'."),
+        )
 
         mongodb_server_options.add_argument(
-            "--storageEngineCacheSizeGB", dest="storage_engine_cache_size_gb", metavar="CONFIG",
-            help="Sets the storage engine cache size configuration"
-            " setting for all mongod's.")
+            "--flowControl",
+            action="store",
+            dest="flow_control",
+            choices=("on", "off"),
+            metavar="ON|OFF",
+            help=("Enable or disable flow control."),
+        )
 
         mongodb_server_options.add_argument(
-            "--tlsMode", dest="tls_mode", metavar="TLS_MODE", help="Indicates what TLS mode mongod "
+            "--flowControlTicketOverride",
+            type=int,
+            action="store",
+            dest="flow_control_tickets",
+            metavar="TICKET_OVERRIDE",
+            help=("Number of tickets available for flow control."),
+        )
+
+        mongodb_server_options.add_argument(
+            "--storageEngine",
+            dest="storage_engine",
+            metavar="ENGINE",
+            help="The storage engine used by dbtests and jstests.",
+        )
+
+        mongodb_server_options.add_argument(
+            "--storageEngineCacheSizeGB",
+            dest="storage_engine_cache_size_gb",
+            metavar="CONFIG",
+            help="Sets the storage engine cache size configuration" " setting for all mongod's.",
+        )
+
+        mongodb_server_options.add_argument(
+            "--tlsMode",
+            dest="tls_mode",
+            metavar="TLS_MODE",
+            help="Indicates what TLS mode mongod "
             "and mongos servers should be started with. See also: https://www.mongodb.com"
-            "/docs/manual/reference/configuration-options/#mongodb-setting-net.tls.mode")
+            "/docs/manual/reference/configuration-options/#mongodb-setting-net.tls.mode",
+        )
 
         mongodb_server_options.add_argument(
-            "--tlsCAFile", dest="tls_ca_file", metavar="TLS_CA_FILE",
-            help="Path to the CA certificate file to be used by all clients and servers.")
+            "--tlsCAFile",
+            dest="tls_ca_file",
+            metavar="TLS_CA_FILE",
+            help="Path to the CA certificate file to be used by all clients and servers.",
+        )
 
         mongodb_server_options.add_argument(
-            "--mongodTlsCertificateKeyFile", dest="mongod_tls_certificate_key_file",
+            "--mongodTlsCertificateKeyFile",
+            dest="mongod_tls_certificate_key_file",
             metavar="MONGOD_TLS_CERTIFICATE_KEY_FILE",
-            help="Path to the TLS certificate to be used by all mongods.")
+            help="Path to the TLS certificate to be used by all mongods.",
+        )
 
         mongodb_server_options.add_argument(
-            "--mongosTlsCertificateKeyFile", dest="mongos_tls_certificate_key_file",
+            "--mongosTlsCertificateKeyFile",
+            dest="mongos_tls_certificate_key_file",
             metavar="MONGOS_TLS_CERTIFICATE_KEY_FILE",
-            help="Path to the TLS certificate to be used by all mongoses.")
+            help="Path to the TLS certificate to be used by all mongoses.",
+        )
 
         mongodb_server_options.add_argument(
-            "--numReplSetNodes", type=int, dest="num_replset_nodes", metavar="N",
+            "--numReplSetNodes",
+            type=int,
+            dest="num_replset_nodes",
+            metavar="N",
             help="The number of nodes to initialize per ReplicaSetFixture. This is also "
             "used to indicate the number of replica set members per shard in a "
-            "ShardedClusterFixture.")
+            "ShardedClusterFixture.",
+        )
 
         mongodb_server_options.add_argument(
-            "--numShards", type=int, dest="num_shards", metavar="N",
-            help="The number of shards to use in a ShardedClusterFixture.")
+            "--numShards",
+            type=int,
+            dest="num_shards",
+            metavar="N",
+            help="The number of shards to use in a ShardedClusterFixture.",
+        )
 
         mongodb_server_options.add_argument(
-            "--wiredTigerCollectionConfigString", dest="wt_coll_config", metavar="CONFIG",
-            help="Sets the WiredTiger collection configuration setting for all mongod's.")
+            "--wiredTigerCollectionConfigString",
+            dest="wt_coll_config",
+            metavar="CONFIG",
+            help="Sets the WiredTiger collection configuration setting for all mongod's.",
+        )
 
         mongodb_server_options.add_argument(
-            "--wiredTigerEngineConfigString", dest="wt_engine_config", metavar="CONFIG",
-            help="Sets the WiredTiger engine configuration setting for all mongod's.")
+            "--wiredTigerEngineConfigString",
+            dest="wt_engine_config",
+            metavar="CONFIG",
+            help="Sets the WiredTiger engine configuration setting for all mongod's.",
+        )
 
         mongodb_server_options.add_argument(
-            "--wiredTigerIndexConfigString", dest="wt_index_config", metavar="CONFIG",
-            help="Sets the WiredTiger index configuration setting for all mongod's.")
+            "--wiredTigerIndexConfigString",
+            dest="wt_index_config",
+            metavar="CONFIG",
+            help="Sets the WiredTiger index configuration setting for all mongod's.",
+        )
 
         mongodb_server_options.add_argument(
-            "--fuzzMongodConfigs", dest="fuzz_mongod_configs",
+            "--fuzzMongodConfigs",
+            dest="fuzz_mongod_configs",
             help="Randomly chooses mongod parameters that were not specified. Use 'stress' to fuzz "
             "all configs including stressful storage configurations that may significantly "
             "slow down the server. Use 'normal' to only fuzz non-stressful configurations. ",
-            metavar="MODE", choices=('normal', 'stress'))
+            metavar="MODE",
+            choices=("normal", "stress"),
+        )
 
         mongodb_server_options.add_argument(
-            "--fuzzMongosConfigs", dest="fuzz_mongos_configs",
-            help="Randomly chooses mongos parameters that were not specified", metavar="MODE",
-            choices=('normal', ))
+            "--fuzzMongosConfigs",
+            dest="fuzz_mongos_configs",
+            help="Randomly chooses mongos parameters that were not specified",
+            metavar="MODE",
+            choices=("normal",),
+        )
 
         mongodb_server_options.add_argument(
-            "--configFuzzSeed", dest="config_fuzz_seed", metavar="PATH",
-            help="Sets the seed used by mongod and mongos config fuzzers")
+            "--configFuzzSeed",
+            dest="config_fuzz_seed",
+            metavar="PATH",
+            help="Sets the seed used by mongod and mongos config fuzzers",
+        )
 
         mongodb_server_options.add_argument(
-            "--configShard", dest="config_shard", metavar="CONFIG",
-            help="If set, specifies which node is the config shard. Can also be set to 'any'.")
+            "--configShard",
+            dest="config_shard",
+            metavar="CONFIG",
+            help="If set, specifies which node is the config shard. Can also be set to 'any'.",
+        )
 
         mongodb_server_options.add_argument(
-            "--embeddedRouter", dest="embedded_router", metavar="CONFIG",
-            help="If set, uses embedded routers instead of dedicated mongos.")
+            "--embeddedRouter",
+            dest="embedded_router",
+            metavar="CONFIG",
+            help="If set, uses embedded routers instead of dedicated mongos.",
+        )
 
         internal_options = parser.add_argument_group(
             title=_INTERNAL_OPTIONS_TITLE,
-            description=("Internal options for advanced users and resmoke developers."
-                         " These are not meant to be invoked when running resmoke locally."))
+            description=(
+                "Internal options for advanced users and resmoke developers."
+                " These are not meant to be invoked when running resmoke locally."
+            ),
+        )
 
         internal_options.add_argument(
-            "--log", dest="logger_file", metavar="LOGGER",
-            help=("A YAML file that specifies the logging configuration. If the file is"
-                  " located in the resmokeconfig/suites/ directory, then the basename"
-                  " without the .yml extension can be specified, e.g. 'console'."))
+            "--log",
+            dest="logger_file",
+            metavar="LOGGER",
+            help=(
+                "A YAML file that specifies the logging configuration. If the file is"
+                " located in the resmokeconfig/suites/ directory, then the basename"
+                " without the .yml extension can be specified, e.g. 'console'."
+            ),
+        )
 
         # Used for testing resmoke.
         #
@@ -1355,189 +1753,299 @@ class RunPlugin(PluginInterface):
         # `test_analysis`:
         #     When specified, the hang-analyzer writes out the pids it will analyze without
         #     actually running analysis, which can be time and resource intensive.
-        internal_options.add_argument("--internalParam", action="append", dest="internal_params",
-                                      help=argparse.SUPPRESS)
-
-        internal_options.add_argument("--cedarReportFile", dest="cedar_report_file",
-                                      metavar="CEDAR_REPORT",
-                                      help="Writes a JSON file with performance test results.")
+        internal_options.add_argument(
+            "--internalParam", action="append", dest="internal_params", help=argparse.SUPPRESS
+        )
 
         internal_options.add_argument(
-            "--reportFile", dest="report_file", metavar="REPORT",
-            help="Writes a JSON file with test status and timing information.")
+            "--cedarReportFile",
+            dest="cedar_report_file",
+            metavar="CEDAR_REPORT",
+            help="Writes a JSON file with performance test results.",
+        )
 
         internal_options.add_argument(
-            "--staggerJobs", action="store", dest="stagger_jobs", choices=("on", "off"),
-            metavar="ON|OFF", help=("Enables or disables the stagger of launching resmoke jobs."
-                                    " Defaults to %(default)s."))
+            "--reportFile",
+            dest="report_file",
+            metavar="REPORT",
+            help="Writes a JSON file with test status and timing information.",
+        )
 
         internal_options.add_argument(
-            "--exportMongodConfig", dest="export_mongod_config", choices=("off", "regular",
-                                                                          "detailed"),
-            help=("Exports a yaml containing the history of each mongod config option to"
-                  " {nodeName}_config.yml."
-                  " Defaults to 'off'. A 'detailed' export will include locations of accesses."))
+            "--staggerJobs",
+            action="store",
+            dest="stagger_jobs",
+            choices=("on", "off"),
+            metavar="ON|OFF",
+            help=(
+                "Enables or disables the stagger of launching resmoke jobs."
+                " Defaults to %(default)s."
+            ),
+        )
+
+        internal_options.add_argument(
+            "--exportMongodConfig",
+            dest="export_mongod_config",
+            choices=("off", "regular", "detailed"),
+            help=(
+                "Exports a yaml containing the history of each mongod config option to"
+                " {nodeName}_config.yml."
+                " Defaults to 'off'. A 'detailed' export will include locations of accesses."
+            ),
+        )
 
         evergreen_options = parser.add_argument_group(
-            title=_EVERGREEN_ARGUMENT_TITLE, description=(
+            title=_EVERGREEN_ARGUMENT_TITLE,
+            description=(
                 "Options used to propagate information about the Evergreen task running this"
-                " script."))
-
-        evergreen_options.add_argument("--evergreenURL", dest="evergreen_url",
-                                       metavar="EVERGREEN_URL",
-                                       help=("The URL of the Evergreen service."))
+                " script."
+            ),
+        )
 
         evergreen_options.add_argument(
-            "--archiveLimitMb", type=int, dest="archive_limit_mb", metavar="ARCHIVE_LIMIT_MB",
-            help=("Sets the limit (in MB) for archived files to S3. A value of 0"
-                  " indicates there is no limit."))
+            "--evergreenURL",
+            dest="evergreen_url",
+            metavar="EVERGREEN_URL",
+            help=("The URL of the Evergreen service."),
+        )
 
         evergreen_options.add_argument(
-            "--archiveLimitTests", type=int, dest="archive_limit_tests",
+            "--archiveLimitMb",
+            type=int,
+            dest="archive_limit_mb",
+            metavar="ARCHIVE_LIMIT_MB",
+            help=(
+                "Sets the limit (in MB) for archived files to S3. A value of 0"
+                " indicates there is no limit."
+            ),
+        )
+
+        evergreen_options.add_argument(
+            "--archiveLimitTests",
+            type=int,
+            dest="archive_limit_tests",
             metavar="ARCHIVE_LIMIT_TESTS",
-            help=("Sets the maximum number of tests to archive to S3. A value"
-                  " of 0 indicates there is no limit."))
-
-        evergreen_options.add_argument("--buildId", dest="build_id", metavar="BUILD_ID",
-                                       help="Sets the build ID of the task.")
-
-        evergreen_options.add_argument("--buildloggerUrl", action="store", dest="buildlogger_url",
-                                       metavar="URL",
-                                       help="The root url of the buildlogger server.")
+            help=(
+                "Sets the maximum number of tests to archive to S3. A value"
+                " of 0 indicates there is no limit."
+            ),
+        )
 
         evergreen_options.add_argument(
-            "--distroId", dest="distro_id", metavar="DISTRO_ID",
-            help=("Sets the identifier for the Evergreen distro running the"
-                  " tests."))
+            "--buildId", dest="build_id", metavar="BUILD_ID", help="Sets the build ID of the task."
+        )
 
         evergreen_options.add_argument(
-            "--executionNumber", type=int, dest="execution_number", metavar="EXECUTION_NUMBER",
-            help=("Sets the number for the Evergreen execution running the"
-                  " tests."))
+            "--buildloggerUrl",
+            action="store",
+            dest="buildlogger_url",
+            metavar="URL",
+            help="The root url of the buildlogger server.",
+        )
 
         evergreen_options.add_argument(
-            "--gitRevision", dest="git_revision", metavar="GIT_REVISION",
-            help=("Sets the git revision for the Evergreen task running the"
-                  " tests."))
+            "--distroId",
+            dest="distro_id",
+            metavar="DISTRO_ID",
+            help=("Sets the identifier for the Evergreen distro running the" " tests."),
+        )
+
+        evergreen_options.add_argument(
+            "--executionNumber",
+            type=int,
+            dest="execution_number",
+            metavar="EXECUTION_NUMBER",
+            help=("Sets the number for the Evergreen execution running the" " tests."),
+        )
+
+        evergreen_options.add_argument(
+            "--gitRevision",
+            dest="git_revision",
+            metavar="GIT_REVISION",
+            help=("Sets the git revision for the Evergreen task running the" " tests."),
+        )
 
         # We intentionally avoid adding a new command line option that starts with --suite so it doesn't
         # become ambiguous with the --suites option and break how engineers run resmoke.py locally.
         evergreen_options.add_argument(
-            "--originSuite", dest="origin_suite", metavar="SUITE",
-            help=("Indicates the name of the test suite prior to the"
-                  " evergreen_generate_resmoke_tasks.py script splitting it"
-                  " up."))
+            "--originSuite",
+            dest="origin_suite",
+            metavar="SUITE",
+            help=(
+                "Indicates the name of the test suite prior to the"
+                " evergreen_generate_resmoke_tasks.py script splitting it"
+                " up."
+            ),
+        )
 
         evergreen_options.add_argument(
-            "--patchBuild", action="store_true", dest="patch_build",
-            help=("Indicates that the Evergreen task running the tests is a"
-                  " patch build."))
+            "--patchBuild",
+            action="store_true",
+            dest="patch_build",
+            help=("Indicates that the Evergreen task running the tests is a" " patch build."),
+        )
 
         evergreen_options.add_argument(
-            "--projectName", dest="project_name", metavar="PROJECT_NAME",
-            help=("Sets the name of the Evergreen project running the tests."))
-
-        evergreen_options.add_argument("--revisionOrderId", dest="revision_order_id",
-                                       metavar="REVISION_ORDER_ID",
-                                       help="Sets the chronological order number of this commit.")
-
-        evergreen_options.add_argument(
-            "--taskName", dest="task_name", metavar="TASK_NAME",
-            help="Sets the name of the Evergreen task running the tests.")
-
-        evergreen_options.add_argument("--taskId", dest="task_id", metavar="TASK_ID",
-                                       help="Sets the Id of the Evergreen task running the tests.")
+            "--projectName",
+            dest="project_name",
+            metavar="PROJECT_NAME",
+            help=("Sets the name of the Evergreen project running the tests."),
+        )
 
         evergreen_options.add_argument(
-            "--variantName", dest="variant_name", metavar="VARIANT_NAME",
-            help=("Sets the name of the Evergreen build variant running the"
-                  " tests."))
-
-        evergreen_options.add_argument("--versionId", dest="version_id", metavar="VERSION_ID",
-                                       help="Sets the version ID of the task.")
-
-        evergreen_options.add_argument("--taskWorkDir", dest="work_dir", metavar="TASK_WORK_DIR",
-                                       help="Sets the working directory of the task.")
+            "--revisionOrderId",
+            dest="revision_order_id",
+            metavar="REVISION_ORDER_ID",
+            help="Sets the chronological order number of this commit.",
+        )
 
         evergreen_options.add_argument(
-            "--projectConfigPath", dest="evg_project_config_path",
-            help="Sets the path to evergreen project configuration yaml.")
+            "--taskName",
+            dest="task_name",
+            metavar="TASK_NAME",
+            help="Sets the name of the Evergreen task running the tests.",
+        )
+
+        evergreen_options.add_argument(
+            "--taskId",
+            dest="task_id",
+            metavar="TASK_ID",
+            help="Sets the Id of the Evergreen task running the tests.",
+        )
+
+        evergreen_options.add_argument(
+            "--variantName",
+            dest="variant_name",
+            metavar="VARIANT_NAME",
+            help=("Sets the name of the Evergreen build variant running the" " tests."),
+        )
+
+        evergreen_options.add_argument(
+            "--versionId",
+            dest="version_id",
+            metavar="VERSION_ID",
+            help="Sets the version ID of the task.",
+        )
+
+        evergreen_options.add_argument(
+            "--taskWorkDir",
+            dest="work_dir",
+            metavar="TASK_WORK_DIR",
+            help="Sets the working directory of the task.",
+        )
+
+        evergreen_options.add_argument(
+            "--projectConfigPath",
+            dest="evg_project_config_path",
+            help="Sets the path to evergreen project configuration yaml.",
+        )
 
         benchmark_options = parser.add_argument_group(
             title=_BENCHMARK_ARGUMENT_TITLE,
-            description="Options for running Benchmark/Benchrun tests")
+            description="Options for running Benchmark/Benchrun tests",
+        )
 
-        benchmark_options.add_argument("--benchmarkFilter", type=str, dest="benchmark_filter",
-                                       metavar="BENCHMARK_FILTER",
-                                       help="Regex to filter Google benchmark tests to run.")
+        benchmark_options.add_argument(
+            "--benchmarkFilter",
+            type=str,
+            dest="benchmark_filter",
+            metavar="BENCHMARK_FILTER",
+            help="Regex to filter Google benchmark tests to run.",
+        )
 
         benchmark_options.add_argument(
             "--benchmarkListTests",
             dest="benchmark_list_tests",
             action="store_true",
             # metavar="BENCHMARK_LIST_TESTS",
-            help=("Lists all Google benchmark test configurations in each"
-                  " test file."))
+            help=("Lists all Google benchmark test configurations in each" " test file."),
+        )
 
         benchmark_min_time_help = (
             "Minimum time to run each benchmark/benchrun test for. Use this option instead of "
-            "--benchmarkRepetitions to make a test run for a longer or shorter duration.")
-        benchmark_options.add_argument("--benchmarkMinTimeSecs", type=int,
-                                       dest="benchmark_min_time_secs", metavar="BENCHMARK_MIN_TIME",
-                                       help=benchmark_min_time_help)
+            "--benchmarkRepetitions to make a test run for a longer or shorter duration."
+        )
+        benchmark_options.add_argument(
+            "--benchmarkMinTimeSecs",
+            type=int,
+            dest="benchmark_min_time_secs",
+            metavar="BENCHMARK_MIN_TIME",
+            help=benchmark_min_time_help,
+        )
 
         benchmark_repetitions_help = (
             "Set --benchmarkRepetitions=1 if you'd like to run the benchmark/benchrun tests only once."
             " By default, each test is run multiple times to provide statistics on the variance"
             " between runs; use --benchmarkMinTimeSecs if you'd like to run a test for a longer or"
-            " shorter duration.")
+            " shorter duration."
+        )
         benchmark_options.add_argument(
-            "--benchmarkRepetitions", type=int, dest="benchmark_repetitions",
-            metavar="BENCHMARK_REPETITIONS", help=benchmark_repetitions_help)
+            "--benchmarkRepetitions",
+            type=int,
+            dest="benchmark_repetitions",
+            metavar="BENCHMARK_REPETITIONS",
+            help=benchmark_repetitions_help,
+        )
 
     @classmethod
     def _add_list_suites(cls, subparsers: argparse._SubParsersAction):
         """Create and add the parser for the list-suites subcommand."""
-        parser = subparsers.add_parser("list-suites",
-                                       help="Lists the names of the suites available to execute.")
+        parser = subparsers.add_parser(
+            "list-suites", help="Lists the names of the suites available to execute."
+        )
 
         parser.add_argument(
-            "--log", dest="logger_file", metavar="LOGGER",
-            help=("A YAML file that specifies the logging configuration. If the file is"
-                  " located in the resmokeconfig/suites/ directory, then the basename"
-                  " without the .yml extension can be specified, e.g. 'console'."))
+            "--log",
+            dest="logger_file",
+            metavar="LOGGER",
+            help=(
+                "A YAML file that specifies the logging configuration. If the file is"
+                " located in the resmokeconfig/suites/ directory, then the basename"
+                " without the .yml extension can be specified, e.g. 'console'."
+            ),
+        )
         parser.set_defaults(logger_file="console")
 
     @classmethod
     def _add_generate(cls, subparsers: argparse._SubParsersAction):
         """Create and add the parser for the generate subcommand."""
-        subparsers.add_parser("generate-matrix-suites",
-                              help="Generate matrix suite config files from the mapping files.")
+        subparsers.add_parser(
+            "generate-matrix-suites",
+            help="Generate matrix suite config files from the mapping files.",
+        )
 
     @classmethod
     def _add_find_suites(cls, subparsers: argparse._SubParsersAction):
         """Create and add the parser for the find-suites subcommand."""
         parser = subparsers.add_parser(
             "find-suites",
-            help="Lists the names of the suites that will execute the specified tests.")
+            help="Lists the names of the suites that will execute the specified tests.",
+        )
 
         # find-suites shares a lot of code with 'run' (for now), and this option needs be specified,
         # though it is not used.
         parser.set_defaults(logger_file="console")
 
-        parser.add_argument("test_files", metavar="TEST_FILES", nargs="*",
-                            help="Explicit test files to run")
+        parser.add_argument(
+            "test_files", metavar="TEST_FILES", nargs="*", help="Explicit test files to run"
+        )
 
     @classmethod
     def _add_list_tags(cls, subparsers: argparse._SubParsersAction):
         """Create and add the parser for the list-tags subcommand."""
         parser = subparsers.add_parser(
-            "list-tags", help="Lists the tags and their documentation available in the suites.")
+            "list-tags", help="Lists the tags and their documentation available in the suites."
+        )
         parser.set_defaults(logger_file="console")
         parser.add_argument(
-            "--suites", dest="suite_files", metavar="SUITE1,SUITE2",
-            help=("Comma separated list of suite names to get tags from."
-                  " All suites are used if unspecified."))
+            "--suites",
+            dest="suite_files",
+            metavar="SUITE1,SUITE2",
+            help=(
+                "Comma separated list of suite names to get tags from."
+                " All suites are used if unspecified."
+            ),
+        )
 
     @classmethod
     def _add_generate_multiversion_exclude_tags(cls, subparser: argparse._SubParsersAction):
@@ -1546,15 +2054,22 @@ class RunPlugin(PluginInterface):
             "generate-multiversion-exclude-tags",
             help="Create a tag file associating multiversion tests to tags for exclusion."
             " Compares the BACKPORTS_REQUIRED_FILE on the current branch with the same file on the"
-            " last-lts and/or last-continuous branch to determine which tests should be denylisted."
+            " last-lts and/or last-continuous branch to determine which tests should be denylisted.",
         )
         parser.set_defaults(logger_file="console")
         parser.add_argument(
-            "--oldBinVersion", type=str, dest="old_bin_version",
+            "--oldBinVersion",
+            type=str,
+            dest="old_bin_version",
             choices=config.MultiversionOptions.all_options(),
-            help="Choose the multiversion binary version as last-lts or last-continuous.")
-        parser.add_argument("--excludeTagsFilePath", type=str, dest="exclude_tags_file_path",
-                            help="Where to output the generated tags.")
+            help="Choose the multiversion binary version as last-lts or last-continuous.",
+        )
+        parser.add_argument(
+            "--excludeTagsFilePath",
+            type=str,
+            dest="exclude_tags_file_path",
+            help="Where to output the generated tags.",
+        )
 
 
 def to_local_args(input_args: Optional[List[str]] = None):
@@ -1570,7 +2085,7 @@ def to_local_args(input_args: Optional[List[str]] = None):
 
     (parser, parsed_args) = main_parser.parse(input_args)
 
-    if parsed_args.command != 'run':
+    if parsed_args.command != "run":
         raise TypeError(
             f"to_local_args can only be called for the 'run' subcommand. Instead was called on '{parsed_args.command}'"
         )
@@ -1584,7 +2099,8 @@ def to_local_args(input_args: Optional[List[str]] = None):
 
     # The top-level parser has one subparser that contains all subcommand parsers.
     command_subparser = [
-        action for action in parser._actions  # pylint: disable=protected-access
+        action
+        for action in parser._actions  # pylint: disable=protected-access
         if action.dest == "command"
     ][0]
 
@@ -1630,12 +2146,14 @@ def to_local_args(input_args: Optional[List[str]] = None):
                 continue
             # Skip any evergreen centric args.
             elif group.title in [
-                    _INTERNAL_OPTIONS_TITLE, _EVERGREEN_ARGUMENT_TITLE, _CEDAR_ARGUMENT_TITLE
+                _INTERNAL_OPTIONS_TITLE,
+                _EVERGREEN_ARGUMENT_TITLE,
+                _CEDAR_ARGUMENT_TITLE,
             ]:
                 continue
             elif arg_dest in skipped_args:
                 continue
-            elif group.title == 'positional arguments':
+            elif group.title == "positional arguments":
                 positional_args.extend(arg_value)
             # Keep all remaining args.
             else:
@@ -1662,8 +2180,12 @@ def to_local_args(input_args: Optional[List[str]] = None):
                     else:
                         other_local_args.append(arg)
 
-    return ["run"] + [arg for arg in (suites_arg, storage_engine_arg) if arg is not None
-                      ] + other_local_args + positional_args
+    return (
+        ["run"]
+        + [arg for arg in (suites_arg, storage_engine_arg) if arg is not None]
+        + other_local_args
+        + positional_args
+    )
 
 
 def strip_fuzz_config_params(input_args: List[str]):

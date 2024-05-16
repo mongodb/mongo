@@ -15,14 +15,20 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
     REGISTERED_NAME = "cpp_libfuzzer_test"
     DEFAULT_TIMEOUT = datetime.timedelta(hours=1)
 
-    def __init__(self, logger: logging.Logger, program_executables: list[str],
-                 program_options: Optional[dict] = None, runs: int = 1000000,
-                 corpus_directory_stem="corpora"):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        program_executables: list[str],
+        program_options: Optional[dict] = None,
+        runs: int = 1000000,
+        corpus_directory_stem="corpora",
+    ):
         """Initialize the CPPLibfuzzerTestCase with the executable to run."""
 
         assert len(program_executables) == 1
-        interface.ProcessTestCase.__init__(self, logger, "C++ libfuzzer test",
-                                           program_executables[0])
+        interface.ProcessTestCase.__init__(
+            self, logger, "C++ libfuzzer test", program_executables[0]
+        )
 
         self.program_executable = program_executables[0]
         self.program_options = utils.default_if_none(program_options, {}).copy()

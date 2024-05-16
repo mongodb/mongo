@@ -1,4 +1,5 @@
 """Library functions for powercycle."""
+
 import logging
 import os
 
@@ -25,7 +26,9 @@ class PowercycleCommand(Subcommand):
     def __init__(self):
         """Initialize PowercycleCommand."""
         self.expansions = yaml.safe_load(open(powercycle_constants.EXPANSIONS_FILE))
-        self.ssh_connection_options = f"-i powercycle.pem {powercycle_constants.DEFAULT_SSH_CONNECTION_OPTIONS}"
+        self.ssh_connection_options = (
+            f"-i powercycle.pem {powercycle_constants.DEFAULT_SSH_CONNECTION_OPTIONS}"
+        )
         self.sudo = "" if self.is_windows() else "sudo"
         # The username on the Windows image that powercycle uses is currently the default user.
         self.user = "Administrator" if self.is_windows() else getpass.getuser()

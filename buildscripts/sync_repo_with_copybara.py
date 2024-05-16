@@ -1,4 +1,5 @@
 """Module for syncing a repo with Copybara and setting up configurations."""
+
 from __future__ import annotations
 
 import argparse
@@ -34,7 +35,7 @@ class CopybaraBranchNames(NamedTuple):
         source_branch_name_pattern = re.compile(r'ref = "(.+?)"')
         destination_branch_name_pattern = re.compile(r'push = "(.+?)"')
 
-        with open(file_path, 'r') as file:
+        with open(file_path, "r") as file:
             content = file.read()
             source_branch_name_match = source_branch_name_pattern.search(content)
             destination_branch_name_match = destination_branch_name_pattern.search(content)
@@ -68,8 +69,9 @@ def run_command(command):
 
     """
     try:
-        return subprocess.run(command, shell=True, check=True, text=True,
-                              capture_output=True).stdout
+        return subprocess.run(
+            command, shell=True, check=True, text=True, capture_output=True
+        ).stdout
     except subprocess.CalledProcessError as e:
         print(f"Error while executing: '{command}'.\n{e}\nStandard Error: {e.stderr}")
         raise
@@ -86,14 +88,15 @@ def create_mongodb_bot_gitconfig():
 
     gitconfig_path = os.path.expanduser("~/mongodb-bot.gitconfig")
 
-    with open(gitconfig_path, 'w') as file:
+    with open(gitconfig_path, "w") as file:
         file.write(content)
 
     print("mongodb-bot.gitconfig file created.")
 
 
-def get_installation_access_token(app_id: int, private_key: str,
-                                  installation_id: int) -> Optional[str]:  # noqa: D407,D413
+def get_installation_access_token(
+    app_id: int, private_key: str, installation_id: int
+) -> Optional[str]:  # noqa: D407,D413
     """
     Obtain an installation access token using JWT.
 
@@ -126,7 +129,8 @@ def send_failure_message_to_slack(expansions):
     error_msg = (
         "Evergreen task '* Copybara Sync Between Repos' failed\n"
         "See troubleshooting doc <http://go/copybara-troubleshoot|here>.\n"
-        f"See task log here: <https://spruce.mongodb.com/version/{current_version_id}|here>.")
+        f"See task log here: <https://spruce.mongodb.com/version/{current_version_id}|here>."
+    )
 
     evg_api = RetryingEvergreenApi.get_api(config_file=".evergreen.yml")
     evg_api.send_slack_message(
@@ -168,18 +172,18 @@ def find_matching_commit(dir_10gen_mongo: str, dir_mongodb_mongo: str) -> str:
     os.chdir(dir_10gen_mongo)
 
     # Find the latest commit hash.
-    private_hash = run_command("git log --pretty=format:\"%H\" -1")
+    private_hash = run_command('git log --pretty=format:"%H" -1')
 
     # Attempt to find a matching commit in the mongodb-mongo repository.
     commit = run_command(
-        f"git --git-dir={dir_mongodb_mongo}/.git log -1 --pretty=format:\"%H\" --grep \"GitOrigin-RevId: {private_hash}\""
+        f'git --git-dir={dir_mongodb_mongo}/.git log -1 --pretty=format:"%H" --grep "GitOrigin-RevId: {private_hash}"'
     )
 
     first_commit = run_command("git rev-list --max-parents=0 HEAD")
 
     # Loop until a matching commit is found or the first commit is reached.
     while len(commit.splitlines()) != 1:
-        current_commit = run_command("git log --pretty=format:\"%H\" -1")
+        current_commit = run_command('git log --pretty=format:"%H" -1')
 
         if current_commit.strip() == first_commit.strip():
             print(
@@ -189,11 +193,11 @@ def find_matching_commit(dir_10gen_mongo: str, dir_mongodb_mongo: str) -> str:
 
         # Revert to the previous commit in the 10gen-mongo repository and try again.
         run_command("git checkout HEAD~1")
-        private_hash = run_command("git log --pretty=format:\"%H\" -1")
+        private_hash = run_command('git log --pretty=format:"%H" -1')
 
         # Attempt to find a matching commit again in the mongodb-mongo repository.
         commit = run_command(
-            f"git --git-dir={dir_mongodb_mongo}/.git log -1 --pretty=format:\"%H\" --grep \"GitOrigin-RevId: {private_hash}\""
+            f'git --git-dir={dir_mongodb_mongo}/.git log -1 --pretty=format:"%H" --grep "GitOrigin-RevId: {private_hash}"'
         )
     return commit
 
@@ -205,15 +209,15 @@ def is_only_mongodb_mongo_repo():
     Returns
         bool: True if the repository only contains the 'mongodb/mongo.git' remote URL, False otherwise.
     """
-    git_config_path = os.path.join('.git', 'config')
-    with open(git_config_path, 'r') as f:
+    git_config_path = os.path.join(".git", "config")
+    with open(git_config_path, "r") as f:
         config_content = f.read()
 
         # Define a regular expression pattern to match the mongodb/mongo.git
-        url_pattern = r'url\s*=\s*(.*?\.git\s*)'
+        url_pattern = r"url\s*=\s*(.*?\.git\s*)"
         matches = re.findall(url_pattern, config_content)
 
-        if len(matches) == 1 and matches[0].strip().endswith('mongodb/mongo.git'):
+        if len(matches) == 1 and matches[0].strip().endswith("mongodb/mongo.git"):
             return True
     print(
         "The current directory's Git repository does not only contain the 'mongodb/mongo.git' remote URL."
@@ -221,8 +225,9 @@ def is_only_mongodb_mongo_repo():
     return False
 
 
-def push_branch_to_public_repo(mongodb_mongo_dir: str, repo_url: str, destination_branch_name: str,
-                               branching_off_commit: str):
+def push_branch_to_public_repo(
+    mongodb_mongo_dir: str, repo_url: str, destination_branch_name: str, branching_off_commit: str
+):
     """
     Pushes a new branch to the remote repository after ensuring it branches off the public repository.
 
@@ -243,10 +248,11 @@ def push_branch_to_public_repo(mongodb_mongo_dir: str, repo_url: str, destinatio
         raise Exception("Not only mongodb repo")
 
     # Confirm the top commit is matching the found commit before pushing
-    new_branch_top_commit = run_command("git log --pretty=format:\"%H\" -1")
+    new_branch_top_commit = run_command('git log --pretty=format:"%H" -1')
     if not new_branch_top_commit == branching_off_commit:
         raise Exception(
-            "The new branch top commit does not match the branching_off_commit. Aborting push.")
+            "The new branch top commit does not match the branching_off_commit. Aborting push."
+        )
 
     # Confirming whether the commit exists in the remote public repository (mongodb/mongo/master) to ensure we are not pushing anything that isn't already in the public repository.
     # run_command will raise an exception if the commit is not found in the remote branch.
@@ -256,8 +262,9 @@ def push_branch_to_public_repo(mongodb_mongo_dir: str, repo_url: str, destinatio
     run_command(f"git push {repo_url} {destination_branch_name}")
 
 
-def create_branch_from_matching_commit(repo_url: str, source_branch_name: str,
-                                       destination_branch_name: str) -> None:
+def create_branch_from_matching_commit(
+    repo_url: str, source_branch_name: str, destination_branch_name: str
+) -> None:
     """
     Creates a new branch in the mongodb/mongo repository based on a matching commit found in 10gen/mongo/branches and mongodb/mongo/master.
 
@@ -273,7 +280,8 @@ def create_branch_from_matching_commit(repo_url: str, source_branch_name: str,
     try:
         # Create a unique directory based on the current timestamp.
         working_dir = os.path.join(
-            original_dir, "make_branch_attempt_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
+            original_dir, "make_branch_attempt_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        )
         os.makedirs(working_dir, exist_ok=True)
         os.chdir(working_dir)
 
@@ -299,8 +307,9 @@ def create_branch_from_matching_commit(repo_url: str, source_branch_name: str,
             run_command(f"git checkout -b {destination_branch_name} {commit}")
 
             # Push the new branch to the remote repository
-            push_branch_to_public_repo(cloned_mongodb_mongo_dir, repo_url, destination_branch_name,
-                                       commit)
+            push_branch_to_public_repo(
+                cloned_mongodb_mongo_dir, repo_url, destination_branch_name, commit
+            )
         else:
             print(
                 f"Could not find matching commits between mongodb/mongo/master and 10gen/mongo/{destination_branch_name} to branching off"
@@ -318,13 +327,17 @@ def main():
     """Clone the Copybara repo, build its Docker image, and set up and run migrations."""
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--expansions-file", "-e", default="../expansions.yml",
-                        help="Location of expansions file generated by evergreen.")
+    parser.add_argument(
+        "--expansions-file",
+        "-e",
+        default="../expansions.yml",
+        help="Location of expansions file generated by evergreen.",
+    )
 
     args = parser.parse_args()
 
     # Check if the copybara directory already exists
-    if os.path.exists('copybara'):
+    if os.path.exists("copybara"):
         print("Copybara directory already exists.")
     else:
         run_command("git clone https://github.com/10gen/copybara.git")
@@ -336,15 +349,19 @@ def main():
     expansions = read_config_file(args.expansions_file)
 
     access_token_copybara_syncer = get_installation_access_token(
-        expansions["app_id_copybara_syncer"], expansions["private_key_copybara_syncer"],
-        expansions["installation_id_copybara_syncer"])
+        expansions["app_id_copybara_syncer"],
+        expansions["private_key_copybara_syncer"],
+        expansions["installation_id_copybara_syncer"],
+    )
 
     # Create the mongodb-bot.gitconfig file as necessary.
     create_mongodb_bot_gitconfig()
 
     current_dir = os.getcwd()
     config_file = f"{current_dir}/copybara.sky"
-    git_destination_url_with_token = f"https://x-access-token:{access_token_copybara_syncer}@github.com/mongodb/mongo.git"
+    git_destination_url_with_token = (
+        f"https://x-access-token:{access_token_copybara_syncer}@github.com/mongodb/mongo.git"
+    )
 
     # create destination branch if not exists
     copybara_branch_names = CopybaraBranchNames.from_copybara_sky_file(config_file)
@@ -356,11 +373,14 @@ def main():
         print("ERROR!!!")
         sys.exit(1)
     else:
-        if not check_destination_branch_exists(git_destination_url_with_token,
-                                               copybara_branch_names.destination):
-            create_branch_from_matching_commit(git_destination_url_with_token,
-                                               copybara_branch_names.source,
-                                               copybara_branch_names.destination)
+        if not check_destination_branch_exists(
+            git_destination_url_with_token, copybara_branch_names.destination
+        ):
+            create_branch_from_matching_commit(
+                git_destination_url_with_token,
+                copybara_branch_names.source,
+                copybara_branch_names.destination,
+            )
             print(
                 f"New branch named {copybara_branch_names.destination} has been created for the mongodb/mongo repo"
             )
@@ -394,8 +414,9 @@ def main():
             "Updates were rejected because the remote contains work that you do",
         ]
 
-        if any(acceptable_message in error_message
-               for acceptable_message in acceptable_error_messages):
+        if any(
+            acceptable_message in error_message for acceptable_message in acceptable_error_messages
+        ):
             return
 
         # Send a failure message to #sdp-triager if the Copybara sync task fails.

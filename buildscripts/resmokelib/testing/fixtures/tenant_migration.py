@@ -10,8 +10,9 @@ class TenantMigrationFixture(multi_replica_set.MultiReplicaSetFixture):
     def __init__(self, logger, job_num, fixturelib, **options):
         """Initialize TenantMigrationFixture with different options for the replica set processes."""
         options["common_mongod_options"].update({"serverless": True})
-        multi_replica_set.MultiReplicaSetFixture.__init__(self, logger, job_num, fixturelib,
-                                                          **options)
+        multi_replica_set.MultiReplicaSetFixture.__init__(
+            self, logger, job_num, fixturelib, **options
+        )
 
         # The ReplicaSetFixture for the replica set that starts out owning the data (i.e. the
         # replica set that driver should connect to when running commands).
@@ -36,11 +37,14 @@ class TenantMigrationFixture(multi_replica_set.MultiReplicaSetFixture):
         return self.replica_set_with_tenant.get_driver_connection_url()
 
     def _create_client(self, fixture, **kwargs):
-        return fixture.mongo_client(username=self.auth_options["username"],
-                                    password=self.auth_options["password"],
-                                    authSource=self.auth_options["authenticationDatabase"],
-                                    authMechanism=self.auth_options["authenticationMechanism"],
-                                    uuidRepresentation='standard', **kwargs)
+        return fixture.mongo_client(
+            username=self.auth_options["username"],
+            password=self.auth_options["password"],
+            authSource=self.auth_options["authenticationDatabase"],
+            authMechanism=self.auth_options["authenticationMechanism"],
+            uuidRepresentation="standard",
+            **kwargs,
+        )
 
     def _create_tenant_migration_donor_and_recipient_roles(self, rs):
         """Create a role for tenant migration donor and recipient."""
@@ -48,32 +52,58 @@ class TenantMigrationFixture(multi_replica_set.MultiReplicaSetFixture):
         primary_client = self._create_client(primary)
 
         try:
-            with_naive_retry(lambda: primary_client.admin.command({
-                "createRole": "tenantMigrationDonorRole", "privileges": [{
-                    "resource": {"cluster": True}, "actions": ["runTenantMigration"]
-                }, {"resource": {"db": "admin", "collection": "system.keys"}, "actions": ["find"]}],
-                "roles": []
-            }))
+            with_naive_retry(
+                lambda: primary_client.admin.command(
+                    {
+                        "createRole": "tenantMigrationDonorRole",
+                        "privileges": [
+                            {"resource": {"cluster": True}, "actions": ["runTenantMigration"]},
+                            {
+                                "resource": {"db": "admin", "collection": "system.keys"},
+                                "actions": ["find"],
+                            },
+                        ],
+                        "roles": [],
+                    }
+                )
+            )
         except:
             self.logger.exception(
-                "Error creating tenant migration donor role on primary on port %d of replica" +
-                " set '%s'.", primary.port, rs.replset_name)
+                "Error creating tenant migration donor role on primary on port %d of replica"
+                + " set '%s'.",
+                primary.port,
+                rs.replset_name,
+            )
             raise
 
         try:
-            with_naive_retry(lambda: primary_client.admin.command({
-                "createRole": "tenantMigrationRecipientRole",
-                "privileges": [{
-                    "resource": {"cluster": True},
-                    "actions": ["listDatabases", "useUUID", "advanceClusterTime"]
-                }, {"resource": {"db": "", "collection": ""}, "actions": ["listCollections"]},
-                               {
-                                   "resource": {"anyResource": True},
-                                   "actions": ["dbStats", "collStats", "find", "listIndexes"]
-                               }], "roles": []
-            }))
+            with_naive_retry(
+                lambda: primary_client.admin.command(
+                    {
+                        "createRole": "tenantMigrationRecipientRole",
+                        "privileges": [
+                            {
+                                "resource": {"cluster": True},
+                                "actions": ["listDatabases", "useUUID", "advanceClusterTime"],
+                            },
+                            {
+                                "resource": {"db": "", "collection": ""},
+                                "actions": ["listCollections"],
+                            },
+                            {
+                                "resource": {"anyResource": True},
+                                "actions": ["dbStats", "collStats", "find", "listIndexes"],
+                            },
+                        ],
+                        "roles": [],
+                    }
+                )
+            )
         except:
             self.logger.exception(
-                "Error creating tenant migration recipient role on primary on port %d of replica" +
-                " set '%s'.", primary.port, rs.replset_name)
+                "Error creating tenant migration recipient role on primary on port %d of replica"
+                + " set '%s'.",
+                primary.port,
+                rs.replset_name,
+            )
             raise

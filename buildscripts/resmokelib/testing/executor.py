@@ -15,10 +15,17 @@ from buildscripts.resmokelib.testing import hook_test_archival as archival
 from buildscripts.resmokelib.testing import hooks as _hooks
 from buildscripts.resmokelib.testing import job as _job
 from buildscripts.resmokelib.testing import report as _report
-from buildscripts.resmokelib.testing.docker_cluster_image_builder import DockerComposeImageBuilder, build_images
+from buildscripts.resmokelib.testing.docker_cluster_image_builder import (
+    DockerComposeImageBuilder,
+    build_images,
+)
 from buildscripts.resmokelib.testing.fixtures.interface import Fixture
 from buildscripts.resmokelib.testing.hooks.interface import Hook
-from buildscripts.resmokelib.testing.queue_element import QueueElemRepeatTime, queue_elem_factory, QueueElem
+from buildscripts.resmokelib.testing.queue_element import (
+    QueueElemRepeatTime,
+    queue_elem_factory,
+    QueueElem,
+)
 from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.utils import queue as _queue
 
@@ -32,9 +39,16 @@ class TestSuiteExecutor(object):
 
     _TIMEOUT = 24 * 60 * 60  # =1 day (a long time to have tests run)
 
-    def __init__(self, exec_logger: Logger, suite: Suite, config=None,
-                 fixture: Optional[Fixture] = None, hooks=None, archive_instance=None,
-                 archive=None):
+    def __init__(
+        self,
+        exec_logger: Logger,
+        suite: Suite,
+        config=None,
+        fixture: Optional[Fixture] = None,
+        hooks=None,
+        archive_instance=None,
+        archive=None,
+    ):
         """Initialize the TestSuiteExecutor with the test suite to run."""
         self.logger = exec_logger
 
@@ -43,7 +57,7 @@ class TestSuiteExecutor(object):
             # specified in the YAML configuration to be the external fixture.
             self.fixture_config = {
                 "class": fixtures.EXTERNAL_FIXTURE_CLASS,
-                "shell_conn_string": _config.SHELL_CONN_STRING
+                "shell_conn_string": _config.SHELL_CONN_STRING,
             }
         else:
             self.fixture_config = fixture
@@ -53,8 +67,9 @@ class TestSuiteExecutor(object):
 
         self.archival = None
         if archive_instance:
-            self.archival = archival.HookTestArchival(suite, self.hooks_config, archive_instance,
-                                                      archive)
+            self.archival = archival.HookTestArchival(
+                suite, self.hooks_config, archive_instance, archive
+            )
 
         self._suite = suite
         self.test_queue_logger = logging.loggers.new_testqueue_logger(suite.test_kind)
@@ -102,8 +117,9 @@ class TestSuiteExecutor(object):
                 # We use the 'hook_failure_flag' to distinguish hook failures from other failures,
                 # so that we can return a separate return code when a hook has failed.
                 hook_failure_flag = threading.Event()
-                (report, interrupted) = self._run_tests(test_queue, setup_flag, teardown_flag,
-                                                        hook_failure_flag)
+                (report, interrupted) = self._run_tests(
+                    test_queue, setup_flag, teardown_flag, hook_failure_flag
+                )
 
                 self._suite.record_test_end(report)
 
@@ -141,7 +157,9 @@ class TestSuiteExecutor(object):
                 if test_results_num < test_queue.num_tests:
                     raise errors.ResmokeError(
                         "{} reported tests is less than {} expected tests".format(
-                            test_results_num, test_queue.num_tests))
+                            test_results_num, test_queue.num_tests
+                        )
+                    )
 
                 # Clear the report so it can be reused for the next execution.
                 for job in self._jobs:
@@ -155,11 +173,11 @@ class TestSuiteExecutor(object):
             self._suite.return_code = return_code
 
     def _run_tests(
-            self,
-            test_queue: 'TestQueue[Union[QueueElemRepeatTime, QueueElem]]',
-            setup_flag: Optional[threading.Event],
-            teardown_flag: Optional[threading.Event],
-            hook_failure_flag: Optional[threading.Event],
+        self,
+        test_queue: "TestQueue[Union[QueueElemRepeatTime, QueueElem]]",
+        setup_flag: Optional[threading.Event],
+        teardown_flag: Optional[threading.Event],
+        hook_failure_flag: Optional[threading.Event],
     ):
         """Start a thread for each Job instance and block until all of the tests are run.
 
@@ -175,12 +193,15 @@ class TestSuiteExecutor(object):
             # Run each Job instance in its own thread.
             for job in self._jobs:
                 thr = threading.Thread(
-                    target=job.start, args=(test_queue, interrupt_flag), kwargs=dict(
+                    target=job.start,
+                    args=(test_queue, interrupt_flag),
+                    kwargs=dict(
                         parent_context=context.get_current(),
                         setup_flag=setup_flag,
                         teardown_flag=teardown_flag,
                         hook_failure_flag=hook_failure_flag,
-                    ))
+                    ),
+                )
                 # Do not wait for tests to finish executing if interrupted by the user.
                 thr.daemon = True
                 thr.start()
@@ -231,8 +252,9 @@ class TestSuiteExecutor(object):
         success = True
         for job in self._jobs:
             if not job.manager.teardown_fixture(self.logger):
-                self.logger.warning("Teardown of %s of job %s was not successful", job.fixture,
-                                    job.job_num)
+                self.logger.warning(
+                    "Teardown of %s of job %s was not successful", job.fixture, job.job_num
+                )
                 success = False
         return success
 
@@ -278,8 +300,16 @@ class TestSuiteExecutor(object):
 
         report = _report.TestReport(job_logger, self._suite.options, job_num)
 
-        return _job.Job(job_num, job_logger, fixture, hooks, report, self.archival,
-                        self._suite.options, self.test_queue_logger)
+        return _job.Job(
+            job_num,
+            job_logger,
+            fixture,
+            hooks,
+            report,
+            self.archival,
+            self._suite.options,
+            self.test_queue_logger,
+        )
 
     def _create_queue_elem_for_test_name(self, test_names: list[str]):
         """
@@ -288,11 +318,12 @@ class TestSuiteExecutor(object):
         :param test_name: Name of test to be queued.
         :return: queue_elem representing the test_name to be run.
         """
-        test_case = testcases.make_test_case(self._suite.test_kind, self.test_queue_logger,
-                                             test_names, **self.test_config)
+        test_case = testcases.make_test_case(
+            self._suite.test_kind, self.test_queue_logger, test_names, **self.test_config
+        )
         return queue_elem_factory(test_case, self.test_config, self._suite.options)
 
-    def _make_test_queue(self) -> 'TestQueue[Union[QueueElemRepeatTime, QueueElem]]':
+    def _make_test_queue(self) -> "TestQueue[Union[QueueElemRepeatTime, QueueElem]]":
         """
         Create a queue of test cases to run.
 
@@ -322,11 +353,13 @@ class TestSuiteExecutor(object):
     def _log_timeout_warning(self, seconds):
         """Log a message if any thread fails to terminate after `seconds`."""
         self.logger.warning(
-            '*** Still waiting for processes to terminate after %s seconds. Try using ctrl-\\ '
-            'to send a SIGQUIT on Linux or ctrl-c again on Windows ***', seconds)
+            "*** Still waiting for processes to terminate after %s seconds. Try using ctrl-\\ "
+            "to send a SIGQUIT on Linux or ctrl-c again on Windows ***",
+            seconds,
+        )
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class TestQueue(_queue.Queue, Generic[T]):

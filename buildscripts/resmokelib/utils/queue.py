@@ -13,7 +13,7 @@ from typing import Generic, TypeVar
 # Exception that is raised when get_nowait() is called on an empty Queue.
 Empty = _queue.Empty
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class Queue(_queue.Queue, Generic[T]):

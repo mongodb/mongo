@@ -25,13 +25,15 @@ class EnableSpuriousWriteConflicts(interface.Hook):
     def before_test(self, test, test_report):
         """Enable WTWriteConflictExceptions."""
         hook_test_case = jsfile.DynamicJSTestCase.create_after_test(
-            test.logger, test, self, self._enable_js_filename, self._shell_options)
+            test.logger, test, self, self._enable_js_filename, self._shell_options
+        )
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 
     def after_test(self, test, test_report):
         """Disable WTWriteConflictExceptions."""
         hook_test_case = jsfile.DynamicJSTestCase.create_after_test(
-            test.logger, test, self, self._disable_js_filename, self._shell_options)
+            test.logger, test, self, self._disable_js_filename, self._shell_options
+        )
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)

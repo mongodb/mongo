@@ -36,19 +36,28 @@ class CoreAnalyzer(Subcommand):
                     if file.read().strip() == self.task_id:
                         skip_download = True
                         self.root_logger.info(
-                            "Files from task id provided were already on disk, skipping download.")
+                            "Files from task id provided were already on disk, skipping download."
+                        )
 
             multiversion_dir = os.path.join(base_dir, "multiversion")
             if not skip_download and not download_task_artifacts(
-                    self.root_logger, self.task_id, base_dir, dumpers.dbg, multiversion_dir,
-                    self.execution):
+                self.root_logger,
+                self.task_id,
+                base_dir,
+                dumpers.dbg,
+                multiversion_dir,
+                self.execution,
+            ):
                 self.root_logger.error("Artifacts were not found.")
-                current_span.set_attributes({
-                    "core_analyzer_execute_error": "Artifacts were not found.",
-                })
+                current_span.set_attributes(
+                    {
+                        "core_analyzer_execute_error": "Artifacts were not found.",
+                    }
+                )
                 current_span.set_status(StatusCode.ERROR, description="Artifacts were not found.")
                 raise RuntimeError(
-                    "Artifacts were not found for specified task. Could not analyze cores.")
+                    "Artifacts were not found for specified task. Could not analyze cores."
+                )
 
             with open(task_id_file, "w") as file:
                 file.write(self.task_id)
@@ -56,14 +65,16 @@ class CoreAnalyzer(Subcommand):
             core_dump_dir = os.path.join(base_dir, "core-dumps")
             install_dir = os.path.join(base_dir, "install")
         else:  # if a task id was not specified, look for input files on the current machine
-            install_dir = self.options.install_dir or os.path.join(os.path.curdir, "build",
-                                                                   "install")
+            install_dir = self.options.install_dir or os.path.join(
+                os.path.curdir, "build", "install"
+            )
             core_dump_dir = self.options.core_dir or os.path.curdir
             multiversion_dir = self.options.multiversion_dir or os.path.curdir
 
         analysis_dir = os.path.join(base_dir, "analysis")
-        report = dumpers.dbg.analyze_cores(core_dump_dir, install_dir, analysis_dir,
-                                           multiversion_dir)
+        report = dumpers.dbg.analyze_cores(
+            core_dump_dir, install_dir, analysis_dir, multiversion_dir
+        )
 
         if self.options.generate_report:
             with open("report.json", "w") as file:
@@ -83,10 +94,15 @@ class CoreAnalyzer(Subcommand):
 class CoreAnalyzerPlugin(PluginInterface):
     """Integration-point for core-analyzer."""
 
-    def parse(self, subcommand: str, parser: argparse.ArgumentParser,
-              parsed_args: argparse.Namespace, **kwargs) -> Optional[Subcommand]:
+    def parse(
+        self,
+        subcommand: str,
+        parser: argparse.ArgumentParser,
+        parsed_args: argparse.Namespace,
+        **kwargs,
+    ) -> Optional[Subcommand]:
         """Parse command-line options."""
-        if subcommand == 'core-analyzer':
+        if subcommand == "core-analyzer":
             configure_resmoke.detect_evergreen_config(parsed_args)
             configure_resmoke.validate_and_update_config(parser, parsed_args)
             return CoreAnalyzer(parsed_args)
@@ -96,11 +112,12 @@ class CoreAnalyzerPlugin(PluginInterface):
         """Create and add the parser for the core analyzer subcommand."""
 
         parser = subparsers.add_parser(
-            "core-analyzer", help="Analyzes the core dumps from the specified input files.")
+            "core-analyzer", help="Analyzes the core dumps from the specified input files."
+        )
 
         parser.add_argument(
             "--task-id",
-            '-t',
+            "-t",
             action="store",
             type=str,
             default=None,
@@ -109,26 +126,57 @@ class CoreAnalyzerPlugin(PluginInterface):
         )
 
         parser.add_argument(
-            "--execution", '-e', action="store", type=int, default=None,
+            "--execution",
+            "-e",
+            action="store",
+            type=int,
+            default=None,
             help="The execution of the task you want to download core dumps for."
-            " This will default to the latest execution if left blank.")
-
-        parser.add_argument("--install-dir", '-b', action="store", type=str, default=None,
-                            help="Directory that contains binaires and debugsymbols.")
-
-        parser.add_argument("--multiversion-dir", '-m', action="store", type=str, default=None,
-                            help="Directory that contains multiversion binaries and debugsymbols.")
-
-        parser.add_argument("--core-dir", '-c', action="store", type=str, default=None,
-                            help="Directory that contains core dumps.")
-
-        parser.add_argument(
-            "--working-dir", '-w', action="store", type=str, default="core-analyzer",
-            help="Directory that downloaded artifacts will be stored and output will be written to."
+            " This will default to the latest execution if left blank.",
         )
 
         parser.add_argument(
-            "--generate-report", '-r', action="store_true", default=False,
-            help="Whether to generate a report used to log individual tests in evergreen.")
+            "--install-dir",
+            "-b",
+            action="store",
+            type=str,
+            default=None,
+            help="Directory that contains binaires and debugsymbols.",
+        )
+
+        parser.add_argument(
+            "--multiversion-dir",
+            "-m",
+            action="store",
+            type=str,
+            default=None,
+            help="Directory that contains multiversion binaries and debugsymbols.",
+        )
+
+        parser.add_argument(
+            "--core-dir",
+            "-c",
+            action="store",
+            type=str,
+            default=None,
+            help="Directory that contains core dumps.",
+        )
+
+        parser.add_argument(
+            "--working-dir",
+            "-w",
+            action="store",
+            type=str,
+            default="core-analyzer",
+            help="Directory that downloaded artifacts will be stored and output will be written to.",
+        )
+
+        parser.add_argument(
+            "--generate-report",
+            "-r",
+            action="store_true",
+            default=False,
+            help="Whether to generate a report used to log individual tests in evergreen.",
+        )
 
         configure_resmoke.add_otel_args(parser)

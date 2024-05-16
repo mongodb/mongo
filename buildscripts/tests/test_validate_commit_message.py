@@ -1,4 +1,5 @@
 """Unit tests for the evergreen_task_timeout script."""
+
 import itertools
 import unittest
 from typing import List, Optional
@@ -31,8 +32,9 @@ def create_mock_patch(code_change_messages: List[str], branch_name: Optional[str
     return mock_patch
 
 
-def create_mock_evg_client(code_change_messages: List[str],
-                           branch_name: Optional[str] = None) -> MagicMock:
+def create_mock_evg_client(
+    code_change_messages: List[str], branch_name: Optional[str] = None
+) -> MagicMock:
     mock_patch = create_mock_patch(code_change_messages, branch_name)
 
     mock_evg_client = MagicMock(spec_set=EvergreenApi)

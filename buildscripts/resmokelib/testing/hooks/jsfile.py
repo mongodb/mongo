@@ -31,8 +31,9 @@ class JSHook(interface.Hook):
         if not self._should_run_after_test():
             return
 
-        hook_test_case = DynamicJSTestCase.create_after_test(test.logger, test, self,
-                                                             self._js_filename, self._shell_options)
+        hook_test_case = DynamicJSTestCase.create_after_test(
+            test.logger, test, self, self._js_filename, self._shell_options
+        )
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 
@@ -68,14 +69,22 @@ class PerClusterDataConsistencyHook(DataConsistencyHook):
         """After test execution."""
 
         # Break the fixture down into its participant clusters if it is a MultiClusterFixture.
-        clusters = [self.fixture] if not isinstance(self.fixture, MultiClusterFixture)\
-                    else self.fixture.get_independent_clusters()
+        clusters = (
+            [self.fixture]
+            if not isinstance(self.fixture, MultiClusterFixture)
+            else self.fixture.get_independent_clusters()
+        )
 
         for cluster in clusters:
-            self.logger.info("Running jsfile '%s' on '%s' with driver URL '%s'", self._js_filename,
-                             cluster, cluster.get_driver_connection_url())
+            self.logger.info(
+                "Running jsfile '%s' on '%s' with driver URL '%s'",
+                self._js_filename,
+                cluster,
+                cluster.get_driver_connection_url(),
+            )
             hook_test_case = DynamicJSTestCase.create_after_test(
-                test.logger, test, self, self._js_filename, self._shell_options)
+                test.logger, test, self, self._js_filename, self._shell_options
+            )
             hook_test_case.configure(cluster)
             hook_test_case.run_dynamic_test(test_report)
 
@@ -83,11 +92,20 @@ class PerClusterDataConsistencyHook(DataConsistencyHook):
 class DynamicJSTestCase(interface.DynamicTestCase):
     """A dynamic TestCase that runs a JavaScript file."""
 
-    def __init__(self, logger: logging.Logger, test_name: str, description: str,
-                 base_test_name: str, hook, js_filename: str, shell_options=None):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        test_name: str,
+        description: str,
+        base_test_name: str,
+        hook,
+        js_filename: str,
+        shell_options=None,
+    ):
         """Initialize DynamicJSTestCase."""
-        interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
-                                           hook)
+        interface.DynamicTestCase.__init__(
+            self, logger, test_name, description, base_test_name, hook
+        )
         self._js_test_builder = jstest.JSTestCaseBuilder(
             logger,
             [js_filename],

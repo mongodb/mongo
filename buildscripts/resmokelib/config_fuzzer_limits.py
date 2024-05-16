@@ -8,18 +8,32 @@ config_fuzzer_params = {
         "minSnapshotHistoryWindowInSeconds": {"min": 30, "max": 600},
         "chunkMigrationConcurrency": {"choices": [1, 4, 16], "min": 1, "max": 16},
         "logicalSessionRefreshMillis": {
-            "choices": [100, 1000, 10000, 100000], "min": 100, "max": 100000
+            "choices": [100, 1000, 10000, 100000],
+            "min": 100,
+            "max": 100000,
         },
         # maxNumberOfTransactionOperationsInSingleOplogEntry has two sources of randomization (rng.randint(1, 10) * rng.choice(mongod_param_choices["maxNumberOfTransactionOperationsInSingleOplogEntry"]))
         # You need to manually update maxNumberOfTransactionOperationsInSingleOplogEntry min and max in the case that you change either randomized choices
         "maxNumberOfTransactionOperationsInSingleOplogEntry": {
-            "choices": [100, 1000, 10000, 100000], "min": 100, "max": 100000
+            "choices": [100, 1000, 10000, 100000],
+            "min": 100,
+            "max": 100000,
         },
-        "enableAutoCompaction": {"choices": [True, False], },
-        "initialServiceExecutorUseDedicatedThread": {"choices": [True, False], },
-        "disableLogicalSessionCacheRefresh": {"choices": [True, False], },
-        "wiredTigerStressConfig": {"choices": [True, False], },
-        "oplogFetcherUsesExhaust": {"choices": [True, False], },
+        "enableAutoCompaction": {
+            "choices": [True, False],
+        },
+        "initialServiceExecutorUseDedicatedThread": {
+            "choices": [True, False],
+        },
+        "disableLogicalSessionCacheRefresh": {
+            "choices": [True, False],
+        },
+        "wiredTigerStressConfig": {
+            "choices": [True, False],
+        },
+        "oplogFetcherUsesExhaust": {
+            "choices": [True, False],
+        },
         "storageEngineConcurrencyAdjustmentAlgorithm": {
             "choices": ["throughputProbing", "fixedConcurrentTransactions"],
         },
@@ -38,7 +52,8 @@ config_fuzzer_params = {
         "throughputProbingInitialConcurrency": {"min": 4, "max": 128},
         "throughputProbingMinConcurrency": {"min": 4, "max": "throughputProbingInitialConcurrency"},
         "throughputProbingMaxConcurrency": {
-            "min": "throughputProbingInitialConcurrency", "max": 128
+            "min": "throughputProbingInitialConcurrency",
+            "max": 128,
         },
         "throughputProbingReadWriteRatio": {"min": 0, "max": 1},
         "throughputProbingConcurrencyMovingAverageWeight": {"min": 0.0, "max": 1.0},
@@ -64,10 +79,10 @@ config_fuzzer_params = {
         "flowControlMaxSamples": {"min": 1, "max": 1000 * 1000},
         "flowControlSamplePeriod": {"min": 1, "max": 1000 * 1000},
         "flowControlMinTicketsPerSecond": {"min": 1, "max": 10 * 1000},
-        "enableFlowControl": {"choices": [True, False]}
+        "enableFlowControl": {"choices": [True, False]},
     },
     "mongos": {
         "initialServiceExecutorUseDedicatedThread": {"choices": [True, False]},
-        "opportunisticSecondaryTargeting": {"choices": [True, False]}
-    }
+        "opportunisticSecondaryTargeting": {"choices": [True, False]},
+    },
 }

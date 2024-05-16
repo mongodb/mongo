@@ -1,4 +1,5 @@
 """The unittest.TestCase for tests with a static JavaScript runner file."""
+
 import os
 
 from typing import Optional
@@ -12,9 +13,15 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self, logger: logging.Logger, test_kind: str, test_name: str,
-                 test_runner_file: str, shell_executable: Optional[str] = None,
-                 shell_options: Optional[dict] = None):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        test_kind: str,
+        test_name: str,
+        test_runner_file: str,
+        shell_executable: Optional[str] = None,
+        shell_options: Optional[dict] = None,
+    ):
         """Initialize the JSRunnerFileTestCase with the 'test_name' file."""
 
         interface.ProcessTestCase.__init__(self, logger, test_kind, test_name)

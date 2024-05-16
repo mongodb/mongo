@@ -1,4 +1,5 @@
 """Script to configure a sharded cluster in Antithesis from the mongos container."""
+
 import json
 import subprocess
 from time import sleep
@@ -58,7 +59,8 @@ retry_until_success(mongo_process_running, {"host": "configsvr1", "port": 27019}
 retry_until_success(mongo_process_running, {"host": "configsvr2", "port": 27019})
 retry_until_success(mongo_process_running, {"host": "configsvr3", "port": 27019})
 retry_until_success(
-    subprocess.run, {
+    subprocess.run,
+    {
         "args": [
             "mongo",
             "--host",
@@ -69,14 +71,16 @@ retry_until_success(
             f"rs.initiate({json.dumps(CONFIGSVR_CONFIG)})",
         ],
         "check": True,
-    })
+    },
+)
 
 # Create Shard1 once all nodes are up
 retry_until_success(mongo_process_running, {"host": "database1", "port": 27018})
 retry_until_success(mongo_process_running, {"host": "database2", "port": 27018})
 retry_until_success(mongo_process_running, {"host": "database3", "port": 27018})
 retry_until_success(
-    subprocess.run, {
+    subprocess.run,
+    {
         "args": [
             "mongo",
             "--host",
@@ -87,14 +91,16 @@ retry_until_success(
             f"rs.initiate({json.dumps(SHARD1_CONFIG)})",
         ],
         "check": True,
-    })
+    },
+)
 
 # Create Shard2 once all nodes are up
 retry_until_success(mongo_process_running, {"host": "database4", "port": 27018})
 retry_until_success(mongo_process_running, {"host": "database5", "port": 27018})
 retry_until_success(mongo_process_running, {"host": "database6", "port": 27018})
 retry_until_success(
-    subprocess.run, {
+    subprocess.run,
+    {
         "args": [
             "mongo",
             "--host",
@@ -105,11 +111,13 @@ retry_until_success(
             f"rs.initiate({json.dumps(SHARD2_CONFIG)})",
         ],
         "check": True,
-    })
+    },
+)
 
 # Start mongos
 retry_until_success(
-    subprocess.run, {
+    subprocess.run,
+    {
         "args": [
             "mongos",
             "--bind_ip",
@@ -125,11 +133,13 @@ retry_until_success(
             "--fork",
         ],
         "check": True,
-    })
+    },
+)
 
 # Add shards to cluster
 retry_until_success(
-    subprocess.run, {
+    subprocess.run,
+    {
         "args": [
             "mongo",
             "--host",
@@ -140,9 +150,11 @@ retry_until_success(
             'sh.addShard("Shard1/database1:27018,database2:27018,database3:27018")',
         ],
         "check": True,
-    })
+    },
+)
 retry_until_success(
-    subprocess.run, {
+    subprocess.run,
+    {
         "args": [
             "mongo",
             "--host",
@@ -153,7 +165,8 @@ retry_until_success(
             'sh.addShard("Shard2/database4:27018,database5:27018,database6:27018")',
         ],
         "check": True,
-    })
+    },
+)
 
 while True:
     sleep(10)

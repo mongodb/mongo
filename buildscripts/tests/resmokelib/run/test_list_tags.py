@@ -1,4 +1,5 @@
 """Unit tests for buildscripts/resmokelib/run/list_tags.py."""
+
 import unittest
 
 from buildscripts.resmokelib.run import list_tags
@@ -8,17 +9,20 @@ def _get_suite(tags_blocks):
     block = ""
     for tags_block in tags_blocks:
         block = f"{block}  {tags_block}" + "\n"
-    return (("test_kind: js_test\n"
-             "\n"
-             "selector:\n"
-             "  roots: []\n") + block + ("\n"
-                                         "executor:\n"
-                                         "  config: {}\n"
-                                         "  fixture:\n"
-                                         "    class: MongoDFixture\n"
-                                         "    mongod_options:\n"
-                                         "      set_parameters:\n"
-                                         "        enableTestCommands: 1\n"))
+    return (
+        ("test_kind: js_test\n" "\n" "selector:\n" "  roots: []\n")
+        + block
+        + (
+            "\n"
+            "executor:\n"
+            "  config: {}\n"
+            "  fixture:\n"
+            "    class: MongoDFixture\n"
+            "    mongod_options:\n"
+            "      set_parameters:\n"
+            "        enableTestCommands: 1\n"
+        )
+    )
 
 
 class TestParseTagsBlocks(unittest.TestCase):
@@ -34,53 +38,61 @@ class TestParseTagsBlocks(unittest.TestCase):
         self.assertCountEqual(tags_blocks, result)
 
     def test_two_tags_blocks(self):
-        tags_blocks = [("exclude_with_any_tags:\n"
-                        "  - dummy_tag_1\n"
-                        "  - dummy_tag_2\n"
-                        "  - dummy_tag_3"),
-                       ("include_with_any_tags:\n"
-                        "  - dummy_tag_4\n"
-                        "  - dummy_tag_5\n"
-                        "  - dummy_tag_6")]
+        tags_blocks = [
+            ("exclude_with_any_tags:\n" "  - dummy_tag_1\n" "  - dummy_tag_2\n" "  - dummy_tag_3"),
+            ("include_with_any_tags:\n" "  - dummy_tag_4\n" "  - dummy_tag_5\n" "  - dummy_tag_6"),
+        ]
         suite = _get_suite(tags_blocks)
         result = list_tags.parse_tags_blocks(suite)
         self.assertCountEqual(tags_blocks, result)
 
     def test_tags_block_with_tags_and_above_comments(self):
-        tags_blocks = [("exclude_with_any_tags:\n"
-                        "  # comment\n"
-                        "  - dummy_tag_1\n"
-                        "  # comment line 1\n"
-                        "  # comment line 2\n"
-                        "  - dummy_tag_2\n"
-                        "  #################\n"
-                        "  # fancy comment #\n"
-                        "  #################\n"
-                        "  - dummy_tag_3")]
+        tags_blocks = [
+            (
+                "exclude_with_any_tags:\n"
+                "  # comment\n"
+                "  - dummy_tag_1\n"
+                "  # comment line 1\n"
+                "  # comment line 2\n"
+                "  - dummy_tag_2\n"
+                "  #################\n"
+                "  # fancy comment #\n"
+                "  #################\n"
+                "  - dummy_tag_3"
+            )
+        ]
         suite = _get_suite(tags_blocks)
         result = list_tags.parse_tags_blocks(suite)
         self.assertCountEqual(tags_blocks, result)
 
     def test_tags_block_with_tags_and_inline_comments(self):
-        tags_blocks = [("exclude_with_any_tags:\n"
-                        "  - dummy_tag_1  # inline comment\n"
-                        "  - dummy_tag_2  # another one\n"
-                        "  - dummy_tag_3  # and another one")]
+        tags_blocks = [
+            (
+                "exclude_with_any_tags:\n"
+                "  - dummy_tag_1  # inline comment\n"
+                "  - dummy_tag_2  # another one\n"
+                "  - dummy_tag_3  # and another one"
+            )
+        ]
         suite = _get_suite(tags_blocks)
         result = list_tags.parse_tags_blocks(suite)
         self.assertCountEqual(tags_blocks, result)
 
     def test_tags_block_with_tags_and_both_comments(self):
-        tags_blocks = [("exclude_with_any_tags:\n"
-                        "  # above comment\n"
-                        "  - dummy_tag_1  # inline comment\n"
-                        "  # above comment line 1\n"
-                        "  # above comment line 2\n"
-                        "  - dummy_tag_2  # another one inline\n"
-                        "  #######################\n"
-                        "  # above fancy comment #\n"
-                        "  #######################\n"
-                        "  - dummy_tag_3  # and another one inline")]
+        tags_blocks = [
+            (
+                "exclude_with_any_tags:\n"
+                "  # above comment\n"
+                "  - dummy_tag_1  # inline comment\n"
+                "  # above comment line 1\n"
+                "  # above comment line 2\n"
+                "  - dummy_tag_2  # another one inline\n"
+                "  #######################\n"
+                "  # above fancy comment #\n"
+                "  #######################\n"
+                "  - dummy_tag_3  # and another one inline"
+            )
+        ]
         suite = _get_suite(tags_blocks)
         result = list_tags.parse_tags_blocks(suite)
         self.assertCountEqual(tags_blocks, result)
@@ -97,10 +109,7 @@ class TestSplitIntoTags(unittest.TestCase):
         self.assertCountEqual([[""]], result)
 
     def test_block_with_tags_no_comments(self):
-        block = ("exclude_with_any_tags:\n"
-                 "  - dummy_tag_1\n"
-                 "  - dummy_tag_2\n"
-                 "  - dummy_tag_3")
+        block = "exclude_with_any_tags:\n" "  - dummy_tag_1\n" "  - dummy_tag_2\n" "  - dummy_tag_3"
         expected = [
             ["- dummy_tag_1"],
             ["- dummy_tag_2"],
@@ -110,16 +119,18 @@ class TestSplitIntoTags(unittest.TestCase):
         self.assertCountEqual(expected, result)
 
     def test_block_with_tags_and_above_comments(self):
-        block = ("exclude_with_any_tags:\n"
-                 "  # comment\n"
-                 "  - dummy_tag_1\n"
-                 "  # comment line 1\n"
-                 "  # comment line 2\n"
-                 "  - dummy_tag_2\n"
-                 "  #################\n"
-                 "  # fancy comment #\n"
-                 "  #################\n"
-                 "  - dummy_tag_3")
+        block = (
+            "exclude_with_any_tags:\n"
+            "  # comment\n"
+            "  - dummy_tag_1\n"
+            "  # comment line 1\n"
+            "  # comment line 2\n"
+            "  - dummy_tag_2\n"
+            "  #################\n"
+            "  # fancy comment #\n"
+            "  #################\n"
+            "  - dummy_tag_3"
+        )
         expected = [
             [
                 "# comment",
@@ -141,10 +152,12 @@ class TestSplitIntoTags(unittest.TestCase):
         self.assertCountEqual(expected, result)
 
     def test_block_with_tags_and_inline_comments(self):
-        block = (("exclude_with_any_tags:\n"
-                  "  - dummy_tag_1  # inline comment\n"
-                  "  - dummy_tag_2  # another one\n"
-                  "  - dummy_tag_3  # and another one"))
+        block = (
+            "exclude_with_any_tags:\n"
+            "  - dummy_tag_1  # inline comment\n"
+            "  - dummy_tag_2  # another one\n"
+            "  - dummy_tag_3  # and another one"
+        )
         expected = [
             ["- dummy_tag_1  # inline comment"],
             ["- dummy_tag_2  # another one"],
@@ -154,16 +167,18 @@ class TestSplitIntoTags(unittest.TestCase):
         self.assertCountEqual(expected, result)
 
     def test_block_with_tags_and_both_comments(self):
-        block = ("exclude_with_any_tags:\n"
-                 "  # above comment\n"
-                 "  - dummy_tag_1  # inline comment\n"
-                 "  # above comment line 1\n"
-                 "  # above comment line 2\n"
-                 "  - dummy_tag_2  # another one inline\n"
-                 "  #######################\n"
-                 "  # above fancy comment #\n"
-                 "  #######################\n"
-                 "  - dummy_tag_3  # and another one inline")
+        block = (
+            "exclude_with_any_tags:\n"
+            "  # above comment\n"
+            "  - dummy_tag_1  # inline comment\n"
+            "  # above comment line 1\n"
+            "  # above comment line 2\n"
+            "  - dummy_tag_2  # another one inline\n"
+            "  #######################\n"
+            "  # above fancy comment #\n"
+            "  #######################\n"
+            "  - dummy_tag_3  # and another one inline"
+        )
         expected = [
             [
                 "# above comment",
@@ -228,8 +243,9 @@ class TestGetTagDoc(unittest.TestCase):
             "# above comment line 2",
             "- dummy_tag  # inline comment",
         ]
-        expected = ("dummy_tag", ("above comment line 1\n"
-                                  "above comment line 2\n"
-                                  "inline comment"))
+        expected = (
+            "dummy_tag",
+            ("above comment line 1\n" "above comment line 2\n" "inline comment"),
+        )
         result = list_tags.get_tag_doc(tag_block)
         self.assertEqual(expected, result)

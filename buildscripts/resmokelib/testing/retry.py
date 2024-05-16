@@ -60,4 +60,5 @@ def with_naive_retry(func, timeout=100, extra_retryable_error_codes=None):
         time.sleep(0.1)
 
     raise ExecutionTimeout(
-        f"Operation exceeded time limit after {timeout} seconds, last error: {last_exc}")
+        f"Operation exceeded time limit after {timeout} seconds, last error: {last_exc}"
+    )

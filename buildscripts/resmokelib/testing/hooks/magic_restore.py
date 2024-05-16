@@ -19,7 +19,9 @@ class MagicRestoreEveryN(interface.Hook):
 
     def __init__(self, hook_logger, fixture, n=DEFAULT_N, randomize_pit=False):
         """Initialize MagicRestoreEveryN."""
-        description = "MagicRestoreEveryN (runs magic restore against a new cluster every `n` tests)"
+        description = (
+            "MagicRestoreEveryN (runs magic restore against a new cluster every `n` tests)"
+        )
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
         self.n = n  # pylint: disable=invalid-name
@@ -59,7 +61,8 @@ class MagicRestoreEveryN(interface.Hook):
         if run_restore:
             # Run the magic restore procedure and run a data consistency check
             magic_restore_test_case = MagicRestoreTestCase.create_after_test(
-                test.logger, test, self)
+                test.logger, test, self
+            )
             magic_restore_test_case.configure(self.fixture)
             magic_restore_test_case.run_dynamic_test(test_report)
 
@@ -81,8 +84,9 @@ class BackupCursorTestCase(jsfile.DynamicJSTestCase):
 
     def __init__(self, logger, test_name, description, base_test_name, hook):
         """Initialize BackupCursorTestCase."""
-        jsfile.DynamicJSTestCase.__init__(self, logger, test_name, description, base_test_name,
-                                          hook, self.JS_FILENAME)
+        jsfile.DynamicJSTestCase.__init__(
+            self, logger, test_name, description, base_test_name, hook, self.JS_FILENAME
+        )
 
     def run_test(self):
         """Execute test hook."""
@@ -98,8 +102,9 @@ class MagicRestoreTestCase(jsfile.DynamicJSTestCase):
 
     def __init__(self, logger, test_name, description, base_test_name, hook):
         """Initialize MagicRestoreTestCase."""
-        jsfile.DynamicJSTestCase.__init__(self, logger, test_name, description, base_test_name,
-                                          hook, self.JS_FILENAME)
+        jsfile.DynamicJSTestCase.__init__(
+            self, logger, test_name, description, base_test_name, hook, self.JS_FILENAME
+        )
 
     def run_test(self):
         """Execute test hook."""

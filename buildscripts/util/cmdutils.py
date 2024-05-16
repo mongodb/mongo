@@ -1,4 +1,5 @@
 """Utilities for build commandline applications."""
+
 import logging
 import sys
 

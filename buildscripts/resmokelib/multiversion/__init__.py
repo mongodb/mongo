@@ -1,4 +1,5 @@
 """Subcommand for multiversion config."""
+
 import argparse
 from typing import List, Optional
 
@@ -6,8 +7,11 @@ import yaml
 from pydantic import BaseModel
 
 from buildscripts.resmokelib import configure_resmoke
-from buildscripts.resmokelib.multiversion.multiversion_service import (MongoReleases, MongoVersion,
-                                                                       MultiversionService)
+from buildscripts.resmokelib.multiversion.multiversion_service import (
+    MongoReleases,
+    MongoVersion,
+    MultiversionService,
+)
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 MULTIVERSION_SUBCOMMAND = "multiversion-config"
@@ -54,6 +58,7 @@ class MultiversionConfigSubcommand(Subcommand):
     def determine_multiversion_config() -> MultiversionConfig:
         """Discover the current multiversion configuration."""
         from buildscripts.resmokelib import multiversionconstants
+
         multiversion_service = MultiversionService(
             mongo_version=MongoVersion.from_yaml_file(multiversionconstants.MONGO_VERSION_YAML),
             mongo_releases=MongoReleases.from_yaml_file(multiversionconstants.RELEASES_YAML),
@@ -78,14 +83,26 @@ class MultiversionPlugin(PluginInterface):
 
         :param subparsers: argparse subparsers
         """
-        parser = subparsers.add_parser(MULTIVERSION_SUBCOMMAND,
-                                       help="Display configuration for multiversion testing")
+        parser = subparsers.add_parser(
+            MULTIVERSION_SUBCOMMAND, help="Display configuration for multiversion testing"
+        )
 
-        parser.add_argument("--config-file-output", '-f', action="store", type=str, default=None,
-                            help="File to write the multiversion config to.")
+        parser.add_argument(
+            "--config-file-output",
+            "-f",
+            action="store",
+            type=str,
+            default=None,
+            help="File to write the multiversion config to.",
+        )
 
-    def parse(self, subcommand: str, parser: argparse.ArgumentParser,
-              parsed_args: argparse.Namespace, **kwargs) -> Optional[Subcommand]:
+    def parse(
+        self,
+        subcommand: str,
+        parser: argparse.ArgumentParser,
+        parsed_args: argparse.Namespace,
+        **kwargs,
+    ) -> Optional[Subcommand]:
         """
         Resolve command-line options to a Subcommand or None.
 

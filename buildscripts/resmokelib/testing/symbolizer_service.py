@@ -1,4 +1,5 @@
 """Symbolize stacktraces inside test logs."""
+
 from __future__ import annotations
 
 import os
@@ -71,20 +72,29 @@ class ResmokeSymbolizerConfig(NamedTuple):
 class ResmokeSymbolizer:
     """Symbolize stacktraces inside test logs."""
 
-    def __init__(self, config: Optional[ResmokeSymbolizerConfig] = None,
-                 symbolizer_service: Optional[SymbolizerService] = None,
-                 file_service: Optional[FileService] = None):
+    def __init__(
+        self,
+        config: Optional[ResmokeSymbolizerConfig] = None,
+        symbolizer_service: Optional[SymbolizerService] = None,
+        file_service: Optional[FileService] = None,
+    ):
         """Initialize instance."""
 
-        self.config = config if config is not None else ResmokeSymbolizerConfig.from_resmoke_config(
+        self.config = (
+            config if config is not None else ResmokeSymbolizerConfig.from_resmoke_config()
         )
-        self.symbolizer_service = symbolizer_service if symbolizer_service is not None else SymbolizerService(
+        self.symbolizer_service = (
+            symbolizer_service if symbolizer_service is not None else SymbolizerService()
         )
-        self.file_service = file_service if file_service is not None else FileService(
-            PROCESSED_FILES_LIST_FILE_PATH)
+        self.file_service = (
+            file_service
+            if file_service is not None
+            else FileService(PROCESSED_FILES_LIST_FILE_PATH)
+        )
 
-    def symbolize_test_logs(self, test: TestCase,
-                            symbolize_retry_timeout: float = SYMBOLIZE_RETRY_TIMEOUT_SECS) -> None:
+    def symbolize_test_logs(
+        self, test: TestCase, symbolize_retry_timeout: float = SYMBOLIZE_RETRY_TIMEOUT_SECS
+    ) -> None:
         """
         Perform all necessary actions to symbolize and write output to test logs.
 
@@ -111,10 +121,12 @@ class ResmokeSymbolizer:
             start_time = time.perf_counter()
             for file_path in files:
                 test.logger.info("Working on: %s", file_path)
-                symbolizer_script_timeout = int(symbolize_retry_timeout -
-                                                (time.perf_counter() - start_time))
+                symbolizer_script_timeout = int(
+                    symbolize_retry_timeout - (time.perf_counter() - start_time)
+                )
                 symbolized_out = self.symbolizer_service.run_symbolizer_script(
-                    file_path, symbolizer_script_timeout)
+                    file_path, symbolizer_script_timeout
+                )
                 test.logger.info(symbolized_out)
                 if time.perf_counter() - start_time > symbolize_retry_timeout:
                     break
@@ -137,8 +149,9 @@ class ResmokeSymbolizer:
             return False
 
         if self.config.client_id is None or self.config.client_secret is None:
-            test.logger.info("Symbolizer client secret and/or client ID are absent,"
-                             " skipping symbolization")
+            test.logger.info(
+                "Symbolizer client secret and/or client ID are absent," " skipping symbolization"
+            )
             return False
 
         if self.config.is_windows():
@@ -336,9 +349,13 @@ class SymbolizerService:
         ]
 
         with open(full_file_path) as file_obj:
-            symbolizer_process = subprocess.Popen(args=symbolizer_args, close_fds=True,
-                                                  stdin=file_obj, stdout=subprocess.PIPE,
-                                                  stderr=subprocess.STDOUT)
+            symbolizer_process = subprocess.Popen(
+                args=symbolizer_args,
+                close_fds=True,
+                stdin=file_obj,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
 
         try:
             output, _ = symbolizer_process.communicate(timeout=retry_timeout_secs)

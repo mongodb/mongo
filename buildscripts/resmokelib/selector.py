@@ -28,10 +28,12 @@ ENTERPRISE_TEST_DIR = os.path.normpath("src/mongo/db/modules/enterprise/jstests"
 
 _DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE = (
     "Pattern(s) and/or filename(s) in `{config_section}`"
-    " do not match any existing test files: {not_matching_paths}")
+    " do not match any existing test files: {not_matching_paths}"
+)
 _DO_NOT_MATCH_ANY_TEST_FILES_FROM_ROOTS_MESSAGE = (
     "Pattern(s) and/or filename(s) in `{config_section}`"
-    " do not match any test files from `roots`: {not_matching_paths}")
+    " do not match any test files from `roots`: {not_matching_paths}"
+)
 
 
 class TestFileExplorer(object):
@@ -104,9 +106,12 @@ class TestFileExplorer(object):
         returncode, stdout, stderr = self._run_program(dbtest_binary, ["--list"])
 
         if returncode != 0:
-            raise errors.ResmokeError("Getting list of dbtest suites failed"
-                                      ", dbtest_binary=`{}`: stdout=`{}`, stderr=`{}`".format(
-                                          dbtest_binary, stdout, stderr))
+            raise errors.ResmokeError(
+                "Getting list of dbtest suites failed"
+                ", dbtest_binary=`{}`: stdout=`{}`, stderr=`{}`".format(
+                    dbtest_binary, stdout, stderr
+                )
+            )
         return stdout.splitlines()
 
     @staticmethod
@@ -184,8 +189,9 @@ class _TestList(object):
             'include_files()' or 'exclude_files()' will raise an TypeError.
     """
 
-    def __init__(self, test_file_explorer: TestFileExplorer, roots: List[str],
-                 tests_are_files: bool = True) -> None:
+    def __init__(
+        self, test_file_explorer: TestFileExplorer, roots: List[str], tests_are_files: bool = True
+    ) -> None:
         """Initialize the _TestList with a TestFileExplorer component and a list of root tests."""
         self._test_file_explorer = test_file_explorer
         self._tests_are_files = tests_are_files
@@ -204,7 +210,8 @@ class _TestList(object):
                 len_after = len(evaluated)
 
                 if len_after == len_before and path.startswith(
-                        self._test_file_explorer.get_jstests_dir()):
+                    self._test_file_explorer.get_jstests_dir()
+                ):
                     unrecognized.append(path)
 
             elif self._test_file_explorer.isfile(path):
@@ -220,7 +227,9 @@ class _TestList(object):
         if len(paths.unrecognized) > 0:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE.format(
-                    config_section="roots", not_matching_paths=paths.unrecognized))
+                    config_section="roots", not_matching_paths=paths.unrecognized
+                )
+            )
         return paths.evaluated
 
     def include_files(self, include_files: List[str]) -> None:
@@ -236,16 +245,22 @@ class _TestList(object):
         if len(paths.unrecognized) > 0:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE.format(
-                    config_section="include_files", not_matching_paths=paths.unrecognized))
+                    config_section="include_files", not_matching_paths=paths.unrecognized
+                )
+            )
 
         paths_missing_from_roots = [
-            path for path in paths.evaluated if
-            path.startswith(self._test_file_explorer.get_jstests_dir()) and path not in self._roots
+            path
+            for path in paths.evaluated
+            if path.startswith(self._test_file_explorer.get_jstests_dir())
+            and path not in self._roots
         ]
         if len(paths_missing_from_roots) > 0:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_TEST_FILES_FROM_ROOTS_MESSAGE.format(
-                    config_section="include_files", not_matching_paths=paths_missing_from_roots))
+                    config_section="include_files", not_matching_paths=paths_missing_from_roots
+                )
+            )
 
         self._filtered = set(paths.evaluated)
 
@@ -262,16 +277,22 @@ class _TestList(object):
         if len(paths.unrecognized) > 0:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE.format(
-                    config_section="exclude_files", not_matching_paths=paths.unrecognized))
+                    config_section="exclude_files", not_matching_paths=paths.unrecognized
+                )
+            )
 
         paths_missing_from_roots = [
-            path for path in paths.evaluated if
-            path.startswith(self._test_file_explorer.get_jstests_dir()) and path not in self._roots
+            path
+            for path in paths.evaluated
+            if path.startswith(self._test_file_explorer.get_jstests_dir())
+            and path not in self._roots
         ]
         if len(paths_missing_from_roots) > 0:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_TEST_FILES_FROM_ROOTS_MESSAGE.format(
-                    config_section="exclude_files", not_matching_paths=paths_missing_from_roots))
+                    config_section="exclude_files", not_matching_paths=paths_missing_from_roots
+                )
+            )
 
         for path in paths.evaluated:
             self._filtered.discard(path)
@@ -280,7 +301,8 @@ class _TestList(object):
         """Exclude tests that start with the enterprise module directory from the test list."""
         self._filtered = {
             test
-            for test in self._filtered if not os.path.normpath(test).startswith(ENTERPRISE_TEST_DIR)
+            for test in self._filtered
+            if not os.path.normpath(test).startswith(ENTERPRISE_TEST_DIR)
         }
 
     def match_tag_expression(self, tag_expression, get_tags):
@@ -407,9 +429,18 @@ def _make_expression_list(configs):
 class _SelectorConfig(object):
     """Base object to represent the configuration for test selection."""
 
-    def __init__(self, root=None, roots=None, include_files=None, exclude_files=None,
-                 include_tags=None, exclude_tags=None, include_with_any_tags=None,
-                 exclude_with_any_tags=None, tag_file=None):
+    def __init__(
+        self,
+        root=None,
+        roots=None,
+        include_files=None,
+        exclude_files=None,
+        include_tags=None,
+        exclude_tags=None,
+        include_with_any_tags=None,
+        exclude_with_any_tags=None,
+        tag_file=None,
+    ):
         """Initialize the _SelectorConfig from the configuration elements.
 
         Args:
@@ -435,18 +466,24 @@ class _SelectorConfig(object):
         self.tag_file = tag_file
         self.include_files = utils.default_if_none(include_files, [])
         self.exclude_files = utils.default_if_none(exclude_files, [])
-        include_with_any_tags = self.__merge_lists(include_with_any_tags,
-                                                   config.INCLUDE_WITH_ANY_TAGS)
-        exclude_with_any_tags = self.__merge_lists(exclude_with_any_tags,
-                                                   config.EXCLUDE_WITH_ANY_TAGS)
+        include_with_any_tags = self.__merge_lists(
+            include_with_any_tags, config.INCLUDE_WITH_ANY_TAGS
+        )
+        exclude_with_any_tags = self.__merge_lists(
+            exclude_with_any_tags, config.EXCLUDE_WITH_ANY_TAGS
+        )
 
         # This is functionally similar to `include_tags` but contains a list of tags rather
         # than an expression.
         include_with_all_tags = config.INCLUDE_TAGS
 
         self.tags_expression = self.__make_tags_expression(
-            include_tags, exclude_tags, include_with_any_tags, exclude_with_any_tags,
-            include_with_all_tags)
+            include_tags,
+            exclude_tags,
+            include_with_any_tags,
+            exclude_with_any_tags,
+            include_with_all_tags,
+        )
 
     @staticmethod
     def __merge_lists(list_a, list_b):
@@ -459,8 +496,13 @@ class _SelectorConfig(object):
         return None
 
     @staticmethod
-    def __make_tags_expression(include_tags, exclude_tags, include_with_any_tags,
-                               exclude_with_any_tags, include_with_all_tags):
+    def __make_tags_expression(
+        include_tags,
+        exclude_tags,
+        include_with_any_tags,
+        exclude_with_any_tags,
+        include_with_all_tags,
+    ):
         expressions = []
         if include_tags:
             expressions.append(make_expression(include_tags))
@@ -549,14 +591,28 @@ class _Selector(object):
 class _JSTestSelectorConfig(_SelectorConfig):
     """_SelectorConfig subclass for JavaScript tests."""
 
-    def __init__(self, roots=None, include_files=None, exclude_files=None,
-                 include_with_any_tags=None, exclude_with_any_tags=None, include_tags=None,
-                 exclude_tags=None, tag_file=None):
+    def __init__(
+        self,
+        roots=None,
+        include_files=None,
+        exclude_files=None,
+        include_with_any_tags=None,
+        exclude_with_any_tags=None,
+        include_tags=None,
+        exclude_tags=None,
+        tag_file=None,
+    ):
         _SelectorConfig.__init__(
-            self, roots=roots, include_files=include_files, exclude_files=exclude_files,
+            self,
+            roots=roots,
+            include_files=include_files,
+            exclude_files=exclude_files,
             include_with_any_tags=include_with_any_tags,
-            exclude_with_any_tags=exclude_with_any_tags, include_tags=include_tags,
-            exclude_tags=exclude_tags, tag_file=tag_file)
+            exclude_with_any_tags=exclude_with_any_tags,
+            include_tags=include_tags,
+            exclude_tags=exclude_tags,
+            tag_file=tag_file,
+        )
 
 
 class _JSTestSelector(_Selector):
@@ -567,8 +623,9 @@ class _JSTestSelector(_Selector):
         self._tags = self._test_file_explorer.parse_tag_files("js_test", config.TAG_FILES)
 
     def select(self, selector_config):
-        self._tags = self._test_file_explorer.parse_tag_files("js_test", [selector_config.tag_file],
-                                                              self._tags)
+        self._tags = self._test_file_explorer.parse_tag_files(
+            "js_test", [selector_config.tag_file], self._tags
+        )
         return _Selector.select(self, selector_config)
 
     def get_tags(self, test_file):
@@ -637,7 +694,7 @@ class _MultiJSTestSelector(_JSTestSelector):
                 random.shuffle(recycled_tests)
                 corpus = corpus[start:] + recycled_tests
                 start = 0
-            grouped_tests.append(corpus[start:start + group_size])
+            grouped_tests.append(corpus[start : start + group_size])
             start += group_size
         return grouped_tests, excluded
 
@@ -650,17 +707,24 @@ class _MultiJSTestSelector(_JSTestSelector):
 class _CppTestSelectorConfig(_SelectorConfig):
     """_SelectorConfig subclass for cpp_integration_test and cpp_unit_test tests."""
 
-    def __init__(self, root=config.DEFAULT_INTEGRATION_TEST_LIST, roots=None, include_files=None,
-                 exclude_files=None):
+    def __init__(
+        self,
+        root=config.DEFAULT_INTEGRATION_TEST_LIST,
+        roots=None,
+        include_files=None,
+        exclude_files=None,
+    ):
         """Initialize _CppTestSelectorConfig."""
         if roots:
             # The 'roots' argument is only present when tests are specified on the command line
             # and in that case they take precedence over the tests in the root file.
-            _SelectorConfig.__init__(self, roots=roots, include_files=include_files,
-                                     exclude_files=exclude_files)
+            _SelectorConfig.__init__(
+                self, roots=roots, include_files=include_files, exclude_files=exclude_files
+            )
         else:
-            _SelectorConfig.__init__(self, root=root, include_files=include_files,
-                                     exclude_files=exclude_files)
+            _SelectorConfig.__init__(
+                self, root=root, include_files=include_files, exclude_files=exclude_files
+            )
 
 
 class _CppTestSelector(_Selector):
@@ -683,17 +747,24 @@ class _CppTestSelector(_Selector):
 class _PrettyPrinterTestSelectorConfig(_SelectorConfig):
     """_SelectorConfig subclass for pretty-printer-tests."""
 
-    def __init__(self, root=config.DEFAULT_INTEGRATION_TEST_LIST, roots=None, include_files=None,
-                 exclude_files=None):
+    def __init__(
+        self,
+        root=config.DEFAULT_INTEGRATION_TEST_LIST,
+        roots=None,
+        include_files=None,
+        exclude_files=None,
+    ):
         """Initialize _PrettyPrinterTestSelectorConfig."""
         if roots:
             # The 'roots' argument is only present when tests are specified on the command line
             # and in that case they take precedence over the tests in the root file.
-            _SelectorConfig.__init__(self, roots=roots, include_files=include_files,
-                                     exclude_files=exclude_files)
+            _SelectorConfig.__init__(
+                self, roots=roots, include_files=include_files, exclude_files=exclude_files
+            )
         else:
-            _SelectorConfig.__init__(self, root=root, include_files=include_files,
-                                     exclude_files=exclude_files)
+            _SelectorConfig.__init__(
+                self, root=root, include_files=include_files, exclude_files=exclude_files
+            )
 
 
 class _PrettyPrinterTestSelector(_Selector):
@@ -771,8 +842,9 @@ class _FileBasedSelectorConfig(_SelectorConfig):
 
     def __init__(self, roots, include_files=None, exclude_files=None):
         """Initialize _FileBasedSelectorConfig."""
-        _SelectorConfig.__init__(self, roots=roots, include_files=include_files,
-                                 exclude_files=exclude_files)
+        _SelectorConfig.__init__(
+            self, roots=roots, include_files=include_files, exclude_files=exclude_files
+        )
 
 
 class _SleepTestCaseSelectorConfig(_SelectorConfig):
@@ -795,8 +867,9 @@ class _PyTestCaseSelectorConfig(_SelectorConfig):
     """_SelectorConfig subclass for py_test tests."""
 
     def __init__(self, roots, include_files=None, exclude_files=None):
-        _SelectorConfig.__init__(self, roots=roots, include_files=include_files,
-                                 exclude_files=exclude_files)
+        _SelectorConfig.__init__(
+            self, roots=roots, include_files=include_files, exclude_files=exclude_files
+        )
 
 
 ##########################################

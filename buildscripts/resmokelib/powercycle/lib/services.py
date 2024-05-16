@@ -1,4 +1,5 @@
 """Wrapper for OS Service Wrappers."""
+
 import importlib
 import os
 import sys
@@ -66,9 +67,14 @@ class WindowsService(object):
         if self.status() in list(self._states.values()):
             return 1, "Service '{}' already installed, status: {}".format(self.name, self.status())
         try:
-            win32serviceutil.InstallService(pythonClassString="Service.{}".format(
-                self.name), serviceName=self.name, displayName=self.name, startType=self.start_type,
-                                            exeName=self.bin_path, exeArgs=self.bin_options)
+            win32serviceutil.InstallService(
+                pythonClassString="Service.{}".format(self.name),
+                serviceName=self.name,
+                displayName=self.name,
+                startType=self.start_type,
+                exeName=self.bin_path,
+                exeArgs=self.bin_options,
+            )
             ret = 0
             output = "Service '{}' created".format(self.name)
         except pywintypes.error as err:
@@ -82,9 +88,14 @@ class WindowsService(object):
         if self.status() not in self._states.values():
             return 1, "Service update '{}' status: {}".format(self.name, self.status())
         try:
-            win32serviceutil.ChangeServiceConfig(pythonClassString="Service.{}".format(
-                self.name), serviceName=self.name, displayName=self.name, startType=self.start_type,
-                                                 exeName=self.bin_path, exeArgs=self.bin_options)
+            win32serviceutil.ChangeServiceConfig(
+                pythonClassString="Service.{}".format(self.name),
+                serviceName=self.name,
+                displayName=self.name,
+                startType=self.start_type,
+                exeName=self.bin_path,
+                exeArgs=self.bin_options,
+            )
             ret = 0
             output = "Service '{}' updated".format(self.name)
         except pywintypes.error as err:
@@ -162,7 +173,8 @@ class WindowsService(object):
             #   (scvType, svcState, svcControls, err, svcErr, svcCP, svcWH)
             # See https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx
             scv_type, svc_state, svc_controls, err, svc_err, svc_cp, svc_wh = (
-                win32serviceutil.QueryServiceStatus(serviceName=self.name))
+                win32serviceutil.QueryServiceStatus(serviceName=self.name)
+            )
             if svc_state in self._states:
                 return self._states[svc_state]
             return "unknown"

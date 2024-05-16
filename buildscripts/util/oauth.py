@@ -1,4 +1,5 @@
 """Helper tools to get OAuth credentials using the PKCE flow."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -44,9 +45,15 @@ class Configs:
     REDIRECT_PORT = 8989
     SCOPE = "kanopy+openid+profile"
 
-    def __init__(self, client_credentials_scope: str = None,
-                 client_credentials_user_name: str = None, auth_domain: str = None,
-                 client_id: str = None, redirect_port: int = None, scope: str = None):
+    def __init__(
+        self,
+        client_credentials_scope: str = None,
+        client_credentials_user_name: str = None,
+        auth_domain: str = None,
+        client_id: str = None,
+        redirect_port: int = None,
+        scope: str = None,
+    ):
         """Initialize configs instance."""
 
         self.AUTH_DOMAIN = auth_domain or self.AUTH_DOMAIN
@@ -84,8 +91,13 @@ class OAuthCredentials(BaseModel):
         """
         try:
             creds = OAuthCredentials(**read_yaml_file(file_path))
-            if (creds.access_token and creds.created_time and creds.expires_in and creds.user_name
-                    and not creds.are_expired()):
+            if (
+                creds.access_token
+                and creds.created_time
+                and creds.expires_in
+                and creds.user_name
+                and not creds.are_expired()
+            ):
                 return creds
             else:
                 return None
@@ -105,13 +117,13 @@ class _RedirectServer(HTTPServer):
     code_verifier: str
 
     def __init__(
-            self,
-            server_address: Tuple[str, int],
-            handler: Callable[..., BaseHTTPRequestHandler],
-            redirect_uri: str,
-            auth_domain: str,
-            client_id: str,
-            code_verifier: str,
+        self,
+        server_address: Tuple[str, int],
+        handler: Callable[..., BaseHTTPRequestHandler],
+        redirect_uri: str,
+        auth_domain: str,
+        client_id: str,
+        code_verifier: str,
     ):
         self.redirect_uri = redirect_uri
         self.auth_domain = auth_domain
@@ -168,8 +180,9 @@ class _Handler(BaseHTTPRequestHandler):
             raise ValueError("Could not get access token or expires_in data about access token")
 
         headers = {"Authorization": f"Bearer {access_token}"}
-        resp = requests.get(f"https://{self.server.auth_domain}/v1/userinfo",
-                            headers=headers).json()
+        resp = requests.get(
+            f"https://{self.server.auth_domain}/v1/userinfo", headers=headers
+        ).json()
 
         split_username = resp["preferred_username"].split("@")
 
@@ -221,15 +234,17 @@ class PKCEOauthTools:
 
         state = "".join(choice(ascii_lowercase) for i in range(10))
 
-        authorization_url = (f"https://{self.auth_domain}/v1/authorize?"
-                             f"scope={self.scope}&"
-                             f"response_type=code&"
-                             f"response_mode=query&"
-                             f"client_id={self.client_id}&"
-                             f"code_challenge={code_challenge}&"
-                             f"state={state}&"
-                             f"code_challenge_method=S256&"
-                             f"redirect_uri={self.redirect_uri}")
+        authorization_url = (
+            f"https://{self.auth_domain}/v1/authorize?"
+            f"scope={self.scope}&"
+            f"response_type=code&"
+            f"response_mode=query&"
+            f"client_id={self.client_id}&"
+            f"code_challenge={code_challenge}&"
+            f"state={state}&"
+            f"code_challenge_method=S256&"
+            f"redirect_uri={self.redirect_uri}"
+        )
 
         httpd = _RedirectServer(
             ("", self.redirect_port),
@@ -249,7 +264,8 @@ class PKCEOauthTools:
         if not httpd.pkce_credentials:
             raise ValueError(
                 "Could not retrieve Okta credentials to talk to Kanopy with. "
-                "Please sign out of Okta in your browser and try runnning this script again")
+                "Please sign out of Okta in your browser and try runnning this script again"
+            )
 
         return httpd.pkce_credentials
 
@@ -262,14 +278,19 @@ def get_oauth_credentials(configs: Configs, print_auth_url: bool = False) -> OAu
     :param print_auth_url: Whether to print the auth url to the console instead of opening it.
     :return: OAuth credentials for the given user.
     """
-    oauth_tools = PKCEOauthTools(auth_domain=configs.AUTH_DOMAIN, client_id=configs.CLIENT_ID,
-                                 redirect_port=configs.REDIRECT_PORT, scope=configs.SCOPE)
+    oauth_tools = PKCEOauthTools(
+        auth_domain=configs.AUTH_DOMAIN,
+        client_id=configs.CLIENT_ID,
+        redirect_port=configs.REDIRECT_PORT,
+        scope=configs.SCOPE,
+    )
     credentials = oauth_tools.get_pkce_credentials(print_auth_url)
     return credentials
 
 
-def get_client_cred_oauth_credentials(client_id: str, client_secret: str,
-                                      configs: Configs) -> OAuthCredentials:
+def get_client_cred_oauth_credentials(
+    client_id: str, client_secret: str, configs: Configs
+) -> OAuthCredentials:
     """
     Run the OAuth workflow to get credentials for a machine user.
 

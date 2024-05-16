@@ -9,6 +9,7 @@ A prototype hang analyzer for Evergreen integration to help investigate test tim
 
 Supports Linux, MacOS X, and Windows.
 """
+
 import logging
 import os
 import platform
@@ -50,7 +51,7 @@ class HangAnalyzer(Subcommand):
             "mongod",
             "mongos",
             "_test",
-            "dbtest"
+            "dbtest",
         ]
         self.go_processes = []
         self.process_ids = []
@@ -62,7 +63,8 @@ class HangAnalyzer(Subcommand):
                 raise ValueError(
                     "The Evergreen Task ID (tid) should be either passed in through `resmoke.py run` "
                     "or through `resmoke.py hang-analyzer` but not both. run tid: %s, hang-analyzer tid: %s"
-                    % (run_tid, hang_analyzer_tid))
+                    % (run_tid, hang_analyzer_tid)
+                )
             return run_tid or hang_analyzer_tid
 
         self.task_id = configure_task_id()
@@ -71,8 +73,12 @@ class HangAnalyzer(Subcommand):
 
     def kill_rogue_processes(self):
         """Kill any processes that are currently being analyzed."""
-        processes = process_list.get_processes(self.process_ids, self.interesting_processes,
-                                               self.options.process_match, self.root_logger)
+        processes = process_list.get_processes(
+            self.process_ids,
+            self.interesting_processes,
+            self.options.process_match,
+            self.root_logger,
+        )
         process.teardown_processes(self.root_logger, processes, dump_pids={})
 
     def execute(self):
@@ -87,8 +93,12 @@ class HangAnalyzer(Subcommand):
 
         dumpers = dumper.get_dumpers(self.root_logger, self.options.debugger_output)
 
-        processes = process_list.get_processes(self.process_ids, self.interesting_processes,
-                                               self.options.process_match, self.root_logger)
+        processes = process_list.get_processes(
+            self.process_ids,
+            self.interesting_processes,
+            self.options.process_match,
+            self.root_logger,
+        )
 
         def is_python_process(pname: str):
             # "live-record*" and "python*" are Python processes. Sending SIGUSR1 causes resmoke.py
@@ -116,7 +126,7 @@ class HangAnalyzer(Subcommand):
             take_core_processes = [
                 pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)
             ]
-            if (os.getenv('ASAN_OPTIONS') or os.getenv('TSAN_OPTIONS')):
+            if os.getenv("ASAN_OPTIONS") or os.getenv("TSAN_OPTIONS"):
                 quit_processes: list[psutil.Process] = []
                 for pinfo in take_core_processes:
                     for pid in pinfo.pidv:
@@ -125,9 +135,11 @@ class HangAnalyzer(Subcommand):
                         process.resume_process(self.root_logger, pinfo.name, pid)
                         self.root_logger.info(
                             "Process %d may be running a sanitizer which uses a large amount of virtual memory.",
-                            pid)
+                            pid,
+                        )
                         self.root_logger.info(
-                            "Sending SIGQUIT to capture a more manageable sized core dump")
+                            "Sending SIGQUIT to capture a more manageable sized core dump"
+                        )
                         process.quit_process(self.root_logger, pinfo.name, pid)
                         quit_processes.append(quit_process)
                 self.root_logger.info("Waiting for all processes to end after SIGQUIT")
@@ -139,8 +151,10 @@ class HangAnalyzer(Subcommand):
                     alive_processes = []
                     # This loop filters out processes that have ended or become a zombie
                     for quit_process in quit_processes:
-                        if quit_process.is_running(
-                        ) and quit_process.status() != psutil.STATUS_ZOMBIE:
+                        if (
+                            quit_process.is_running()
+                            and quit_process.status() != psutil.STATUS_ZOMBIE
+                        ):
                             alive_processes.append(quit_process)
 
                     # Update the quit_processes list with only the ones left alive
@@ -155,7 +169,7 @@ class HangAnalyzer(Subcommand):
                             f"The following processes took too long to end after SIGQUIT: {alive_processes}"
                         )
 
-                    time.sleep(.1)
+                    time.sleep(0.1)
                 self.root_logger.info("Finished waiting for all processes to end.")
             else:
                 for pinfo in take_core_processes:
@@ -166,14 +180,17 @@ class HangAnalyzer(Subcommand):
                             self.root_logger.error(err.message)
                             dump_pids = {**err.dump_pids, **dump_pids}
                         except Exception as err:  # pylint: disable=broad-except
-                            self.root_logger.info("Error encountered when invoking debugger %s",
-                                                  err)
+                            self.root_logger.info(
+                                "Error encountered when invoking debugger %s", err
+                            )
 
                             trapped_exceptions.append(traceback.format_exc())
                     else:
                         self.root_logger.info(
                             "Not enough space for a core dump, skipping %s processes with PIDs %s",
-                            pinfo.name, str(pinfo.pidv))
+                            pinfo.name,
+                            str(pinfo.pidv),
+                        )
 
         # Download symbols after pausing if the task ID is not None and not running with sanitizers.
         # Sanitizer builds are not stripped and don't require debug symbols.
@@ -194,8 +211,9 @@ class HangAnalyzer(Subcommand):
         for pinfo in [pinfo for pinfo in processes if pinfo.name.startswith("java")]:
             for pid in pinfo.pidv:
                 try:
-                    dumpers.jstack.dump_info(self.root_logger, self.options.debugger_output,
-                                             pinfo.name, pid)
+                    dumpers.jstack.dump_info(
+                        self.root_logger, self.options.debugger_output, pinfo.name, pid
+                    )
                 except Exception as err:  # pylint: disable=broad-except
                     self.root_logger.info("Error encountered when invoking debugger %s", err)
                     trapped_exceptions.append(traceback.format_exc())
@@ -206,8 +224,9 @@ class HangAnalyzer(Subcommand):
         # Note: The stacktrace output may be captured elsewhere (i.e. resmoke).
         for pinfo in [pinfo for pinfo in processes if pinfo.name in self.go_processes]:
             for pid in pinfo.pidv:
-                self.root_logger.info("Sending signal SIGABRT to go process %s with PID %d",
-                                      pinfo.name, pid)
+                self.root_logger.info(
+                    "Sending signal SIGABRT to go process %s with PID %d", pinfo.name, pid
+                )
                 process.signal_process(self.root_logger, pid, signal.SIGABRT)
 
         self.root_logger.info("Done analyzing all processes for hangs")
@@ -225,21 +244,22 @@ class HangAnalyzer(Subcommand):
             self.root_logger.info(exception)
         if trapped_exceptions:
             raise RuntimeError(
-                "Exceptions were thrown while dumping. There may still be some valid dumps.")
+                "Exceptions were thrown while dumping. There may still be some valid dumps."
+            )
 
     def _configure_processes(self):
         if self.options.debugger_output is None:
-            self.options.debugger_output = ['stdout']
+            self.options.debugger_output = ["stdout"]
 
         if self.options.process_ids is not None:
             # self.process_ids is an int list of PIDs
-            self.process_ids = [int(pid) for pid in self.options.process_ids.split(',')]
+            self.process_ids = [int(pid) for pid in self.options.process_ids.split(",")]
 
         if self.options.process_names is not None:
-            self.interesting_processes = self.options.process_names.split(',')
+            self.interesting_processes = self.options.process_names.split(",")
 
         if self.options.go_process_names is not None:
-            self.go_processes = self.options.go_process_names.split(',')
+            self.go_processes = self.options.go_process_names.split(",")
             self.interesting_processes += self.go_processes
 
     def _setup_logging(self, logger):
@@ -271,7 +291,8 @@ class HangAnalyzer(Subcommand):
             self.root_logger.info("Current UID: %s", uid)
         except AttributeError:
             self.root_logger.warning(
-                "Cannot determine Unix Current Login, not supported on Windows")
+                "Cannot determine Unix Current Login, not supported on Windows"
+            )
 
     def _check_enough_free_space(self):
         usage_percent = psutil.disk_usage(".").percent
@@ -284,7 +305,7 @@ class HangAnalyzerPlugin(PluginInterface):
 
     def parse(self, subcommand, parser, parsed_args, **kwargs):
         """Parse command-line options."""
-        if subcommand == 'hang-analyzer':
+        if subcommand == "hang-analyzer":
             return HangAnalyzer(parsed_args, task_id=parsed_args.task_id, **kwargs)
         return None
 
@@ -293,36 +314,78 @@ class HangAnalyzerPlugin(PluginInterface):
         parser = subparsers.add_parser("hang-analyzer", help=__doc__)
 
         parser.add_argument(
-            '-m', '--process-match', dest='process_match', choices=('contains',
-                                                                    'exact'), default='contains',
+            "-m",
+            "--process-match",
+            dest="process_match",
+            choices=("contains", "exact"),
+            default="contains",
             help="Type of match for process names (-p & -g), specify 'contains', or"
             " 'exact'. Note that the process name match performs the following"
             " conversions: change all process names to lowecase, strip off the file"
-            " extension, like '.exe' on Windows. Default is 'contains'.")
-        parser.add_argument('-p', '--process-names', dest='process_names',
-                            help='Comma separated list of process names to analyze')
-        parser.add_argument('-g', '--go-process-names', dest='go_process_names',
-                            help='Comma separated list of go process names to analyze')
+            " extension, like '.exe' on Windows. Default is 'contains'.",
+        )
         parser.add_argument(
-            '-d', '--process-ids', dest='process_ids', default=None,
-            help='Comma separated list of process ids (PID) to analyze, overrides -p &'
-            ' -g')
-        parser.add_argument('-c', '--dump-core', dest='dump_core', action="store_true",
-                            default=False, help='Dump core file for each analyzed process')
-        parser.add_argument('-s', '--max-disk-usage-percent', dest='max_disk_usage_percent',
-                            default=90, help='Maximum disk usage percent for a core dump')
+            "-p",
+            "--process-names",
+            dest="process_names",
+            help="Comma separated list of process names to analyze",
+        )
         parser.add_argument(
-            '-o', '--debugger-output', dest='debugger_output', action="append", choices=('file',
-                                                                                         'stdout'),
-            default=None, help="If 'stdout', then the debugger's output is written to the Python"
+            "-g",
+            "--go-process-names",
+            dest="go_process_names",
+            help="Comma separated list of go process names to analyze",
+        )
+        parser.add_argument(
+            "-d",
+            "--process-ids",
+            dest="process_ids",
+            default=None,
+            help="Comma separated list of process ids (PID) to analyze, overrides -p &" " -g",
+        )
+        parser.add_argument(
+            "-c",
+            "--dump-core",
+            dest="dump_core",
+            action="store_true",
+            default=False,
+            help="Dump core file for each analyzed process",
+        )
+        parser.add_argument(
+            "-s",
+            "--max-disk-usage-percent",
+            dest="max_disk_usage_percent",
+            default=90,
+            help="Maximum disk usage percent for a core dump",
+        )
+        parser.add_argument(
+            "-o",
+            "--debugger-output",
+            dest="debugger_output",
+            action="append",
+            choices=("file", "stdout"),
+            default=None,
+            help="If 'stdout', then the debugger's output is written to the Python"
             " process's stdout. If 'file', then the debugger's output is written"
             " to a file named debugger_<process>_<pid>.log for each process it"
             " attaches to. This option can be specified multiple times on the"
             " command line to have the debugger's output written to multiple"
             " locations. By default, the debugger's output is written only to the"
-            " Python process's stdout.")
-        parser.add_argument('-k', '--kill-processes', dest='kill_processes', action="store_true",
-                            default=False,
-                            help="Kills the analyzed processes after analysis completes.")
-        parser.add_argument("--task-id", '-t', action="store", type=str, default=None,
-                            help="Fetch corresponding symbols given an Evergreen task ID")
+            " Python process's stdout.",
+        )
+        parser.add_argument(
+            "-k",
+            "--kill-processes",
+            dest="kill_processes",
+            action="store_true",
+            default=False,
+            help="Kills the analyzed processes after analysis completes.",
+        )
+        parser.add_argument(
+            "--task-id",
+            "-t",
+            action="store",
+            type=str,
+            default=None,
+            help="Fetch corresponding symbols given an Evergreen task ID",
+        )

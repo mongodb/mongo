@@ -1,4 +1,5 @@
 """Facade wrapping the resmokelib dependencies used by fixtures."""
+
 from logging import Logger, Handler
 from typing import Dict
 
@@ -41,9 +42,14 @@ class FixtureLib:
         """Build fixtures by calling builder API."""
         return _builder.make_fixture(class_name, logger, job_num, *args, **kwargs)
 
-    def mongod_program(self, logger: logging.Logger, job_num: int, executable: str,
-                       process_kwargs: dict,
-                       mongod_options: HistoryDict) -> tuple["process.Process", HistoryDict]:
+    def mongod_program(
+        self,
+        logger: logging.Logger,
+        job_num: int,
+        executable: str,
+        process_kwargs: dict,
+        mongod_options: HistoryDict,
+    ) -> tuple["process.Process", HistoryDict]:
         """
         Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 
@@ -52,20 +58,35 @@ class FixtureLib:
         @param process_kwargs - A dict of key-value pairs to pass to the process.
         @param mongod_options - A HistoryDict describing the various options to pass to the mongod.
         """
-        return core.programs.mongod_program(logger, job_num, executable, process_kwargs,
-                                            mongod_options)
+        return core.programs.mongod_program(
+            logger, job_num, executable, process_kwargs, mongod_options
+        )
 
-    def mongos_program(self, logger: logging.Logger, job_num: int, executable=None,
-                       process_kwargs=None, mongos_options=None):
+    def mongos_program(
+        self,
+        logger: logging.Logger,
+        job_num: int,
+        executable=None,
+        process_kwargs=None,
+        mongos_options=None,
+    ):
         """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
-        return core.programs.mongos_program(logger, job_num, executable, process_kwargs,
-                                            mongos_options)
+        return core.programs.mongos_program(
+            logger, job_num, executable, process_kwargs, mongos_options
+        )
 
-    def mongot_program(self, logger: logging.Logger, job_num: int, executable=None,
-                       process_kwargs=None, mongot_options=None):
+    def mongot_program(
+        self,
+        logger: logging.Logger,
+        job_num: int,
+        executable=None,
+        process_kwargs=None,
+        mongot_options=None,
+    ):
         """Return a Process instance that starts a mongot with arguments constructed from 'kwargs'."""
-        return core.programs.mongot_program(logger, job_num, executable, process_kwargs,
-                                            mongot_options)
+        return core.programs.mongot_program(
+            logger, job_num, executable, process_kwargs, mongot_options
+        )
 
     def generic_program(self, logger: logging.Logger, args, process_kwargs=None, **kwargs):
         """Return a Process instance that starts an arbitrary executable.
@@ -121,7 +142,12 @@ class _FixtureConfig(object):
 
     def __init__(self):
         """Initialize FixtureConfig, setting values."""
-        from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY, LAST_LTS_MONGOS_BINARY, LAST_CONTINUOUS_MONGOD_BINARY, LAST_CONTINUOUS_MONGOS_BINARY
+        from buildscripts.resmokelib.multiversionconstants import (
+            LAST_LTS_MONGOD_BINARY,
+            LAST_LTS_MONGOS_BINARY,
+            LAST_CONTINUOUS_MONGOD_BINARY,
+            LAST_CONTINUOUS_MONGOS_BINARY,
+        )
 
         # pylint: disable=invalid-name
         self.MONGOD_EXECUTABLE = config.MONGOD_EXECUTABLE

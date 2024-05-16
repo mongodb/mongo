@@ -30,6 +30,6 @@ class MypyLinter(base.LinterBase):
         # Only idl and linter should be type checked by mypy. Other
         # files return errors under python 3 type checking. If we
         # return an empty list the runner will skip this file.
-        if 'idl' in file_name or 'linter' in file_name:
+        if "idl" in file_name or "linter" in file_name:
             return args + [file_name]
         return []

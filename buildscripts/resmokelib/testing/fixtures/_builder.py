@@ -1,4 +1,5 @@
 """Utilities for constructing fixtures that may span multiple versions."""
+
 import logging
 import threading
 from abc import ABC, abstractmethod
@@ -12,10 +13,11 @@ from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.testing.fixtures.interface import _FIXTURES
 from buildscripts.resmokelib.suitesconfig import _get_suite_config
 from buildscripts.resmokelib.testing import suite as _suite
-from buildscripts.resmokelib.testing.fixtures.replicaset import \
-    ReplicaSetFixture
-from buildscripts.resmokelib.testing.fixtures.shardedcluster import \
-    ShardedClusterFixture, _RouterView
+from buildscripts.resmokelib.testing.fixtures.replicaset import ReplicaSetFixture
+from buildscripts.resmokelib.testing.fixtures.shardedcluster import (
+    ShardedClusterFixture,
+    _RouterView,
+)
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
 from buildscripts.resmokelib.utils import autoloader, default_if_none, pick_catalog_shard_node
 
@@ -42,8 +44,14 @@ def make_fixture(class_name, logger, job_num, *args, enable_feature_flags=True, 
     # Special case MongoDFixture or _MongosFixture for now since we only add one option.
     # If there's more logic, we should add a builder class for them.
     if class_name in ["MongoDFixture", "_MongoSFixture"] and enable_feature_flags:
-        return _FIXTURES[class_name](logger, job_num, fixturelib, *args,
-                                     add_feature_flags=bool(config.ENABLED_FEATURE_FLAGS), **kwargs)
+        return _FIXTURES[class_name](
+            logger,
+            job_num,
+            fixturelib,
+            *args,
+            add_feature_flags=bool(config.ENABLED_FEATURE_FLAGS),
+            **kwargs,
+        )
 
     return _FIXTURES[class_name](logger, job_num, fixturelib, *args, **kwargs)
 
@@ -88,8 +96,8 @@ class FixtureBuilder(ABC, metaclass=registry.make_registry_metaclass(_BUILDERS, 
 class BinVersionEnum(object):
     """Enumeration version types."""
 
-    OLD = 'old'
-    NEW = 'new'
+    OLD = "old"
+    NEW = "new"
 
 
 class FixtureContainer(object):
@@ -138,7 +146,8 @@ class FixtureContainer(object):
 
 
 def _extract_multiversion_options(
-        kwargs: Dict[str, Any]) -> Tuple[Optional[List[str]], Optional[str]]:
+    kwargs: Dict[str, Any],
+) -> Tuple[Optional[List[str]], Optional[str]]:
     """Pop multiversion options from kwargs dict and return them.
 
     :param kwargs: fixture kwargs
@@ -166,9 +175,15 @@ class ReplSetBuilder(FixtureBuilder):
     REGISTERED_NAME = "ReplicaSetFixture"
     LATEST_MONGOD_CLASS = "MongoDFixture"
 
-    def build_fixture(self, logger: logging.Logger, job_num: int, fixturelib: Type[FixtureLib],
-                      *args, existing_nodes: Optional[List[MongoDFixture]] = None,
-                      **kwargs) -> ReplicaSetFixture:
+    def build_fixture(
+        self,
+        logger: logging.Logger,
+        job_num: int,
+        fixturelib: Type[FixtureLib],
+        *args,
+        existing_nodes: Optional[List[MongoDFixture]] = None,
+        **kwargs,
+    ) -> ReplicaSetFixture:
         """Build a replica set.
 
         :param logger: fixture logger
@@ -183,7 +198,8 @@ class ReplSetBuilder(FixtureBuilder):
         mixed_bin_versions, old_bin_version = _extract_multiversion_options(kwargs)
         self._validate_multiversion_options(kwargs, mixed_bin_versions)
         mongod_class, mongod_executables, mongod_binary_versions = self._get_mongod_assets(
-            kwargs, mixed_bin_versions, old_bin_version)
+            kwargs, mixed_bin_versions, old_bin_version
+        )
 
         replset = _FIXTURES[self.REGISTERED_NAME](logger, job_num, fixturelib, *args, **kwargs)
 
@@ -200,17 +216,29 @@ class ReplSetBuilder(FixtureBuilder):
             return replset
 
         for node_index in range(replset.num_nodes):
-            node = self._new_mongod(replset, node_index, mongod_executables, mongod_class,
-                                    mongod_binary_versions[node_index], is_multiversion,
-                                    launch_mongot)
+            node = self._new_mongod(
+                replset,
+                node_index,
+                mongod_executables,
+                mongod_class,
+                mongod_binary_versions[node_index],
+                is_multiversion,
+                launch_mongot,
+            )
             replset.install_mongod(node)
 
         if replset.start_initial_sync_node:
             if not replset.initial_sync_node:
                 replset.initial_sync_node_idx = replset.num_nodes
                 replset.initial_sync_node = self._new_mongod(
-                    replset, replset.initial_sync_node_idx, mongod_executables, mongod_class,
-                    BinVersionEnum.NEW, is_multiversion, launch_mongot)
+                    replset,
+                    replset.initial_sync_node_idx,
+                    mongod_executables,
+                    mongod_class,
+                    BinVersionEnum.NEW,
+                    is_multiversion,
+                    launch_mongot,
+                )
 
         return replset
 
@@ -225,13 +253,16 @@ class ReplSetBuilder(FixtureBuilder):
         kwargs["num_nodes"] = num_nodes
 
         mongod_executable = default_if_none(
-            kwargs.get("mongod_executable"), config.MONGOD_EXECUTABLE,
-            config.DEFAULT_MONGOD_EXECUTABLE)
+            kwargs.get("mongod_executable"),
+            config.MONGOD_EXECUTABLE,
+            config.DEFAULT_MONGOD_EXECUTABLE,
+        )
         kwargs["mongod_executable"] = mongod_executable
 
     @staticmethod
-    def _validate_multiversion_options(kwargs: Dict[str, Any],
-                                       mixed_bin_versions: Optional[List[str]]) -> None:
+    def _validate_multiversion_options(
+        kwargs: Dict[str, Any], mixed_bin_versions: Optional[List[str]]
+    ) -> None:
         """Error out if the number of binary versions does not match the number of nodes in replica set.
 
         :param kwargs: sharded cluster fixture kwargs
@@ -240,18 +271,24 @@ class ReplSetBuilder(FixtureBuilder):
         if mixed_bin_versions is not None:
             num_versions = len(mixed_bin_versions)
             replset_config_options = kwargs.get("replset_config_options", {})
-            is_config_svr = "configsvr" in replset_config_options and replset_config_options[
-                "configsvr"]
+            is_config_svr = (
+                "configsvr" in replset_config_options and replset_config_options["configsvr"]
+            )
 
             if num_versions != kwargs["num_nodes"] and not is_config_svr:
-                msg = ("The number of binary versions specified: {} do not match the number of"
-                       " nodes in the replica set: {}.").format(num_versions, kwargs["num_nodes"])
+                msg = (
+                    "The number of binary versions specified: {} do not match the number of"
+                    " nodes in the replica set: {}."
+                ).format(num_versions, kwargs["num_nodes"])
                 raise errors.ServerFailure(msg)
 
     @classmethod
     def _get_mongod_assets(
-            cls, kwargs: Dict[str, Any], mixed_bin_versions: Optional[List[str]],
-            old_bin_version: Optional[str]) -> Tuple[Dict[str, str], Dict[str, str], List[str]]:
+        cls,
+        kwargs: Dict[str, Any],
+        mixed_bin_versions: Optional[List[str]],
+        old_bin_version: Optional[str],
+    ) -> Tuple[Dict[str, str], Dict[str, str], List[str]]:
         """Make dicts with mongod new/old class and executable names and binary versions.
 
         :param kwargs: sharded cluster fixture kwargs
@@ -270,10 +307,8 @@ class ReplSetBuilder(FixtureBuilder):
             from buildscripts.resmokelib import multiversionconstants
 
             old_mongod_version = {
-                config.MultiversionOptions.LAST_LTS:
-                    multiversionconstants.LAST_LTS_MONGOD_BINARY,
-                config.MultiversionOptions.LAST_CONTINUOUS:
-                    multiversionconstants.LAST_CONTINUOUS_MONGOD_BINARY,
+                config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGOD_BINARY,
+                config.MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGOD_BINARY,
             }[old_bin_version]
 
             executables[BinVersionEnum.OLD] = old_mongod_version
@@ -294,18 +329,22 @@ class ReplSetBuilder(FixtureBuilder):
         fcv = multiversionconstants.LATEST_FCV
         if is_multiversion:
             fcv = {
-                config.MultiversionOptions.LAST_LTS:
-                    multiversionconstants.LAST_LTS_FCV,
-                config.MultiversionOptions.LAST_CONTINUOUS:
-                    multiversionconstants.LAST_CONTINUOUS_FCV,
+                config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_FCV,
+                config.MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_FCV,
             }[old_bin_version]
 
         return fcv
 
     @staticmethod
-    def _new_mongod(replset: ReplicaSetFixture, replset_node_index: int,
-                    executables: Dict[str, str], _class: str, cur_version: str,
-                    is_multiversion: bool, launch_mongot: bool) -> FixtureContainer:
+    def _new_mongod(
+        replset: ReplicaSetFixture,
+        replset_node_index: int,
+        executables: Dict[str, str],
+        _class: str,
+        cur_version: str,
+        is_multiversion: bool,
+        launch_mongot: bool,
+    ) -> FixtureContainer:
         """Make a fixture container with configured mongod fixture(s) in it.
 
         In non-multiversion mode only a new mongod fixture will be in the fixture container.
@@ -328,9 +367,14 @@ class ReplSetBuilder(FixtureBuilder):
         if is_multiversion:
             # We do not run old versions with feature flags enabled
             old_fixture = make_fixture(
-                _class, mongod_logger, replset.job_num, enable_feature_flags=False,
-                mongod_executable=executables[BinVersionEnum.OLD], mongod_options=mongod_options,
-                preserve_dbpath=replset.preserve_dbpath)
+                _class,
+                mongod_logger,
+                replset.job_num,
+                enable_feature_flags=False,
+                mongod_executable=executables[BinVersionEnum.OLD],
+                mongod_options=mongod_options,
+                preserve_dbpath=replset.preserve_dbpath,
+            )
 
             # Assign the same port for old and new fixtures so upgrade/downgrade can be done without
             # changing the replicaset config.
@@ -342,11 +386,16 @@ class ReplSetBuilder(FixtureBuilder):
         if is_multiversion:
             new_fixture_mongod_options["upgradeBackCompat"] = ""
 
-        new_fixture = make_fixture(_class, mongod_logger, replset.job_num,
-                                   mongod_executable=executables[BinVersionEnum.NEW],
-                                   mongod_options=new_fixture_mongod_options,
-                                   preserve_dbpath=replset.preserve_dbpath, port=new_fixture_port,
-                                   launch_mongot=launch_mongot)
+        new_fixture = make_fixture(
+            _class,
+            mongod_logger,
+            replset.job_num,
+            mongod_executable=executables[BinVersionEnum.NEW],
+            mongod_options=new_fixture_mongod_options,
+            preserve_dbpath=replset.preserve_dbpath,
+            port=new_fixture_port,
+            launch_mongot=launch_mongot,
+        )
 
         return FixtureContainer(new_fixture, old_fixture, cur_version)
 
@@ -357,7 +406,7 @@ def get_package_name(dir_path: str) -> str:
     :param dir_path: relative directory path
     :return: python package name
     """
-    return dir_path.replace('/', '.').replace("\\", ".")
+    return dir_path.replace("/", ".").replace("\\", ".")
 
 
 class ShardedClusterBuilder(FixtureBuilder):
@@ -366,8 +415,9 @@ class ShardedClusterBuilder(FixtureBuilder):
     REGISTERED_NAME = "ShardedClusterFixture"
     LATEST_MONGOS_CLASS = "_MongoSFixture"
 
-    def build_fixture(self, logger: logging.Logger, job_num: int, fixturelib: Type[FixtureLib],
-                      *args, **kwargs) -> ShardedClusterFixture:
+    def build_fixture(
+        self, logger: logging.Logger, job_num: int, fixturelib: Type[FixtureLib], *args, **kwargs
+    ) -> ShardedClusterFixture:
         """Build a sharded cluster.
 
         :param logger: fixture logger
@@ -382,11 +432,13 @@ class ShardedClusterBuilder(FixtureBuilder):
         self._validate_multiversion_options(kwargs, mixed_bin_versions)
         self._validate_embedded_router_mode_options(kwargs, is_config_shard, is_multiversion)
 
-        mongos_class, mongos_executables = self._get_mongos_assets(kwargs, mixed_bin_versions,
-                                                                   old_bin_version)
+        mongos_class, mongos_executables = self._get_mongos_assets(
+            kwargs, mixed_bin_versions, old_bin_version
+        )
 
-        sharded_cluster = _FIXTURES[self.REGISTERED_NAME](logger, job_num, fixturelib, *args,
-                                                          **kwargs)
+        sharded_cluster = _FIXTURES[self.REGISTERED_NAME](
+            logger, job_num, fixturelib, *args, **kwargs
+        )
 
         config_shard = kwargs["config_shard"]
         config_svr = None
@@ -397,9 +449,14 @@ class ShardedClusterBuilder(FixtureBuilder):
         if config_shard is None:
             config_svr = self._new_configsvr(sharded_cluster, is_multiversion, old_bin_version)
         else:
-            config_svr = self._new_rs_shard(sharded_cluster, mixed_bin_versions, old_bin_version,
-                                            config_shard, kwargs["num_rs_nodes_per_shard"],
-                                            launch_mongot=False)
+            config_svr = self._new_rs_shard(
+                sharded_cluster,
+                mixed_bin_versions,
+                old_bin_version,
+                config_shard,
+                kwargs["num_rs_nodes_per_shard"],
+                launch_mongot=False,
+            )
         sharded_cluster.install_configsvr(config_svr)
 
         # Persist a list of all nodes from the cluster with a boolean that indicates if that node
@@ -409,9 +466,14 @@ class ShardedClusterBuilder(FixtureBuilder):
         launch_mongot = kwargs.get("launch_mongot")
         for rs_shard_index in range(kwargs["num_shards"]):
             if rs_shard_index != config_shard:
-                rs_shard = self._new_rs_shard(sharded_cluster, mixed_bin_versions, old_bin_version,
-                                              rs_shard_index, kwargs["num_rs_nodes_per_shard"],
-                                              launch_mongot)
+                rs_shard = self._new_rs_shard(
+                    sharded_cluster,
+                    mixed_bin_versions,
+                    old_bin_version,
+                    rs_shard_index,
+                    kwargs["num_rs_nodes_per_shard"],
+                    launch_mongot,
+                )
                 sharded_cluster.install_rs_shard(rs_shard)
                 # Extend the list of nodes to be sure configsvr nodes are placed at first places.
                 nodes.extend([(node, False) for node in rs_shard._all_mongo_d_s_t()])
@@ -422,13 +484,20 @@ class ShardedClusterBuilder(FixtureBuilder):
 
         def install_router():
             if not kwargs.get("embedded_router", None):
-                mongos = self._new_mongos(sharded_cluster, mongos_executables, mongos_class,
-                                          mongos_index, num_routers, is_multiversion)
+                mongos = self._new_mongos(
+                    sharded_cluster,
+                    mongos_executables,
+                    mongos_class,
+                    mongos_index,
+                    num_routers,
+                    is_multiversion,
+                )
                 sharded_cluster.install_mongos(mongos)
             else:
                 node = nodes.pop(0)
-                router_view = self._new_router_view(sharded_cluster, mongos_index, num_routers,
-                                                    node[0], node[1])
+                router_view = self._new_router_view(
+                    sharded_cluster, mongos_index, num_routers, node[0], node[1]
+                )
                 sharded_cluster.install_mongos(router_view)
 
         for mongos_index in range(num_routers):
@@ -447,29 +516,38 @@ class ShardedClusterBuilder(FixtureBuilder):
         kwargs["num_shards"] = num_shards
 
         num_rs_nodes_per_shard = kwargs.pop("num_rs_nodes_per_shard", 1)
-        num_rs_nodes_per_shard = num_rs_nodes_per_shard if not config.NUM_REPLSET_NODES else config.NUM_REPLSET_NODES
+        num_rs_nodes_per_shard = (
+            num_rs_nodes_per_shard if not config.NUM_REPLSET_NODES else config.NUM_REPLSET_NODES
+        )
         kwargs["num_rs_nodes_per_shard"] = num_rs_nodes_per_shard
 
         num_mongos = kwargs.pop("num_mongos", 1)
         kwargs["num_mongos"] = num_mongos
 
         mongos_executable = default_if_none(
-            kwargs.get("mongos_executable"), config.MONGOS_EXECUTABLE,
-            config.DEFAULT_MONGOS_EXECUTABLE)
+            kwargs.get("mongos_executable"),
+            config.MONGOS_EXECUTABLE,
+            config.DEFAULT_MONGOS_EXECUTABLE,
+        )
         kwargs["mongos_executable"] = mongos_executable
 
         config_shard = pick_catalog_shard_node(
-            kwargs.pop("config_shard", config.CONFIG_SHARD), num_shards)
+            kwargs.pop("config_shard", config.CONFIG_SHARD), num_shards
+        )
         # Currently the auto_boostrap_procedure requires us to have a config_shard
-        if "use_auto_bootstrap_procedure" in kwargs and kwargs[
-                "use_auto_bootstrap_procedure"] and not config_shard:
+        if (
+            "use_auto_bootstrap_procedure" in kwargs
+            and kwargs["use_auto_bootstrap_procedure"]
+            and not config_shard
+        ):
             config_shard = 0
         kwargs["embedded_router"] = kwargs.pop("embedded_router", config.EMBEDDED_ROUTER)
         kwargs["config_shard"] = config_shard
 
     @staticmethod
-    def _validate_multiversion_options(kwargs: Dict[str, Any],
-                                       mixed_bin_versions: Optional[List[str]]) -> None:
+    def _validate_multiversion_options(
+        kwargs: Dict[str, Any], mixed_bin_versions: Optional[List[str]]
+    ) -> None:
         """Error out if the number of binary versions does not match the number of nodes in sharded cluster.
 
         :param kwargs: sharded cluster fixture kwargs
@@ -480,13 +558,16 @@ class ShardedClusterBuilder(FixtureBuilder):
             num_mongods = kwargs["num_shards"] * kwargs["num_rs_nodes_per_shard"]
 
             if len_versions != num_mongods:
-                msg = ("The number of binary versions specified: {} do not match the number of"
-                       " nodes in the sharded cluster: {}.").format(len_versions, num_mongods)
+                msg = (
+                    "The number of binary versions specified: {} do not match the number of"
+                    " nodes in the sharded cluster: {}."
+                ).format(len_versions, num_mongods)
                 raise errors.ServerFailure(msg)
 
     @staticmethod
-    def _validate_embedded_router_mode_options(kwargs: Dict[str, Any], is_config_shard: bool,
-                                               is_multiversion: bool) -> None:
+    def _validate_embedded_router_mode_options(
+        kwargs: Dict[str, Any], is_config_shard: bool, is_multiversion: bool
+    ) -> None:
         """Raise an exception if the configuration for the sharded cluster can't support embedded_router_mode.
 
         :param kwargs: sharded cluster fixture kwargs.
@@ -514,8 +595,12 @@ class ShardedClusterBuilder(FixtureBuilder):
                 raise ValueError("Embedded router mode does not support multiversion testing.")
 
     @classmethod
-    def _get_mongos_assets(cls, kwargs: Dict[str, Any], mixed_bin_versions: Optional[List[str]],
-                           old_bin_version: Optional[str]) -> Tuple[Dict[str, str], Dict[str, str]]:
+    def _get_mongos_assets(
+        cls,
+        kwargs: Dict[str, Any],
+        mixed_bin_versions: Optional[List[str]],
+        old_bin_version: Optional[str],
+    ) -> Tuple[Dict[str, str], Dict[str, str]]:
         """Make dicts with mongos new/old class and executable names.
 
         :param kwargs: sharded cluster fixture kwargs
@@ -531,18 +616,19 @@ class ShardedClusterBuilder(FixtureBuilder):
             from buildscripts.resmokelib import multiversionconstants
 
             old_mongos_version = {
-                config.MultiversionOptions.LAST_LTS:
-                    multiversionconstants.LAST_LTS_MONGOS_BINARY,
-                config.MultiversionOptions.LAST_CONTINUOUS:
-                    multiversionconstants.LAST_CONTINUOUS_MONGOS_BINARY,
+                config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGOS_BINARY,
+                config.MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGOS_BINARY,
             }[old_bin_version]
 
             executables[BinVersionEnum.OLD] = old_mongos_version
         return _class, executables
 
     @staticmethod
-    def _new_configsvr(sharded_cluster: ShardedClusterFixture, is_multiversion: bool,
-                       old_bin_version: Optional[str]) -> ReplicaSetFixture:
+    def _new_configsvr(
+        sharded_cluster: ShardedClusterFixture,
+        is_multiversion: bool,
+        old_bin_version: Optional[str],
+    ) -> ReplicaSetFixture:
         """Return a replica set fixture configured as the config server.
 
         :param sharded_cluster: sharded cluster fixture we are configuring config server for
@@ -560,15 +646,24 @@ class ShardedClusterBuilder(FixtureBuilder):
             # server nodes will always be fully upgraded before shard nodes.
             mixed_bin_versions = [BinVersionEnum.NEW] * 2
 
-        return make_fixture("ReplicaSetFixture", configsvr_logger, sharded_cluster.job_num,
-                            mixed_bin_versions=mixed_bin_versions, old_bin_version=old_bin_version,
-                            **configsvr_kwargs)
+        return make_fixture(
+            "ReplicaSetFixture",
+            configsvr_logger,
+            sharded_cluster.job_num,
+            mixed_bin_versions=mixed_bin_versions,
+            old_bin_version=old_bin_version,
+            **configsvr_kwargs,
+        )
 
     @staticmethod
-    def _new_rs_shard(sharded_cluster: ShardedClusterFixture,
-                      mixed_bin_versions: Optional[List[str]], old_bin_version: Optional[str],
-                      rs_shard_index: int, num_rs_nodes_per_shard: int,
-                      launch_mongot: bool) -> ReplicaSetFixture:
+    def _new_rs_shard(
+        sharded_cluster: ShardedClusterFixture,
+        mixed_bin_versions: Optional[List[str]],
+        old_bin_version: Optional[str],
+        rs_shard_index: int,
+        num_rs_nodes_per_shard: int,
+        launch_mongot: bool,
+    ) -> ReplicaSetFixture:
         """Return a replica set fixture configured as a shard in a sharded cluster.
 
         :param sharded_cluster: sharded cluster fixture we are configuring config server for
@@ -585,17 +680,29 @@ class ShardedClusterBuilder(FixtureBuilder):
 
         if mixed_bin_versions is not None:
             start_index = rs_shard_index * num_rs_nodes_per_shard
-            mixed_bin_versions = mixed_bin_versions[start_index:start_index +
-                                                    num_rs_nodes_per_shard]
+            mixed_bin_versions = mixed_bin_versions[
+                start_index : start_index + num_rs_nodes_per_shard
+            ]
 
-        return make_fixture("ReplicaSetFixture", rs_shard_logger, sharded_cluster.job_num,
-                            num_nodes=num_rs_nodes_per_shard, mixed_bin_versions=mixed_bin_versions,
-                            old_bin_version=old_bin_version, **rs_shard_kwargs)
+        return make_fixture(
+            "ReplicaSetFixture",
+            rs_shard_logger,
+            sharded_cluster.job_num,
+            num_nodes=num_rs_nodes_per_shard,
+            mixed_bin_versions=mixed_bin_versions,
+            old_bin_version=old_bin_version,
+            **rs_shard_kwargs,
+        )
 
     @staticmethod
-    def _new_mongos(sharded_cluster: ShardedClusterFixture, executables: Dict[str, str],
-                    _class: str, mongos_index: int, total: int,
-                    is_multiversion: bool) -> FixtureContainer:
+    def _new_mongos(
+        sharded_cluster: ShardedClusterFixture,
+        executables: Dict[str, str],
+        _class: str,
+        mongos_index: int,
+        total: int,
+        is_multiversion: bool,
+    ) -> FixtureContainer:
         """Make a fixture container with configured mongos fixture(s) in it.
 
         In non-multiversion mode only a new mongos fixture will be in the fixture container.
@@ -618,8 +725,13 @@ class ShardedClusterBuilder(FixtureBuilder):
         if is_multiversion:
             # We do not run old versions with feature flags enabled
             old_fixture = make_fixture(
-                _class, mongos_logger, sharded_cluster.job_num, enable_feature_flags=False,
-                mongos_executable=executables[BinVersionEnum.OLD], **mongos_kwargs)
+                _class,
+                mongos_logger,
+                sharded_cluster.job_num,
+                enable_feature_flags=False,
+                mongos_executable=executables[BinVersionEnum.OLD],
+                **mongos_kwargs,
+            )
 
         # We can't restart mongos since explicit ports are not supported.
         new_fixture_mongos_kwargs = sharded_cluster.get_mongos_kwargs()
@@ -628,23 +740,34 @@ class ShardedClusterBuilder(FixtureBuilder):
         if is_multiversion:
             new_fixture_mongos_kwargs["mongos_options"]["upgradeBackCompat"] = ""
 
-        new_fixture = make_fixture(_class, mongos_logger, sharded_cluster.job_num,
-                                   mongos_executable=executables[BinVersionEnum.NEW],
-                                   **new_fixture_mongos_kwargs)
+        new_fixture = make_fixture(
+            _class,
+            mongos_logger,
+            sharded_cluster.job_num,
+            mongos_executable=executables[BinVersionEnum.NEW],
+            **new_fixture_mongos_kwargs,
+        )
 
         # Always spin up an old mongos if in multiversion mode given mongos is the last thing in the update path.
-        return FixtureContainer(new_fixture, old_fixture,
-                                BinVersionEnum.OLD if is_multiversion else BinVersionEnum.NEW)
+        return FixtureContainer(
+            new_fixture, old_fixture, BinVersionEnum.OLD if is_multiversion else BinVersionEnum.NEW
+        )
 
     @staticmethod
-    def _new_router_view(sharded_cluster: ShardedClusterFixture, mongos_index: int, total: int,
-                         mongod: MongoDFixture, is_configsvr: bool) -> _RouterView:
+    def _new_router_view(
+        sharded_cluster: ShardedClusterFixture,
+        mongos_index: int,
+        total: int,
+        mongod: MongoDFixture,
+        is_configsvr: bool,
+    ) -> _RouterView:
         """Make a fixture that allows ShardedClusterFixture to treat a shardsvr as a router."""
 
         router_logger = sharded_cluster.get_mongos_logger(mongos_index, total)
         router_kwargs = {}
         router_kwargs["mongod"] = mongod
 
-        fix = make_fixture("_RouterView", router_logger, sharded_cluster.job_num, is_configsvr,
-                           **router_kwargs)
+        fix = make_fixture(
+            "_RouterView", router_logger, sharded_cluster.job_num, is_configsvr, **router_kwargs
+        )
         return fix

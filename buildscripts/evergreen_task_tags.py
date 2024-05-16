@@ -21,17 +21,40 @@ def parse_command_line():
     """Parse command line options."""
     parser = argparse.ArgumentParser(description=main.__doc__)
 
-    parser.add_argument("--list-tags", action="store_true", default=False,
-                        help="List all tags used by tasks in evergreen yml.")
+    parser.add_argument(
+        "--list-tags",
+        action="store_true",
+        default=False,
+        help="List all tags used by tasks in evergreen yml.",
+    )
     parser.add_argument("--list-tasks", type=str, help="List all tasks for the given buildvariant.")
-    parser.add_argument("--list-variants-and-tasks", action="store_true",
-                        help="List all tasks for every buildvariant.")
-    parser.add_argument("-t", "--tasks-for-tag", type=str, default=None, action="append",
-                        help="List all tasks that use the given tag.")
-    parser.add_argument("-x", "--remove-tasks-for-tag-filter", type=str, default=None,
-                        action="append", help="Remove tasks tagged with given tag.")
-    parser.add_argument("--evergreen-file", type=str, default=DEFAULT_EVERGREEN_FILE,
-                        help="Location of evergreen file.")
+    parser.add_argument(
+        "--list-variants-and-tasks",
+        action="store_true",
+        help="List all tasks for every buildvariant.",
+    )
+    parser.add_argument(
+        "-t",
+        "--tasks-for-tag",
+        type=str,
+        default=None,
+        action="append",
+        help="List all tasks that use the given tag.",
+    )
+    parser.add_argument(
+        "-x",
+        "--remove-tasks-for-tag-filter",
+        type=str,
+        default=None,
+        action="append",
+        help="Remove tasks tagged with given tag.",
+    )
+    parser.add_argument(
+        "--evergreen-file",
+        type=str,
+        default=DEFAULT_EVERGREEN_FILE,
+        help="Location of evergreen file.",
+    )
 
     options = parser.parse_args()
 

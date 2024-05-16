@@ -29,9 +29,9 @@ def exec_update(db, query, column, value):
 
 def main():
     """Execute Main program."""
-    parser = argparse.ArgumentParser(description='Trim MSI.')
-    parser.add_argument('file', type=argparse.FileType('r'), help='file to trim')
-    parser.add_argument('out', type=argparse.FileType('w'), help='file to output to')
+    parser = argparse.ArgumentParser(description="Trim MSI.")
+    parser.add_argument("file", type=argparse.FileType("r"), help="file to trim")
+    parser.add_argument("out", type=argparse.FileType("w"), help="file to output to")
 
     args = parser.parse_args()
     print("Trimming MSI")
@@ -40,19 +40,19 @@ def main():
 
     exec_delete(
         db,
-        "select * from ControlEvent WHERE Dialog_ = 'LicenseAgreementDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'"
+        "select * from ControlEvent WHERE Dialog_ = 'LicenseAgreementDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'",
     )
     exec_delete(
         db,
-        "select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'LicenseAgreementDlg'"
+        "select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'LicenseAgreementDlg'",
     )
     exec_delete(
         db,
-        "select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'VerifyReadyDlg'"
+        "select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'VerifyReadyDlg'",
     )
     exec_delete(
         db,
-        "select * from ControlEvent WHERE Dialog_ = 'VerifyReadyDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'"
+        "select * from ControlEvent WHERE Dialog_ = 'VerifyReadyDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'",
     )
 
     db.Commit()

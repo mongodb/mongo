@@ -43,21 +43,25 @@ def main():
                 merged = {**thread_record, **prologue}
 
                 output_fn = None
-                if options.output_format == 'json':
+                if options.output_format == "json":
                     output_fn = json.dump
-                if options.output_format == 'classic':
+                if options.output_format == "classic":
                     output_fn = mongosymb.classic_output
 
                 resolver = None
-                if options.debug_file_resolver == 'path':
+                if options.debug_file_resolver == "path":
                     resolver = mongosymb.PathDbgFileResolver(options.path_to_executable)
-                elif options.debug_file_resolver == 's3':
-                    resolver = mongosymb.S3BuildidDbgFileResolver(options.s3_cache_dir,
-                                                                  options.s3_bucket)
+                elif options.debug_file_resolver == "s3":
+                    resolver = mongosymb.S3BuildidDbgFileResolver(
+                        options.s3_cache_dir, options.s3_bucket
+                    )
 
                 frames = mongosymb.symbolize_frames(merged, resolver, **vars(options))
-                print("\nthread {{name='{}', tid={}}}:".format(thread_record["name"],
-                                                               thread_record["tid"]))
+                print(
+                    "\nthread {{name='{}', tid={}}}:".format(
+                        thread_record["name"], thread_record["tid"]
+                    )
+                )
 
                 output_fn(frames, sys.stdout, indent=2)
 
@@ -65,6 +69,6 @@ def main():
             print("failed to parse line: `{}`".format(line), file=sys.stderr)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
     sys.exit(0)

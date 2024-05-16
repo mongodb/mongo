@@ -59,42 +59,65 @@ from colorama import Fore
 
 colorama_init()
 
-parser = argparse.ArgumentParser(description='Run include what you use and test output')
+parser = argparse.ArgumentParser(description="Run include what you use and test output")
 
-parser.add_argument('--compile-commands', metavar='FILE', type=str, default='compile_commands.json',
-                    help='Path to the compile commands file to use.')
 parser.add_argument(
-    '--check', action='store_true', help=
-    'Enables check mode, which does not apply fixes and only runs to see if any files produce IWYU changes. Exit 0 if no new changes detected.'
+    "--compile-commands",
+    metavar="FILE",
+    type=str,
+    default="compile_commands.json",
+    help="Path to the compile commands file to use.",
 )
 parser.add_argument(
-    '--config-file', metavar='FILE', type=str, default="", help=
-    'Enables check mode, which does not apply fixes and only runs to see if any files produce IWYU changes. Exit 0 if no new changes detected.'
+    "--check",
+    action="store_true",
+    help="Enables check mode, which does not apply fixes and only runs to see if any files produce IWYU changes. Exit 0 if no new changes detected.",
 )
 parser.add_argument(
-    '--iwyu-data', metavar='FILE', type=str, default='iwyu.dat',
-    help='Location of data used by IWYU, contains hash and status info about all files.')
-parser.add_argument(
-    '--keep-going', action='store_true', help=
-    'Do not stop on errors, instead resubmit the job to try again later (after things may have been fixed elsewhere)'
+    "--config-file",
+    metavar="FILE",
+    type=str,
+    default="",
+    help="Enables check mode, which does not apply fixes and only runs to see if any files produce IWYU changes. Exit 0 if no new changes detected.",
 )
 parser.add_argument(
-    '--cycle-debugging', action='store_true', help=
-    'Once a cycle has been detected, each directory tree for each step in the cycle will be saved to a .cycle directory.'
+    "--iwyu-data",
+    metavar="FILE",
+    type=str,
+    default="iwyu.dat",
+    help="Location of data used by IWYU, contains hash and status info about all files.",
 )
-parser.add_argument('--verbose', action='store_true',
-                    help='Prints more info about what is taking place.')
-parser.add_argument('--mongo-toolchain-bin-dir', type=str,
-                    help='Which toolchain bin directory to use for this analysis.',
-                    default='/opt/mongodbtoolchain/v4/bin')
 parser.add_argument(
-    '--start-ratio', type=float, help=
-    'decimal value between 0 and 1 which indicates what starting ratio index of the total compile commands to run over, can not be greater than the --end-ratio.',
-    default=0.0)
+    "--keep-going",
+    action="store_true",
+    help="Do not stop on errors, instead resubmit the job to try again later (after things may have been fixed elsewhere)",
+)
 parser.add_argument(
-    '--end-ratio', type=float, help=
-    'decimal value between 0 and 1 which indicates what ending ratio index of the total compile commands to run over, can not be less than the --start-ratio.',
-    default=1.0)
+    "--cycle-debugging",
+    action="store_true",
+    help="Once a cycle has been detected, each directory tree for each step in the cycle will be saved to a .cycle directory.",
+)
+parser.add_argument(
+    "--verbose", action="store_true", help="Prints more info about what is taking place."
+)
+parser.add_argument(
+    "--mongo-toolchain-bin-dir",
+    type=str,
+    help="Which toolchain bin directory to use for this analysis.",
+    default="/opt/mongodbtoolchain/v4/bin",
+)
+parser.add_argument(
+    "--start-ratio",
+    type=float,
+    help="decimal value between 0 and 1 which indicates what starting ratio index of the total compile commands to run over, can not be greater than the --end-ratio.",
+    default=0.0,
+)
+parser.add_argument(
+    "--end-ratio",
+    type=float,
+    help="decimal value between 0 and 1 which indicates what ending ratio index of the total compile commands to run over, can not be less than the --start-ratio.",
+    default=1.0,
+)
 command_line_args = parser.parse_args()
 
 # the current state of all files, contain the cmd_entry, hashes, successes
@@ -117,11 +140,11 @@ with open(config_file, "r") as stream:
         if value is None:
             config[key] = []
 
-IWYU_OPTIONS = config.get('iwyu_options', [])
-IWYU_FIX_OPTIONS = config.get('fix_options', [])
-NO_INCLUDES = config.get('no_includes', [])
-KEEP_INCLUDES = config.get('keep_includes', [])
-SKIP_FILES = tuple(config.get('skip_files', []))
+IWYU_OPTIONS = config.get("iwyu_options", [])
+IWYU_FIX_OPTIONS = config.get("fix_options", [])
+NO_INCLUDES = config.get("no_includes", [])
+KEEP_INCLUDES = config.get("keep_includes", [])
+SKIP_FILES = tuple(config.get("skip_files", []))
 CYCLE_FILES: List[str] = []
 
 
@@ -158,11 +181,11 @@ class ResultType(enum.Enum):
 TOOLCHAIN_DIR = command_line_args.mongo_toolchain_bin_dir
 SHUTDOWN_FLAG = False
 CLANG_INCLUDES = None
-IWYU_OPTIONS = [val for pair in zip(['-Xiwyu'] * len(IWYU_OPTIONS), IWYU_OPTIONS) for val in pair]
+IWYU_OPTIONS = [val for pair in zip(["-Xiwyu"] * len(IWYU_OPTIONS), IWYU_OPTIONS) for val in pair]
 if NO_INCLUDES:
-    NO_INCLUDE_REGEX = re.compile(r'^\s*#include\s+[\",<](' + '|'.join(NO_INCLUDES) + ')[\",>]')
+    NO_INCLUDE_REGEX = re.compile(r"^\s*#include\s+[\",<](" + "|".join(NO_INCLUDES) + ')[",>]')
 if KEEP_INCLUDES:
-    KEEP_INCLUDE_REGEX = re.compile(r'^\s*#include\s+(' + '|'.join(KEEP_INCLUDES) + ')')
+    KEEP_INCLUDE_REGEX = re.compile(r"^\s*#include\s+(" + "|".join(KEEP_INCLUDES) + ")")
 CHANGED_FILES_REGEX = re.compile(r"^The\sfull\sinclude-list\sfor\s(.+):$", re.MULTILINE)
 
 
@@ -204,11 +227,13 @@ def in_project_root(file: str) -> bool:
     """
 
     return os.path.abspath(file).startswith(
-        os.path.abspath(os.path.dirname(command_line_args.compile_commands)))
+        os.path.abspath(os.path.dirname(command_line_args.compile_commands))
+    )
 
 
-def copy_error_state(cmd_entry: CompileCommand, test_dir: str,
-                     dir_ext: str = '.iwyu_test_dir') -> Optional[str]:
+def copy_error_state(
+    cmd_entry: CompileCommand, test_dir: str, dir_ext: str = ".iwyu_test_dir"
+) -> Optional[str]:
     """
     When we fail, we want to copy the current state of the temp dir.
 
@@ -244,15 +269,15 @@ def calc_hash_of_file(file: str) -> Optional[str]:
     if file not in hash_lookup_locks:
         hash_lookup_locks[file] = threading.Lock()
     with hash_lookup_locks[file]:
-        if file in mtime_hash_lookup and os.path.getmtime(file) == mtime_hash_lookup[file]['mtime']:
-            return mtime_hash_lookup[file]['hash']
+        if file in mtime_hash_lookup and os.path.getmtime(file) == mtime_hash_lookup[file]["mtime"]:
+            return mtime_hash_lookup[file]["hash"]
         else:
             try:
-                hash_val = hashlib.md5(open(file, 'rb').read()).hexdigest()
+                hash_val = hashlib.md5(open(file, "rb").read()).hexdigest()
             except FileNotFoundError:
                 return None
 
-            mtime_hash_lookup[file] = {'mtime': os.path.getmtime(file), 'hash': hash_val}
+            mtime_hash_lookup[file] = {"mtime": os.path.getmtime(file), "hash": hash_val}
             return hash_val
 
 
@@ -287,7 +312,6 @@ def add_pragmas(source_files: List[str]):
     """
 
     for source_file in source_files:
-
         # before we run IWYU, we take a guess at the likely header by swapping .cpp for .h
         # so it may not be a real header. After IWYU runs we know exactly where to add the pragmas
         # in case we got it wrong the first time around
@@ -296,22 +320,23 @@ def add_pragmas(source_files: List[str]):
 
         # we load in the file content operate on it, and then write it back out
         output_lines: List[str] = []
-        with open(source_file, 'r') as fin:
+        with open(source_file, "r") as fin:
             file_lines = fin.readlines()
             for line in file_lines:
-
                 if NO_INCLUDES and find_no_include(line, file_lines, output_lines):
                     continue
 
-                if KEEP_INCLUDES and re.search(KEEP_INCLUDE_REGEX,
-                                               line) and '// IWYU pragma: keep' not in line:
-
+                if (
+                    KEEP_INCLUDES
+                    and re.search(KEEP_INCLUDE_REGEX, line)
+                    and "// IWYU pragma: keep" not in line
+                ):
                     output_lines.append(line.strip() + " // IWYU pragma: keep\n")
                     continue
 
                 output_lines.append(line)
 
-        with open(source_file, 'w') as fout:
+        with open(source_file, "w") as fout:
             for line in output_lines:
                 fout.write(line)
 
@@ -329,8 +354,8 @@ def recalc_hashes(deps: List[str], change_dir: Optional[str] = None) -> Dict[str
     change from last time.
     """
 
-    hashes: Dict[str, Any] = {'deps': {}}
-    full_hash = hashlib.new('md5')
+    hashes: Dict[str, Any] = {"deps": {}}
+    full_hash = hashlib.new("md5")
     for dep in sorted(list(deps)):
         if not in_project_root(dep):
             continue
@@ -342,9 +367,9 @@ def recalc_hashes(deps: List[str], change_dir: Optional[str] = None) -> Dict[str
             continue
         if change_dir:
             dep = orig_dep
-        full_hash.update(dep_hash.encode('utf-8'))
-        hashes['deps'][dep] = dep_hash
-    hashes['full_hash'] = full_hash.hexdigest()
+        full_hash.update(dep_hash.encode("utf-8"))
+        hashes["deps"][dep] = dep_hash
+    hashes["full_hash"] = full_hash.hexdigest()
     return hashes
 
 
@@ -363,17 +388,17 @@ def setup_test_dir(cmd_entry: CompileCommand, test_dir: str) -> List[str]:
     """
 
     original_sources = [
-        orig_source for orig_source in [cmd_entry.file,
-                                        os.path.splitext(cmd_entry.file)[0] + '.h']
+        orig_source
+        for orig_source in [cmd_entry.file, os.path.splitext(cmd_entry.file)[0] + ".h"]
         if os.path.exists(orig_source)
     ]
     test_source_files = [os.path.join(test_dir, source_file) for source_file in original_sources]
-    dep_headers = [dep for dep in IWYU_ANALYSIS_STATE[cmd_entry.file]['hashes']['deps'].keys()]
+    dep_headers = [dep for dep in IWYU_ANALYSIS_STATE[cmd_entry.file]["hashes"]["deps"].keys()]
 
     # copy each required header from our source tree into our test dir
     # this does cost some time, but the alternative (everything operating in the real source tree)
     # was much longer due to constant failures.
-    for source_file in dep_headers + ['etc/iwyu_mapping.imp']:
+    for source_file in dep_headers + ["etc/iwyu_mapping.imp"]:
         if in_project_root(source_file):
             os.makedirs(os.path.join(test_dir, os.path.dirname(source_file)), exist_ok=True)
             shutil.copyfile(source_file, os.path.join(test_dir, source_file))
@@ -396,8 +421,8 @@ def get_clang_includes() -> List[str]:
     if CLANG_INCLUDES is None:
         clang_includes = subprocess.getoutput(
             f"{TOOLCHAIN_DIR}/clang++ -Wp,-v -x c++ - -fsyntax-only < /dev/null 2>&1 | sed -e '/^#include <...>/,/^End of search/{{ //!b }};d'"
-        ).split('\n')
-        clang_includes = ['-I' + include.strip() for include in clang_includes]
+        ).split("\n")
+        clang_includes = ["-I" + include.strip() for include in clang_includes]
         CLANG_INCLUDES = clang_includes
     return CLANG_INCLUDES
 
@@ -409,10 +434,11 @@ def write_cycle_diff(source_file: str, cycle_dir: str, latest_hashes: Dict[str, 
     The file contains the hash for before and after for each file involved in the compilation.
     """
 
-    with open(os.path.join(cycle_dir, 'hashes_diff.txt'), 'w') as out:
+    with open(os.path.join(cycle_dir, "hashes_diff.txt"), "w") as out:
         dep_list = set(
-            list(IWYU_ANALYSIS_STATE[source_file]['hashes']['deps'].keys()) +
-            list(latest_hashes['deps'].keys()))
+            list(IWYU_ANALYSIS_STATE[source_file]["hashes"]["deps"].keys())
+            + list(latest_hashes["deps"].keys())
+        )
         not_found_str = "not found" + (" " * 23)
         for dep in sorted(dep_list):
             out.write(
@@ -420,8 +446,9 @@ def write_cycle_diff(source_file: str, cycle_dir: str, latest_hashes: Dict[str, 
             )
 
 
-def check_for_cycles(cmd_entry: CompileCommand, latest_hashes: Dict[str, Any],
-                     test_dir: str) -> Optional[ResultType]:
+def check_for_cycles(
+    cmd_entry: CompileCommand, latest_hashes: Dict[str, Any], test_dir: str
+) -> Optional[ResultType]:
     """
     IWYU can induce cycles so we should check our previous results to see if a cycle has occurred.
 
@@ -435,23 +462,25 @@ def check_for_cycles(cmd_entry: CompileCommand, latest_hashes: Dict[str, Any],
 
     if cmd_entry.file not in IWYU_CYCLE_STATE:
         IWYU_CYCLE_STATE[cmd_entry.file] = {
-            'cycles': [],
+            "cycles": [],
         }
 
-    if latest_hashes['full_hash'] in IWYU_CYCLE_STATE[cmd_entry.file]['cycles']:
+    if latest_hashes["full_hash"] in IWYU_CYCLE_STATE[cmd_entry.file]["cycles"]:
         if command_line_args.cycle_debugging:
-            if 'debug_cycles' not in IWYU_CYCLE_STATE[cmd_entry.file]:
-                IWYU_CYCLE_STATE[cmd_entry.file]['debug_cycles'] = {}
+            if "debug_cycles" not in IWYU_CYCLE_STATE[cmd_entry.file]:
+                IWYU_CYCLE_STATE[cmd_entry.file]["debug_cycles"] = {}
 
-            IWYU_CYCLE_STATE[cmd_entry.file]['debug_cycles'][
-                latest_hashes['full_hash']] = latest_hashes
+            IWYU_CYCLE_STATE[cmd_entry.file]["debug_cycles"][latest_hashes["full_hash"]] = (
+                latest_hashes
+            )
 
             cycle_dir = copy_error_state(
-                cmd_entry, test_dir, dir_ext=
-                f".{latest_hashes['full_hash']}.cycle{len(IWYU_CYCLE_STATE[cmd_entry.file]['debug_cycles'])}"
+                cmd_entry,
+                test_dir,
+                dir_ext=f".{latest_hashes['full_hash']}.cycle{len(IWYU_CYCLE_STATE[cmd_entry.file]['debug_cycles'])}",
             )
             write_cycle_diff(cmd_entry.file, cycle_dir, latest_hashes)
-            if latest_hashes['full_hash'] not in IWYU_CYCLE_STATE[cmd_entry.file]['debug_cycles']:
+            if latest_hashes["full_hash"] not in IWYU_CYCLE_STATE[cmd_entry.file]["debug_cycles"]:
                 printer(f"{Fore.YELLOW}[5] - Cycle Found!: {cmd_entry.file}{Fore.RESET}")
             else:
                 printer(f"{Fore.RED}[5] - Cycle Done! : {cmd_entry.file}{Fore.RESET}")
@@ -461,7 +490,7 @@ def check_for_cycles(cmd_entry: CompileCommand, latest_hashes: Dict[str, Any],
             CYCLE_FILES.append(cmd_entry.file)
             return ResultType.SUCCESS
     else:
-        IWYU_CYCLE_STATE[cmd_entry.file]['cycles'].append(latest_hashes['full_hash'])
+        IWYU_CYCLE_STATE[cmd_entry.file]["cycles"].append(latest_hashes["full_hash"])
 
     return None
 
@@ -478,7 +507,7 @@ def write_iwyu_data() -> None:
             # destroying everything, at least we can keep the original
             # data safe from emotional outbursts.
             with tempfile.NamedTemporaryFile() as temp:
-                with open(temp.name, 'w') as iwyu_data_file:
+                with open(temp.name, "w") as iwyu_data_file:
                     json.dump(IWYU_ANALYSIS_STATE, iwyu_data_file, sort_keys=True, indent=4)
                 shutil.move(temp.name, command_line_args.iwyu_data)
         except FileNotFoundError as exc:
@@ -486,8 +515,9 @@ def write_iwyu_data() -> None:
                 pass
 
 
-def need_to_process(cmd_entry: CompileCommand,
-                    custom_printer: Callable[[str], None] = printer) -> Optional[ResultType]:
+def need_to_process(
+    cmd_entry: CompileCommand, custom_printer: Callable[[str], None] = printer
+) -> Optional[ResultType]:
     """
     The first step in the first step for processing a given source file.
 
@@ -497,35 +527,43 @@ def need_to_process(cmd_entry: CompileCommand,
     hashes and seeing if what we recorded last time has changed.
     """
 
-    if cmd_entry.file.startswith(
-            SKIP_FILES) or cmd_entry.file in CYCLE_FILES or '/conftest_' in cmd_entry.file:
+    if (
+        cmd_entry.file.startswith(SKIP_FILES)
+        or cmd_entry.file in CYCLE_FILES
+        or "/conftest_" in cmd_entry.file
+    ):
         custom_printer(f"{Fore.YELLOW}[5] - Not running!: {cmd_entry.file}{Fore.RESET}")
         return ResultType.NOT_RUNNING
 
     if IWYU_ANALYSIS_STATE.get(cmd_entry.file):
-        hashes = recalc_hashes(IWYU_ANALYSIS_STATE[cmd_entry.file]['hashes']['deps'].keys())
+        hashes = recalc_hashes(IWYU_ANALYSIS_STATE[cmd_entry.file]["hashes"]["deps"].keys())
 
         # we only skip if the matching mode was successful last time, otherwise we assume we need to rerun
-        mode_success = 'CHECK' if command_line_args.check else 'FIX'
+        mode_success = "CHECK" if command_line_args.check else "FIX"
         if command_line_args.verbose:
             diff_files = list(
-                set(hashes['deps'].keys()).symmetric_difference(
-                    set(IWYU_ANALYSIS_STATE[cmd_entry.file]['hashes']['deps'].keys())))
+                set(hashes["deps"].keys()).symmetric_difference(
+                    set(IWYU_ANALYSIS_STATE[cmd_entry.file]["hashes"]["deps"].keys())
+                )
+            )
             if diff_files:
                 msg = f"[1] Need to process {cmd_entry.file} because different files:\n"
                 for file in diff_files:
-                    msg += f'{file}\n'
+                    msg += f"{file}\n"
                 debug_printer(msg)
-            for file in IWYU_ANALYSIS_STATE[cmd_entry.file]['hashes']['deps'].keys():
-                if file in hashes['deps'] and hashes['deps'][file] != IWYU_ANALYSIS_STATE[
-                        cmd_entry.file]['hashes']['deps'][file]:
+            for file in IWYU_ANALYSIS_STATE[cmd_entry.file]["hashes"]["deps"].keys():
+                if (
+                    file in hashes["deps"]
+                    and hashes["deps"][file]
+                    != IWYU_ANALYSIS_STATE[cmd_entry.file]["hashes"]["deps"][file]
+                ):
                     debug_printer(
                         f"[1] Need to process {cmd_entry.file} because hash changed:\n{file}: {hashes['deps'][file]}\n{file}: {IWYU_ANALYSIS_STATE[cmd_entry.file]['hashes']['deps'][file]}"
                     )
 
-        if hashes['full_hash'] == IWYU_ANALYSIS_STATE[
-                cmd_entry.file]['hashes']['full_hash'] and mode_success in IWYU_ANALYSIS_STATE[
-                    cmd_entry.file].get('success', []):
+        if hashes["full_hash"] == IWYU_ANALYSIS_STATE[cmd_entry.file]["hashes"][
+            "full_hash"
+        ] and mode_success in IWYU_ANALYSIS_STATE[cmd_entry.file].get("success", []):
             custom_printer(f"{Fore.YELLOW}[5] - No Change!  : {cmd_entry.file}{Fore.RESET}")
             return ResultType.NO_CHANGE
 
@@ -545,7 +583,6 @@ def calc_dep_headers(cmd_entry: CompileCommand) -> Optional[ResultType]:
 
     try:
         with tempfile.NamedTemporaryFile() as depfile:
-
             # first time we could be executing a real command so we make sure the dir
             # so the compiler is not mad
             outputs = shlex.split(cmd_entry.output)
@@ -556,13 +593,14 @@ def calc_dep_headers(cmd_entry: CompileCommand) -> Optional[ResultType]:
 
             # setup up command for fast depfile generation
             cmd = cmd_entry.command
-            cmd += f' -MD -MF {depfile.name}'
-            cmd = cmd.replace(' -c ', ' -E ')
+            cmd += f" -MD -MF {depfile.name}"
+            cmd = cmd.replace(" -c ", " -E ")
             debug_printer(f"[1] - Getting Deps: {cmd_entry.file}")
 
             try:
-                deps_proc = subprocess.run(cmd, shell=True, capture_output=True, text=True,
-                                           timeout=300)
+                deps_proc = subprocess.run(
+                    cmd, shell=True, capture_output=True, text=True, timeout=300
+                )
             except subprocess.TimeoutExpired:
                 deps_proc = None
                 pass
@@ -575,13 +613,13 @@ def calc_dep_headers(cmd_entry: CompileCommand) -> Optional[ResultType]:
             else:
                 with open(depfile.name) as deps:
                     deps_str = deps.read()
-                    deps_str = deps_str.replace('\\\n', '').strip()
+                    deps_str = deps_str.replace("\\\n", "").strip()
 
                     hashes = recalc_hashes(shlex.split(deps_str)[1:])
                     if not IWYU_ANALYSIS_STATE.get(cmd_entry.file):
                         IWYU_ANALYSIS_STATE[cmd_entry.file] = asdict(cmd_entry)
-                    IWYU_ANALYSIS_STATE[cmd_entry.file]['hashes'] = hashes
-                    IWYU_ANALYSIS_STATE[cmd_entry.file]['success'] = []
+                    IWYU_ANALYSIS_STATE[cmd_entry.file]["hashes"] = hashes
+                    IWYU_ANALYSIS_STATE[cmd_entry.file]["success"] = []
 
     # if the dep command failed the context will through an execption, we will ignore just
     # that case
@@ -604,35 +642,40 @@ def execute_iwyu(cmd_entry: CompileCommand, test_dir: str) -> Union[ResultType, 
     """
 
     # assert we are working with a pure clang++ build
-    if not cmd_entry.command.startswith(f'{TOOLCHAIN_DIR}/clang++'):
+    if not cmd_entry.command.startswith(f"{TOOLCHAIN_DIR}/clang++"):
         printer("unexpected compiler:")
         printer(cmd_entry.command)
         return ResultType.FAILED
 
     # swap out for our tool and add in extra options for IWYU
-    cmd = f'{TOOLCHAIN_DIR}/include-what-you-use' + cmd_entry.command[len(f'{TOOLCHAIN_DIR}/clang++'
-                                                                          ):]
-    cmd += ' ' + ' '.join(get_clang_includes())
-    cmd += ' ' + ' '.join(IWYU_OPTIONS)
+    cmd = (
+        f"{TOOLCHAIN_DIR}/include-what-you-use"
+        + cmd_entry.command[len(f"{TOOLCHAIN_DIR}/clang++") :]
+    )
+    cmd += " " + " ".join(get_clang_includes())
+    cmd += " " + " ".join(IWYU_OPTIONS)
 
     # mimic the PATH we normally use in our build
     env = os.environ.copy()
-    env['PATH'] += f':{TOOLCHAIN_DIR}'
+    env["PATH"] += f":{TOOLCHAIN_DIR}"
 
-    debug_printer(f'[2] - Running IWYU: {cmd_entry.file}')
+    debug_printer(f"[2] - Running IWYU: {cmd_entry.file}")
     proc = subprocess.run(cmd, shell=True, env=env, capture_output=True, cwd=test_dir)
 
     # IWYU has some bugs about forward declares I am assuming, because in some cases even though
     # we have passed --no_fwd_decls it still sometimes recommend forward declares and sometimes they
     # are wrong and cause compilation errors.
     remove_fwd_declares = []
-    for line in proc.stderr.decode('utf-8').split('\n'):
+    for line in proc.stderr.decode("utf-8").split("\n"):
         line = line.strip()
-        if not line.endswith(':') and not line.startswith(
-            ('#include ', '-')) and ('class ' in line or 'struct ' in line):
+        if (
+            not line.endswith(":")
+            and not line.startswith(("#include ", "-"))
+            and ("class " in line or "struct " in line)
+        ):
             continue
         remove_fwd_declares.append(line)
-    iwyu_output = '\n'.join(remove_fwd_declares)
+    iwyu_output = "\n".join(remove_fwd_declares)
 
     # IWYU has weird exit codes, where a >=2 is considered success:
     # https://github.com/include-what-you-use/include-what-you-use/blob/clang_12/iwyu_globals.h#L27-L34
@@ -645,30 +688,31 @@ def execute_iwyu(cmd_entry: CompileCommand, test_dir: str) -> Union[ResultType, 
         printer(iwyu_output)
         return failed_return()
     elif proc.returncode < 2:
-        printer(f'{Fore.RED}[2] - IWYU Failed : {cmd_entry.file}{Fore.RESET}')
+        printer(f"{Fore.RED}[2] - IWYU Failed : {cmd_entry.file}{Fore.RESET}")
         printer(cmd)
         printer(str(proc.returncode))
-        printer(proc.stderr.decode('utf-8'))
+        printer(proc.stderr.decode("utf-8"))
         copy_error_state(cmd_entry, test_dir)
         return failed_return()
 
     # save the output for debug or inspection later
-    with open(os.path.splitext(cmd_entry.output)[0] + '.iwyu', 'w') as iwyu_out:
+    with open(os.path.splitext(cmd_entry.output)[0] + ".iwyu", "w") as iwyu_out:
         iwyu_out.write(iwyu_output)
 
-    return iwyu_output.encode('utf-8')
+    return iwyu_output.encode("utf-8")
 
 
-def apply_fixes(cmd_entry: CompileCommand, iwyu_output: bytes,
-                test_dir: str) -> Optional[ResultType]:
+def apply_fixes(
+    cmd_entry: CompileCommand, iwyu_output: bytes, test_dir: str
+) -> Optional[ResultType]:
     """
     Step 4 in the IWYU process.
 
     We need to run the fix_includes script to apply the output from the IWYU binary.
     """
-    cmd = [f'{sys.executable}', f'{TOOLCHAIN_DIR}/fix_includes.py'] + IWYU_FIX_OPTIONS
+    cmd = [f"{sys.executable}", f"{TOOLCHAIN_DIR}/fix_includes.py"] + IWYU_FIX_OPTIONS
 
-    debug_printer(f'[3] - Apply fixes : {cmd_entry.file}')
+    debug_printer(f"[3] - Apply fixes : {cmd_entry.file}")
     try:
         subprocess.run(cmd, capture_output=True, input=iwyu_output, timeout=180, cwd=test_dir)
     except subprocess.TimeoutExpired:
@@ -692,10 +736,11 @@ def test_compile(cmd_entry: CompileCommand, test_dir: str) -> Optional[ResultTyp
 
             # we want to capture the header deps again because IWYU may have changed them
             cmd = cmd_entry.command
-            cmd += f' -MMD -MF {depfile.name}'
+            cmd += f" -MMD -MF {depfile.name}"
             try:
-                p3 = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300,
-                                    cwd=test_dir)
+                p3 = subprocess.run(
+                    cmd, shell=True, capture_output=True, text=True, timeout=300, cwd=test_dir
+                )
             except (subprocess.TimeoutExpired, MemoryError):
                 p3 = None
                 pass
@@ -713,15 +758,15 @@ def test_compile(cmd_entry: CompileCommand, test_dir: str) -> Optional[ResultTyp
                     # calculate the hashes of the deps used to create
                     # this successful compile.
                     deps_str = deps.read()
-                    deps_str = deps_str.replace('\\\n', '').strip()
+                    deps_str = deps_str.replace("\\\n", "").strip()
                     hashes = recalc_hashes(shlex.split(deps_str)[1:], change_dir=test_dir)
 
                     if result := check_for_cycles(cmd_entry, hashes, test_dir):
                         return result
 
-                    IWYU_ANALYSIS_STATE[cmd_entry.file]['hashes'] = hashes
-                    if 'FIX' not in IWYU_ANALYSIS_STATE[cmd_entry.file]['success']:
-                        IWYU_ANALYSIS_STATE[cmd_entry.file]['success'].append('FIX')
+                    IWYU_ANALYSIS_STATE[cmd_entry.file]["hashes"] = hashes
+                    if "FIX" not in IWYU_ANALYSIS_STATE[cmd_entry.file]["success"]:
+                        IWYU_ANALYSIS_STATE[cmd_entry.file]["success"].append("FIX")
                     printer(f"{Fore.GREEN}[5] - IWYU Success: {cmd_entry.file}{Fore.RESET}")
                     return ResultType.SUCCESS
 
@@ -753,7 +798,7 @@ def intialize_deps(cmd_entry: CompileCommand) -> Tuple[ResultType, CompileComman
     # of how dependency heavy it is, and its worth just taking that over
     # needing to invoke the compiler.
     try:
-        if len(IWYU_ANALYSIS_STATE[cmd_entry.file]['hashes']['deps']):
+        if len(IWYU_ANALYSIS_STATE[cmd_entry.file]["hashes"]["deps"]):
             return ResultType.SUCCESS, cmd_entry
 
     except KeyError:
@@ -782,14 +827,14 @@ def check_iwyu(cmd_entry: CompileCommand) -> ResultType:
         return result
 
     # step 3
-    iwyu_out = execute_iwyu(cmd_entry, '.')
+    iwyu_out = execute_iwyu(cmd_entry, ".")
     if isinstance(iwyu_out, ResultType):
         return iwyu_out
 
     # success!
     printer(f"{Fore.GREEN}[2] - IWYU Success: {cmd_entry.file}{Fore.RESET}")
-    if "CHECK" not in IWYU_ANALYSIS_STATE[cmd_entry.file]['success']:
-        IWYU_ANALYSIS_STATE[cmd_entry.file]['success'].append('CHECK')
+    if "CHECK" not in IWYU_ANALYSIS_STATE[cmd_entry.file]["success"]:
+        IWYU_ANALYSIS_STATE[cmd_entry.file]["success"].append("CHECK")
     return ResultType.SUCCESS
 
 
@@ -811,7 +856,6 @@ def fix_iwyu(cmd_entry: CompileCommand) -> ResultType:
         return result
 
     with tempfile.TemporaryDirectory() as test_dir:
-
         # the changes will be done in an isolated test dir so not to conflict with
         # other concurrent processes.
         test_source_files = setup_test_dir(cmd_entry, test_dir)
@@ -827,7 +871,7 @@ def fix_iwyu(cmd_entry: CompileCommand) -> ResultType:
         # now we can extract exactly what files IWYU operated on and copy only those back
         changed_files = [
             os.path.join(test_dir, file)
-            for file in re.findall(CHANGED_FILES_REGEX, iwyu_out.decode('utf-8'))
+            for file in re.findall(CHANGED_FILES_REGEX, iwyu_out.decode("utf-8"))
             if in_project_root(file)
         ]
         test_source_files += [file for file in changed_files if file not in test_source_files]
@@ -844,7 +888,7 @@ def fix_iwyu(cmd_entry: CompileCommand) -> ResultType:
         if result == ResultType.SUCCESS:
             for file in test_source_files:
                 if os.path.exists(file):
-                    shutil.move(file, file[len(test_dir) + 1:])
+                    shutil.move(file, file[len(test_dir) + 1 :])
 
         return result
 
@@ -864,8 +908,8 @@ def main() -> None:
     atexit.register(write_iwyu_data)
 
     with concurrent.futures.ThreadPoolExecutor(
-            max_workers=len(os.sched_getaffinity(0)) + 4) as executor:
-
+        max_workers=len(os.sched_getaffinity(0)) + 4
+    ) as executor:
         # ctrl+c tru to shutdown as fast as possible.
         def sigint_handler(the_signal, frame):
             executor.shutdown(wait=False, cancel_futures=True)
@@ -884,7 +928,7 @@ def main() -> None:
 
             # assert the generated source code has been generated
             for cmd_entry in compiledb:
-                if cmd_entry.file.endswith('_gen.cpp') and not os.path.exists(cmd_entry.file):
+                if cmd_entry.file.endswith("_gen.cpp") and not os.path.exists(cmd_entry.file):
                     printer(f"{Fore.RED}[5] - Missing Gen!: {cmd_entry.file}{Fore.RESET}")
                     printer(
                         f"Error: missing generated file {cmd_entry.file}, make sure generated-sources are generated."
@@ -923,7 +967,6 @@ def main() -> None:
                 cmd_entry_list = []
                 try:
                     with tqdm(total=len(compiledb), disable=None) as pbar:
-
                         # create and run the dependency check jobs
                         future_cmd = {
                             executor.submit(intialize_deps, cmd_entry): cmd_entry
@@ -943,18 +986,16 @@ def main() -> None:
                 cmd_entry_list = compiledb
 
             try:
-
                 # this loop will keep looping until a full run produce no new changes.
                 changes_left = True
                 while changes_left:
                     changes_left = False
 
                     with tqdm(total=len(cmd_entry_list), disable=None) as pbar:
-
                         # create and run the IWYU jobs
                         def dep_sorted(cmd_entry):
                             try:
-                                return len(IWYU_ANALYSIS_STATE[cmd_entry.file]['hashes']['deps'])
+                                return len(IWYU_ANALYSIS_STATE[cmd_entry.file]["hashes"]["deps"])
                             except KeyError:
                                 return 0
 
@@ -974,7 +1015,9 @@ def main() -> None:
 
                             # if a file is considered done for this loop, update the status bar
                             if result in [
-                                    ResultType.SUCCESS, ResultType.NO_CHANGE, ResultType.NOT_RUNNING
+                                ResultType.SUCCESS,
+                                ResultType.NO_CHANGE,
+                                ResultType.NOT_RUNNING,
                             ]:
                                 pbar.update(1)
                             # resubmit jobs which may have a better change to run later
@@ -987,7 +1030,8 @@ def main() -> None:
                                     f"{result.name}: Shutting down other threads, please be patient."
                                 )
                                 raise Exception(
-                                    f'Shutdown due to {result.name} {cmd_entry["file"]}')
+                                    f'Shutdown due to {result.name} {cmd_entry["file"]}'
+                                )
 
             except Exception:
                 SHUTDOWN_FLAG = True
@@ -998,7 +1042,7 @@ def main() -> None:
                 if CYCLE_FILES:
                     printer(f"{Fore.YELLOW} Cycles detected:")
                     for file in CYCLE_FILES:
-                        printer(f'    {file}')
+                        printer(f"    {file}")
 
 
 main()

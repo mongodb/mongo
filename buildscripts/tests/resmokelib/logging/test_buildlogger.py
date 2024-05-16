@@ -34,15 +34,27 @@ class TestLogsSplitter(unittest.TestCase):
     def test_split_max_size_larger(self):
         logs = self.__generate_logs(size=31)
         max_size = 30
-        self.assertEqual([logs[0:-1], logs[-1:]],
-                         buildlogger._LogsSplitter.split_logs(logs, max_size))
+        self.assertEqual(
+            [logs[0:-1], logs[-1:]], buildlogger._LogsSplitter.split_logs(logs, max_size)
+        )
 
         logs = self.__generate_logs(size=149)
         max_size = 19
-        self.assertEqual([
-            logs[0:3], logs[3:6], logs[6:9], logs[9:12], logs[12:15], logs[15:18], logs[18:21],
-            logs[21:24], logs[24:27], logs[27:]
-        ], buildlogger._LogsSplitter.split_logs(logs, max_size))
+        self.assertEqual(
+            [
+                logs[0:3],
+                logs[3:6],
+                logs[6:9],
+                logs[9:12],
+                logs[12:15],
+                logs[15:18],
+                logs[18:21],
+                logs[21:24],
+                logs[24:27],
+                logs[27:],
+            ],
+            buildlogger._LogsSplitter.split_logs(logs, max_size),
+        )
 
     def check_split_sizes(self, splits, max_size):
         for split in splits:

@@ -22,8 +22,10 @@ class TestRemoveGenSuffix(unittest.TestCase):
 
     def test_doesnt_remove_non_gen_suffix(self):
         input_task_name = "sharded_multi_stmt_txn_jscore_passthroug"
-        self.assertEqual("sharded_multi_stmt_txn_jscore_passthroug",
-                         under_test.remove_gen_suffix(input_task_name))
+        self.assertEqual(
+            "sharded_multi_stmt_txn_jscore_passthroug",
+            under_test.remove_gen_suffix(input_task_name),
+        )
 
 
 class TestDetermineTaskBaseName(unittest.TestCase):

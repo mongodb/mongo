@@ -112,16 +112,19 @@ async def load_calibration_data(database: DatabaseInstance, collection_name: str
 
     data = await database.get_all_documents(collection_name)
     df = pd.DataFrame(data)
-    df['sbe'] = df.explain.apply(lambda e: sbe.build_execution_tree(
-        json.loads(e)['executionStats']))
-    df['abt'] = df.explain.apply(lambda e: abt.build(
-        json.loads(e)['queryPlanner']['winningPlan']['queryPlan']))
-    df['total_execution_time'] = df.sbe.apply(lambda t: t.total_execution_time)
+    df["sbe"] = df.explain.apply(
+        lambda e: sbe.build_execution_tree(json.loads(e)["executionStats"])
+    )
+    df["abt"] = df.explain.apply(
+        lambda e: abt.build(json.loads(e)["queryPlanner"]["winningPlan"]["queryPlan"])
+    )
+    df["total_execution_time"] = df.sbe.apply(lambda t: t.total_execution_time)
     return df
 
 
-def remove_outliers(df: pd.DataFrame, lower_percentile: float = 0.1,
-                    upper_percentile: float = 0.9) -> pd.DataFrame:
+def remove_outliers(
+    df: pd.DataFrame, lower_percentile: float = 0.1, upper_percentile: float = 0.9
+) -> pd.DataFrame:
     """Remove the outliers from the parsed calibration DataFrame."""
 
     def is_not_outlier(df_seq):
@@ -129,8 +132,11 @@ def remove_outliers(df: pd.DataFrame, lower_percentile: float = 0.1,
         high = df_seq.quantile(upper_percentile)
         return (df_seq >= low) & (df_seq <= high)
 
-    return df[df.groupby(['run_id', 'collection',
-                          'pipeline']).total_execution_time.transform(is_not_outlier).eq(1)]
+    return df[
+        df.groupby(["run_id", "collection", "pipeline"])
+        .total_execution_time.transform(is_not_outlier)
+        .eq(1)
+    ]
 
 
 def extract_sbe_stages(df: pd.DataFrame) -> pd.DataFrame:
@@ -138,18 +144,18 @@ def extract_sbe_stages(df: pd.DataFrame) -> pd.DataFrame:
 
     def flatten_sbe_stages(explain):
         def traverse(node, stages):
-            execution_time = node['executionTimeNanos']
-            children_fields = ['innerStage', 'outerStage', 'inputStage', 'thenStage', 'elseStage']
+            execution_time = node["executionTimeNanos"]
+            children_fields = ["innerStage", "outerStage", "inputStage", "thenStage", "elseStage"]
             for field in children_fields:
                 if field in node and node[field]:
                     child = node[field]
-                    execution_time -= child['executionTimeNanos']
+                    execution_time -= child["executionTimeNanos"]
                     traverse(child, stages)
                     del node[field]
-            node['executionTime'] = execution_time
+            node["executionTime"] = execution_time
             stages.append(node)
 
-        sbe_tree = json.loads(explain)['executionStats']['executionStages']
+        sbe_tree = json.loads(explain)["executionStats"]["executionStages"]
         result = []
         traverse(sbe_tree, result)
         return result
@@ -166,15 +172,18 @@ def extract_abt_nodes(df: pd.DataFrame) -> pd.DataFrame:
     """Extract ABT Nodes and execution statistics from calibration DataFrame."""
 
     def extract(df_seq):
-        es_dict = extract_execution_stats(df_seq['sbe'], df_seq['abt'], [])
+        es_dict = extract_execution_stats(df_seq["sbe"], df_seq["abt"], [])
 
         rows = []
         for abt_type, es in es_dict.items():
             for stat in es:
                 row = {
-                    'abt_type': abt_type, **dataclasses.asdict(stat),
-                    **json.loads(df_seq['query_parameters']), 'run_id': df_seq.run_id,
-                    'pipeline': df_seq.pipeline, 'source': df_seq.name
+                    "abt_type": abt_type,
+                    **dataclasses.asdict(stat),
+                    **json.loads(df_seq["query_parameters"]),
+                    "run_id": df_seq.run_id,
+                    "pipeline": df_seq.pipeline,
+                    "source": df_seq.name,
                 }
                 rows.append(row)
         return rows
@@ -185,9 +194,9 @@ def extract_abt_nodes(df: pd.DataFrame) -> pd.DataFrame:
 def print_trees(calibration_df: pd.DataFrame, abt_df: pd.DataFrame, row_index: int = 0):
     """Print SBE and ABT Trees."""
     row = calibration_df.loc[abt_df.iloc[row_index].source]
-    print('SBE')
+    print("SBE")
     row.sbe.print()
-    print('\nABT')
+    print("\nABT")
     row.abt.print()
 
 
@@ -203,33 +212,37 @@ def calibrate(abt_node_df: pd.DataFrame, variables: list[str] = None):
     """Calibrate the ABT node given in abd_node_df with the given model input variables."""
     # pylint: disable=invalid-name
     if variables is None:
-        variables = ['n_processed']
-    y = abt_node_df['execution_time']
+        variables = ["n_processed"]
+    y = abt_node_df["execution_time"]
     X = abt_node_df[variables]
     X = sm.add_constant(X)
 
     nnls = LinearRegression(positive=True, fit_intercept=False)
     model = nnls.fit(X, y)
     y_pred = model.predict(X)
-    print(f'R2: {r2_score(y, y_pred)}')
-    print(f'Coefficients: {model.coef_}')
+    print(f"R2: {r2_score(y, y_pred)}")
+    print(f"Coefficients: {model.coef_}")
 
-    sns.scatterplot(x=abt_node_df['n_processed'], y=abt_node_df['execution_time'])
-    sns.lineplot(x=abt_node_df['n_processed'], y=y_pred, color='red')
+    sns.scatterplot(x=abt_node_df["n_processed"], y=abt_node_df["execution_time"])
+    sns.lineplot(x=abt_node_df["n_processed"], y=y_pred, color="red")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import asyncio
     from config import DatabaseConfig
 
     async def test():
         """Smoke tests."""
-        database_config = DatabaseConfig(connection_string='mongodb://localhost',
-                                         database_name='abt_calibration', dump_path='',
-                                         restore_from_dump=False, dump_on_exit=False)
+        database_config = DatabaseConfig(
+            connection_string="mongodb://localhost",
+            database_name="abt_calibration",
+            dump_path="",
+            restore_from_dump=False,
+            dump_on_exit=False,
+        )
         database = DatabaseInstance(database_config)
 
-        raw_df = await load_calibration_data(database, 'calibrationData')
+        raw_df = await load_calibration_data(database, "calibrationData")
         print(raw_df.head())
 
         cleaned_df = remove_outliers(raw_df, 0.0, 0.9)
@@ -238,7 +251,7 @@ if __name__ == '__main__':
         sbe_stages_df = extract_sbe_stages(cleaned_df)
         print(sbe_stages_df.head())
 
-        seek_df = get_sbe_stage(sbe_stages_df, 'seek')
+        seek_df = get_sbe_stage(sbe_stages_df, "seek")
         print(seek_df.head())
 
         abt_nodes_df = extract_abt_nodes(cleaned_df)

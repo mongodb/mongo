@@ -1,4 +1,5 @@
 """Given a test name, path to log file and exit code, generate/append an Evergreen report.json."""
+
 import json
 import pathlib
 import os
@@ -53,15 +54,21 @@ def _clean_log_file(log_file: pathlib.Path, dedup_lines: bool) -> str:
 
 def make_report(test_name: str, log_file_contents: str, exit_code: int) -> Report:
     status = "pass" if exit_code == 0 else "fail"
-    return Report({
-        'failures':
-            0 if exit_code == 0 else 1, "results": [
-                Result({
-                    "status": status, "exit_code": exit_code, "test_file": test_name,
-                    "log_raw": log_file_contents
-                })
-            ]
-    })
+    return Report(
+        {
+            "failures": 0 if exit_code == 0 else 1,
+            "results": [
+                Result(
+                    {
+                        "status": status,
+                        "exit_code": exit_code,
+                        "test_file": test_name,
+                        "log_raw": log_file_contents,
+                    }
+                )
+            ],
+        }
+    )
 
 
 def try_combine_reports(out: Report):

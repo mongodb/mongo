@@ -21,7 +21,7 @@ from buildscripts.resmokelib.testing.hooks import interface
 class ContinuousTenantMigration(interface.Hook):
     """Starts a tenant migration thread at the beginning of each test."""
 
-    DESCRIPTION = ("Continuous tenant migrations")
+    DESCRIPTION = "Continuous tenant migrations"
 
     IS_BACKGROUND = True
 
@@ -50,7 +50,8 @@ class ContinuousTenantMigration(interface.Hook):
             raise ValueError("No TenantMigrationFixture to run migrations on")
         self.logger.info("Starting the tenant migration thread.")
         self._tenant_migration_thread = _TenantMigrationThread(
-            self.logger, self._tenant_migration_fixture, self._shell_options, test_report)
+            self.logger, self._tenant_migration_fixture, self._shell_options, test_report
+        )
         self._tenant_migration_thread.start()
 
     def after_suite(self, test_report, teardown_flag=None):
@@ -169,8 +170,13 @@ def get_primary(rs, logger, max_tries=5):  # noqa: D205,D400
             return rs.get_primary()
         except errors.ServerFailure:
             logger.info(
-                "Timed out while waiting for a primary for replica set '%s' on try %d." +
-                " Retrying." if num_tries < max_tries else "", rs.replset_name, num_tries)
+                "Timed out while waiting for a primary for replica set '%s' on try %d."
+                + " Retrying."
+                if num_tries < max_tries
+                else "",
+                rs.replset_name,
+                num_tries,
+            )
 
 
 class _TenantMigrationOptions:
@@ -208,9 +214,11 @@ class _TenantMigrationOptions:
 
     def __str__(self):
         opts = {
-            "donor": self.get_donor_name(), "recipient": self.get_recipient_name(),
-            "migration_id": self.migration_id, "tenant_id": self.tenant_id,
-            "read_preference": self.read_preference
+            "donor": self.get_donor_name(),
+            "recipient": self.get_recipient_name(),
+            "migration_id": self.migration_id,
+            "tenant_id": self.tenant_id,
+            "read_preference": self.read_preference,
         }
         return str(opts)
 
@@ -274,13 +282,15 @@ class _TenantMigrationThread(threading.Thread):
                     donor_rs_index = 0
 
                 recipient_rs_index = (
-                    donor_rs_index + 1) % self._tenant_migration_fixture.get_num_replsets()
+                    donor_rs_index + 1
+                ) % self._tenant_migration_fixture.get_num_replsets()
                 migration_opts = self._create_migration_opts(donor_rs_index, recipient_rs_index)
 
                 # Briefly wait to let the test run before starting the tenant migration, so that
                 # the first migration is more likely to have data to migrate.
                 wait_secs = random.uniform(
-                    *self.WAIT_SECS_RANGES[migration_num % len(self.WAIT_SECS_RANGES)])
+                    *self.WAIT_SECS_RANGES[migration_num % len(self.WAIT_SECS_RANGES)]
+                )
                 self.logger.info("Waiting for %.3f seconds before starting migration.", wait_secs)
                 self.__lifecycle.wait_for_tenant_migration_interval(wait_secs)
 
@@ -288,8 +298,11 @@ class _TenantMigrationThread(threading.Thread):
                 start_time = time.time()
                 is_committed = self._run_migration(migration_opts)
                 end_time = time.time()
-                self.logger.info("Completed tenant migration in %0d ms: %s.",
-                                 (end_time - start_time) * 1000, str(migration_opts))
+                self.logger.info(
+                    "Completed tenant migration in %0d ms: %s.",
+                    (end_time - start_time) * 1000,
+                    str(migration_opts),
+                )
 
                 found_idle_request = self.__lifecycle.poll_for_idle_request()
                 if found_idle_request:
@@ -326,7 +339,9 @@ class _TenantMigrationThread(threading.Thread):
             raise errors.ServerFailure(
                 "TenantMigrationFixture with pids {} expected to be running in"
                 " ContinuousTenantMigration, but wasn't".format(
-                    self._tenant_migration_fixture.pids()))
+                    self._tenant_migration_fixture.pids()
+                )
+            )
 
     def resume(self, test):
         """Resume the thread before test."""
@@ -349,41 +364,50 @@ class _TenantMigrationThread(threading.Thread):
             raise errors.ServerFailure(msg)
 
     def _is_fail_point_abort_reason(self, abort_reason):
-        return abort_reason["code"] == self.INTERNAL_ERR_CODE and abort_reason[
-            "errmsg"] == "simulate a tenant migration error"
+        return (
+            abort_reason["code"] == self.INTERNAL_ERR_CODE
+            and abort_reason["errmsg"] == "simulate a tenant migration error"
+        )
 
     def _is_recipient_failover_abort_reason(self, abort_reason):
         return abort_reason["code"] == self.MIGRATION_ABORTED_ERR_CODE and abort_reason[
-            "errmsg"].find("Recipient failover happened during migration")
+            "errmsg"
+        ].find("Recipient failover happened during migration")
 
     def _create_migration_opts(self, donor_rs_index, recipient_rs_index):
         donor_rs = self._tenant_migration_fixture.get_replset(donor_rs_index)
         recipient_rs = self._tenant_migration_fixture.get_replset(recipient_rs_index)
         read_preference = {"mode": "primary"} if random.randint(0, 1) else {"mode": "secondary"}
-        return _TenantMigrationOptions(donor_rs, recipient_rs, self._tenant_id, read_preference,
-                                       self.logger)
+        return _TenantMigrationOptions(
+            donor_rs, recipient_rs, self._tenant_id, read_preference, self.logger
+        )
 
     def _create_client(self, fixture, **kwargs):
-        return fixture.mongo_client(username=self._auth_options["username"],
-                                    password=self._auth_options["password"],
-                                    authSource=self._auth_options["authenticationDatabase"],
-                                    authMechanism=self._auth_options["authenticationMechanism"],
-                                    uuidRepresentation='standard', **kwargs)
+        return fixture.mongo_client(
+            username=self._auth_options["username"],
+            password=self._auth_options["password"],
+            authSource=self._auth_options["authenticationDatabase"],
+            authMechanism=self._auth_options["authenticationMechanism"],
+            uuidRepresentation="standard",
+            **kwargs,
+        )
 
     def _check_tenant_migration_dbhash(self, migration_opts):
         # Set the donor connection string, recipient connection string, and migration uuid string
         # for the tenant migration dbhash check script.
-        self._shell_options[
-            "global_vars"]["TestData"]["donorConnectionString"] = migration_opts.get_donor_primary(
-            ).get_internal_connection_string()
-        self._shell_options["global_vars"]["TestData"][
-            "recipientConnectionString"] = migration_opts.get_recipient_primary(
-            ).get_internal_connection_string()
-        self._shell_options["global_vars"]["TestData"][
-            "migrationIdString"] = migration_opts.migration_id.__str__()
+        self._shell_options["global_vars"]["TestData"]["donorConnectionString"] = (
+            migration_opts.get_donor_primary().get_internal_connection_string()
+        )
+        self._shell_options["global_vars"]["TestData"]["recipientConnectionString"] = (
+            migration_opts.get_recipient_primary().get_internal_connection_string()
+        )
+        self._shell_options["global_vars"]["TestData"]["migrationIdString"] = (
+            migration_opts.migration_id.__str__()
+        )
 
         dbhash_test_case = dbhash_tenant_migration.CheckTenantMigrationDBHash(
-            self.logger, self._tenant_migration_fixture, self._shell_options)
+            self.logger, self._tenant_migration_fixture, self._shell_options
+        )
         dbhash_test_case.before_suite(self._test_report)
         dbhash_test_case.before_test(self._test, self._test_report)
         dbhash_test_case.after_test(self._test, self._test_report)
@@ -415,32 +439,49 @@ class _TenantMigrationThread(threading.Thread):
             self._wait_for_migration_garbage_collection(migration_opts)
 
             if not res["ok"]:
-                raise errors.ServerFailure("Tenant migration '" + str(migration_opts.migration_id) +
-                                           "' with donor replica set '" +
-                                           migration_opts.get_donor_name() + "' failed: " +
-                                           str(res))
+                raise errors.ServerFailure(
+                    "Tenant migration '"
+                    + str(migration_opts.migration_id)
+                    + "' with donor replica set '"
+                    + migration_opts.get_donor_name()
+                    + "' failed: "
+                    + str(res)
+                )
 
             if is_committed:
                 return True
 
             abort_reason = res["abortReason"]
             if self._is_recipient_failover_abort_reason(abort_reason):
-                self.logger.info("Tenant migration '%s' aborted due to recipient failover: %s",
-                                 migration_opts.migration_id, str(res))
+                self.logger.info(
+                    "Tenant migration '%s' aborted due to recipient failover: %s",
+                    migration_opts.migration_id,
+                    str(res),
+                )
                 return False
             elif self._is_fail_point_abort_reason(abort_reason):
                 self.logger.info(
-                    "Tenant migration '%s' with donor replica set '%s' aborted due to failpoint: " +
-                    "%s.", migration_opts.migration_id, migration_opts.get_donor_name(), str(res))
+                    "Tenant migration '%s' with donor replica set '%s' aborted due to failpoint: "
+                    + "%s.",
+                    migration_opts.migration_id,
+                    migration_opts.get_donor_name(),
+                    str(res),
+                )
                 return False
-            raise errors.ServerFailure("Tenant migration '" + str(migration_opts.migration_id) +
-                                       "' with donor replica set '" +
-                                       migration_opts.get_donor_name() +
-                                       "' aborted due to an error: " + str(res))
+            raise errors.ServerFailure(
+                "Tenant migration '"
+                + str(migration_opts.migration_id)
+                + "' with donor replica set '"
+                + migration_opts.get_donor_name()
+                + "' aborted due to an error: "
+                + str(res)
+            )
         except PyMongoError:
             self.logger.exception(
                 "Error running tenant migration '%s' with donor primary on replica set '%s'.",
-                migration_opts.migration_id, migration_opts.get_donor_name())
+                migration_opts.migration_id,
+                migration_opts.get_donor_name(),
+            )
             raise
 
     def _start_and_wait_for_migration(self, donor_client, migration_opts):  # noqa: D205,D400
@@ -450,34 +491,40 @@ class _TenantMigrationThread(threading.Thread):
 
         self.logger.info(
             f"Starting tenant migration '{migration_opts.migration_id}' on replica set "
-            f"'{migration_opts.get_donor_name()}'.")
+            f"'{migration_opts.get_donor_name()}'."
+        )
 
         while True:
             # Keep polling the migration state until the migration completes.
-            res = with_naive_retry(lambda: donor_client.admin.command({
-                "donorStartMigration":
-                    1,
-                "migrationId":
-                    Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE),
-                "recipientConnectionString":
-                    migration_opts.recipient_rs.get_driver_connection_url(),
-                "tenantId":
-                    migration_opts.tenant_id,
-                "readPreference":
-                    migration_opts.read_preference,
-            }))
+            res = with_naive_retry(
+                lambda: donor_client.admin.command(
+                    {
+                        "donorStartMigration": 1,
+                        "migrationId": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE),
+                        "recipientConnectionString": migration_opts.recipient_rs.get_driver_connection_url(),
+                        "tenantId": migration_opts.tenant_id,
+                        "readPreference": migration_opts.read_preference,
+                    }
+                )
+            )
 
             if res["state"] == "committed":
-                self.logger.info(f"Tenant migration '{migration_opts.migration_id}' on replica set "
-                                 f"'{migration_opts.get_donor_name()}' has committed.")
+                self.logger.info(
+                    f"Tenant migration '{migration_opts.migration_id}' on replica set "
+                    f"'{migration_opts.get_donor_name()}' has committed."
+                )
                 return res
             if res["state"] == "aborted":
-                self.logger.info(f"Tenant migration '{migration_opts.migration_id}' on replica set "
-                                 f"'{migration_opts.get_donor_name()}' has aborted: '{str(res)}'.")
+                self.logger.info(
+                    f"Tenant migration '{migration_opts.migration_id}' on replica set "
+                    f"'{migration_opts.get_donor_name()}' has aborted: '{str(res)}'."
+                )
                 return res
             if not res["ok"]:
-                self.logger.info(f"Tenant migration '{migration_opts.migration_id}' on replica set "
-                                 f"'{migration_opts.get_donor_name()}' has failed: '{str(res)}'.")
+                self.logger.info(
+                    f"Tenant migration '{migration_opts.migration_id}' on replica set "
+                    f"'{migration_opts.get_donor_name()}' has failed: '{str(res)}'."
+                )
                 return res
 
             time.sleep(self.POLL_INTERVAL_SECS)
@@ -486,23 +533,31 @@ class _TenantMigrationThread(threading.Thread):
         """Run donorForgetMigration to garbage collection the tenant migration denoted by migration_opts'."""
         self.logger.info(
             f"Forgetting tenant migration '{migration_opts.migration_id}' on replica set "
-            f"'{migration_opts.get_donor_name()}'.")
+            f"'{migration_opts.get_donor_name()}'."
+        )
 
         try:
-            with_naive_retry(lambda: donor_client.admin.command({
-                "donorForgetMigration": 1, "migrationId": Binary(migration_opts.migration_id.bytes,
-                                                                 UUID_SUBTYPE)
-            }))
+            with_naive_retry(
+                lambda: donor_client.admin.command(
+                    {
+                        "donorForgetMigration": 1,
+                        "migrationId": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE),
+                    }
+                )
+            )
         except OperationFailure as err:
             if err.code != self.NO_SUCH_MIGRATION_ERR_CODE:
                 raise
 
-            self.logger.info(f"Could not find tenant migration '{migration_opts.migration_id}' on "
-                             f"replica set '{migration_opts.get_donor_name()}': {str(err)}.")
+            self.logger.info(
+                f"Could not find tenant migration '{migration_opts.migration_id}' on "
+                f"replica set '{migration_opts.get_donor_name()}': {str(err)}."
+            )
         except PyMongoError:
             self.logger.exception(
                 f"Error forgetting tenant migration '{migration_opts.migration_id}' on "
-                f"replica set '{migration_opts.get_donor_name()}'.")
+                f"replica set '{migration_opts.get_donor_name()}'."
+            )
             raise
 
     def _wait_for_migration_garbage_collection(self, migration_opts):  # noqa: D205,D400
@@ -513,65 +568,81 @@ class _TenantMigrationThread(threading.Thread):
 
         def wait_for_gc_on_node(node, rs_name, collection_name):
             self.logger.info(
-                "Waiting for tenant migration '%s' to be garbage collected on donor node on " +
-                "port %d of replica set '%s'.", migration_opts.migration_id, node.port, rs_name)
+                "Waiting for tenant migration '%s' to be garbage collected on donor node on "
+                + "port %d of replica set '%s'.",
+                migration_opts.migration_id,
+                node.port,
+                rs_name,
+            )
 
             node_client = self._create_client(node)
 
             start = time.monotonic()
             while time.monotonic() - start < timeout_secs:
-                res = with_naive_retry(lambda: node_client.config.command(
-                    {"count": collection_name, "query": {"tenantId": migration_opts.tenant_id}}))
+                res = with_naive_retry(
+                    lambda: node_client.config.command(
+                        {"count": collection_name, "query": {"tenantId": migration_opts.tenant_id}}
+                    )
+                )
                 if res["n"] == 0:
                     return
                 time.sleep(self.POLL_INTERVAL_SECS)
 
             raise errors.ServerFailure(
-                f"Timed out while waiting for garbage collection of node on port {node.port}.")
+                f"Timed out while waiting for garbage collection of node on port {node.port}."
+            )
 
         try:
             donor_nodes = migration_opts.get_donor_nodes()
             for donor_node in donor_nodes:
-                wait_for_gc_on_node(donor_node, migration_opts.get_donor_name(),
-                                    "tenantMigrationDonors")
+                wait_for_gc_on_node(
+                    donor_node, migration_opts.get_donor_name(), "tenantMigrationDonors"
+                )
 
             recipient_nodes = migration_opts.get_recipient_nodes()
             for recipient_node in recipient_nodes:
-                wait_for_gc_on_node(recipient_node, migration_opts.get_recipient_name(),
-                                    "tenantMigrationRecipients")
+                wait_for_gc_on_node(
+                    recipient_node, migration_opts.get_recipient_name(), "tenantMigrationRecipients"
+                )
         except PyMongoError:
             self.logger.exception(
-                "Error waiting for tenant migration '%s' from donor replica set '%s" +
-                " to recipient replica set '%s' to be garbage collected.",
-                migration_opts.migration_id, migration_opts.get_donor_name(),
-                migration_opts.get_recipient_name())
+                "Error waiting for tenant migration '%s' from donor replica set '%s"
+                + " to recipient replica set '%s' to be garbage collected.",
+                migration_opts.migration_id,
+                migration_opts.get_donor_name(),
+                migration_opts.get_recipient_name(),
+            )
             raise
 
     def _wait_for_reroute_or_test_completion(self, donor_client, migration_opts):
         self.logger.info(
             f"Waiting for tenant migration '{migration_opts.migration_id}' on replica set "
             f"'{migration_opts.get_donor_name()}' to reroute at least one conflicting command. "
-            f"Stop waiting when the test finishes.")
+            f"Stop waiting when the test finishes."
+        )
 
         start_time = time.time()
         while not self.__lifecycle.is_test_finished():
             try:
                 doc = donor_client["testTenantMigration"]["rerouted"].find_one(
-                    {"_id": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE)})
+                    {"_id": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE)}
+                )
                 if doc is not None:
                     return
             except PyMongoError:
                 end_time = time.time()
                 self.logger.exception(
                     f"Error running find command on replica set '{migration_opts.get_donor_name()}' "
-                    f"after waiting for reroute for {(end_time - start_time) * 1000} ms")
+                    f"after waiting for reroute for {(end_time - start_time) * 1000} ms"
+                )
                 raise
 
             time.sleep(self.POLL_INTERVAL_SECS)
 
     def _drop_tenant_databases_on_recipient(self, migration_opts):
         self.logger.info(
-            f"Dropping tenant databases from replica set '{migration_opts.get_recipient_name()}'.")
+            f"Dropping tenant databases from replica set '{migration_opts.get_recipient_name()}'."
+        )
         recipient_client = self._create_client(migration_opts.recipient_rs)
 
         try:

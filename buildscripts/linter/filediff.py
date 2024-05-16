@@ -1,4 +1,5 @@
 """Modules for find which files should be linted."""
+
 import os
 import sys
 from typing import Tuple, List, Dict, Callable
@@ -12,8 +13,11 @@ if __name__ == "__main__" and __package__ is None:
 
 # pylint: disable=wrong-import-position
 from buildscripts.linter import git
-from buildscripts.patch_builds.change_data import generate_revision_map, \
-    RevisionMap, find_changed_files_in_repos
+from buildscripts.patch_builds.change_data import (
+    generate_revision_map,
+    RevisionMap,
+    find_changed_files_in_repos,
+)
 
 # pylint: enable=wrong-import-position
 
@@ -24,7 +28,8 @@ MONGO_REVISION_ENV_VAR = "REVISION"
 def _get_repos_and_revisions() -> Tuple[List[Repo], RevisionMap]:
     """Get the repo object and a map of revisions to compare against."""
     modules = [
-        path for path in git.get_module_paths()
+        path
+        for path in git.get_module_paths()
         # Exclude enterprise module; it's in the "modules" folder but does not correspond to a repo
         if "src/mongo/db/modules/enterprise" not in path
     ]

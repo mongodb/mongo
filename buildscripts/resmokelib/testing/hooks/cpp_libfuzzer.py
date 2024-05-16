@@ -41,8 +41,10 @@ class LibfuzzerHook(interface.Hook):
         self._merge_corpus(test)
 
     def _merge_corpus(self, test):
-        self.logger.info(f"Merge for {test.short_name()} libfuzzer test started, "
-                         f"merging to {test.merged_corpus_directory}.")
+        self.logger.info(
+            f"Merge for {test.short_name()} libfuzzer test started, "
+            f"merging to {test.merged_corpus_directory}."
+        )
         os.makedirs(test.merged_corpus_directory, exist_ok=True)
         default_args = [
             test.program_executable,

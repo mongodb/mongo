@@ -1,4 +1,5 @@
 """Wrapper around mongosym to download everything required."""
+
 import logging
 import os
 import shutil
@@ -9,7 +10,10 @@ from typing import Optional
 
 from buildscripts import mongosymb
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
-from buildscripts.resmokelib.setup_multiversion.setup_multiversion import SetupMultiversion, _DownloadOptions
+from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
+    SetupMultiversion,
+    _DownloadOptions,
+)
 from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path, mkdtemp_in_build_dir
 
@@ -28,12 +32,12 @@ class Symbolizer(Subcommand):
     """Interact with Symbolizer."""
 
     def __init__(
-            self,
-            task_id,
-            download_symbols_only,
-            bin_name=None,
-            all_args=None,
-            logger: Optional[logging.Logger] = None,
+        self,
+        task_id,
+        download_symbols_only,
+        bin_name=None,
+        all_args=None,
+        logger: Optional[logging.Logger] = None,
     ):
         """Constructor."""
 
@@ -76,7 +80,8 @@ class Symbolizer(Subcommand):
         logger = logging.Logger("symbolizer", level=log_level)
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(
-            logging.Formatter(fmt="[%(asctime)s - %(name)s - %(levelname)s] %(message)s"))
+            logging.Formatter(fmt="[%(asctime)s - %(name)s - %(levelname)s] %(message)s")
+        )
         logger.addHandler(handler)
         return logger
 
@@ -85,21 +90,26 @@ class Symbolizer(Subcommand):
         if not task_id:
             raise ValueError(
                 "A valid Evergreen Task ID is required. You can get it by double clicking the"
-                " Evergreen URL after `/task/` on any task page")
+                " Evergreen URL after `/task/` on any task page"
+            )
 
         if not download_symbols_only:
             if not bin_name:
                 raise ValueError(
-                    "A binary base name is required. This is usually `mongod` or `mongos`")
+                    "A binary base name is required. This is usually `mongod` or `mongos`"
+                )
 
             if not os.path.isfile(DEFAULT_SYMBOLIZER_LOCATION):
                 raise ValueError(
                     "llvm-symbolizer in MongoDB toolchain not found. Please run this on a "
-                    "virtual workstation or install the toolchain manually")
+                    "virtual workstation or install the toolchain manually"
+                )
 
             if not os.access("/data/mci", os.W_OK):
-                raise ValueError("Please ensure you have write access to /data/mci. "
-                                 "E.g. with `sudo mkdir -p /data/mci; sudo chown $USER /data/mci`")
+                raise ValueError(
+                    "Please ensure you have write access to /data/mci. "
+                    "E.g. with `sudo mkdir -p /data/mci; sudo chown $USER /data/mci`"
+                )
 
     def _get_multiversion_setup(self):
         if self.download_symbols_only:
@@ -113,12 +123,14 @@ class Symbolizer(Subcommand):
         version_id = self.task_info.version_id
         buildvariant_name = self.task_info.build_variant
 
-        urlinfo = self.multiversion_setup.get_urls(version=version_id,
-                                                   buildvariant_name=buildvariant_name)
+        urlinfo = self.multiversion_setup.get_urls(
+            version=version_id, buildvariant_name=buildvariant_name
+        )
         self.logger.info("Found urls to download and extract %s", urlinfo.urls)
 
-        self.multiversion_setup.download_and_extract_from_urls(urlinfo.urls, bin_suffix=None,
-                                                               install_dir=self.dest_dir)
+        self.multiversion_setup.download_and_extract_from_urls(
+            urlinfo.urls, bin_suffix=None, install_dir=self.dest_dir
+        )
 
     def _patch_diff_by_id(self):
         version_id = self.task_info.version_id
@@ -131,7 +143,7 @@ class Symbolizer(Subcommand):
         for module_name, diff in module_diffs.items():
             # TODO: enterprise.
             if "mongodb-mongo-" in module_name:
-                with open(os.path.join(self.dest_dir, "patch.diff"), 'w') as git_diff_file:
+                with open(os.path.join(self.dest_dir, "patch.diff"), "w") as git_diff_file:
                     git_diff_file.write(diff)
                     subprocess.run(["git", "apply", "patch.diff"], cwd=self.dest_dir, check=True)
 
@@ -142,8 +154,9 @@ class Symbolizer(Subcommand):
 
         try:
             cache_dir = mkdtemp_in_build_dir()
-            subprocess.run(["curl", "-L", "-o", "source.zip", source_url], cwd=cache_dir,
-                           check=True)
+            subprocess.run(
+                ["curl", "-L", "-o", "source.zip", source_url], cwd=cache_dir, check=True
+            )
             subprocess.run(["unzip", "-q", "source.zip"], cwd=cache_dir, check=True)
             subprocess.run(["rm", "source.zip"], cwd=cache_dir, check=True)
 
@@ -164,13 +177,15 @@ class Symbolizer(Subcommand):
         try:
             if os.path.isdir(self.dest_dir):
                 self.logger.info(
-                    "directory for build already exists, skipping fetching source and symbols")
+                    "directory for build already exists, skipping fetching source and symbols"
+                )
                 return
 
             self.logger.info("Getting source from GitHub...")
             self._get_source()
             self.logger.info(
-                "Downloading debug symbols and binaries, this may take a few minutes...")
+                "Downloading debug symbols and binaries, this may take a few minutes..."
+            )
             self._get_compile_artifacts()
             self.logger.info("Applying patch diff (if any)...")
             self._patch_diff_by_id()
@@ -187,18 +202,22 @@ class Symbolizer(Subcommand):
     def _parse_mongosymb_args(self):
         symbolizer_path = self.mongosym_args.symbolizer_path
         if symbolizer_path:
-            raise ValueError("Must use the default symbolizer from the toolchain,"
-                             f"not {symbolizer_path}")
+            raise ValueError(
+                "Must use the default symbolizer from the toolchain," f"not {symbolizer_path}"
+            )
         self.mongosym_args.symbolizer_path = DEFAULT_SYMBOLIZER_LOCATION
 
         sym_search_path = self.mongosym_args.path_to_executable
         if sym_search_path:
-            raise ValueError(f"Must not specify path_to_executable, the original path that "
-                             f"generated the symbols will be used: {sym_search_path}")
+            raise ValueError(
+                f"Must not specify path_to_executable, the original path that "
+                f"generated the symbols will be used: {sym_search_path}"
+            )
 
         # TODO: support non-hygienic builds.
         self.mongosym_args.path_to_executable = build_hygienic_bin_path(
-            parent=self.dest_dir, child=self.bin_name)
+            parent=self.dest_dir, child=self.bin_name
+        )
 
         self.mongosym_args.src_dir_to_move = self.dest_dir
 
@@ -230,22 +249,44 @@ class SymbolizerPlugin(PluginInterface):
         """
         parser = subparsers.add_parser(_COMMAND, help=_HELP)
         parser.add_argument(
-            "--task-id", '-t', action="store", type=str, required=True,
-            help="Fetch corresponding binaries and/or symbols given an Evergreen task ID")
+            "--task-id",
+            "-t",
+            action="store",
+            type=str,
+            required=True,
+            help="Fetch corresponding binaries and/or symbols given an Evergreen task ID",
+        )
 
         parser.add_argument(
-            "--binary-name", "-b", action="store", type=str, default="mongod",
-            help="Base name of the binary that generated the stacktrace; e.g. `mongod` or `mongos`")
+            "--binary-name",
+            "-b",
+            action="store",
+            type=str,
+            default="mongod",
+            help="Base name of the binary that generated the stacktrace; e.g. `mongod` or `mongos`",
+        )
 
-        parser.add_argument("--download-symbols-only", "-s", action="store_true", default=False,
-                            help="Just download the debug symbol tarball for the given task-id")
+        parser.add_argument(
+            "--download-symbols-only",
+            "-s",
+            action="store_true",
+            default=False,
+            help="Just download the debug symbol tarball for the given task-id",
+        )
 
-        parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False,
-                            help="Set DEBUG logging level.")
+        parser.add_argument(
+            "--debug",
+            "-d",
+            dest="debug",
+            action="store_true",
+            default=False,
+            help="Set DEBUG logging level.",
+        )
 
         group = parser.add_argument_group(
             "Verbatim mongosymb.py options for advanced usages",
-            description="Compatibility not guaranteed, use at your own risk")
+            description="Compatibility not guaranteed, use at your own risk",
+        )
         mongosymb.make_argument_parser(group)
 
     def parse(self, subcommand, parser, parsed_args, **kwargs):

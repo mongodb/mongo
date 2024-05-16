@@ -15,10 +15,13 @@ class CheckClusterIndexConsistency(jsfile.DataConsistencyHook):
         """Initialize CheckClusterIndexConsistency."""
 
         if not isinstance(fixture, shardedcluster.ShardedClusterFixture):
-            raise ValueError(f"'fixture' must be an instance of ShardedClusterFixture, but got"
-                             f" {fixture.__class__.__name__}")
+            raise ValueError(
+                f"'fixture' must be an instance of ShardedClusterFixture, but got"
+                f" {fixture.__class__.__name__}"
+            )
 
         description = "Check index consistency across cluster"
         js_filename = os.path.join("jstests", "hooks", "run_cluster_index_consistency.js")
-        super().__init__(hook_logger, fixture, js_filename, description,
-                         shell_options=shell_options)
+        super().__init__(
+            hook_logger, fixture, js_filename, description, shell_options=shell_options
+        )

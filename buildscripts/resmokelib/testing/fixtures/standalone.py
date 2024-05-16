@@ -22,11 +22,19 @@ from buildscripts.resmokelib.utils.history import HistoryDict
 class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a standalone mongod to run against."""
 
-    def __init__(self, logger: logging.Logger, job_num: int, fixturelib: FixtureLib,
-                 mongod_executable: Optional[str] = None, mongod_options: Optional[dict] = None,
-                 add_feature_flags: bool = False, dbpath_prefix: Optional[str] = None,
-                 preserve_dbpath: bool = False, port: Optional[int] = None,
-                 launch_mongot: bool = False):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        job_num: int,
+        fixturelib: FixtureLib,
+        mongod_executable: Optional[str] = None,
+        mongod_options: Optional[dict] = None,
+        add_feature_flags: bool = False,
+        dbpath_prefix: Optional[str] = None,
+        preserve_dbpath: bool = False,
+        port: Optional[int] = None,
+        launch_mongot: bool = False,
+    ):
         """Initialize MongoDFixture with different options for the mongod process.
 
         Args:
@@ -46,7 +54,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         """
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
         self.mongod_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongod_options, {}))
+            self.fixturelib.default_if_none(mongod_options, {})
+        )
 
         if "set_parameters" not in self.mongod_options:
             self.mongod_options["set_parameters"] = {}
@@ -59,14 +68,16 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             raise ValueError("Cannot specify both mongod_options.dbpath and dbpath_prefix")
 
         # Default to command line options if the YAML configuration is not passed in.
-        self.mongod_executable = self.fixturelib.default_if_none(mongod_executable,
-                                                                 self.config.MONGOD_EXECUTABLE)
+        self.mongod_executable = self.fixturelib.default_if_none(
+            mongod_executable, self.config.MONGOD_EXECUTABLE
+        )
 
         # The dbpath in mongod_options takes precedence over other settings to make it easier for
         # users to specify a dbpath containing data to test against.
         if "dbpath" not in self.mongod_options:
-            self.mongod_options["dbpath"] = os.path.join(self._dbpath_prefix,
-                                                         self.config.FIXTURE_SUBDIR)
+            self.mongod_options["dbpath"] = os.path.join(
+                self._dbpath_prefix, self.config.FIXTURE_SUBDIR
+            )
         self._dbpath = self.mongod_options["dbpath"]
 
         if self.config.ALWAYS_USE_LOG_FILES:
@@ -86,7 +97,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_port)
             # In future architectures, this could change
             self.mongod_options["searchIndexManagementHostAndPort"] = self.mongod_options[
-                "mongotHost"]
+                "mongotHost"
+            ]
         else:
             self.launch_mongot = False
         # If a suite enables launching mongot, the MongoTFixture will be created in setup_mongot,
@@ -103,8 +115,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.mongod_options["grpcPort"] = self.grpcPort
 
         # Always log backtraces to a file in the dbpath in our testing.
-        backtrace_log_file_name = os.path.join(self.get_dbpath_prefix(),
-                                               uuid.uuid4().hex + ".stacktrace")
+        backtrace_log_file_name = os.path.join(
+            self.get_dbpath_prefix(), uuid.uuid4().hex + ".stacktrace"
+        )
         self.mongod_options["set_parameters"]["backtraceLogFile"] = backtrace_log_file_name
 
     def setup(self):
@@ -118,9 +131,12 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         # Second return val is the port, which we ignore because we explicitly created the port above.
         # The port is used to set other mongod_option's here:
         # https://github.com/mongodb/mongo/blob/532a6a8ae7b8e7ab5939e900759c00794862963d/buildscripts/resmokelib/testing/fixtures/replicaset.py#L136
-        mongod, _ = launcher.launch_mongod_program(self.logger, self.job_num,
-                                                   executable=self.mongod_executable,
-                                                   mongod_options=self.mongod_options)
+        mongod, _ = launcher.launch_mongod_program(
+            self.logger,
+            self.job_num,
+            executable=self.mongod_executable,
+            mongod_options=self.mongod_options,
+        )
 
         try:
             msg = f"Starting mongod on port { self.port }{(' with embedded router on port ' + str(self.router_port)) if self.router_port else ''}...\n{ mongod.as_command() }"
@@ -143,7 +159,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         """:return: pids owned by this fixture if any."""
         out = [x.pid for x in [self.mongod] if x is not None]
         if not out:
-            self.logger.debug('Mongod not running when gathering standalone fixture pid.')
+            self.logger.debug("Mongod not running when gathering standalone fixture pid.")
         return out
 
     def _handle_await_ready_retry(self, deadline):
@@ -151,7 +167,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         if remaining <= 0.0:
             raise self.fixturelib.ServerFailure(
                 "Failed to connect to mongod on port {} after {} seconds".format(
-                    self.port, MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
+                    self.port, MongoDFixture.AWAIT_READY_TIMEOUT_SECS
+                )
+            )
 
         self.logger.info("Waiting to connect to mongod on port %d.", self.port)
         time.sleep(0.1)  # Wait a little bit before trying again.
@@ -166,8 +184,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         mongot_options["keyFile"] = self.mongod_options["keyFile"]
 
-        mongot = self.fixturelib.make_fixture("MongoTFixture", self.logger, self.job_num,
-                                              mongot_options=mongot_options)
+        mongot = self.fixturelib.make_fixture(
+            "MongoTFixture", self.logger, self.job_num, mongot_options=mongot_options
+        )
 
         mongot.setup()
         self.mongot = mongot
@@ -186,7 +205,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             if exit_code is not None:
                 raise self.fixturelib.ServerFailure(
                     "Could not connect to mongod on port {}, process ended"
-                    " unexpectedly with code {}.".format(self.port, exit_code))
+                    " unexpectedly with code {}.".format(self.port, exit_code)
+                )
 
             try:
                 # Use a shorter connection timeout to more closely satisfy the requested deadline.
@@ -216,14 +236,19 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         if mode == interface.TeardownMode.ABORT:
             self.logger.info(
                 "Attempting to send SIGABRT from resmoke to mongod on port %d with pid %d...",
-                self.port, self.mongod.pid)
+                self.port,
+                self.mongod.pid,
+            )
         else:
-            self.logger.info("Stopping mongod on port %d with pid %d...", self.port,
-                             self.mongod.pid)
+            self.logger.info(
+                "Stopping mongod on port %d with pid %d...", self.port, self.mongod.pid
+            )
         if not self.is_running():
             exit_code = self.mongod.poll()
-            msg = ("mongod on port {:d} was expected to be running, but wasn't. "
-                   "Process exited with code {:d}.").format(self.port, exit_code)
+            msg = (
+                "mongod on port {:d} was expected to be running, but wasn't. "
+                "Process exited with code {:d}."
+            ).format(self.port, exit_code)
             self.logger.warning(msg)
             raise self.fixturelib.ServerFailure(msg)
 
@@ -237,11 +262,16 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         if exit_code == 0 or (mode is not None and exit_code == -(mode.value)):
             self.logger.info("Successfully stopped the mongod on port {:d}.".format(self.port))
         else:
-            self.logger.warning("Stopped the mongod on port {:d}. "
-                                "Process exited with code {:d}.".format(self.port, exit_code))
+            self.logger.warning(
+                "Stopped the mongod on port {:d}. " "Process exited with code {:d}.".format(
+                    self.port, exit_code
+                )
+            )
             raise self.fixturelib.ServerFailure(
                 "mongod on port {:d} with pid {:d} exited with code {:d}".format(
-                    self.port, self.mongod.pid, exit_code))
+                    self.port, self.mongod.pid, exit_code
+                )
+            )
 
     def is_running(self):
         """Return true if the mongod is still operating."""
@@ -257,12 +287,21 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.logger.warning("The mongod fixture has not been set up yet.")
             return []
 
-        info = interface.NodeInfo(full_name=self.logger.full_name, name=self.logger.name,
-                                  port=self.port, pid=self.mongod.pid, router_port=self.router_port)
+        info = interface.NodeInfo(
+            full_name=self.logger.full_name,
+            name=self.logger.name,
+            port=self.port,
+            pid=self.mongod.pid,
+            router_port=self.router_port,
+        )
         return [info]
 
     def _get_hostname(self):
-        return self.logger.external_sut_hostname if self.config.NOOP_MONGO_D_S_PROCESSES else 'localhost'
+        return (
+            self.logger.external_sut_hostname
+            if self.config.NOOP_MONGO_D_S_PROCESSES
+            else "localhost"
+        )
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
@@ -286,16 +325,20 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 # The default verbosity setting for any tests that are not started with an Evergreen task id. This
 # will apply to any tests run locally.
 DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = {
-    "replication": {"rollback": 2}, "sharding": {"migration": 2, "rangeDeleter": 2},
-    "transaction": 4, "tenantMigration": 4
+    "replication": {"rollback": 2},
+    "sharding": {"migration": 2, "rangeDeleter": 2},
+    "transaction": 4,
+    "tenantMigration": 4,
 }
 
 # The default verbosity setting for any mongod processes running in Evergreen i.e. started with an
 # Evergreen task id.
 DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = {
-    "replication": {"election": 4, "heartbeats": 2, "initialSync": 2,
-                    "rollback": 2}, "sharding": {"migration": 2, "rangeDeleter": 2},
-    "storage": {"recovery": 2}, "transaction": 4, "tenantMigration": 4
+    "replication": {"election": 4, "heartbeats": 2, "initialSync": 2, "rollback": 2},
+    "sharding": {"migration": 2, "rangeDeleter": 2},
+    "storage": {"recovery": 2},
+    "transaction": 4,
+    "tenantMigration": 4,
 }
 
 
@@ -308,9 +351,13 @@ class MongodLauncher(object):
         self.config = fixturelib.get_config()
 
     def launch_mongod_program(
-            self, logger: logging.Logger, job_num: str, executable: Optional[str] = None,
-            process_kwargs: Optional[dict] = None,
-            mongod_options: Optional[HistoryDict] = None) -> tuple["process.Process", HistoryDict]:
+        self,
+        logger: logging.Logger,
+        job_num: str,
+        executable: Optional[str] = None,
+        process_kwargs: Optional[dict] = None,
+        mongod_options: Optional[HistoryDict] = None,
+    ) -> tuple["process.Process", HistoryDict]:
         """
         Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 
@@ -319,8 +366,9 @@ class MongodLauncher(object):
         @param process_kwargs - A dict of key-value pairs to pass to the process.
         @param mongod_options - A HistoryDict describing the various options to pass to the mongod.
         """
-        executable = self.fixturelib.default_if_none(executable,
-                                                     self.config.DEFAULT_MONGOD_EXECUTABLE)
+        executable = self.fixturelib.default_if_none(
+            executable, self.config.DEFAULT_MONGOD_EXECUTABLE
+        )
         mongod_options = self.fixturelib.default_if_none(mongod_options, {}).copy()
 
         # Apply the --setParameter command line argument. Command line options to resmoke.py override
@@ -334,7 +382,8 @@ class MongodLauncher(object):
         if "mongotHost" in mongod_options:
             suite_set_parameters["mongotHost"] = mongod_options.pop("mongotHost")
             suite_set_parameters["searchIndexManagementHostAndPort"] = mongod_options.pop(
-                "searchIndexManagementHostAndPort")
+                "searchIndexManagementHostAndPort"
+            )
         # Some storage options are both a mongod option (as in config file option and its equivalent
         # "--xyz" command line parameter) and a "--setParameter". In case of conflict, for instance
         # due to the config fuzzer adding "xyz" as a "--setParameter" when the "--xyz" option is
@@ -342,20 +391,22 @@ class MongodLauncher(object):
         # "--xyz" option discarded to avoid hitting an error due to conflicting definitions.
         mongod_option_and_set_parameter_conflicts = ["syncdelay", "journalCommitInterval"]
         for key in mongod_option_and_set_parameter_conflicts:
-            if (key in mongod_options and key in suite_set_parameters):
+            if key in mongod_options and key in suite_set_parameters:
                 del mongod_options[key]
 
         # Set default log verbosity levels if none were specified.
         if "logComponentVerbosity" not in suite_set_parameters:
-            suite_set_parameters[
-                "logComponentVerbosity"] = self.get_default_log_component_verbosity_for_mongod()
+            suite_set_parameters["logComponentVerbosity"] = (
+                self.get_default_log_component_verbosity_for_mongod()
+            )
 
         # orphanCleanupDelaySecs controls an artificial delay before cleaning up an orphaned chunk
         # that has migrated off of a shard, meant to allow most dependent queries on secondaries to
         # complete first. It defaults to 900, or 15 minutes, which is prohibitively long for tests.
         # Setting it in the .yml file overrides this.
-        if (("shardsvr" in mongod_options or "configsvr" in mongod_options)
-                and "orphanCleanupDelaySecs" not in suite_set_parameters):
+        if (
+            "shardsvr" in mongod_options or "configsvr" in mongod_options
+        ) and "orphanCleanupDelaySecs" not in suite_set_parameters:
             suite_set_parameters["orphanCleanupDelaySecs"] = 1
 
         # receiveChunkWaitForRangeDeleterTimeoutMS controls the amount of time an incoming migration
@@ -363,8 +414,9 @@ class MongodLauncher(object):
         # default is 10 seconds, but in some slower variants this is not enough time for the range
         # deleter to finish so we increase it here to 90 seconds. Setting a value for this parameter
         # in the .yml file overrides this.
-        if (("shardsvr" in mongod_options or "configsvr" in mongod_options)
-                and "receiveChunkWaitForRangeDeleterTimeoutMS" not in suite_set_parameters):
+        if (
+            "shardsvr" in mongod_options or "configsvr" in mongod_options
+        ) and "receiveChunkWaitForRangeDeleterTimeoutMS" not in suite_set_parameters:
             suite_set_parameters["receiveChunkWaitForRangeDeleterTimeoutMS"] = 90000
 
         # The LogicalSessionCache does automatic background refreshes in the server. This is
@@ -404,17 +456,21 @@ class MongodLauncher(object):
         # The default time for stepdown and quiesce mode in response to SIGTERM is 15 seconds. Reduce
         # this to 100ms for faster shutdown. On branches 4.4 and earlier, there is no quiesce mode, but
         # the default time for stepdown is 10 seconds.
-        if (("replSet" in mongod_options or "serverless" in mongod_options)
-                and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters):
+        if (
+            "replSet" in mongod_options or "serverless" in mongod_options
+        ) and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters:
             suite_set_parameters["shutdownTimeoutMillisForSignaledShutdown"] = 100
 
         if "enableFlowControl" not in suite_set_parameters and self.config.FLOW_CONTROL is not None:
-            suite_set_parameters["enableFlowControl"] = (self.config.FLOW_CONTROL == "on")
+            suite_set_parameters["enableFlowControl"] = self.config.FLOW_CONTROL == "on"
 
-        if ("failpoint.flowControlTicketOverride" not in suite_set_parameters
-                and self.config.FLOW_CONTROL_TICKETS is not None):
+        if (
+            "failpoint.flowControlTicketOverride" not in suite_set_parameters
+            and self.config.FLOW_CONTROL_TICKETS is not None
+        ):
             suite_set_parameters["failpoint.flowControlTicketOverride"] = {
-                "mode": "alwaysOn", "data": {"numTickets": self.config.FLOW_CONTROL_TICKETS}
+                "mode": "alwaysOn",
+                "data": {"numTickets": self.config.FLOW_CONTROL_TICKETS},
             }
 
         _add_testing_set_parameters(suite_set_parameters)
@@ -433,13 +489,14 @@ class MongodLauncher(object):
             shortcut_opts["wiredTigerCacheSizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
 
         # These options are just flags, so they should not take a value.
-        opts_without_vals = ("logappend")
+        opts_without_vals = "logappend"
 
         # Ensure that config servers run with journaling enabled.
         if "configsvr" in mongod_options:
             suite_set_parameters.setdefault("reshardingMinimumOperationDurationMillis", 5000)
-            suite_set_parameters.setdefault("reshardingCriticalSectionTimeoutMillis",
-                                            24 * 60 * 60 * 1000)  # 24 hours
+            suite_set_parameters.setdefault(
+                "reshardingCriticalSectionTimeoutMillis", 24 * 60 * 60 * 1000
+            )  # 24 hours
 
         # Command line options override the YAML configuration.
         for opt_name in shortcut_opts:
@@ -460,8 +517,9 @@ class MongodLauncher(object):
         if "configsvr" in mongod_options:
             mongod_options["storageEngine"] = "wiredTiger"
 
-        return self.fixturelib.mongod_program(logger, job_num, executable, process_kwargs,
-                                              mongod_options)
+        return self.fixturelib.mongod_program(
+            logger, job_num, executable, process_kwargs, mongod_options
+        )
 
     def get_default_log_component_verbosity_for_mongod(self):
         """Return the default 'logComponentVerbosity' value to use for mongod processes."""

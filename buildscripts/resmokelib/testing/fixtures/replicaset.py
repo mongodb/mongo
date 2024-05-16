@@ -42,31 +42,53 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS = 60
 
-    def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
-                 dbpath_prefix=None, preserve_dbpath=False, num_nodes=2,
-                 start_initial_sync_node=False, electable_initial_sync_node=False,
-                 write_concern_majority_journal_default=None, auth_options=None,
-                 replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
-                 use_replica_set_connection_string=None, linear_chain=False,
-                 default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
-                 replicaset_logging_prefix=None, replset_name=None,
-                 use_auto_bootstrap_procedure=None, initial_sync_uninitialized_fcv=False,
-                 hide_initial_sync_node_from_conn_string=False, launch_mongot=False):
+    def __init__(
+        self,
+        logger,
+        job_num,
+        fixturelib,
+        mongod_executable=None,
+        mongod_options=None,
+        dbpath_prefix=None,
+        preserve_dbpath=False,
+        num_nodes=2,
+        start_initial_sync_node=False,
+        electable_initial_sync_node=False,
+        write_concern_majority_journal_default=None,
+        auth_options=None,
+        replset_config_options=None,
+        voting_secondaries=True,
+        all_nodes_electable=False,
+        use_replica_set_connection_string=None,
+        linear_chain=False,
+        default_read_concern=None,
+        default_write_concern=None,
+        shard_logging_prefix=None,
+        replicaset_logging_prefix=None,
+        replset_name=None,
+        use_auto_bootstrap_procedure=None,
+        initial_sync_uninitialized_fcv=False,
+        hide_initial_sync_node_from_conn_string=False,
+        launch_mongot=False,
+    ):
         """Initialize ReplicaSetFixture."""
 
-        interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
-                                       dbpath_prefix=dbpath_prefix)
+        interface.ReplFixture.__init__(
+            self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix
+        )
 
         self.mongod_executable = mongod_executable
         self.mongod_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongod_options, {}))
+            self.fixturelib.default_if_none(mongod_options, {})
+        )
         self.preserve_dbpath = preserve_dbpath
         self.start_initial_sync_node = start_initial_sync_node
         self.electable_initial_sync_node = electable_initial_sync_node
         self.write_concern_majority_journal_default = write_concern_majority_journal_default
         self.auth_options = auth_options
         self.replset_config_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(replset_config_options, {}))
+            self.fixturelib.default_if_none(replset_config_options, {})
+        )
         self.voting_secondaries = voting_secondaries
         self.all_nodes_electable = all_nodes_electable
         self.use_replica_set_connection_string = use_replica_set_connection_string
@@ -84,8 +106,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Used by suites that run search integration tests.
         self.launch_mongot = launch_mongot
         # Use the values given from the command line if they exist for linear_chain and num_nodes.
-        linear_chain_option = self.fixturelib.default_if_none(self.config.LINEAR_CHAIN,
-                                                              linear_chain)
+        linear_chain_option = self.fixturelib.default_if_none(
+            self.config.LINEAR_CHAIN, linear_chain
+        )
         self.linear_chain = linear_chain_option if linear_chain_option else linear_chain
 
         # By default, we only use a replica set connection string if all nodes are capable of being
@@ -94,12 +117,14 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.use_replica_set_connection_string = self.all_nodes_electable
 
         if self.default_write_concern is True:
-            self.default_write_concern = self.fixturelib.make_historic({
-                "w": "majority",
-                # Use a "signature" value that won't typically match a value assigned in normal use.
-                # This way the wtimeout set by this override is distinguishable in the server logs.
-                "wtimeout": 5 * 60 * 1000 + 321,  # 300321ms
-            })
+            self.default_write_concern = self.fixturelib.make_historic(
+                {
+                    "w": "majority",
+                    # Use a "signature" value that won't typically match a value assigned in normal use.
+                    # This way the wtimeout set by this override is distinguishable in the server logs.
+                    "wtimeout": 5 * 60 * 1000 + 321,  # 300321ms
+                }
+            )
 
         # Set the default oplogSize to 511MB.
         self.mongod_options.setdefault("oplogSize", 511)
@@ -131,8 +156,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # get the auto generated replSet name and update the replSet name of the other mongods with it.
             self.nodes[0].setup()
             self.nodes[0].await_ready()
-            self._await_primary(
-            )  # Wait for writeable primary (this indicates replSet auto-intiiate finished).
+            self._await_primary()  # Wait for writeable primary (this indicates replSet auto-intiiate finished).
 
             client = interface.build_client(self.nodes[0], self.auth_options)
             res = client.admin.command("hello")
@@ -169,7 +193,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         # Initiate the replica set.
         members = []
-        for (i, node) in enumerate(self.nodes):
+        for i, node in enumerate(self.nodes):
             member_info = {"_id": i, "host": node.get_internal_connection_string()}
             if i > 0:
                 if not self.all_nodes_electable:
@@ -194,8 +218,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         repl_config = {"_id": self.replset_name, "protocolVersion": 1}
         client = interface.build_client(self.nodes[0], self.auth_options)
 
-        if client.local.system.replset.count_documents(
-                filter={}) and not self.use_auto_bootstrap_procedure:
+        if (
+            client.local.system.replset.count_documents(filter={})
+            and not self.use_auto_bootstrap_procedure
+        ):
             # Skip initializing the replset if there is an existing configuration.
             # Auto-bootstrapping will automatically create a configuration document but we do not
             # want to skip reconfiguring the replset (which adds the other nodes
@@ -204,15 +230,17 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             return
 
         if self.write_concern_majority_journal_default is not None:
-            repl_config[
-                "writeConcernMajorityJournalDefault"] = self.write_concern_majority_journal_default
+            repl_config["writeConcernMajorityJournalDefault"] = (
+                self.write_concern_majority_journal_default
+            )
         else:
             server_status = client.admin.command({"serverStatus": 1})
             if not server_status["storageEngine"]["persistent"]:
                 repl_config["writeConcernMajorityJournalDefault"] = False
 
-        if (self.replset_config_options.get("configsvr", False)
-                or (self.use_auto_bootstrap_procedure and not "shardsvr" in self.mongod_options)):
+        if self.replset_config_options.get("configsvr", False) or (
+            self.use_auto_bootstrap_procedure and not "shardsvr" in self.mongod_options
+        ):
             repl_config["configsvr"] = True
         if self.replset_config_options.get("settings"):
             replset_settings = self.replset_config_options["settings"]
@@ -249,10 +277,12 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # nodes are subsequently added to the set, since such nodes cannot set their FCV to
             # "latest". Therefore, we make sure the primary is "last-lts" FCV before adding in
             # nodes of different binary versions to the replica set.
-            client.admin.command({
-                "setFeatureCompatibilityVersion": self.fcv,
-                "fromConfigServer": True,
-            })
+            client.admin.command(
+                {
+                    "setFeatureCompatibilityVersion": self.fcv,
+                    "fromConfigServer": True,
+                }
+            )
 
         if self.nodes[1:]:
             # Wait to connect to each of the secondaries before running the replSetReconfig
@@ -295,7 +325,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         for node in self.nodes:
             pids.extend(node.pids())
         if not pids:
-            self.logger.debug('No members running when gathering replicaset fixture pids.')
+            self.logger.debug("No members running when gathering replicaset fixture pids.")
         return pids
 
     def _add_node_to_repl_set(self, client, repl_config, member_index, members):
@@ -308,14 +338,16 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             try:
                 # 'newlyAdded' removal reconfigs could bump the version.
                 # Get the current version to be safe.
-                curr_version = client.admin.command({"replSetGetConfig": 1})['config']['version']
+                curr_version = client.admin.command({"replSetGetConfig": 1})["config"]["version"]
                 repl_config["version"] = curr_version + 1
 
                 self.logger.info("Issuing replSetReconfig command: %s", repl_config)
-                client.admin.command({
-                    "replSetReconfig": repl_config,
-                    "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
-                })
+                client.admin.command(
+                    {
+                        "replSetReconfig": repl_config,
+                        "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000,
+                    }
+                )
                 break
             except pymongo.errors.OperationFailure as err:
                 # These error codes may be transient, and so we retry the reconfig with a
@@ -323,15 +355,16 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 # indefinitely.
                 # pylint: disable=too-many-boolean-expressions
                 if err.code not in [
-                        ReplicaSetFixture._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE,
-                        ReplicaSetFixture._CURRENT_CONFIG_NOT_COMMITTED_YET,
-                        ReplicaSetFixture._CONFIGURATION_IN_PROGRESS,
-                        ReplicaSetFixture._NODE_NOT_FOUND,
-                        ReplicaSetFixture._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
-                        ReplicaSetFixture._INTERRUPTED_DUE_TO_STORAGE_CHANGE
+                    ReplicaSetFixture._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE,
+                    ReplicaSetFixture._CURRENT_CONFIG_NOT_COMMITTED_YET,
+                    ReplicaSetFixture._CONFIGURATION_IN_PROGRESS,
+                    ReplicaSetFixture._NODE_NOT_FOUND,
+                    ReplicaSetFixture._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                    ReplicaSetFixture._INTERRUPTED_DUE_TO_STORAGE_CHANGE,
                 ]:
-                    msg = ("Operation failure while setting up the "
-                           "replica set fixture: {}").format(err)
+                    msg = (
+                        "Operation failure while setting up the " "replica set fixture: {}"
+                    ).format(err)
                     self.logger.error(msg)
                     raise self.fixturelib.ServerFailure(msg)
 
@@ -351,13 +384,15 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             except pymongo.errors.OperationFailure as err:
                 # Retry on NodeNotFound errors from the "replSetInitiate" command.
                 if err.code != ReplicaSetFixture._NODE_NOT_FOUND:
-                    msg = ("Operation failure while configuring the "
-                           "replica set fixture: {}").format(err)
+                    msg = (
+                        "Operation failure while configuring the " "replica set fixture: {}"
+                    ).format(err)
                     self.logger.error(msg)
                     raise self.fixturelib.ServerFailure(msg)
 
                 msg = "replSetInitiate failed attempt {0} of {1} with error: {2}".format(
-                    attempt, num_initiate_attempts, err)
+                    attempt, num_initiate_attempts, err
+                )
                 self.logger.error(msg)
                 if attempt == num_initiate_attempts:
                     msg = "Exceeded number of retries while configuring the replica set fixture"
@@ -377,14 +412,17 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             res = client.admin.command({"replSetGetStatus": 1})
             read_concern_majority_optime = res["optimes"]["readConcernMajorityOpTime"]
 
-            if (read_concern_majority_optime["t"] == primary_optime["t"]
-                    and read_concern_majority_optime["ts"] >= primary_optime["ts"]):
+            if (
+                read_concern_majority_optime["t"] == primary_optime["t"]
+                and read_concern_majority_optime["ts"] >= primary_optime["ts"]
+            ):
                 up_to_date_nodes.add(node.port)
 
             return len(up_to_date_nodes) == len(self.nodes)
 
-        self._await_cmd_all_nodes(check_rcmaj_optime, "waiting for last committed optime",
-                                  timeout_secs)
+        self._await_cmd_all_nodes(
+            check_rcmaj_optime, "waiting for last committed optime", timeout_secs
+        )
 
     def await_ready(self):
         """Wait for replica set to be ready."""
@@ -421,8 +459,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         for secondary in secondaries:
             client = secondary.mongo_client(read_preference=pymongo.ReadPreference.SECONDARY)
             while True:
-                self.logger.info("Waiting for secondary on port %d to become available.",
-                                 secondary.port)
+                self.logger.info(
+                    "Waiting for secondary on port %d to become available.", secondary.port
+                )
                 try:
                     is_secondary = client.admin.command("isMaster")["secondary"]
                     if is_secondary:
@@ -458,14 +497,17 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # propagate to all members and trigger a stable checkpoint on all persisted storage engines
         # nodes.
         admin = primary_client.get_database(
-            "admin", write_concern=pymongo.write_concern.WriteConcern(w="majority"))
+            "admin", write_concern=pymongo.write_concern.WriteConcern(w="majority")
+        )
         admin.command("appendOplogNote", data={"await_stable_recovery_timestamp": 1})
 
         for node in self.nodes:
-            self.logger.info("Waiting for node on port %d to have a stable recovery timestamp.",
-                             node.port)
-            client = interface.build_client(node, self.auth_options,
-                                            read_preference=pymongo.ReadPreference.SECONDARY)
+            self.logger.info(
+                "Waiting for node on port %d to have a stable recovery timestamp.", node.port
+            )
+            client = interface.build_client(
+                node, self.auth_options, read_preference=pymongo.ReadPreference.SECONDARY
+            )
 
             client_admin = client["admin"]
 
@@ -486,7 +528,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 if last_stable_recovery_timestamp.time:
                     self.logger.info(
                         "Node on port %d now has a stable timestamp for recovery. Time: %s",
-                        node.port, last_stable_recovery_timestamp)
+                        node.port,
+                        last_stable_recovery_timestamp,
+                    )
                     break
                 time.sleep(0.1)  # Wait a little bit before trying again.
 
@@ -498,16 +542,20 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         """
 
         get_config_res = client.admin.command(
-            {"replSetGetConfig": 1, "commitmentStatus": True, "$_internalIncludeNewlyAdded": True})
+            {"replSetGetConfig": 1, "commitmentStatus": True, "$_internalIncludeNewlyAdded": True}
+        )
         for member in get_config_res["config"]["members"]:
             if "newlyAdded" in member:
                 self.logger.info(
-                    "Waiting longer for 'newlyAdded' removals, " +
-                    "member %d is still 'newlyAdded'", member["_id"])
+                    "Waiting longer for 'newlyAdded' removals, "
+                    + "member %d is still 'newlyAdded'",
+                    member["_id"],
+                )
                 return True
         if not get_config_res["commitmentStatus"]:
-            self.logger.info("Waiting longer for 'newlyAdded' removals, " +
-                             "config is not yet committed")
+            self.logger.info(
+                "Waiting longer for 'newlyAdded' removals, " + "config is not yet committed"
+            )
             return True
 
         return False
@@ -550,38 +598,44 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         while True:
             client = interface.build_client(self.get_primary(), self.auth_options)
             config_shard_count = client.get_database("config").command(
-                {"count": "shards", "query": {"_id": "config"}})
+                {"count": "shards", "query": {"_id": "config"}}
+            )
 
-            if config_shard_count['n'] == 1:
+            if config_shard_count["n"] == 1:
                 break
 
             if timeout_occurred():
                 port = self.get_primary().port
                 raise self.fixturelib.ServerFailure(
-                    "mongod on port: {} failed waiting for auto-bootstrapped config shard success after {} seconds"
-                    .format(port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
+                    "mongod on port: {} failed waiting for auto-bootstrapped config shard success after {} seconds".format(
+                        port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS
+                    )
+                )
             time.sleep(0.1)
 
-        self.logger.info("%s successfully auto-bootstrapped as a config shard...",
-                         connection_string)
+        self.logger.info(
+            "%s successfully auto-bootstrapped as a config shard...", connection_string
+        )
 
     def _check_initial_sync_node_has_uninitialized_fcv(self, initial_sync_node):
         sync_node_conn = initial_sync_node.mongo_client()
         self.logger.info("Checking that initial sync node has uninitialized fcv")
         try:
             fcv = sync_node_conn.admin.command(
-                {'getParameter': 1, 'featureCompatibilityVersion': 1})
+                {"getParameter": 1, "featureCompatibilityVersion": 1}
+            )
 
             msg = "Initial sync node should have an uninitialized FCV, but got fcv: " + str(fcv)
             raise self.fixturelib.ServerFailure(msg)
         except pymongo.errors.OperationFailure as err:
-            if err.code == 258:  #codeName == 'UnknownFeatureCompatibilityVersion'
+            if err.code == 258:  # codeName == 'UnknownFeatureCompatibilityVersion'
                 return
             raise
 
     def _pause_initial_sync_at_uninitialized_fcv(self, initial_sync_node):
         failpointOnCmd = {
-            'configureFailPoint': 'initialSyncHangAfterResettingFCV', 'mode': 'alwaysOn'
+            "configureFailPoint": "initialSyncHangAfterResettingFCV",
+            "mode": "alwaysOn",
         }
         sync_node_conn = initial_sync_node.mongo_client()
         self.logger.info("Pausing initial sync at failpoint")
@@ -590,26 +644,37 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     def _unpause_and_finish_initial_sync(self, initial_sync_node):
         failpoint_off_cmd = {
-            'configureFailPoint': 'initialSyncHangAfterResettingFCV', 'mode': 'off'
+            "configureFailPoint": "initialSyncHangAfterResettingFCV",
+            "mode": "off",
         }
         self.logger.info("Unpausing initial sync")
         sync_node_conn = initial_sync_node.mongo_client()
         sync_node_conn.admin.command(failpoint_off_cmd)
 
         wait_for_initial_sync_finish_cmd = bson.SON(
-            [("replSetTest", 1), ("waitForMemberState", 2),
-             ("timeoutMillis", interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000)])
+            [
+                ("replSetTest", 1),
+                ("waitForMemberState", 2),
+                (
+                    "timeoutMillis",
+                    interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000,
+                ),
+            ]
+        )
         while True:
             try:
                 self.logger.info("Waiting for initial sync to finish")
                 sync_node_conn.admin.command(wait_for_initial_sync_finish_cmd)
                 break
             except pymongo.errors.OperationFailure as err:
-                if err.code not in (self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
-                                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                if err.code not in (
+                    self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE,
+                ):
                     raise
-                msg = ("Interrupted while waiting for node to reach secondary state, retrying: {}"
-                       ).format(err)
+                msg = (
+                    "Interrupted while waiting for node to reach secondary state, retrying: {}"
+                ).format(err)
                 self.logger.error(msg)
 
     def _do_teardown(self, mode=None):
@@ -617,8 +682,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         running_at_start = self.is_running()
         if not running_at_start:
-            self.logger.info("All members of the replica set were expected to be running, "
-                             "but weren't.")
+            self.logger.info(
+                "All members of the replica set were expected to be running, " "but weren't."
+            )
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
@@ -658,8 +724,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             """Return if `node` is master."""
             is_master = client.admin.command("isMaster")["ismaster"]
             if is_master:
-                self.logger.info("The node on port %d is primary of replica set '%s'", node.port,
-                                 self.replset_name)
+                self.logger.info(
+                    "The node on port %d is primary of replica set '%s'",
+                    node.port,
+                    self.replset_name,
+                )
                 return True
             return False
 
@@ -709,9 +778,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Check that the fixture is still running before stepping down or killing the primary.
         # This ensures we still detect some cases in which the fixture has already crashed.
         if not self.is_running():
-            raise self.fixturelib.ServerFailure("ReplicaSetFixture {} expected to be running in"
-                                                " ContinuousStepdown, but wasn't.".format(
-                                                    self.replset_name))
+            raise self.fixturelib.ServerFailure(
+                "ReplicaSetFixture {} expected to be running in"
+                " ContinuousStepdown, but wasn't.".format(self.replset_name)
+            )
 
         # If we're running with background reconfigs, it's possible to be in a scenario
         # where we kill a necessary voting node (i.e. in a 5 node repl set), only 2 are
@@ -731,13 +801,19 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         should_kill = kill and random.choice([True, False])
         action = "Killing" if should_kill else "Terminating"
-        self.logger.info("%s the primary on port %d of replica set '%s'.", action, primary.port,
-                         self.replset_name)
+        self.logger.info(
+            "%s the primary on port %d of replica set '%s'.",
+            action,
+            primary.port,
+            self.replset_name,
+        )
 
         # We send the mongod process the signal to exit but don't immediately wait for it to
         # exit because clean shutdown may take a while and we want to restore write availability
         # as quickly as possible.
-        teardown_mode = interface.TeardownMode.KILL if should_kill else interface.TeardownMode.TERMINATE
+        teardown_mode = (
+            interface.TeardownMode.KILL if should_kill else interface.TeardownMode.TERMINATE
+        )
         primary.mongod.stop(mode=teardown_mode)
         return True
 
@@ -770,7 +846,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 if chosen_index is None or max_optime is None:
                     raise self.fixturelib.ServerFailure(
                         "Failed to find a secondary eligible for "
-                        f"election; index: {chosen_index}, optime: {max_optime}")
+                        f"election; index: {chosen_index}, optime: {max_optime}"
+                    )
 
                 return self.nodes[chosen_index]
 
@@ -785,7 +862,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             if chosen_node.change_version_if_needed(primary):
                 self.logger.info(
                     "Waiting for the chosen secondary on port %d of replica set '%s' to exit.",
-                    chosen_node.port, self.replset_name)
+                    chosen_node.port,
+                    self.replset_name,
+                )
 
                 teardown_mode = interface.TeardownMode.TERMINATE
                 chosen_node.mongod.stop(mode=teardown_mode)
@@ -793,7 +872,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
                 self.logger.info(
                     "Attempting to restart the chosen secondary on port %d of replica set '%s'.",
-                    chosen_node.port, self.replset_name)
+                    chosen_node.port,
+                    self.replset_name,
+                )
 
                 chosen_node.setup()
                 self.logger.info(interface.create_fixture_table(self))
@@ -805,7 +886,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             if time.time() - retry_start_time > retry_time_secs:
                 raise self.fixturelib.ServerFailure(
                     "The old primary on port {} of replica set {} did not step up in"
-                    " {} seconds.".format(chosen_node.port, self.replset_name, retry_time_secs))
+                    " {} seconds.".format(chosen_node.port, self.replset_name, retry_time_secs)
+                )
 
         return chosen_node
 
@@ -814,7 +896,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         try:
             self.logger.info(
                 "Attempting to step up the chosen secondary on port %d of replica set '%s'.",
-                node.port, self.replset_name)
+                node.port,
+                self.replset_name,
+            )
             client = interface.build_client(node, auth_options)
             client.admin.command("replSetStepUp")
             return True
@@ -823,8 +907,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # not receiving enough votes. This can happen when the 'chosen' secondary's opTime
             # is behind that of other secondaries. We handle this by attempting to elect a
             # different secondary.
-            self.logger.info("Failed to step up the secondary on port %d of replica set '%s'.",
-                             node.port, self.replset_name)
+            self.logger.info(
+                "Failed to step up the secondary on port %d of replica set '%s'.",
+                node.port,
+                self.replset_name,
+            )
             return False
         except pymongo.errors.AutoReconnect:
             # It is possible for a replSetStepUp to fail with AutoReconnect if that node goes
@@ -833,8 +920,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     def restart_node(self, chosen):
         """Restart the new step up node."""
-        self.logger.info("Waiting for the old primary on port %d of replica set '%s' to exit.",
-                         chosen.port, self.replset_name)
+        self.logger.info(
+            "Waiting for the old primary on port %d of replica set '%s' to exit.",
+            chosen.port,
+            self.replset_name,
+        )
 
         exit_code = chosen.mongod.wait()
         # This function is called after stop_primary() which could kill or cleanly shutdown the
@@ -842,14 +932,22 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         if exit_code in (0, -interface.TeardownMode.KILL.value):
             self.logger.info("Successfully stopped the mongod on port {:d}.".format(chosen.port))
         else:
-            self.logger.warning("Stopped the mongod on port {:d}. "
-                                "Process exited with code {:d}.".format(chosen.port, exit_code))
+            self.logger.warning(
+                "Stopped the mongod on port {:d}. " "Process exited with code {:d}.".format(
+                    chosen.port, exit_code
+                )
+            )
             raise self.fixturelib.ServerFailure(
                 "mongod on port {:d} with pid {:d} exited with code {:d}".format(
-                    chosen.port, chosen.mongod.pid, exit_code))
+                    chosen.port, chosen.mongod.pid, exit_code
+                )
+            )
 
-        self.logger.info("Attempting to restart the old primary on port %d of replica set '%s'.",
-                         chosen.port, self.replset_name)
+        self.logger.info(
+            "Attempting to restart the old primary on port %d of replica set '%s'.",
+            chosen.port,
+            self.replset_name,
+        )
 
         # Restart the mongod on the old primary and wait until we can contact it again. Keep the
         # original preserve_dbpath to restore after restarting the mongod.
@@ -877,8 +975,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         primary = self.get_primary()
         client = primary.mongo_client()
 
-        members = client.admin.command({"replSetGetConfig": 1})['config']['members']
-        voting_members = [member['host'] for member in members if member['votes'] == 1]
+        members = client.admin.command({"replSetGetConfig": 1})["config"]["members"]
+        voting_members = [member["host"] for member in members if member["votes"] == 1]
 
         return voting_members
 
@@ -899,19 +997,24 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         mongod_options = self.mongod_options.copy()
 
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "node{}".format(index))
-        mongod_options["set_parameters"] = mongod_options.get("set_parameters",
-                                                              self.fixturelib.make_historic(
-                                                                  {})).copy()
+        mongod_options["set_parameters"] = mongod_options.get(
+            "set_parameters", self.fixturelib.make_historic({})
+        ).copy()
 
         if index == 0 and self.use_auto_bootstrap_procedure:
             del mongod_options["replSet"]
 
         if self.linear_chain and index > 0:
-            self.mongod_options["set_parameters"][
-                "failpoint.forceSyncSourceCandidate"] = self.fixturelib.make_historic({
-                    "mode": "alwaysOn",
-                    "data": {"hostAndPort": self.nodes[index - 1].get_internal_connection_string()}
-                })
+            self.mongod_options["set_parameters"]["failpoint.forceSyncSourceCandidate"] = (
+                self.fixturelib.make_historic(
+                    {
+                        "mode": "alwaysOn",
+                        "data": {
+                            "hostAndPort": self.nodes[index - 1].get_internal_connection_string()
+                        },
+                    }
+                )
+            )
         return mongod_options
 
     def get_logger_for_mongod(self, index):
@@ -932,14 +1035,16 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         if self.shard_logging_prefix is not None:
             node_name = f"{self.shard_logging_prefix}:{node_name}"
-            return self.fixturelib.new_fixture_node_logger("ShardedClusterFixture", self.job_num,
-                                                           node_name)
+            return self.fixturelib.new_fixture_node_logger(
+                "ShardedClusterFixture", self.job_num, node_name
+            )
 
         if self.replicaset_logging_prefix is not None:
             node_name = f"{self.replicaset_logging_prefix}:{node_name}"
 
-        return self.fixturelib.new_fixture_node_logger(self.__class__.__name__, self.job_num,
-                                                       node_name)
+        return self.fixturelib.new_fixture_node_logger(
+            self.__class__.__name__, self.job_num, node_name
+        )
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
@@ -995,13 +1100,15 @@ def get_last_optime(client, fixturelib):
     optime_is_empty = False
 
     if isinstance(optime, bson.Timestamp):  # PV0
-        optime_is_empty = (optime == bson.Timestamp(0, 0))
+        optime_is_empty = optime == bson.Timestamp(0, 0)
     else:  # PV1
-        optime_is_empty = (optime["ts"] == bson.Timestamp(0, 0) and optime["t"] == -1)
+        optime_is_empty = optime["ts"] == bson.Timestamp(0, 0) and optime["t"] == -1
 
     if optime_is_empty:
         raise fixturelib.ServerFailure(
             "Uninitialized opTime being reported by {addr[0]}:{addr[1]}: {repl_set_status}".format(
-                addr=client.address, repl_set_status=repl_set_status))
+                addr=client.address, repl_set_status=repl_set_status
+            )
+        )
 
     return optime

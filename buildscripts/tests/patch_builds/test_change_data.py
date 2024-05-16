@@ -1,4 +1,5 @@
 """Unit tests for buildscripts.patch_builds.change_data.py."""
+
 from __future__ import absolute_import
 
 import os

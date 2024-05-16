@@ -19,16 +19,22 @@ def find_all_failed(bin_path: str) -> list[str]:
             if contents:
                 ignored_paths.append(contents)
 
-    process = subprocess.run([bin_path, "--format=json", "--mode=check", "-r", "./"], check=True,
-                             capture_output=True)
+    process = subprocess.run(
+        [bin_path, "--format=json", "--mode=check", "-r", "./"], check=True, capture_output=True
+    )
     buildifier_results = json.loads(process.stdout)
     if buildifier_results["success"]:
         return []
 
     return [
-        result["filename"] for result in buildifier_results["files"]
-        if (not result["formatted"] and \
-            not any(result["filename"].startswith(ignored_path) for ignored_path in ignored_paths))
+        result["filename"]
+        for result in buildifier_results["files"]
+        if (
+            not result["formatted"]
+            and not any(
+                result["filename"].startswith(ignored_path) for ignored_path in ignored_paths
+            )
+        )
     ]
 
 
@@ -44,14 +50,16 @@ def fix_all(bin_path: str):
 
 def lint(bin_path: str, files: list[str], generate_report: bool):
     for file in files:
-        process = subprocess.run([bin_path, "--format=json", "--mode=check", file], check=True,
-                                 capture_output=True)
+        process = subprocess.run(
+            [bin_path, "--format=json", "--mode=check", file], check=True, capture_output=True
+        )
         result = json.loads(process.stdout)
         if result["success"]:
             continue
         # This purposefully gives a exit code of 4 when there is a diff
-        process = subprocess.run([bin_path, "--mode=diff", file], capture_output=True,
-                                 encoding='utf-8')
+        process = subprocess.run(
+            [bin_path, "--mode=diff", file], capture_output=True, encoding="utf-8"
+        )
         if process.returncode not in (0, 4):
             raise RuntimeError()
         diff = process.stdout
@@ -62,7 +70,8 @@ def lint(bin_path: str, files: list[str], generate_report: bool):
             header = (
                 "There are linting errors in this file, fix them with one of the following commands:\n"
                 "python3 buildscripts/buildifier.py fix-all\n"
-                f"python3 buildscripts/buildifier.py fix {file}\n\n")
+                f"python3 buildscripts/buildifier.py fix {file}\n\n"
+            )
             report = make_report(f"{file} warnings", json.dumps(result, indent=2), 1)
             try_combine_reports(report)
             put_report(report)
@@ -79,15 +88,20 @@ def fix(bin_path: str, files: list[str]):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='buildifier wrapper')
+    parser = argparse.ArgumentParser(description="buildifier wrapper")
     parser.add_argument(
-        "--binary-dir", "-b", type=str,
+        "--binary-dir",
+        "-b",
+        type=str,
         help="Path to the buildifier binary, defaults to looking in the current directory.",
-        default="")
+        default="",
+    )
     parser.add_argument(
-        "--generate-report", action="store_true",
+        "--generate-report",
+        action="store_true",
         help="Whether or not a report of the lint errors should be generated for evergreen.",
-        default=False)
+        default=False,
+    )
     parser.set_defaults(subcommand=None)
 
     sub = parser.add_subparsers(title="buildifier subcommands", help="sub-command help")
@@ -108,7 +122,8 @@ def main():
 
     args = parser.parse_args()
     assert os.path.abspath(os.curdir) == str(
-        mongo_dir.absolute()), "buildifier.py must be run from the root of the mongo repo"
+        mongo_dir.absolute()
+    ), "buildifier.py must be run from the root of the mongo repo"
     binary_name = "buildifier.exe" if platform.system() == "Windows" else "buildifier"
     if args.binary_dir:
         binary_path = os.path.join(args.binary_dir, binary_name)

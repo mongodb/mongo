@@ -1,4 +1,5 @@
 """The unittest.TestCase for Python unittests."""
+
 import os
 import sys
 
@@ -18,7 +19,8 @@ class PyTestCase(interface.ProcessTestCase):
 
     def _make_process(self):
         return core.programs.generic_program(
-            self.logger, [sys.executable, "-m", "unittest", self.test_module_name])
+            self.logger, [sys.executable, "-m", "unittest", self.test_module_name]
+        )
 
     @property
     def test_module_name(self):

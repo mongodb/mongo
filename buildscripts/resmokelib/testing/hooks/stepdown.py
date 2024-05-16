@@ -21,18 +21,30 @@ from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interfa
 class ContinuousStepdown(interface.Hook):
     """Regularly connect to replica sets and send a replSetStepDown command."""
 
-    DESCRIPTION = ("Continuous stepdown (steps down the primary of replica sets at regular"
-                   " intervals)")
+    DESCRIPTION = (
+        "Continuous stepdown (steps down the primary of replica sets at regular" " intervals)"
+    )
 
     IS_BACKGROUND = True
 
     # The hook stops the fixture partially during its execution.
     STOPS_FIXTURE = True
 
-    def __init__(self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
-                 stepdown_interval_ms=8000, terminate=False, kill=False, randomize_kill=False,
-                 use_action_permitted_file=False, background_reconfig=False, auth_options=None,
-                 should_downgrade=False):
+    def __init__(
+        self,
+        hook_logger,
+        fixture,
+        config_stepdown=True,
+        shard_stepdown=True,
+        stepdown_interval_ms=8000,
+        terminate=False,
+        kill=False,
+        randomize_kill=False,
+        use_action_permitted_file=False,
+        background_reconfig=False,
+        auth_options=None,
+        should_downgrade=False,
+    ):
         """Initialize the ContinuousStepdown.
 
         Args:
@@ -84,10 +96,12 @@ class ContinuousStepdown(interface.Hook):
         dbpath_prefix = fixture.get_dbpath_prefix()
 
         if use_action_permitted_file:
-            self.__action_files = lifecycle_interface.ActionFiles._make([
-                os.path.join(dbpath_prefix, field)
-                for field in lifecycle_interface.ActionFiles._fields
-            ])
+            self.__action_files = lifecycle_interface.ActionFiles._make(
+                [
+                    os.path.join(dbpath_prefix, field)
+                    for field in lifecycle_interface.ActionFiles._fields
+                ]
+            )
         else:
             self.__action_files = None
 
@@ -102,9 +116,18 @@ class ContinuousStepdown(interface.Hook):
             lifecycle = lifecycle_interface.FlagBasedThreadLifecycle()
 
         self._stepdown_thread = _StepdownThread(
-            self.logger, self._mongos_fixtures, self._rs_fixtures, self._stepdown_interval_secs,
-            self._terminate, self._kill, lifecycle, self._background_reconfig, self._fixture,
-            self._auth_options, self._should_downgrade)
+            self.logger,
+            self._mongos_fixtures,
+            self._rs_fixtures,
+            self._stepdown_interval_secs,
+            self._terminate,
+            self._kill,
+            lifecycle,
+            self._background_reconfig,
+            self._fixture,
+            self._auth_options,
+            self._should_downgrade,
+        )
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
@@ -131,7 +154,8 @@ class ContinuousStepdown(interface.Hook):
             if not fixture.all_nodes_electable:
                 raise ValueError(
                     "The replica sets that are the target of the ContinuousStepdown hook must have"
-                    " the 'all_nodes_electable' option set.")
+                    " the 'all_nodes_electable' option set."
+                )
             self._rs_fixtures.append(fixture)
         elif isinstance(fixture, shardedcluster.ShardedClusterFixture):
             if self._shard_stepdown:
@@ -146,7 +170,8 @@ class ContinuousStepdown(interface.Hook):
             if not fixture.all_nodes_electable:
                 raise ValueError(
                     "The replica sets that are the target of the ContinuousStepdown hook must have"
-                    " the 'all_nodes_electable' option set.")
+                    " the 'all_nodes_electable' option set."
+                )
 
             for rs_fixture in fixture.get_replsets():
                 self._rs_fixtures.append(rs_fixture)
@@ -158,13 +183,24 @@ class ContinuousStepdown(interface.Hook):
 
 def is_shard_split(fixture):
     """Used to determine if the provided fixture is an instance of the ShardSplitFixture class."""
-    return fixture.__class__.__name__ == 'ShardSplitFixture'
+    return fixture.__class__.__name__ == "ShardSplitFixture"
 
 
 class _StepdownThread(threading.Thread):
-    def __init__(self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs, terminate,
-                 kill, stepdown_lifecycle, background_reconfig, fixture, auth_options=None,
-                 should_downgrade=False):
+    def __init__(
+        self,
+        logger,
+        mongos_fixtures,
+        rs_fixtures,
+        stepdown_interval_secs,
+        terminate,
+        kill,
+        stepdown_lifecycle,
+        background_reconfig,
+        fixture,
+        auth_options=None,
+        should_downgrade=False,
+    ):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
@@ -220,8 +256,10 @@ class _StepdownThread(threading.Thread):
                     # Wait until each replica set has a primary, so the test can make progress.
                     self._await_primaries()
                     self._last_exec = time.time()
-                    self.logger.info("Completed stepdown of all primaries in %0d ms",
-                                     (self._last_exec - now) * 1000)
+                    self.logger.info(
+                        "Completed stepdown of all primaries in %0d ms",
+                        (self._last_exec - now) * 1000,
+                    )
 
                 if is_shard_split(self._fixture):
                     self._rs_fixtures = []
@@ -268,12 +306,14 @@ class _StepdownThread(threading.Thread):
             if not rs_fixture.is_running():
                 raise errors.ServerFailure(
                     "ReplicaSetFixture with pids {} expected to be running in"
-                    " ContinuousStepdown, but wasn't.".format(rs_fixture.pids()))
+                    " ContinuousStepdown, but wasn't.".format(rs_fixture.pids())
+                )
         for mongos_fixture in self._mongos_fixtures:
             if not mongos_fixture.is_running():
-                raise errors.ServerFailure("MongoSFixture with pids {} expected to be running in"
-                                           " ContinuousStepdown, but wasn't.".format(
-                                               mongos_fixture.pids()))
+                raise errors.ServerFailure(
+                    "MongoSFixture with pids {} expected to be running in"
+                    " ContinuousStepdown, but wasn't.".format(mongos_fixture.pids())
+                )
 
     def resume(self):
         """Resume the thread."""
@@ -281,7 +321,8 @@ class _StepdownThread(threading.Thread):
 
         self.logger.info(
             "Current statistics about which nodes have been successfully stepped up: %s",
-            self._step_up_stats)
+            self._step_up_stats,
+        )
 
     def _wait(self, timeout):
         # Wait until stop or timeout.
@@ -314,15 +355,19 @@ class _StepdownThread(threading.Thread):
 
         secondaries = rs_fixture.get_secondaries()
 
-        self.logger.info("Stepping down primary on port %d of replica set '%s'", old_primary.port,
-                         rs_fixture.replset_name)
+        self.logger.info(
+            "Stepping down primary on port %d of replica set '%s'",
+            old_primary.port,
+            rs_fixture.replset_name,
+        )
         if self._terminate:
             if not rs_fixture.stop_primary(old_primary, self._background_reconfig, self._kill):
                 return
 
         if self._should_downgrade:
-            new_primary = rs_fixture.change_version_and_restart_node(old_primary,
-                                                                     self._auth_options)
+            new_primary = rs_fixture.change_version_and_restart_node(
+                old_primary, self._auth_options
+            )
         else:
 
             def step_up_secondary():
@@ -330,11 +375,15 @@ class _StepdownThread(threading.Thread):
                     chosen = random.choice(secondaries)
                     self.logger.info(
                         "Chose secondary on port %d of replica set '%s' for step up attempt.",
-                        chosen.port, rs_fixture.replset_name)
+                        chosen.port,
+                        rs_fixture.replset_name,
+                    )
                     if not rs_fixture.stepup_node(chosen, self._auth_options):
                         self.logger.info(
                             "Attempt to step up secondary on port %d of replica set '%s' failed.",
-                            chosen.port, rs_fixture.replset_name)
+                            chosen.port,
+                            rs_fixture.replset_name,
+                        )
                         secondaries.remove(chosen)
                     else:
                         return chosen
@@ -351,7 +400,9 @@ class _StepdownThread(threading.Thread):
             # that may depend on the health of the replica set.
             self.logger.info(
                 "Successfully stepped up the secondary on port %d of replica set '%s'.",
-                new_primary.port, rs_fixture.replset_name)
+                new_primary.port,
+                rs_fixture.replset_name,
+            )
             retry_time_secs = rs_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
             retry_start_time = time.time()
             while True:
@@ -365,13 +416,19 @@ class _StepdownThread(threading.Thread):
                 if time.time() - retry_start_time > retry_time_secs:
                     raise errors.ServerFailure(
                         "The old primary on port {} of replica set {} did not step down in"
-                        " {} seconds.".format(client.port, rs_fixture.replset_name,
-                                              retry_time_secs))
-                self.logger.info("Waiting for primary on port %d of replica set '%s' to step down.",
-                                 old_primary.port, rs_fixture.replset_name)
+                        " {} seconds.".format(client.port, rs_fixture.replset_name, retry_time_secs)
+                    )
+                self.logger.info(
+                    "Waiting for primary on port %d of replica set '%s' to step down.",
+                    old_primary.port,
+                    rs_fixture.replset_name,
+                )
                 time.sleep(0.2)  # Wait a little bit before trying again.
-            self.logger.info("Primary on port %d of replica set '%s' stepped down.",
-                             old_primary.port, rs_fixture.replset_name)
+            self.logger.info(
+                "Primary on port %d of replica set '%s' stepped down.",
+                old_primary.port,
+                rs_fixture.replset_name,
+            )
 
         if not secondaries:
             # If we failed to step up one of the secondaries, then we run the replSetStepUp to try
@@ -399,12 +456,13 @@ class _StepdownThread(threading.Thread):
                 if time.time() - retry_start_time > retry_time_secs:
                     raise errors.ServerFailure(
                         "The old primary on port {} of replica set {} did not step up in"
-                        " {} seconds.".format(client.port, rs_fixture.replset_name,
-                                              retry_time_secs))
+                        " {} seconds.".format(client.port, rs_fixture.replset_name, retry_time_secs)
+                    )
 
         # Bump the counter for the chosen secondary to indicate that the replSetStepUp command
         # executed successfully.
         key = "{}/{}".format(
             rs_fixture.replset_name,
-            new_primary.get_internal_connection_string() if secondaries else "none")
+            new_primary.get_internal_connection_string() if secondaries else "none",
+        )
         self._step_up_stats[key] += 1

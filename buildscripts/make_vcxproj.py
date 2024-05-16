@@ -42,7 +42,7 @@ VCXPROJ_FOOTER = r"""
 </Project>
 """
 
-VCXPROJ_NAMESPACE = 'http://schemas.microsoft.com/developer/msbuild/2003'
+VCXPROJ_NAMESPACE = "http://schemas.microsoft.com/developer/msbuild/2003"
 
 # We preserve certain fields by saving them and restoring between file generations
 VCXPROJ_FIELDS_TO_PRESERVE = [
@@ -77,7 +77,7 @@ def get_defines(args):
     """Parse a compiler argument list looking for defines."""
     ret = set()
     for arg in args:
-        if arg.startswith('/D'):
+        if arg.startswith("/D"):
             ret.add(arg[2:])
     return ret
 
@@ -86,7 +86,7 @@ def get_includes(args):
     """Parse a compiler argument list looking for includes."""
     ret = set()
     for arg in args:
-        if arg.startswith('/I'):
+        if arg.startswith("/I"):
             ret.add(arg[2:])
     return ret
 
@@ -100,14 +100,14 @@ def _read_vcxproj(file_name):
 
     tree = ET.parse(file_name)
 
-    interesting_tags = ['{%s}%s' % (VCXPROJ_NAMESPACE, tag) for tag in VCXPROJ_FIELDS_TO_PRESERVE]
+    interesting_tags = ["{%s}%s" % (VCXPROJ_NAMESPACE, tag) for tag in VCXPROJ_FIELDS_TO_PRESERVE]
 
     save_elements = {}
 
     for parent in tree.getroot():
         for child in parent:
             if child.tag in interesting_tags:
-                cond = parent.attrib['Condition']
+                cond = parent.attrib["Condition"]
                 save_elements[(parent.tag, child.tag, cond)] = child.text
 
     return save_elements
@@ -121,27 +121,28 @@ def _replace_vcxproj(file_name, restore_elements):
 
     tree = ET.parse(file_name)
 
-    interesting_tags = ['{%s}%s' % (VCXPROJ_NAMESPACE, tag) for tag in VCXPROJ_FIELDS_TO_PRESERVE]
+    interesting_tags = ["{%s}%s" % (VCXPROJ_NAMESPACE, tag) for tag in VCXPROJ_FIELDS_TO_PRESERVE]
 
     for parent in tree.getroot():
         for child in parent:
             if child.tag in interesting_tags:
                 # Match PropertyGroup elements based on their condition
-                cond = parent.attrib['Condition']
+                cond = parent.attrib["Condition"]
                 saved_value = restore_elements[(parent.tag, child.tag, cond)]
                 child.text = saved_value
 
     stream = io.StringIO()
 
-    tree.write(stream, encoding='unicode')
+    tree.write(stream, encoding="unicode")
 
     str_value = stream.getvalue()
 
     # Strip the "ns0:" namespace prefix because ElementTree does not support default namespaces.
-    str_value = str_value.replace("<ns0:", "<").replace("</ns0:", "</").replace(
-        "xmlns:ns0", "xmlns")
+    str_value = (
+        str_value.replace("<ns0:", "<").replace("</ns0:", "</").replace("xmlns:ns0", "xmlns")
+    )
 
-    with io.open(file_name, mode='w') as file_handle:
+    with io.open(file_name, mode="w") as file_handle:
         file_handle.write(str_value)
 
 
@@ -179,42 +180,53 @@ class ProjFileGenerator(object):
             "w",
         )
 
-        with open('buildscripts/vcxproj.header', 'r') as header_file:
+        with open("buildscripts/vcxproj.header", "r") as header_file:
             header_str = header_file.read()
             header_str = header_str.replace("%_TARGET_%", self.target)
             header_str = header_str.replace("%ToolsVersion%", self.tools_version)
             header_str = header_str.replace("%PlatformToolset%", self.platform_toolset)
-            header_str = header_str.replace("%WindowsTargetPlatformVersion%",
-                                            self.windows_target_sdk)
-            header_str = header_str.replace("%AdditionalIncludeDirectories%", ';'.join(
-                sorted(self.includes)))
+            header_str = header_str.replace(
+                "%WindowsTargetPlatformVersion%", self.windows_target_sdk
+            )
+            header_str = header_str.replace(
+                "%AdditionalIncludeDirectories%", ";".join(sorted(self.includes))
+            )
             self.vcxproj.write(header_str)
 
         common_defines = self.all_defines
         for comp in self.compiles:
-            common_defines = common_defines.intersection(comp['defines'])
+            common_defines = common_defines.intersection(comp["defines"])
 
         self.vcxproj.write("<!-- common_defines -->\n")
-        self.vcxproj.write("<ItemDefinitionGroup><ClCompile><PreprocessorDefinitions>" +
-                           ';'.join(common_defines) + ";%(PreprocessorDefinitions)\n")
+        self.vcxproj.write(
+            "<ItemDefinitionGroup><ClCompile><PreprocessorDefinitions>"
+            + ";".join(common_defines)
+            + ";%(PreprocessorDefinitions)\n"
+        )
         self.vcxproj.write("</PreprocessorDefinitions></ClCompile></ItemDefinitionGroup>\n")
 
         self.vcxproj.write("  <ItemGroup>\n")
         for command in self.compiles:
             defines = command["defines"].difference(common_defines)
             if defines:
-                self.vcxproj.write("    <ClCompile Include=\"" + command["file"] +
-                                   "\"><PreprocessorDefinitions>" + ';'.join(defines) +
-                                   ";%(PreprocessorDefinitions)" +
-                                   "</PreprocessorDefinitions></ClCompile>\n")
+                self.vcxproj.write(
+                    '    <ClCompile Include="'
+                    + command["file"]
+                    + '"><PreprocessorDefinitions>'
+                    + ";".join(defines)
+                    + ";%(PreprocessorDefinitions)"
+                    + "</PreprocessorDefinitions></ClCompile>\n"
+                )
             else:
-                self.vcxproj.write("    <ClCompile Include=\"" + command["file"] + "\" />\n")
+                self.vcxproj.write('    <ClCompile Include="' + command["file"] + '" />\n')
         self.vcxproj.write("  </ItemGroup>\n")
 
         self.filters = open(self.target + ".vcxproj.filters", "w")
         self.filters.write("<?xml version='1.0' encoding='utf-8'?>\n")
-        self.filters.write("<Project ToolsVersion='14.0' " +
-                           "xmlns='http://schemas.microsoft.com/developer/msbuild/2003'>\n")
+        self.filters.write(
+            "<Project ToolsVersion='14.0' "
+            + "xmlns='http://schemas.microsoft.com/developer/msbuild/2003'>\n"
+        )
 
         self.__write_filters()
 
@@ -243,7 +255,7 @@ class ProjFileGenerator(object):
 
         self.files.add(file_name)
 
-        args = line.split(' ')
+        args = line.split(" ")
 
         file_defines = set()
         for arg in get_defines(args):
@@ -289,8 +301,13 @@ class ProjFileGenerator(object):
         base_dirs = set()
         for directory in dirs:
             if not os.path.exists(directory):
-                print(("Warning: skipping include file scan for directory '%s'" +
-                       " because it does not exist.") % str(directory))
+                print(
+                    (
+                        "Warning: skipping include file scan for directory '%s'"
+                        + " because it does not exist."
+                    )
+                    % str(directory)
+                )
                 continue
 
             # Get all the C++ files
@@ -365,16 +382,21 @@ class ProjFileGenerator(object):
 
 def main():
     """Execute Main program."""
-    parser = argparse.ArgumentParser(description='VS Project File Generator.')
-    parser.add_argument('--version', type=str, nargs='?', help="MSVC Toolchain version",
-                        default=VCXPROJ_MSVC_DEFAULT_VERSION)
-    parser.add_argument('target', type=str, help="File to generate")
+    parser = argparse.ArgumentParser(description="VS Project File Generator.")
+    parser.add_argument(
+        "--version",
+        type=str,
+        nargs="?",
+        help="MSVC Toolchain version",
+        default=VCXPROJ_MSVC_DEFAULT_VERSION,
+    )
+    parser.add_argument("target", type=str, help="File to generate")
 
     args = parser.parse_args()
 
     with ProjFileGenerator(args.target, args.version) as projfile:
         with open("compile_commands.json", "rb") as sjh:
-            contents = sjh.read().decode('utf-8')
+            contents = sjh.read().decode("utf-8")
             commands = json.loads(contents)
 
         for command in commands:

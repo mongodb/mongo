@@ -23,8 +23,10 @@ def _check_port(func):
             raise errors.PortAllocationError("Attempted to use a negative port")
 
         if port > PortAllocator.MAX_PORT:
-            raise errors.PortAllocationError("Exhausted all available ports. Consider decreasing"
-                                             " the number of jobs, or using a lower base port")
+            raise errors.PortAllocationError(
+                "Exhausted all available ports. Consider decreasing"
+                " the number of jobs, or using a lower base port"
+            )
 
         return port
 
@@ -74,8 +76,9 @@ class PortAllocator(object):
 
             if next_port >= start_port + cls._PORTS_PER_FIXTURE:
                 raise errors.PortAllocationError(
-                    "Fixture has requested more than the %d ports reserved per fixture" %
-                    cls._PORTS_PER_FIXTURE)
+                    "Fixture has requested more than the %d ports reserved per fixture"
+                    % cls._PORTS_PER_FIXTURE
+                )
 
             return next_port
 

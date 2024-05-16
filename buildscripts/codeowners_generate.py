@@ -37,8 +37,9 @@ def add_owner_line(output_lines: list[str], directory: str, pattern: str, owners
     else:
         parsed_pattern = f"/{directory}/**/{pattern}"
 
-    test_pattern = f".{parsed_pattern}" if parsed_pattern.startswith(
-        "/") else f"./**/{parsed_pattern}"
+    test_pattern = (
+        f".{parsed_pattern}" if parsed_pattern.startswith("/") else f"./**/{parsed_pattern}"
+    )
 
     # ensure at least one file patches the pattern.
     first_file_found = glob.iglob(test_pattern, recursive=True)
@@ -52,7 +53,8 @@ def add_owner_line(output_lines: list[str], directory: str, pattern: str, owners
 def process_alias_import(path: str) -> dict[str, list[str]]:
     if not path.startswith("//"):
         raise RuntimeError(
-            f"Alias file paths must start with // and be relative to the repo root: {path}")
+            f"Alias file paths must start with // and be relative to the repo root: {path}"
+        )
 
     # remove // from beginning of path
     parsed_path = path[2::]
@@ -96,7 +98,9 @@ def process_owners_file(output_lines: list[str], directory: str) -> None:
         if "filters" in contents:
             filters = contents["filters"]
             for _filter in filters:
-                assert "approvers" in _filter, f"Filter in {owners_file_path} does not have approvers."
+                assert (
+                    "approvers" in _filter
+                ), f"Filter in {owners_file_path} does not have approvers."
                 approvers = _filter["approvers"]
                 del _filter["approvers"]
                 if "emeritus_approvers" in _filter:
@@ -119,8 +123,9 @@ def process_owners_file(output_lines: list[str], directory: str) -> None:
 
                 NOOWNERS_NAME = "NOOWNERS-DO-NOT-USE-DEPRECATED-2024-07-01"
                 if NOOWNERS_NAME in approvers:
-                    assert len(approvers
-                               ) == 1, f"{NOOWNERS_NAME} must be the only approver when it is used."
+                    assert (
+                        len(approvers) == 1
+                    ), f"{NOOWNERS_NAME} must be the only approver when it is used."
                 else:
                     for approver in approvers:
                         if approver in aliases:
@@ -149,24 +154,32 @@ def main():
     # If we are running in bazel, default the directory to the workspace
     default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
     if not default_dir:
-        process = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True,
-                                 text=True, check=True)
+        process = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True
+        )
         default_dir = process.stdout.strip()
 
     parser = argparse.ArgumentParser(
-        prog='GenerateCodeowners',
-        description='This generates a CODEOWNERS file based off of our OWNERS.yml files. '
-        'Whenever changes are made to the OWNERS.yml files in the repo this script '
-        'should be run.')
+        prog="GenerateCodeowners",
+        description="This generates a CODEOWNERS file based off of our OWNERS.yml files. "
+        "Whenever changes are made to the OWNERS.yml files in the repo this script "
+        "should be run.",
+    )
 
-    parser.add_argument("--output-file", help="Path of the CODEOWNERS file to be generated.",
-                        default=os.path.join(".github", "CODEOWNERS"))
-    parser.add_argument("--repo-dir", help="Root of the repo to scan for OWNER files.",
-                        default=default_dir)
     parser.add_argument(
-        "--check", help=
-        "When set, program exits 1 when the CODEOWNERS content changes. This will skip generation",
-        default=False, action="store_true")
+        "--output-file",
+        help="Path of the CODEOWNERS file to be generated.",
+        default=os.path.join(".github", "CODEOWNERS"),
+    )
+    parser.add_argument(
+        "--repo-dir", help="Root of the repo to scan for OWNER files.", default=default_dir
+    )
+    parser.add_argument(
+        "--check",
+        help="When set, program exits 1 when the CODEOWNERS content changes. This will skip generation",
+        default=False,
+        action="store_true",
+    )
 
     args = parser.parse_args()
     os.chdir(args.repo_dir)
@@ -188,8 +201,9 @@ def main():
         process_dir(output_lines, "./")
     except Exception as ex:
         print("An exception was found while generating the CODEOWNERS file.", file=sys.stderr)
-        print("Please refer to the docs to see the spec for OWNERS.yml files here :",
-              file=sys.stderr)
+        print(
+            "Please refer to the docs to see the spec for OWNERS.yml files here :", file=sys.stderr
+        )
         print("https://github.com/10gen/mongo/blob/master/docs/owners_format.md", file=sys.stderr)
         raise ex
 

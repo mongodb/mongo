@@ -16,16 +16,16 @@ logger = getLogger(__name__)
 class FileSpanExporter(SpanExporter):
     """
     FileSpanExporter is an implementation of :class:`SpanExporter` that sends spans to files in directory.
-    
+
     These files are in JSON format by default.
     """
 
     def __init__(
-            self,
-            directory: str,
-            pretty_print=False,
-            service_name: Optional[str] = None,
-            formatter: Callable[[ReadableSpan], str] = lambda span: span.to_json() + linesep,
+        self,
+        directory: str,
+        pretty_print=False,
+        service_name: Optional[str] = None,
+        formatter: Callable[[ReadableSpan], str] = lambda span: span.to_json() + linesep,
     ):
         self.formatter = formatter
         self.service_name = service_name
@@ -56,7 +56,7 @@ class FileSpanExporter(SpanExporter):
                 if self.pretty_print:
                     json.dump(message, file, indent=2)
                 else:
-                    json.dump(message, file, indent=None, separators=(',', ':'))
+                    json.dump(message, file, indent=None, separators=(",", ":"))
         except:
             logger.exception("Failed to write OTEL metrics to file %s", file_name)
             return SpanExportResult.FAILURE

@@ -16,10 +16,19 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
     CONNECTION_STRING_DB_NAME = "config"
     CONNECTION_STRING_COLL_NAME = "multiShardedClusterFixture"
 
-    def __init__(self, logger, job_num, fixturelib, dbpath_prefix=None, num_sharded_clusters=2,
-                 common_mongod_options=None, per_mongod_options=None,
-                 per_sharded_cluster_options=None, persist_connection_strings=False,
-                 **common_sharded_cluster_options):
+    def __init__(
+        self,
+        logger,
+        job_num,
+        fixturelib,
+        dbpath_prefix=None,
+        num_sharded_clusters=2,
+        common_mongod_options=None,
+        per_mongod_options=None,
+        per_sharded_cluster_options=None,
+        persist_connection_strings=False,
+        **common_sharded_cluster_options,
+    ):
         """Initialize MultiShardedClusterFixture with different options for the sharded cluster processes."""
 
         interface.MultiClusterFixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix)
@@ -32,7 +41,8 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
         self.per_mongod_options = self.fixturelib.default_if_none(per_mongod_options, [])
         self.common_sharded_cluster_options = common_sharded_cluster_options
         self.per_sharded_cluster_options = self.fixturelib.default_if_none(
-            per_sharded_cluster_options, [])
+            per_sharded_cluster_options, []
+        )
         self.persist_connection_strings = persist_connection_strings
 
         self.sharded_clusters = []
@@ -49,9 +59,15 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
 
                 self.sharded_clusters.append(
                     self.fixturelib.make_fixture(
-                        "ShardedClusterFixture", self.logger, self.job_num,
-                        dbpath_prefix=dbpath_prefix, cluster_logging_prefix=cluster_name,
-                        mongod_options=mongod_options, **sharded_cluster_options))
+                        "ShardedClusterFixture",
+                        self.logger,
+                        self.job_num,
+                        dbpath_prefix=dbpath_prefix,
+                        cluster_logging_prefix=cluster_name,
+                        mongod_options=mongod_options,
+                        **sharded_cluster_options,
+                    )
+                )
 
     def pids(self):
         """:return: pids owned by this fixture if any."""
@@ -60,7 +76,8 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
             out.extend(sharded_cluster.pids())
         if not out:
             self.logger.debug(
-                'No sharded clusters when gathering multi sharded cluster fixture pids.')
+                "No sharded clusters when gathering multi sharded cluster fixture pids."
+            )
         return out
 
     def setup(self):
@@ -74,8 +91,10 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
         for sharded_cluster in self.sharded_clusters:
             sharded_cluster.await_ready()
         if self.persist_connection_strings:
-            docs = [{"_id": i, "connectionString": sharded_cluster.get_driver_connection_url()}
-                    for (i, sharded_cluster) in enumerate(self.sharded_clusters)]
+            docs = [
+                {"_id": i, "connectionString": sharded_cluster.get_driver_connection_url()}
+                for (i, sharded_cluster) in enumerate(self.sharded_clusters)
+            ]
             client = pymongo.MongoClient(self.sharded_clusters[0].get_driver_connection_url())
             coll = client[self.CONNECTION_STRING_DB_NAME][self.CONNECTION_STRING_COLL_NAME]
             coll.insert_many(docs)

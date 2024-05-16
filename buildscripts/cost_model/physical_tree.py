@@ -30,7 +30,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
-__all__ = ['Node', 'build']
+__all__ = ["Node", "build"]
 
 
 @dataclass
@@ -61,20 +61,25 @@ def build(optimizer_plan: dict[str, any]) -> Node:
 def parse_optimizer_node(explain_node: dict[str, any]) -> Node:
     """Recursively parse ABT node from query explain's node."""
     children = get_children(explain_node)
-    properties = explain_node['properties']
-    return Node(node_type=explain_node['nodeType'], plan_node_id=properties['planNodeID'],
-                cost=properties['cost'], local_cost=properties['localCost'],
-                adjusted_ce=properties['adjustedCE'], children=children)
+    properties = explain_node["properties"]
+    return Node(
+        node_type=explain_node["nodeType"],
+        plan_node_id=properties["planNodeID"],
+        cost=properties["cost"],
+        local_cost=properties["localCost"],
+        adjusted_ce=properties["adjustedCE"],
+        children=children,
+    )
 
 
 def get_children(explain_node: dict[str, any]) -> list[Node]:
     """Get children nodes of the ABT node."""
-    if 'children' in explain_node:
-        children = [parse_optimizer_node(child) for child in explain_node['children']]
+    if "children" in explain_node:
+        children = [parse_optimizer_node(child) for child in explain_node["children"]]
     else:
         children = []
 
-    children_refs = ['child', 'leftChild', 'rightChild']
+    children_refs = ["child", "leftChild", "rightChild"]
 
     for ref in children_refs:
         if ref in explain_node:

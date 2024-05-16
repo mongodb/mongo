@@ -20,13 +20,32 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS = 60
 
-    def __init__(self, logger, job_num, fixturelib, mongos_options=None, mongod_executable=None,
-                 mongod_options=None, dbpath_prefix=None, preserve_dbpath=False, num_shards=1,
-                 num_rs_nodes_per_shard=1, num_mongos=1, enable_balancer=True, auth_options=None,
-                 configsvr_options=None, shard_options=None, cluster_logging_prefix=None,
-                 config_shard=None, use_auto_bootstrap_procedure=None, embedded_router=False,
-                 replica_set_endpoint=False, random_migrations=False, launch_mongot=False,
-                 set_cluster_parameter=None):
+    def __init__(
+        self,
+        logger,
+        job_num,
+        fixturelib,
+        mongos_options=None,
+        mongod_executable=None,
+        mongod_options=None,
+        dbpath_prefix=None,
+        preserve_dbpath=False,
+        num_shards=1,
+        num_rs_nodes_per_shard=1,
+        num_mongos=1,
+        enable_balancer=True,
+        auth_options=None,
+        configsvr_options=None,
+        shard_options=None,
+        cluster_logging_prefix=None,
+        config_shard=None,
+        use_auto_bootstrap_procedure=None,
+        embedded_router=False,
+        replica_set_endpoint=False,
+        random_migrations=False,
+        launch_mongot=False,
+        set_cluster_parameter=None,
+    ):
         """Initialize ShardedClusterFixture with different options for the cluster processes.
 
         :param embedded_router - True if this ShardedCluster is running in "embedded router mode". Today, this means that:
@@ -42,22 +61,29 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             raise ValueError("Cannot specify mongod_options.dbpath")
 
         self.mongos_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongos_options, {}))
+            self.fixturelib.default_if_none(mongos_options, {})
+        )
         # The mongotHost and searchIndexManagementHostAndPort options cannot be set on mongos_options yet because
         # the port value is only assigned in MongoDFixture initialization, which happens later.
         self.launch_mongot = launch_mongot
 
         # mongod options
         self.mongod_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongod_options, {}))
+            self.fixturelib.default_if_none(mongod_options, {})
+        )
         self.mongod_executable = mongod_executable
         self.mongod_options["set_parameters"] = self.fixturelib.make_historic(
-            mongod_options.get("set_parameters", {})).copy()
-        self.mongod_options["set_parameters"]["migrationLockAcquisitionMaxWaitMS"] = \
-                self.mongod_options["set_parameters"].get("migrationLockAcquisitionMaxWaitMS", 30000)
+            mongod_options.get("set_parameters", {})
+        ).copy()
+        self.mongod_options["set_parameters"]["migrationLockAcquisitionMaxWaitMS"] = (
+            self.mongod_options["set_parameters"].get("migrationLockAcquisitionMaxWaitMS", 30000)
+        )
         # Extend time for transactions by default to account for slow machines during testing.
-        self.mongod_options["set_parameters"]["maxTransactionLockRequestTimeoutMillis"] = \
-                self.mongod_options["set_parameters"].get("maxTransactionLockRequestTimeoutMillis", 10 * 1000)
+        self.mongod_options["set_parameters"]["maxTransactionLockRequestTimeoutMillis"] = (
+            self.mongod_options[
+                "set_parameters"
+            ].get("maxTransactionLockRequestTimeoutMillis", 10 * 1000)
+        )
 
         # Misc other options for the fixture.
         self.config_shard = config_shard
@@ -73,13 +99,17 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         # Options for roles - shardsvr, configsvr.
         self.configsvr_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(configsvr_options, {}))
+            self.fixturelib.default_if_none(configsvr_options, {})
+        )
         self.shard_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(shard_options, {}))
+            self.fixturelib.default_if_none(shard_options, {})
+        )
 
         # Logging prefix options.
         #  `cluster_logging_prefix` is the logging prefix used in cluster to cluster replication.
-        self.cluster_logging_prefix = "" if cluster_logging_prefix is None else f"{cluster_logging_prefix}:"
+        self.cluster_logging_prefix = (
+            "" if cluster_logging_prefix is None else f"{cluster_logging_prefix}:"
+        )
         self.configsvr_shard_logging_prefix = f"{self.cluster_logging_prefix}configsvr"
         self.rs_shard_logging_prefix = f"{self.cluster_logging_prefix}shard"
         self.mongos_logging_prefix = f"{self.cluster_logging_prefix}mongos"
@@ -99,23 +129,27 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                     "random_migrations can only be enabled when balancer is enabled (enable_balancer=True)"
                 )
 
-            if "failpoint.balancerShouldReturnRandomMigrations" in self.mongod_options[
-                    "set_parameters"]:
+            if (
+                "failpoint.balancerShouldReturnRandomMigrations"
+                in self.mongod_options["set_parameters"]
+            ):
                 raise ValueError(
                     "Cannot enable random_migrations because balancerShouldReturnRandomMigrations failpoint is already present in mongod_options"
                 )
 
             # Enable random migrations failpoint
             self.mongod_options["set_parameters"][
-                "failpoint.balancerShouldReturnRandomMigrations"] = {"mode": "alwaysOn"}
+                "failpoint.balancerShouldReturnRandomMigrations"
+            ] = {"mode": "alwaysOn"}
 
             # Reduce migration throttling to increase frequency of random migrations
-            self.mongod_options["set_parameters"][
-                "balancerMigrationsThrottlingMs"] = self.mongod_options["set_parameters"].get(
-                    "balancerMigrationsThrottlingMs", 100)  # millis
+            self.mongod_options["set_parameters"]["balancerMigrationsThrottlingMs"] = (
+                self.mongod_options["set_parameters"].get("balancerMigrationsThrottlingMs", 100)
+            )  # millis
 
-        self._dbpath_prefix = os.path.join(dbpath_prefix if dbpath_prefix else self._dbpath_prefix,
-                                           self.config.FIXTURE_SUBDIR)
+        self._dbpath_prefix = os.path.join(
+            dbpath_prefix if dbpath_prefix else self._dbpath_prefix, self.config.FIXTURE_SUBDIR
+        )
 
         self.configsvr = None
         self.mongos = []
@@ -134,12 +168,13 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             out.extend(self.configsvr.pids())
         else:
             self.logger.debug(
-                'Config server not running when gathering sharded cluster fixture pids.')
+                "Config server not running when gathering sharded cluster fixture pids."
+            )
         if self.shards is not None:
             for shard in self.shards:
                 out.extend(shard.pids())
         else:
-            self.logger.debug('No shards when gathering sharded cluster fixture pids.')
+            self.logger.debug("No shards when gathering sharded cluster fixture pids.")
         return out
 
     def setup(self):
@@ -181,8 +216,10 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         except pymongo.errors.OperationFailure as err:
             if err.code != self._WRITE_CONCERN_FAILED:
                 raise err
-            self.logger.info("Ignoring write concern timeout for refreshLogicalSessionCacheNow "
-                             "command and continuing to wait")
+            self.logger.info(
+                "Ignoring write concern timeout for refreshLogicalSessionCacheNow "
+                "command and continuing to wait"
+            )
             target.await_last_op_committed(target.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60)
 
     def get_shard_ids(self):
@@ -213,8 +250,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 # In search enabled sharded cluster, mongos has to be spun up with a connection string to a
                 # mongot in order to issue PlanShardedSearch commands.
                 mongos.mongos_options["mongotHost"] = self.mongotHost
-                mongos.mongos_options[
-                    "searchIndexManagementHostAndPort"] = self.searchIndexManagementHostAndPort
+                mongos.mongos_options["searchIndexManagementHostAndPort"] = (
+                    self.searchIndexManagementHostAndPort
+                )
             # Start up the mongos.
             mongos.setup()
 
@@ -282,7 +320,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         csrs_client = interface.build_client(self.configsvr, self.auth_options)
         try:
             res = csrs_client.admin.command({"getParameter": 1, full_ff_name: 1})
-            return bool(res[full_ff_name]['value'])
+            return bool(res[full_ff_name]["value"])
         except pymongo.errors.OperationFailure as err:
             if err.code == 72:  # InvalidOptions
                 # The feature flag is not present
@@ -295,13 +333,16 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         running_at_start = self.is_running()
         if not running_at_start:
-            self.logger.warning("All members of the sharded cluster were expected to be running, "
-                                "but weren't.")
+            self.logger.warning(
+                "All members of the sharded cluster were expected to be running, " "but weren't."
+            )
 
         # If we're killing or aborting to archive data files, stopping the balancer will execute
         # server commands that might lead to on-disk changes from the point of failure.
-        if self.enable_balancer and mode not in (interface.TeardownMode.KILL,
-                                                 interface.TeardownMode.ABORT):
+        if self.enable_balancer and mode not in (
+            interface.TeardownMode.KILL,
+            interface.TeardownMode.ABORT,
+        ):
             self.stop_balancer()
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
@@ -327,9 +368,12 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     def is_running(self):
         """Return true if all nodes in the cluster are all still operating."""
-        return (self.configsvr is not None and self.configsvr.is_running()
-                and all(shard.is_running() for shard in self.shards)
-                and all(mongos.is_running() for mongos in self.mongos))
+        return (
+            self.configsvr is not None
+            and self.configsvr.is_running()
+            and all(shard.is_running() for shard in self.shards)
+            and all(mongos.is_running() for mongos in self.mongos)
+        )
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
@@ -347,7 +391,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             # commands.
             if len(self.shards) == 0:
                 raise ValueError(
-                    "Must call install_rs_shard() before calling get_internal_connection_string()")
+                    "Must call install_rs_shard() before calling get_internal_connection_string()"
+                )
             if len(self.shards) > 1:
                 raise ValueError("Cannot use replica set endpoint on a multi-shard cluster")
             return self.shards[0].get_driver_connection_url()
@@ -355,8 +400,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         if self.embedded_router_mode:
             # If the embedded router is enabled, we must have a mongos placed in a node acting as a
             # configsvr.
-            config_mongos = next((mongos for mongos in self.mongos if mongos.is_from_configsvr()),
-                                 None)
+            config_mongos = next(
+                (mongos for mongos in self.mongos if mongos.is_from_configsvr()), None
+            )
             if config_mongos:
                 return config_mongos.get_driver_connection_url()
             else:
@@ -377,8 +423,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     def get_configsvr_logger(self):
         """Return a new logging.Logger instance used for a config server shard."""
-        return self.fixturelib.new_fixture_node_logger(self.__class__.__name__, self.job_num,
-                                                       self.configsvr_shard_logging_prefix)
+        return self.fixturelib.new_fixture_node_logger(
+            self.__class__.__name__, self.job_num, self.configsvr_shard_logging_prefix
+        )
 
     def get_configsvr_kwargs(self):
         """Return args to create replicaset.ReplicaSetFixture configured as the config server."""
@@ -393,7 +440,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         mongod_options = self.mongod_options.copy()
         mongod_options = self.fixturelib.merge_mongo_option_dicts(
             mongod_options,
-            self.fixturelib.make_historic(configsvr_options.pop("mongod_options", {})))
+            self.fixturelib.make_historic(configsvr_options.pop("mongod_options", {})),
+        )
         mongod_options["configsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
         mongod_options["replSet"] = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
@@ -403,10 +451,14 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             mongod_options["routerPort"] = ""
 
         return {
-            "mongod_options": mongod_options, "mongod_executable": self.mongod_executable,
-            "preserve_dbpath": preserve_dbpath, "num_nodes": num_nodes,
-            "auth_options": auth_options, "replset_config_options": replset_config_options,
-            "shard_logging_prefix": self.configsvr_shard_logging_prefix, **configsvr_options
+            "mongod_options": mongod_options,
+            "mongod_executable": self.mongod_executable,
+            "preserve_dbpath": preserve_dbpath,
+            "num_nodes": num_nodes,
+            "auth_options": auth_options,
+            "replset_config_options": replset_config_options,
+            "shard_logging_prefix": self.configsvr_shard_logging_prefix,
+            **configsvr_options,
         }
 
     def install_configsvr(self, configsvr):
@@ -420,8 +472,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
     def get_rs_shard_logger(self, index):
         """Return a new logging.Logger instance used for a replica set shard."""
         shard_logging_prefix = self._get_rs_shard_logging_prefix(index)
-        return self.fixturelib.new_fixture_node_logger(self.__class__.__name__, self.job_num,
-                                                       shard_logging_prefix)
+        return self.fixturelib.new_fixture_node_logger(
+            self.__class__.__name__, self.job_num, shard_logging_prefix
+        )
 
     def get_rs_shard_kwargs(self, index):
         """Return args to create replicaset.ReplicaSetFixture configured as a shard in a sharded cluster."""
@@ -436,7 +489,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         mongod_options = self.mongod_options.copy()
         mongod_options = self.fixturelib.merge_mongo_option_dicts(
-            mongod_options, self.fixturelib.make_historic(shard_options.pop("mongod_options", {})))
+            mongod_options, self.fixturelib.make_historic(shard_options.pop("mongod_options", {}))
+        )
         mongod_options["shardsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
         mongod_options["replSet"] = self._SHARD_REPLSET_NAME_PREFIX + str(index)
@@ -451,10 +505,12 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
             if "mongod_options" in configsvr_options:
                 mongod_options = self.fixturelib.merge_mongo_option_dicts(
-                    mongod_options, configsvr_options["mongod_options"])
+                    mongod_options, configsvr_options["mongod_options"]
+                )
             if "replset_config_options" in configsvr_options:
                 replset_config_options = self.fixturelib.merge_mongo_option_dicts(
-                    replset_config_options, configsvr_options["replset_config_options"])
+                    replset_config_options, configsvr_options["replset_config_options"]
+                )
 
             for option, value in configsvr_options.items():
                 if option in ("num_nodes", "mongod_options", "replset_config_options"):
@@ -462,22 +518,28 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 if option in shard_options:
                     if shard_options[option] != value:
                         raise Exception(
-                            "Conflicting values when combining shard and configsvr options")
+                            "Conflicting values when combining shard and configsvr options"
+                        )
                 else:
                     shard_options[option] = value
 
         if self.embedded_router_mode:
             mongod_options["routerPort"] = ""
 
-        use_auto_bootstrap_procedure = self.use_auto_bootstrap_procedure and self.config_shard == index
+        use_auto_bootstrap_procedure = (
+            self.use_auto_bootstrap_procedure and self.config_shard == index
+        )
         shard_logging_prefix = self._get_rs_shard_logging_prefix(index)
 
         return {
-            "mongod_options": mongod_options, "mongod_executable": self.mongod_executable,
-            "auth_options": auth_options, "preserve_dbpath": preserve_dbpath,
-            "replset_config_options": replset_config_options, "shard_logging_prefix":
-                shard_logging_prefix, "use_auto_bootstrap_procedure": use_auto_bootstrap_procedure,
-            **shard_options
+            "mongod_options": mongod_options,
+            "mongod_executable": self.mongod_executable,
+            "auth_options": auth_options,
+            "preserve_dbpath": preserve_dbpath,
+            "replset_config_options": replset_config_options,
+            "shard_logging_prefix": shard_logging_prefix,
+            "use_auto_bootstrap_procedure": use_auto_bootstrap_procedure,
+            **shard_options,
         }
 
     def install_rs_shard(self, rs_shard):
@@ -486,9 +548,12 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     def get_mongos_logger(self, index, total):
         """Return a new logging.Logger instance used for a mongos."""
-        logger_name = self.mongos_logging_prefix if total == 1 else f"{self.mongos_logging_prefix}{index}"
-        return self.fixturelib.new_fixture_node_logger(self.__class__.__name__, self.job_num,
-                                                       logger_name)
+        logger_name = (
+            self.mongos_logging_prefix if total == 1 else f"{self.mongos_logging_prefix}{index}"
+        )
+        return self.fixturelib.new_fixture_node_logger(
+            self.__class__.__name__, self.job_num, logger_name
+        )
 
     def get_mongos_kwargs(self):
         """Return options that may be passed to a mongos."""
@@ -497,9 +562,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         if self.config_shard is not None:
             if "set_parameters" not in mongos_options:
                 mongos_options["set_parameters"] = {}
-        mongos_options["set_parameters"] = mongos_options.get("set_parameters",
-                                                              self.fixturelib.make_historic(
-                                                                  {})).copy()
+        mongos_options["set_parameters"] = mongos_options.get(
+            "set_parameters", self.fixturelib.make_historic({})
+        ).copy()
         return {"dbpath_prefix": self._dbpath_prefix, "mongos_options": mongos_options}
 
     def install_mongos(self, mongos):
@@ -531,7 +596,8 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
         """Initialize ExternalShardedClusterFixture."""
         self.dummy_fixture = _builder.make_dummy_fixture(original_suite_name)
         self.shell_conn_string = "mongodb://" + ",".join(
-            [f"mongos{i}:27017" for i in range(self.dummy_fixture.num_mongos)])
+            [f"mongos{i}:27017" for i in range(self.dummy_fixture.num_mongos)]
+        )
 
         external.ExternalFixture.__init__(self, logger, job_num, fixturelib, self.shell_conn_string)
         ShardedClusterFixture.__init__(self, logger, job_num, fixturelib, mongod_options={})
@@ -541,7 +607,7 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
         client = pymongo.MongoClient(self.get_driver_connection_url())
         for i in range(50):
             if i == 49:
-                raise RuntimeError('Sharded Cluster setup has timed out.')
+                raise RuntimeError("Sharded Cluster setup has timed out.")
             payload = client.admin.command({"listShards": 1})
             if len(payload["shards"]) == self.dummy_fixture.num_shards:
                 print("Sharded Cluster available.")
@@ -551,7 +617,7 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
                 time.sleep(5)
                 continue
             if len(payload["shards"]) > self.dummy_fixture.num_shards:
-                raise RuntimeError('More shards in cluster than expected.')
+                raise RuntimeError("More shards in cluster than expected.")
 
     def pids(self):
         """Use ExternalFixture method."""
@@ -600,7 +666,8 @@ class _RouterView(interface.Fixture):
         self.is_configsvr = is_configsvr
         if not self.port:
             raise ValueError(
-                "Mongod must be started with the --routerPort flag to support a RouterView")
+                "Mongod must be started with the --routerPort flag to support a RouterView"
+            )
 
     def pids(self):
         return self.mongod.pids
@@ -629,7 +696,9 @@ class _RouterView(interface.Fixture):
                 if remaining <= 0.0:
                     raise self.fixturelib.ServerFailure(
                         "Failed to connect to embedded router on port {} after {} seconds".format(
-                            self.port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
+                            self.port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS
+                        )
+                    )
 
                 self.logger.info("Waiting to connect to embedded router on port %d.", self.port)
                 time.sleep(0.1)  # Wait a little bit before trying again.
@@ -652,8 +721,16 @@ class _RouterView(interface.Fixture):
 class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a mongos to connect to."""
 
-    def __init__(self, logger, job_num, fixturelib, dbpath_prefix, mongos_executable=None,
-                 mongos_options=None, add_feature_flags=False):
+    def __init__(
+        self,
+        logger,
+        job_num,
+        fixturelib,
+        dbpath_prefix,
+        mongos_executable=None,
+        mongos_options=None,
+        add_feature_flags=False,
+    ):
         """Initialize _MongoSFixture."""
 
         interface.Fixture.__init__(self, logger, job_num, fixturelib)
@@ -662,11 +739,13 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         self.config = self.fixturelib.get_config()
 
         # Default to command line options if the YAML configuration is not passed in.
-        self.mongos_executable = self.fixturelib.default_if_none(mongos_executable,
-                                                                 self.config.MONGOS_EXECUTABLE)
+        self.mongos_executable = self.fixturelib.default_if_none(
+            mongos_executable, self.config.MONGOS_EXECUTABLE
+        )
 
         self.mongos_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongos_options, {})).copy()
+            self.fixturelib.default_if_none(mongos_options, {})
+        ).copy()
 
         if add_feature_flags:
             for ff in self.config.ENABLED_FEATURE_FLAGS:
@@ -684,13 +763,17 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         """Set up the sharded cluster."""
         if self.config.ALWAYS_USE_LOG_FILES:
             self.mongos_options["logpath"] = self._dbpath_prefix + "/{name}.log".format(
-                name=self.logger.name)
+                name=self.logger.name
+            )
             self.mongos_options["logappend"] = ""
 
         launcher = MongosLauncher(self.fixturelib)
-        mongos, _ = launcher.launch_mongos_program(self.logger, self.job_num,
-                                                   executable=self.mongos_executable,
-                                                   mongos_options=self.mongos_options)
+        mongos, _ = launcher.launch_mongos_program(
+            self.logger,
+            self.job_num,
+            executable=self.mongos_executable,
+            mongos_options=self.mongos_options,
+        )
         self.mongos_options["port"] = self.port
         try:
             self.logger.info("Starting mongos on port %d...\n%s", self.port, mongos.as_command())
@@ -712,7 +795,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         if self.mongos is not None:
             return [self.mongos.pid]
         else:
-            self.logger.debug('Mongos not running when gathering mongos fixture pids.')
+            self.logger.debug("Mongos not running when gathering mongos fixture pids.")
         return []
 
     def is_from_configsvr(self):
@@ -732,7 +815,8 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
             if exit_code is not None:
                 raise self.fixturelib.ServerFailure(
                     "Could not connect to mongos on port {}, process ended"
-                    " unexpectedly with code {}.".format(self.port, exit_code))
+                    " unexpectedly with code {}.".format(self.port, exit_code)
+                )
 
             try:
                 # Use a shorter connection timeout to more closely satisfy the requested deadline.
@@ -744,7 +828,9 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
                 if remaining <= 0.0:
                     raise self.fixturelib.ServerFailure(
                         "Failed to connect to mongos on port {} after {} seconds".format(
-                            self.port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
+                            self.port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS
+                        )
+                    )
 
                 self.logger.info("Waiting to connect to mongos on port %d.", self.port)
                 time.sleep(0.1)  # Wait a little bit before trying again.
@@ -765,14 +851,19 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         if mode == interface.TeardownMode.ABORT:
             self.logger.info(
                 "Attempting to send SIGABRT from resmoke to mongos on port %d with pid %d...",
-                self.port, self.mongos.pid)
+                self.port,
+                self.mongos.pid,
+            )
         else:
-            self.logger.info("Stopping mongos on port %d with pid %d...", self.port,
-                             self.mongos.pid)
+            self.logger.info(
+                "Stopping mongos on port %d with pid %d...", self.port, self.mongos.pid
+            )
         if not self.is_running():
             exit_code = self.mongos.poll()
-            msg = ("mongos on port {:d} was expected to be running, but wasn't. "
-                   "Process exited with code {:d}").format(self.port, exit_code)
+            msg = (
+                "mongos on port {:d} was expected to be running, but wasn't. "
+                "Process exited with code {:d}"
+            ).format(self.port, exit_code)
             self.logger.warning(msg)
             raise self.fixturelib.ServerFailure(msg)
 
@@ -783,18 +874,27 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         if exit_code == 0 or (mode is not None and exit_code == -(mode.value)):
             self.logger.info("Successfully stopped the mongos on port {:d}".format(self.port))
         else:
-            self.logger.warning("Stopped the mongos on port {:d}. "
-                                "Process exited with code {:d}.".format(self.port, exit_code))
+            self.logger.warning(
+                "Stopped the mongos on port {:d}. " "Process exited with code {:d}.".format(
+                    self.port, exit_code
+                )
+            )
             raise self.fixturelib.ServerFailure(
                 "mongos on port {:d} with pid {:d} exited with code {:d}".format(
-                    self.port, self.mongos.pid, exit_code))
+                    self.port, self.mongos.pid, exit_code
+                )
+            )
 
     def is_running(self):
         """Return true if the cluster is still operating."""
         return self.mongos is not None and self.mongos.poll() is None
 
     def _get_hostname(self):
-        return self.logger.external_sut_hostname if self.config.NOOP_MONGO_D_S_PROCESSES else 'localhost'
+        return (
+            self.logger.external_sut_hostname
+            if self.config.NOOP_MONGO_D_S_PROCESSES
+            else "localhost"
+        )
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
@@ -814,8 +914,13 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
             self.logger.warning("The mongos fixture has not been set up yet.")
             return []
 
-        info = interface.NodeInfo(full_name=self.logger.full_name, name=self.logger.name,
-                                  port=self.port, pid=self.mongos.pid, router_port=None)
+        info = interface.NodeInfo(
+            full_name=self.logger.full_name,
+            name=self.logger.name,
+            port=self.port,
+            pid=self.mongos.pid,
+            router_port=None,
+        )
         return [info]
 
 
@@ -845,12 +950,14 @@ class MongosLauncher(object):
             return DEFAULT_EVERGREEN_MONGOS_LOG_COMPONENT_VERBOSITY
         return DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY
 
-    def launch_mongos_program(self, logger, job_num, executable=None, process_kwargs=None,
-                              mongos_options=None):
+    def launch_mongos_program(
+        self, logger, job_num, executable=None, process_kwargs=None, mongos_options=None
+    ):
         """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
 
-        executable = self.fixturelib.default_if_none(executable,
-                                                     self.config.DEFAULT_MONGOS_EXECUTABLE)
+        executable = self.fixturelib.default_if_none(
+            executable, self.config.DEFAULT_MONGOS_EXECUTABLE
+        )
 
         # Apply the --setParameter command line argument. Command line options to resmoke.py override
         # the YAML configuration.
@@ -862,22 +969,26 @@ class MongosLauncher(object):
         if "mongotHost" in mongos_options:
             suite_set_parameters["mongotHost"] = mongos_options.pop("mongotHost")
             suite_set_parameters["searchIndexManagementHostAndPort"] = mongos_options.pop(
-                "searchIndexManagementHostAndPort")
+                "searchIndexManagementHostAndPort"
+            )
 
         # Set default log verbosity levels if none were specified.
         if "logComponentVerbosity" not in suite_set_parameters:
-            suite_set_parameters[
-                "logComponentVerbosity"] = self.default_mongos_log_component_verbosity()
+            suite_set_parameters["logComponentVerbosity"] = (
+                self.default_mongos_log_component_verbosity()
+            )
 
         # Set default shutdown timeout millis if none was specified.
         if "mongosShutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters:
-            suite_set_parameters[
-                "mongosShutdownTimeoutMillisForSignaledShutdown"] = DEFAULT_MONGOS_SHUTDOWN_TIMEOUT_MILLIS
+            suite_set_parameters["mongosShutdownTimeoutMillisForSignaledShutdown"] = (
+                DEFAULT_MONGOS_SHUTDOWN_TIMEOUT_MILLIS
+            )
 
         _add_testing_set_parameters(suite_set_parameters)
 
-        return self.fixturelib.mongos_program(logger, job_num, executable, process_kwargs,
-                                              mongos_options)
+        return self.fixturelib.mongos_program(
+            logger, job_num, executable, process_kwargs, mongos_options
+        )
 
 
 def _add_testing_set_parameters(suite_set_parameters):

@@ -1,4 +1,5 @@
 """Fetch subcommand unittest."""
+
 import os
 import unittest
 from mock import MagicMock, Mock, patch, call
@@ -16,12 +17,17 @@ class TestFetch(unittest.TestCase):
     def test_fetch(self, tarfile_open_mock, copyfileobj_mock, urlopen_mock, get_api_mock):
         api_mock = MagicMock()
         get_api_mock.return_value = api_mock
-        api_mock.task_by_id.return_value = evergreen.task.Task({
-            "artifacts": [{
-                "name": "UndoDB Recordings - Execution 1",
-                "url": "fake://somewhere.over/the/rainbow.tgz",
-            }]
-        }, api_mock)
+        api_mock.task_by_id.return_value = evergreen.task.Task(
+            {
+                "artifacts": [
+                    {
+                        "name": "UndoDB Recordings - Execution 1",
+                        "url": "fake://somewhere.over/the/rainbow.tgz",
+                    }
+                ]
+            },
+            api_mock,
+        )
 
         subcommand = fetch.Fetch("task_id")
         subcommand.execute()

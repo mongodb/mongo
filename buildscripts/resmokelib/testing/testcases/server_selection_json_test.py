@@ -1,4 +1,5 @@
 """The unittest.TestCase for Server Selection JSON tests."""
+
 import os
 import os.path
 from typing import Optional
@@ -14,12 +15,17 @@ class ServerSelectionJsonTestCase(interface.ProcessTestCase):
     REGISTERED_NAME = "server_selection_json_test"
     TEST_DIR = os.path.normpath("src/mongo/client/sdam/json_tests/server_selection_tests")
 
-    def __init__(self, logger: logging.Logger, json_test_files: list[str],
-                 program_options: Optional[dict] = None):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        json_test_files: list[str],
+        program_options: Optional[dict] = None,
+    ):
         """Initialize the TestCase with the executable to run."""
         assert len(json_test_files) == 1
-        interface.ProcessTestCase.__init__(self, logger, "Server Selection Json Test",
-                                           json_test_files[0])
+        interface.ProcessTestCase.__init__(
+            self, logger, "Server Selection Json Test", json_test_files[0]
+        )
 
         self.program_executable = self._find_executable()
         self.json_test_file = os.path.normpath(json_test_files[0])
@@ -32,7 +38,8 @@ class ServerSelectionJsonTestCase(interface.ProcessTestCase):
 
         if not os.path.isfile(binary):
             raise errors.StopExecution(
-                f"Failed to locate server_selection_json_test binary at {binary}")
+                f"Failed to locate server_selection_json_test binary at {binary}"
+            )
         return binary
 
     def _make_process(self):

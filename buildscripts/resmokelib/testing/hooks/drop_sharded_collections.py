@@ -17,5 +17,6 @@ class DropShardedCollections(jsfile.JSHook):
         """."""
         description = "Drop all sharded collections"
         js_filename = os.path.join("jstests", "hooks", "drop_sharded_collections.js")
-        jsfile.JSHook.__init__(self, hook_logger, fixture, js_filename, description,
-                               shell_options=shell_options)
+        jsfile.JSHook.__init__(
+            self, hook_logger, fixture, js_filename, description, shell_options=shell_options
+        )

@@ -57,8 +57,9 @@ def get_binary_version(executable):
     return LATEST_FCV
 
 
-def remove_set_parameter_if_before_version(set_parameters, parameter_name, bin_version,
-                                           required_bin_version):
+def remove_set_parameter_if_before_version(
+    set_parameters, parameter_name, bin_version, required_bin_version
+):
     """
     Used for removing a server parameter that does not exist prior to a specified version.
 
@@ -69,8 +70,13 @@ def remove_set_parameter_if_before_version(set_parameters, parameter_name, bin_v
         set_parameters.pop(parameter_name, None)
 
 
-def mongod_program(logger: logging.Logger, job_num: int, executable: str, process_kwargs: dict,
-                   mongod_options: HistoryDict) -> tuple[process.Process, HistoryDict]:
+def mongod_program(
+    logger: logging.Logger,
+    job_num: int,
+    executable: str,
+    process_kwargs: dict,
+    mongod_options: HistoryDict,
+) -> tuple[process.Process, HistoryDict]:
     """
     Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 
@@ -89,13 +95,15 @@ def mongod_program(logger: logging.Logger, job_num: int, executable: str, proces
         args[0] = os.path.basename(args[0])
         mongod_options["set_parameters"]["fassertOnLockTimeoutForStepUpDown"] = 0
         mongod_options["set_parameters"].pop("backtraceLogFile", None)
-        mongod_options.update({
-            "logpath": "/var/log/mongodb/mongodb.log",
-            "dbpath": "/data/db",
-            "bind_ip": "0.0.0.0",
-            "oplogSize": "256",
-            "wiredTigerCacheSizeGB": "1",
-        })
+        mongod_options.update(
+            {
+                "logpath": "/var/log/mongodb/mongodb.log",
+                "dbpath": "/data/db",
+                "bind_ip": "0.0.0.0",
+                "oplogSize": "256",
+                "wiredTigerCacheSizeGB": "1",
+            }
+        )
 
     if config.TLS_MODE:
         mongod_options["tlsMode"] = config.TLS_MODE
@@ -116,21 +124,27 @@ def mongod_program(logger: logging.Logger, job_num: int, executable: str, proces
 
     suite_set_parameters = mongod_options.get("set_parameters", {})
     remove_set_parameter_if_before_version(
-        suite_set_parameters, "queryAnalysisSamplerConfigurationRefreshSecs", bin_version, "7.0.0")
-    remove_set_parameter_if_before_version(suite_set_parameters, "queryAnalysisWriterIntervalSecs",
-                                           bin_version, "7.0.0")
-    remove_set_parameter_if_before_version(suite_set_parameters, "defaultConfigCommandTimeoutMS",
-                                           bin_version, "7.3.0")
+        suite_set_parameters, "queryAnalysisSamplerConfigurationRefreshSecs", bin_version, "7.0.0"
+    )
+    remove_set_parameter_if_before_version(
+        suite_set_parameters, "queryAnalysisWriterIntervalSecs", bin_version, "7.0.0"
+    )
+    remove_set_parameter_if_before_version(
+        suite_set_parameters, "defaultConfigCommandTimeoutMS", bin_version, "7.3.0"
+    )
 
     if "grpcPort" not in mongod_options and suite_set_parameters.get("featureFlagGRPC"):
         mongod_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
 
-    remove_set_parameter_if_before_version(suite_set_parameters, "internalQueryStatsRateLimit",
-                                           bin_version, "7.3.0")
     remove_set_parameter_if_before_version(
-        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.3.0")
-    remove_set_parameter_if_before_version(suite_set_parameters, "enableAutoCompaction",
-                                           bin_version, "7.3.0")
+        suite_set_parameters, "internalQueryStatsRateLimit", bin_version, "7.3.0"
+    )
+    remove_set_parameter_if_before_version(
+        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.3.0"
+    )
+    remove_set_parameter_if_before_version(
+        suite_set_parameters, "enableAutoCompaction", bin_version, "7.3.0"
+    )
 
     if "grpcPort" not in mongod_options and suite_set_parameters.get("featureFlagGRPC"):
         mongod_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
@@ -181,17 +195,21 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
 
     suite_set_parameters = mongos_options.get("set_parameters", {})
     remove_set_parameter_if_before_version(
-        suite_set_parameters, "queryAnalysisSamplerConfigurationRefreshSecs", bin_version, "7.0.0")
-    remove_set_parameter_if_before_version(suite_set_parameters, "defaultConfigCommandTimeoutMS",
-                                           bin_version, "7.3.0")
+        suite_set_parameters, "queryAnalysisSamplerConfigurationRefreshSecs", bin_version, "7.0.0"
+    )
+    remove_set_parameter_if_before_version(
+        suite_set_parameters, "defaultConfigCommandTimeoutMS", bin_version, "7.3.0"
+    )
 
     if "grpcPort" not in mongos_options and suite_set_parameters.get("featureFlagGRPC"):
         mongos_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
 
-    remove_set_parameter_if_before_version(suite_set_parameters, "internalQueryStatsRateLimit",
-                                           bin_version, "7.3.0")
     remove_set_parameter_if_before_version(
-        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.3.0")
+        suite_set_parameters, "internalQueryStatsRateLimit", bin_version, "7.3.0"
+    )
+    remove_set_parameter_if_before_version(
+        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.3.0"
+    )
 
     if "grpcPort" not in mongos_options and suite_set_parameters.get("featureFlagGRPC"):
         mongos_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
@@ -210,8 +228,9 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     return make_process(logger, args, **process_kwargs), final_mongos_options
 
 
-def mongot_program(logger, job_num, executable=None, process_kwargs=None,
-                   mongot_options=None) -> Tuple[process.Process, Any]:
+def mongot_program(
+    logger, job_num, executable=None, process_kwargs=None, mongot_options=None
+) -> Tuple[process.Process, Any]:
     """Return a Process instance that starts a mongot."""
     args = [executable]
     mongot_options = mongot_options.copy()
@@ -222,10 +241,15 @@ def mongot_program(logger, job_num, executable=None, process_kwargs=None,
     return make_process(logger, args, **process_kwargs), final_mongot_options
 
 
-def mongo_shell_program(logger: logging.Logger, test_name: str, executable: Optional[str] = None,
-                        connection_string: Optional[str] = None,
-                        filenames: Optional[list[str]] = None,
-                        process_kwargs: Optional[dict] = None, **kwargs) -> process.Process:
+def mongo_shell_program(
+    logger: logging.Logger,
+    test_name: str,
+    executable: Optional[str] = None,
+    connection_string: Optional[str] = None,
+    filenames: Optional[list[str]] = None,
+    process_kwargs: Optional[dict] = None,
+    **kwargs,
+) -> process.Process:
     """Return a Process instance that starts a mongo shell.
 
     Args:
@@ -241,7 +265,8 @@ def mongo_shell_program(logger: logging.Logger, test_name: str, executable: Opti
     """
 
     executable = utils.default_if_none(
-        utils.default_if_none(executable, config.MONGO_EXECUTABLE), config.DEFAULT_MONGO_EXECUTABLE)
+        utils.default_if_none(executable, config.MONGO_EXECUTABLE), config.DEFAULT_MONGO_EXECUTABLE
+    )
     args = [executable]
 
     eval_sb = []  # String builder.
@@ -338,7 +363,8 @@ def mongo_shell_program(logger: logging.Logger, test_name: str, executable: Opti
     # If the 'logComponentVerbosity' setParameter for mongod was not already specified, we set its
     # value to a default.
     mongod_set_parameters.setdefault(
-        "logComponentVerbosity", mongod_launcher.get_default_log_component_verbosity_for_mongod())
+        "logComponentVerbosity", mongod_launcher.get_default_log_component_verbosity_for_mongod()
+    )
 
     # If the 'enableFlowControl' setParameter for mongod was not already specified, we set its value
     # to a default.
@@ -348,8 +374,9 @@ def mongo_shell_program(logger: logging.Logger, test_name: str, executable: Opti
     mongos_launcher = shardedcluster.MongosLauncher(fixturelib)
     # If the 'logComponentVerbosity' setParameter for mongos was not already specified, we set its
     # value to a default.
-    mongos_set_parameters.setdefault("logComponentVerbosity",
-                                     mongos_launcher.default_mongos_log_component_verbosity())
+    mongos_set_parameters.setdefault(
+        "logComponentVerbosity", mongos_launcher.default_mongos_log_component_verbosity()
+    )
 
     test_data["setParameters"] = mongod_set_parameters
     test_data["setParametersMongos"] = mongos_set_parameters
@@ -391,15 +418,18 @@ def mongo_shell_program(logger: logging.Logger, test_name: str, executable: Opti
 
     # Load this file to allow a callback to validate collections before shutting down mongod.
     eval_sb.append(
-        'await import("jstests/libs/override_methods/validate_collections_on_shutdown.js")')
+        'await import("jstests/libs/override_methods/validate_collections_on_shutdown.js")'
+    )
 
     # Load a callback to check UUID consistency before shutting down a ShardingTest.
     eval_sb.append(
-        'await import("jstests/libs/override_methods/check_uuids_consistent_across_cluster.js")')
+        'await import("jstests/libs/override_methods/check_uuids_consistent_across_cluster.js")'
+    )
 
     # Load a callback to check index consistency before shutting down a ShardingTest.
     eval_sb.append(
-        'await import("jstests/libs/override_methods/check_indexes_consistent_across_cluster.js")')
+        'await import("jstests/libs/override_methods/check_indexes_consistent_across_cluster.js")'
+    )
 
     # Load a callback to check that all orphans are deleted before shutting down a ShardingTest.
     eval_sb.append('await import("jstests/libs/override_methods/check_orphans_are_deleted.js")')
@@ -407,17 +437,20 @@ def mongo_shell_program(logger: logging.Logger, test_name: str, executable: Opti
     # Load a callback to check that the info stored in config.collections and config.chunks is
     # semantically correct before shutting down a ShardingTest.
     eval_sb.append(
-        'await import("jstests/libs/override_methods/check_routing_table_consistency.js")')
+        'await import("jstests/libs/override_methods/check_routing_table_consistency.js")'
+    )
 
     # Load a callback to check that all shards have correct filtering information before shutting
     # down a ShardingTest.
     eval_sb.append(
-        'await import("jstests/libs/override_methods/check_shard_filtering_metadata.js")')
+        'await import("jstests/libs/override_methods/check_shard_filtering_metadata.js")'
+    )
 
     if config.FUZZ_MONGOD_CONFIGS is not None and config.FUZZ_MONGOD_CONFIGS is not False:
         # Prevent commands from running with the config fuzzer.
         eval_sb.append(
-            'await import("jstests/libs/override_methods/config_fuzzer_incompatible_commands.js")')
+            'await import("jstests/libs/override_methods/config_fuzzer_incompatible_commands.js")'
+        )
 
     # Load this file to retry operations that fail due to in-progress background operations.
     eval_sb.append(
@@ -425,7 +458,7 @@ def mongo_shell_program(logger: logging.Logger, test_name: str, executable: Opti
     )
 
     eval_sb.append(
-        "(function() { Timestamp.prototype.toString = function() { throw new Error(\"Cannot toString timestamps. Consider using timestampCmp() for comparison or tojson(<variable>) for output.\"); } })()"
+        '(function() { Timestamp.prototype.toString = function() { throw new Error("Cannot toString timestamps. Consider using timestampCmp() for comparison or tojson(<variable>) for output."); } })()'
     )
 
     eval_str = "; ".join(eval_sb)
@@ -480,7 +513,7 @@ def _format_shell_vars(sb, paths, value):
 
     # Convert the list ["a", "b", "c"] into the string 'a["b"]["c"]'
     def bracketize(lst):
-        return lst[0] + ''.join(f'["{i}"]' for i in lst[1:])
+        return lst[0] + "".join(f'["{i}"]' for i in lst[1:])
 
     # Only need to do special handling for JSON objects.
     if not isinstance(value, (dict, HistoryDict)):
@@ -494,8 +527,9 @@ def _format_shell_vars(sb, paths, value):
         _format_shell_vars(sb, paths + [subkey], value[subkey])
 
 
-def dbtest_program(logger, executable=None, suites=None, process_kwargs=None,
-                   **kwargs) -> process.Process:
+def dbtest_program(
+    logger, executable=None, suites=None, process_kwargs=None, **kwargs
+) -> process.Process:
     """Return a Process instance that starts a dbtest with arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_DBTEST_EXECUTABLE)
@@ -509,7 +543,7 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None,
         kwargs["storageEngine"] = config.STORAGE_ENGINE
 
     if config.FLOW_CONTROL is not None:
-        kwargs["flowControl"] = (config.FLOW_CONTROL == "on")
+        kwargs["flowControl"] = config.FLOW_CONTROL == "on"
 
     return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
 

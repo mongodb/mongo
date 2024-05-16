@@ -9,20 +9,13 @@ import sys
 import urllib.request
 
 _S3_HASH_MAPPING = {
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-ppc64le":
-        "dd21c75817533ff601bf797e64f0eb2f7f6b813af26c829f0bda30e328caef46",
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-s390x":
-        "6d72eabc1789b041bbe4cfc033bbac4491ec9938ef6da9899c0188ecf270a7f4",
-    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-amd64":
-        "f2ba5f721a995b54bab68c6b76a340719888aa740310e634771086b6d1528ecd",
-    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-arm64":
-        "69fa21cd2ccffc2f0970c21aa3615484ba89e3553ecce1233a9d8ad9570d170e",
-    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-amd64":
-        "d28b588ac0916abd6bf02defb5433f6eddf7cba35ffa808eabb65a44aab226f7",
-    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-arm64":
-        "861a16ba9979613e70bd3d2f9d9ab5e3b59fe79471c5753acdc9c431ab6c9d94",
-    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-windows-amd64.exe":
-        "d04555245a99dfb628e33da24e2b9198beb8f46d7e7661c313eb045f6a59f5e4",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-ppc64le": "dd21c75817533ff601bf797e64f0eb2f7f6b813af26c829f0bda30e328caef46",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-s390x": "6d72eabc1789b041bbe4cfc033bbac4491ec9938ef6da9899c0188ecf270a7f4",
+    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-amd64": "f2ba5f721a995b54bab68c6b76a340719888aa740310e634771086b6d1528ecd",
+    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-arm64": "69fa21cd2ccffc2f0970c21aa3615484ba89e3553ecce1233a9d8ad9570d170e",
+    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-amd64": "d28b588ac0916abd6bf02defb5433f6eddf7cba35ffa808eabb65a44aab226f7",
+    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-arm64": "861a16ba9979613e70bd3d2f9d9ab5e3b59fe79471c5753acdc9c431ab6c9d94",
+    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-windows-amd64.exe": "d04555245a99dfb628e33da24e2b9198beb8f46d7e7661c313eb045f6a59f5e4",
 }
 
 
@@ -53,8 +46,9 @@ def _verify_s3_hash(s3_path: str, local_path: str) -> None:
 
 
 def install_bazel(binary_directory: str) -> str:
-    normalized_arch = platform.machine().lower().replace("aarch64", "arm64").replace(
-        "x86_64", "amd64")
+    normalized_arch = (
+        platform.machine().lower().replace("aarch64", "arm64").replace("x86_64", "amd64")
+    )
     normalized_os = sys.platform.replace("win32", "windows").replace("darwin", "macos")
 
     # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
@@ -90,13 +84,23 @@ def install_bazel(binary_directory: str) -> str:
 
 def _set_bazel_permissions(binary_path: str) -> None:
     # Bazel is a self-extracting zip launcher and needs read perms on the executable to read the zip from itself.
-    perms = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IWUSR | stat.S_IWGRP
+    perms = (
+        stat.S_IXUSR
+        | stat.S_IXGRP
+        | stat.S_IXOTH
+        | stat.S_IRUSR
+        | stat.S_IRGRP
+        | stat.S_IROTH
+        | stat.S_IWUSR
+        | stat.S_IWGRP
+    )
     os.chmod(binary_path, perms)
 
 
 def create_bazel_to_bazelisk_symlink(binary_directory: str) -> str:
-    bazel_symlink = os.path.join(binary_directory,
-                                 "bazel.exe" if sys.platform == "win32" else "bazel")
+    bazel_symlink = os.path.join(
+        binary_directory, "bazel.exe" if sys.platform == "win32" else "bazel"
+    )
     if os.path.exists(bazel_symlink):
         print(f"Symlink {bazel_symlink} already exists, skipping symlink creation")
         return bazel_symlink
@@ -144,17 +148,17 @@ def main():
             else:
                 print("To add it to your PATH, run: \n")
                 if os.path.exists(os.path.expanduser("~/.bashrc")):
-                    print(f"echo \"export PATH=\\$PATH:{abs_binary_directory}\" >> ~/.bashrc")
+                    print(f'echo "export PATH=\\$PATH:{abs_binary_directory}" >> ~/.bashrc')
                     print("source ~/.bashrc")
                 elif os.path.exists(os.path.expanduser("~/.bash_profile")):
-                    print(f"echo \"export PATH=\\$PATH:{abs_binary_directory}\" >> ~/.bash_profile")
+                    print(f'echo "export PATH=\\$PATH:{abs_binary_directory}" >> ~/.bash_profile')
                     print("source ~/.bash_profile")
                 elif os.path.exists(os.path.expanduser("~/.zshrc")):
-                    print(f"echo \"export PATH=\\$PATH:{abs_binary_directory}\" >> ~/.zshrc")
+                    print(f'echo "export PATH=\\$PATH:{abs_binary_directory}" >> ~/.zshrc')
                     print("source ~/.zshrc")
                 else:
                     print(f"export PATH=$PATH:{abs_binary_directory}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

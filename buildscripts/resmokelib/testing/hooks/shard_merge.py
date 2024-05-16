@@ -22,7 +22,7 @@ from buildscripts.resmokelib.testing.hooks import interface
 class ContinuousShardMerge(interface.Hook):
     """Starts a shard merge thread at the beginning of each test."""
 
-    DESCRIPTION = ("Continuous shard merges")
+    DESCRIPTION = "Continuous shard merges"
 
     IS_BACKGROUND = True
 
@@ -50,8 +50,9 @@ class ContinuousShardMerge(interface.Hook):
         if not self._shard_merge_fixture:
             raise ValueError("No ShardMergeFixture to run migrations on")
         self.logger.info("Starting the shard merge thread.")
-        self._shard_merge_thread = _ShardMergeThread(self.logger, self._shard_merge_fixture,
-                                                     self._shell_options, test_report)
+        self._shard_merge_thread = _ShardMergeThread(
+            self.logger, self._shard_merge_fixture, self._shell_options, test_report
+        )
         self._shard_merge_thread.start()
 
     def after_suite(self, test_report, teardown_flag=None):
@@ -170,14 +171,26 @@ def get_primary(rs, logger, max_tries=5):  # noqa: D205,D400
             return rs.get_primary()
         except errors.ServerFailure:
             logger.info(
-                "Timed out while waiting for a primary for replica set '%s' on try %d." +
-                " Retrying." if num_tries < max_tries else "", rs.replset_name, num_tries)
+                "Timed out while waiting for a primary for replica set '%s' on try %d."
+                + " Retrying."
+                if num_tries < max_tries
+                else "",
+                rs.replset_name,
+                num_tries,
+            )
 
 
 class _ShardMergeOptions:  # pylint:disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
-            self, donor_rs, recipient_rs, tenant_ids, read_preference, logger, donor_rs_index,
-            recipient_rs_index):
+        self,
+        donor_rs,
+        recipient_rs,
+        tenant_ids,
+        read_preference,
+        logger,
+        donor_rs_index,
+        recipient_rs_index,
+    ):
         self.donor_rs = donor_rs
         self.recipient_rs = recipient_rs
         self.migration_id = uuid.uuid4()
@@ -213,9 +226,11 @@ class _ShardMergeOptions:  # pylint:disable=too-many-instance-attributes
 
     def __str__(self):
         opts = {
-            "donor": self.get_donor_name(), "recipient": self.get_recipient_name(),
-            "migration_id": self.migration_id, "tenant_ids": self.tenant_ids,
-            "read_preference": self.read_preference
+            "donor": self.get_donor_name(),
+            "recipient": self.get_recipient_name(),
+            "migration_id": self.migration_id,
+            "tenant_ids": self.tenant_ids,
+            "read_preference": self.read_preference,
         }
         return str(opts)
 
@@ -280,13 +295,15 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                     donor_rs_index = 0
 
                 recipient_rs_index = (
-                    donor_rs_index + 1) % self._shard_merge_fixture.get_num_replsets()
+                    donor_rs_index + 1
+                ) % self._shard_merge_fixture.get_num_replsets()
                 migration_opts = self._create_migration_opts(donor_rs_index, recipient_rs_index)
 
                 # Briefly wait to let the test run before starting the shard merge, so that
                 # the first migration is more likely to have data to migrate.
                 wait_secs = random.uniform(
-                    *self.WAIT_SECS_RANGES[migration_num % len(self.WAIT_SECS_RANGES)])
+                    *self.WAIT_SECS_RANGES[migration_num % len(self.WAIT_SECS_RANGES)]
+                )
                 self.logger.info("Waiting for %.3f seconds before starting migration.", wait_secs)
                 self.__lifecycle.wait_for_tenant_migration_interval(wait_secs)
 
@@ -294,8 +311,11 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                 start_time = time.time()
                 is_committed = self._run_migration(migration_opts)
                 end_time = time.time()
-                self.logger.info("Completed shard merge in %0d ms: %s.",
-                                 (end_time - start_time) * 1000, str(migration_opts))
+                self.logger.info(
+                    "Completed shard merge in %0d ms: %s.",
+                    (end_time - start_time) * 1000,
+                    str(migration_opts),
+                )
 
                 found_idle_request = self.__lifecycle.poll_for_idle_request()
                 if found_idle_request:
@@ -329,9 +349,10 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
 
         # Check that the fixture is still running.
         if not self._shard_merge_fixture.is_running():
-            raise errors.ServerFailure("ShardMergeFixture with pids {} expected to be running in"
-                                       " ContinuousShardMerge, but wasn't".format(
-                                           self._shard_merge_fixture.pids()))
+            raise errors.ServerFailure(
+                "ShardMergeFixture with pids {} expected to be running in"
+                " ContinuousShardMerge, but wasn't".format(self._shard_merge_fixture.pids())
+            )
 
     def resume(self, test):
         """Resume the thread before test."""
@@ -354,15 +375,24 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
             raise errors.ServerFailure(msg)
 
     def _is_fail_point_abort_reason(self, abort_reason):
-        return abort_reason["code"] == self.INTERNAL_ERR_CODE and abort_reason[
-            "errmsg"] == "simulate a tenant migration error"
+        return (
+            abort_reason["code"] == self.INTERNAL_ERR_CODE
+            and abort_reason["errmsg"] == "simulate a tenant migration error"
+        )
 
     def _create_migration_opts(self, donor_rs_index, recipient_rs_index):
         donor_rs = self._shard_merge_fixture.get_replset(donor_rs_index)
         recipient_rs = self._shard_merge_fixture.get_replset(recipient_rs_index)
         read_preference = {"mode": "primary"}
-        return _ShardMergeOptions(donor_rs, recipient_rs, self._tenant_ids, read_preference,
-                                  self.logger, donor_rs_index, recipient_rs_index)
+        return _ShardMergeOptions(
+            donor_rs,
+            recipient_rs,
+            self._tenant_ids,
+            read_preference,
+            self.logger,
+            donor_rs_index,
+            recipient_rs_index,
+        )
 
     def _create_client(self, node):
         return fixture_interface.build_client(node, self._auth_options)
@@ -370,17 +400,19 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
     def _check_tenant_migration_dbhash(self, migration_opts):
         # Set the donor connection string, recipient connection string, and migration uuid string
         # for the shard merge dbhash check script.
-        self._shell_options[
-            "global_vars"]["TestData"]["donorConnectionString"] = migration_opts.get_donor_primary(
-            ).get_internal_connection_string()
-        self._shell_options["global_vars"]["TestData"][
-            "recipientConnectionString"] = migration_opts.get_recipient_primary(
-            ).get_internal_connection_string()
-        self._shell_options["global_vars"]["TestData"][
-            "migrationIdString"] = migration_opts.migration_id.__str__()
+        self._shell_options["global_vars"]["TestData"]["donorConnectionString"] = (
+            migration_opts.get_donor_primary().get_internal_connection_string()
+        )
+        self._shell_options["global_vars"]["TestData"]["recipientConnectionString"] = (
+            migration_opts.get_recipient_primary().get_internal_connection_string()
+        )
+        self._shell_options["global_vars"]["TestData"]["migrationIdString"] = (
+            migration_opts.migration_id.__str__()
+        )
 
         dbhash_test_case = dbhash_tenant_migration.CheckTenantMigrationDBHash(
-            self.logger, self._shard_merge_fixture, self._shell_options)
+            self.logger, self._shard_merge_fixture, self._shell_options
+        )
         dbhash_test_case.before_suite(self._test_report)
         dbhash_test_case.before_test(self._test, self._test_report)
         dbhash_test_case.after_test(self._test, self._test_report)
@@ -410,10 +442,14 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
             self._wait_for_migration_garbage_collection(migration_opts)
 
             if not res["ok"]:
-                raise errors.ServerFailure("Shard merge '" + str(migration_opts.migration_id) +
-                                           "' with donor replica set '" +
-                                           migration_opts.get_donor_name() + "' failed: " +
-                                           str(res))
+                raise errors.ServerFailure(
+                    "Shard merge '"
+                    + str(migration_opts.migration_id)
+                    + "' with donor replica set '"
+                    + migration_opts.get_donor_name()
+                    + "' failed: "
+                    + str(res)
+                )
 
             if is_committed:
                 return True
@@ -421,16 +457,27 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
             abort_reason = res["abortReason"]
             if self._is_fail_point_abort_reason(abort_reason):
                 self.logger.info(
-                    "Shard merge '%s' with donor replica set '%s' aborted due to failpoint: " +
-                    "%s.", migration_opts.migration_id, migration_opts.get_donor_name(), str(res))
+                    "Shard merge '%s' with donor replica set '%s' aborted due to failpoint: "
+                    + "%s.",
+                    migration_opts.migration_id,
+                    migration_opts.get_donor_name(),
+                    str(res),
+                )
                 return False
             raise errors.ServerFailure(
-                "Shard merge '" + str(migration_opts.migration_id) + "' with donor replica set '" +
-                migration_opts.get_donor_name() + "' aborted due to an error: " + str(res))
+                "Shard merge '"
+                + str(migration_opts.migration_id)
+                + "' with donor replica set '"
+                + migration_opts.get_donor_name()
+                + "' aborted due to an error: "
+                + str(res)
+            )
         except pymongo.errors.PyMongoError:
             self.logger.exception(
                 "Error running shard merge '%s' with donor primary on replica set '%s'.",
-                migration_opts.migration_id, migration_opts.get_donor_name())
+                migration_opts.migration_id,
+                migration_opts.get_donor_name(),
+            )
             raise
 
     def _start_and_wait_for_migration(self, migration_opts):  # noqa: D205,D400
@@ -450,38 +497,56 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
 
         self.logger.info(
             "Starting shard merge '%s' on donor primary on port %d of replica set '%s'.",
-            migration_opts.migration_id, donor_primary.port, migration_opts.get_donor_name())
+            migration_opts.migration_id,
+            donor_primary.port,
+            migration_opts.get_donor_name(),
+        )
 
         while True:
             try:
                 # Keep polling the migration state until the migration completes.
                 donor_primary_client = self._create_client(donor_primary)
                 res = donor_primary_client.admin.command(
-                    cmd_obj, bson.codec_options.CodecOptions(uuid_representation=UUID_SUBTYPE))
+                    cmd_obj, bson.codec_options.CodecOptions(uuid_representation=UUID_SUBTYPE)
+                )
             except (pymongo.errors.AutoReconnect, pymongo.errors.NotPrimaryError):
                 donor_primary = migration_opts.get_donor_primary()
                 self.logger.info(
-                    "Retrying shard merge '%s' against donor primary on port %d of" +
-                    " replica set '%s'.", migration_opts.migration_id, donor_primary.port,
-                    migration_opts.get_donor_name())
+                    "Retrying shard merge '%s' against donor primary on port %d of"
+                    + " replica set '%s'.",
+                    migration_opts.migration_id,
+                    donor_primary.port,
+                    migration_opts.get_donor_name(),
+                )
                 continue
             if res["state"] == "committed":
                 self.logger.info(
-                    "Shard merge '%s' with donor primary on port %d of replica set '%s'" +
-                    " has committed.", migration_opts.migration_id, donor_primary.port,
-                    migration_opts.get_donor_name())
+                    "Shard merge '%s' with donor primary on port %d of replica set '%s'"
+                    + " has committed.",
+                    migration_opts.migration_id,
+                    donor_primary.port,
+                    migration_opts.get_donor_name(),
+                )
                 return res
             if res["state"] == "aborted":
                 self.logger.info(
-                    "Shard merge '%s' with donor primary on port %d of replica set '%s'" +
-                    " has aborted: %s.", migration_opts.migration_id, donor_primary.port,
-                    migration_opts.get_donor_name(), str(res))
+                    "Shard merge '%s' with donor primary on port %d of replica set '%s'"
+                    + " has aborted: %s.",
+                    migration_opts.migration_id,
+                    donor_primary.port,
+                    migration_opts.get_donor_name(),
+                    str(res),
+                )
                 return res
             if not res["ok"]:
                 self.logger.info(
-                    "Shard merge '%s' with donor primary on port %d of replica set '%s'" +
-                    " has failed: %s.", migration_opts.migration_id, donor_primary.port,
-                    migration_opts.get_donor_name(), str(res))
+                    "Shard merge '%s' with donor primary on port %d of replica set '%s'"
+                    + " has failed: %s.",
+                    migration_opts.migration_id,
+                    donor_primary.port,
+                    migration_opts.get_donor_name(),
+                    str(res),
+                )
                 return res
             time.sleep(self.POLL_INTERVAL_SECS)
 
@@ -490,42 +555,56 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
         self.logger.info("Forgetting shard merge: %s.", str(migration_opts))
 
         cmd_obj = {
-            "donorForgetMigration": 1, "migrationId": Binary(migration_opts.migration_id.bytes,
-                                                             UUID_SUBTYPE)
+            "donorForgetMigration": 1,
+            "migrationId": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE),
         }
         donor_primary = migration_opts.get_donor_primary()
 
         self.logger.info(
             "Forgetting shard merge '%s' on donor primary on port %d of replica set '%s'.",
-            migration_opts.migration_id, donor_primary.port, migration_opts.get_donor_name())
+            migration_opts.migration_id,
+            donor_primary.port,
+            migration_opts.get_donor_name(),
+        )
 
         while True:
             try:
                 donor_primary_client = self._create_client(donor_primary)
                 donor_primary_client.admin.command(
-                    cmd_obj, bson.codec_options.CodecOptions(uuid_representation=UUID_SUBTYPE))
+                    cmd_obj, bson.codec_options.CodecOptions(uuid_representation=UUID_SUBTYPE)
+                )
                 return
             except (pymongo.errors.AutoReconnect, pymongo.errors.NotPrimaryError):
                 donor_primary = migration_opts.get_donor_primary()
                 self.logger.info(
-                    "Retrying forgetting shard merge '%s' against donor primary on port %d of " +
-                    "replica set '%s'.", migration_opts.migration_id, donor_primary.port,
-                    migration_opts.get_donor_name())
+                    "Retrying forgetting shard merge '%s' against donor primary on port %d of "
+                    + "replica set '%s'.",
+                    migration_opts.migration_id,
+                    donor_primary.port,
+                    migration_opts.get_donor_name(),
+                )
                 continue
             except pymongo.errors.OperationFailure as err:
                 if err.code != self.NO_SUCH_MIGRATION_ERR_CODE:
                     raise
                 # The fixture was restarted.
                 self.logger.info(
-                    "Could not find shard merge '%s' on donor primary on" +
-                    " port %d of replica set '%s': %s.", migration_opts.migration_id,
-                    donor_primary.port, migration_opts.get_donor_name(), str(err))
+                    "Could not find shard merge '%s' on donor primary on"
+                    + " port %d of replica set '%s': %s.",
+                    migration_opts.migration_id,
+                    donor_primary.port,
+                    migration_opts.get_donor_name(),
+                    str(err),
+                )
                 return
             except pymongo.errors.PyMongoError:
                 self.logger.exception(
-                    "Error forgetting shard merge '%s' on donor primary on" +
-                    " port %d of replica set '%s'.", migration_opts.migration_id,
-                    donor_primary.port, migration_opts.get_donor_name())
+                    "Error forgetting shard merge '%s' on donor primary on"
+                    + " port %d of replica set '%s'.",
+                    migration_opts.migration_id,
+                    donor_primary.port,
+                    migration_opts.get_donor_name(),
+                )
                 raise
 
     def _wait_for_migration_garbage_collection(self, migration_opts):  # noqa: D205,D400
@@ -536,18 +615,24 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
             donor_nodes = migration_opts.get_donor_nodes()
             for donor_node in donor_nodes:
                 self.logger.info(
-                    "Waiting for shard merge '%s' to be garbage collected on donor node on " +
-                    "port %d of replica set '%s'.", migration_opts.migration_id, donor_node.port,
-                    migration_opts.get_donor_name())
+                    "Waiting for shard merge '%s' to be garbage collected on donor node on "
+                    + "port %d of replica set '%s'.",
+                    migration_opts.migration_id,
+                    donor_node.port,
+                    migration_opts.get_donor_name(),
+                )
 
                 while True:
                     try:
                         donor_node_client = self._create_client(donor_node)
-                        res = donor_node_client.config.command({
-                            "count": "tenantMigrationDonors", "query": {
-                                "_id": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE)
+                        res = donor_node_client.config.command(
+                            {
+                                "count": "tenantMigrationDonors",
+                                "query": {
+                                    "_id": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE)
+                                },
                             }
-                        })
+                        )
                         if res["n"] == 0:
                             break
                     except (pymongo.errors.AutoReconnect, pymongo.errors.NotPrimaryError):
@@ -555,28 +640,36 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                         # InterruptedDueToReplStateChange if the donor primary steps down or shuts
                         # down during the garbage collection check.
                         self.logger.info(
-                            "Retrying waiting for shard merge '%s' to be garbage collected on" +
-                            " donor node on port %d of replica set '%s'.",
-                            migration_opts.migration_id, donor_node.port,
-                            migration_opts.get_donor_name())
+                            "Retrying waiting for shard merge '%s' to be garbage collected on"
+                            + " donor node on port %d of replica set '%s'.",
+                            migration_opts.migration_id,
+                            donor_node.port,
+                            migration_opts.get_donor_name(),
+                        )
                         continue
                     time.sleep(self.POLL_INTERVAL_SECS)
 
             recipient_nodes = migration_opts.get_recipient_nodes()
             for recipient_node in recipient_nodes:
                 self.logger.info(
-                    "Waiting for shard merge '%s' to be garbage collected on recipient node on" +
-                    " port %d of replica set '%s'.", migration_opts.migration_id,
-                    recipient_node.port, migration_opts.get_recipient_name())
+                    "Waiting for shard merge '%s' to be garbage collected on recipient node on"
+                    + " port %d of replica set '%s'.",
+                    migration_opts.migration_id,
+                    recipient_node.port,
+                    migration_opts.get_recipient_name(),
+                )
 
                 while True:
                     try:
                         recipient_node_client = self._create_client(recipient_node)
-                        res = recipient_node_client.config.command({
-                            "count": "shardMergeRecipients", "query": {
-                                "_id": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE)
+                        res = recipient_node_client.config.command(
+                            {
+                                "count": "shardMergeRecipients",
+                                "query": {
+                                    "_id": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE)
+                                },
                             }
-                        })
+                        )
                         if res["n"] == 0:
                             break
                     except (pymongo.errors.AutoReconnect, pymongo.errors.NotPrimaryError):
@@ -584,18 +677,22 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                         # InterruptedDueToReplStateChange if the recipient primary steps down or
                         # shuts down during the garbage collection check.
                         self.logger.info(
-                            "Retrying waiting for shard merge '%s' to be garbage collected on" +
-                            " recipient node on port %d of replica set '%s'.",
-                            migration_opts.migration_id, recipient_node.port,
-                            migration_opts.get_recipient_name())
+                            "Retrying waiting for shard merge '%s' to be garbage collected on"
+                            + " recipient node on port %d of replica set '%s'.",
+                            migration_opts.migration_id,
+                            recipient_node.port,
+                            migration_opts.get_recipient_name(),
+                        )
                         continue
                     time.sleep(self.POLL_INTERVAL_SECS)
         except pymongo.errors.PyMongoError:
             self.logger.exception(
-                "Error waiting for shard merge '%s' from donor replica set '%s" +
-                " to recipient replica set '%s' to be garbage collected.",
-                migration_opts.migration_id, migration_opts.get_donor_name(),
-                migration_opts.get_recipient_name())
+                "Error waiting for shard merge '%s' from donor replica set '%s"
+                + " to recipient replica set '%s' to be garbage collected.",
+                migration_opts.migration_id,
+                migration_opts.get_donor_name(),
+                migration_opts.get_recipient_name(),
+            )
             raise
 
     def _wait_for_reroute_or_test_completion(self, migration_opts):
@@ -603,31 +700,40 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
         donor_primary = migration_opts.get_donor_primary()
 
         self.logger.info(
-            "Waiting for donor primary on port %d of replica set '%s' for shard merge '%s' " +
-            "to reroute at least one conflicting command. Stop waiting when the test finishes.",
-            donor_primary.port, migration_opts.get_donor_name(), migration_opts.migration_id)
+            "Waiting for donor primary on port %d of replica set '%s' for shard merge '%s' "
+            + "to reroute at least one conflicting command. Stop waiting when the test finishes.",
+            donor_primary.port,
+            migration_opts.get_donor_name(),
+            migration_opts.migration_id,
+        )
 
         while not self.__lifecycle.is_test_finished():
             try:
                 donor_primary_client = self._create_client(donor_primary)
                 doc = donor_primary_client["local"]["rerouted"].find_one(
-                    {"_id": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE)})
+                    {"_id": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE)}
+                )
                 if doc is not None:
                     return
             except (pymongo.errors.AutoReconnect, pymongo.errors.NotPrimaryError):
                 donor_primary = migration_opts.get_donor_primary()
                 self.logger.info(
-                    "Retrying waiting for donor primary on port '%d' of replica set '%s' for " +
-                    "shard merge '%s' to reroute at least one conflicting command.",
-                    donor_primary.port, migration_opts.get_donor_name(),
-                    migration_opts.migration_id)
+                    "Retrying waiting for donor primary on port '%d' of replica set '%s' for "
+                    + "shard merge '%s' to reroute at least one conflicting command.",
+                    donor_primary.port,
+                    migration_opts.get_donor_name(),
+                    migration_opts.migration_id,
+                )
                 continue
             except pymongo.errors.PyMongoError:
                 end_time = time.time()
                 self.logger.exception(
-                    "Error running find command on donor primary on port %d of replica set '%s' " +
-                    "after waiting for reroute for %0d ms", donor_primary.port,
-                    migration_opts.get_donor_name(), (end_time - start_time) * 1000)
+                    "Error running find command on donor primary on port %d of replica set '%s' "
+                    + "after waiting for reroute for %0d ms",
+                    donor_primary.port,
+                    migration_opts.get_donor_name(),
+                    (end_time - start_time) * 1000,
+                )
                 raise
 
             time.sleep(self.POLL_INTERVAL_SECS)
@@ -650,16 +756,24 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                 return
             # We retry on all write concern errors because we assume the only reason waiting for
             # write concern should fail is because of a failover.
-            except (pymongo.errors.AutoReconnect, pymongo.errors.NotPrimaryError,
-                    pymongo.errors.WriteConcernError) as err:
+            except (
+                pymongo.errors.AutoReconnect,
+                pymongo.errors.NotPrimaryError,
+                pymongo.errors.WriteConcernError,
+            ) as err:
                 primary = get_primary(rs, self.logger)
                 self.logger.info(
                     "Retrying dropDatabase commands against primary on port %d after error %s.",
-                    primary.port, str(err))
+                    primary.port,
+                    str(err),
+                )
                 continue
             except pymongo.errors.PyMongoError:
                 self.logger.exception(
-                    "Error dropping databases for tenants %s on primary on" +
-                    " port %d of replica set '%s' to be garbage collection.", str(self._tenant_ids),
-                    primary.port, rs.replset_name)
+                    "Error dropping databases for tenants %s on primary on"
+                    + " port %d of replica set '%s' to be garbage collection.",
+                    str(self._tenant_ids),
+                    primary.port,
+                    rs.replset_name,
+                )
                 raise

@@ -20,10 +20,10 @@ class ValidateGeneratedSuites(unittest.TestCase):
             try:
                 suite = self.matrix_suite_config.get_config_obj_and_verify(suite_name)
                 self.assertIsNotNone(
-                    suite, msg=
-                    f"{suite_name} was not found. This means either MatrixSuiteConfig.get_named_suites() "
-                    +
-                    "or MatrixSuiteConfig.get_config_obj_and_verify() are not working as intended.")
+                    suite,
+                    msg=f"{suite_name} was not found. This means either MatrixSuiteConfig.get_named_suites() "
+                    + "or MatrixSuiteConfig.get_config_obj_and_verify() are not working as intended.",
+                )
             except Exception as ex:
                 self.fail(repr(ex))
 
@@ -33,14 +33,17 @@ class ValidateGeneratedSuites(unittest.TestCase):
         generated_files = os.listdir(suites_dir)
         for filename in generated_files:
             (suite_name, ext) = os.path.splitext(filename)
-            self.assertEqual(ext, ".yml",
-                             msg=f"{filename} has the wrong file extension, expected `.yml`")
-            expected_mapping_file = os.path.join(self.matrix_suite_config.get_suites_dir(),
-                                                 f"mappings/{suite_name}.yml")
+            self.assertEqual(
+                ext, ".yml", msg=f"{filename} has the wrong file extension, expected `.yml`"
+            )
+            expected_mapping_file = os.path.join(
+                self.matrix_suite_config.get_suites_dir(), f"mappings/{suite_name}.yml"
+            )
             self.assertIn(
-                suite_name, suite_names, msg=
-                f"{filename} does not have a correlated mapping file . Make a mapping file or delete it."
+                suite_name,
+                suite_names,
+                msg=f"{filename} does not have a correlated mapping file . Make a mapping file or delete it."
                 f"You have a generated file {filename} that does not have a corresponding mapping file {expected_mapping_file}. "
-                +
-                "If you have added a non matrix suite to resmokeconfig/matrix_suites/generated_suites, move it to the resmokeconfig/suites."
-                + " If you have removed the mapping file be sure to remove the generated file.")
+                + "If you have added a non matrix suite to resmokeconfig/matrix_suites/generated_suites, move it to the resmokeconfig/suites."
+                + " If you have removed the mapping file be sure to remove the generated file.",
+            )

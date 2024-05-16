@@ -48,16 +48,19 @@ def validate_and_update_config(parser, args):
 def _validate_options(parser, args):
     """Do preliminary validation on the options and error on any invalid options."""
 
-    if not 'shell_port' in args or not 'shell_conn_string' in args:
+    if not "shell_port" in args or not "shell_conn_string" in args:
         return
 
     if args.shell_port is not None and args.shell_conn_string is not None:
         parser.error("Cannot specify both `shellPort` and `shellConnString`")
 
     if args.executor_file:
-        parser.error("--executor is superseded by --suites; specify --suites={} {} to run the"
-                     " test(s) under those suite configuration(s)".format(
-                         args.executor_file, " ".join(args.test_files)))
+        parser.error(
+            "--executor is superseded by --suites; specify --suites={} {} to run the"
+            " test(s) under those suite configuration(s)".format(
+                args.executor_file, " ".join(args.test_files)
+            )
+        )
 
     # The "test_files" positional argument logically overlaps with `--replayFile`. Disallow using both.
     if args.test_files and args.replay_file:
@@ -69,7 +72,8 @@ def _validate_options(parser, args):
         parser.error("The --shellSeed argument must be used with only one test.")
 
     if args.additional_feature_flags_file and not os.path.isfile(
-            args.additional_feature_flags_file):
+        args.additional_feature_flags_file
+    ):
         parser.error("The specified additional feature flags file does not exist.")
 
     def get_set_param_errors(process_params):
@@ -93,10 +97,11 @@ def _validate_options(parser, args):
         return errors
 
     config = vars(args)
-    mongod_set_param_errors = get_set_param_errors(config.get('mongod_set_parameters') or [])
-    mongos_set_param_errors = get_set_param_errors(config.get('mongos_set_parameters') or [])
+    mongod_set_param_errors = get_set_param_errors(config.get("mongod_set_parameters") or [])
+    mongos_set_param_errors = get_set_param_errors(config.get("mongos_set_parameters") or [])
     mongocryptd_set_param_errors = get_set_param_errors(
-        config.get('mongocryptd_set_parameters') or [])
+        config.get("mongocryptd_set_parameters") or []
+    )
     error_msgs = {}
     if mongod_set_param_errors:
         error_msgs["mongodSetParameters"] = mongod_set_param_errors
@@ -126,13 +131,17 @@ def _validate_config(parser):
 
     if _config.MIXED_BIN_VERSIONS is not None:
         for version in _config.MIXED_BIN_VERSIONS:
-            if version not in set(['old', 'new']):
-                parser.error("Must specify binary versions as 'old' or 'new' in format"
-                             " 'version1-version2'")
+            if version not in set(["old", "new"]):
+                parser.error(
+                    "Must specify binary versions as 'old' or 'new' in format"
+                    " 'version1-version2'"
+                )
 
     if _config.UNDO_RECORDER_PATH is not None:
-        if not sys.platform.startswith('linux') or platform.machine() not in [
-                "i386", "i686", "x86_64"
+        if not sys.platform.startswith("linux") or platform.machine() not in [
+            "i386",
+            "i686",
+            "x86_64",
         ]:
             parser.error("--recordWith is only supported on x86 and x86_64 Linux distributions")
             return
@@ -176,10 +185,10 @@ def _find_resmoke_wrappers():
 
 
 def _set_up_tracing(
-        otel_collector_dir: Optional[str],
-        trace_id: Optional[str],
-        parent_span_id: Optional[str],
-        extra_context: Optional[Dict[str, object]],
+    otel_collector_dir: Optional[str],
+    trace_id: Optional[str],
+    parent_span_id: Optional[str],
+    extra_context: Optional[Dict[str, object]],
 ) -> bool:
     """Try to set up otel tracing. On success return True. On failure return False.
 
@@ -206,7 +215,8 @@ def _set_up_tracing(
             # Make the file easy to read when ran locally.
             pretty_print = _config.EVERGREEN_TASK_ID is None
             processor = BatchedBaggageSpanProcessor(
-                FileSpanExporter(otel_collector_dir, pretty_print))
+                FileSpanExporter(otel_collector_dir, pretty_print)
+            )
             provider.add_span_processor(processor)
         except OSError:
             traceback.print_exc()
@@ -290,7 +300,8 @@ be invoked as either:
 
         if _config.ADDITIONAL_FEATURE_FLAGS_FILE:
             enabled_feature_flags.extend(
-                process_feature_flag_file(_config.ADDITIONAL_FEATURE_FLAGS_FILE))
+                process_feature_flag_file(_config.ADDITIONAL_FEATURE_FLAGS_FILE)
+            )
 
         # Specify additional feature flags from the command line.
         # Set running all feature flag tests to True if this options is specified.
@@ -314,7 +325,8 @@ be invoked as either:
     # EXCLUDE_WITH_ANY_TAGS will always contain the implicitly defined EXCLUDED_TAG.
     _config.EXCLUDE_WITH_ANY_TAGS = [_config.EXCLUDED_TAG]
     _config.EXCLUDE_WITH_ANY_TAGS.extend(
-        utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), []))
+        utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), [])
+    )
 
     with open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml") as fully_disabled_ffs:
         force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
@@ -328,7 +340,8 @@ be invoked as either:
         # Don't run tests with feature flags that are not enabled.
         _config.EXCLUDE_WITH_ANY_TAGS.extend(not_enabled_feature_flags)
         _config.EXCLUDE_WITH_ANY_TAGS.extend(
-            [f"{feature_flag}_incompatible" for feature_flag in _config.ENABLED_FEATURE_FLAGS])
+            [f"{feature_flag}_incompatible" for feature_flag in _config.ENABLED_FEATURE_FLAGS]
+        )
 
     _config.DOCKER_COMPOSE_BUILD_IMAGES = config.pop("docker_compose_build_images")
     if _config.DOCKER_COMPOSE_BUILD_IMAGES is not None:
@@ -341,7 +354,9 @@ be invoked as either:
     # (1) We are building images for an External SUT, OR ...
     # (2) We are running resmoke against an External SUT
     # This option needs to be set before the _config.CONFIG_SHARD option below
-    _config.NOOP_MONGO_D_S_PROCESSES = _config.DOCKER_COMPOSE_BUILD_IMAGES is not None or _config.EXTERNAL_SUT
+    _config.NOOP_MONGO_D_S_PROCESSES = (
+        _config.DOCKER_COMPOSE_BUILD_IMAGES is not None or _config.EXTERNAL_SUT
+    )
 
     # When running resmoke against an External SUT, we are expected to be in
     # the workload container -- which may require additional setup before running tests.
@@ -412,9 +427,14 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
             _config.CONFIG_FUZZ_SEED = random.randrange(sys.maxsize)
         else:
             _config.CONFIG_FUZZ_SEED = int(_config.CONFIG_FUZZ_SEED)
-        _config.MONGOD_SET_PARAMETERS, _config.WT_ENGINE_CONFIG, _config.WT_COLL_CONFIG, \
-        _config.WT_INDEX_CONFIG = mongo_fuzzer_configs.fuzz_mongod_set_parameters(
-            _config.FUZZ_MONGOD_CONFIGS, _config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS)
+        (
+            _config.MONGOD_SET_PARAMETERS,
+            _config.WT_ENGINE_CONFIG,
+            _config.WT_COLL_CONFIG,
+            _config.WT_INDEX_CONFIG,
+        ) = mongo_fuzzer_configs.fuzz_mongod_set_parameters(
+            _config.FUZZ_MONGOD_CONFIGS, _config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS
+        )
         _config.EXCLUDE_WITH_ANY_TAGS.extend(["uses_compact"])
         _config.EXCLUDE_WITH_ANY_TAGS.extend(["requires_emptycapped"])
 
@@ -429,7 +449,8 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
             _config.CONFIG_FUZZ_SEED = int(_config.CONFIG_FUZZ_SEED)
 
         _config.MONGOS_SET_PARAMETERS = mongo_fuzzer_configs.fuzz_mongos_set_parameters(
-            _config.FUZZ_MONGOS_CONFIGS, _config.CONFIG_FUZZ_SEED, _config.MONGOS_SET_PARAMETERS)
+            _config.FUZZ_MONGOS_CONFIGS, _config.CONFIG_FUZZ_SEED, _config.MONGOS_SET_PARAMETERS
+        )
 
     _config.MONGOCRYPTD_SET_PARAMETERS = _merge_set_params(config.pop("mongocryptd_set_parameters"))
 
@@ -451,7 +472,8 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.MONGOS_TLS_CERTIFICATE_KEY_FILE = config.pop("mongos_tls_certificate_key_file")
     _config.NUM_SHARDS = config.pop("num_shards")
     _config.CONFIG_SHARD = utils.pick_catalog_shard_node(
-        config.pop("config_shard"), _config.NUM_SHARDS)
+        config.pop("config_shard"), _config.NUM_SHARDS
+    )
     _config.EMBEDDED_ROUTER = config.pop("embedded_router")
     _config.ORIGIN_SUITE = config.pop("origin_suite")
     _config.CEDAR_REPORT_FILE = config.pop("cedar_report_file")
@@ -569,8 +591,9 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
 
     # Configure evergreen task documentation
     if _config.EVERGREEN_TASK_NAME:
-        task_name = utils.get_task_name_without_suffix(_config.EVERGREEN_TASK_NAME,
-                                                       _config.EVERGREEN_VARIANT_NAME)
+        task_name = utils.get_task_name_without_suffix(
+            _config.EVERGREEN_TASK_NAME, _config.EVERGREEN_VARIANT_NAME
+        )
         evg_task_doc_file = os.path.join(_config.CONFIG_DIR, "evg_task_doc", "evg_task_doc.yml")
         if os.path.exists(evg_task_doc_file):
             evg_task_doc = utils.load_yaml_file(evg_task_doc_file)
@@ -724,8 +747,9 @@ def add_otel_args(parser: argparse.ArgumentParser):
     )
 
 
-def detect_evergreen_config(parsed_args: argparse.Namespace,
-                            expansions_file: str = "../expansions.yml"):
+def detect_evergreen_config(
+    parsed_args: argparse.Namespace, expansions_file: str = "../expansions.yml"
+):
     if not os.path.exists(expansions_file):
         return
 

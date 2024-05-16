@@ -13,10 +13,13 @@ class CheckShardFilteringMetadata(jsfile.DataConsistencyHook):
         """Initialize CheckShardFilteringMetadata."""
 
         if not isinstance(fixture, shardedcluster.ShardedClusterFixture):
-            raise ValueError(f"'fixture' must be an instance of ShardedClusterFixture, but got"
-                             f" {fixture.__class__.__name__}")
+            raise ValueError(
+                f"'fixture' must be an instance of ShardedClusterFixture, but got"
+                f" {fixture.__class__.__name__}"
+            )
 
         description = "Inspect filtering metadata on shards"
         js_filename = os.path.join("jstests", "hooks", "run_check_shard_filtering_metadata.js")
-        super().__init__(hook_logger, fixture, js_filename, description,
-                         shell_options=shell_options)
+        super().__init__(
+            hook_logger, fixture, js_filename, description, shell_options=shell_options
+        )

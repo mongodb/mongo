@@ -8,40 +8,56 @@ from buildscripts.resmokelib.testing.fixtures import interface
 class BulkWriteFixture(interface.MultiClusterFixture):
     """Fixture which provides JSTests with a set of clusters to run tests against."""
 
-    def __init__(self, logger, job_num, fixturelib, cluster_options, dbpath_prefix=None,
-                 preserve_dbpath=False, requires_auth=False):
+    def __init__(
+        self,
+        logger,
+        job_num,
+        fixturelib,
+        cluster_options,
+        dbpath_prefix=None,
+        preserve_dbpath=False,
+        requires_auth=False,
+    ):
         """Initialize BulkWriteFixture with different options."""
 
-        interface.MultiClusterFixture.__init__(self, logger, job_num, fixturelib,
-                                               dbpath_prefix=dbpath_prefix)
+        interface.MultiClusterFixture.__init__(
+            self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix
+        )
 
         self.setup_complete = False
         self.clusters = []
 
         # cluster_options will be used for the bulkWrite cluster.
-        cluster_options["settings"] = self.fixturelib.default_if_none(cluster_options["settings"],
-                                                                      {})
-        if "preserve_dbpath" not in cluster_options["settings"]\
-            or cluster_options["settings"]["preserve_dbpath"] is None:
+        cluster_options["settings"] = self.fixturelib.default_if_none(
+            cluster_options["settings"], {}
+        )
+        if (
+            "preserve_dbpath" not in cluster_options["settings"]
+            or cluster_options["settings"]["preserve_dbpath"] is None
+        ):
             cluster_options["settings"]["preserve_dbpath"] = preserve_dbpath
 
         # The "dbpath_prefix" needs to be under "settings" for replicasets
         # but also under "mongod_options" for sharded clusters.
-        cluster_options["settings"]["dbpath_prefix"] = os.path.join(self._dbpath_prefix,
-                                                                    "bulkWriteCluster")
+        cluster_options["settings"]["dbpath_prefix"] = os.path.join(
+            self._dbpath_prefix, "bulkWriteCluster"
+        )
 
         if cluster_options["class"] == "ReplicaSetFixture":
             cluster_options["settings"]["replicaset_logging_prefix"] = "bw"
             cluster_options["settings"]["dbpath_prefix"] = os.path.join(
-                self._dbpath_prefix, "bulkWriteCluster")
+                self._dbpath_prefix, "bulkWriteCluster"
+            )
         elif cluster_options["class"] == "ShardedClusterFixture":
             cluster_options["settings"]["cluster_logging_prefix"] = "bw"
         else:
             raise ValueError(f"Illegal fixture class: {cluster_options['class']}")
 
         self.clusters.append(
-            self.fixturelib.make_fixture(cluster_options["class"], self.logger, self.job_num,
-                                         **cluster_options["settings"]))
+            self.fixturelib.make_fixture(
+                cluster_options["class"], self.logger, self.job_num, **cluster_options["settings"]
+            )
+        )
 
         # The cluster where normal writes will be executed has set options.
         normal_cluster_options = {}
@@ -49,17 +65,25 @@ class BulkWriteFixture(interface.MultiClusterFixture):
         normal_cluster_options["settings"]["mongod_options"] = {}
         normal_cluster_options["settings"]["mongod_options"]["set_parameters"] = {}
         normal_cluster_options["settings"]["mongod_options"]["set_parameters"][
-            "enableTestCommands"] = 1
+            "enableTestCommands"
+        ] = 1
 
         normal_cluster_options["settings"]["num_nodes"] = 1
         normal_cluster_options["settings"]["use_replica_set_connection_string"] = True
 
         normal_cluster_options["settings"]["replicaset_logging_prefix"] = "nc"
         normal_cluster_options["settings"]["dbpath_prefix"] = os.path.join(
-            self._dbpath_prefix, "normalCluster")
+            self._dbpath_prefix, "normalCluster"
+        )
         self.clusters.append(
-            self.fixturelib.make_fixture("ReplicaSetFixture", self.logger, self.job_num,
-                                         **normal_cluster_options["settings"], replset_name="rs1"))
+            self.fixturelib.make_fixture(
+                "ReplicaSetFixture",
+                self.logger,
+                self.job_num,
+                **normal_cluster_options["settings"],
+                replset_name="rs1",
+            )
+        )
 
     def pids(self):
         """Return: pids owned by this fixture if any."""
@@ -67,7 +91,7 @@ class BulkWriteFixture(interface.MultiClusterFixture):
         for cluster in self.clusters:
             out.extend(cluster.pids())
         if not out:
-            self.logger.debug('No clusters when gathering multi replicaset fixture pids.')
+            self.logger.debug("No clusters when gathering multi replicaset fixture pids.")
         return out
 
     def setup(self):

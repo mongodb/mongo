@@ -16,9 +16,13 @@ class SpanMetrics:
 
     def to_dict(self):
         return {
-            'id': self.id, 'name': self.name, 'parentId': self.parent_id,
-            'totalNanos': self.total_nanos, 'netNanos': self.net_nanos,
-            'exclusiveNanos': self.exclusive_nanos, 'count': self.count
+            "id": self.id,
+            "name": self.name,
+            "parentId": self.parent_id,
+            "totalNanos": self.total_nanos,
+            "netNanos": self.net_nanos,
+            "exclusiveNanos": self.exclusive_nanos,
+            "count": self.count,
         }
 
 
@@ -28,17 +32,23 @@ class CallMetrics:
 
     @staticmethod
     def new_empty():
-        spans = {0: SpanMetrics(0, '', 0, 0, 0, 0, 0, {})}
+        spans = {0: SpanMetrics(0, "", 0, 0, 0, 0, 0, {})}
         return CallMetrics(spans)
 
     @staticmethod
     def from_json(json):
-        spans = {0: SpanMetrics(0, '', 0, 0, 0, 0, 0, {})}
-        for spanJson in json['spans']:
-            spans[int(spanJson['id'])] = SpanMetrics(
-                int(spanJson['id']), str(spanJson['name']), int(spanJson['parentId']),
-                int(spanJson['totalNanos']), int(spanJson['netNanos']),
-                int(spanJson['exclusiveNanos']), int(spanJson['count']), {})
+        spans = {0: SpanMetrics(0, "", 0, 0, 0, 0, 0, {})}
+        for spanJson in json["spans"]:
+            spans[int(spanJson["id"])] = SpanMetrics(
+                int(spanJson["id"]),
+                str(spanJson["name"]),
+                int(spanJson["parentId"]),
+                int(spanJson["totalNanos"]),
+                int(spanJson["netNanos"]),
+                int(spanJson["exclusiveNanos"]),
+                int(spanJson["count"]),
+                {},
+            )
 
         for span in spans.values():
             if span.id == 0:
@@ -75,7 +85,7 @@ class CallMetrics:
 
     def find_span(self, path: str):
         span_id = 0
-        for p in path.split('.'):
+        for p in path.split("."):
             if span_id is None:
                 return None
 
@@ -84,7 +94,7 @@ class CallMetrics:
 
     def to_dict(self):
         return {
-            'spans': [
+            "spans": [
                 s.to_dict() for s in sorted(self.spans.values(), key=lambda x: x.id) if s.id != 0
             ]
         }

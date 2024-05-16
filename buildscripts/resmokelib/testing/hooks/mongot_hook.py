@@ -9,7 +9,7 @@ from buildscripts.resmokelib.testing.hooks import interface
 class MongotHook(interface.Hook):
     """Removes data directory files (eg config journals) associated with each mongot launched from a replica set."""
 
-    DESCRIPTION = ("hook for managing and cleaning up data files for mongot")
+    DESCRIPTION = "hook for managing and cleaning up data files for mongot"
 
     IS_BACKGROUND = True
 
@@ -25,12 +25,14 @@ class MongotHook(interface.Hook):
             raise ValueError("The Mongot hook requires launch_mongot to be enabled")
 
         self.fixture = None
-        if isinstance(fixture,
-                      (replicaset.ReplicaSetFixture, shardedcluster.ShardedClusterFixture)):
+        if isinstance(
+            fixture, (replicaset.ReplicaSetFixture, shardedcluster.ShardedClusterFixture)
+        ):
             self.fixture = fixture
         else:
             raise ValueError(
-                "The Mongot hook requires a ReplicaSetFixture or ShardedClusterFixture")
+                "The Mongot hook requires a ReplicaSetFixture or ShardedClusterFixture"
+            )
 
     def clear_mongot_data_files(self):
         # Remove each MongoTFixture's associated config journal.

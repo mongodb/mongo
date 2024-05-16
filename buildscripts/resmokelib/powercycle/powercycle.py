@@ -1,4 +1,5 @@
 """Powercycle test helper functions."""
+
 import atexit
 import collections
 import copy
@@ -30,8 +31,12 @@ import pymongo
 import requests
 import yaml
 
-from buildscripts.resmokelib.powercycle.lib import remote_operations, execute_cmd, \
-    create_temp_executable_file, NamedTempFile
+from buildscripts.resmokelib.powercycle.lib import (
+    remote_operations,
+    execute_cmd,
+    create_temp_executable_file,
+    NamedTempFile,
+)
 from buildscripts.resmokelib.powercycle import powercycle_config, powercycle_constants
 
 # See https://docs.python.org/2/library/sys.html#sys.platform
@@ -165,8 +170,9 @@ def register_signal_handler(handler):
             security_attributes = None
             manual_reset = False
             initial_state = False
-            task_timeout_handle = win32event.CreateEvent(security_attributes, manual_reset,
-                                                         initial_state, event_name)
+            task_timeout_handle = win32event.CreateEvent(
+                security_attributes, manual_reset, initial_state, event_name
+            )
         except win32event.error as err:
             LOGGER.error("Exception from win32event.CreateEvent with error: %s", err)
             return
@@ -177,8 +183,9 @@ def register_signal_handler(handler):
         # Create thread.
         event_handler_thread = threading.Thread(
             target=_handle_set_event,
-            kwargs={"event_handle": task_timeout_handle,
-                    "handler": handler}, name="windows_event_handler_thread")
+            kwargs={"event_handle": task_timeout_handle, "handler": handler},
+            name="windows_event_handler_thread",
+        )
         event_handler_thread.daemon = True
         event_handler_thread.start()
     else:
@@ -267,8 +274,9 @@ def abs_path(path):
         cmd = "cygpath -wa {}".format(path)
         ret, output = execute_cmd(cmd, use_file=True)
         if ret:
-            raise Exception("Command \"{}\" failed with code {} and output message: {}".format(
-                cmd, ret, output))
+            raise Exception(
+                'Command "{}" failed with code {} and output message: {}'.format(cmd, ret, output)
+            )
         return output.rstrip().replace("\\", "/")
     return os.path.abspath(os.path.normpath(path))
 
@@ -277,7 +285,8 @@ def symlink_dir(source_dir, dest_dir):
     """Symlink the 'dest_dir' to 'source_dir'."""
     if _IS_WINDOWS:
         win32file.CreateSymbolicLink(  # pylint: disable=undefined-variable
-            dest_dir, source_dir, win32file.SYMBOLIC_LINK_FLAG_DIRECTORY)  # pylint: disable=undefined-variable
+            dest_dir, source_dir, win32file.SYMBOLIC_LINK_FLAG_DIRECTORY
+        )  # pylint: disable=undefined-variable
     else:
         os.symlink(source_dir, dest_dir)
 
@@ -347,7 +356,7 @@ def parse_options(options):
                 options_map[opt_name] = (None, opt_form)
             else:
                 opt_name = opt[opt_idx:eq_idx]
-                options_map[opt_name] = (opt[eq_idx + 1:], opt_form)
+                options_map[opt_name] = (opt[eq_idx + 1 :], opt_form)
                 opt_name = None
         elif opt_name:
             options_map[opt_name] = (opt, opt_form)
@@ -359,7 +368,6 @@ def download_file(url, file_name, download_retries=5):
 
     LOGGER.info("Downloading %s to %s", url, file_name)
     while download_retries > 0:
-
         with requests.Session() as session:
             adapter = requests.adapters.HTTPAdapter(max_retries=download_retries)
             session.mount(url, adapter)
@@ -384,9 +392,10 @@ def download_file(url, file_name, download_retries=5):
             if url_content_length != file_size:
                 download_retries -= 1
                 if download_retries == 0:
-                    raise Exception("Downloaded file size ({} bytes) doesn't match content length"
-                                    "({} bytes) for URL {}".format(file_size, url_content_length,
-                                                                   url))
+                    raise Exception(
+                        "Downloaded file size ({} bytes) doesn't match content length"
+                        "({} bytes) for URL {}".format(file_size, url_content_length, url)
+                    )
                 continue
 
         return True
@@ -443,8 +452,11 @@ def install_tarball(tarball, root_dir):
         ret, output = execute_cmd(cmds, use_file=True)
         shutil.rmtree(tmp_dir)
     else:
-        raise Exception("Unsupported file extension to unzip {},"
-                        " supported extensions are {}".format(tarball, extensions))
+        raise Exception(
+            "Unsupported file extension to unzip {}," " supported extensions are {}".format(
+                tarball, extensions
+            )
+        )
 
     LOGGER.debug(output)
     if ret:
@@ -523,7 +535,8 @@ def _do_install_mongod(bin_dir=None, tarball_url="latest", root_dir=None):
             # MSI default:
             # https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-ssl-latest-signed.msi
             tarball_url = (
-                "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-ssl-latest.zip")
+                "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-ssl-latest.zip"
+            )
         elif _IS_LINUX:
             tarball_url = "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-latest.tgz"
 
@@ -547,15 +560,15 @@ def get_boot_datetime(uptime_string):
     match = re.search(r"last booted (.*), up", uptime_string)
     if match:
         return datetime.datetime(
-            *list(map(int, list(map(float, re.split("[ :-]",
-                                                    match.groups()[0]))))))
+            *list(map(int, list(map(float, re.split("[ :-]", match.groups()[0])))))
+        )
     return -1
 
 
 def print_uptime():
     """Print the last time the system was booted, and the uptime (in seconds)."""
     boot_time_epoch = psutil.boot_time()
-    boot_time = datetime.datetime.fromtimestamp(boot_time_epoch).strftime('%Y-%m-%d %H:%M:%S.%f')
+    boot_time = datetime.datetime.fromtimestamp(boot_time_epoch).strftime("%Y-%m-%d %H:%M:%S.%f")
     uptime = int(time.time() - boot_time_epoch)
     LOGGER.info("System was last booted %s, up %d seconds", boot_time, uptime)
 
@@ -626,8 +639,9 @@ class MongodControl(object):
             self._service = PosixService
         # After mongod has been installed, self.bin_path is defined.
         if self.bin_path:
-            self.service = self._service("mongod-powercycle-test", self.bin_path,
-                                         self.mongod_options(), db_path)
+            self.service = self._service(
+                "mongod-powercycle-test", self.bin_path, self.mongod_options(), db_path
+            )
 
     def set_mongod_option(self, option, option_value=None, option_form="--"):
         """Set mongod command line option."""
@@ -666,8 +680,9 @@ class MongodControl(object):
         self.bin_path = os.path.join(self.bin_dir, self.process_name)
         # We need to instantiate the Service when installing, since the bin_path
         # is only known after install_mongod runs.
-        self.service = self._service("mongod-powercycle-test", self.bin_path, self.mongod_options(),
-                                     db_path=None)
+        self.service = self._service(
+            "mongod-powercycle-test", self.bin_path, self.mongod_options(), db_path=None
+        )
         ret, output = self.service.create()
         return ret, output
 
@@ -722,14 +737,26 @@ class LocalToRemoteOperations(object):
     Return (return code, output).
     """
 
-    def __init__(self, user_host, ssh_connection_options=None, ssh_options=None,
-                 shell_binary="/bin/bash", use_shell=False, access_retry_count=5):
+    def __init__(
+        self,
+        user_host,
+        ssh_connection_options=None,
+        ssh_options=None,
+        shell_binary="/bin/bash",
+        use_shell=False,
+        access_retry_count=5,
+    ):
         """Initialize LocalToRemoteOperations."""
 
         self.remote_op = remote_operations.RemoteOperations(
-            user_host=user_host, ssh_connection_options=ssh_connection_options,
-            ssh_options=ssh_options, shell_binary=shell_binary, use_shell=use_shell,
-            ignore_ret=True, access_retry_count=access_retry_count)
+            user_host=user_host,
+            ssh_connection_options=ssh_connection_options,
+            ssh_options=ssh_options,
+            shell_binary=shell_binary,
+            use_shell=use_shell,
+            ignore_ret=True,
+            access_retry_count=access_retry_count,
+        )
 
     def shell(self, cmds, remote_dir=None):
         """Return tuple (ret, output) from performing remote shell operation."""
@@ -782,8 +809,13 @@ def remote_handler(options, task_config, root_dir):
     db_path = abs_path(powercycle_constants.DB_PATH)
     log_path = abs_path(powercycle_constants.LOG_PATH)
 
-    mongod = MongodControl(bin_dir=bin_dir, db_path=db_path, log_path=log_path, port=options.port,
-                           options=mongod_options)
+    mongod = MongodControl(
+        bin_dir=bin_dir,
+        db_path=db_path,
+        log_path=log_path,
+        port=options.port,
+        options=mongod_options,
+    )
 
     mongo_client_opts = get_mongo_client_args(host=host, port=options.port, task_config=task_config)
 
@@ -890,8 +922,9 @@ def remote_handler(options, task_config, root_dir):
 
         def rsync_data():
             rsync_dir, new_rsync_dir = options.rsync_dest
-            ret, output = rsync(powercycle_constants.DB_PATH, rsync_dir,
-                                powercycle_constants.RSYNC_EXCLUDE_FILES)
+            ret, output = rsync(
+                powercycle_constants.DB_PATH, rsync_dir, powercycle_constants.RSYNC_EXCLUDE_FILES
+            )
             if output:
                 LOGGER.info(output)
             # Rename the rsync_dir only if it has a different name than new_rsync_dir.
@@ -903,14 +936,19 @@ def remote_handler(options, task_config, root_dir):
 
         def seed_docs():
             mongo = pymongo.MongoClient(**mongo_client_opts)
-            return mongo_seed_docs(mongo, powercycle_constants.DB_NAME,
-                                   powercycle_constants.COLLECTION_NAME, task_config.seed_doc_num)
+            return mongo_seed_docs(
+                mongo,
+                powercycle_constants.DB_NAME,
+                powercycle_constants.COLLECTION_NAME,
+                task_config.seed_doc_num,
+            )
 
         def set_fcv():
             mongo = pymongo.MongoClient(**mongo_client_opts)
             try:
-                ret = mongo.admin.command("setFeatureCompatibilityVersion", task_config.fcv,
-                                          confirm=True)
+                ret = mongo.admin.command(
+                    "setFeatureCompatibilityVersion", task_config.fcv, confirm=True
+                )
                 ret = 0 if ret["ok"] == 1 else 1
             except pymongo.errors.OperationFailure as err:
                 LOGGER.error("%s", err)
@@ -937,18 +975,29 @@ def remote_handler(options, task_config, root_dir):
                     LOGGER.info("Running chkdsk command for %s drive", drive_letter)
                     cmds = f"chkdsk '{drive_letter}'"
                     ret, output = execute_cmd(cmds, use_file=True)
-                    LOGGER.warning("chkdsk command for %s drive exited with code %d:\n%s",
-                                   drive_letter, ret, output)
+                    LOGGER.warning(
+                        "chkdsk command for %s drive exited with code %d:\n%s",
+                        drive_letter,
+                        ret,
+                        output,
+                    )
 
                     if ret != 0:
                         return ret
             return ret
 
         op_map = {
-            "noop": noop, "crash_server": crash_server, "kill_mongod": kill_mongod,
-            "install_mongod": install_mongod, "start_mongod": start_mongod, "stop_mongod":
-                stop_mongod, "shutdown_mongod": shutdown_mongod, "rsync_data": rsync_data,
-            "seed_docs": seed_docs, "set_fcv": set_fcv, "check_disk": check_disk
+            "noop": noop,
+            "crash_server": crash_server,
+            "kill_mongod": kill_mongod,
+            "install_mongod": install_mongod,
+            "start_mongod": start_mongod,
+            "stop_mongod": stop_mongod,
+            "shutdown_mongod": shutdown_mongod,
+            "rsync_data": rsync_data,
+            "seed_docs": seed_docs,
+            "set_fcv": set_fcv,
+            "check_disk": check_disk,
         }
 
         if operation not in op_map:
@@ -996,8 +1045,9 @@ def rsync(src_dir, dest_dir, exclude_files=None):
         if ret == 0 or "No medium found" not in rsync_output:
             break
 
-        LOGGER.warning("[%d/%d] rsync command failed (code=%d): %s", attempt, max_attempts, ret,
-                       rsync_output)
+        LOGGER.warning(
+            "[%d/%d] rsync command failed (code=%d): %s", attempt, max_attempts, ret, rsync_output
+        )
 
         # If the rsync command failed with an "No medium found" error message, then we log some
         # basic information about the /log mount point.
@@ -1055,7 +1105,8 @@ def crash_server_or_kill_mongod(task_config, crash_canary, local_ops, script_nam
     """Crash server or kill mongod and optionally write canary doc. Return tuple (ret, output)."""
 
     crash_wait_time = powercycle_constants.CRASH_WAIT_TIME + random.randint(
-        0, powercycle_constants.CRASH_WAIT_TIME_JITTER)
+        0, powercycle_constants.CRASH_WAIT_TIME_JITTER
+    )
     message_prefix = "Killing mongod" if task_config.crash_method == "kill" else "Crashing server"
     LOGGER.info("%s in %d seconds", message_prefix, crash_wait_time)
     time.sleep(crash_wait_time)
@@ -1099,9 +1150,14 @@ def wait_for_mongod_shutdown(mongod_control, timeout=2 * ONE_HOUR_SECS):
     return 0
 
 
-def get_mongo_client_args(host=None, port=None, task_config=None,
-                          server_selection_timeout_ms=2 * ONE_HOUR_SECS * 1000,
-                          socket_timeout_ms=2 * ONE_HOUR_SECS * 1000, direct_connection=True):
+def get_mongo_client_args(
+    host=None,
+    port=None,
+    task_config=None,
+    server_selection_timeout_ms=2 * ONE_HOUR_SECS * 1000,
+    socket_timeout_ms=2 * ONE_HOUR_SECS * 1000,
+    direct_connection=True,
+):
     """Return keyword arg dict used in PyMongo client."""
     # Set the default serverSelectionTimeoutMS & socketTimeoutMS to 10 minutes.
     mongo_args = {
@@ -1126,7 +1182,8 @@ def get_mongo_client_args(host=None, port=None, task_config=None,
 def mongo_shell(mongo_path, work_dir, host_port, mongo_cmds, retries=5, retry_sleep=5):
     """Start mongo_path from work_dir, connecting to host_port and executes mongo_cmds."""
     cmds = "cd {}; echo {} | {} {}".format(
-        pipes.quote(work_dir), pipes.quote(mongo_cmds), pipes.quote(mongo_path), host_port)
+        pipes.quote(work_dir), pipes.quote(mongo_cmds), pipes.quote(mongo_path), host_port
+    )
     attempt_num = 0
     while True:
         ret, output = execute_cmd(cmds, use_file=True)
@@ -1212,11 +1269,17 @@ def mongo_seed_docs(mongo, db_name, coll_name, num_docs):
 
     def rand_string(max_length=1024):
         """Return random string of random length."""
-        return ''.join(
-            random.choice(string.ascii_letters) for _ in range(random.randint(1, max_length)))
+        return "".join(
+            random.choice(string.ascii_letters) for _ in range(random.randint(1, max_length))
+        )
 
-    LOGGER.info("Seeding DB '%s' collection '%s' with %d documents, %d already exist", db_name,
-                coll_name, num_docs, mongo[db_name][coll_name].estimated_document_count())
+    LOGGER.info(
+        "Seeding DB '%s' collection '%s' with %d documents, %d already exist",
+        db_name,
+        coll_name,
+        num_docs,
+        mongo[db_name][coll_name].estimated_document_count(),
+    )
     random.seed()
     base_num = 100000
     bulk_num = min(num_docs, 10000)
@@ -1226,9 +1289,12 @@ def mongo_seed_docs(mongo, db_name, coll_name, num_docs):
         if num_coll_docs >= num_docs:
             break
         mongo[db_name][coll_name].insert_many(
-            [{"x": random.randint(0, base_num), "doc": rand_string(1024)} for _ in range(bulk_num)])
-    LOGGER.info("After seeding there are %d documents in the collection",
-                mongo[db_name][coll_name].estimated_document_count())
+            [{"x": random.randint(0, base_num), "doc": rand_string(1024)} for _ in range(bulk_num)]
+        )
+    LOGGER.info(
+        "After seeding there are %d documents in the collection",
+        mongo[db_name][coll_name].estimated_document_count(),
+    )
     return 0
 
 
@@ -1244,7 +1310,8 @@ def mongo_insert_canary(mongo, db_name, coll_name, doc):
     """Insert a canary document with 'j' True, return 0 if successful."""
     LOGGER.info("Inserting canary document using %s.%s.insert_one(%s)", db_name, coll_name, doc)
     coll = mongo[db_name][coll_name].with_options(
-        write_concern=pymongo.write_concern.WriteConcern(j=True))
+        write_concern=pymongo.write_concern.WriteConcern(j=True)
+    )
     res = coll.insert_one(doc)
     return 0 if res.inserted_id else 1
 
@@ -1263,20 +1330,30 @@ def new_resmoke_config(config_file, new_config_file, test_data, eval_str=""):
         yaml.safe_dump(config, yaml_stream)
 
 
-def resmoke_client(work_dir, mongo_path, host_port, js_test, resmoke_suite, repeat_num=1,
-                   no_wait=False, log_file=None):
+def resmoke_client(
+    work_dir,
+    mongo_path,
+    host_port,
+    js_test,
+    resmoke_suite,
+    repeat_num=1,
+    no_wait=False,
+    log_file=None,
+):
     """Start resmoke client from work_dir, connecting to host_port and executes js_test."""
     log_output = f">> {log_file} 2>&1" if log_file else ""
-    cmds = (f"cd {pipes.quote(work_dir)};"
-            f" python {powercycle_constants.RESMOKE_PATH}"
-            f" run"
-            f" --mongo {pipes.quote(mongo_path)}"
-            f" --suites {pipes.quote(resmoke_suite)}"
-            f" --shellConnString mongodb://{host_port}"
-            f" --continueOnFailure"
-            f" --repeat {repeat_num}"
-            f" {pipes.quote(js_test)}"
-            f" {log_output}")
+    cmds = (
+        f"cd {pipes.quote(work_dir)};"
+        f" python {powercycle_constants.RESMOKE_PATH}"
+        f" run"
+        f" --mongo {pipes.quote(mongo_path)}"
+        f" --suites {pipes.quote(resmoke_suite)}"
+        f" --shellConnString mongodb://{host_port}"
+        f" --continueOnFailure"
+        f" --repeat {repeat_num}"
+        f" {pipes.quote(js_test)}"
+        f" {log_output}"
+    )
     ret, output = None, None
     if no_wait:
         Processes.create(cmds, use_file=True)
@@ -1308,8 +1385,11 @@ def main(parser_actions, options):
     atexit.register(exit_handler)
     register_signal_handler(dump_stacks_and_exit)
 
-    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.ERROR,
-                        filename=options.log_file)
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)s %(message)s",
+        level=logging.ERROR,
+        filename=options.log_file,
+    )
     logging.getLogger(__name__).setLevel(options.log_level.upper())
     logging.Formatter.converter = time.gmtime
 
@@ -1338,11 +1418,17 @@ def main(parser_actions, options):
     EXIT_YML_FILE = powercycle_constants.POWERCYCLE_EXIT_FILE
     REPORT_JSON_FILE = powercycle_constants.REPORT_JSON_FILE
     REPORT_JSON = {
-        "failures":
-            0, "results": [{
-                "status": "fail", "test_file": task_name, "exit_code": 1, "elapsed": 0,
-                "start": int(time.time()), "end": int(time.time())
-            }]
+        "failures": 0,
+        "results": [
+            {
+                "status": "fail",
+                "test_file": task_name,
+                "exit_code": 1,
+                "elapsed": 0,
+                "start": int(time.time()),
+                "end": int(time.time()),
+            }
+        ],
     }
     LOGGER.debug("Creating report JSON %s", REPORT_JSON)
 
@@ -1372,15 +1458,17 @@ def main(parser_actions, options):
     backup_path_after = f"{backup_path_after}-1"
 
     # Setup the mongo client, mongo_path is required if there are local clients.
-    mongo_executable = shutil.which(cmd="dist-test/bin/mongo",
-                                    path=os.getcwd() + os.pathsep + os.environ["PATH"])
+    mongo_executable = shutil.which(
+        cmd="dist-test/bin/mongo", path=os.getcwd() + os.pathsep + os.environ["PATH"]
+    )
     # Note: No check for `if mongo_executable is None`
     mongo_path = os.path.abspath(os.path.normpath(mongo_executable))
 
     # Setup the CRUD & FSM clients.
     if not os.path.isfile(powercycle_constants.CONFIG_CRUD_CLIENT):
-        LOGGER.error("config crud client %s does not exist",
-                     powercycle_constants.CONFIG_CRUD_CLIENT)
+        LOGGER.error(
+            "config crud client %s does not exist", powercycle_constants.CONFIG_CRUD_CLIENT
+        )
         local_exit(1)
     with_external_server = powercycle_constants.CONFIG_CRUD_CLIENT
     fsm_client = powercycle_constants.FSM_CLIENT
@@ -1420,7 +1508,8 @@ def main(parser_actions, options):
     # user-specified --sshConnection options.
     ssh_connection_options = (
         f"{options.ssh_connection_options if options.ssh_connection_options else ''}"
-        f" {powercycle_constants.DEFAULT_SSH_CONNECTION_OPTIONS}")
+        f" {powercycle_constants.DEFAULT_SSH_CONNECTION_OPTIONS}"
+    )
     # For remote operations requiring sudo, force pseudo-tty allocation,
     # see https://stackoverflow.com/questions/10310299/proper-way-to-sudo-over-ssh.
     # Note - the ssh option RequestTTY was added in OpenSSH 5.9, so we use '-tt'.
@@ -1428,8 +1517,12 @@ def main(parser_actions, options):
 
     # Instantiate the local handler object.
     local_ops = LocalToRemoteOperations(
-        user_host=ssh_user_host, ssh_connection_options=ssh_connection_options,
-        ssh_options=ssh_options, use_shell=True, access_retry_count=options.ssh_access_retry_count)
+        user_host=ssh_user_host,
+        ssh_connection_options=ssh_connection_options,
+        ssh_options=ssh_options,
+        use_shell=True,
+        access_retry_count=options.ssh_access_retry_count,
+    )
     verify_remote_access(local_ops)
 
     # Pass client_args to the remote script invocation.
@@ -1458,8 +1551,9 @@ def main(parser_actions, options):
     remote_python = get_remote_python()
 
     # Remote install of MongoDB.
-    ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
-                                        "--remoteOperation install_mongod")
+    ret, output = call_remote_operation(
+        local_ops, remote_python, script_name, client_args, "--remoteOperation install_mongod"
+    )
     LOGGER.info("****install_mongod: %d %s****", ret, output)
     if ret:
         local_exit(ret)
@@ -1502,16 +1596,19 @@ def main(parser_actions, options):
         # Optionally, rsync the pre-recovery database.
         # Start monogd on the secret port.
         # Optionally validate collections, validate the canary and seed the collection.
-        remote_operation = (f"--remoteOperation"
-                            f" {rsync_opt}"
-                            f" --mongodHost {mongod_host}"
-                            f" --mongodPort {secret_port}"
-                            f" {rsync_cmd}"
-                            f" start_mongod"
-                            f" {set_fcv_cmd if loop_num == 1 else ''}"
-                            f" {seed_docs if loop_num == 1 else ''}")
-        ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
-                                            remote_operation)
+        remote_operation = (
+            f"--remoteOperation"
+            f" {rsync_opt}"
+            f" --mongodHost {mongod_host}"
+            f" --mongodPort {secret_port}"
+            f" {rsync_cmd}"
+            f" start_mongod"
+            f" {set_fcv_cmd if loop_num == 1 else ''}"
+            f" {seed_docs if loop_num == 1 else ''}"
+        )
+        ret, output = call_remote_operation(
+            local_ops, remote_python, script_name, client_args, remote_operation
+        )
         rsync_text = "rsync_data beforerecovery & "
         LOGGER.info("****%sstart mongod: %d %s****", rsync_text, ret, output)
         if ret:
@@ -1519,11 +1616,20 @@ def main(parser_actions, options):
 
         # Optionally validate canary document locally.
         if validate_canary_local:
-            mongo = pymongo.MongoClient(**get_mongo_client_args(
-                host=mongod_host, port=secret_port, server_selection_timeout_ms=one_hour_ms,
-                socket_timeout_ms=one_hour_ms))
-            ret = mongo_validate_canary(mongo, powercycle_constants.DB_NAME,
-                                        powercycle_constants.COLLECTION_NAME, canary_doc)
+            mongo = pymongo.MongoClient(
+                **get_mongo_client_args(
+                    host=mongod_host,
+                    port=secret_port,
+                    server_selection_timeout_ms=one_hour_ms,
+                    socket_timeout_ms=one_hour_ms,
+                )
+            )
+            ret = mongo_validate_canary(
+                mongo,
+                powercycle_constants.DB_NAME,
+                powercycle_constants.COLLECTION_NAME,
+                canary_doc,
+            )
             LOGGER.info("Local canary validation: %d", ret)
             if ret:
                 local_exit(ret)
@@ -1533,15 +1639,22 @@ def main(parser_actions, options):
         new_config_file = NamedTempFile.create(suffix=".yml", directory="tmp")
         temp_client_files.append(new_config_file)
         validation_test_data = {
-            "skipValidationOnNamespaceNotFound": True, "allowUncleanShutdowns": True
+            "skipValidationOnNamespaceNotFound": True,
+            "allowUncleanShutdowns": True,
         }
         new_resmoke_config(with_external_server, new_config_file, validation_test_data)
-        ret, output = resmoke_client(mongo_repo_root_dir, mongo_path, host_port,
-                                     "jstests/hooks/run_validate_collections.js", new_config_file)
+        ret, output = resmoke_client(
+            mongo_repo_root_dir,
+            mongo_path,
+            host_port,
+            "jstests/hooks/run_validate_collections.js",
+            new_config_file,
+        )
         LOGGER.info("Local collection validation: %d %s", ret, output)
         if ret:
             network_error = (
-                f"network error while attempting to run command 'isMaster' on host '{host_port}'")
+                f"network error while attempting to run command 'isMaster' on host '{host_port}'"
+            )
             # Mark this error as ssh failure, since it happens during the first test loop before
             # the first server crash and likely related to port forwarding not working, which
             # uses ssh tunnel command.
@@ -1551,8 +1664,9 @@ def main(parser_actions, options):
 
         # Shutdown mongod on secret port.
         remote_op = f"--remoteOperation --mongodPort {secret_port} shutdown_mongod"
-        ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
-                                            remote_op)
+        ret, output = call_remote_operation(
+            local_ops, remote_python, script_name, client_args, remote_op
+        )
         LOGGER.info("****shutdown_mongod: %d %s****", ret, output)
         if ret:
             local_exit(ret)
@@ -1565,14 +1679,17 @@ def main(parser_actions, options):
 
         # Optionally, rsync the post-recovery database.
         # Start monogd on the standard port.
-        remote_op = (f"--remoteOperation"
-                     f" {rsync_opt}"
-                     f" --mongodHost {mongod_host}"
-                     f" --mongodPort {standard_port}"
-                     f" {rsync_cmd}"
-                     f" start_mongod")
-        ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
-                                            remote_op)
+        remote_op = (
+            f"--remoteOperation"
+            f" {rsync_opt}"
+            f" --mongodHost {mongod_host}"
+            f" --mongodPort {standard_port}"
+            f" {rsync_cmd}"
+            f" start_mongod"
+        )
+        ret, output = call_remote_operation(
+            local_ops, remote_python, script_name, client_args, remote_op
+        )
         rsync_text = "rsync_data afterrecovery & "
         LOGGER.info("****%s start mongod: %d %s****", rsync_text, ret, output)
         if ret:
@@ -1586,10 +1703,16 @@ def main(parser_actions, options):
             crud_config_file = NamedTempFile.create(suffix=".yml", directory="tmp")
             crud_test_data["collectionName"] = f"{powercycle_constants.COLLECTION_NAME}-{i}"
             new_resmoke_config(with_external_server, crud_config_file, crud_test_data, eval_str)
-            _, _ = resmoke_client(work_dir=mongo_repo_root_dir, mongo_path=mongo_path,
-                                  host_port=host_port, js_test=powercycle_constants.CRUD_CLIENT,
-                                  resmoke_suite=crud_config_file, repeat_num=100, no_wait=True,
-                                  log_file=f"crud_{i}.log")
+            _, _ = resmoke_client(
+                work_dir=mongo_repo_root_dir,
+                mongo_path=mongo_path,
+                host_port=host_port,
+                js_test=powercycle_constants.CRUD_CLIENT,
+                resmoke_suite=crud_config_file,
+                repeat_num=100,
+                no_wait=True,
+                log_file=f"crud_{i}.log",
+            )
 
         LOGGER.info("****Started %d CRUD client(s)****", num_crud_clients)
 
@@ -1600,10 +1723,16 @@ def main(parser_actions, options):
             # Do collection validation only for the first FSM client.
             fsm_test_data["validateCollections"] = bool(i == 0)
             new_resmoke_config(with_external_server, fsm_config_file, fsm_test_data, eval_str)
-            _, _ = resmoke_client(work_dir=mongo_repo_root_dir, mongo_path=mongo_path,
-                                  host_port=host_port, js_test=fsm_client,
-                                  resmoke_suite=fsm_config_file, repeat_num=100, no_wait=True,
-                                  log_file=f"fsm_{i}.log")
+            _, _ = resmoke_client(
+                work_dir=mongo_repo_root_dir,
+                mongo_path=mongo_path,
+                host_port=host_port,
+                js_test=fsm_client,
+                resmoke_suite=fsm_config_file,
+                repeat_num=100,
+                no_wait=True,
+                log_file=f"fsm_{i}.log",
+            )
 
         LOGGER.info("****Started %d FSM client(s)****", num_fsm_clients)
 
@@ -1611,15 +1740,24 @@ def main(parser_actions, options):
         crash_canary = {}
         canary_doc = {"x": time.time()}
         orig_canary_doc = copy.deepcopy(canary_doc)
-        mongo = pymongo.MongoClient(**get_mongo_client_args(host=mongod_host, port=standard_port,
-                                                            server_selection_timeout_ms=one_hour_ms,
-                                                            socket_timeout_ms=one_hour_ms))
+        mongo = pymongo.MongoClient(
+            **get_mongo_client_args(
+                host=mongod_host,
+                port=standard_port,
+                server_selection_timeout_ms=one_hour_ms,
+                socket_timeout_ms=one_hour_ms,
+            )
+        )
         crash_canary["function"] = mongo_insert_canary
         crash_canary["args"] = [
-            mongo, powercycle_constants.DB_NAME, powercycle_constants.COLLECTION_NAME, canary_doc
+            mongo,
+            powercycle_constants.DB_NAME,
+            powercycle_constants.COLLECTION_NAME,
+            canary_doc,
         ]
-        ret, output = crash_server_or_kill_mongod(task_config, crash_canary, local_ops, script_name,
-                                                  client_args)
+        ret, output = crash_server_or_kill_mongod(
+            task_config, crash_canary, local_ops, script_name, client_args
+        )
 
         LOGGER.info("Crash server or Kill mongod: %d %s****", ret, output)
 
@@ -1642,21 +1780,31 @@ def main(parser_actions, options):
             NamedTempFile.delete(temp_file)
 
         # Reestablish remote access after crash.
-        local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
-                                            ssh_connection_options=ssh_connection_options,
-                                            ssh_options=ssh_options, use_shell=True,
-                                            access_retry_count=options.ssh_access_retry_count)
+        local_ops = LocalToRemoteOperations(
+            user_host=ssh_user_host,
+            ssh_connection_options=ssh_connection_options,
+            ssh_options=ssh_options,
+            use_shell=True,
+            access_retry_count=options.ssh_access_retry_count,
+        )
         verify_remote_access(local_ops)
-        ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
-                                            "--remoteOperation noop")
+        ret, output = call_remote_operation(
+            local_ops, remote_python, script_name, client_args, "--remoteOperation noop"
+        )
         boot_time_after_crash = get_boot_datetime(output)
         if boot_time_after_crash == -1 or boot_time_after_recovery == -1:
             LOGGER.warning(
                 "Cannot compare boot time after recovery: %s with boot time after crash: %s",
-                boot_time_after_recovery, boot_time_after_crash)
-        elif task_config.crash_method != "kill" and boot_time_after_crash <= boot_time_after_recovery:
-            raise Exception(f"System boot time after crash ({boot_time_after_crash}) is not newer"
-                            f" than boot time before crash ({boot_time_after_recovery})")
+                boot_time_after_recovery,
+                boot_time_after_crash,
+            )
+        elif (
+            task_config.crash_method != "kill" and boot_time_after_crash <= boot_time_after_recovery
+        ):
+            raise Exception(
+                f"System boot time after crash ({boot_time_after_crash}) is not newer"
+                f" than boot time before crash ({boot_time_after_recovery})"
+            )
 
         canary_doc = copy.deepcopy(orig_canary_doc)
 
@@ -1665,8 +1813,9 @@ def main(parser_actions, options):
         if loop_num == test_loops:
             break
 
-        ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
-                                            "--remoteOperation check_disk")
+        ret, output = call_remote_operation(
+            local_ops, remote_python, script_name, client_args, "--remoteOperation check_disk"
+        )
         if ret != 0:
             LOGGER.error("****check_disk: %d %s****", ret, output)
 

@@ -74,7 +74,8 @@ def make_registry_metaclass(registry_store, base_metaclass=None):
                 if name_to_register in registry_store:
                     raise ValueError(
                         "The name %s is already registered; a different value for the"
-                        " 'REGISTERED_NAME' attribute must be chosen" % (registered_name))
+                        " 'REGISTERED_NAME' attribute must be chosen" % (registered_name)
+                    )
                 registry_store[name_to_register] = cls
 
             return cls

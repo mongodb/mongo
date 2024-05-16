@@ -39,7 +39,7 @@ def timer_decorator(func):
         t0 = time.perf_counter()
         result = func(*args, **kwargs)
         t1 = time.perf_counter()
-        print(f'{func.__name__} took {t1-t0}s.')
+        print(f"{func.__name__} took {t1-t0}s.")
         return result
 
     return wrapper

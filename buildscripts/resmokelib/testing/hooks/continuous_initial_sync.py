@@ -25,7 +25,7 @@ from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interfa
 class ContinuousInitialSync(interface.Hook):
     """Periodically initial sync nodes then step them up."""
 
-    DESCRIPTION = ("Continuous initial sync with failover")
+    DESCRIPTION = "Continuous initial sync with failover"
 
     IS_BACKGROUND = True
 
@@ -58,10 +58,12 @@ class ContinuousInitialSync(interface.Hook):
         dbpath_prefix = fixture.get_dbpath_prefix()
 
         if use_action_permitted_file:
-            self.__action_files = lifecycle_interface.ActionFiles._make([
-                os.path.join(dbpath_prefix, field)
-                for field in lifecycle_interface.ActionFiles._fields
-            ])
+            self.__action_files = lifecycle_interface.ActionFiles._make(
+                [
+                    os.path.join(dbpath_prefix, field)
+                    for field in lifecycle_interface.ActionFiles._fields
+                ]
+            )
         else:
             self.__action_files = None
 
@@ -75,9 +77,14 @@ class ContinuousInitialSync(interface.Hook):
         else:
             lifecycle_interface.FlagBasedThreadLifecycle()
 
-        self._initial_sync_thread = _InitialSyncThread(self.logger, self._rs_fixtures,
-                                                       self._mongos_fixtures, self._fixture,
-                                                       lifecycle, self._sync_interval_secs)
+        self._initial_sync_thread = _InitialSyncThread(
+            self.logger,
+            self._rs_fixtures,
+            self._mongos_fixtures,
+            self._fixture,
+            lifecycle,
+            self._sync_interval_secs,
+        )
         self.logger.info("Starting the continuous initial syncer thread.")
         self._initial_sync_thread.start()
 
@@ -124,7 +131,6 @@ class SyncerStage(Enum):
 
 
 class _InitialSyncThread(threading.Thread):
-
     # Error codes, taken from mongo/base/error_codes.yml.
     _NODE_NOT_FOUND = 74
     _NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE = 103
@@ -133,8 +139,9 @@ class _InitialSyncThread(threading.Thread):
     _INTERRUPTED_DUE_TO_STORAGE_CHANGE = 355
     _INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
 
-    def __init__(self, logger, rs_fixtures, mongos_fixtures, fixture, lifecycle,
-                 sync_interval_secs):
+    def __init__(
+        self, logger, rs_fixtures, mongos_fixtures, fixture, lifecycle, sync_interval_secs
+    ):
         """Initialize _InitialSyncThread."""
         threading.Thread.__init__(self, name="InitialSyncThread")
         self.daemon = True
@@ -220,7 +227,9 @@ class _InitialSyncThread(threading.Thread):
                 self._is_idle_evt.set()
                 self.logger.info(
                     "Syncer sleeping for {} seconds before moving to the next stage.".format(
-                        wait_secs))
+                        wait_secs
+                    )
+                )
                 self.__lifecycle.wait_for_action_interval(wait_secs)
 
         except Exception as err:  # pylint: disable=broad-except
@@ -275,19 +284,24 @@ class _InitialSyncThread(threading.Thread):
             if not rs_fixture.is_running():
                 raise errors.ServerFailure(
                     "ReplicaSetFixture with pids {} expected to be running in"
-                    " ContinuousInitialSync, but wasn't.".format(rs_fixture.pids()))
+                    " ContinuousInitialSync, but wasn't.".format(rs_fixture.pids())
+                )
         for mongos_fixture in self._mongos_fixtures:
             if not mongos_fixture.is_running():
-                raise errors.ServerFailure("MongoSFixture with pids {} expected to be running in"
-                                           " ContinuousInitialSync, but wasn't.".format(
-                                               mongos_fixture.pids()))
+                raise errors.ServerFailure(
+                    "MongoSFixture with pids {} expected to be running in"
+                    " ContinuousInitialSync, but wasn't.".format(mongos_fixture.pids())
+                )
 
     def _add_initsync_tag(self, fixture):
         """Adds the 'INIT_SYNC' unique tag to the initial-sync node of the given fixture."""
         sync_node = fixture.get_initial_sync_node()
 
-        self.logger.info("Adding unique tag to initial sync node on port {} in set {}".format(
-            sync_node.port, fixture.replset_name))
+        self.logger.info(
+            "Adding unique tag to initial sync node on port {} in set {}".format(
+                sync_node.port, fixture.replset_name
+            )
+        )
 
         retry_time_secs = fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60
         retry_start_time = time.time()
@@ -295,8 +309,10 @@ class _InitialSyncThread(threading.Thread):
         while True:
             if time.time() - retry_start_time > retry_time_secs:
                 raise errors.ServerFailure(
-                    "Could not add unique tag to node on port {} for replica set {} in {} seconds.".
-                    format(sync_node.port, fixture.replset_name, retry_time_secs))
+                    "Could not add unique tag to node on port {} for replica set {} in {} seconds.".format(
+                        sync_node.port, fixture.replset_name, retry_time_secs
+                    )
+                )
             try:
                 primary = fixture.get_primary()
                 client = primary.mongo_client()
@@ -305,10 +321,14 @@ class _InitialSyncThread(threading.Thread):
                 repl_config["version"] += 1
                 repl_config["members"][-1]["tags"]["uniqueTag"] = "INIT_SYNC_NODE"
 
-                client.admin.command({
-                    "replSetReconfig": repl_config,
-                    "maxTimeMS": fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
-                })
+                client.admin.command(
+                    {
+                        "replSetReconfig": repl_config,
+                        "maxTimeMS": fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS
+                        * 60
+                        * 1000,
+                    }
+                )
                 break
 
             except pymongo.errors.AutoReconnect:
@@ -324,11 +344,14 @@ class _InitialSyncThread(threading.Thread):
                 # (potentially) higher config version. We should not receive these codes
                 # indefinitely.
                 # pylint: disable=too-many-boolean-expressions
-                if err.code not in (self._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE,
-                                    self._CURRENT_CONFIG_NOT_COMMITTED_YET,
-                                    self._CONFIGURATION_IN_PROGRESS, self._NODE_NOT_FOUND,
-                                    self._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
-                                    self._INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                if err.code not in (
+                    self._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE,
+                    self._CURRENT_CONFIG_NOT_COMMITTED_YET,
+                    self._CONFIGURATION_IN_PROGRESS,
+                    self._NODE_NOT_FOUND,
+                    self._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                    self._INTERRUPTED_DUE_TO_STORAGE_CHANGE,
+                ):
                     msg = (
                         "Operation failure while adding tag for node on port {} in fixture {}: {}"
                     ).format(sync_node.port, fixture.replset_name, err)
@@ -336,8 +359,8 @@ class _InitialSyncThread(threading.Thread):
                     raise self.fixturelib.ServerFailure(msg)
 
                 msg = (
-                    "Retrying failed attempt to add new node on port {} to fixture {}: {}").format(
-                        sync_node.port, fixture.replset_name, err)
+                    "Retrying failed attempt to add new node on port {} to fixture {}: {}"
+                ).format(sync_node.port, fixture.replset_name, err)
                 self.logger.error(msg)
                 time.sleep(0.1)
                 continue
@@ -349,8 +372,10 @@ class _InitialSyncThread(threading.Thread):
         method = random.choice(["logical", "fileCopyBased"])
 
         self.logger.info(
-            "Restarting initial sync on node on port {} in set {} with initial sync method {}".
-            format(sync_node.port, fixture.replset_name, method))
+            "Restarting initial sync on node on port {} in set {} with initial sync method {}".format(
+                sync_node.port, fixture.replset_name, method
+            )
+        )
 
         sync_node.teardown()
         sync_node.mongod_options["set_parameters"]["initialSyncMethod"] = method
@@ -365,8 +390,11 @@ class _InitialSyncThread(threading.Thread):
         """Waits for the initial sync node to complete its transition to secondary."""
         sync_node = fixture.get_initial_sync_node()
 
-        self.logger.info("Waiting for node on port {} in set {} to complete initial sync".format(
-            sync_node.port, fixture.replset_name))
+        self.logger.info(
+            "Waiting for node on port {} in set {} to complete initial sync".format(
+                sync_node.port, fixture.replset_name
+            )
+        )
 
         retry_time_secs = fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60
         retry_start_time = time.time()
@@ -377,16 +405,21 @@ class _InitialSyncThread(threading.Thread):
             time.sleep(2)
             if time.time() - retry_start_time > retry_time_secs:
                 raise errors.ServerFailure(
-                    "Node on port {} of replica set {} did not finish initial sync in {} seconds.".
-                    format(sync_node.port, fixture.replset_name, retry_time_secs))
+                    "Node on port {} of replica set {} did not finish initial sync in {} seconds.".format(
+                        sync_node.port, fixture.replset_name, retry_time_secs
+                    )
+                )
 
     def _check_initial_sync_done(self, fixture):
         """A one-time check for whether a node has completed initial sync and transitioned to a secondary state."""
         sync_node = fixture.get_initial_sync_node()
         sync_node_conn = sync_node.mongo_client()
 
-        self.logger.info("Checking initial sync progress for node on port {} in set {}".format(
-            sync_node.port, fixture.replset_name))
+        self.logger.info(
+            "Checking initial sync progress for node on port {} in set {}".format(
+                sync_node.port, fixture.replset_name
+            )
+        )
 
         try:
             state = sync_node_conn.admin.command("replSetGetStatus").get("myState")
@@ -400,8 +433,11 @@ class _InitialSyncThread(threading.Thread):
         conn = node.mongo_client()
         old_primary = fixture.get_primary()
 
-        self.logger.info("Failing over to node on port {} from node on port {} in set {}".format(
-            node.port, old_primary.port, fixture.replset_name))
+        self.logger.info(
+            "Failing over to node on port {} from node on port {} in set {}".format(
+                node.port, old_primary.port, fixture.replset_name
+            )
+        )
 
         retry_time_secs = fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60
         retry_start_time = time.time()
@@ -419,11 +455,20 @@ class _InitialSyncThread(threading.Thread):
             if time.time() - retry_start_time > retry_time_secs:
                 raise errors.ServerFailure(
                     "Node on port {} of replica set {} did not step up in {} seconds.".format(
-                        node.port, fixture.replset_name, retry_time_secs))
+                        node.port, fixture.replset_name, retry_time_secs
+                    )
+                )
 
-        cmd = bson.SON([("replSetTest", 1), ("waitForMemberState", 1),
-                        ("timeoutMillis",
-                         fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60)])
+        cmd = bson.SON(
+            [
+                ("replSetTest", 1),
+                ("waitForMemberState", 1),
+                (
+                    "timeoutMillis",
+                    fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60,
+                ),
+            ]
+        )
 
         retry_start_time = time.time()
 
@@ -432,8 +477,10 @@ class _InitialSyncThread(threading.Thread):
                 conn.admin.command(cmd)
                 break
             except pymongo.errors.OperationFailure as err:
-                if err.code not in (self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
-                                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                if err.code not in (
+                    self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE,
+                ):
                     raise
                 msg = (
                     "Interrupted while waiting for node on port {} in set {} to reach primary state, retrying: {}"
@@ -441,13 +488,17 @@ class _InitialSyncThread(threading.Thread):
                 self.logger.error(msg)
             if time.time() - retry_start_time > retry_time_secs:
                 raise errors.ServerFailure(
-                    "Node on port {} of replica set {} did not finish stepping up in {} seconds.".
-                    format(node.port, fixture.replset_name, retry_time_secs))
+                    "Node on port {} of replica set {} did not finish stepping up in {} seconds.".format(
+                        node.port, fixture.replset_name, retry_time_secs
+                    )
+                )
             time.sleep(0.2)
 
         self.logger.info(
-            "Successfully stepped up node on port {} in set {}. Waiting for old primary on port {} to step down"
-            .format(node.port, fixture.replset_name, old_primary.port))
+            "Successfully stepped up node on port {} in set {}. Waiting for old primary on port {} to step down".format(
+                node.port, fixture.replset_name, old_primary.port
+            )
+        )
 
         retry_start_time = time.time()
 
@@ -460,16 +511,24 @@ class _InitialSyncThread(threading.Thread):
                     break
             except pymongo.errors.AutoReconnect:
                 pass
-            self.logger.info("Waiting for old primary on port {} in set {} to step down.".format(
-                old_primary.port, fixture.replset_name))
+            self.logger.info(
+                "Waiting for old primary on port {} in set {} to step down.".format(
+                    old_primary.port, fixture.replset_name
+                )
+            )
             if time.time() - retry_start_time > retry_time_secs:
                 raise errors.ServerFailure(
-                    "Old primary on port {} of replica set {} did not step down in {} seconds.".
-                    format(node.port, fixture.replset_name, retry_time_secs))
+                    "Old primary on port {} of replica set {} did not step down in {} seconds.".format(
+                        node.port, fixture.replset_name, retry_time_secs
+                    )
+                )
             time.sleep(0.2)
 
-        self.logger.info("Old primary on port {} in set {} successfully stepped down".format(
-            old_primary.port, fixture.replset_name))
+        self.logger.info(
+            "Old primary on port {} in set {} successfully stepped down".format(
+                old_primary.port, fixture.replset_name
+            )
+        )
 
         # It is possible for the initial sync node to have been behind every other node when it
         # stepped up causing them all to enter rollback. To make sure this doesn't happen we

@@ -1,4 +1,5 @@
 """Unit tests for the evergreen_task_timeout script."""
+
 import unittest
 from datetime import timedelta
 from unittest.mock import MagicMock
@@ -52,16 +53,20 @@ class TestTimeoutOverrides(unittest.TestCase):
     def test_looking_up_a_duplicate_override_should_raise_error(self):
         timeout_overrides = under_test.TimeoutOverrides(
             overrides={
-                "bv": [{
-                    "task": "task_name",
-                    "exec_timeout": 42,
-                    "idle_timeout": 10,
-                }, {
-                    "task": "task_name",
-                    "exec_timeout": 314,
-                    "idle_timeout": 20,
-                }]
-            })
+                "bv": [
+                    {
+                        "task": "task_name",
+                        "exec_timeout": 42,
+                        "idle_timeout": 10,
+                    },
+                    {
+                        "task": "task_name",
+                        "exec_timeout": 314,
+                        "idle_timeout": 20,
+                    },
+                ]
+            }
+        )
 
         with self.assertRaises(ValueError):
             self.assertIsNone(timeout_overrides.lookup_exec_override("bv", "task_name"))
@@ -83,10 +88,12 @@ class TestTimeoutOverrides(unittest.TestCase):
                         "exec_timeout": 42,
                     },
                 ]
-            })
+            }
+        )
 
-        self.assertEqual(42 * 60,
-                         timeout_overrides.lookup_exec_override("bv", "task_name").total_seconds())
+        self.assertEqual(
+            42 * 60, timeout_overrides.lookup_exec_override("bv", "task_name").total_seconds()
+        )
 
     def test_looking_up_an_idle_override_should_work(self):
         timeout_overrides = under_test.TimeoutOverrides(
@@ -102,15 +109,26 @@ class TestTimeoutOverrides(unittest.TestCase):
                         "idle_timeout": 10,
                     },
                 ]
-            })
+            }
+        )
 
-        self.assertEqual(10 * 60,
-                         timeout_overrides.lookup_idle_override("bv", "task_name").total_seconds())
+        self.assertEqual(
+            10 * 60, timeout_overrides.lookup_idle_override("bv", "task_name").total_seconds()
+        )
 
 
 class TestDetermineExecTimeout(unittest.TestCase):
-    def _validate_exec_timeout(self, idle_timeout, exec_timeout, historic_timeout, evg_alias,
-                               build_variant, display_name, timeout_override, expected_timeout):
+    def _validate_exec_timeout(
+        self,
+        idle_timeout,
+        exec_timeout,
+        historic_timeout,
+        evg_alias,
+        build_variant,
+        display_name,
+        timeout_override,
+        expected_timeout,
+    ):
         task_name = "task_name"
         variant = build_variant
         overrides = {}
@@ -121,100 +139,180 @@ class TestDetermineExecTimeout(unittest.TestCase):
 
         orchestrator = under_test.TaskTimeoutOrchestrator(
             timeout_service=MagicMock(spec_set=TimeoutService),
-            timeout_overrides=mock_timeout_overrides, evg_project_config=MagicMock(
+            timeout_overrides=mock_timeout_overrides,
+            evg_project_config=MagicMock(
                 spec_set=EvergreenProjectConfig,
-                get_variant=MagicMock(return_value=MagicMock(display_name=display_name))))
+                get_variant=MagicMock(return_value=MagicMock(display_name=display_name)),
+            ),
+        )
 
         actual_timeout = orchestrator.determine_exec_timeout(
-            task_name, variant, idle_timeout, exec_timeout, evg_alias, historic_timeout)
+            task_name, variant, idle_timeout, exec_timeout, evg_alias, historic_timeout
+        )
 
         self.assertEqual(actual_timeout, expected_timeout)
 
     def test_timeout_used_if_specified(self):
-        self._validate_exec_timeout(idle_timeout=None, exec_timeout=timedelta(seconds=42),
-                                    historic_timeout=None, evg_alias=None, build_variant="variant",
-                                    display_name="not required", timeout_override=None,
-                                    expected_timeout=timedelta(seconds=42))
+        self._validate_exec_timeout(
+            idle_timeout=None,
+            exec_timeout=timedelta(seconds=42),
+            historic_timeout=None,
+            evg_alias=None,
+            build_variant="variant",
+            display_name="not required",
+            timeout_override=None,
+            expected_timeout=timedelta(seconds=42),
+        )
 
     def test_default_is_returned_with_no_timeout(self):
-        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None, historic_timeout=None,
-                                    evg_alias=None, build_variant="variant",
-                                    display_name="not required", timeout_override=None,
-                                    expected_timeout=under_test.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT)
+        self._validate_exec_timeout(
+            idle_timeout=None,
+            exec_timeout=None,
+            historic_timeout=None,
+            evg_alias=None,
+            build_variant="variant",
+            display_name="not required",
+            timeout_override=None,
+            expected_timeout=under_test.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT,
+        )
 
     def test_default_is_returned_with_timeout_at_zero(self):
-        self._validate_exec_timeout(idle_timeout=None, exec_timeout=timedelta(seconds=0),
-                                    historic_timeout=None, evg_alias=None, build_variant="variant",
-                                    display_name="not required", timeout_override=None,
-                                    expected_timeout=under_test.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT)
+        self._validate_exec_timeout(
+            idle_timeout=None,
+            exec_timeout=timedelta(seconds=0),
+            historic_timeout=None,
+            evg_alias=None,
+            build_variant="variant",
+            display_name="not required",
+            timeout_override=None,
+            expected_timeout=under_test.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT,
+        )
 
     def test_default_required_returned_on_required_variants(self):
-        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None, historic_timeout=None,
-                                    evg_alias=None, build_variant="variant-required",
-                                    display_name="! required", timeout_override=None,
-                                    expected_timeout=under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT)
+        self._validate_exec_timeout(
+            idle_timeout=None,
+            exec_timeout=None,
+            historic_timeout=None,
+            evg_alias=None,
+            build_variant="variant-required",
+            display_name="! required",
+            timeout_override=None,
+            expected_timeout=under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT,
+        )
 
     def test_override_on_required_should_use_override(self):
-        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None, historic_timeout=None,
-                                    evg_alias=None, build_variant="variant-required",
-                                    display_name="! required", timeout_override=3 * 60,
-                                    expected_timeout=timedelta(minutes=3 * 60))
+        self._validate_exec_timeout(
+            idle_timeout=None,
+            exec_timeout=None,
+            historic_timeout=None,
+            evg_alias=None,
+            build_variant="variant-required",
+            display_name="! required",
+            timeout_override=3 * 60,
+            expected_timeout=timedelta(minutes=3 * 60),
+        )
 
     def test_task_specific_timeout(self):
-        self._validate_exec_timeout(idle_timeout=None, exec_timeout=timedelta(seconds=0),
-                                    historic_timeout=None, evg_alias=None, build_variant="variant",
-                                    display_name="not required", timeout_override=60,
-                                    expected_timeout=timedelta(minutes=60))
+        self._validate_exec_timeout(
+            idle_timeout=None,
+            exec_timeout=timedelta(seconds=0),
+            historic_timeout=None,
+            evg_alias=None,
+            build_variant="variant",
+            display_name="not required",
+            timeout_override=60,
+            expected_timeout=timedelta(minutes=60),
+        )
 
     def test_commit_queue_items_use_commit_queue_timeout(self):
-        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None, historic_timeout=None,
-                                    evg_alias=under_test.COMMIT_QUEUE_ALIAS,
-                                    build_variant="variant", display_name="not required",
-                                    timeout_override=None,
-                                    expected_timeout=under_test.COMMIT_QUEUE_TIMEOUT)
+        self._validate_exec_timeout(
+            idle_timeout=None,
+            exec_timeout=None,
+            historic_timeout=None,
+            evg_alias=under_test.COMMIT_QUEUE_ALIAS,
+            build_variant="variant",
+            display_name="not required",
+            timeout_override=None,
+            expected_timeout=under_test.COMMIT_QUEUE_TIMEOUT,
+        )
 
     def test_use_idle_timeout_if_greater_than_exec_timeout(self):
         self._validate_exec_timeout(
-            idle_timeout=timedelta(hours=2), exec_timeout=timedelta(minutes=10),
-            historic_timeout=None, evg_alias=None, build_variant="variant",
-            display_name="not required", timeout_override=None, expected_timeout=timedelta(hours=2))
+            idle_timeout=timedelta(hours=2),
+            exec_timeout=timedelta(minutes=10),
+            historic_timeout=None,
+            evg_alias=None,
+            build_variant="variant",
+            display_name="not required",
+            timeout_override=None,
+            expected_timeout=timedelta(hours=2),
+        )
 
     def test_historic_timeout_should_be_used_if_given(self):
-        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None,
-                                    historic_timeout=timedelta(minutes=15), evg_alias=None,
-                                    build_variant="variant", display_name="not required",
-                                    timeout_override=None, expected_timeout=timedelta(minutes=15))
+        self._validate_exec_timeout(
+            idle_timeout=None,
+            exec_timeout=None,
+            historic_timeout=timedelta(minutes=15),
+            evg_alias=None,
+            build_variant="variant",
+            display_name="not required",
+            timeout_override=None,
+            expected_timeout=timedelta(minutes=15),
+        )
 
     def test_commit_queue_should_override_historic_timeouts(self):
         self._validate_exec_timeout(
-            idle_timeout=None, exec_timeout=None, historic_timeout=timedelta(minutes=15),
-            evg_alias=under_test.COMMIT_QUEUE_ALIAS, build_variant="variant",
-            display_name="not required", timeout_override=None,
-            expected_timeout=under_test.COMMIT_QUEUE_TIMEOUT)
+            idle_timeout=None,
+            exec_timeout=None,
+            historic_timeout=timedelta(minutes=15),
+            evg_alias=under_test.COMMIT_QUEUE_ALIAS,
+            build_variant="variant",
+            display_name="not required",
+            timeout_override=None,
+            expected_timeout=under_test.COMMIT_QUEUE_TIMEOUT,
+        )
 
     def test_override_should_override_historic_timeouts(self):
-        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None,
-                                    historic_timeout=timedelta(minutes=15), evg_alias=None,
-                                    build_variant="variant", display_name="not required",
-                                    timeout_override=33, expected_timeout=timedelta(minutes=33))
+        self._validate_exec_timeout(
+            idle_timeout=None,
+            exec_timeout=None,
+            historic_timeout=timedelta(minutes=15),
+            evg_alias=None,
+            build_variant="variant",
+            display_name="not required",
+            timeout_override=33,
+            expected_timeout=timedelta(minutes=33),
+        )
 
     def test_historic_timeout_should_not_be_overridden_by_required_bv(self):
-        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None,
-                                    historic_timeout=timedelta(minutes=15), evg_alias=None,
-                                    build_variant="variant-required", display_name="! required",
-                                    timeout_override=None, expected_timeout=timedelta(minutes=15))
+        self._validate_exec_timeout(
+            idle_timeout=None,
+            exec_timeout=None,
+            historic_timeout=timedelta(minutes=15),
+            evg_alias=None,
+            build_variant="variant-required",
+            display_name="! required",
+            timeout_override=None,
+            expected_timeout=timedelta(minutes=15),
+        )
 
     def test_historic_timeout_should_not_be_increase_required_bv_timeout(self):
         self._validate_exec_timeout(
-            idle_timeout=None, exec_timeout=None,
+            idle_timeout=None,
+            exec_timeout=None,
             historic_timeout=under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT + timedelta(minutes=30),
-            evg_alias=None, build_variant="variant-required", display_name="! required",
-            timeout_override=None, expected_timeout=under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT)
+            evg_alias=None,
+            build_variant="variant-required",
+            display_name="! required",
+            timeout_override=None,
+            expected_timeout=under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT,
+        )
 
 
 class TestDetermineIdleTimeout(unittest.TestCase):
-    def _validate_idle_timeout(self, idle_timeout, historic_timeout, build_variant,
-                               timeout_override, expected_timeout):
+    def _validate_idle_timeout(
+        self, idle_timeout, historic_timeout, build_variant, timeout_override, expected_timeout
+    ):
         task_name = "task_name"
         overrides = {}
         if timeout_override is not None:
@@ -225,10 +323,12 @@ class TestDetermineIdleTimeout(unittest.TestCase):
         orchestrator = under_test.TaskTimeoutOrchestrator(
             timeout_service=MagicMock(spec_set=TimeoutService),
             timeout_overrides=mock_timeout_overrides,
-            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
+            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig),
+        )
 
-        actual_timeout = orchestrator.determine_idle_timeout(task_name, build_variant, idle_timeout,
-                                                             historic_timeout)
+        actual_timeout = orchestrator.determine_idle_timeout(
+            task_name, build_variant, idle_timeout, historic_timeout
+        )
 
         self.assertEqual(actual_timeout, expected_timeout)
 
@@ -260,11 +360,19 @@ class TestDetermineIdleTimeout(unittest.TestCase):
         )
 
     def test_historic_timeout_should_be_used_if_given(self):
-        self._validate_idle_timeout(idle_timeout=None, historic_timeout=timedelta(minutes=15),
-                                    build_variant="variant", timeout_override=None,
-                                    expected_timeout=timedelta(minutes=15))
+        self._validate_idle_timeout(
+            idle_timeout=None,
+            historic_timeout=timedelta(minutes=15),
+            build_variant="variant",
+            timeout_override=None,
+            expected_timeout=timedelta(minutes=15),
+        )
 
     def test_override_should_override_historic_timeout(self):
-        self._validate_idle_timeout(idle_timeout=None, historic_timeout=timedelta(minutes=15),
-                                    build_variant="variant", timeout_override=30,
-                                    expected_timeout=timedelta(minutes=30))
+        self._validate_idle_timeout(
+            idle_timeout=None,
+            historic_timeout=timedelta(minutes=15),
+            build_variant="variant",
+            timeout_override=30,
+            expected_timeout=timedelta(minutes=30),
+        )

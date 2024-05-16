@@ -36,8 +36,12 @@ from tenacity import wait_fixed, stop_after_delay, retry_if_result, Retrying
 
 sys.path.append(str(Path(os.getcwd(), __file__).parent.parent))
 
-from buildscripts.util.oauth import Configs, get_oauth_credentials, get_client_cred_oauth_credentials  #pylint: disable=wrong-import-position
-from buildscripts.build_system_options import PathOptions  #pylint: disable=wrong-import-position
+from buildscripts.util.oauth import (
+    Configs,
+    get_oauth_credentials,
+    get_client_cred_oauth_credentials,
+)  # pylint: disable=wrong-import-position
+from buildscripts.build_system_options import PathOptions  # pylint: disable=wrong-import-position
 
 SYMBOLIZER_PATH_ENV = "MONGOSYMB_SYMBOLIZER_PATH"
 # since older versions may have issues with symbolizing, we are setting the toolchain version to v4
@@ -96,8 +100,9 @@ class S3BuildidDbgFileResolver(DbgFileResolver):
                 self._get_from_s3(build_id)
             except Exception:  # noqa pylint: disable=broad-except
                 ex = sys.exc_info()[0]
-                sys.stderr.write("Failed to find debug symbols for {} in s3: {}\n".format(
-                    build_id, ex))
+                sys.stderr.write(
+                    "Failed to find debug symbols for {} in s3: {}\n".format(build_id, ex)
+                )
                 return None
         if not os.path.exists(build_id_path):
             return None
@@ -106,9 +111,10 @@ class S3BuildidDbgFileResolver(DbgFileResolver):
     def _get_from_s3(self, build_id):
         """Download debug symbols from S3."""
         subprocess.check_call(
-            ['wget', 'https://s3.amazonaws.com/{}/{}.debug.gz'.format(self._s3_bucket, build_id)],
-            cwd=self._cache_dir)
-        subprocess.check_call(['gunzip', build_id + ".debug.gz"], cwd=self._cache_dir)
+            ["wget", "https://s3.amazonaws.com/{}/{}.debug.gz".format(self._s3_bucket, build_id)],
+            cwd=self._cache_dir,
+        )
+        subprocess.check_call(["gunzip", build_id + ".debug.gz"], cwd=self._cache_dir)
 
 
 class CachedResults(object):
@@ -190,10 +196,19 @@ class PathResolver(DbgFileResolver):
     default_client_credentials_user_name = "client-user"
     download_timeout_secs = timedelta(minutes=4).total_seconds()
 
-    def __init__(self, host: str = None, cache_size: int = 0, cache_dir: str = None,
-                 client_credentials_scope: str = None, client_credentials_user_name: str = None,
-                 client_id: str = None, client_secret: str = None, redirect_port: int = None,
-                 scope: str = None, auth_domain: str = None):
+    def __init__(
+        self,
+        host: str = None,
+        cache_size: int = 0,
+        cache_dir: str = None,
+        client_credentials_scope: str = None,
+        client_credentials_user_name: str = None,
+        client_id: str = None,
+        client_secret: str = None,
+        redirect_port: int = None,
+        scope: str = None,
+        auth_domain: str = None,
+    ):
         """
         Initialize instance.
 
@@ -205,17 +220,25 @@ class PathResolver(DbgFileResolver):
         self._cached_results = CachedResults(max_cache_size=cache_size)
         self.cache_dir = cache_dir or self.default_cache_dir
         self.mci_build_dir = None
-        self.client_credentials_scope = client_credentials_scope or self.default_client_credentials_scope
-        self.client_credentials_user_name = client_credentials_user_name or self.default_client_credentials_user_name
+        self.client_credentials_scope = (
+            client_credentials_scope or self.default_client_credentials_scope
+        )
+        self.client_credentials_user_name = (
+            client_credentials_user_name or self.default_client_credentials_user_name
+        )
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_port = redirect_port
         self.scope = scope
         self.auth_domain = auth_domain
-        self.configs = Configs(client_credentials_scope=self.client_credentials_scope,
-                               client_credentials_user_name=self.client_credentials_user_name,
-                               client_id=self.client_id, auth_domain=self.auth_domain,
-                               redirect_port=self.redirect_port, scope=self.scope)
+        self.configs = Configs(
+            client_credentials_scope=self.client_credentials_scope,
+            client_credentials_user_name=self.client_credentials_user_name,
+            client_id=self.client_id,
+            auth_domain=self.auth_domain,
+            redirect_port=self.redirect_port,
+            scope=self.scope,
+        )
         self.http_client = requests.Session()
         self.path_options = PathOptions()
 
@@ -240,8 +263,9 @@ class PathResolver(DbgFileResolver):
 
         if self.client_id and self.client_secret:
             # auth using secrets
-            credentials = get_client_cred_oauth_credentials(self.client_id, self.client_secret,
-                                                            self.configs)
+            credentials = get_client_cred_oauth_credentials(
+                self.client_id, self.client_secret, self.configs
+            )
         else:
             # since we don't have access to secrets, ask user to auth manually
             credentials = get_oauth_credentials(configs=self.configs, print_auth_url=True)
@@ -250,10 +274,13 @@ class PathResolver(DbgFileResolver):
         # write credentials to local file for further useage
         with open(self.default_creds_file_path, "w") as cfile:
             cfile.write(
-                json.dumps({
-                    "access_token": credentials.access_token,
-                    "expire_time": time.time() + credentials.expires_in
-                }))
+                json.dumps(
+                    {
+                        "access_token": credentials.access_token,
+                        "expire_time": time.time() + credentials.expires_in,
+                    }
+                )
+            )
 
     @staticmethod
     def is_valid_path(path: str) -> bool:
@@ -366,14 +393,17 @@ class PathResolver(DbgFileResolver):
                 if response.status_code != 200:
                     sys.stderr.write(
                         f"Server returned unsuccessful status: {response.status_code}, "
-                        f"response body: {response.text}\n")
+                        f"response body: {response.text}\n"
+                    )
                     return None
                 else:
                     data = response.json().get("data", {})
                     path, binary_name = data.get("debug_symbols_url"), data.get("file_name")
             except Exception as err:  # noqa pylint: disable=broad-except
-                sys.stderr.write(f"Error occurred while trying to get response from server "
-                                 f"for buildId({build_id}): {err}\n")
+                sys.stderr.write(
+                    f"Error occurred while trying to get response from server "
+                    f"for buildId({build_id}): {err}\n"
+                )
                 return None
 
             # update cached results
@@ -444,8 +474,13 @@ def parse_input(trace_doc, dbg_path_resolver):
         addr -= 1
         frames.append(
             dict(
-                path=dbg_path_resolver.get_dbg_file(soinfo), buildId=soinfo.get("buildId", None),
-                offset=frame["o"], addr="0x{:x}".format(addr), symbol=frame.get("s", None)))
+                path=dbg_path_resolver.get_dbg_file(soinfo),
+                buildId=soinfo.get("buildId", None),
+                offset=frame["o"],
+                addr="0x{:x}".format(addr),
+                symbol=frame.get("s", None),
+            )
+        )
     return frames
 
 
@@ -459,30 +494,38 @@ def get_version(trace_doc: Dict[str, Any]) -> Optional[str]:
     return trace_doc.get("processInfo", {}).get("mongodbVersion")
 
 
-def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, input_format,
-                     **kwargs):
+def symbolize_frames(
+    trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, input_format, **kwargs
+):
     """Return a list of symbolized stack frames from a trace_doc in MongoDB stack dump format."""
 
     # Keep frames in kwargs to avoid changing the function signature.
     frames = kwargs.get("frames")
     if frames is None:
         total_seconds_for_retries = kwargs.get("total_seconds_for_retries", 0)
-        frames = preprocess_frames_with_retries(dbg_path_resolver, trace_doc, input_format,
-                                                total_seconds_for_retries)
+        frames = preprocess_frames_with_retries(
+            dbg_path_resolver, trace_doc, input_format, total_seconds_for_retries
+        )
 
     if not symbolizer_path:
         symbolizer_path = os.environ.get(SYMBOLIZER_PATH_ENV)
         if not symbolizer_path:
-            print(f"Env value for '{SYMBOLIZER_PATH_ENV}' not found, using"
-                  f" '{DEFAULT_SYMBOLIZER_PATH}' as a default executable path.")
+            print(
+                f"Env value for '{SYMBOLIZER_PATH_ENV}' not found, using"
+                f" '{DEFAULT_SYMBOLIZER_PATH}' as a default executable path."
+            )
             symbolizer_path = DEFAULT_SYMBOLIZER_PATH
 
     symbolizer_args = [symbolizer_path]
     for dh in dsym_hint:
         symbolizer_args.append("-dsym-hint={}".format(dh))
-    symbolizer_process = subprocess.Popen(args=symbolizer_args, close_fds=True,
-                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                          stderr=sys.stdout)
+    symbolizer_process = subprocess.Popen(
+        args=symbolizer_args,
+        close_fds=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=sys.stdout,
+    )
 
     def extract_symbols(stdin):
         """Extract symbol information from the output of llvm-symbolizer.
@@ -507,7 +550,7 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, i
                 result.append({"fn": line.strip()})
                 step = 1
             else:
-                file_name, line, column = line.strip().rsplit(':', 3)
+                file_name, line, column = line.strip().rsplit(":", 3)
                 result[-1].update({"file": file_name, "column": int(column), "line": int(line)})
                 step = 0
         return result
@@ -525,8 +568,9 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, i
     return frames
 
 
-def preprocess_frames(dbg_path_resolver: DbgFileResolver, trace_doc: Dict[str, Any],
-                      input_format: str) -> List[Dict[str, Any]]:
+def preprocess_frames(
+    dbg_path_resolver: DbgFileResolver, trace_doc: Dict[str, Any], input_format: str
+) -> List[Dict[str, Any]]:
     """
     Process the paths in frame objects.
 
@@ -560,9 +604,12 @@ def has_high_not_found_paths_ratio(frames: List[Dict[str, Any]]) -> bool:
     return not_found_ratio >= 0.5
 
 
-def preprocess_frames_with_retries(dbg_path_resolver: DbgFileResolver, trace_doc: Dict[str, Any],
-                                   input_format: str,
-                                   total_seconds_for_retries: int = 0) -> List[Dict[str, Any]]:
+def preprocess_frames_with_retries(
+    dbg_path_resolver: DbgFileResolver,
+    trace_doc: Dict[str, Any],
+    input_format: str,
+    total_seconds_for_retries: int = 0,
+) -> List[Dict[str, Any]]:
     """
     Process the paths in frame objects.
 
@@ -574,9 +621,11 @@ def preprocess_frames_with_retries(dbg_path_resolver: DbgFileResolver, trace_doc
     """
 
     retrying = Retrying(
-        retry=retry_if_result(has_high_not_found_paths_ratio), wait=wait_fixed(60),
+        retry=retry_if_result(has_high_not_found_paths_ratio),
+        wait=wait_fixed(60),
         stop=stop_after_delay(total_seconds_for_retries),
-        retry_error_callback=lambda retry_state: retry_state.outcome.result())
+        retry_error_callback=lambda retry_state: retry_state.outcome.result(),
+    )
 
     return retrying(preprocess_frames, dbg_path_resolver, trace_doc, input_format)
 
@@ -589,8 +638,11 @@ def classic_output(frames, outfile, **kwargs):  # pylint: disable=unused-argumen
             for sframe in symbinfo:
                 outfile.write(" {file:s}:{line:d}:{column:d}: {fn:s}\n".format(**sframe))
         else:
-            outfile.write(" Couldn't extract symbols: path={path}\n".format(
-                path=frame.get('path', 'no value found')))
+            outfile.write(
+                " Couldn't extract symbols: path={path}\n".format(
+                    path=frame.get("path", "no value found")
+                )
+            )
 
 
 def make_argument_parser(parser=None, **kwargs):
@@ -598,42 +650,58 @@ def make_argument_parser(parser=None, **kwargs):
     if parser is None:
         parser = argparse.ArgumentParser(**kwargs)
 
-    parser.add_argument('--dsym-hint', default=[], action='append')
-    parser.add_argument('--symbolizer-path', default='')
-    parser.add_argument('--input-format', choices=['classic', 'thin'], default='classic')
-    parser.add_argument('--output-format', choices=['classic', 'json'], default='classic',
-                        help='"json" shows some extra information')
-    parser.add_argument('--debug-file-resolver', choices=['path', 's3', 'pr'], default='pr')
-    parser.add_argument('--src-dir-to-move', action="store", type=str, default=None,
-                        help="Specify a src dir to move to /data/mci/{original_buildid}/src")
+    parser.add_argument("--dsym-hint", default=[], action="append")
+    parser.add_argument("--symbolizer-path", default="")
+    parser.add_argument("--input-format", choices=["classic", "thin"], default="classic")
     parser.add_argument(
-        '--total-seconds-for-retries', default=0, type=int,
+        "--output-format",
+        choices=["classic", "json"],
+        default="classic",
+        help='"json" shows some extra information',
+    )
+    parser.add_argument("--debug-file-resolver", choices=["path", "s3", "pr"], default="pr")
+    parser.add_argument(
+        "--src-dir-to-move",
+        action="store",
+        type=str,
+        default=None,
+        help="Specify a src dir to move to /data/mci/{original_buildid}/src",
+    )
+    parser.add_argument(
+        "--total-seconds-for-retries",
+        default=0,
+        type=int,
         help="If web service fails to find path for given build id, it could be because mapping "
         "process was not finished yet. We can wait for it to finish and retry again. Each retry"
         " adds 2 minutes to previous wait time. It is guaranteed that total wait time does not exceed this "
-        "specified amount.")
+        "specified amount.",
+    )
 
-    parser.add_argument('--live', action='store_true')
+    parser.add_argument("--live", action="store_true")
     s3_group = parser.add_argument_group(
-        "s3 options", description='Options used with \'--debug-file-resolver s3\'')
-    s3_group.add_argument('--s3-cache-dir')
-    s3_group.add_argument('--s3-bucket')
+        "s3 options", description="Options used with '--debug-file-resolver s3'"
+    )
+    s3_group.add_argument("--s3-cache-dir")
+    s3_group.add_argument("--s3-bucket")
 
     pr_group = parser.add_argument_group(
-        'Path Resolver options (Path Resolver uses a special web service to retrieve URL of debug symbols file for '
+        "Path Resolver options (Path Resolver uses a special web service to retrieve URL of debug symbols file for "
         'a given BuildID), we use "pr" as a shorter/easier name for this',
-        description='Options used with \'--debug-file-resolver pr\'')
-    pr_group.add_argument('--pr-host', default='',
-                          help='URL of web service running the API to get debug symbol URL')
-    pr_group.add_argument('--pr-cache-dir', default='',
-                          help='Full path to a directory to store cache/files')
-    pr_group.add_argument('--client-secret', default='', help='Secret key for Okta Oauth')
-    pr_group.add_argument('--client-id', default='', help='Client id for Okta Oauth')
+        description="Options used with '--debug-file-resolver pr'",
+    )
+    pr_group.add_argument(
+        "--pr-host", default="", help="URL of web service running the API to get debug symbol URL"
+    )
+    pr_group.add_argument(
+        "--pr-cache-dir", default="", help="Full path to a directory to store cache/files"
+    )
+    pr_group.add_argument("--client-secret", default="", help="Secret key for Okta Oauth")
+    pr_group.add_argument("--client-id", default="", help="Client id for Okta Oauth")
     # caching mechanism is currently not fully developed and needs more advanced cleaning techniques, we add an option
     # to enable it after completing the implementation
 
     # Look for symbols in the cwd by default.
-    parser.add_argument('path_to_executable', nargs="?")
+    parser.add_argument("path_to_executable", nargs="?")
     return parser
 
 
@@ -652,7 +720,7 @@ def substitute_stdin(options, resolver):
 
         line = line.strip()
 
-        if 'Frame: 0x' in line:
+        if "Frame: 0x" in line:
             continue
 
         if backtrace_indicator in line:
@@ -682,13 +750,17 @@ def main(options):
     """Execute Main program."""
 
     resolver = None
-    if options.debug_file_resolver == 'path':
+    if options.debug_file_resolver == "path":
         resolver = PathDbgFileResolver(options.path_to_executable)
-    elif options.debug_file_resolver == 's3':
+    elif options.debug_file_resolver == "s3":
         resolver = S3BuildidDbgFileResolver(options.s3_cache_dir, options.s3_bucket)
-    elif options.debug_file_resolver == 'pr':
-        resolver = PathResolver(host=options.pr_host, cache_dir=options.pr_cache_dir,
-                                client_secret=options.client_secret, client_id=options.client_id)
+    elif options.debug_file_resolver == "pr":
+        resolver = PathResolver(
+            host=options.pr_host,
+            cache_dir=options.pr_cache_dir,
+            client_secret=options.client_secret,
+            client_id=options.client_id,
+        )
 
     if options.live:
         print("Entering live mode")
@@ -701,8 +773,10 @@ def main(options):
     trace_doc = sys.stdin.read()
 
     if not trace_doc or not trace_doc.strip():
-        print("Please provide the backtrace through stdin for symbolization;"
-              " e.g. `your/symbolization/command < /file/with/stacktrace`")
+        print(
+            "Please provide the backtrace through stdin for symbolization;"
+            " e.g. `your/symbolization/command < /file/with/stacktrace`"
+        )
 
     # Search the trace_doc for an object having "backtrace" and "processInfo" keys.
     def bt_search(obj):
@@ -720,7 +794,7 @@ def main(options):
     # given a log file including traceback,
     # we try to find traceback from that file, analyzing each line until we find it
     for line in trace_doc.splitlines():
-        possible_trace_doc = line[line.find('{'):]
+        possible_trace_doc = line[line.find("{") :]
         try:
             possible_trace_doc = json.JSONDecoder().raw_decode(possible_trace_doc)[0]
             trace_doc = bt_search(possible_trace_doc)
@@ -733,29 +807,32 @@ def main(options):
         sys.exit(1)
 
     output_fn = None
-    if options.output_format == 'json':
+    if options.output_format == "json":
         output_fn = json.dump
-    if options.output_format == 'classic':
+    if options.output_format == "classic":
         output_fn = classic_output
 
-    frames = preprocess_frames_with_retries(resolver, trace_doc, options.input_format,
-                                            options.total_seconds_for_retries)
+    frames = preprocess_frames_with_retries(
+        resolver, trace_doc, options.input_format, options.total_seconds_for_retries
+    )
 
     if options.src_dir_to_move and resolver.mci_build_dir is not None:
         try:
             os.makedirs(resolver.mci_build_dir)
             os.symlink(
                 os.path.join(os.getcwd(), options.src_dir_to_move),
-                os.path.join(resolver.mci_build_dir, 'src'))
+                os.path.join(resolver.mci_build_dir, "src"),
+            )
         except FileExistsError:
             pass
 
-    frames = symbolize_frames(frames=frames, trace_doc=trace_doc, dbg_path_resolver=resolver,
-                              **vars(options))
+    frames = symbolize_frames(
+        frames=frames, trace_doc=trace_doc, dbg_path_resolver=resolver, **vars(options)
+    )
     output_fn(frames, sys.stdout, indent=2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     symbolizer_options = make_argument_parser(description=__doc__).parse_args()
     main(symbolizer_options)
     sys.exit(0)

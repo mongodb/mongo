@@ -1,4 +1,5 @@
 """Unit tests for the resmokelib.testing.suite module."""
+
 import unittest
 
 from mock import MagicMock

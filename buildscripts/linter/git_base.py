@@ -184,7 +184,7 @@ class Repository(object):
         params.extend(["rev-parse", "--show-toplevel"])
         result = Repository._run_process("rev-parse", params)
         result.check_returncode()
-        return result.stdout.decode('utf-8').rstrip()
+        return result.stdout.decode("utf-8").rstrip()
 
     @staticmethod
     def current_repository():
@@ -195,7 +195,7 @@ class Repository(object):
         """Call git for this repository, and return the captured output."""
         result = self._run_cmd(cmd, args)
         result.check_returncode()
-        return result.stdout.decode('utf-8')
+        return result.stdout.decode("utf-8")
 
     def _callgit(self, cmd, args, raise_exception=False):
         """
@@ -239,8 +239,9 @@ class GitException(Exception):
 
     """
 
-    def __init__(self, message, returncode=None, cmd=None, process_args=None, stdout=None,
-                 stderr=None):
+    def __init__(
+        self, message, returncode=None, cmd=None, process_args=None, stdout=None, stderr=None
+    ):
         """Initialize GitException."""
         Exception.__init__(self, message)
         self.returncode = returncode
@@ -274,6 +275,12 @@ class GitCommandResult(object):
         """Raise GitException if the exit code is non-zero."""
         if self.returncode:
             raise GitException(
-                "Command '{0}' failed with code '{1}'".format(" ".join(self.process_args),
-                                                              self.returncode), self.returncode,
-                self.cmd, self.process_args, self.stdout, self.stderr)
+                "Command '{0}' failed with code '{1}'".format(
+                    " ".join(self.process_args), self.returncode
+                ),
+                self.returncode,
+                self.cmd,
+                self.process_args,
+                self.stdout,
+                self.stderr,
+            )

@@ -105,7 +105,7 @@ class DockerComposeImageBuilder:
         # (2) it should add the `--externalSUT` flag
         command = sys.argv
         rm_index = command.index("--dockerComposeBuildImages")
-        return ' '.join(command[0:rm_index] + command[rm_index + 2:] + ["--externalSUT"])
+        return " ".join(command[0:rm_index] + command[rm_index + 2 :] + ["--externalSUT"])
 
     def _add_docker_compose_configuration_to_build_context(self, build_context) -> None:
         """
@@ -129,30 +129,37 @@ class DockerComposeImageBuilder:
                 ip_suffix = self.next_available_fault_disabled_ip
                 self.next_available_fault_disabled_ip += 1
             return {
-                "container_name": name, "hostname": name,
+                "container_name": name,
+                "hostname": name,
                 "image": f'{"workload" if name == "workload" else "mongo-binaries"}:{self.tag}',
                 "volumes": [
                     f"./logs/{name}:/var/log/mongodb/",
                     "./scripts:/scripts/",
                     f"./data/{name}:/data/db",
-                ], "command": f"/bin/bash /scripts/{name}.sh", "networks": {
-                    "antithesis-net": {"ipv4_address": f"10.20.20.{ip_suffix}"}
-                }, "depends_on": depends_on
+                ],
+                "command": f"/bin/bash /scripts/{name}.sh",
+                "networks": {"antithesis-net": {"ipv4_address": f"10.20.20.{ip_suffix}"}},
+                "depends_on": depends_on,
             }
 
         docker_compose_yml = {
-            "version": "3.0", "services": {
-                "workload":
-                    create_docker_compose_service(
-                        "workload", fault_injection=False, depends_on=[
-                            process.logger.external_sut_hostname
-                            for process in self.suite_fixture.all_processes()
-                        ])
-            }, "networks": {
+            "version": "3.0",
+            "services": {
+                "workload": create_docker_compose_service(
+                    "workload",
+                    fault_injection=False,
+                    depends_on=[
+                        process.logger.external_sut_hostname
+                        for process in self.suite_fixture.all_processes()
+                    ],
+                )
+            },
+            "networks": {
                 "antithesis-net": {
-                    "driver": "bridge", "ipam": {"config": [{"subnet": "10.20.20.0/24"}]}
+                    "driver": "bridge",
+                    "ipam": {"config": [{"subnet": "10.20.20.0/24"}]},
                 }
-            }
+            },
         }
         print("Writing workload init script...")
         with open(os.path.join(build_context, "scripts", "workload.sh"), "w") as workload_init:
@@ -167,15 +174,16 @@ class DockerComposeImageBuilder:
             # Add the `Process` as a service in the docker-compose.yml
             service_name = process.logger.external_sut_hostname
             docker_compose_yml["services"][service_name] = create_docker_compose_service(
-                service_name, fault_injection=True, depends_on=[])
+                service_name, fault_injection=True, depends_on=[]
+            )
 
             # Write the `Process` args as an init script
             with open(os.path.join(build_context, "scripts", f"{service_name}.sh"), "w") as file:
-                file.write(" ".join(map(shlex.quote, process.args)) + '\n')
+                file.write(" ".join(map(shlex.quote, process.args)) + "\n")
 
         print("Writing `docker-compose.yml`...")
         with open(os.path.join(build_context, "docker-compose.yml"), "w") as docker_compose:
-            docker_compose.write(yaml.dump(docker_compose_yml) + '\n')
+            docker_compose.write(yaml.dump(docker_compose_yml) + "\n")
 
         print("Writing Dockerfile...")
         with open(os.path.join(build_context, "Dockerfile"), "w") as dockerfile:
@@ -212,7 +220,7 @@ class DockerComposeImageBuilder:
     def _get_docker_build_san_args(self):
         args = []
         for key, value in self.san_options.items():
-            args += ["--build-arg", f'{key}={value}']
+            args += ["--build-arg", f"{key}={value}"]
         return args
 
     def _docker_build(self, image_name, dockerfile, build_context):
@@ -236,16 +244,21 @@ class DockerComposeImageBuilder:
         # Our official builds happen in Evergreen. Assert debug symbols are on system.
         # If this is running locally, this is for development purposes only and debug symbols are not required.
         if self.in_evergreen:
-            assert os.path.exists(self.MONGODB_DEBUGSYMBOLS
-                                  ), f"No debug symbols available at: {self.MONGODB_DEBUGSYMBOLS}"
+            assert os.path.exists(
+                self.MONGODB_DEBUGSYMBOLS
+            ), f"No debug symbols available at: {self.MONGODB_DEBUGSYMBOLS}"
             print("Running in Evergreen -- copying debug symbols to build context...")
-            shutil.copy(self.MONGODB_DEBUGSYMBOLS,
-                        os.path.join(self.DOCKER_COMPOSE_BUILD_CONTEXT, "debug"))
+            shutil.copy(
+                self.MONGODB_DEBUGSYMBOLS, os.path.join(self.DOCKER_COMPOSE_BUILD_CONTEXT, "debug")
+            )
 
         print(f"Done setting up antithesis config image build context for `{self.suite_name}...")
         print("Building antithesis config image...")
-        self._docker_build(self.suite_name, f"{self.DOCKER_COMPOSE_BUILD_CONTEXT}/Dockerfile",
-                           self.DOCKER_COMPOSE_BUILD_CONTEXT)
+        self._docker_build(
+            self.suite_name,
+            f"{self.DOCKER_COMPOSE_BUILD_CONTEXT}/Dockerfile",
+            self.DOCKER_COMPOSE_BUILD_CONTEXT,
+        )
         print("Done building antithesis config image.")
 
     def build_workload_image(self):
@@ -292,8 +305,9 @@ class DockerComposeImageBuilder:
 
         # Build docker image
         print("Building mongo binaries image...")
-        self._docker_build("mongo-binaries", self.MONGO_BINARIES_DOCKERFILE,
-                           self.MONGO_BINARIES_BUILD_CONTEXT)
+        self._docker_build(
+            "mongo-binaries", self.MONGO_BINARIES_DOCKERFILE, self.MONGO_BINARIES_BUILD_CONTEXT
+        )
         print("Done building mongo binaries image.")
 
     def _fetch_mongodb_binaries(self):
@@ -322,38 +336,49 @@ class DockerComposeImageBuilder:
 
             More info on `db-contrib-tool` available here: `https://github.com/10gen/db-contrib-tool`
             """
-            assert subprocess.run(["which",
-                                   "db-contrib-tool"]).returncode == 0, db_contrib_tool_error
+            assert (
+                subprocess.run(["which", "db-contrib-tool"]).returncode == 0
+            ), db_contrib_tool_error
 
             # Use `db-contrib-tool` to get MongoDB binaries for this image
             print("Running Locally - Fetching All MongoDB binaries for image build...")
-            subprocess.run([
-                "db-contrib-tool",
-                "setup-repro-env",
-                "--variant",
-                "ubuntu2204",
-                "--linkDir",
-                mongodb_binaries_destination,
-                "--installLastContinuous",
-                "--installLastLTS",
-                "master",
-            ], stdout=sys.stdout, stderr=sys.stderr, check=True)
+            subprocess.run(
+                [
+                    "db-contrib-tool",
+                    "setup-repro-env",
+                    "--variant",
+                    "ubuntu2204",
+                    "--linkDir",
+                    mongodb_binaries_destination,
+                    "--installLastContinuous",
+                    "--installLastLTS",
+                    "master",
+                ],
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                check=True,
+            )
         elif self.in_evergreen:
             print(
                 "Running in Evergreen - Fetching `last-continuous` and `last-lts` MongoDB binaries for image build..."
             )
-            subprocess.run([
-                "db-contrib-tool",
-                "setup-repro-env",
-                "--variant",
-                "ubuntu2204",
-                "--linkDir",
-                mongodb_binaries_destination,
-                "--installLastContinuous",
-                "--installLastLTS",
-                "--evergreenConfig",
-                "./.evergreen.yml",
-            ], stdout=sys.stdout, stderr=sys.stderr, check=True)
+            subprocess.run(
+                [
+                    "db-contrib-tool",
+                    "setup-repro-env",
+                    "--variant",
+                    "ubuntu2204",
+                    "--linkDir",
+                    mongodb_binaries_destination,
+                    "--installLastContinuous",
+                    "--installLastLTS",
+                    "--evergreenConfig",
+                    "./.evergreen.yml",
+                ],
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                check=True,
+            )
 
         # Verify the binaries were downloaded successfully
         for required_binary in [self.MONGO_BINARY, self.MONGOD_BINARY, self.MONGOS_BINARY]:
@@ -369,7 +394,8 @@ class DockerComposeImageBuilder:
                     check=True,
                     capture_output=True,
                 ).stdout.decode(
-                    "utf-8"), f"MongoDB binary is not linked to `libvoidstar.so`: {required_binary}"
+                    "utf-8"
+                ), f"MongoDB binary is not linked to `libvoidstar.so`: {required_binary}"
 
     def _copy_mongo_binary_to_build_context(self, dir_path):
         """
@@ -403,7 +429,8 @@ class DockerComposeImageBuilder:
         # Instead, we rely on Evergreen's `git.get_project` which will correctly clone the repo and apply changes from the `patch`.
         if self.in_evergreen:
             assert os.path.exists(
-                mongo_repo_destination), f"No `mongo` repo available at: {mongo_repo_destination}"
+                mongo_repo_destination
+            ), f"No `mongo` repo available at: {mongo_repo_destination}"
             print("Running in Evergreen -- no need to clone `mongo` repo since it already exists.")
             return
 
@@ -429,18 +456,23 @@ class DockerComposeImageBuilder:
         print(clone_repo_warning_message)
 
         # Create the modules directory in the mongo repo at the build context
-        modules_directory_at_build_context = os.path.join(mongo_repo_destination,
-                                                          self.MODULES_RELATIVE_PATH)
+        modules_directory_at_build_context = os.path.join(
+            mongo_repo_destination, self.MODULES_RELATIVE_PATH
+        )
         os.mkdir(modules_directory_at_build_context)
 
         mongo_enterprise_modules_destination = os.path.join(
-            mongo_repo_destination, self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH)
+            mongo_repo_destination, self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH
+        )
 
         # Copy the mongo enterprise modules repo to the build context.
         # If this fails to clone, the `git` library will raise an exception.
         active_branch = git.Repo(self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH).active_branch.name
-        git.Repo.clone_from(self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH,
-                            mongo_enterprise_modules_destination, branch=active_branch)
+        git.Repo.clone_from(
+            self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH,
+            mongo_enterprise_modules_destination,
+            branch=active_branch,
+        )
         print("Done cloning MongoDB Enterprise Modules repo to build context.")
 
     def _clone_qa_repo_to_build_context(self, dir_path):
@@ -536,7 +568,8 @@ class DockerComposeImageBuilder:
         # Our official builds happen in Evergreen. Assert a "real" `libvoidstar.so` is on system.
         if self.in_evergreen:
             assert os.path.exists(
-                self.LIBVOIDSTAR_PATH), f"No `libvoidstar.so` available at: {self.LIBVOIDSTAR_PATH}"
+                self.LIBVOIDSTAR_PATH
+            ), f"No `libvoidstar.so` available at: {self.LIBVOIDSTAR_PATH}"
             print("Running in Evergreen -- using system `libvoidstar.so`.")
             shutil.copy(self.LIBVOIDSTAR_PATH, libvoidstar_destination)
             print("Done copying `libvoidstar.so` from system to build context")

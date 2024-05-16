@@ -1,4 +1,5 @@
 """FCV and Server binary version constants used for multiversion testing."""
+
 import os
 import shutil
 from subprocess import DEVNULL, STDOUT, CalledProcessError, call, check_output
@@ -10,9 +11,13 @@ import structlog
 import buildscripts.resmokelib.config as _config
 
 from buildscripts.resmokelib.multiversion.multiversion_service import (
-    MongoReleases, MongoVersion, MultiversionService, MONGO_VERSION_YAML, RELEASES_YAML)
-from buildscripts.resmokelib.multiversionsetupconstants import \
-    USE_EXISTING_RELEASES_FILE
+    MongoReleases,
+    MongoVersion,
+    MultiversionService,
+    MONGO_VERSION_YAML,
+    RELEASES_YAML,
+)
+from buildscripts.resmokelib.multiversionsetupconstants import USE_EXISTING_RELEASES_FILE
 
 LAST_LTS = "last_lts"
 LAST_CONTINUOUS = "last_continuous"
@@ -21,7 +26,9 @@ RELEASES_LOCAL_FILE = os.path.join("src", "mongo", "util", "version", "releases.
 # We use the "releases.yml" file from "master" because it is guaranteed to be up-to-date
 # with the latest EOL versions. If a "last-continuous" version is EOL, we don't include
 # it in the multiversion config and therefore don't test against it.
-MASTER_RELEASES_REMOTE_FILE = "https://raw.githubusercontent.com/mongodb/mongo/master/src/mongo/util/version/releases.yml"
+MASTER_RELEASES_REMOTE_FILE = (
+    "https://raw.githubusercontent.com/mongodb/mongo/master/src/mongo/util/version/releases.yml"
+)
 
 LOGGER = structlog.getLogger(__name__)
 
@@ -34,7 +41,7 @@ def generate_mongo_version_file():
         raise ChildProcessError("Failed to run git describe to get the latest tag") from exp
 
     # Write the current MONGO_VERSION to a data file.
-    with open(MONGO_VERSION_YAML, 'w') as mongo_version_fh:
+    with open(MONGO_VERSION_YAML, "w") as mongo_version_fh:
         # E.g. res = 'r5.1.0-alpha-597-g8c345c6693\n'
         res = res[1:]  # Remove the leading "r" character.
         mongo_version_fh.write("mongo_version: " + res)
@@ -47,8 +54,10 @@ def get_releases_file_from_remote():
         with open(RELEASES_YAML, "wb") as file:
             response = requests.get(MASTER_RELEASES_REMOTE_FILE)
             if response.status_code != http.HTTPStatus.OK:
-                raise RuntimeError("Http response for releases yml file was not 200 but was " +
-                                   response.status_code)
+                raise RuntimeError(
+                    "Http response for releases yml file was not 200 but was "
+                    + response.status_code
+                )
             file.write(response.content)
         LOGGER.info(f"Got releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
     except Exception as exc:
@@ -97,12 +106,13 @@ if not USE_EXISTING_RELEASES_FILE:
     generate_releases_file()
 else:
     LOGGER.info(
-        "Skipping generating releases file since the --useExistingReleasesFile flag has been set")
+        "Skipping generating releases file since the --useExistingReleasesFile flag has been set"
+    )
 
 
 def evg_project_str(version):
     """Return the evergreen project name for the given version."""
-    return 'mongodb-mongo-v{}.{}'.format(version.major, version.minor)
+    return "mongodb-mongo-v{}.{}".format(version.major, version.minor)
 
 
 multiversion_service = MultiversionService(
@@ -134,13 +144,14 @@ REQUIRES_FCV_TAG_LATEST = version_constants.get_latest_tag()
 REQUIRES_FCV_TAG = version_constants.get_fcv_tag_list()
 
 # Generate evergreen project names for all FCVs less than latest.
-EVERGREEN_PROJECTS = ['mongodb-mongo-master']
+EVERGREEN_PROJECTS = ["mongodb-mongo-master"]
 EVERGREEN_PROJECTS.extend([evg_project_str(fcv) for fcv in version_constants.fcvs_less_than_latest])
 
-OLD_VERSIONS = [
-    LAST_LTS
-] if LAST_CONTINUOUS_FCV == LAST_LTS_FCV or LAST_CONTINUOUS_FCV in version_constants.get_eols(
-) else [LAST_LTS, LAST_CONTINUOUS]
+OLD_VERSIONS = (
+    [LAST_LTS]
+    if LAST_CONTINUOUS_FCV == LAST_LTS_FCV or LAST_CONTINUOUS_FCV in version_constants.get_eols()
+    else [LAST_LTS, LAST_CONTINUOUS]
+)
 
 
 def log_constants(exec_log):

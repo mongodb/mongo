@@ -21,7 +21,7 @@ from buildscripts.resmokelib.testing.hooks import dbhash_tenant_migration
 class ContinuousShardSplit(interface.Hook):
     """Starts a shard split thread at the beginning of each test."""
 
-    DESCRIPTION = ("Continuous shard split operations")
+    DESCRIPTION = "Continuous shard split operations"
 
     IS_BACKGROUND = True
     AWAIT_REPL_TIMEOUT_MINS = ReplicaSetFixture.AWAIT_REPL_TIMEOUT_MINS
@@ -49,8 +49,9 @@ class ContinuousShardSplit(interface.Hook):
         if not self._shard_split_fixture:
             raise ValueError("No ShardSplitFixture to run shard splits on")
         self.logger.info("Starting the shard split thread.")
-        self._shard_split_thread = _ShardSplitThread(self.logger, self._shard_split_fixture,
-                                                     self._shell_options, test_report)
+        self._shard_split_thread = _ShardSplitThread(
+            self.logger, self._shard_split_fixture, self._shell_options, test_report
+        )
         self._shard_split_thread.start()
 
     def after_suite(self, test_report, teardown_flag=None):
@@ -156,8 +157,9 @@ class ShardSplitLifeCycle(object):
 
 
 class _ShardSplitOptions:
-    def __init__(self, logger, shard_split_fixture, tenant_ids, recipient_tag_name,
-                 recipient_set_name):
+    def __init__(
+        self, logger, shard_split_fixture, tenant_ids, recipient_tag_name, recipient_set_name
+    ):
         self.logger = logger
         self.migration_id = uuid.uuid4()
         self.shard_split_fixture = shard_split_fixture
@@ -180,7 +182,8 @@ class _ShardSplitOptions:
     def get_donor_primary(self):
         """Return a connection to the donor primary."""
         return self.get_donor_rs().get_primary(
-            timeout_secs=self.shard_split_fixture.AWAIT_REPL_TIMEOUT_MINS * 60)
+            timeout_secs=self.shard_split_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
+        )
 
     def get_donor_nodes(self):
         """Return the nodes for the current shard split fixture donor."""
@@ -192,9 +195,11 @@ class _ShardSplitOptions:
 
     def __str__(self):
         opts = {
-            "migration_id": self.migration_id, "tenant_ids": self.tenant_ids,
-            "donor": self.get_donor_name(), "recipientSetName": self.recipient_set_name,
-            "recipientTagName": self.recipient_tag_name
+            "migration_id": self.migration_id,
+            "tenant_ids": self.tenant_ids,
+            "donor": self.get_donor_name(),
+            "recipientSetName": self.recipient_set_name,
+            "recipientTagName": self.recipient_tag_name,
         }
         return str(opts)
 
@@ -255,7 +260,8 @@ class _ShardSplitThread(threading.Thread):
                 # Briefly wait to let the test run before starting the split operation, so that
                 # the first split is more likely to have data to migrate.
                 wait_secs = random.uniform(
-                    *self.WAIT_SECS_RANGES[split_count % len(self.WAIT_SECS_RANGES)])
+                    *self.WAIT_SECS_RANGES[split_count % len(self.WAIT_SECS_RANGES)]
+                )
                 self.logger.info(f"Waiting for {wait_secs} seconds before starting split.")
                 self.__lifecycle.wait_for_shard_split_interval(wait_secs)
 
@@ -272,7 +278,8 @@ class _ShardSplitThread(threading.Thread):
                 # set up the fixture for the next split operation
                 if is_committed:
                     self._shard_split_fixture.replace_donor_with_recipient(
-                        split_opts.recipient_set_name)
+                        split_opts.recipient_set_name
+                    )
                 else:
                     self._shard_split_fixture.remove_recipient_nodes()
 
@@ -306,7 +313,8 @@ class _ShardSplitThread(threading.Thread):
         if not self._shard_split_fixture.is_running():
             raise errors.ServerFailure(
                 f"ShardSplitFixture with pids {self._shard_split_fixture.pids()} expected to be running in"
-                " ContinuousShardSplit, but wasn't.")
+                " ContinuousShardSplit, but wasn't."
+            )
 
     def resume(self, test):
         """Resume the thread before test."""
@@ -329,21 +337,31 @@ class _ShardSplitThread(threading.Thread):
             raise errors.ServerFailure(msg)
 
     def _is_fail_point_err(self, err):
-        return err.code == self.TENANT_MIGRATION_ABORTED_ERR_CODE and "simulate a shard split error" in str(
-            err)
+        return (
+            err.code == self.TENANT_MIGRATION_ABORTED_ERR_CODE
+            and "simulate a shard split error" in str(err)
+        )
 
     def _create_split_opts(self, split_count):
         recipient_set_name = f"rs{split_count+1}"
         recipient_tag_name = "recipientNode"
-        return _ShardSplitOptions(self.logger, self._shard_split_fixture, self._tenant_ids,
-                                  recipient_tag_name, recipient_set_name)
+        return _ShardSplitOptions(
+            self.logger,
+            self._shard_split_fixture,
+            self._tenant_ids,
+            recipient_tag_name,
+            recipient_set_name,
+        )
 
     def _create_client(self, fixture, **kwargs):
-        return fixture.mongo_client(username=self._auth_options["username"],
-                                    password=self._auth_options["password"],
-                                    authSource=self._auth_options["authenticationDatabase"],
-                                    authMechanism=self._auth_options["authenticationMechanism"],
-                                    uuidRepresentation='standard', **kwargs)
+        return fixture.mongo_client(
+            username=self._auth_options["username"],
+            password=self._auth_options["password"],
+            authSource=self._auth_options["authenticationDatabase"],
+            authMechanism=self._auth_options["authenticationMechanism"],
+            uuidRepresentation="standard",
+            **kwargs,
+        )
 
     def _get_recipient_primary(self, split_opts, timeout_secs=None):
         if timeout_secs is None:
@@ -370,19 +388,21 @@ class _ShardSplitThread(threading.Thread):
     def _check_split_dbhash(self, split_opts):
         # Set the donor connection string, recipient connection string, and migration uuid string
         # for the tenant migration dbhash check script.
-        self._shell_options["global_vars"]["TestData"].update({
-            "donorConnectionString":
-                split_opts.get_donor_primary().get_internal_connection_string(),
-            "recipientConnectionString":
-                self._get_recipient_primary(split_opts).get_internal_connection_string(),
-            "migrationIdString":
-                split_opts.migration_id.__str__()
-        })
+        self._shell_options["global_vars"]["TestData"].update(
+            {
+                "donorConnectionString": split_opts.get_donor_primary().get_internal_connection_string(),
+                "recipientConnectionString": self._get_recipient_primary(
+                    split_opts
+                ).get_internal_connection_string(),
+                "migrationIdString": split_opts.migration_id.__str__(),
+            }
+        )
 
         # Synthetically invoke the CheckTenantMigrationDBHash hook. We call each of the hook's
         # lifecycle methods here as if it were called by the resmoke test runner.
         dbhash_test_case = dbhash_tenant_migration.CheckTenantMigrationDBHash(
-            self.logger, self._shard_split_fixture, self._shell_options)
+            self.logger, self._shard_split_fixture, self._shell_options
+        )
         dbhash_test_case.before_suite(self._test_report)
         dbhash_test_case.before_test(self._test, self._test_report)
         dbhash_test_case.after_test(self._test, self._test_report)
@@ -405,18 +425,28 @@ class _ShardSplitThread(threading.Thread):
         return is_committed
 
     def _commit_shard_split(self, donor_client, split_opts):  # noqa: D205,D400
-        self.logger.info(f"Committing shard split '{split_opts.migration_id}' on replica set "
-                         f"'{split_opts.get_donor_name()}'.")
+        self.logger.info(
+            f"Committing shard split '{split_opts.migration_id}' on replica set "
+            f"'{split_opts.get_donor_name()}'."
+        )
 
         try:
-            with_naive_retry(lambda: donor_client.admin.command({
-                "commitShardSplit": 1, "migrationId": split_opts.get_migration_id_as_binary(),
-                "tenantIds": split_opts.tenant_ids, "recipientTagName":
-                    split_opts.recipient_tag_name, "recipientSetName": split_opts.recipient_set_name
-            }))
+            with_naive_retry(
+                lambda: donor_client.admin.command(
+                    {
+                        "commitShardSplit": 1,
+                        "migrationId": split_opts.get_migration_id_as_binary(),
+                        "tenantIds": split_opts.tenant_ids,
+                        "recipientTagName": split_opts.recipient_tag_name,
+                        "recipientSetName": split_opts.recipient_set_name,
+                    }
+                )
+            )
 
-            self.logger.info(f"Shard split '{split_opts.migration_id}' on replica set "
-                             f"'{split_opts.get_donor_name()}' has committed.")
+            self.logger.info(
+                f"Shard split '{split_opts.migration_id}' on replica set "
+                f"'{split_opts.get_donor_name()}' has committed."
+            )
             return True
         except OperationFailure as err:
             if not self._is_fail_point_err(err):
@@ -425,26 +455,36 @@ class _ShardSplitThread(threading.Thread):
 
             self.logger.info(
                 f"Shard split '{split_opts.migration_id}' on replica set "
-                f"'{split_opts.get_donor_name()}' has aborted due to failpoint: {str(err)}.")
+                f"'{split_opts.get_donor_name()}' has aborted due to failpoint: {str(err)}."
+            )
             return False
 
     def _forget_shard_split(self, donor_client, split_opts):
-        self.logger.info(f"Forgetting shard split '{split_opts.migration_id}' on replica set "
-                         f"'{split_opts.get_donor_name()}'.")
+        self.logger.info(
+            f"Forgetting shard split '{split_opts.migration_id}' on replica set "
+            f"'{split_opts.get_donor_name()}'."
+        )
 
         try:
-            with_naive_retry(lambda: donor_client.admin.command(
-                {"forgetShardSplit": 1, "migrationId": split_opts.get_migration_id_as_binary()}))
+            with_naive_retry(
+                lambda: donor_client.admin.command(
+                    {"forgetShardSplit": 1, "migrationId": split_opts.get_migration_id_as_binary()}
+                )
+            )
             return
         except OperationFailure as err:
             if err.code != self.NO_SUCH_MIGRATION_ERR_CODE:
                 raise
 
-            self.logger.info(f"Could not find shard split '{split_opts.migration_id}' on "
-                             f"replica set '{split_opts.get_donor_name()}': {str(err)}.")
+            self.logger.info(
+                f"Could not find shard split '{split_opts.migration_id}' on "
+                f"replica set '{split_opts.get_donor_name()}': {str(err)}."
+            )
         except PyMongoError:
-            self.logger.exception(f"Error forgetting shard split '{split_opts.migration_id}' on "
-                                  f"replica set '{split_opts.get_donor_name()}'.")
+            self.logger.exception(
+                f"Error forgetting shard split '{split_opts.migration_id}' on "
+                f"replica set '{split_opts.get_donor_name()}'."
+            )
             raise
 
     def _wait_for_garbage_collection(self, split_opts, is_committed):  # noqa: D205,D400
@@ -454,20 +494,25 @@ class _ShardSplitThread(threading.Thread):
             self.logger.info(
                 f"Waiting for shard split '{split_opts.migration_id}' to be garbage collected "
                 f"on donor node on port {node.port} of replica set "
-                f"'{rs_name}'.")
+                f"'{rs_name}'."
+            )
 
             node_client = self._create_client(node)
 
             start = time.monotonic()
             while time.monotonic() - start < timeout_secs:
-                res = with_naive_retry(lambda: node_client.config.command(
-                    {"count": "shardSplitDonors", "query": {"tenantIds": split_opts.tenant_ids}}))
+                res = with_naive_retry(
+                    lambda: node_client.config.command(
+                        {"count": "shardSplitDonors", "query": {"tenantIds": split_opts.tenant_ids}}
+                    )
+                )
                 if res["n"] == 0:
                     return
                 time.sleep(self.POLL_INTERVAL_SECS)
 
             raise errors.ServerFailure(
-                f"Timed out while waiting for garbage collection for node on port {node.port}.")
+                f"Timed out while waiting for garbage collection for node on port {node.port}."
+            )
 
         try:
             donor_nodes = split_opts.get_donor_nodes()
@@ -486,14 +531,16 @@ class _ShardSplitThread(threading.Thread):
             self.logger.exception(
                 f"Error waiting for shard split '{split_opts.migration_id}' from donor replica set "
                 f"'{split_opts.get_donor_name()} to recipient replica set "
-                f"'{split_opts.recipient_set_name}' to be garbage collected.")
+                f"'{split_opts.recipient_set_name}' to be garbage collected."
+            )
             raise
 
     def _wait_for_reroute_or_test_completion(self, donor_client, split_opts):
         self.logger.info(
             f"Waiting for shard split '{split_opts.migration_id}' on replica set "
             f"'{split_opts.get_donor_name()}' to reroute at least one conflicting command. "
-            f"Stop waiting when the test finishes.")
+            f"Stop waiting when the test finishes."
+        )
 
         start_time = time.monotonic()
         while not self.__lifecycle.is_test_finished():
@@ -502,14 +549,16 @@ class _ShardSplitThread(threading.Thread):
                 # and aren't concerned about conflicts because we don't expect the tenant migration
                 # and shard split hooks to run concurrently.
                 doc = donor_client["testTenantMigration"]["rerouted"].find_one(
-                    {"_id": split_opts.get_migration_id_as_binary()})
+                    {"_id": split_opts.get_migration_id_as_binary()}
+                )
                 if doc is not None:
                     return
             except PyMongoError:
                 end_time = time.monotonic()
                 self.logger.exception(
                     f"Error running find command on replica set '{split_opts.get_donor_name()}' "
-                    f"after waiting for reroute for {(end_time - start_time) * 1000} ms")
+                    f"after waiting for reroute for {(end_time - start_time) * 1000} ms"
+                )
                 raise
 
             time.sleep(self.POLL_INTERVAL_SECS)

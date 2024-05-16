@@ -1,4 +1,5 @@
 """Test hook to run change streams in the background."""
+
 import random
 import threading
 import time
@@ -29,8 +30,11 @@ class RunChangeStreamsInBackground(interface.Hook):
 
     def before_suite(self, test_report):
         """Print the log message."""
-        self.logger.info("Opening and closing change streams every %d tests. The seed is %d.",
-                         self._every_n_tests, config.RANDOM_SEED)
+        self.logger.info(
+            "Opening and closing change streams every %d tests. The seed is %d.",
+            self._every_n_tests,
+            config.RANDOM_SEED,
+        )
 
     def after_suite(self, test_report, teardown_flag=None):
         """Stop the background thread."""
@@ -79,12 +83,13 @@ class _ChangeStreamsThread(threading.Thread):
                 try:
                     change = stream.try_next()
                 except Exception as err:  # pylint: disable=broad-except
-                    self.logger.error("Failed to get the next change from the change stream: %s",
-                                      err)
+                    self.logger.error(
+                        "Failed to get the next change from the change stream: %s", err
+                    )
                 else:
                     if change is None:
                         # Since there are tests that are running under 1s, we are sleeping here for just 10ms
-                        time.sleep(.01)
+                        time.sleep(0.01)
                     else:
                         self.logger.info("Change document: %r", change)
                         self._changes_num += 1

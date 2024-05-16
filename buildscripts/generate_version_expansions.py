@@ -46,7 +46,7 @@ def generate_version_expansions():
         with open(VERSION_JSON, "r") as fh:
             data = fh.read()
             version_data = json.loads(data)
-        version_line = version_data['version']
+        version_line = version_data["version"]
         version_parts = match_verstr(version_line)
         if not version_parts:
             raise ValueError("Unable to parse version.json")
@@ -83,7 +83,7 @@ def match_verstr(verstr):
     r2.3.4-git234, r2.3.4-rc0-234-githash If the version is invalid (i.e.
     doesn't start with "2.3.4" or "2.3.4-rc0", this will return False.
     """
-    res = re.match(r'^r?(?:\d+\.\d+\.\d+(?:-rc\d+|-alpha\d+)?)(-.*)?', verstr)
+    res = re.match(r"^r?(?:\d+\.\d+\.\d+(?:-rc\d+|-alpha\d+)?)(-.*)?", verstr)
     if not res:
         return False
     return res.groups()

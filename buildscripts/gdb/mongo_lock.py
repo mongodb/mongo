@@ -9,11 +9,17 @@ import gdb.printing
 
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-    from buildscripts.gdb.mongo import get_current_thread_name, get_thread_id, lookup_type, RegisterMongoCommand
+    from buildscripts.gdb.mongo import (
+        get_current_thread_name,
+        get_thread_id,
+        lookup_type,
+        RegisterMongoCommand,
+    )
 
 if sys.version_info[0] < 3:
     raise gdb.GdbError(
-        "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2")
+        "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2"
+    )
 
 
 class NonExecutingThread(object):
@@ -119,7 +125,7 @@ class Graph(object):
     def add_node(self, node):
         """Add node to graph."""
         if not self.find_node(node):
-            self.nodes[node.key()] = {'node': node, 'next_nodes': []}
+            self.nodes[node.key()] = {"node": node, "next_nodes": []}
 
     def find_node(self, node):
         """Find node in graph."""
@@ -131,8 +137,8 @@ class Graph(object):
         """Find from node."""
         for node_key in self.nodes:
             node = self.nodes[node_key]
-            for next_node in node['next_nodes']:
-                if next_node == from_node['node'].key():
+            for next_node in node["next_nodes"]:
+                if next_node == from_node["node"].key():
                     return node
         return None
 
@@ -142,7 +148,7 @@ class Graph(object):
         temp_nodes = {}
         for node_key in self.nodes:
             node = self.nodes[node_key]
-            if node['next_nodes'] or self.find_from_node(node) is not None:
+            if node["next_nodes"] or self.find_from_node(node) is not None:
                 temp_nodes[node_key] = self.nodes[node_key]
         self.nodes = temp_nodes
 
@@ -158,44 +164,50 @@ class Graph(object):
             self.add_node(to_node)
             t_node = self.nodes[to_node.key()]
 
-        for n_node in f_node['next_nodes']:
+        for n_node in f_node["next_nodes"]:
             if n_node == to_node.key():
                 return
-        self.nodes[from_node.key()]['next_nodes'].append(to_node.key())
+        self.nodes[from_node.key()]["next_nodes"].append(to_node.key())
 
     def print(self):
         """Print graph."""
         for node_key in self.nodes:
-            print("Node", self.nodes[node_key]['node'])
-            for to_node in self.nodes[node_key]['next_nodes']:
-                print(" ->", self.nodes[to_node]['node'])
+            print("Node", self.nodes[node_key]["node"])
+            for to_node in self.nodes[node_key]["next_nodes"]:
+                print(" ->", self.nodes[to_node]["node"])
 
     def _get_node_escaped(self, node_key):
         """Return the name of the node with any double quotes escaped.
 
         The DOT language requires that literal double quotes be escaped using a backslash character.
         """
-        return str(self.nodes[node_key]['node']).replace('"', '\\"')
+        return str(self.nodes[node_key]["node"]).replace('"', '\\"')
 
     def to_graph(self, nodes=None, message=None):
         """Return the 'to_graph'."""
         sb = []
-        sb.append('# Legend:')
-        sb.append('#    Thread 1 -> Lock C (MODE_IX) indicates Thread 1 is waiting on Lock C and'
-                  ' Lock C is currently held in MODE_IX')
-        sb.append('#    Lock C (MODE_IX) -> Thread 2 indicates Lock C is held by Thread 2 in'
-                  ' MODE_IX')
+        sb.append("# Legend:")
+        sb.append(
+            "#    Thread 1 -> Lock C (MODE_IX) indicates Thread 1 is waiting on Lock C and"
+            " Lock C is currently held in MODE_IX"
+        )
+        sb.append(
+            "#    Lock C (MODE_IX) -> Thread 2 indicates Lock C is held by Thread 2 in" " MODE_IX"
+        )
         if message is not None:
             sb.append(message)
         sb.append('digraph "mongod+lock-status" {')
         # Draw the graph from left to right. There can be hundreds of threads blocked by the same
         # resource, but only a few resources involved in a deadlock, so we prefer a long graph
         # than a super wide one. Long resource / thread names would make a wide graph even wider.
-        sb.append('    rankdir=LR;')
+        sb.append("    rankdir=LR;")
         for node_key in self.nodes:
-            for next_node_key in self.nodes[node_key]['next_nodes']:
-                sb.append('    "{}" -> "{}";'.format(
-                    self._get_node_escaped(node_key), self._get_node_escaped(next_node_key)))
+            for next_node_key in self.nodes[node_key]["next_nodes"]:
+                sb.append(
+                    '    "{}" -> "{}";'.format(
+                        self._get_node_escaped(node_key), self._get_node_escaped(next_node_key)
+                    )
+                )
         for node_key in self.nodes:
             color = ""
             if nodes and node_key in nodes:
@@ -215,10 +227,10 @@ class Graph(object):
             nodes_in_cycle = []
         nodes_visited.add(node_key)
         nodes_in_cycle.append(node_key)
-        for node in self.nodes[node_key]['next_nodes']:
+        for node in self.nodes[node_key]["next_nodes"]:
             if node in nodes_in_cycle:
                 # The graph cycle starts at the index of node in nodes_in_cycle.
-                return nodes_in_cycle[nodes_in_cycle.index(node):]
+                return nodes_in_cycle[nodes_in_cycle.index(node) :]
             if node not in nodes_visited:
                 dfs_nodes = self.depth_first_search(node, nodes_visited, nodes_in_cycle)
                 if dfs_nodes:
@@ -235,13 +247,13 @@ class Graph(object):
             if node not in nodes_visited:
                 cycle_path = self.depth_first_search(node, nodes_visited)
                 if cycle_path:
-                    return [str(self.nodes[node_key]['node']) for node_key in cycle_path]
+                    return [str(self.nodes[node_key]["node"]) for node_key in cycle_path]
         return None
 
 
 def find_thread(thread_dict, search_thread_id):
     """Find thread."""
-    for (_, thread) in list(thread_dict.items()):
+    for _, thread in list(thread_dict.items()):
         if thread.thread_id == search_thread_id:
             return thread
     return None
@@ -280,7 +292,7 @@ def find_frame(function_name_pattern):
 
 def find_mutex_holder(graph, thread_dict, show):
     """Find mutex holder."""
-    frame = find_frame(r'std::mutex::lock\(\)')
+    frame = find_frame(r"std::mutex::lock\(\)")
     if frame is None:
         return
 
@@ -295,9 +307,12 @@ def find_mutex_holder(graph, thread_dict, show):
     # At time thread_dict was initialized, the mutex holder may not have been found.
     # Use the thread LWP as a substitute for showing output or generating the graph.
     if mutex_holder_lwpid not in thread_dict:
-        print("Warning: Mutex at {} held by thread with LWP {}"
-              " not found in thread_dict. Using LWP to track thread.".format(
-                  mutex_value, mutex_holder_lwpid))
+        print(
+            "Warning: Mutex at {} held by thread with LWP {}"
+            " not found in thread_dict. Using LWP to track thread.".format(
+                mutex_value, mutex_holder_lwpid
+            )
+        )
         mutex_holder = Thread(mutex_holder_lwpid, mutex_holder_lwpid, '"[unknown]"')
     else:
         mutex_holder = thread_dict[mutex_holder_lwpid]
@@ -305,8 +320,9 @@ def find_mutex_holder(graph, thread_dict, show):
     (_, mutex_waiter_lwpid, _) = gdb.selected_thread().ptid
     mutex_waiter = thread_dict[mutex_waiter_lwpid]
     if show:
-        print("Mutex at {} held by {} waited on by {}".format(mutex_value, mutex_holder,
-                                                              mutex_waiter))
+        print(
+            "Mutex at {} held by {} waited on by {}".format(mutex_value, mutex_holder, mutex_waiter)
+        )
     if graph:
         graph.add_edge(mutex_waiter, Lock(int(mutex_value), "Mutex"))
         graph.add_edge(Lock(int(mutex_value), "Mutex"), mutex_holder)
@@ -314,7 +330,7 @@ def find_mutex_holder(graph, thread_dict, show):
 
 def find_lock_manager_holders(graph, thread_dict, show):
     """Find lock manager holders."""
-    frame = find_frame(r'mongo::Locker::')
+    frame = find_frame(r"mongo::Locker::")
     if not frame:
         return
 
@@ -343,8 +359,11 @@ def find_lock_manager_holders(graph, thread_dict, show):
         else:
             lock_holder = find_thread(thread_dict, lock_holder_id)
         if show:
-            print("MongoDB Lock at {} held by {} ({}) waited on by {}".format(
-                lock_head, lock_holder, lock_request["mode"], lock_waiter))
+            print(
+                "MongoDB Lock at {} held by {} ({}) waited on by {}".format(
+                    lock_head, lock_holder, lock_request["mode"], lock_waiter
+                )
+            )
         if graph:
             graph.add_edge(lock_waiter, Lock(int(lock_head), lock_request["mode"]))
             graph.add_edge(Lock(int(lock_head), lock_request["mode"]), lock_holder)
@@ -440,7 +459,7 @@ class MongoDBWaitsForGraph(gdb.Command):
                 cycle_message = "# Cycle detected in the graph nodes %s" % cycle_nodes
             if graph_file:
                 print("Saving digraph to %s" % graph_file)
-                with open(graph_file, 'w') as fh:
+                with open(graph_file, "w") as fh:
                     fh.write(graph.to_graph(nodes=cycle_nodes, message=cycle_message))
                 print(cycle_message.split("# ")[1])
             else:

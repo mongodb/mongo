@@ -38,7 +38,8 @@ class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):  # pylin
 
         if self.IS_BACKGROUND is None:
             raise ValueError(
-                "Concrete Hook subclasses must override the IS_BACKGROUND class property")
+                "Concrete Hook subclasses must override the IS_BACKGROUND class property"
+            )
 
     def before_suite(self, test_report):
         """Test runner calls this exactly once before they start running the suite."""

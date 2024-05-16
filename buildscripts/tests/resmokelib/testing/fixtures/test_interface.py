@@ -1,4 +1,5 @@
 """Unit tests for the resmokelib.testing.fixtures.interface module."""
+
 import logging
 import unittest
 

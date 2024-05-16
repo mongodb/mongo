@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate a task to run core analysis on uploaded core dumps in evergreen."""
+
 import argparse
 import os
 import pathlib
@@ -29,14 +30,17 @@ MULTIVERSION_BIN_DIR = os.path.normpath("/data/multiversion")
 
 def get_generated_task_name(current_task_name: str, execution: str) -> str:
     # random string so we do not define the same task name for multiple variants which causes issues
-    random_string = ''.join(
-        random.choices(string.ascii_uppercase + string.digits + string.ascii_lowercase,
-                       k=RANDOM_STRING_LENGTH))
+    random_string = "".join(
+        random.choices(
+            string.ascii_uppercase + string.digits + string.ascii_lowercase, k=RANDOM_STRING_LENGTH
+        )
+    )
     return f"{GENERATED_TASK_PREFIX}_{current_task_name}{execution}_{random_string}"
 
 
-def get_core_analyzer_commands(task_id: str, execution: str,
-                               core_analyzer_results_url: str) -> List[FunctionCall]:
+def get_core_analyzer_commands(
+    task_id: str, execution: str, core_analyzer_results_url: str
+) -> List[FunctionCall]:
     """Return setup commands."""
     return [
         FunctionCall("f_expansions_write"),
@@ -49,7 +53,8 @@ def get_core_analyzer_commands(task_id: str, execution: str,
         FunctionCall("upload pip requirements"),
         FunctionCall("configure evergreen api credentials"),
         BuiltInCommand(
-            "subprocess.exec", {
+            "subprocess.exec",
+            {
                 "binary": "bash",
                 "args": [
                     "src/evergreen/run_python_script.sh",
@@ -64,15 +69,19 @@ def get_core_analyzer_commands(task_id: str, execution: str,
                     "OTEL_PARENT_ID": "${otel_parent_id}",
                     "OTEL_COLLECTOR_DIR": "../build/OTelTraces/",
                 },
-            }),
+            },
+        ),
         BuiltInCommand(
-            "archive.targz_pack", {
+            "archive.targz_pack",
+            {
                 "target": "src/mongo-coreanalysis.tgz",
                 "source_dir": "src",
                 "include": ["./core-analyzer/analysis/**"],
-            }),
+            },
+        ),
         BuiltInCommand(
-            "s3.put", {
+            "s3.put",
+            {
                 "aws_key": "${aws_key}",
                 "aws_secret": "${aws_secret}",
                 "local_file": "src/mongo-coreanalysis.tgz",
@@ -81,22 +90,24 @@ def get_core_analyzer_commands(task_id: str, execution: str,
                 "permissions": "public-read",
                 "content_type": "application/gzip",
                 "display_name": "Core Analyzer Output - Execution ${execution}",
-            }),
+            },
+        ),
         # We delete the core dumps after we are done processing them so they are not
         # reuploaded to s3 in the generated task's post task block
         FunctionCall(
-            "remove files", {
-                "files":
-                    " ".join([
-                        "src/core-analyzer/core-dumps/*.core", "src/core-analyzer/core-dumps/*.mdmp"
-                    ])
-            }),
+            "remove files",
+            {
+                "files": " ".join(
+                    ["src/core-analyzer/core-dumps/*.core", "src/core-analyzer/core-dumps/*.mdmp"]
+                )
+            },
+        ),
     ]
 
 
-def generate(expansions_file: str = "../expansions.yml",
-             output_file: str = "hang_analyzer_task.json") -> None:
-
+def generate(
+    expansions_file: str = "../expansions.yml", output_file: str = "hang_analyzer_task.json"
+) -> None:
     if not sys.platform.startswith("linux"):
         print("This platform is not supported, skipping core analysis task generation.")
         return
@@ -119,13 +130,16 @@ def generate(expansions_file: str = "../expansions.yml",
     except RuntimeError:
         print(
             "WARNING: Cannot generate core analysis because the evergreen api file could not be found.",
-            file=sys.stderr)
+            file=sys.stderr,
+        )
         print(
             "This is probably not an error, if you want core analysis to run on this task make sure",
-            file=sys.stderr)
+            file=sys.stderr,
+        )
         print(
             "the evergreen function 'configure evergreen api credentials' is called before this task",
-            file=sys.stderr)
+            file=sys.stderr,
+        )
         return
 
     task_info = evg_api.task_by_id(task_id)
@@ -190,13 +204,18 @@ def generate(expansions_file: str = "../expansions.yml",
     write_file(output_file, shrub_project.json())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--expansions-file", help="Location of evergreen expansions file.",
-                        default="../expansions.yml")
-    parser.add_argument("--output-file",
-                        help="Name of output file to write the generated task config to.",
-                        default="hang_analyzer_task.json")
+    parser.add_argument(
+        "--expansions-file",
+        help="Location of evergreen expansions file.",
+        default="../expansions.yml",
+    )
+    parser.add_argument(
+        "--output-file",
+        help="Name of output file to write the generated task config to.",
+        default="hang_analyzer_task.json",
+    )
     args = parser.parse_args()
     expansions_file = args.expansions_file
     output_file = args.output_file

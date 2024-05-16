@@ -12,21 +12,26 @@ sys.path.append(mongo_path)
 # pylint: disable=wrong-import-position
 from buildscripts.util.read_config import read_config_file
 from buildscripts.resmokelib.utils import evergreen_conn
-from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import GENERATED_TASK_PREFIX, RANDOM_STRING_LENGTH
+from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import (
+    GENERATED_TASK_PREFIX,
+    RANDOM_STRING_LENGTH,
+)
 
 
-def matches_generated_task_pattern(original_task_name: str,
-                                   generated_task_name: str) -> Optional[str]:
+def matches_generated_task_pattern(
+    original_task_name: str, generated_task_name: str
+) -> Optional[str]:
     regex = re.match(
         f"{GENERATED_TASK_PREFIX}_{original_task_name}([0-9]{{1,2}})_[a-zA-Z0-9]{{{RANDOM_STRING_LENGTH}}}",
-        generated_task_name)
+        generated_task_name,
+    )
 
     return regex.group(1) if regex else None
 
 
-def maybe_attach_core_analyzer_task(expansions_file: str, conditional_file: str,
-                                    artifact_output_file: str, results_output_file: str):
-
+def maybe_attach_core_analyzer_task(
+    expansions_file: str, conditional_file: str, artifact_output_file: str, results_output_file: str
+):
     # This script runs for every task even if the task is passing.
     # This statement checks to see if the file that was made to generate a core analyzer task
     # lives on the machine or not.
@@ -75,13 +80,19 @@ def maybe_attach_core_analyzer_task(expansions_file: str, conditional_file: str,
     # Check if the core analysis is from the current execution or a previous one
     gen_from_cur_execution = current_task.execution == int(matching_execution)
 
-    artifact_name = "Core Analyzer Task" if gen_from_cur_execution else f"Core Analyzer Task (Previous Execution #{matching_execution})"
+    artifact_name = (
+        "Core Analyzer Task"
+        if gen_from_cur_execution
+        else f"Core Analyzer Task (Previous Execution #{matching_execution})"
+    )
 
-    core_analyzer_task_artifact = [{
-        "name": artifact_name,
-        "link": core_analysis_task_url,
-        "visibility": "public",
-    }]
+    core_analyzer_task_artifact = [
+        {
+            "name": artifact_name,
+            "link": core_analysis_task_url,
+            "visibility": "public",
+        }
+    ]
 
     with open(artifact_output_file, "w") as file:
         json.dump(core_analyzer_task_artifact, file, indent=4)
@@ -103,27 +114,34 @@ def maybe_attach_core_analyzer_task(expansions_file: str, conditional_file: str,
         file.write("\n".join(file_lines))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--expansions-file", "-e",
-                        help="Expansions file to read task info and aws credentials from.",
-                        default="../expansions.yml")
+    parser.add_argument(
+        "--expansions-file",
+        "-e",
+        help="Expansions file to read task info and aws credentials from.",
+        default="../expansions.yml",
+    )
     parser.add_argument(
         "--conditional-file",
         help="Path to file. If this file exists, that means task generation was successful.",
-        default="hang_analyzer_task.json")
+        default="hang_analyzer_task.json",
+    )
     parser.add_argument(
         "--artifact-output-file",
         help="Name of output file to write artifact of the core analyzer task url to.",
-        default="core_analyzer_artifact.json")
+        default="core_analyzer_artifact.json",
+    )
     parser.add_argument(
         "--results-output-file",
         help="Name of output file to write the temperary core analyzer result text.",
-        default="core_analyzer_results.txt")
+        default="core_analyzer_results.txt",
+    )
     args = parser.parse_args()
     expansions_file = args.expansions_file
     conditional_file = args.conditional_file
     artifact_output_file = args.artifact_output_file
     results_output_file = args.results_output_file
-    maybe_attach_core_analyzer_task(expansions_file, conditional_file, artifact_output_file,
-                                    results_output_file)
+    maybe_attach_core_analyzer_task(
+        expansions_file, conditional_file, artifact_output_file, results_output_file
+    )

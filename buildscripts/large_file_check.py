@@ -23,18 +23,21 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(mongo_dir)
 
 from buildscripts.linter import git
-from buildscripts.patch_builds.change_data import (RevisionMap, find_changed_files_in_repos,
-                                                   generate_revision_map)
+from buildscripts.patch_builds.change_data import (
+    RevisionMap,
+    find_changed_files_in_repos,
+    generate_revision_map,
+)
 
 
 # Console renderer for structured logging
 def renderer(_logger: logging.Logger, _name: str, eventdict: Dict[Any, Any]) -> str:
-    if 'files' in eventdict:
+    if "files" in eventdict:
         return "{event}: {files}".format(**eventdict)
-    if 'repo' in eventdict:
+    if "repo" in eventdict:
         return "{event}: {repo}".format(**eventdict)
-    if 'file' in eventdict:
-        if 'bytes' in eventdict:
+    if "file" in eventdict:
+        if "bytes" in eventdict:
             return "{event}: {file} {bytes} bytes".format(**eventdict)
         return "{event}: {file}".format(**eventdict)
     return "{event}".format(**eventdict)
@@ -60,7 +63,8 @@ def _get_repos_and_revisions() -> Tuple[List[Repo], RevisionMap]:
     modules = git.get_module_paths()
 
     repos = [
-        Repo(path) for path in modules
+        Repo(path)
+        for path in modules
         # Exclude enterprise module; it's in the "modules" folder but does not correspond to a repo
         if "src/mongo/db/modules/enterprise" not in path
     ]
@@ -117,22 +121,29 @@ def main(*args: str) -> int:
     """Execute Main entry point."""
 
     parser = argparse.ArgumentParser(
-        description='Git commit large file checker.', epilog=textwrap.dedent('''\
+        description="Git commit large file checker.",
+        epilog=textwrap.dedent("""\
         NOTE: The --exclude argument is an exact match but can accept glob patterns. If * is used,
         it matches *all* characters, including path separators.
-    '''))
+    """),
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
-    parser.add_argument("--exclude", help="Paths to exclude from check", nargs="+",
-                        type=pathlib.Path, required=False)
+    parser.add_argument(
+        "--exclude",
+        help="Paths to exclude from check",
+        nargs="+",
+        type=pathlib.Path,
+        required=False,
+    )
     parser.add_argument("--size-mb", help="File size limit (MiB)", type=int, default="10")
     parsed_args = parser.parse_args(args[1:])
 
     if parsed_args.verbose:
         logging.basicConfig(level=logging.DEBUG)
-        structlog.stdlib.filter_by_level(LOGGER, 'debug', {})
+        structlog.stdlib.filter_by_level(LOGGER, "debug", {})
     else:
         logging.basicConfig(level=logging.INFO)
-        structlog.stdlib.filter_by_level(LOGGER, 'info', {})
+        structlog.stdlib.filter_by_level(LOGGER, "info", {})
 
     large_files = diff_file_sizes(parsed_args.size_mb * 1024 * 1024, parsed_args.exclude)
     if len(large_files) == 0:
@@ -143,5 +154,5 @@ def main(*args: str) -> int:
     return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main(*sys.argv))

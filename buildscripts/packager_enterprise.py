@@ -106,14 +106,26 @@ class EnterpriseDistro(packager.Distro):
 
         if re.search("^(debian|ubuntu)", self.dname):
             return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/%s/binary-%s/" % (
-                self.dname, self.repo_os_version(build_os), repo_directory, self.repo_component(),
-                self.archname(arch))
+                self.dname,
+                self.repo_os_version(build_os),
+                repo_directory,
+                self.repo_component(),
+                self.archname(arch),
+            )
         elif re.search("(redhat|fedora|centos|amazon)", self.dname):
             return "repo/yum/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (
-                self.dname, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+                self.dname,
+                self.repo_os_version(build_os),
+                repo_directory,
+                self.archname(arch),
+            )
         elif re.search("(suse)", self.dname):
             return "repo/zypper/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (
-                self.dname, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+                self.dname,
+                self.repo_os_version(build_os),
+                repo_directory,
+                self.archname(arch),
+            )
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -124,28 +136,28 @@ class EnterpriseDistro(packager.Distro):
         the others are delegated to the super class.
         """
         if arch == "ppc64le":
-            if self.dname == 'ubuntu':
+            if self.dname == "ubuntu":
                 return ["ubuntu1604", "ubuntu1804"]
-            if self.dname == 'redhat':
+            if self.dname == "redhat":
                 return ["rhel71", "rhel81"]
             return []
         if arch == "s390x":
-            if self.dname == 'redhat':
+            if self.dname == "redhat":
                 return ["rhel67", "rhel72", "rhel83"]
-            if self.dname == 'suse':
+            if self.dname == "suse":
                 return ["suse11", "suse12", "suse15"]
-            if self.dname == 'ubuntu':
+            if self.dname == "ubuntu":
                 return ["ubuntu1604", "ubuntu1804"]
             return []
         if arch == "arm64":
-            if self.dname == 'ubuntu':
+            if self.dname == "ubuntu":
                 return ["ubuntu1804", "ubuntu2004", "ubuntu2204", "ubuntu2404"]
         if arch == "aarch64":
-            if self.dname == 'redhat':
+            if self.dname == "redhat":
                 return ["rhel82", "rhel88", "rhel90", "rhel93"]
-            if self.dname == 'amazon2':
+            if self.dname == "amazon2":
                 return ["amazon2"]
-            if self.dname == 'amazon2023':
+            if self.dname == "amazon2023":
                 return ["amazon2023"]
             return []
 
@@ -179,11 +191,9 @@ def main():
         made_pkg = False
         # Build a package for each distro/spec/arch tuple, and
         # accumulate the repository-layout directories.
-        for (distro, arch) in packager.crossproduct(distros, args.arches):
-
+        for distro, arch in packager.crossproduct(distros, args.arches):
             for build_os in distro.build_os(arch):
                 if build_os in args.distros or not args.distros:
-
                     filename = tarfile(build_os, arch, spec)
                     packager.ensure_dir(filename)
                     shutil.copyfile(args.tarball, filename)
@@ -213,8 +223,14 @@ def setupdir(distro, build_os, arch, spec):
     # the following format string is unclear, an example setupdir
     # would be dst/x86_64/debian-sysvinit/wheezy/mongodb-org-unstable/
     # or dst/x86_64/redhat/rhel57/mongodb-org-unstable/
-    return "dst/%s/%s/%s/%s%s-%s/" % (arch, distro.name(), build_os, distro.pkgbase(),
-                                      spec.suffix(), spec.pversion(distro))
+    return "dst/%s/%s/%s/%s%s-%s/" % (
+        arch,
+        distro.name(),
+        build_os,
+        distro.pkgbase(),
+        spec.suffix(),
+        spec.pversion(distro),
+    )
 
 
 def unpack_binaries_into(build_os, arch, spec, where):
@@ -228,8 +244,14 @@ def unpack_binaries_into(build_os, arch, spec, where):
     os.chdir(where)
     try:
         packager.sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
-        release_dir = glob('mongodb-linux-*')[0]
-        for releasefile in "bin", "LICENSE-Enterprise.txt", "README", "THIRD-PARTY-NOTICES", "MPL-2":
+        release_dir = glob("mongodb-linux-*")[0]
+        for releasefile in (
+            "bin",
+            "LICENSE-Enterprise.txt",
+            "README",
+            "THIRD-PARTY-NOTICES",
+            "MPL-2",
+        ):
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
     except Exception:
@@ -261,19 +283,23 @@ def make_package(distro, build_os, arch, spec, srcdir):
         git_repo.git.add(all=True)
         # only commit changes if there are any
         if len(git_repo.index.diff("HEAD")) != 0:
-            with git_repo.git.custom_environment(GIT_COMMITTER_NAME="Evergreen",
-                                                 GIT_COMMITTER_EMAIL="evergreen@mongodb.com"):
+            with git_repo.git.custom_environment(
+                GIT_COMMITTER_NAME="Evergreen", GIT_COMMITTER_EMAIL="evergreen@mongodb.com"
+            ):
                 git_repo.git.commit("--author='Evergreen <>'", "-m", "temp commit")
 
         # original command to preserve functionality
         # FIXME: make consistent with the rest of the code when we have more packaging testing
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
         print("Copying packaging files from specified gitspec:", spec.metadata_gitspec())
-        packager.sysassert([
-            "sh", "-c",
-            "(cd \"%s\" && git archive %s %s/ ) | (cd \"%s\" && tar xvf -)" %
-            (srcdir, spec.metadata_gitspec(), pkgdir, sdir)
-        ])
+        packager.sysassert(
+            [
+                "sh",
+                "-c",
+                '(cd "%s" && git archive %s %s/ ) | (cd "%s" && tar xvf -)'
+                % (srcdir, spec.metadata_gitspec(), pkgdir, sdir),
+            ]
+        )
 
         # reset branch to original state
         print("Resetting branch to original state")
@@ -306,7 +332,7 @@ def make_deb_repo(repo, distro, build_os):
     try:
         dirs = {
             os.path.dirname(deb)[2:]
-            for deb in packager.backtick(["find", ".", "-name", "*.deb"]).decode('utf-8').split()
+            for deb in packager.backtick(["find", ".", "-name", "*.deb"]).decode("utf-8").split()
         }
         for directory in dirs:
             st = packager.backtick(["dpkg-scanpackages", directory, "/dev/null"])
@@ -336,8 +362,8 @@ Description: MongoDB packages
     os.chdir(repo + "../../")
     s2 = packager.backtick(["apt-ftparchive", "release", "."])
     try:
-        with open("Release", 'wb') as fh:
-            fh.write(s1.encode('utf-8'))
+        with open("Release", "wb") as fh:
+            fh.write(s1.encode("utf-8"))
             fh.write(s2)
     finally:
         os.chdir(oldpwd)

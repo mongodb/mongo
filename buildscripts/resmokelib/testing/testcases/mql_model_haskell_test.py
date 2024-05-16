@@ -14,19 +14,25 @@ class MqlModelHaskellTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "mql_model_haskell_test"
 
-    def __init__(self, logger: logging.Logger, json_filenames: list[str],
-                 mql_executable: Optional[str] = None):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        json_filenames: list[str],
+        mql_executable: Optional[str] = None,
+    ):
         """Initialize the MqlModelHaskellTestCase with the executable to run."""
 
         assert len(json_filenames) == 1
-        interface.ProcessTestCase.__init__(self, logger, "MQL Haskell Model test",
-                                           json_filenames[0])
+        interface.ProcessTestCase.__init__(
+            self, logger, "MQL Haskell Model test", json_filenames[0]
+        )
 
         self.json_test_file = json_filenames[0]
 
         # Determine the top level directory where we start a search for a mql binary
         self.top_level_dirname = os.path.join(
-            os.path.normpath(self.json_test_file).split(os.sep)[0], "")
+            os.path.normpath(self.json_test_file).split(os.sep)[0], ""
+        )
 
         # Our haskell cabal build produces binaries in an unique directory
         # .../dist-sandbox-<some hex hash>/...
@@ -39,7 +45,13 @@ class MqlModelHaskellTestCase(interface.ProcessTestCase):
         self.program_executable = execs[0]
 
     def _make_process(self):
-        return core.programs.make_process(self.logger, [
-            self.program_executable, "--test", self.json_test_file, "--prefix",
-            self.top_level_dirname
-        ])
+        return core.programs.make_process(
+            self.logger,
+            [
+                self.program_executable,
+                "--test",
+                self.json_test_file,
+                "--prefix",
+                self.top_level_dirname,
+            ],
+        )

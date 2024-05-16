@@ -3,6 +3,7 @@
 A hook to enable change stream in the replica set and the sharded cluster in the multi-tenant
 environment.
 """
+
 from time import sleep
 from bson.objectid import ObjectId
 from pymongo import MongoClient
@@ -52,6 +53,7 @@ class EnableChangeStream(interface.Hook):
     def _call_js_hook(self, fixture, test, test_report):
         shell_options = {"global_vars": {"TestData": {"tenantId": str(self._tenant_id)}}}
         hook_test_case = jsfile.DynamicJSTestCase.create_before_test(
-            test.logger, test, self, self._js_filename, shell_options)
+            test.logger, test, self, self._js_filename, shell_options
+        )
         hook_test_case.configure(fixture)
         hook_test_case.run_dynamic_test(test_report)

@@ -15,7 +15,12 @@ if ROOT_PATH not in sys.path:
 from src.third_party.immer.dist.tools.gdb_pretty_printers.printers import ListIter as ImmerListIter  # pylint: disable=wrong-import-position
 
 if not gdb:
-    from buildscripts.gdb.mongo import get_boost_optional, lookup_type, get_decorable_info, get_object_decoration
+    from buildscripts.gdb.mongo import (
+        get_boost_optional,
+        lookup_type,
+        get_decorable_info,
+        get_object_decoration,
+    )
     from buildscripts.gdb.optimizer_printers import register_optimizer_printers
 
 try:
@@ -30,7 +35,8 @@ except ImportError as err:
 
 if sys.version_info[0] < 3:
     raise gdb.GdbError(
-        "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2")
+        "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2"
+    )
 
 
 def get_unique_ptr_bytes(obj):
@@ -41,7 +47,7 @@ def get_unique_ptr_bytes(obj):
     mongo::Decorable<> types which store the decorations as a slab of memory with
     std::unique_ptr<unsigned char[]>. In all other cases get_unique_ptr() can be preferred.
     """
-    return obj.cast(gdb.lookup_type('std::_Head_base<0, unsigned char*, false>'))['_M_head_impl']
+    return obj.cast(gdb.lookup_type("std::_Head_base<0, unsigned char*, false>"))["_M_head_impl"]
 
 
 def get_unique_ptr(obj):
@@ -62,20 +68,20 @@ class StatusPrinter(object):
     @staticmethod
     def extract_error(val):
         """Extract the error object (if any) from a Status/StatusWith."""
-        error = val['_error']
-        if 'px' in error.type.iterkeys():
-            return error['px']
+        error = val["_error"]
+        if "px" in error.type.iterkeys():
+            return error["px"]
         return error
 
     @staticmethod
     def generate_error_details(error):
         """Generate a (code,reason) tuple from a Status/StatusWith error object."""
         info = error.dereference()
-        code = info['code']
+        code = info["code"]
         # Remove the mongo::ErrorCodes:: prefix. Does nothing if not a real ErrorCode.
-        code = str(code).split('::')[-1]
+        code = str(code).split("::")[-1]
 
-        return (code, info['reason'])
+        return (code, info["reason"])
 
     def __init__(self, val):
         """Initialize StatusPrinter."""
@@ -85,8 +91,8 @@ class StatusPrinter(object):
         """Return status for printing."""
         error = StatusPrinter.extract_error(self.val)
         if not error:
-            return 'Status::OK()'
-        return 'Status(%s, %s)' % StatusPrinter.generate_error_details(error)
+            return "Status::OK()"
+        return "Status(%s, %s)" % StatusPrinter.generate_error_details(error)
 
 
 class StatusWithPrinter(object):
@@ -98,10 +104,10 @@ class StatusWithPrinter(object):
 
     def to_string(self):
         """Return status for printing."""
-        error = StatusPrinter.extract_error(self.val['_status'])
+        error = StatusPrinter.extract_error(self.val["_status"])
         if not error:
-            return 'StatusWith(OK, %s)' % (self.val['_t'])
-        return 'StatusWith(%s, %s)' % StatusPrinter.generate_error_details(error)
+            return "StatusWith(OK, %s)" % (self.val["_t"])
+        return "StatusWith(%s, %s)" % StatusPrinter.generate_error_details(error)
 
 
 class StringDataPrinter(object):
@@ -114,20 +120,20 @@ class StringDataPrinter(object):
     @staticmethod
     def display_hint():
         """Display hint."""
-        return 'string'
+        return "string"
 
     def to_string(self):
         """Return data for printing."""
         # As of SERVER-82604, StringData is based on std::string_view, so try with that first
-        sv = self.val['_sv']
+        sv = self.val["_sv"]
         if sv is not None:
             return sv
 
         # ... back-off to the legacy format otherwise
-        size = self.val['_size']
+        size = self.val["_size"]
         if size == -1:
-            return self.val['_data'].lazy_string()
-        return self.val['_data'].lazy_string(length=size)
+            return self.val["_data"].lazy_string()
+        return self.val["_data"].lazy_string(length=size)
 
 
 class BoostOptionalPrinter(object):
@@ -148,7 +154,7 @@ class BSONObjPrinter(object):
     def __init__(self, val):
         """Initialize BSONObjPrinter."""
         self.val = val
-        self.ptr = self.val['_objdata'].cast(lookup_type('void').pointer())
+        self.ptr = self.val["_objdata"].cast(lookup_type("void").pointer())
         self.is_valid = False
 
         # Handle the endianness of the BSON object size, which is represented as a 32-bit integer
@@ -159,7 +165,7 @@ class BSONObjPrinter(object):
             self.size = -1
             self.raw_memory = None
         else:
-            self.size = struct.unpack('<I', inferior.read_memory(self.ptr, 4))[0]
+            self.size = struct.unpack("<I", inferior.read_memory(self.ptr, 4))[0]
             self.raw_memory = bytes(memoryview(inferior.read_memory(self.ptr, self.size)))
             if bson:
                 self.is_valid = bson.is_valid(self.raw_memory)
@@ -167,7 +173,7 @@ class BSONObjPrinter(object):
     @staticmethod
     def display_hint():
         """Display hint."""
-        return 'map'
+        return "map"
 
     def children(self):
         """Children."""
@@ -180,8 +186,8 @@ class BSONObjPrinter(object):
         bsondoc = bson.decode(self.raw_memory, codec_options=options)
 
         for key, val in list(bsondoc.items()):
-            yield 'key', key
-            yield 'value', bson.json_util.dumps(val)
+            yield "key", key
+            yield "value", bson.json_util.dumps(val)
 
     def to_string(self):
         """Return BSONObj for printing."""
@@ -189,7 +195,7 @@ class BSONObjPrinter(object):
         if self.size == -1:
             return "BSONObj @ %s - optimized out" % (self.ptr)
 
-        ownership = "owned" if self.val['_ownedBuffer']['_buffer']['_holder']['px'] else "unowned"
+        ownership = "owned" if self.val["_ownedBuffer"]["_buffer"]["_holder"]["px"] else "unowned"
 
         size = self.size
         # Print an invalid BSONObj size in hex.
@@ -223,12 +229,14 @@ class OplogEntryPrinter(object):
 
     def to_string(self):
         """Return OplogEntry for printing."""
-        optime = self.val['_entry']['_opTimeBase']
-        optime_str = "ts(%s, %s)" % (optime['_timestamp']['secs'], optime['_timestamp']['i'])
+        optime = self.val["_entry"]["_opTimeBase"]
+        optime_str = "ts(%s, %s)" % (optime["_timestamp"]["secs"], optime["_timestamp"]["i"])
         return "OplogEntry(%s, %s, %s, %s)" % (
-            str(self.val['_entry']['_durableReplOperation']['_opType']).split('::')[-1],
-            str(self.val['_entry']['_commandType']).split('::')[-1],
-            self.val['_entry']['_durableReplOperation']['_nss'], optime_str)
+            str(self.val["_entry"]["_durableReplOperation"]["_opType"]).split("::")[-1],
+            str(self.val["_entry"]["_commandType"]).split("::")[-1],
+            self.val["_entry"]["_durableReplOperation"]["_nss"],
+            optime_str,
+        )
 
 
 class UUIDPrinter(object):
@@ -241,11 +249,11 @@ class UUIDPrinter(object):
     @staticmethod
     def display_hint():
         """Display hint."""
-        return 'string'
+        return "string"
 
     def to_string(self):
         """Return UUID for printing."""
-        raw_bytes = [self.val['_uuid']['_M_elems'][i] for i in range(16)]
+        raw_bytes = [self.val["_uuid"]["_M_elems"][i] for i in range(16)]
         uuid_hex_bytes = [hex(int(b))[2:].zfill(2) for b in raw_bytes]
         return str(uuid.UUID("".join(uuid_hex_bytes)))
 
@@ -260,11 +268,11 @@ class OIDPrinter(object):
     @staticmethod
     def display_hint():
         """Display hint."""
-        return 'string'
+        return "string"
 
     def to_string(self):
         """Return OID for printing."""
-        raw_bytes = [int(self.val['_data'][i]) for i in range(OBJECT_ID_WIDTH)]
+        raw_bytes = [int(self.val["_data"][i]) for i in range(OBJECT_ID_WIDTH)]
         oid_hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
         return "ObjectID('%s')" % "".join(oid_hex_bytes)
 
@@ -279,12 +287,12 @@ class RecordIdPrinter(object):
     @staticmethod
     def display_hint():
         """Display hint."""
-        return 'string'
+        return "string"
 
     ## Get the address at given offset of data as the selected pointer type
     def __get_data_address(self, ptr, offset):
         ptr_type = gdb.lookup_type(ptr).pointer()
-        return self.val['_data']['_M_elems'][offset].address.cast(ptr_type)
+        return self.val["_data"]["_M_elems"][offset].address.cast(ptr_type)
 
     def to_string(self):
         """Return RecordId for printing."""
@@ -293,26 +301,31 @@ class RecordIdPrinter(object):
             return "null RecordId"
         elif rid_format == 1:
             koffset = 8 - 1  ##  std::alignment_of_v<int64_t> - sizeof(Format); (see record_id.h)
-            rid_address = self.__get_data_address('int64_t', koffset)
+            rid_address = self.__get_data_address("int64_t", koffset)
             return "RecordId long: %d" % int(rid_address.dereference())
         elif rid_format == 2:
-            str_len = self.__get_data_address('int8_t', 0).dereference()
-            array_address = self.__get_data_address('int8_t', 1)
+            str_len = self.__get_data_address("int8_t", 0).dereference()
+            array_address = self.__get_data_address("int8_t", 1)
             raw_bytes = [array_address[i] for i in range(0, str_len)]
             hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
             return "RecordId small string %d hex bytes: %s" % (str_len, str("".join(hex_bytes)))
         elif rid_format == 3:
-            koffset = 8 - 1  ## std::alignment_of_v<ConstSharedBuffer> - sizeof(Format); (see record_id.h)
-            buffer = self.__get_data_address('mongo::ConstSharedBuffer', koffset).dereference()
-            holder_ptr = holder = buffer['_buffer']["_holder"]["px"]
+            koffset = (
+                8 - 1
+            )  ## std::alignment_of_v<ConstSharedBuffer> - sizeof(Format); (see record_id.h)
+            buffer = self.__get_data_address("mongo::ConstSharedBuffer", koffset).dereference()
+            holder_ptr = holder = buffer["_buffer"]["_holder"]["px"]
             holder = holder.dereference()
             str_len = int(holder["_capacity"])
             # Start of data is immediately after pointer for holder
             start_ptr = (holder_ptr + 1).dereference().cast(lookup_type("char")).address
             raw_bytes = [start_ptr[i] for i in range(0, str_len)]
             hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
-            return "RecordId big string %d hex bytes @ %s: %s" % (str_len, holder_ptr + 1,
-                                                                  str("".join(hex_bytes)))
+            return "RecordId big string %d hex bytes @ %s: %s" % (
+                str_len,
+                holder_ptr + 1,
+                str("".join(hex_bytes)),
+            )
         else:
             return "unknown RecordId format: %d" % rid_format
 
@@ -344,22 +357,22 @@ class DatabaseNamePrinter(object):
     @staticmethod
     def display_hint():
         """Display hint."""
-        return 'string'
+        return "string"
 
     def _get_storage_data(self):
         """Return the data pointer from the _data Storage class."""
-        data = self.val['_data']
-        footer = data['_footer']
+        data = self.val["_data"]
+        footer = data["_footer"]
         f_size = footer.type.sizeof
 
         # The last byte of _footer contain the flags (and the size when using small string).
-        flags = footer.cast(gdb.lookup_type('char').array(f_size))[f_size - 1]
+        flags = footer.cast(gdb.lookup_type("char").array(f_size))[f_size - 1]
 
-        data_ptr = data['_data']
+        data_ptr = data["_data"]
         if is_small_string(flags):
             return data_ptr.address, small_string_size(flags)
         else:
-            return data_ptr, data['_length']
+            return data_ptr, data["_length"]
 
     def _get_string(self, address, size):
         data = gdb.selected_inferior().read_memory(address, size).tobytes()
@@ -387,7 +400,7 @@ class DecorablePrinter(object):
     @staticmethod
     def display_hint():
         """Display hint."""
-        return 'map'
+        return "map"
 
     def to_string(self):
         """Return Decorable for printing."""
@@ -398,8 +411,8 @@ class DecorablePrinter(object):
         for index in range(self.count):
             try:
                 deco_type_name, obj, obj_addr = get_object_decoration(self.val, self.start, index)
-                yield ('key', "{}:{}:{}".format(index, obj_addr, deco_type_name))
-                yield ('value', obj)
+                yield ("key", "{}:{}:{}".format(index, obj_addr, deco_type_name))
+                yield ("value", obj)
             except Exception as err:
                 print("Failed to look up decoration type: " + deco_type_name + ": " + str(err))
 
@@ -454,8 +467,10 @@ class WtCursorPrinter(object):
         for field in self.val.type.fields():
             field_val = self.val[field.name]
             if field.name == "flags":
-                yield ("flags", "{} ({})".format(field_val,
-                                                 str(_get_flags(field_val, self.cursor_flags))))
+                yield (
+                    "flags",
+                    "{} ({})".format(field_val, str(_get_flags(field_val, self.cursor_flags))),
+                )
             else:
                 yield (field.name, field_val)
 
@@ -488,8 +503,10 @@ class WtSessionImplPrinter(object):
         for field in self.val.type.fields():
             field_val = self.val[field.name]
             if field.name == "flags":
-                yield ("flags", "{} ({})".format(field_val,
-                                                 str(_get_flags(field_val, self.session_flags))))
+                yield (
+                    "flags",
+                    "{} ({})".format(field_val, str(_get_flags(field_val, self.session_flags))),
+                )
             else:
                 yield (field.name, field_val)
 
@@ -522,8 +539,10 @@ class WtTxnPrinter(object):
         for field in self.val.type.fields():
             field_val = self.val[field.name]
             if field.name == "flags":
-                yield ("flags", "{} ({})".format(field_val,
-                                                 str(_get_flags(field_val, self.txn_flags))))
+                yield (
+                    "flags",
+                    "{} ({})".format(field_val, str(_get_flags(field_val, self.txn_flags))),
+                )
             else:
                 yield (field.name, field_val)
 
@@ -565,12 +584,15 @@ class AbslHashSetPrinterBase(object):
     @staticmethod
     def display_hint():
         """Display hint."""
-        return 'array'
+        return "array"
 
     def to_string(self):
         """Return absl::[node/flat]_hash_set for printing."""
         return "absl::%s_hash_set<%s> with %s elems " % (
-            self.to_str, self.val.type.template_argument(0), absl_container_size(self.val))
+            self.to_str,
+            self.val.type.template_argument(0),
+            absl_container_size(self.val),
+        )
 
 
 class AbslNodeHashSetPrinter(AbslHashSetPrinterBase):
@@ -614,13 +636,16 @@ class AbslHashMapPrinterBase(object):
     @staticmethod
     def display_hint():
         """Display hint."""
-        return 'map'
+        return "map"
 
     def to_string(self):
         """Return absl::[node/flat]_hash_map for printing."""
         return "absl::%s_hash_map<%s, %s> with %s elems " % (
-            self.to_str, self.val.type.template_argument(0), self.val.type.template_argument(1),
-            absl_container_size(self.val))
+            self.to_str,
+            self.val.type.template_argument(0),
+            self.val.type.template_argument(1),
+            absl_container_size(self.val),
+        )
 
 
 class AbslNodeHashMapPrinter(AbslHashMapPrinterBase):
@@ -633,8 +658,8 @@ class AbslNodeHashMapPrinter(AbslHashMapPrinterBase):
     def children(self):
         """Children."""
         for kvp in absl_get_nodes(self.val):
-            yield ('key', kvp['first'])
-            yield ('value', kvp['second'])
+            yield ("key", kvp["first"])
+            yield ("value", kvp["second"])
 
 
 class AbslFlatHashMapPrinter(AbslHashMapPrinterBase):
@@ -647,8 +672,8 @@ class AbslFlatHashMapPrinter(AbslHashMapPrinterBase):
     def children(self):
         """Children."""
         for kvp in absl_get_nodes(self.val):
-            yield ('key', kvp['key'])
-            yield ('value', kvp['value']["second"])
+            yield ("key", kvp["key"])
+            yield ("value", kvp["value"]["second"])
 
 
 class ImmutableMapIter(ImmerListIter):
@@ -660,7 +685,7 @@ class ImmutableMapIter(ImmerListIter):
 
     def __next__(self):
         if self.pair:
-            result = ('value', self.pair['second'])
+            result = ("value", self.pair["second"])
             self.pair = None
             self.i += 1
             return result
@@ -669,8 +694,9 @@ class ImmutableMapIter(ImmerListIter):
         if self.i < self.curr[1] or self.i >= self.curr[2]:
             self.curr = self.region()
         self.pair = self.curr[0][self.i - self.curr[1]].cast(
-            gdb.lookup_type(self.v.type.template_argument(0).name))
-        result = ('key', self.pair['first'])
+            gdb.lookup_type(self.v.type.template_argument(0).name)
+        )
+        result = ("key", self.pair["first"])
         return result
 
 
@@ -681,13 +707,13 @@ class ImmutableMapPrinter:
         self.val = val
 
     def to_string(self):
-        return '%s of size %d' % (self.val.type, int(self.val['_storage']['impl_']['size']))
+        return "%s of size %d" % (self.val.type, int(self.val["_storage"]["impl_"]["size"]))
 
     def children(self):
-        return ImmutableMapIter(self.val['_storage'])
+        return ImmutableMapIter(self.val["_storage"])
 
     def display_hint(self):
-        return 'map'
+        return "map"
 
 
 class ImmutableSetPrinter:
@@ -697,16 +723,16 @@ class ImmutableSetPrinter:
         self.val = val
 
     def to_string(self):
-        return '%s of size %d' % (self.val.type, int(self.val['_storage']['impl_']['size']))
+        return "%s of size %d" % (self.val.type, int(self.val["_storage"]["impl_"]["size"]))
 
     def children(self):
-        return ImmerListIter(self.val['_storage'])
+        return ImmerListIter(self.val["_storage"])
 
     def display_hint(self):
-        return 'array'
+        return "array"
 
 
-def find_match_brackets(search, opening='<', closing='>'):
+def find_match_brackets(search, opening="<", closing=">"):
     """Return the index of the closing bracket that matches the first opening bracket.
 
     Return -1 if no last matching bracket is found, i.e. not a template.
@@ -780,7 +806,7 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
             # Ignore subtypes of templated classes.
             # We do not want HashTable<T>::iterator as an example, just HashTable<T>
             if printer.is_template:
-                if (index + 1 == len(lookup_tag) and lookup_tag.find(printer.prefix) == 0):
+                if index + 1 == len(lookup_tag) and lookup_tag.find(printer.prefix) == 0:
                     return printer.printer(val)
             elif lookup_tag == printer.prefix:
                 return printer.printer(val)
@@ -794,13 +820,13 @@ class WtUpdateToBsonPrinter(object):
     def __init__(self, val):
         """Initializer."""
         self.val = val
-        self.size = self.val['size']
-        self.ptr = self.val['data']
+        self.size = self.val["size"]
+        self.ptr = self.val["data"]
 
     @staticmethod
     def display_hint():
         """DisplayHint."""
-        return 'map'
+        return "map"
 
     def to_string(self):
         """ToString."""
@@ -809,11 +835,11 @@ class WtUpdateToBsonPrinter(object):
             fld = self.val.type.fields()[idx]
             val = self.val[fld.name]
             elems.append(str((fld.name, str(val))))
-        return "WT_UPDATE: \n  %s" % ('\n  '.join(elems))
+        return "WT_UPDATE: \n  %s" % ("\n  ".join(elems))
 
     def children(self):
         """children."""
-        if self.val['type'] != 3:
+        if self.val["type"] != 3:
             # Type 3 is a "normal" update. Notably type 4 is a deletion and type 1 represents a
             # delta relative to the previous committed version in the update chain. Only attempt
             # to parse type 3 as bson.
@@ -827,8 +853,8 @@ class WtUpdateToBsonPrinter(object):
             return
 
         for key, value in list(bsonobj.items()):
-            yield 'key', key
-            yield 'value', bson.json_util.dumps(value)
+            yield "key", key
+            yield "value", bson.json_util.dumps(value)
 
 
 def make_inverse_enum_dict(enum_type_name):
@@ -841,7 +867,7 @@ def make_inverse_enum_dict(enum_type_name):
     enum_dict = gdb.types.make_enum_dict(lookup_type(enum_type_name))
     enum_inverse_dic = dict()
     for key, value in enum_dict.items():
-        enum_inverse_dic[int(value)] = key.split('::')[-1]  # take last element
+        enum_inverse_dic[int(value)] = key.split("::")[-1]  # take last element
     return enum_inverse_dic
 
 
@@ -884,19 +910,20 @@ class SbeCodeFragmentPrinter(object):
         # The instructions stream is stored using 'absl::InlinedVector<uint8_t, 16>' type, which can
         # either use an inline buffer or an allocated one. The choice of storage is decoded in the
         # last bit of the 'metadata_' field.
-        storage = self.val['_instrs']['storage_']
-        meta = storage['metadata_'].cast(lookup_type('size_t'))
-        self.is_inlined = (meta % 2 == 0)
-        self.size = (meta >> 1)
-        self.pdata = \
-            storage['data_']['inlined']['inlined_data'].cast(lookup_type('uint8_t').pointer()) \
-            if self.is_inlined \
-            else storage['data_']['allocated']['allocated_data']
+        storage = self.val["_instrs"]["storage_"]
+        meta = storage["metadata_"].cast(lookup_type("size_t"))
+        self.is_inlined = meta % 2 == 0
+        self.size = meta >> 1
+        self.pdata = (
+            storage["data_"]["inlined"]["inlined_data"].cast(lookup_type("uint8_t").pointer())
+            if self.is_inlined
+            else storage["data_"]["allocated"]["allocated_data"]
+        )
 
         # Precompute lookup tables for Instructions and Builtins.
-        self.optags_lookup = make_inverse_enum_dict('mongo::sbe::vm::Instruction::Tags')
-        self.builtins_lookup = make_inverse_enum_dict('mongo::sbe::vm::Builtin')
-        self.valuetags_lookup = make_inverse_enum_dict('mongo::sbe::value::TypeTags')
+        self.optags_lookup = make_inverse_enum_dict("mongo::sbe::vm::Instruction::Tags")
+        self.builtins_lookup = make_inverse_enum_dict("mongo::sbe::vm::Builtin")
+        self.valuetags_lookup = make_inverse_enum_dict("mongo::sbe::value::TypeTags")
 
     def to_string(self):
         """Return sbe::vm::CodeFragment for printing."""
@@ -904,26 +931,26 @@ class SbeCodeFragmentPrinter(object):
 
     def children(self):
         """children."""
-        yield '_instrs', '{... (to see raw output, run "disable pretty-printer")}'
-        yield '_fixUps', self.val['_fixUps']
-        yield '_stackSize', self.val['_stackSize']
+        yield "_instrs", '{... (to see raw output, run "disable pretty-printer")}'
+        yield "_fixUps", self.val["_fixUps"]
+        yield "_stackSize", self.val["_stackSize"]
 
-        yield 'inlined', self.is_inlined
-        yield 'instrs data at', '[{} - {}]'.format(hex(self.pdata), hex(self.pdata + self.size))
-        yield 'instrs total size', self.size
+        yield "inlined", self.is_inlined
+        yield "instrs data at", "[{} - {}]".format(hex(self.pdata), hex(self.pdata + self.size))
+        yield "instrs total size", self.size
 
         # Sizes for types we'll use when parsing the insructions stream.
-        int_size = lookup_type('int').sizeof
-        ptr_size = lookup_type('void').pointer().sizeof
-        tag_size = lookup_type('mongo::sbe::value::TypeTags').sizeof
-        value_size = lookup_type('mongo::sbe::value::Value').sizeof
-        uint8_size = lookup_type('uint8_t').sizeof
-        uint32_size = lookup_type('uint32_t').sizeof
-        uint64_size = lookup_type('uint64_t').sizeof
-        builtin_size = lookup_type('mongo::sbe::vm::Builtin').sizeof
-        time_unit_size = lookup_type('mongo::TimeUnit').sizeof
-        timezone_size = lookup_type('mongo::TimeZone').sizeof
-        day_of_week_size = lookup_type('mongo::DayOfWeek').sizeof
+        int_size = lookup_type("int").sizeof
+        ptr_size = lookup_type("void").pointer().sizeof
+        tag_size = lookup_type("mongo::sbe::value::TypeTags").sizeof
+        value_size = lookup_type("mongo::sbe::value::Value").sizeof
+        uint8_size = lookup_type("uint8_t").sizeof
+        uint32_size = lookup_type("uint32_t").sizeof
+        uint64_size = lookup_type("uint64_t").sizeof
+        builtin_size = lookup_type("mongo::sbe::vm::Builtin").sizeof
+        time_unit_size = lookup_type("mongo::TimeUnit").sizeof
+        timezone_size = lookup_type("mongo::TimeZone").sizeof
+        day_of_week_size = lookup_type("mongo::DayOfWeek").sizeof
 
         cur_op = self.pdata
         end_op = self.pdata + self.size
@@ -934,7 +961,7 @@ class SbeCodeFragmentPrinter(object):
             op_tag = read_as_integer(op_addr, 1)
 
             if not op_tag in self.optags_lookup:
-                yield hex(op_addr), 'unknown op tag: {}'.format(op_tag)
+                yield hex(op_addr), "unknown op tag: {}".format(op_tag)
                 error = True
                 break
             op_name = self.optags_lookup[op_tag]
@@ -943,98 +970,109 @@ class SbeCodeFragmentPrinter(object):
             instr_count += 1
 
             # Some instructions have extra arguments, embedded into the ops stream.
-            args = ''
-            if op_name in ['pushLocalVal', 'pushMoveLocalVal', 'pushLocalLambda']:
-                args = 'arg: ' + str(read_as_integer(cur_op, int_size))
+            args = ""
+            if op_name in ["pushLocalVal", "pushMoveLocalVal", "pushLocalLambda"]:
+                args = "arg: " + str(read_as_integer(cur_op, int_size))
                 cur_op += int_size
-            elif op_name in ['jmp', 'jmpTrue', 'jmpFalse', 'jmpNothing', 'jmpNotNothing']:
+            elif op_name in ["jmp", "jmpTrue", "jmpFalse", "jmpNothing", "jmpNotNothing"]:
                 offset = read_as_integer_signed(cur_op, int_size)
                 cur_op += int_size
-                args = 'offset: ' + str(offset) + ', target: ' + hex(cur_op + offset)
-            elif op_name in ['pushConstVal', 'getFieldImm']:
+                args = "offset: " + str(offset) + ", target: " + hex(cur_op + offset)
+            elif op_name in ["pushConstVal", "getFieldImm"]:
                 tag = read_as_integer(cur_op, tag_size)
-                args = 'tag: ' + self.valuetags_lookup.get(tag, "unknown") + \
-                    ', value: ' + hex(read_as_integer(cur_op + tag_size, value_size))
-                cur_op += (tag_size + value_size)
-            elif op_name in ['pushAccessVal', 'pushMoveVal']:
-                args = 'accessor: ' + hex(read_as_integer(cur_op, ptr_size))
+                args = (
+                    "tag: "
+                    + self.valuetags_lookup.get(tag, "unknown")
+                    + ", value: "
+                    + hex(read_as_integer(cur_op + tag_size, value_size))
+                )
+                cur_op += tag_size + value_size
+            elif op_name in ["pushAccessVal", "pushMoveVal"]:
+                args = "accessor: " + hex(read_as_integer(cur_op, ptr_size))
                 cur_op += ptr_size
-            elif op_name in ['numConvert']:
-                args = 'convert to: ' + \
-                    self.valuetags_lookup.get(read_as_integer(cur_op, tag_size), "unknown")
+            elif op_name in ["numConvert"]:
+                args = "convert to: " + self.valuetags_lookup.get(
+                    read_as_integer(cur_op, tag_size), "unknown"
+                )
                 cur_op += tag_size
-            elif op_name in ['typeMatchImm']:
-                args = 'mask: ' + hex(read_as_integer(cur_op, uint32_size))
+            elif op_name in ["typeMatchImm"]:
+                args = "mask: " + hex(read_as_integer(cur_op, uint32_size))
                 cur_op += uint32_size
-            elif op_name in ['function', 'functionSmall']:
-                arity_size = \
-                    lookup_type('mongo::sbe::vm::ArityType').sizeof \
-                    if op_name == 'function' \
-                    else lookup_type('mongo::sbe::vm::SmallArityType').sizeof
+            elif op_name in ["function", "functionSmall"]:
+                arity_size = (
+                    lookup_type("mongo::sbe::vm::ArityType").sizeof
+                    if op_name == "function"
+                    else lookup_type("mongo::sbe::vm::SmallArityType").sizeof
+                )
                 builtin_id = read_as_integer(cur_op, builtin_size)
-                args = 'builtin: ' + self.builtins_lookup.get(builtin_id, "unknown")
-                args += ' arity: ' + str(read_as_integer(cur_op + builtin_size, arity_size))
-                cur_op += (builtin_size + arity_size)
-            elif op_name in ['fillEmptyImm']:
-                args = 'Instruction::Constants: ' + str(read_as_integer(cur_op, uint8_size))
+                args = "builtin: " + self.builtins_lookup.get(builtin_id, "unknown")
+                args += " arity: " + str(read_as_integer(cur_op + builtin_size, arity_size))
+                cur_op += builtin_size + arity_size
+            elif op_name in ["fillEmptyImm"]:
+                args = "Instruction::Constants: " + str(read_as_integer(cur_op, uint8_size))
                 cur_op += uint8_size
-            elif op_name in ['traverseFImm', 'traversePImm']:
+            elif op_name in ["traverseFImm", "traversePImm"]:
                 const_enum = read_as_integer(cur_op, uint8_size)
                 cur_op += uint8_size
-                args = \
-                    'Instruction::Constants: ' + str(const_enum) + \
-                    ", offset: " + str(read_as_integer_signed(cur_op, int_size))
+                args = (
+                    "Instruction::Constants: "
+                    + str(const_enum)
+                    + ", offset: "
+                    + str(read_as_integer_signed(cur_op, int_size))
+                )
                 cur_op += int_size
-            elif op_name in ['dateTruncImm']:
+            elif op_name in ["dateTruncImm"]:
                 unit = read_as_integer(cur_op, time_unit_size)
                 cur_op += time_unit_size
-                args = 'unit: ' + str(unit)
+                args = "unit: " + str(unit)
                 bin_size = read_as_integer(cur_op, uint64_size)
                 cur_op += uint64_size
-                args += ', binSize: ' + str(bin_size)
+                args += ", binSize: " + str(bin_size)
                 timezone = read_as_integer(cur_op, timezone_size)
                 cur_op += timezone_size
-                args += ', timezone: ' + hex(timezone)
+                args += ", timezone: " + hex(timezone)
                 day_of_week = read_as_integer(cur_op, day_of_week_size)
                 cur_op += day_of_week_size
-                args += ', dayOfWeek: ' + str(day_of_week)
-            elif op_name in ['traverseCsiCellValues', 'traverseCsiCellTypes']:
+                args += ", dayOfWeek: " + str(day_of_week)
+            elif op_name in ["traverseCsiCellValues", "traverseCsiCellTypes"]:
                 offset = read_as_integer_signed(cur_op, int_size)
                 cur_op += int_size
-                args = 'lambda at: ' + hex(cur_op + offset)
+                args = "lambda at: " + hex(cur_op + offset)
 
-            yield hex(op_addr), '{} ({})'.format(op_name, args)
+            yield hex(op_addr), "{} ({})".format(op_name, args)
 
-        yield 'instructions count', \
-            instr_count if not error else '? (successfully parsed {})'.format(instr_count)
+        yield (
+            "instructions count",
+            instr_count if not error else "? (successfully parsed {})".format(instr_count),
+        )
 
 
 def build_pretty_printer():
     """Build a pretty printer."""
     pp = MongoPrettyPrinterCollection()
-    pp.add('BSONObj', 'mongo::BSONObj', False, BSONObjPrinter)
-    pp.add('DatabaseName', 'mongo::DatabaseName', False, DatabaseNamePrinter)
-    pp.add('NamespaceString', 'mongo::NamespaceString', False, DatabaseNamePrinter)
-    pp.add('Decorable', 'mongo::Decorable', True, DecorablePrinter)
-    pp.add('Status', 'mongo::Status', False, StatusPrinter)
-    pp.add('StatusWith', 'mongo::StatusWith', True, StatusWithPrinter)
-    pp.add('StringData', 'mongo::StringData', False, StringDataPrinter)
-    pp.add('node_hash_map', 'absl::lts_20230802::node_hash_map', True, AbslNodeHashMapPrinter)
-    pp.add('node_hash_set', 'absl::lts_20230802::node_hash_set', True, AbslNodeHashSetPrinter)
-    pp.add('flat_hash_map', 'absl::lts_20230802::flat_hash_map', True, AbslFlatHashMapPrinter)
-    pp.add('flat_hash_set', 'absl::lts_20230802::flat_hash_set', True, AbslFlatHashSetPrinter)
-    pp.add('RecordId', 'mongo::RecordId', False, RecordIdPrinter)
-    pp.add('UUID', 'mongo::UUID', False, UUIDPrinter)
-    pp.add('OID', 'mongo::OID', False, OIDPrinter)
-    pp.add('OplogEntry', 'mongo::repl::OplogEntry', False, OplogEntryPrinter)
-    pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
-    pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
-    pp.add('__wt_txn', '__wt_txn', False, WtTxnPrinter)
-    pp.add('__wt_update', '__wt_update', False, WtUpdateToBsonPrinter)
-    pp.add('CodeFragment', 'mongo::sbe::vm::CodeFragment', False, SbeCodeFragmentPrinter)
-    pp.add('boost::optional', 'boost::optional', True, BoostOptionalPrinter)
-    pp.add('immutable::map', 'mongo::immutable::map', True, ImmutableMapPrinter)
-    pp.add('immutable::set', 'mongo::immutable::set', True, ImmutableSetPrinter)
+    pp.add("BSONObj", "mongo::BSONObj", False, BSONObjPrinter)
+    pp.add("DatabaseName", "mongo::DatabaseName", False, DatabaseNamePrinter)
+    pp.add("NamespaceString", "mongo::NamespaceString", False, DatabaseNamePrinter)
+    pp.add("Decorable", "mongo::Decorable", True, DecorablePrinter)
+    pp.add("Status", "mongo::Status", False, StatusPrinter)
+    pp.add("StatusWith", "mongo::StatusWith", True, StatusWithPrinter)
+    pp.add("StringData", "mongo::StringData", False, StringDataPrinter)
+    pp.add("node_hash_map", "absl::lts_20230802::node_hash_map", True, AbslNodeHashMapPrinter)
+    pp.add("node_hash_set", "absl::lts_20230802::node_hash_set", True, AbslNodeHashSetPrinter)
+    pp.add("flat_hash_map", "absl::lts_20230802::flat_hash_map", True, AbslFlatHashMapPrinter)
+    pp.add("flat_hash_set", "absl::lts_20230802::flat_hash_set", True, AbslFlatHashSetPrinter)
+    pp.add("RecordId", "mongo::RecordId", False, RecordIdPrinter)
+    pp.add("UUID", "mongo::UUID", False, UUIDPrinter)
+    pp.add("OID", "mongo::OID", False, OIDPrinter)
+    pp.add("OplogEntry", "mongo::repl::OplogEntry", False, OplogEntryPrinter)
+    pp.add("__wt_cursor", "__wt_cursor", False, WtCursorPrinter)
+    pp.add("__wt_session_impl", "__wt_session_impl", False, WtSessionImplPrinter)
+    pp.add("__wt_txn", "__wt_txn", False, WtTxnPrinter)
+    pp.add("__wt_update", "__wt_update", False, WtUpdateToBsonPrinter)
+    pp.add("CodeFragment", "mongo::sbe::vm::CodeFragment", False, SbeCodeFragmentPrinter)
+    pp.add("boost::optional", "boost::optional", True, BoostOptionalPrinter)
+    pp.add("immutable::map", "mongo::immutable::map", True, ImmutableMapPrinter)
+    pp.add("immutable::set", "mongo::immutable::set", True, ImmutableSetPrinter)
 
     # Optimizer/ABT related pretty printers that can be used only with a running process.
     register_optimizer_printers(pp)

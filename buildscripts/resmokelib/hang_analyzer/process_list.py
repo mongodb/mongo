@@ -45,8 +45,9 @@ def get_processes(process_ids, interesting_processes, process_match, logger):
         running_pids = {pidv for (pname, pidv) in all_processes}
         missing_pids = set(process_ids) - running_pids
         if missing_pids:
-            logger.warning("The following requested process ids are not running %s",
-                           list(missing_pids))
+            logger.warning(
+                "The following requested process ids are not running %s", list(missing_pids)
+            )
 
     processes_to_keep = []
     for process in all_processes:
@@ -61,8 +62,11 @@ def get_processes(process_ids, interesting_processes, process_match, logger):
 
         # if we don't have a list of pids, make sure the process matches
         # the list of interesting processes
-        if not process_ids and interesting_processes and not _pname_match(
-                process_match, process.name, interesting_processes):
+        if (
+            not process_ids
+            and interesting_processes
+            and not _pname_match(process_match, process.name, interesting_processes)
+        ):
             continue
 
         processes_to_keep.append(process)
@@ -133,7 +137,7 @@ class _DarwinProcessList(_ProcessList):
     @staticmethod
     def __find_ps():
         """Find ps."""
-        return find_program('ps', ['/bin'])
+        return find_program("ps", ["/bin"])
 
     def dump_processes(self, logger):
         """Get list of [Pid, Process Name]."""
@@ -144,7 +148,7 @@ class _DarwinProcessList(_ProcessList):
         ret = callo([ps, "-axco", "pid,comm"], logger)
 
         buff = io.StringIO(ret)
-        csv_reader = csv.reader(buff, delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace=True)
+        csv_reader = csv.reader(buff, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace=True)
 
         return [[int(row[0]), row[1]] for row in csv_reader if row[0] != "PID"]
 
@@ -155,7 +159,7 @@ class _LinuxProcessList(_ProcessList):
     @staticmethod
     def __find_ps():
         """Find ps."""
-        return find_program('ps', ['/bin', '/usr/bin'])
+        return find_program("ps", ["/bin", "/usr/bin"])
 
     def dump_processes(self, logger):
         """Get list of [Pid, Process Name]."""
@@ -168,7 +172,7 @@ class _LinuxProcessList(_ProcessList):
         ret = callo([ps, "-eo", "pid,args"], logger)
 
         buff = io.StringIO(ret)
-        csv_reader = csv.reader(buff, delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace=True)
+        csv_reader = csv.reader(buff, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace=True)
 
         return [[int(row[0]), os.path.split(row[1])[1]] for row in csv_reader if row[0] != "PID"]
 
@@ -177,6 +181,6 @@ def _pname_match(match_type, pname, interesting_processes):
     """Return True if the pname matches an interesting_processes."""
     pname = os.path.splitext(pname)[0]
     for ip in interesting_processes:
-        if match_type == 'exact' and pname == ip or match_type == 'contains' and ip in pname:
+        if match_type == "exact" and pname == ip or match_type == "contains" and ip in pname:
             return True
     return False

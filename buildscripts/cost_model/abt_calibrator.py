@@ -36,7 +36,7 @@ from database_instance import DatabaseInstance
 from cost_estimator import estimate
 import experiment as exp
 
-__all__ = ['calibrate']
+__all__ = ["calibrate"]
 
 
 async def calibrate(config: AbtCalibratorConfig, database: DatabaseInstance):
@@ -54,18 +54,19 @@ async def calibrate(config: AbtCalibratorConfig, database: DatabaseInstance):
     return result
 
 
-def calibrate_node(abt_df: pd.DataFrame, config: AbtCalibratorConfig,
-                   node_config: AbtNodeCalibrationConfig):
+def calibrate_node(
+    abt_df: pd.DataFrame, config: AbtCalibratorConfig, node_config: AbtNodeCalibrationConfig
+):
     abt_node_df = abt_df[abt_df.abt_type == node_config.type]
     if node_config.filter_function is not None:
         abt_node_df = node_config.filter_function(abt_node_df)
 
     # pylint: disable=invalid-name
     if node_config.variables_override is None:
-        variables = ['n_processed']
+        variables = ["n_processed"]
     else:
         variables = node_config.variables_override
-    y = abt_node_df['execution_time']
+    y = abt_node_df["execution_time"]
     X = abt_node_df[variables]
 
     X = sm.add_constant(X)

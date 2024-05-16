@@ -29,7 +29,7 @@ root.setLevel(logging.DEBUG)
 
 handler = logging.StreamHandler(sys.stdout)
 handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('[%(asctime)s]%(levelname)s:%(message)s')
+formatter = logging.Formatter("[%(asctime)s]%(levelname)s:%(message)s")
 handler.setFormatter(formatter)
 root.addHandler(handler)
 
@@ -51,115 +51,196 @@ PACKAGE_MANAGER_COMMANDS = {
 # Lookup table used when building and running containers
 # os_name, Optional[(base_image, package_manager, frozenset(base_packages), python_command)]
 OS_DOCKER_LOOKUP = {
-    'amazon': None,
-    'amzn64': None,
-    'amazon2': ('amazonlinux:2', "yum",
-                frozenset(["python", "python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
-                "python3"),
-    'amazon2023': ('amazonlinux:2023', "yum",
-                   frozenset(
-                       ["python", "python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
-                   "python3"),
-    'debian10': ('debian:10-slim', "apt",
-                 frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps",
-                            "file"]), "python3"),
-    'debian11': ('debian:11-slim', "apt",
-                 frozenset([
-                     "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
-                     "file"
-                 ]), "python3"),
-    'debian12': ('debian:12-slim', "apt",
-                 frozenset([
-                     "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
-                     "file"
-                 ]), "python3"),
-    'debian71': ('debian:7-slim', "apt",
-                 frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps",
-                            "file"]), "python3"),
-    'debian81': ('debian:8-slim', "apt",
-                 frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps",
-                            "file"]), "python3"),
-    'debian92': ('debian:9-slim', "apt",
-                 frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps",
-                            "file"]), "python3"),
-    'linux_i686': None,
-    'linux_x86_64': None,
-    'macos': None,
-    'osx': None,
-    'osx-ssl': None,
-    'rhel55': None,
-    'rhel57': None,
-    'rhel62': None,
-    'rhel70': ('centos:7', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel71': ('centos:7', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel72': ('centos:7', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel79': ('centos:7', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel80': ('almalinux:8', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel81': ('almalinux:8', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel82': ('almalinux:8', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel83': ('almalinux:8', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel88': ('almalinux:8', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel90': ('almalinux:9', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel93': ('almalinux:9', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'sunos5': None,
-    'suse11': None,
-    'suse12': None,
-    'suse15': ('registry.suse.com/suse/sle15:latest', "zypper",
-               frozenset(["python3", "wget", "pkg-config", "systemd", "procps", "file"]),
-               "python3"),
+    "amazon": None,
+    "amzn64": None,
+    "amazon2": (
+        "amazonlinux:2",
+        "yum",
+        frozenset(["python", "python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "amazon2023": (
+        "amazonlinux:2023",
+        "yum",
+        frozenset(["python", "python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "debian10": (
+        "debian:10-slim",
+        "apt",
+        frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "debian11": (
+        "debian:11-slim",
+        "apt",
+        frozenset(
+            ["python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps", "file"]
+        ),
+        "python3",
+    ),
+    "debian12": (
+        "debian:12-slim",
+        "apt",
+        frozenset(
+            ["python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps", "file"]
+        ),
+        "python3",
+    ),
+    "debian71": (
+        "debian:7-slim",
+        "apt",
+        frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "debian81": (
+        "debian:8-slim",
+        "apt",
+        frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "debian92": (
+        "debian:9-slim",
+        "apt",
+        frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "linux_i686": None,
+    "linux_x86_64": None,
+    "macos": None,
+    "osx": None,
+    "osx-ssl": None,
+    "rhel55": None,
+    "rhel57": None,
+    "rhel62": None,
+    "rhel70": (
+        "centos:7",
+        "yum",
+        frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "/opt/rh/rh-python38/root/usr/bin/python3",
+    ),
+    "rhel71": (
+        "centos:7",
+        "yum",
+        frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "/opt/rh/rh-python38/root/usr/bin/python3",
+    ),
+    "rhel72": (
+        "centos:7",
+        "yum",
+        frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "/opt/rh/rh-python38/root/usr/bin/python3",
+    ),
+    "rhel79": (
+        "centos:7",
+        "yum",
+        frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "/opt/rh/rh-python38/root/usr/bin/python3",
+    ),
+    "rhel80": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel81": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel82": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel83": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel88": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel90": (
+        "almalinux:9",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel93": (
+        "almalinux:9",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "sunos5": None,
+    "suse11": None,
+    "suse12": None,
+    "suse15": (
+        "registry.suse.com/suse/sle15:latest",
+        "zypper",
+        frozenset(["python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
     # Has the same error as above
-    'ubuntu1204': None,
-    'ubuntu1404': None,
-    'ubuntu1604': ('ubuntu:16.04', "apt",
-                   frozenset([
-                       "apt-utils", "python", "python3", "wget", "pkg-config", "systemd", "procps",
-                       "file"
-                   ]), "python3"),
-    'ubuntu1804': ('ubuntu:18.04', "apt",
-                   frozenset(
-                       ["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
-                   "python3"),
-    'ubuntu2004': ('ubuntu:20.04', "apt",
-                   frozenset([
-                       "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
-                       "file"
-                   ]), "python3"),
-    'ubuntu2204': ('ubuntu:22.04', "apt",
-                   frozenset([
-                       "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
-                       "file"
-                   ]), "python3"),
-    'ubuntu2404': ('ubuntu:24.04', "apt",
-                   frozenset([
-                       "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
-                       "file"
-                   ]), "python3"),
-    'windows': None,
-    'windows_i686': None,
-    'windows_x86_64': None,
-    'windows_x86_64-2008plus': None,
-    'windows_x86_64-2008plus-ssl': None,
-    'windows_x86_64-2012plus': None,
+    "ubuntu1204": None,
+    "ubuntu1404": None,
+    "ubuntu1604": (
+        "ubuntu:16.04",
+        "apt",
+        frozenset(
+            ["apt-utils", "python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]
+        ),
+        "python3",
+    ),
+    "ubuntu1804": (
+        "ubuntu:18.04",
+        "apt",
+        frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "ubuntu2004": (
+        "ubuntu:20.04",
+        "apt",
+        frozenset(
+            ["python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps", "file"]
+        ),
+        "python3",
+    ),
+    "ubuntu2204": (
+        "ubuntu:22.04",
+        "apt",
+        frozenset(
+            ["python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps", "file"]
+        ),
+        "python3",
+    ),
+    "ubuntu2404": (
+        "ubuntu:24.04",
+        "apt",
+        frozenset(
+            ["python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps", "file"]
+        ),
+        "python3",
+    ),
+    "windows": None,
+    "windows_i686": None,
+    "windows_x86_64": None,
+    "windows_x86_64-2008plus": None,
+    "windows_x86_64-2008plus-ssl": None,
+    "windows_x86_64-2012plus": None,
 }
 
 # These versions are marked "current" but in fact are EOL
 VERSIONS_TO_SKIP: Set[str] = set(
-    ['3.0.15', '3.2.22', '3.4.24', '3.6.23', '4.0.28', '4.2.24', '4.2.25', '4.4.29', '6.3.2'])
+    ["3.0.15", "3.2.22", "3.4.24", "3.6.23", "4.0.28", "4.2.24", "4.2.25", "4.4.29", "6.3.2"]
+)
 DISABLED_TESTS: Set[Tuple[str, str]] = set()
 
 
@@ -207,8 +288,9 @@ def get_image(test: Test, client: DockerClient) -> Image:
     tries = 1
     while True:
         try:
-            logging.info("Pulling base image for %s: %s, try %s", test.os_name, test.base_image,
-                         tries)
+            logging.info(
+                "Pulling base image for %s: %s, try %s", test.os_name, test.base_image, tries
+            )
             base_image = client.images.pull(test.base_image)
         except docker.errors.ImageNotFound as exc:
             if tries >= 5:
@@ -221,7 +303,7 @@ def get_image(test: Test, client: DockerClient) -> Image:
             time.sleep(1)
 
 
-def join_commands(commands: List[str], sep: str = ' && ') -> str:
+def join_commands(commands: List[str], sep: str = " && ") -> str:
     return sep.join(commands)
 
 
@@ -234,8 +316,14 @@ def run_test_with_timeout(test: Test, client: DockerClient, timeout: int) -> Res
         except futures.TimeoutError:
             end_time = time.time()
             logging.debug("Test %s timed out", test)
-            result = Result(status="fail", test_file=test.name(), start=start_time,
-                            log_raw="test timed out", end=end_time, exit_code=1)
+            result = Result(
+                status="fail",
+                test_file=test.name(),
+                start=start_time,
+                log_raw="test timed out",
+                end=end_time,
+                exit_code=1,
+            )
     return result
 
 
@@ -250,8 +338,8 @@ def run_test(test: Test, client: DockerClient) -> Result:
     log_external_path = Path.joinpath(test_external_root, log_name)
     commands: List[str] = ["export PYTHONIOENCODING=UTF-8"]
 
-    if test.os_name.startswith('rhel'):
-        if test.os_name.startswith('rhel7'):
+    if test.os_name.startswith("rhel"):
+        if test.os_name.startswith("rhel7"):
             # RHEL 7 needs the SCL installed for Python 3
             commands += [
                 "yum -y install centos-release-scl",
@@ -262,7 +350,7 @@ def run_test(test: Test, client: DockerClient) -> Result:
             "yum -y install yum-utils epel-release",
             "yum-config-manager --enable epel",
         ]
-    if test.os_name.startswith('debian92'):
+    if test.os_name.startswith("debian92"):
         # Adapted from https://stackoverflow.com/questions/76094428/debian-stretch-repositories-404-not-found
         # Debian92 renamed its repos to archive
         # The first two sed commands are to replace debian92's sources list to archive repo
@@ -278,60 +366,66 @@ def run_test(test: Test, client: DockerClient) -> Result:
         test.install_command.format(" ".join(test.base_packages)),
     ]
 
-    if test.python_command != 'python3':
+    if test.python_command != "python3":
         commands.append(f"ln -s {test.python_command} /usr/bin/python3")
 
     os.makedirs(log_external_path.parent, exist_ok=True)
     commands.append(
         f"python3 /mnt/package_test/package_test_internal.py {log_docker_path} {' '.join(test.packages_urls)}"
     )
-    logging.debug("Attempting to run the following docker commands:\n\t%s",
-                  join_commands(commands, sep='\n\t'))
+    logging.debug(
+        "Attempting to run the following docker commands:\n\t%s",
+        join_commands(commands, sep="\n\t"),
+    )
 
     image: Image | None = None
     container: Container | None = None
     try:
         image = get_image(test, client)
-        container = client.containers.run(image, command=f"bash -c \"{join_commands(commands)}\"",
-                                          auto_remove=True, detach=True,
-                                          volumes=[f'{test_external_root}:{test_docker_root}'])
+        container = client.containers.run(
+            image,
+            command=f'bash -c "{join_commands(commands)}"',
+            auto_remove=True,
+            detach=True,
+            volumes=[f"{test_external_root}:{test_docker_root}"],
+        )
         for log in container.logs(stream=True):
-            result["log_raw"] += log.decode('UTF-8')
+            result["log_raw"] += log.decode("UTF-8")
             # This is pretty verbose, lets run this way for a while and we can delete this if it ends up being too much
-            logging.debug(log.decode('UTF-8').strip())
+            logging.debug(log.decode("UTF-8").strip())
         exit_code = container.wait()
-        result["exit_code"] = exit_code['StatusCode']
+        result["exit_code"] = exit_code["StatusCode"]
     except docker.errors.APIError as exc:
         traceback.print_exception(type(exc), exc, exc.__traceback__)
         logging.error("Failed to start test")
         result["end"] = time.time()
-        result['status'] = 'fail'
+        result["status"] = "fail"
         result["exit_code"] = 1
         return result
 
     try:
-        with open(log_external_path, 'r') as log_raw:
+        with open(log_external_path, "r") as log_raw:
             result["log_raw"] += log_raw.read()
     except OSError as oserror:
         logging.error("Failed to open %s with error %s", log_external_path, oserror)
 
-    if exit_code['StatusCode'] != 0:
+    if exit_code["StatusCode"] != 0:
         logging.error("Failed test %s with exit code %s", test, exit_code)
-        result['status'] = 'fail'
+        result["status"] = "fail"
     result["end"] = time.time()
     return result
 
 
 logging.info("Attempting to download current mongo releases json")
-r = requests.get('https://downloads.mongodb.org/current.json')
+r = requests.get("https://downloads.mongodb.org/current.json")
 current_releases = r.json()
 
 logging.info("Attempting to download current mongo tools releases json")
-r = requests.get('https://downloads.mongodb.org/tools/db/release.json')
+r = requests.get("https://downloads.mongodb.org/tools/db/release.json")
 current_tools_releases = r.json()
 
 logging.info("Attempting to download current mongosh releases json")
-r = requests.get('https://s3.amazonaws.com/info-mongodb-com/com-download-center/mongosh.json')
+r = requests.get("https://s3.amazonaws.com/info-mongodb-com/com-download-center/mongosh.json")
 mongosh_releases = r.json()
 
 
@@ -351,8 +445,11 @@ def iterate_over_downloads() -> Generator[Dict[str, Any], None, None]:
 def get_tools_package(arch_name: str, os_name: str) -> Optional[str]:
     # TODO: MONGOSH-1308 - we need to sub the arch alias until package
     # architectures are named consistently with the server packages
-    if arch_name == "aarch64" and not os_name.startswith("amazon") and not os_name.startswith(
-            "rhel"):
+    if (
+        arch_name == "aarch64"
+        and not os_name.startswith("amazon")
+        and not os_name.startswith("rhel")
+    ):
         arch_name = "arm64"
     for download in current_tools_releases["versions"][0]["downloads"]:
         if download["name"] == os_name and download["arch"] == arch_name:
@@ -377,10 +474,10 @@ def get_mongosh_package(arch_name: str, os_name: str) -> Optional[str]:
 
 
 def get_arch_aliases(arch_name: str) -> List[str]:
-    if arch_name in ('amd64', 'x86_64'):
-        return ['amd64', 'x86_64']
-    if arch_name in ('ppc64le', 'ppc64el'):
-        return ['ppc64le', 'ppc64el']
+    if arch_name in ("amd64", "x86_64"):
+        return ["amd64", "x86_64"]
+    if arch_name in ("ppc64le", "ppc64el"):
+        return ["ppc64le", "ppc64el"]
     return [arch_name]
 
 
@@ -402,36 +499,64 @@ for dl in iterate_over_downloads():
     versions.add(dl["version"])
 
 parser = argparse.ArgumentParser(
-    description=
-    'Test packages on various hosts. This will spin up docker containers and test the installs.')
-parser.add_argument("--arch", type=str, help="Arch of packages to test",
-                    choices=["auto"] + list(arches), default="auto")
-parser.add_argument("-r", "--retries", type=int, help="Number of times to retry failed tests",
-                    default=3)
+    description="Test packages on various hosts. This will spin up docker containers and test the installs."
+)
+parser.add_argument(
+    "--arch",
+    type=str,
+    help="Arch of packages to test",
+    choices=["auto"] + list(arches),
+    default="auto",
+)
+parser.add_argument(
+    "-r", "--retries", type=int, help="Number of times to retry failed tests", default=3
+)
 subparsers = parser.add_subparsers(dest="command")
 release_test_parser = subparsers.add_parser("release")
 release_test_parser.add_argument(
-    "--os", type=str, help=
-    "OS of docker image to run test(s) on. All means run all os tests on this arch. None means run no os test on this arch (except for one specified in extra-packages.",
-    choices=["all"] + list(oses), default="all")
-release_test_parser.add_argument("-e", "--edition", help="Server edition to run tests for",
-                                 choices=["all"] + list(editions), default="all")
-release_test_parser.add_argument("-v", "--server-version", type=str,
-                                 help="Version of MongoDB to run tests for",
-                                 choices=["all"] + list(versions), default="all")
+    "--os",
+    type=str,
+    help="OS of docker image to run test(s) on. All means run all os tests on this arch. None means run no os test on this arch (except for one specified in extra-packages.",
+    choices=["all"] + list(oses),
+    default="all",
+)
 release_test_parser.add_argument(
-    "--evg-project", type=str, help=
-    "The evergreen project this is intended to run under (master only). Note that this interface is primarly for evergreen to set, and so the script will check if its is appropriate to run the tests.",
-    default="")
+    "-e",
+    "--edition",
+    help="Server edition to run tests for",
+    choices=["all"] + list(editions),
+    default="all",
+)
+release_test_parser.add_argument(
+    "-v",
+    "--server-version",
+    type=str,
+    help="Version of MongoDB to run tests for",
+    choices=["all"] + list(versions),
+    default="all",
+)
+release_test_parser.add_argument(
+    "--evg-project",
+    type=str,
+    help="The evergreen project this is intended to run under (master only). Note that this interface is primarly for evergreen to set, and so the script will check if its is appropriate to run the tests.",
+    default="",
+)
 branch_test_parser = subparsers.add_parser("branch")
 branch_test_parser.add_argument(
-    "-t", "--test", type=str, help=
-    "Space-separated tuple of (test_os, package_archive_path). For example: ubuntu2004 https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz.",
-    action='append', nargs=2, default=[])
-branch_test_parser.add_argument("-e", "--edition", type=str, help="Server edition being tested",
-                                required=True)
-branch_test_parser.add_argument("-v", "--server-version", type=str,
-                                help="Server version being tested", required=True)
+    "-t",
+    "--test",
+    type=str,
+    help="Space-separated tuple of (test_os, package_archive_path). For example: ubuntu2004 https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz.",
+    action="append",
+    nargs=2,
+    default=[],
+)
+branch_test_parser.add_argument(
+    "-e", "--edition", type=str, help="Server edition being tested", required=True
+)
+branch_test_parser.add_argument(
+    "-v", "--server-version", type=str, help="Server version being tested", required=True
+)
 args = parser.parse_args()
 
 if args.command == "release":
@@ -444,7 +569,8 @@ if args.command == "release":
     if re.fullmatch(r"mongodb-mongo-v\d\.\d", evg_project):
         logging.info(
             "Non-master evergreen project detected: '%s', skipping release package testing which is expected to only be run from master branches.",
-            evg_project)
+            evg_project,
+        )
         sys.exit(0)
 
 arch: str = args.arch
@@ -459,14 +585,16 @@ if args.command == "branch":
         test_os = test_pair[0]
         urls = [test_pair[1]]
         if test_os not in OS_DOCKER_LOOKUP:
-            logging.error("We have not seen this OS %s before, please add it to OS_DOCKER_LOOKUP",
-                          test_os)
+            logging.error(
+                "We have not seen this OS %s before, please add it to OS_DOCKER_LOOKUP", test_os
+            )
             sys.exit(1)
 
         if not OS_DOCKER_LOOKUP[test_os]:
             logging.info(
                 "Skipping test on target because the OS has no associated container %s->???",
-                test_os)
+                test_os,
+            )
             continue
 
         tools_package = get_tools_package(arch, test_os)
@@ -484,12 +612,16 @@ if args.command == "branch":
             sys.exit(1)
 
         tests.append(
-            Test(os_name=test_os, edition=args.edition, version=args.server_version,
-                 packages_urls=urls))
+            Test(
+                os_name=test_os,
+                edition=args.edition,
+                version=args.server_version,
+                packages_urls=urls,
+            )
+        )
 
 # If os is None we only want to do the tests specified in the arguments
 if args.command == "release":
-
     for dl in iterate_over_downloads():
         if args.os not in ["all", dl["target"]]:
             continue
@@ -508,13 +640,17 @@ if args.command == "release":
         if not OS_DOCKER_LOOKUP[dl["target"]]:
             logging.info(
                 "Skipping test on target because the OS has no associated container %s->??? on mongo version %s",
-                dl['target'], dl['version'])
+                dl["target"],
+                dl["version"],
+            )
             continue
 
         if "packages" not in dl:
             logging.info(
                 "Skipping test on target because there are no packages %s->??? on mongo version %s",
-                dl['target'], dl['version'])
+                dl["target"],
+                dl["version"],
+            )
             continue
 
         if (dl["target"], dl["version"]) in DISABLED_TESTS:
@@ -534,7 +670,7 @@ if args.command == "release":
         repo_uri: str
         package: str
         repo_uri, package = urls[0].rsplit("/", 1)
-        match = re.match(r'(\w+-(\w+(?:-unstable)?))-[^-_]+((?:-|_).*)', package)
+        match = re.match(r"(\w+-(\w+(?:-unstable)?))-[^-_]+((?:-|_).*)", package)
         if match:
             urls.insert(0, f"{repo_uri}/{match.group(1)}{match.group(3)}")
             # The actual "edition" may be an unstable package release, so we
@@ -581,11 +717,12 @@ if args.command == "release":
             sys.exit(1)
 
         tests.append(
-            Test(os_name=test_os, packages_urls=urls, edition=edition, version=server_version))
+            Test(os_name=test_os, packages_urls=urls, edition=edition, version=server_version)
+        )
 
 docker_client = docker.client.from_env()
-docker_username = os.environ.get('docker_username')
-docker_password = os.environ.get('docker_password')
+docker_username = os.environ.get("docker_username")
+docker_password = os.environ.get("docker_password")
 if all((docker_username, docker_password)):
     logging.info("Logging into docker.io")
     response = docker_client.login(username=docker_username, password=docker_password)
@@ -605,8 +742,9 @@ with futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as tpe:
     retried_tests: int = 0
     total_tests: int = len(tests)
     while len(test_futures.keys()) > 0:
-        finished_futures, active_futures = futures.wait(test_futures.keys(), timeout=None,
-                                                        return_when="FIRST_COMPLETED")
+        finished_futures, active_futures = futures.wait(
+            test_futures.keys(), timeout=None, return_when="FIRST_COMPLETED"
+        )
         for f in finished_futures:
             completed_test = test_futures.pop(f)
             test_result = f.result()
@@ -614,8 +752,9 @@ with futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as tpe:
                 if completed_test.attempts < args.retries:
                     retried_tests += 1
                     completed_test.attempts += 1
-                    test_futures[tpe.submit(run_test, completed_test,
-                                            docker_client)] = completed_test
+                    test_futures[tpe.submit(run_test, completed_test, docker_client)] = (
+                        completed_test
+                    )
                     continue
                 report["failures"] += 1
 
@@ -624,7 +763,11 @@ with futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as tpe:
 
         logging.info(
             "Completed %s tests, retried %s tests, total %s tests, %s tests are in progress.",
-            completed_tests, retried_tests, total_tests, len(test_futures))
+            completed_tests,
+            retried_tests,
+            total_tests,
+            len(test_futures),
+        )
 
         # We are printing here to help diagnose hangs
         # This adds a bit of logging so we are only going to log running tests after a test completes
@@ -635,15 +778,16 @@ with open("report.json", "w") as fh:
     json.dump(report, fh)
 
 if report["failures"] == 0:
-    logging.info("All %s tests passed :)", len(report['results']))
+    logging.info("All %s tests passed :)", len(report["results"]))
     sys.exit(0)
 else:
     failed_tests = [
-        test_result["test_file"] for test_result in report["results"]
+        test_result["test_file"]
+        for test_result in report["results"]
         if test_result["exit_code"] != 0
     ]
-    success_count = len(report['results']) - len(failed_tests)
-    logging.info("%s/%s tests passed", success_count, len(report['results']))
+    success_count = len(report["results"]) - len(failed_tests)
+    logging.info("%s/%s tests passed", success_count, len(report["results"]))
     if len(failed_tests) > 0:
         logging.info("Failed tests:\n\t%s", "\n\t".join(failed_tests))
     sys.exit(1)
