@@ -663,7 +663,7 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
                                nssToDrop,
                                &unusedDropReply,
                                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops,
-                               false /* fromMigrate */));
+                               true /* fromMigrate */));
         } catch (const DBException& e) {
             LOGV2_WARNING(7120210,
                           "Failed to drop stale collection on donor",
@@ -695,7 +695,7 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
             {_doc.getToShardId()},
             **executor,
             getNewSession(opCtx),
-            false /* fromMigrate */,
+            true /* fromMigrate */,
             true /* dropSystemCollections */);
     }
 }
