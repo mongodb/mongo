@@ -634,6 +634,32 @@ protected:
     virtual std::unique_ptr<ResultType> buildMultiPlan(
         std::vector<std::unique_ptr<QuerySolution>> solutions) = 0;
 
+    /**
+     * Helper for getting the QuerySolution hash from the plan caches.
+     */
+    boost::optional<size_t> getPlanHashFromClassicCache(const PlanCacheKey& key) {
+        if (auto cs = CollectionQueryInfo::get(getCollections().getMainCollection())
+                          .getPlanCache()
+                          ->getCacheEntryIfActive(key)) {
+            return cs->cachedPlan->solutionHash;
+        }
+        return boost::none;
+    }
+
+    /**
+     * Helper for getting the plan hash from the SBE cache.
+     *
+     * TODO SERVER-88047: This function can be moved into the PrepareExecutionHelper that uses the
+     *  SBE plan cache.
+     */
+    boost::optional<size_t> getPlanHashFromSbeCache(const sbe::PlanCacheKey& key) {
+        auto&& planCache = sbe::getPlanCache(_opCtx);
+        if (auto cacheEntry = planCache.getCacheEntryIfActive(key); cacheEntry) {
+            return cacheEntry->cachedPlan->solutionHash;
+        }
+        return boost::none;
+    }
+
     OperationContext* _opCtx;
     const MultipleCollectionAccessor& _collections;
     CanonicalQuery* _cq;
@@ -738,13 +764,9 @@ private:
         if (_cachedPlanHash) {
             return _cachedPlanHash;
         }
-        if (auto cs = CollectionQueryInfo::get(getCollections().getMainCollection())
-                          .getPlanCache()
-                          ->getCacheEntryIfActive(planCacheKey)) {
-            _cachedPlanHash = cs->cachedPlan->solutionHash;
-            return _cachedPlanHash;
-        }
-        return boost::none;
+
+        _cachedPlanHash = getPlanHashFromClassicCache(planCacheKey);
+        return _cachedPlanHash;
     }
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildSubPlan() final {
@@ -871,11 +893,7 @@ private:
     }
 
     boost::optional<size_t> getCachedPlanHash(const sbe::PlanCacheKey& planCacheKey) final {
-        auto&& planCache = sbe::getPlanCache(_opCtx);
-        if (auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey); cacheEntry) {
-            return cacheEntry->cachedPlan->solutionHash;
-        }
-        return boost::none;
+        return getPlanHashFromSbeCache(planCacheKey);
     }
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildSubPlan() final {
@@ -901,14 +919,24 @@ private:
 };
 
 /**
- * A helper class to initialize classic_runtime_planner_for_sbe::PlannerInterface. This
- * PlannerInterface can subsequently be used to prepare a SBE PlanStage tree using the Classic
- * runtime planners.
+ * Base class for SBE with classic runtime planning prepare execution helper.
+ *
+ *  ------------- PrepareExecutionHelper
+ *  |              /                     \
+ *  |   ClassicPrepareExecutionHelper    SbeWithClassicRuntimePlanningPrepareExecutionHelperBase
+ *  |                                   /                                                   |
+ *  |               SbeWithClassicRuntimePlanningAndClassicCachePrepareExecutionHelper      |
+ *  |                                                                                       |
+ *  |                               SbeWithClassicRuntimePlanningAndSbeCachePrepareExecutionHelper
+ * SlotBasedPrepareExecutionHelper
+ *
+ * TODO SERVER-88047: Delete SlotBasedPrepareExecutionHelper.
  */
-class SbeWithClassicRuntimePlanningPrepareExecutionHelper final
-    : public PrepareExecutionHelper<sbe::PlanCacheKey, SbeWithClassicRuntimePlanningResult> {
+template <class CacheKey, class RuntimePlanningResult>
+class SbeWithClassicRuntimePlanningPrepareExecutionHelperBase
+    : public PrepareExecutionHelper<CacheKey, RuntimePlanningResult> {
 public:
-    SbeWithClassicRuntimePlanningPrepareExecutionHelper(
+    SbeWithClassicRuntimePlanningPrepareExecutionHelperBase(
         OperationContext* opCtx,
         const MultipleCollectionAccessor& collections,
         std::unique_ptr<WorkingSet> ws,
@@ -916,18 +944,21 @@ public:
         PlanYieldPolicy::YieldPolicy policy,
         std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
         std::unique_ptr<QueryPlannerParams> plannerParams)
-        : PrepareExecutionHelper{opCtx, collections, cq, std::move(plannerParams)},
+        : PrepareExecutionHelper<CacheKey, RuntimePlanningResult>(
+              opCtx, collections, cq, std::move(plannerParams)),
           _ws{std::move(ws)},
           _yieldPolicy{policy},
           _sbeYieldPolicy{std::move(sbeYieldPolicy)} {}
 
-private:
+protected:
     crp_sbe::PlannerDataForSBE makePlannerData() {
-        return crp_sbe::PlannerDataForSBE{_opCtx,
-                                          _cq,
+        // Use of 'this->' is necessary since some compilers have trouble resolving member
+        // variables in templated parent class.
+        return crp_sbe::PlannerDataForSBE{this->_opCtx,
+                                          this->_cq,
                                           std::move(_ws),
-                                          _collections,
-                                          std::move(_plannerParams),
+                                          this->_collections,
+                                          std::move(this->_plannerParams),
                                           _yieldPolicy,
                                           _cachedPlanHash,
                                           std::move(_sbeYieldPolicy)};
@@ -938,54 +969,16 @@ private:
         return nullptr;
     }
 
-    sbe::PlanCacheKey buildPlanCacheKey() const override {
-        return plan_cache_key_factory::make(
-            *_cq, _collections, canonical_query_encoder::Optimizer::kSbeStageBuilders);
-    }
-
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution) final {
-        auto result = releaseResult();
+        auto result = this->releaseResult();
         result->runtimePlanner = std::make_unique<crp_sbe::SingleSolutionPassthroughPlanner>(
             makePlannerData(), std::move(solution));
         return result;
     }
 
-    std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildCachedPlan(
-        const sbe::PlanCacheKey& planCacheKey) final {
-        if (shouldCacheQuery(*_cq)) {
-            auto&& planCache = sbe::getPlanCache(_opCtx);
-            auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
-            if (!cacheEntry) {
-                planCacheCounters.incrementSbeMissesCounter();
-                return nullptr;
-            }
-            planCacheCounters.incrementSbeHitsCounter();
-
-            auto result = releaseResult();
-            result->runtimePlanner =
-                crp_sbe::makePlannerForCacheEntry(makePlannerData(), std::move(cacheEntry));
-            return result;
-        }
-
-        planCacheCounters.incrementSbeSkippedCounter();
-        return nullptr;
-    }
-
-    boost::optional<size_t> getCachedPlanHash(const sbe::PlanCacheKey& planCacheKey) final {
-        if (_cachedPlanHash) {
-            return _cachedPlanHash;
-        }
-        auto&& planCache = sbe::getPlanCache(_opCtx);
-        if (auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey); cacheEntry) {
-            _cachedPlanHash = cacheEntry->cachedPlan->solutionHash;
-            return _cachedPlanHash;
-        }
-        return boost::none;
-    };
-
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildSubPlan() final {
-        auto result = releaseResult();
+        auto result = this->releaseResult();
         result->runtimePlanner = std::make_unique<crp_sbe::SubPlanner>(makePlannerData());
         return result;
     }
@@ -993,18 +986,19 @@ private:
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildMultiPlan(
         std::vector<std::unique_ptr<QuerySolution>> solutions) final {
         for (auto&& solution : solutions) {
-            solution->indexFilterApplied = _plannerParams->indexFiltersApplied;
+            solution->indexFilterApplied = this->_plannerParams->indexFiltersApplied;
         }
 
         if (solutions.size() > 1 ||
             // Search queries are not supported in classic multi-planner.
-            (internalQueryPlannerUseMultiplannerForSingleSolutions && !_cq->isSearchQuery())) {
-            auto result = releaseResult();
+            (internalQueryPlannerUseMultiplannerForSingleSolutions &&
+             !this->_cq->isSearchQuery())) {
+            auto result = this->releaseResult();
             result->runtimePlanner = std::make_unique<crp_sbe::MultiPlanner>(
-                makePlannerData(), std::move(solutions), PlanCachingMode::AlwaysCache);
+                this->makePlannerData(), std::move(solutions), PlanCachingMode::AlwaysCache);
             return result;
         } else {
-            return buildSingleSolutionPlan(std::move(solutions[0]));
+            return this->buildSingleSolutionPlan(std::move(solutions[0]));
         }
     }
 
@@ -1017,6 +1011,99 @@ private:
 
     // If there is a matching cache entry, this is the hash of that plan.
     boost::optional<size_t> _cachedPlanHash;
+};
+
+/**
+ * Helper for SBE with classic runtime planning and SBE plan cache.
+ */
+class SbeWithClassicRuntimePlanningAndSbeCachePrepareExecutionHelper final
+    : public SbeWithClassicRuntimePlanningPrepareExecutionHelperBase<
+          sbe::PlanCacheKey,
+          SbeWithClassicRuntimePlanningResult> {
+public:
+    // Use constructor provided by parent class.
+    using SbeWithClassicRuntimePlanningPrepareExecutionHelperBase<
+        sbe::PlanCacheKey,
+        SbeWithClassicRuntimePlanningResult>::
+        SbeWithClassicRuntimePlanningPrepareExecutionHelperBase;
+
+private:
+    sbe::PlanCacheKey buildPlanCacheKey() const override {
+        return plan_cache_key_factory::make(
+            *_cq, _collections, canonical_query_encoder::Optimizer::kSbeStageBuilders);
+    }
+
+    std::unique_ptr<SbeWithClassicRuntimePlanningResult> tryToBuildCachedPlanFromSbeCache(
+        const sbe::PlanCacheKey& sbeCacheKey) {
+        auto&& planCache = sbe::getPlanCache(_opCtx);
+
+        auto cacheEntry = planCache.getCacheEntryIfActive(sbeCacheKey);
+        if (!cacheEntry) {
+            planCacheCounters.incrementSbeMissesCounter();
+            return nullptr;
+        }
+        planCacheCounters.incrementSbeHitsCounter();
+
+        auto result = releaseResult();
+        result->runtimePlanner =
+            crp_sbe::makePlannerForCacheEntry(makePlannerData(), std::move(cacheEntry));
+        return result;
+    }
+
+    std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildCachedPlan(
+        const sbe::PlanCacheKey& key) final {
+        if (shouldCacheQuery(*_cq)) {
+            return tryToBuildCachedPlanFromSbeCache(key);
+        }
+
+        planCacheCounters.incrementSbeSkippedCounter();
+        return nullptr;
+    }
+
+    boost::optional<size_t> getCachedPlanHash(const sbe::PlanCacheKey& key) final {
+        if (_cachedPlanHash) {
+            return _cachedPlanHash;
+        }
+
+        _cachedPlanHash = getPlanHashFromSbeCache(key);
+        return _cachedPlanHash;
+    }
+};
+
+/**
+ * Skeleton helper for SBE with classic runtime planning and classic plan cache.
+ *
+ * TODO SERVER-90415: Replace unimplemented methods.
+ */
+class SbeWithClassicRuntimePlanningAndClassicCachePrepareExecutionHelper final
+    : public SbeWithClassicRuntimePlanningPrepareExecutionHelperBase<
+          PlanCacheKey,
+          SbeWithClassicRuntimePlanningResult> {
+public:
+    // Use constructor provided by parent class.
+    using SbeWithClassicRuntimePlanningPrepareExecutionHelperBase<
+        PlanCacheKey,
+        SbeWithClassicRuntimePlanningResult>::
+        SbeWithClassicRuntimePlanningPrepareExecutionHelperBase;
+
+private:
+    PlanCacheKey buildPlanCacheKey() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<SbeWithClassicRuntimePlanningResult> tryToBuildCachedPlanFromClassicCache(
+        const PlanCacheKey& planCacheKey) {
+        MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildCachedPlan(
+        const PlanCacheKey& classicKey) final {
+        MONGO_UNREACHABLE;
+    }
+
+    boost::optional<size_t> getCachedPlanHash(const PlanCacheKey& key) final {
+        MONGO_UNREACHABLE;
+    }
 };
 
 std::unique_ptr<PlannerInterface> getClassicPlanner(
@@ -1097,7 +1184,7 @@ std::unique_ptr<PlannerInterface> getClassicPlannerForSbe(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
     std::unique_ptr<QueryPlannerParams> plannerParams) {
-    SbeWithClassicRuntimePlanningPrepareExecutionHelper helper{
+    SbeWithClassicRuntimePlanningAndSbeCachePrepareExecutionHelper helper{
         opCtx,
         collections,
         std::make_unique<WorkingSet>(),
