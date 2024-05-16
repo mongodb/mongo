@@ -2054,27 +2054,6 @@ if env.get('ENABLE_OOM_RETRY'):
     else:
         env['OOM_RETRY_ATTEMPTS'] = 10
         env['OOM_RETRY_MAX_DELAY_SECONDS'] = 120
-
-        if env.ToolchainIs('clang', 'gcc'):
-            env['OOM_RETRY_MESSAGES'] = [
-                ': out of memory',
-                'virtual memory exhausted: Cannot allocate memory',
-                ': fatal error: Killed signal terminated program cc1',
-                # TODO: SERVER-77322 remove this non memory related ICE.
-                r'during IPA pass: cp.+g\+\+: internal compiler error',
-                'ld terminated with signal 9',
-            ]
-        elif env.ToolchainIs('msvc'):
-            env['OOM_RETRY_MESSAGES'] = [
-                'LNK1102: out of memory',
-                'C1060: compiler is out of heap space',
-                'c1xx : fatal error C1063: INTERNAL COMPILER ERROR',
-                r'LNK1171: unable to load mspdbcore\.dll',
-                "LNK1201: error writing to program database ",
-                "The paging file is too small for this operation to complete.",
-            ]
-            env['OOM_RETRY_RETURNCODES'] = [1102]
-
         env.Tool('oom_auto_retry')
 
 if env.ToolchainIs('clang'):
