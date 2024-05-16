@@ -644,6 +644,14 @@ private:
     // Executes the parsed command against the database.
     void _commandExec();
 
+    // Takes a command execution error (or write error), attempts to perform metadata refresh and
+    // return true in case the refresh was executed, false in case no refresh was executed and an
+    // error status if the refresh failed.
+    StatusWith<bool> _refreshIfNeeded(const Status& execError);
+
+    // Decides if the command can be retried based on the execution error.
+    bool _canRetryCommand(const Status& execError);
+
     // Any error-handling logic that must be performed if the command initiation/execution fails.
     void _handleFailure(Status status);
 
@@ -669,7 +677,6 @@ private:
     boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
     boost::optional<ImpersonationSessionGuard> _impersonationSessionGuard;
     boost::optional<auth::SecurityTokenAuthenticationGuard> _tokenAuthorizationSessionGuard;
-    std::unique_ptr<PolymorphicScoped> _scoped;
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
     bool _refreshedCatalogCache = false;
@@ -1868,8 +1875,6 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     }
 
-    _scoped = _execContext.behaviors.scopedOperationCompletionShardingActions(opCtx);
-
     // This may trigger the maxTimeAlwaysTimeOut failpoint.
     auto status = opCtx->checkForInterruptNoAssert();
 
@@ -1885,43 +1890,6 @@ void ExecCommandDatabase::_initiateCommand() {
 
     command->incrementCommandsExecuted();
 }
-
-namespace {
-bool canRetryCommandExecution(const HandleRequest::ExecutionContext& execContext) {
-    // Can not rerun the command when executing an aggregation that runs $mergeCursors as it may
-    // have consumed the cursors within.
-    if (execContext.getCommand()->getName() == "aggregate") {
-        const auto opCtx = execContext.getOpCtx();
-        const auto& opMsgRequest = execContext.getRequest();
-        SerializationContext serializationCtx = opMsgRequest.getSerializationContext();
-
-        const AggregateCommandRequest aggregationRequest =
-            aggregation_request_helper::parseFromBSON(
-                opMsgRequest.body,
-                opMsgRequest.validatedTenancyScope,
-                boost::none,
-                APIParameters::get(opCtx).getAPIStrict().value_or(false),
-                serializationCtx);
-
-        const auto& pipeline = aggregationRequest.getPipeline();
-        const auto hasMergeCursor =
-            std::any_of(pipeline.begin(), pipeline.end(), [](const BSONObj& stage) {
-                return stage.firstElementFieldNameStringData() ==
-                    DocumentSourceMergeCursors::kStageName;
-            });
-        if (hasMergeCursor) {
-            return false;
-        }
-    }
-
-    // Can not rerun the command when executing a GetMore command as the cursor may already be lost.
-    if (execContext.getCommand()->getName() == "getMore") {
-        return false;
-    }
-
-    return true;
-}
-}  // namespace
 
 void ExecCommandDatabase::_commandExec() {
     auto opCtx = _execContext.getOpCtx();
@@ -1955,112 +1923,195 @@ void ExecCommandDatabase::_commandExec() {
             RunCommandImpl runner(this);
             runner.run();
         }
-    } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
-        auto opCtx = _execContext.getOpCtx();
+    } catch (const DBException& ex) {
+        // If the command has failed, there is no need to look for write errors at the oss.
+        OperationShardingState::get(opCtx).resetShardingOperationFailedStatus();
 
-        if (!opCtx->getClient()->isInDirectClient() && !_refreshedDatabase) {
-            auto sce = ex.toStatus().extraInfo<StaleDbRoutingVersion>();
-            invariant(sce);
+        const auto metadataRefreshStatus = _refreshIfNeeded(ex.toStatus());
+        const auto refreshed = uassertStatusOK(metadataRefreshStatus);
 
-            bool stableLocalVersion = !sce->getCriticalSectionSignal() && sce->getVersionWanted();
-
-            if (stableLocalVersion && sce->getVersionReceived() < sce->getVersionWanted()) {
-                // The shard is recovered and the router is staler than the shard, so we cannot
-                // retry locally
-                throw;
-            }
-
-            const auto refreshed = _execContext.behaviors.refreshDatabase(opCtx, *sce);
-            if (refreshed) {
-                _refreshedDatabase = true;
-                if (!opCtx->isContinuingMultiDocumentTransaction() &&
-                    !sce->getCriticalSectionSignal()) {
-                    _resetLockerStateAfterShardingUpdate(opCtx);
-                    _commandExec();
-                    return;
-                }
-            }
-        }
-
-        throw;
-    } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
-        auto opCtx = _execContext.getOpCtx();
-        ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
-
-        if (!opCtx->getClient()->isInDirectClient() && !_refreshedCollection) {
-            if (auto sce = ex.toStatus().extraInfo<StaleConfigInfo>()) {
-                bool inCriticalSection = sce->getCriticalSectionSignal().has_value();
-                bool stableLocalVersion = !inCriticalSection && sce->getVersionWanted();
-
-                if (stableLocalVersion &&
-                    ShardVersion::isPlacementVersionIgnored(sce->getVersionReceived())) {
-                    // Shard is recovered, but the router didn't sent a shard version, therefore
-                    // we just need to tell the router how much it needs to advance to
-                    // (getVersionWanted).
-                    throw;
-                }
-
-                if (stableLocalVersion &&
-                    sce->getVersionReceived().placementVersion().isOlderThan(
-                        sce->getVersionWanted()->placementVersion())) {
-                    // Shard is recovered and the router is staler than the shard
-                    throw;
-                }
-
-                if (inCriticalSection) {
-                    _execContext.behaviors.handleReshardingCriticalSectionMetrics(opCtx, *sce);
-                }
-
-                // Fail the direct shard operation so that a RetryableWriteError label can be
-                // returned and the write can be retried by the driver. The retry should succeed
-                // because a command failing with StaleConfig triggers sharding metadata refresh in
-                // the ScopedOperationCompletionShardingActions destructor.
-                auto fromRouter = OperationShardingState::isComingFromRouter(opCtx);
-                if (opCtx->isRetryableWrite() && !fromRouter &&
-                    ex.code() == ErrorCodes::StaleConfig) {
-                    throw;
-                }
-
-                const auto refreshed = _execContext.behaviors.refreshCollection(opCtx, *sce);
-                if (refreshed) {
-                    _refreshedCollection = true;
-
-                    const auto canRetryCommand = canRetryCommandExecution(_execContext);
-                    if (!opCtx->isContinuingMultiDocumentTransaction() && !inCriticalSection &&
-                        canRetryCommand) {
-                        _resetLockerStateAfterShardingUpdate(opCtx);
-                        _commandExec();
-                        return;
-                    }
-                }
-            }
-        }
-
-        throw;
-    } catch (const ExceptionFor<ErrorCodes::ShardCannotRefreshDueToLocksHeld>& ex) {
-        auto opCtx = _execContext.getOpCtx();
-        if (!opCtx->getClient()->isInDirectClient() && !_refreshedCatalogCache) {
-            invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-
-            auto refreshInfo = ex.toStatus().extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
-            invariant(refreshInfo);
-
-            const auto refreshed = _execContext.behaviors.refreshCatalogCache(opCtx, *refreshInfo);
-
-            if (refreshed) {
-                _refreshedCatalogCache = true;
-
-                const auto canRetryCommand = canRetryCommandExecution(_execContext);
-                if (!opCtx->isContinuingMultiDocumentTransaction() && canRetryCommand) {
-                    _resetLockerStateAfterShardingUpdate(opCtx);
-                    _commandExec();
-                    return;
-                }
-            }
+        if (refreshed && _canRetryCommand(ex.toStatus())) {
+            _resetLockerStateAfterShardingUpdate(opCtx);
+            _commandExec();
+            return;
         }
 
         throw;
     }
+
+    // Regardless if the command has succeeded, it needs to check if the operation sharding state
+    // has some stale config errors to be handled before returning to the router.
+    if (auto writeError = OperationShardingState::get(opCtx).resetShardingOperationFailedStatus()) {
+        const auto metadataRefreshStatus = _refreshIfNeeded(*writeError);
+        if (!metadataRefreshStatus.isOK() &&
+            ErrorCodes::isInterruption(metadataRefreshStatus.getStatus())) {
+            uassertStatusOK(metadataRefreshStatus);
+        }
+    }
+}
+
+StatusWith<bool> ExecCommandDatabase::_refreshIfNeeded(const Status& execError) {
+    auto opCtx = _execContext.getOpCtx();
+
+    tassert(8462308, "Expected to find an error in the status of the command", !execError.isOK());
+
+    if (execError == ErrorCodes::StaleConfig) {
+        ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
+    }
+
+    if (opCtx->getClient()->isInDirectClient()) {
+        return false;
+    }
+
+    if (execError == ErrorCodes::StaleDbVersion && !_refreshedDatabase) {
+        const auto staleInfo = execError.extraInfo<StaleDbRoutingVersion>();
+        tassert(8462303, "StaleDbVersion must have extraInfo", staleInfo);
+        const auto stableLocalVersion =
+            !staleInfo->getCriticalSectionSignal() && staleInfo->getVersionWanted();
+
+        if (stableLocalVersion && staleInfo->getVersionReceived() < staleInfo->getVersionWanted()) {
+            // The shard is recovered and the router is staler than the shard, so we cannot retry
+            // locally.
+            return false;
+        }
+
+        const auto refreshStatus = _execContext.behaviors.refreshDatabase(opCtx, *staleInfo);
+        if (refreshStatus.isOK()) {
+            _refreshedDatabase = true;
+            return true;
+        } else {
+            LOGV2_WARNING(
+                8462300,
+                "Failed to refresh database metadata cache while handling StaleDbVersion exception",
+                "error"_attr = redact(refreshStatus));
+            return refreshStatus;
+        }
+    } else if (execError == ErrorCodes::StaleConfig && !_refreshedCollection) {
+        const auto staleInfo = execError.extraInfo<StaleConfigInfo>();
+        tassert(8462304, "StaleConfig must have extraInfo", staleInfo);
+        const auto inCriticalSection = staleInfo->getCriticalSectionSignal().has_value();
+        const auto stableLocalVersion = !inCriticalSection && staleInfo->getVersionWanted();
+
+        if (stableLocalVersion &&
+            ShardVersion::isPlacementVersionIgnored(staleInfo->getVersionReceived())) {
+            // Shard is recovered, but the router didn't sent a shard version, therefore we just
+            // need to tell the router how much it needs to advance to (getVersionWanted).
+            return false;
+        }
+
+        if (stableLocalVersion &&
+            staleInfo->getVersionReceived().placementVersion().isOlderThan(
+                staleInfo->getVersionWanted()->placementVersion())) {
+            // Shard is recovered and the router is staler than the shard.
+            return false;
+        }
+
+        if (inCriticalSection) {
+            _execContext.behaviors.handleReshardingCriticalSectionMetrics(opCtx, *staleInfo);
+        }
+
+        const auto refreshStatus = _execContext.behaviors.refreshCollection(opCtx, *staleInfo);
+
+        // Fail the direct shard operation so that a RetryableWriteError label can be returned and
+        // the write can be retried by the driver.
+        const auto fromRouter = OperationShardingState::isComingFromRouter(opCtx);
+        if (opCtx->isRetryableWrite() && !fromRouter) {
+            return false;
+        }
+
+        if (refreshStatus.isOK()) {
+            _refreshedCollection = true;
+            return true;
+        } else {
+            LOGV2_WARNING(
+                8462301,
+                "Failed to refresh collection metadata cache while handling StaleConfig exception",
+                "error"_attr = redact(refreshStatus));
+            return refreshStatus;
+        }
+    } else if (execError == ErrorCodes::ShardCannotRefreshDueToLocksHeld &&
+               !_refreshedCatalogCache) {
+        const auto refreshInfo = execError.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+        tassert(8462305, "ShardCannotRefreshDueToLocksHeld must have extraInfo", refreshInfo);
+        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+
+        const auto refreshStatus = _execContext.behaviors.refreshCatalogCache(opCtx, *refreshInfo);
+        if (refreshStatus.isOK()) {
+            _refreshedCatalogCache = true;
+            return true;
+        } else {
+            LOGV2_WARNING(8462302,
+                          "Failed to refresh catalog cache while handling "
+                          "ShardCannotRefreshDueToLocksHeld exception",
+                          "error"_attr = redact(refreshStatus));
+            return refreshStatus;
+        }
+    }
+
+    return false;
+}
+
+bool ExecCommandDatabase::_canRetryCommand(const Status& execError) {
+    auto opCtx = _execContext.getOpCtx();
+
+    tassert(8462309, "Expected to find an error in the status of the command", !execError.isOK());
+    tassert(8462310,
+            "Expected to not be in a direct client connection",
+            !opCtx->getClient()->isInDirectClient());
+
+    if (opCtx->isContinuingMultiDocumentTransaction()) {
+        return false;
+    }
+
+    if (execError == ErrorCodes::StaleDbVersion) {
+        const auto staleInfo = execError.extraInfo<StaleDbRoutingVersion>();
+        tassert(8462306, "StaleDbVersion must have extraInfo", staleInfo);
+        const auto inCriticalSection = staleInfo->getCriticalSectionSignal().has_value();
+
+        return !inCriticalSection;
+    }
+
+    // Can not rerun the command when executing a GetMore command as the cursor may already be lost.
+    const auto isRunningGetMoreCmd = _execContext.getCommand()->getName() == "getMore";
+
+    // Can not rerun the command when executing an aggregation that runs $mergeCursors as it may
+    // have consumed the cursors within.
+    const auto isAggregateWithMergeCursors = [&]() {
+        if (_execContext.getCommand()->getName() != "aggregate") {
+            return false;
+        }
+
+        const auto& opMsgRequest = _execContext.getRequest();
+        SerializationContext serializationCtx = opMsgRequest.getSerializationContext();
+
+        const AggregateCommandRequest aggregationRequest =
+            aggregation_request_helper::parseFromBSON(
+                opMsgRequest.body,
+                opMsgRequest.validatedTenancyScope,
+                boost::none,
+                APIParameters::get(opCtx).getAPIStrict().value_or(false),
+                serializationCtx);
+
+        const auto& pipeline = aggregationRequest.getPipeline();
+        const auto hasMergeCursor =
+            std::any_of(pipeline.begin(), pipeline.end(), [](const BSONObj& stage) {
+                return stage.firstElementFieldNameStringData() ==
+                    DocumentSourceMergeCursors::kStageName;
+            });
+        return hasMergeCursor;
+    }();
+
+    if (execError == ErrorCodes::StaleConfig) {
+        const auto staleInfo = execError.extraInfo<StaleConfigInfo>();
+        tassert(8462307, "StaleConfig must have extraInfo", staleInfo);
+        const auto inCriticalSection = staleInfo->getCriticalSectionSignal().has_value();
+
+        return !inCriticalSection && !isRunningGetMoreCmd && !isAggregateWithMergeCursors;
+    } else if (execError == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
+        return !isRunningGetMoreCmd && !isAggregateWithMergeCursors;
+    }
+
+    return false;
 }
 
 void ExecCommandDatabase::_handleFailure(Status status) {

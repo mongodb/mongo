@@ -53,7 +53,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/polymorphic_scoped.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -134,20 +133,20 @@ public:
 
     void attachCurOpErrInfo(OperationContext*, const Status) const override {}
 
-    bool refreshDatabase(OperationContext* opCtx,
-                         const StaleDbRoutingVersion& se) const noexcept override {
-        return false;
+    Status refreshDatabase(OperationContext* opCtx,
+                           const StaleDbRoutingVersion& se) const noexcept override {
+        UASSERT_NOT_IMPLEMENTED;
     }
 
-    bool refreshCollection(OperationContext* opCtx,
-                           const StaleConfigInfo& se) const noexcept override {
-        return false;
+    Status refreshCollection(OperationContext* opCtx,
+                             const StaleConfigInfo& se) const noexcept override {
+        UASSERT_NOT_IMPLEMENTED;
     }
 
-    bool refreshCatalogCache(
+    Status refreshCatalogCache(
         OperationContext* opCtx,
         const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) const noexcept override {
-        return false;
+        UASSERT_NOT_IMPLEMENTED;
     }
 
     void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
@@ -155,11 +154,6 @@ public:
     }
 
     void resetLockerState(OperationContext* opCtx) const noexcept override {}
-
-    std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(
-        OperationContext* opCtx) const override {
-        return nullptr;
-    }
 
     void appendReplyMetadata(OperationContext* opCtx,
                              const CommonRequestArgs& requestArgs,

@@ -8,6 +8,7 @@
 // ]
 import "jstests/multiVersion/libs/verify_versions.js";
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {
     assertNoSuchTransactionOnAllShards,
@@ -237,10 +238,8 @@ assert.commandWorked(session.commitTransaction_forTesting());
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: -5}, to: st.shard0.shardName}));
 expectChunks(st, ns, [1, 0, 1]);
 
-// Disable metadata refreshes on the stale shard so it will indefinitely return a stale version
-// error.
-assert.commandWorked(st.rs0.getPrimary().adminCommand(
-    {configureFailPoint: "skipShardFilteringMetadataRefresh", mode: "alwaysOn"}));
+// Make metadata refreshes on the stale shard indefinitely return StaleConfig.
+const fp = configureFailPoint(st.rs0.getPrimary(), "alwaysThrowStaleConfigInfo");
 
 session.startTransaction();
 
@@ -256,8 +255,7 @@ assert.eq(res.errorLabels, ["TransientTransactionError"]);
 assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-assert.commandWorked(st.rs0.getPrimary().adminCommand(
-    {configureFailPoint: "skipShardFilteringMetadataRefresh", mode: "off"}));
+fp.off();
 
 disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 

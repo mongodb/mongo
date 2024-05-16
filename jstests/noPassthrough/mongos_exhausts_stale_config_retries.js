@@ -4,6 +4,9 @@
 // @tags: [
 //   requires_sharding,
 // ]
+
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + '.' + collName;
@@ -16,19 +19,12 @@ assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-const sourcePrimary = st.rs0.getPrimary();
 const recipientPrimary = st.rs1.getPrimary();
-
-// Disable the best-effort recipient metadata refresh after migrations and move the chunk
-// between shards so the recipient shard, shard1, is stale.
-assert.commandWorked(recipientPrimary.adminCommand(
-    {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}));
 
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
 
-// Disable metadata refreshes on the recipient shard so it will indefinitely return StaleConfig.
-assert.commandWorked(recipientPrimary.adminCommand(
-    {configureFailPoint: "skipShardFilteringMetadataRefresh", mode: "alwaysOn"}));
+// Make metadata refreshes on the recipient shard indefinitely return StaleConfig.
+let fp = configureFailPoint(recipientPrimary, "alwaysThrowStaleConfigInfo");
 
 // Test various read and write commands that are sent with shard versions and thus can return
 // StaleConfig. Batch writes, i.e. insert/update/delete, return batch responses with ok:1 and
@@ -49,10 +45,29 @@ kCommands.forEach((cmd) => {
                                  "expected to fail with StaleConfig, cmd: " + tojson(cmd));
 });
 
-assert.commandWorked(recipientPrimary.adminCommand(
-    {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "off"}));
+fp.off();
 
-assert.commandWorked(recipientPrimary.adminCommand(
-    {configureFailPoint: "skipShardFilteringMetadataRefresh", mode: "off"}));
+if (jsTest.options().storageEngine === "inMemory") {
+    jsTestLog("Skipping the last scenario because we need persistance to restart nodes");
+    st.stop();
+    quit();
+}
+
+// Restart nodes to clear filtering metadata to trigger a refresh with following operations.
+st.rs0.nodes.forEach(node => {
+    st.rs0.restart(node, undefined, undefined, false /* wait */);
+});
+
+// Waits for a stable primary.
+st.rs0.getPrimary();
+
+// Enable failpoint to force refresh fail until exhausting mongos retries.
+fp = configureFailPoint(st.shard0, "skipShardFilteringMetadataRefresh");
+
+// Test that StaleConfig is not bubble up in case of a failed refreshed.
+assert.commandFailedWithCode(testDB.createCollection("coll3"), ErrorCodes.InternalError);
+assert.commandFailedWithCode(testDB.collName.insert({x: 10}), ErrorCodes.NoProgressMade);
+
+fp.off();
 
 st.stop();

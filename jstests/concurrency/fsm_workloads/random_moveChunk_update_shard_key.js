@@ -84,7 +84,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ErrorCodes.WriteConflict,
             ErrorCodes.LockTimeout,
             ErrorCodes.PreparedTransactionInProgress,
-            ErrorCodes.NoSuchTransaction
+            ErrorCodes.NoSuchTransaction,
+            ErrorCodes.ExceededTimeLimit
         ];
 
         // If we're running in a stepdown suite, then attempting to update the shard key may

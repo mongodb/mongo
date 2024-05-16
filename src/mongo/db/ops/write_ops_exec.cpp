@@ -511,19 +511,17 @@ bool handleError(OperationContext* opCtx,
     if (ex.code() == ErrorCodes::StaleDbVersion || ErrorCodes::isStaleShardVersionError(ex) ||
         ex.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
         ex.code() == ErrorCodes::CannotImplicitlyCreateCollection) {
+        // Fail the write for direct shard operations so that a RetryableWriteError label can be
+        // returned and the write can be retried by the driver.
+        if (!OperationShardingState::isComingFromRouter(opCtx) &&
+            ex.code() == ErrorCodes::StaleConfig && opCtx->isRetryableWrite()) {
+            throw;
+        }
+
         if (!opCtx->getClient()->isInDirectClient() &&
             ex.code() != ErrorCodes::CannotImplicitlyCreateCollection) {
             auto& oss = OperationShardingState::get(opCtx);
             oss.setShardingOperationFailedStatus(ex.toStatus());
-        }
-
-        // Fail the write for direct shard operations so that a RetryableWriteError label
-        // can be returned and the write can be retried by the driver. The retry should succeed
-        // because a command failing with StaleConfig triggers sharding metadata refresh in the
-        // ScopedOperationCompletionShardingActions destructor.
-        if (!OperationShardingState::isComingFromRouter(opCtx) &&
-            ex.code() == ErrorCodes::StaleConfig && opCtx->isRetryableWrite()) {
-            throw;
         }
 
         // For routing errors, it is guaranteed that all subsequent operations will fail

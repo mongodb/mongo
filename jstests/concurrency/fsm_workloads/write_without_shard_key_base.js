@@ -254,7 +254,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ErrorCodes.NoSuchTransaction,
             ErrorCodes.StaleConfig,
             ErrorCodes.ShardCannotRefreshDueToLocksHeld,
-            ErrorCodes.WriteConflict
+            ErrorCodes.WriteConflict,
+            ErrorCodes.ExceededTimeLimit
         ];
 
         // If we're running in a stepdown suite, then attempting to update the shard key may
@@ -293,7 +294,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     res.code === ErrorCodes.ConflictingOperationInProgress ||
                     res.code === ErrorCodes.ShardCannotRefreshDueToLocksHeld ||
                     res.code == ErrorCodes.WriteConflict ||
-                    res.code == ErrorCodes.SnapshotUnavailable) {
+                    res.code == ErrorCodes.SnapshotUnavailable ||
+                    res.code == ErrorCodes.ExceededTimeLimit) {
                     if (!msg.includes(otherErrorsInChangeShardKeyMsg)) {
                         return false;
                     }
