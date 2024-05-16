@@ -177,11 +177,46 @@ libdeps = [
 resmoke = "buildscripts.resmoke:entrypoint"
 
 [tool.ruff]
-exclude = [
+extend-exclude = [
     "site_scons/third_party",
     "src/third_party",
 ]
 extend-include = ["*/SConscript"]
+
+[tool.ruff.lint]
+ignore = [
+    "E402", # module-import-not-at-top-of-file
+    "E703", # useless-semicolon
+    "E711", # none-comparison
+    "E712", # true-false-comparison
+    "E713", # not-in-test
+    "E714", # not-is-test
+    "E721", # type-comparison
+    "E722", # bare-except
+    "E731", # lambda-assignment
+    "E741", # ambiguous-variable-name
+    "F401", # unused-import
+    "F402", # import-shadowed-by-loop-var
+    "F403", # undefined-local-with-import-star
+    "F405", # undefined-local-with-import-star-usage
+    "F541", # f-string-missing-placeholders
+    "F811", # redefined-while-unused
+    "F821", # undefined-name
+    "F822", # undefined-export
+    "F841", # unused-variable
+    ]
+
+[tool.ruff.format]
+exclude = [
+    # allow-list: incrementally remove as each is formatted and locked down
+    "bazel/*",
+    "buildscripts/*",
+    "evergreen/*",
+    "jstests/*",
+    "site_scons/*",
+    "src/*",
+    ]
+
 
 [build-system]
 requires = ["poetry-core"]

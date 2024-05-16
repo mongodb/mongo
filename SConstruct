@@ -6338,16 +6338,6 @@ if get_option('lint-scope') == 'changed':
 
     env.AlwaysBuild(patch_file)
 
-    pylinters = env.Command(
-        target="#lint-pylinters",
-        source=[
-            "buildscripts/pylinters.py",
-            patch_file,
-        ],
-        action=
-        "REVISION=$REVISION ENTERPRISE_REV=$ENTERPRISE_REV $PYTHON ${SOURCES[0]} lint-git-diff",
-    )
-
     clang_format = env.Command(
         target="#lint-clang-format",
         source=[
@@ -6369,14 +6359,6 @@ if get_option('lint-scope') == 'changed':
     )
 
 else:
-    pylinters = env.Command(
-        target="#lint-pylinters",
-        source=[
-            "buildscripts/pylinters.py",
-        ],
-        action="$PYTHON ${SOURCES[0]} lint-all",
-    )
-
     clang_format = env.Command(
         target="#lint-clang-format",
         source=[
@@ -6393,15 +6375,16 @@ else:
         action="$PYTHON ${SOURCES[0]} --dirmode lint jstests/ src/mongo",
     )
 
-sconslinters = env.Command(
-    target="#lint-sconslinters",
+
+pylinters = env.Command(
+    target="#lint-pylinters",
     source=[
         "buildscripts/pylinters.py",
     ],
-    action="$PYTHON ${SOURCES[0]} lint-scons",
+    action="$PYTHON ${SOURCES[0]} lint",
 )
 
-lint_py = env.Command(
+quickmongolint = env.Command(
     target="#lint-lint.py",
     source=["buildscripts/quickmongolint.py"],
     action="$PYTHON ${SOURCES[0]} lint",
@@ -6413,8 +6396,8 @@ lint_errorcodes = env.Command(
     action="$PYTHON ${SOURCES[0]} --quiet",
 )
 
-env.Alias("lint", [lint_py, eslint, clang_format, pylinters, sconslinters, lint_errorcodes])
-env.Alias("lint-fast", [eslint, clang_format, pylinters, sconslinters, lint_errorcodes])
+env.Alias("lint", [quickmongolint, eslint, clang_format, pylinters, lint_errorcodes])
+env.Alias("lint-fast", [eslint, clang_format, pylinters, lint_errorcodes])
 env.AlwaysBuild("lint")
 env.AlwaysBuild("lint-fast")
 

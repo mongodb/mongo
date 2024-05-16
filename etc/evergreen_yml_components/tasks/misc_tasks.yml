@@ -1028,31 +1028,6 @@ tasks:
         vars:
           targets: lint-pylinters
 
-  - name: lint_sconslinters
-    tags:
-      [
-        "assigned_to_jira_team_devprod_build",
-        "development_critical_single_variant",
-        "lint",
-      ]
-    commands:
-      - command: timeout.update
-        params:
-          # 40 minutes
-          exec_timeout_secs: 2400
-      - func: "f_expansions_write"
-      - command: manifest.load
-      - func: "git get project and add git tag"
-      - func: "f_expansions_write"
-      - func: "kill processes"
-      - func: "cleanup environment"
-      - func: "set up venv"
-      - func: "upload pip requirements"
-      - func: "get engflow creds"
-      - func: "scons lint"
-        vars:
-          targets: lint-sconslinters
-
   - name: lint_shellscripts
     tags:
       [

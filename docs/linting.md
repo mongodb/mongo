@@ -68,23 +68,17 @@ Ex: `bash buildscripts/yamllinters.sh`
 
 The `buildscripts/pylinters.py` wrapper script runs the Python linters. You can
 see the usage message for the wrapper by running the following command:
-`buildscripts/pylinters.py --help`. The following linters are supported: `pylint`, `mypy`,
-`pydocstyle` & `yapf`.
+`buildscripts/pylinters.py --help`.
 
 Ex: `buildscripts/pylinters.py lint`
 
-| Linter       | Configuration File(s) | Help Command        | Documentation                                                                                |
-| ------------ | --------------------- | ------------------- | -------------------------------------------------------------------------------------------- |
-| `pylint`     | `.pylintrc`           | `pylint --help`     | [https://www.pylint.org/](https://www.pylint.org/)                                           |
-| `mypy`       | `.mypy.ini`           | `mypy --help`       | [https://readthedocs.org/projects/mypy/](https://readthedocs.org/projects/mypy/)             |
-| `pydocstyle` | `.pydocstyle`         | `pydocstyle --help` | [https://readthedocs.org/projects/pydocstyle/](https://readthedocs.org/projects/pydocstyle/) |
-| `yapf`       | `.style.yapf`         | `yapf --help`       | [https://github.com/google/yapf](https://github.com/google/yapf)                             |
+| Linter | Configuration File(s) | Help Command  | Documentation                                                |
+| ------ | --------------------- | ------------- | ------------------------------------------------------------ |
+| `ruff` | `pyproject.toml`      | `ruff --help` | [https://docs.astral.sh/ruff/](https://docs.astral.sh/ruff/) |
 
 ### SCons Linters
 
-`buildscripts/pylinters.py` has the `lint-scons` and `fix-scons` commands to lint
-and fix SCons and build system related code. Currently `yapf` is the only
-linter supported for SCons code.
+`buildscripts/pylinters.py` lints over the SCons code automatically.
 
 ## Using SCons for linting
 

@@ -96,7 +96,13 @@ def _find_linter(linter, config_dict):
         # On Linux, these scripts are installed in %PYTHONDIR%\bin like
         # '/opt/mongodbtoolchain/v4/bin', but they may point to the wrong interpreter.
         cmd_str = os.path.join(python_dir, linter.cmd_name)
-        cmd = [sys.executable, cmd_str]
+
+        # Check for executables before assuming they are python scripts
+        cmd = [cmd_str]
+        if _check_version(linter, cmd, linter.get_lint_version_cmd_args()):
+            return base.LinterInstance(linter, cmd)
+        
+        cmd = [sys.executable] + cmd
 
     # Check 1: interpreter location or for linters that ignore current interpreter.
     if _check_version(linter, cmd, linter.get_lint_version_cmd_args()):
@@ -168,61 +174,28 @@ class LintRunner(object):
         with self.print_lock:
             print(line)
 
-    def run_lint(self, linter: base.LinterInstance, file_name: str, mongo_path: str,
-                 fix_command: str) -> bool:
+    def run_lint(self, linter: base.LinterInstance, file_name: str, mongo_path: str) -> bool:
         """Run the specified linter for the file."""
 
         linter_args = linter.linter.get_lint_cmd_args(file_name)
-        if not linter_args:
-            # If args is empty it means we didn't get a valid command
-            # to run and so should skip this file.
-            #
-            # For example the MyPy linter class will return empty args
-            # for non-idl files since they shouldn't be type checked.
-            return True
+        cmd = linter.cmd_path + linter_args
+
+        logging.debug(' '.join(cmd))
+
+        no_lint_errors = self.run(cmd)
+        return no_lint_errors
+    
+
+    def run_fix(self, linter: base.LinterInstance, file_name: str, mongo_path: str) -> bool:
+        """Run the specified lint fixes for the file."""
+
+        linter_args = linter.linter.get_fix_cmd_args(file_name)
 
         cmd = linter.cmd_path + linter_args
 
         logging.debug(' '.join(cmd))
 
-        no_lint_errors = True
-
-        try:
-            if linter.linter.needs_file_diff():
-                # Need a file diff
-                with open(file_name, 'rb') as original_text:
-                    original_file = original_text.read().decode('utf-8')
-
-                formatted_file = subprocess.check_output(cmd).decode('utf-8')
-                if original_file != formatted_file:
-                    original_lines = original_file.splitlines()
-                    formatted_lines = formatted_file.splitlines()
-                    result = difflib.unified_diff(original_lines, formatted_lines)
-
-                    # Take a lock to ensure diffs do not get mixed when printed to the screen
-                    with self.print_lock:
-                        file_name = os.path.relpath(file_name, mongo_path)
-                        print("ERROR: Found diff for " + file_name)
-                        print(
-                            f"To fix formatting errors, run buildscripts/pylinters.py {fix_command} {file_name}"
-                        )
-
-                        count = 0
-                        for line in result:
-                            print(line.rstrip())
-                            count += 1
-
-                        if count == 0:
-                            print("ERROR: The files only differ in trailing whitespace? LF vs CRLF")
-
-                    no_lint_errors = False
-            else:
-                subprocess.check_output(cmd).decode('utf-8')
-
-        except subprocess.CalledProcessError as cpe:
-            self._safe_print("CMD [%s] failed:\n%s" % (' '.join(cmd), cpe.output.decode('utf-8')))
-            no_lint_errors = False
-
+        no_lint_errors = self.run(cmd)
         return no_lint_errors
 
     def run(self, cmd):
@@ -234,7 +207,7 @@ class LintRunner(object):
         try:
             subprocess.check_output(cmd).decode('utf-8')
         except subprocess.CalledProcessError as cpe:
-            self._safe_print("CMD [%s] failed:\n%s" % (' '.join(cmd), cpe.output))
+            self._safe_print("CMD [%s] failed:\n%s" % (' '.join(cmd), cpe.output.decode('utf-8')))
             return False
 
         return True
