@@ -149,3 +149,12 @@ npm_translate_lock(
 load("@npm//:repositories.bzl", "npm_repositories")
 
 npm_repositories()
+
+ruff_version = "0.4.4"
+
+http_archive(
+    name = "ruff-linux",
+    build_file_content = 'exports_files(["ruff"])',
+    sha256 = "8ae35b6773bba1ca414c5134ba7e10935f35880bebbe50f18bb609bad9da5b13",
+    urls = ["https://github.com/astral-sh/ruff/releases/download/v{0}/ruff-{0}-aarch64-unknown-linux-gnu.tar.gz".format(ruff_version)],
+)

@@ -11,14 +11,24 @@ prettier.prettier_binary(
     env = {"BAZEL_BINDIR": "."},
 )
 
+alias(
+    name = "ruff",
+    actual = "@ruff-linux//:ruff",
+)
+
 py_binary(
     name = "format",
     srcs = ["format.py"],
     args = [
         "--prettier",
         "$(location :prettier)",
+        "--ruff",
+        "$(location :ruff)",
     ],
-    data = [":prettier"],
+    data = [
+        ":prettier",
+        ":ruff",
+    ],
     main = "format.py",
     visibility = ["//visibility:public"],
 )
