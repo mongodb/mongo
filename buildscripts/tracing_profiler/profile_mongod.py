@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from dataclasses import dataclass
 import argparse
 from threading import Event
 import json
@@ -9,42 +8,88 @@ import subprocess
 import sys
 from profilerlib import CallMetrics
 
-stop_event = Event()
 
+def get_profiler_stats(args):
+    command = [
+        "mongosh",
+        "--quiet",
+        "--eval",
+        "print(EJSON.stringify(db.runCommand({serverStatus: 1}).tracing_profiler))",
+    ]
 
-def on_stop_signal(signum, frame):
-    stop_event.set()
+    if args.username:
+        command.extend(["--username", args.username])
+    if args.password:
+        command.extend(["--password", args.password])
+    if args.tls:
+        command.append("--tls")
+    if args.tlsAllowInvalidCertificates:
+        command.append("--tlsAllowInvalidCertificates")
+    if args.tlsAllowInvalidHostnames:
+        command.append("--tlsAllowInvalidHostnames")
 
-
-def get_profiler_stats():
-    r = subprocess.check_output([
-        'mongosh', '--quiet', '--eval',
-        'print(EJSON.stringify(db.runCommand({serverStatus: 1}).tracing_profiler))'
-    ])
+    r = subprocess.check_output(command)
     return json.loads(r)
 
 
-def get_call_metrics():
-    return CallMetrics.from_json(get_profiler_stats())
+def get_call_metrics(args):
+    return CallMetrics.from_json(get_profiler_stats(args))
 
 
 def main():
-    signal.signal(signal.SIGINT, on_stop_signal)
+    stop_event = Event()
+    signal.signal(signal.SIGINT, lambda *_: stop_event.set())
 
     parser = argparse.ArgumentParser(
-        usage="usage: %(prog)s [options]", description="Collects a profiler data from mongod",
-        formatter_class=argparse.RawTextHelpFormatter, epilog="Press CTRL-C to stop profiling")
-
-    parser.add_argument("-s", "--sleep", dest="sleep", default=None,
-                        help="profiles for given number of seconds, or indefinitely if not")
+        usage="usage: %(prog)s [options]",
+        description="Collects a profiler data from mongod",
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog="Press CTRL-C to stop profiling",
+    )
+    parser.add_argument(
+        "-s",
+        "--sleep",
+        dest="sleep",
+        type=int,
+        help="profiles for given number of seconds, or indefinitely if not",
+    )
+    # The following are args that get passed through to mongosh
+    # See https://github.com/mongodb-js/mongosh?tab=readme-ov-file#cli-usage
+    parser.add_argument(
+        "-u",
+        "--username",
+        dest="username",
+        help="Username for authentication",
+    )
+    parser.add_argument(
+        "-p",
+        "--password",
+        dest="password",
+        help="Password for authentication",
+    )
+    parser.add_argument(
+        "--tls", dest="tls", action="store_true", help="Use TLS for all connections"
+    )
+    parser.add_argument(
+        "--tlsAllowInvalidCertificates",
+        dest="tlsAllowInvalidCertificates",
+        action="store_true",
+        help="Allow connections to servers with invalid certificates",
+    )
+    parser.add_argument(
+        "--tlsAllowInvalidHostnames",
+        dest="tlsAllowInvalidHostnames",
+        action="store_true",
+        help="Allow connections to servers with non-matching hostnames",
+    )
 
     args = parser.parse_args()
 
-    before_metrics = get_call_metrics()
+    before_metrics = get_call_metrics(args)
 
     sleep_sec = None
     if args.sleep is not None:
-        sleep_sec = int(args.sleep)
+        sleep_sec = args.sleep
 
     if sleep_sec is None:
         print("Profiling indefinitely until interrupted...", file=sys.stderr)
@@ -54,7 +99,7 @@ def main():
     print("Press CTRL-C to stop profiling", file=sys.stderr)
     stop_event.wait(sleep_sec)
 
-    after_metrics = get_call_metrics()
+    after_metrics = get_call_metrics(args)
 
     after_metrics.subtract(before_metrics)
     print(after_metrics.to_json())
