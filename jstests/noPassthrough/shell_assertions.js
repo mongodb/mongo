@@ -61,6 +61,29 @@
                   'doAssert should throw passed object as exception');
     });
 
+    tests.push(function callingDoAssertCorrectlyAttachesWriteErrors() {
+        const errorMessage = "Operation was interrupted";
+        const bulkResult = {
+            nModified: 0,
+            n: 0,
+            writeErrors: [{"index": 0, "code": 11601, "errmsg": errorMessage}],
+            upserted: [],
+            ok: 1
+        };
+
+        let error = assert.throws(() => doassert(errorMessage, new BulkWriteError(bulkResult)));
+        assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, new BulkWriteResult(bulkResult)));
+        assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, new WriteResult(bulkResult)));
+        assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, bulkResult));
+        assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
+    });
+
     /* assert tests */
 
     tests.push(function assertShouldFailForMoreThan2Args() {
