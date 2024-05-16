@@ -635,8 +635,6 @@ last-continuous:
     ticket: SERVER-89744
   - test_file: jstests/sharding/move_chunk_deferred_lookup.js
     ticket: SERVER-89859
-  - test_file: jstests/sharding/secondaries_clear_filtering_metadata.js
-    ticket: SERVER-86669
   - test_file: jstests/sharding/move_collection_capped_collection.js
     ticket: SERVER-89342
   - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
@@ -1332,8 +1330,6 @@ last-lts:
     ticket: SERVER-89744
   - test_file: jstests/sharding/move_chunk_deferred_lookup.js
     ticket: SERVER-89859
-  - test_file: jstests/sharding/secondaries_clear_filtering_metadata.js
-    ticket: SERVER-86669
   - test_file: jstests/sharding/move_collection_capped_collection.js
     ticket: SERVER-89342
   - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
