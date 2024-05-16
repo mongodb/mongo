@@ -83,7 +83,8 @@ public:
                                    const BSONObj& query,
                                    const BSONObj& update) override {}
 
-    void clearFilteringMetadata(OperationContext* opCtx) override {}
+    void refreshCollectionPlacementInfo(OperationContext* opCtx,
+                                        const NamespaceString& sourceNss) override {}
 };
 
 class DonorOpObserverForTest : public OpObserverForTest {

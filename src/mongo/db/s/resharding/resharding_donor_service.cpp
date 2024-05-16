@@ -47,6 +47,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
@@ -177,8 +178,9 @@ public:
         }
     }
 
-    void clearFilteringMetadata(OperationContext* opCtx) {
-        resharding::clearFilteringMetadata(opCtx, true /* scheduleAsyncRefresh */);
+    void refreshCollectionPlacementInfo(OperationContext* opCtx,
+                                        const NamespaceString& sourceNss) override {
+        onShardVersionMismatch(opCtx, sourceNss, boost::none);
     }
 };
 
@@ -367,8 +369,15 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
 
                {
                    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                   std::initializer_list<NamespaceString> namespacesToRefresh{
+                       _metadata.getSourceNss(), _metadata.getTempReshardingNss()};
 
-                   _externalState->clearFilteringMetadata(opCtx.get());
+                   // Clear filtering metadata for the source and temp resharding nss.
+                   for (const auto& nss : namespacesToRefresh) {
+                       AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
+                       CollectionShardingRuntime::get(opCtx.get(), nss)
+                           ->clearFilteringMetadata(opCtx.get());
+                   }
 
                    RecoverableCriticalSectionService::get(opCtx.get())
                        ->releaseRecoverableCriticalSection(
@@ -378,6 +387,13 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                            ShardingCatalogClient::kLocalWriteConcern);
 
                    _metrics()->leaveCriticalSection(getCurrentTime());
+
+                   // We force a refresh to make sure that the placement information is updated in
+                   // cache after abort decision before the donor state document is deleted.
+                   for (const auto& nss : namespacesToRefresh) {
+                       _externalState->refreshCollectionPlacementInfo(opCtx.get(), nss);
+                       _externalState->waitForCollectionFlush(opCtx.get(), nss);
+                   }
                }
 
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
