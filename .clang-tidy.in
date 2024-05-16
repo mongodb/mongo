@@ -20,6 +20,7 @@ Checks:          '-*,
                   bugprone-multiple-statement-macro,
                   bugprone-parent-virtual-call,
                   bugprone-sizeof-container,
+                  bugprone-string-constructor,
                   bugprone-string-integer-assignment,
                   bugprone-suspicious-enum-usage,
                   bugprone-suspicious-memset-usage,
@@ -77,7 +78,6 @@ Checks:          '-*,
                   -bugprone-move-forwarding-reference,
                   -bugprone-narrowing-conversions,
                   -bugprone-sizeof-expression,
-                  -bugprone-string-constructor,
                   -bugprone-string-literal-with-embedded-nul,
                   -bugprone-suspicious-missing-comma,
                   -bugprone-undefined-memory-manipulation,
@@ -137,17 +137,19 @@ HeaderFilterRegex: '(mongo/.*|@MONGO_BUILD_DIR@/.*)'
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros
     value:           assert
-  - key:             mongo-header-bracket-check.mongoSourceDirs
-    value:           'src/mongo;@MONGO_BUILD_DIR@'
-  - key:             mongo-collection-sharding-runtime-check.exceptionDirs
-    value:           'src/mongo/db/s'
   - key:             bugprone-assert-side-effect.CheckFunctionCalls
     value:           '0'
   - key:             bugprone-dangling-handle.HandleClasses
     value:           'std::basic_string_view;std::experimental::basic_string_view'
+  - key:             bugprone-string-constructor.WarnOnLargeLength
+    value:           '0'
   - key:             bugprone-suspicious-enum-usage.StrictMode
     value:           '0'
   - key:             modernize-replace-auto-ptr.IncludeStyle
     value:           llvm
   - key:             modernize-replace-random-shuffle.IncludeStyle
     value:           llvm
+  - key:             mongo-collection-sharding-runtime-check.exceptionDirs
+    value:           'src/mongo/db/s'
+  - key:             mongo-header-bracket-check.mongoSourceDirs
+    value:           'src/mongo;@MONGO_BUILD_DIR@'

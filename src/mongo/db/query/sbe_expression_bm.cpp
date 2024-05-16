@@ -73,7 +73,7 @@ namespace mongo {
 namespace {
 template <typename T>
 std::string debugPrint(const T* sbeElement) {
-    return sbeElement ? sbe::DebugPrinter{}.print(sbeElement->debugPrint()) : nullptr;
+    return sbeElement ? sbe::DebugPrinter{}.print(sbeElement->debugPrint()) : std::string();
 }
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.bm");
