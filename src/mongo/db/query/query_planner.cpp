@@ -848,6 +848,21 @@ std::unique_ptr<QuerySolution> buildEofOrCollscanSoln(
     return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
 }
 
+std::unique_ptr<QuerySolution> buildVirtScanSoln(const std::vector<BSONArray>& docs,
+                                                 bool hasRecordId,
+                                                 const BSONObj& indexKeyPattern,
+                                                 const CanonicalQuery& query,
+                                                 const QueryPlannerParams& params) {
+    const auto kScanType = indexKeyPattern.isEmpty() ? VirtualScanNode::ScanType::kCollScan
+                                                     : VirtualScanNode::ScanType::kIxscan;
+
+    std::unique_ptr<QuerySolutionNode> solnRoot =
+        std::make_unique<VirtualScanNode>(docs, kScanType, hasRecordId);
+    solnRoot->filter = query.getPrimaryMatchExpression()->clone();
+
+    return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
+}
+
 std::unique_ptr<QuerySolution> buildWholeIXSoln(
     const IndexEntry& index,
     const CanonicalQuery& query,
@@ -1025,6 +1040,18 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
         if (!soln) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "plan cache error: collection scan soln");
+        } else {
+            return {std::move(soln)};
+        }
+    } else if (SolutionCacheData::VIRTSCAN_SOLN == solnCacheData.solnType) {
+        tassert(9049200,
+                "Constructing a virtual scan plan from cache requires 'VirtualScanCacheData",
+                solnCacheData.virtualScanData);
+        const VirtualScanCacheData& vscd = *solnCacheData.virtualScanData;
+        auto soln =
+            buildVirtScanSoln(vscd.docs, vscd.hasRecordId, vscd.indexKeyPattern, query, params);
+        if (!soln) {
+            return Status(ErrorCodes::NoQueryExecutionPlans, "plan cache error: virtual scan soln");
         } else {
             return {std::move(soln)};
         }
