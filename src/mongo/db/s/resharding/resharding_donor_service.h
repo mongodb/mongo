@@ -298,7 +298,8 @@ public:
                                            const BSONObj& query,
                                            const BSONObj& update) = 0;
 
-    virtual void clearFilteringMetadata(OperationContext* opCtx) = 0;
+    virtual void refreshCollectionPlacementInfo(OperationContext* opCtx,
+                                                const NamespaceString& sourceNss) = 0;
 };
 
 }  // namespace mongo
