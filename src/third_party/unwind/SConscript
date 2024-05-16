@@ -3,6 +3,7 @@
 Import("env")
 Import("has_option")
 Import("debugBuild")
+Import("vendored_libunwind_needs_lzma")
 
 # https://www.nongnu.org/libunwind/man/libunwind(3).html#section_1
 # For local unwinding (introspection, which is all we want), include
@@ -153,13 +154,15 @@ env.Append(CPPPATH=[
     unwind_root.Dir("dist/include/tdep-${UNWIND_TARGET_ARCH}"),
 ])
 
-# propagates to consumers that inject (depend on) unwind.
-env.RegisterConsumerModifications(
-    CPPPATH=[unwind_platform.Dir("install/include")],
-    SYSLIBDEPS_PRIVATE=[env['LIBDEPS_LZMA_SYSLIBDEP']],
-)
+extra_sysdeps = {}
+if vendored_libunwind_needs_lzma:
+    extra_sysdeps['SYSLIBDEPS_PRIVATE'] = [env['LIBDEPS_LZMA_SYSLIBDEP']]
 
-env.Append(SYSLIBDEPS_PRIVATE=[env['LIBDEPS_LZMA_SYSLIBDEP']])
+# propagates to consumers that inject (depend on) unwind.
+env.RegisterConsumerModifications(CPPPATH=[unwind_platform.Dir("install/include")], **extra_sysdeps)
+
+if len(extra_sysdeps):
+    env.Append(**extra_sysdeps)
 
 env.Append(CPPDEFINES=[
     'HAVE_CONFIG_H',
