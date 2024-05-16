@@ -188,6 +188,7 @@ functions:
   "get engflow creds":
     - *get_engflow_key
     - *get_engflow_cert
+    - *f_expansions_write
     - *generate_evergreen_bazelrc
 
   "adjust venv": &adjust_venv
@@ -241,12 +242,11 @@ functions:
       local_file: src/mongo-binaries.tgz
 
   "write mongo binary URL to downstream_expansions.yml": &echo_mongo_binary_url
-    command: shell.exec
+    command: subprocess.exec
     params:
-      shell: bash
-      script: |
-        touch downstream_expansions.yaml
-        echo "${build_variant}-mongo-binaries: https://mciuploads.s3.amazonaws.com/${mongo_binaries}" 2>&1 | tee downstream_expansions.yaml
+      binary: bash
+      args:
+        - "./src/evergreen/write_mongo_binary_url_to_downstream_expansions.sh"
 
   "set downstreams expansions": &downstream_expansions
     command: downstream_expansions.set
@@ -299,6 +299,7 @@ functions:
   "get and apply version expansions":
     - *get_version_expansions
     - *apply_version_expansions
+    - *f_expansions_write
 
   "fetch benchmarks": &fetch_benchmarks
     command: s3.get
@@ -601,6 +602,7 @@ functions:
       display_name: Pip Requirements
 
   "run clang tidy": &run_clang_tidy
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
@@ -687,6 +689,12 @@ functions:
     - *collect_ulimit_info
 
   "write and set downstream expansions":
+    - *f_expansions_write
+    - *fetch_artifacts
+    - *kill_processes
+    - *cleanup_environment
+    - *fetch_venv
+    - *adjust_venv
     - *echo_mongo_binary_url
     - *downstream_expansions
 
@@ -698,6 +706,7 @@ functions:
         remote_file: ${mongo_debugsymbols}
         bucket: mciuploads
         local_file: src/mongo-debugsymbols.${ext|tgz}
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
@@ -969,9 +978,12 @@ functions:
     - *generate_resmoke_tasks_config
 
   "initialize multiversion tasks": &initialize_multiversion_tasks
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        script: "echo 'noop'"
+        binary: echo
+        args:
+          - "noop"
 
   "generate resmoke tasks":
     - *fetch_artifacts
@@ -980,6 +992,7 @@ functions:
     - *cleanup_environment
     - *get_version_expansions
     - *apply_version_expansions
+    - *f_expansions_write
     - *fetch_venv
     - *adjust_venv
     - *f_expansions_write
@@ -1055,6 +1068,7 @@ functions:
     - *configure_evergreen_api_credentials
     - *determine_task_timeout
     - *update_task_timeout_expansions
+    - *f_expansions_write
     - *update_task_timeout
     - *f_expansions_write
     - *sign_macos_dev_binaries
@@ -1177,6 +1191,7 @@ functions:
         updates:
           - key: install_dir
             value: ${install_dir}
+    - *f_expansions_write
     - command: s3.put
       display_name: "attach bazel scons diff file"
       params:
@@ -1231,6 +1246,7 @@ functions:
       display_name: Bazel-SCons Diff File
 
   "fetch bazel":
+    - *f_expansions_write
     - command: subprocess.exec
       display_name: "fetch bazel"
       type: test
@@ -1242,12 +1258,13 @@ functions:
   "verify build output present":
     # Args:
     #   $output (string) - relpath to the file-to-be-checked
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       display_name: "verify build output present"
       params:
-        working_dir: src
-        script: |
-          test -f ${output}
+        binary: bash
+        args:
+          - "src/evergreen/verify_build_output_present.sh"
 
   "bazel compile sh": &bazel_compile_sh
     command: subprocess.exec
@@ -1326,6 +1343,7 @@ functions:
       display_name: version expansions
 
   "generate and upload version expansions":
+    - *f_expansions_write
     - *generate_version_expansions
     - *upload_version_expansions
 
@@ -1367,6 +1385,7 @@ functions:
       display_name: resmoke constants
 
   "generate and upload resmoke constants":
+    - *f_expansions_write
     - *generate_resmoke_constants
     - *archive_resmoke_constants
     - *upload_remoske_constants
@@ -1712,11 +1731,12 @@ functions:
           - "./src/evergreen/packager.py_run.sh"
 
   "do watchdog setup":
-    command: subprocess.exec
-    params:
-      binary: bash
-      args:
-        - "./src/evergreen/do_watchdog_setup.sh"
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/do_watchdog_setup.sh"
 
   "run package test":
     - *get_version_expansions
@@ -2343,6 +2363,7 @@ functions:
       file_location: ${report_file|src/report.json}
 
   "combine build metrics":
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
@@ -2350,6 +2371,7 @@ functions:
         args:
           - "src/evergreen/run_python_script.sh"
           - "site_scons/site_tools/build_metrics/combine_metrics_unittest.py"
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
@@ -2362,6 +2384,7 @@ functions:
           - "--prefix-name=pull_cache"
 
   "print top N metrics":
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
@@ -2405,6 +2428,7 @@ functions:
         content_type: application/gzip
         display_name: Metrics JSON
 
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
@@ -2561,22 +2585,25 @@ functions:
           - "./src/evergreen/antithesis_image_build_and_push.sh"
 
   "cleanup external auth OIDC resources":
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "./src/evergreen/external_auth_gcp_teardown.sh"
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "./src/evergreen/external_auth_azure_teardown.sh"
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "./src/evergreen/external_auth_oidc_teardown.sh"
-
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash

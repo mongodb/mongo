@@ -15,7 +15,7 @@ rules:
   # # users to source a script called `prelude.sh`. This script requires that
   # # the user be in ${workdir}, so we forbid users from `cd`ing with
   # # `working_dir` parameter.
-  # - rule: "no-working-dir-on-shell"
+  - rule: "no-working-dir-on-shell"
 
   # # Embedding shell.exec scripts in the Evergreen yaml has been a historical
   # # source of pain:
@@ -25,7 +25,7 @@ rules:
   # # We completed a project to completely eject all shell scripts from the
   # # YAML, and now require this of all shell scripts. Add your scripts to the
   # # evergreen/ directory, and make use of subprocess.exec.
-  # - rule: "no-shell-exec"
+  - rule: "no-shell-exec"
 
   # Historically, expansions.update has been used to inject shell scripts
   # into expansions, which were then used to inject commonly used snippets
@@ -41,8 +41,8 @@ rules:
   # # To ensure that the expansions file loaded by prelude.sh is not stale, we
   # # require the user to add sometimes superfluous expansions.write calls to
   # # ere on side of correctness.
-  # - rule: "required-expansions-write"
-  #   regex: .*\/evergreen\/.*\.sh
+  - rule: "required-expansions-write"
+    regex: .*\/evergreen\/.*\.sh
 
   # Generated tests must depend on build_variant_gen (which generates the
   # tasks that contain them) and archive_dist_test (which contains

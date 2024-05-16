@@ -56,9 +56,12 @@ variables:
     tags:
       - assigned_to_jira_team_devprod_correctness
     commands:
-      - command: shell.exec
+      - func: "f_expansions_write"
+      - command: subprocess.exec
         params:
-          script: "echo 'noop'"
+          binary: echo
+          args:
+            - "noop"
 
 ################################################
 #                    Tasks                     #
@@ -383,6 +386,7 @@ tasks:
         variant: generate-tasks-for-version
     commands:
       - func: "do scons setup"
+      - func: "f_expansions_write"
       - command: subprocess.exec
         params:
           binary: bash
@@ -531,6 +535,7 @@ tasks:
       ]
     commands:
       - func: "do scons setup"
+      - func: "f_expansions_write"
       - command: subprocess.exec
         params:
           binary: bash
@@ -1508,6 +1513,7 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "configure evergreen api credentials"
+      - func: "f_expansions_write"
       - command: subprocess.exec
         type: test
         params:

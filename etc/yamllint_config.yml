@@ -8,5 +8,8 @@ rules:
   comments-indentation: disable
   truthy: disable
 
-ignore: |
-  buildscripts/packaging/msi/mongod.yaml
+ignore:
+  - buildscripts/packaging/msi/mongod.yaml
+  - etc/evaluated_evergreen.yml
+  - etc/evaluated_evergreen_nightly.yml
+  - etc/evaluated_system_perf.yml
