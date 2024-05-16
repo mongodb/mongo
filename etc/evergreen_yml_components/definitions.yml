@@ -2451,6 +2451,14 @@ functions:
       args:
       - "./src/evergreen/antithesis_image_build_and_push.sh"
 
+  "cleanup external auth test artifacts":
+  - *f_expansions_write
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "./src/evergreen/sasl_windows_cyrussasl_teardown.sh"
+
 
 #######################################
 #               Tasks                 #
@@ -2558,6 +2566,20 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: multiversion_future_git_tag
+
+- <<: *task_template
+  name: sasl_windows_cyrussasl
+  tags: ["assigned_to_jira_team_server_security", "sasl", "experimental"]
+  commands:
+  - func: "f_expansions_write"
+  - func: "do setup"
+  - func: "f_expansions_write"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/sasl_windows_cyrussasl_setup.sh"
+  - func: "run tests"
 
 - <<: *task_template
   name: jsCore

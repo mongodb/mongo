@@ -115,6 +115,7 @@ buildvariants:
   - name: .replica_sets .common
   - name: .replica_sets .multi_oplog !.gcm
   - name: sasl
+  - name: sasl_windows_cyrussasl
   - name: .sharding .txns
   - name: sharding_auth_audit_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
