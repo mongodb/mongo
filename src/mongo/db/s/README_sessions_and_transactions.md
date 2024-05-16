@@ -334,6 +334,45 @@ command to the mongos that the transaction runs on. The command is also retryabl
 been started on the session and the session is still alive. In both cases, the mongos simply sends `abortTransaction`
 to all participant shards.
 
+### Shard Acting as Router
+
+In typical transactions, all transaction participants are contacted by mongos,
+which maintains the state of the transaction and its shard participants.
+However, some sub-operations and sub-pipelines executing on a shard can cause the shard
+to target a second shard that may or may not already be a participant in the transaction.
+As such, the originating participant begins acting as a "subrouter" --
+a participant that can send requests to and receive responses from participants
+it has added to the transaction.
+
+To target another shard and add it as a participant to the transaction,
+the originating participant instantiates a subrouter object (`TransactionRouter`) to maintain
+a list of participants it has added.
+The originating participant attaches an internal-only field,
+`startOrContinueTransaction: true`, on the request it is sending to the targeted shard.
+The transaction-level `readConcern` argument will also be attached to the request.
+If the transaction's `readConcern` level is not `snapshot`,
+then the originating participant includes its own
+`placementConflictTimeForNonSnapshotReadConcern` as
+`placementConflictTime` in `shardVersion` on the request.
+Otherwise, for `snapshot` `readConcern`, there is no change:
+the `atClusterTime` of the transaction's snapshot is included in `shardVersion`.
+
+The targeted shard that receives this request starts a new transaction in the same way it would
+if receiving a request from mongos with the field `startTransaction: true`.
+However, if the targeted shard is already a participant of the same transaction,
+it performs the request as part of its current transaction.
+When a participant with a subrouter responds to a request,
+it attaches its list of participants to its response;
+thus mongos is made aware of participants that have been added to the transaction
+by the participant shard.
+This ensures that mongos sends abort and commit commands to participants
+that have been added by other participants.
+
+Because subrouters do not maintain global knowledge of the participants in a transaction,
+they do not initiate commit or abort of the transaction.
+
+Clients are not allowed to send the `startOrContinueTransaction` field.
+
 #### Code references
 
 - [**TransactionRouter class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/transaction_router.h)
