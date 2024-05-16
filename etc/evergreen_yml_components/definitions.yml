@@ -7118,6 +7118,13 @@ tasks:
   - name: compile_dist_test
   commands:
   - *f_expansions_write
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/obtain_sbom_from_silk.py"
+      - "--path=sbom_from_silk.json"
   - func: "scons compile"
     vars:
       targets: >-
@@ -7128,6 +7135,7 @@ tasks:
         ${additional_package_targets|}
       task_compile_flags: >-
         --legacy-tarball
+        --extra_dist_files=sbom_from_silk.json
   - command: subprocess.exec
     params:
       binary: bash

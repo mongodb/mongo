@@ -268,3 +268,4 @@ buildifier
 .bazelrc.local
 .bazel_info_for_ninja.txt
 .ninja_last_command_line_targets.txt
+scons_cache.log.json

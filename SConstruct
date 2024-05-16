@@ -165,6 +165,12 @@ add_option(
 )
 
 add_option(
+    'extra_dist_files',
+    help=
+    'If defined, it should be a comma-delimited list of repository-relative paths to include in the dist target as installed files',
+)
+
+add_option(
     'build-tools',
     choices=['stable', 'next'],
     default='stable',
@@ -6316,6 +6322,20 @@ clang_tidy_config = env.Substfile(
     ],
     SUBST_DICT=replacements,
 )
+
+if has_option('extra_dist_files'):
+    distsrc = env.Dir('#distsrc')
+    env.AutoInstall(
+        target='$PREFIX',
+        source=[
+            distsrc.File("#/" + extra_dist_file)
+            for extra_dist_file in get_option('extra_dist_files').split(',')
+        ],
+        AIB_COMPONENT='common',
+        AIB_COMPONENTS_EXTRA=['dist'],
+        AIB_ROLE='base',
+    )
+
 env.Alias("generated-sources", clang_tidy_config)
 
 if get_option('ninja') == 'disabled':
