@@ -64,6 +64,7 @@ def install_bazel(binary_directory: str) -> str:
     binary_path = os.path.join(binary_directory, binary_filename)
     if os.path.exists(binary_path):
         print(f"{binary_filename} already exists ({binary_path}), skipping download")
+        _set_bazel_permissions(binary_path)
         return binary_path
 
     print(f"Downloading {binary_filename}...")
@@ -83,10 +84,14 @@ def install_bazel(binary_directory: str) -> str:
 
     print(f"Downloaded {binary_filename} to {binary_path}")
 
+    _set_bazel_permissions(binary_path)
+    return binary_path
+
+
+def _set_bazel_permissions(binary_path: str) -> None:
     # Bazel is a self-extracting zip launcher and needs read perms on the executable to read the zip from itself.
     perms = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IWUSR | stat.S_IWGRP
     os.chmod(binary_path, perms)
-    return binary_path
 
 
 def create_bazel_to_bazelisk_symlink(binary_directory: str) -> str:
