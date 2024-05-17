@@ -38,8 +38,9 @@ def list_idls(directory: str) -> Set[str]:
     """Find all IDL files in the current directory."""
     return {
         os.path.join(dirpath, filename)
-        for dirpath, dirnames, filenames in os.walk(directory) for filename in filenames
-        if filename.endswith('.idl')
+        for dirpath, dirnames, filenames in os.walk(directory)
+        for filename in filenames
+        if filename.endswith(".idl")
     }
 
 

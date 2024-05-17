@@ -36,7 +36,7 @@ import sys
 from typing import List
 
 # Permit imports from "buildscripts".
-sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), '../../..')))
+sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), "../../..")))
 
 # pylint: disable=wrong-import-position
 from buildscripts.idl import lib
@@ -58,7 +58,7 @@ def gen_all_server_params(idl_dirs: List[str] = None):
             # Most IDL files do not contain server parameters.
             # We can discard these quickly without expensive YAML parsing.
             with open(idl_path) as idl_file:
-                if 'server_parameters' not in idl_file.read():
+                if "server_parameters" not in idl_file.read():
                     continue
             with open(idl_path) as idl_file:
                 doc = parser.parse_file(idl_file, idl_path)
@@ -80,5 +80,5 @@ def main():
     gen_all_server_params_file()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

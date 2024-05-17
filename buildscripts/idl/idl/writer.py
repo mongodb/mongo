@@ -39,9 +39,9 @@ _INDENT_SPACE_COUNT = 4
 def _fill_spaces(count):
     # type: (int) -> str
     """Fill a string full of spaces."""
-    fill = ''
+    fill = ""
     for _ in range(count * _INDENT_SPACE_COUNT):
-        fill += ' '
+        fill += " "
 
     return fill
 
@@ -51,7 +51,7 @@ def _indent_text(count, unindented_text):
     """Indent each line of a multi-line string."""
     lines = unindented_text.splitlines()
     fill = _fill_spaces(count)
-    return '\n'.join(fill + line for line in lines)
+    return "\n".join(fill + line for line in lines)
 
 
 def is_function(name):
@@ -68,10 +68,10 @@ def is_function(name):
 def get_method_name(name):
     # type: (str) -> str
     """Get a method name from a fully qualified method name."""
-    pos = name.rfind('::')
+    pos = name.rfind("::")
     if pos == -1:
         return name
-    return name[pos + 2:]
+    return name[pos + 2 :]
 
 
 def get_method_name_from_qualified_method_name(name):
@@ -82,12 +82,12 @@ def get_method_name_from_qualified_method_name(name):
     if name.startswith("::"):
         name = name[2:]
 
-    prefix = 'mongo::'
+    prefix = "mongo::"
     pos = name.find(prefix)
     if pos == -1:
         return name
 
-    return name[len(prefix):]
+    return name[len(prefix) :]
 
 
 class IndentedTextWriter(object):
@@ -243,7 +243,7 @@ class NamespaceScopeBlock(WriterBlock):
         # type: () -> None
         """Write the beginning of the block and do not indent."""
         for namespace in self._namespaces:
-            self._writer.write_unindented_line('namespace %s {' % (namespace))
+            self._writer.write_unindented_line("namespace %s {" % (namespace))
 
     def __exit__(self, *args):
         # type: (*str) -> None
@@ -251,7 +251,7 @@ class NamespaceScopeBlock(WriterBlock):
         self._namespaces.reverse()
 
         for namespace in self._namespaces:
-            self._writer.write_unindented_line('}  // namespace %s' % (namespace))
+            self._writer.write_unindented_line("}  // namespace %s" % (namespace))
 
 
 class UnindentedBlock(WriterBlock):
@@ -304,7 +304,7 @@ def _get_common_prefix(words):
     """
     empty_words = [lw for lw in words if len(lw) == 0]
     if empty_words:
-        return ''
+        return ""
 
     first_letters = {w[0] for w in words}
 
@@ -317,7 +317,7 @@ def _get_common_prefix(words):
 
         return words[0][0] + _get_common_prefix(suffix_words)
     else:
-        return ''
+        return ""
 
 
 def gen_trie(words, writer, callback):
@@ -329,7 +329,7 @@ def gen_trie(words, writer, callback):
     i.e. for ["abc", "def"], then callback() will be called twice, once for each string.
     """
 
-    _gen_trie('', words, writer, callback)
+    _gen_trie("", words, writer, callback)
 
 
 def _gen_trie(prefix, words, writer, callback):
@@ -352,12 +352,14 @@ def _gen_trie(prefix, words, writer, callback):
         suffix = words[0]
         suffix_len = len(suffix)
 
-        predicate = f'fieldName.size() == {len(word_to_check)} && ' \
+        predicate = (
+            f"fieldName.size() == {len(word_to_check)} && "
             + f'std::char_traits<char>::compare(fieldName.rawData() + {prefix_len}, "{suffix}", {suffix_len}) == 0'
+        )
 
         # If there is no trailing text, we just need to check length to validate we matched
         if suffix_len == 0:
-            predicate = f'fieldName.size() == {len(word_to_check)}'
+            predicate = f"fieldName.size() == {len(word_to_check)}"
 
         # Optimization:
         # Checking strings of length 1 or even length is efficient. Strings of 3 byte length are
@@ -365,10 +367,12 @@ def _gen_trie(prefix, words, writer, callback):
         # length strings require just 1. Since we know the field name is zero terminated, we can
         # just use memcmp and compare with the trailing null byte.
         elif suffix_len % 4 == 3:
-            predicate = f'fieldName.size() == {len(word_to_check)} && ' \
+            predicate = (
+                f"fieldName.size() == {len(word_to_check)} && "
                 + f' memcmp(fieldName.rawData() + {prefix_len}, "{suffix}\\0", {suffix_len + 1}) == 0'
+            )
 
-        with IndentedScopedBlock(writer, f'if ({predicate}) {{', '}'):
+        with IndentedScopedBlock(writer, f"if ({predicate}) {{", "}"):
             callback(word_to_check)
 
         return
@@ -379,7 +383,7 @@ def _gen_trie(prefix, words, writer, callback):
     empty_words = [lw for lw in words if len(lw) == 0]
     if empty_words:
         word_to_check = prefix
-        with IndentedScopedBlock(writer, f'if (fieldName.size() == {len(word_to_check)}) {{', "}"):
+        with IndentedScopedBlock(writer, f"if (fieldName.size() == {len(word_to_check)}) {{", "}"):
             callback(word_to_check)
 
     # Filter out empty words
@@ -395,10 +399,11 @@ def _gen_trie(prefix, words, writer, callback):
         suffix_words = [flw[gcp_len:] for flw in words]
 
         with IndentedScopedBlock(
-                writer,
-                f'if (fieldName.size() >= {gcp_len} && '\
-                  + f'std::char_traits<char>::compare(fieldName.rawData() + {prefix_len}, "{gcp}", {gcp_len}) == 0) {{',
-                "}"):
+            writer,
+            f"if (fieldName.size() >= {gcp_len} && "
+            + f'std::char_traits<char>::compare(fieldName.rawData() + {prefix_len}, "{gcp}", {gcp_len}) == 0) {{',
+            "}",
+        ):
             _gen_trie(prefix + gcp, suffix_words, writer, callback)
 
         return
@@ -410,16 +415,16 @@ def _gen_trie(prefix, words, writer, callback):
     first_letters = {w[0] for w in sorted_words}
     min_len = len(prefix) + min([len(w) for w in sorted_words])
 
-    with IndentedScopedBlock(writer, f'if (fieldName.size() >= {min_len}) {{', "}"):
+    with IndentedScopedBlock(writer, f"if (fieldName.size() >= {min_len}) {{", "}"):
         first_if = True
 
         for first_letter in first_letters:
-
             fl_words = [flw[1:] for flw in words if flw[0] == first_letter]
 
-            ei = "else " if not first_if else ''
+            ei = "else " if not first_if else ""
             with IndentedScopedBlock(
-                    writer, f"{ei}if (fieldName[{len(prefix)}] == '{first_letter}') {{", "}"):
+                writer, f"{ei}if (fieldName[{len(prefix)}] == '{first_letter}') {{", "}"
+            ):
                 _gen_trie(prefix + first_letter, fl_words, writer, callback)
 
             first_if = False
@@ -429,6 +434,6 @@ def gen_string_table_find_function_block(out, in_str, on_match, on_fail, words):
     # type: (IndentedTextWriter, str, str, str, list[str]) -> None
     """Wrap a gen_trie generated block as a function."""
     index = {word: i for i, word in enumerate(words)}
-    out.write_line(f'StringData fieldName{{{in_str}}};')
-    gen_trie(words, out, lambda w: out.write_line(f'return {on_match.format(index[w])};'))
-    out.write_line(f'return {on_fail};')
+    out.write_line(f"StringData fieldName{{{in_str}}};")
+    gen_trie(words, out, lambda w: out.write_line(f"return {on_match.format(index[w])};"))
+    out.write_line(f"return {on_fail};")

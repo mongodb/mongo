@@ -43,6 +43,7 @@ from textwrap import dedent
 # import package so that it works regardless of whether we run as a module or file
 if __package__ is None:
     import sys
+
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     from context import idl
     import testcase
@@ -61,16 +62,17 @@ class TestGenerator(testcase.IDLTestcase):
     def _src_dir(self):
         """Get the directory of the src folder."""
         base_dir = os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        )
         return os.path.join(
             base_dir,
-            'src',
+            "src",
         )
 
     @property
     def _idl_dir(self):
         """Get the directory of the idl folder."""
-        return os.path.join(self._src_dir, 'mongo', 'idl')
+        return os.path.join(self._src_dir, "mongo", "idl")
 
     def tearDown(self) -> None:
         """Cleanup resources created by tests."""
@@ -87,14 +89,15 @@ class TestGenerator(testcase.IDLTestcase):
         args.output_suffix = self.output_suffix
         args.import_directories = [self._src_dir]
 
-        unittest_idl_file = os.path.join(self._idl_dir, f'{self.idl_files_to_test[0]}.idl')
+        unittest_idl_file = os.path.join(self._idl_dir, f"{self.idl_files_to_test[0]}.idl")
         if not os.path.exists(unittest_idl_file):
             unittest.skip(
-                "Skipping IDL Generator testing since %s could not be found." % (unittest_idl_file))
+                "Skipping IDL Generator testing since %s could not be found." % (unittest_idl_file)
+            )
             return
 
         for idl_file in self.idl_files_to_test:
-            args.input_file = os.path.join(self._idl_dir, f'{idl_file}.idl')
+            args.input_file = os.path.join(self._idl_dir, f"{idl_file}.idl")
             self.assertTrue(idl.compiler.compile_idl(args))
 
     def test_enum_non_const(self):
@@ -130,13 +133,15 @@ class TestGenerator(testcase.IDLTestcase):
         # Make sure the getter is marked as const.
         # Make sure the return type is not marked as const by validating the getter marked as const
         # is the only occurrence of the word "const".
-        header_lines = header.split('\n')
+        header_lines = header.split("\n")
 
         found = False
         for header_line in header_lines:
-            if header_line.find("getValue") > 0 \
-                and header_line.find("const {") > 0 \
-                and header_line.find("const {") == header_line.find("const"):
+            if (
+                header_line.find("getValue") > 0
+                and header_line.find("const {") > 0
+                and header_line.find("const {") == header_line.find("const")
+            ):
                 found = True
 
         self.assertTrue(found, "Bad Header: " + header)
@@ -267,7 +272,8 @@ class TestGenerator(testcase.IDLTestcase):
         self.assertIn(expected, source)
 
     def test_array_of_object_type_with_custom_serializer_and_query_shape_specification_custom(
-            self) -> None:
+        self,
+    ) -> None:
         """Serialization with custom query_shape used, array use case."""
         _, source = self.assert_generate("""
         types:
@@ -373,7 +379,9 @@ class TestGenerator(testcase.IDLTestcase):
 
     def test_view_struct_generates_anchor(self) -> None:
         """Test anchor generation on view struct."""
-        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        header, _ = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
         structs:
                 ViewStruct:
                     description: ViewStruct
@@ -382,14 +390,17 @@ class TestGenerator(testcase.IDLTestcase):
                         value2: random_type_not_view
                         value3: random_type_not_view
                         value4: random_type_not_view
-        """))
+        """)
+        )
 
         expected = dedent("BSONObj _anchorObj;")
         self.assertIn(expected, header)
 
     def test_non_view_struct_does_not_generate_anchor(self) -> None:
         """Test anchor is not generated on non view struct."""
-        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        header, _ = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
         structs:
                 NonViewStruct:
                     description: NonViewStruct
@@ -398,14 +409,17 @@ class TestGenerator(testcase.IDLTestcase):
                         value2: random_type_not_view
                         value3: random_type_not_view
                         value4: random_type_not_view
-        """))
+        """)
+        )
 
         expected = dedent("BSONObj _anchorObj;")
         self.assertNotIn(expected, header)
 
     def test_compound_view_struct_generates_anchor(self) -> None:
         """Test anchor generation on view struct with compound type."""
-        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        header, _ = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
         structs:
                 ViewStruct:
                     description: ViewStruct
@@ -414,14 +428,17 @@ class TestGenerator(testcase.IDLTestcase):
                         value2: random_type_not_view
                         value3: random_type_not_view
                         value4: random_type_not_view
-        """))
+        """)
+        )
 
         expected = dedent("BSONObj _anchorObj;")
         self.assertIn(expected, header)
 
     def test_compound_non_view_struct_does_not_generate_anchor(self) -> None:
         """Test anchor is not generated on non view struct with compound type."""
-        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        header, _ = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
         structs:
                 NonViewStruct:
                     description: NonViewStruct
@@ -430,14 +447,17 @@ class TestGenerator(testcase.IDLTestcase):
                         value2: random_type_not_view
                         value3: random_type_not_view
                         value4: random_type_not_view
-        """))
+        """)
+        )
 
         expected = dedent("BSONObj _anchorObj;")
         self.assertNotIn(expected, header)
 
     def test_command_view_type_generates_anchor(self) -> None:
         """Test anchor generation on command with view parameter."""
-        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        header, _ = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
         commands:
                 CommandTypeArrayObjectCommand:
                     description: CommandTypeArrayObjectCommand
@@ -445,14 +465,17 @@ class TestGenerator(testcase.IDLTestcase):
                     namespace: type
                     api_version: ""
                     type: array<object_is_view>
-        """))
+        """)
+        )
 
         expected = dedent("BSONObj _anchorObj;")
         self.assertIn(expected, header)
 
     def test_command_non_view_type_does_not_generate_anchor(self) -> None:
         """Test anchor is not generated on command with nont view parameter."""
-        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        header, _ = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
         commands:
                 CommandTypeArrayObjectCommand:
                     description: CommandTypeArrayObjectCommand
@@ -460,14 +483,17 @@ class TestGenerator(testcase.IDLTestcase):
                     namespace: type
                     api_version: ""
                     type: array<object_is_not_view>
-        """))
+        """)
+        )
 
         expected = dedent("BSONObj _anchorObj;")
         self.assertNotIn(expected, header)
 
     def test_chained_view_struct_generates_anchor(self) -> None:
         """Test anchor generation on struct chained with view struct."""
-        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        header, _ = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
         structs:
                 ViewStruct:
                     description: ViewStruct
@@ -480,14 +506,17 @@ class TestGenerator(testcase.IDLTestcase):
                     description: ViewStructChainedStruct
                     chained_structs:
                         ViewStruct: ViewStruct
-        """))
+        """)
+        )
 
         expected = dedent("BSONObj _anchorObj;")
         self.assertIn(expected, header)
 
     def test_chained_non_view_struct_does_not_generate_anchor(self) -> None:
         """Test anchor not generated on struct chained with non view struct."""
-        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        header, _ = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
         structs:
                 NonViewStruct:
                     description: NonViewStruct
@@ -500,12 +529,12 @@ class TestGenerator(testcase.IDLTestcase):
                     description: NonViewStructChainedStruct
                     chained_structs:
                         NonViewStruct: NonViewStruct
-        """))
+        """)
+        )
 
         expected = dedent("BSONObj _anchorObj;")
         self.assertNotIn(expected, header)
 
 
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     unittest.main()

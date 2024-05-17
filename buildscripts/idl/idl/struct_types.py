@@ -40,8 +40,14 @@ from . import writer
 def _is_required_constructor_arg(field):
     # type: (ast.Field) -> bool
     """Get whether we require this field to have a value set for constructor purposes."""
-    return not field.ignore and not field.optional and not field.default and not field.chained \
-        and not field.chained_struct_field and not field.serialize_op_msg_request_only
+    return (
+        not field.ignore
+        and not field.optional
+        and not field.default
+        and not field.chained
+        and not field.chained_struct_field
+        and not field.serialize_op_msg_request_only
+    )
 
 
 def _get_arg_for_field(field):
@@ -66,7 +72,7 @@ def _get_required_parameters(struct):
 
 
 def _get_serialization_ctx_arg():
-    return 'boost::optional<SerializationContext> serializationContext = boost::none'
+    return "boost::optional<SerializationContext> serializationContext = boost::none"
 
 
 class ArgumentInfo(object):
@@ -76,12 +82,12 @@ class ArgumentInfo(object):
         # type: (str) -> None
         """Create a instance of the ArgumentInfo class by parsing the argument string."""
         self.defaults = None
-        equal_tokens = arg.split('=')
+        equal_tokens = arg.split("=")
         if len(equal_tokens) > 1:
             self.defaults = equal_tokens[-1].strip()
 
-        space_tokens = equal_tokens[0].strip().split(' ')
-        self.type = ' '.join(space_tokens[0:-1])
+        space_tokens = equal_tokens[0].strip().split(" ")
+        self.type = " ".join(space_tokens[0:-1])
         self.name = space_tokens[-1]
 
     def get_string(self, get_defaults):
@@ -97,8 +103,17 @@ class MethodInfo(object):
 
     # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, class_name, method_name, args, return_type=None, static=False, const=False,
-                 explicit=False, desc_for_comment=None):
+    def __init__(
+        self,
+        class_name,
+        method_name,
+        args,
+        return_type=None,
+        static=False,
+        const=False,
+        explicit=False,
+        desc_for_comment=None,
+    ):
         # type: (str, str, List[str], str, bool, bool, bool, Optional[str]) -> None
         # pylint: disable=too-many-arguments
         """Create a MethodInfo instance."""
@@ -114,59 +129,68 @@ class MethodInfo(object):
     def get_declaration(self):
         # type: () -> str
         """Get a declaration for a method."""
-        pre_modifiers = ''
-        post_modifiers = ''
-        return_type_str = ''
+        pre_modifiers = ""
+        post_modifiers = ""
+        return_type_str = ""
 
         if self.static:
-            pre_modifiers = 'static '
+            pre_modifiers = "static "
 
         if self.const:
-            post_modifiers = ' const'
+            post_modifiers = " const"
 
         if self.explicit:
-            pre_modifiers += 'explicit '
+            pre_modifiers += "explicit "
 
         if self.return_type:
-            return_type_str = self.return_type + ' '
+            return_type_str = self.return_type + " "
 
         return common.template_args(
             "${pre_modifiers}${return_type}${method_name}(${args})${post_modifiers};",
-            pre_modifiers=pre_modifiers, return_type=return_type_str, method_name=self.method_name,
-            args=', '.join(
-                [arg.get_string(True) for arg in self.args]), post_modifiers=post_modifiers)
+            pre_modifiers=pre_modifiers,
+            return_type=return_type_str,
+            method_name=self.method_name,
+            args=", ".join([arg.get_string(True) for arg in self.args]),
+            post_modifiers=post_modifiers,
+        )
 
     def get_definition(self):
         # type: () -> str
         """Get a definition for a method."""
-        pre_modifiers = ''
-        post_modifiers = ''
-        return_type_str = ''
+        pre_modifiers = ""
+        post_modifiers = ""
+        return_type_str = ""
 
         if self.const:
-            post_modifiers = ' const'
+            post_modifiers = " const"
 
         if self.return_type:
-            return_type_str = self.return_type + ' '
+            return_type_str = self.return_type + " "
 
         return common.template_args(
             "${pre_modifiers}${return_type}${class_name}::${method_name}(${args})${post_modifiers}",
-            pre_modifiers=pre_modifiers, return_type=return_type_str, class_name=self.class_name,
-            method_name=self.method_name, args=', '.join(
-                [arg.get_string(False) for arg in self.args]), post_modifiers=post_modifiers)
+            pre_modifiers=pre_modifiers,
+            return_type=return_type_str,
+            class_name=self.class_name,
+            method_name=self.method_name,
+            args=", ".join([arg.get_string(False) for arg in self.args]),
+            post_modifiers=post_modifiers,
+        )
 
     def get_call(self, obj):
         # type: (Optional[str]) -> str
         """Generate a simple call to the method using the defined args list."""
 
-        args = ', '.join([arg.name for arg in self.args])
+        args = ", ".join([arg.name for arg in self.args])
 
         if obj:
-            return common.template_args("${obj}.${method_name}(${args});", obj=obj,
-                                        method_name=self.method_name, args=args)
+            return common.template_args(
+                "${obj}.${method_name}(${args});", obj=obj, method_name=self.method_name, args=args
+            )
 
-        return common.template_args("${method_name}(${args});", method_name=self.method_name,
-                                    args=args)
+        return common.template_args(
+            "${method_name}(${args});", method_name=self.method_name, args=args
+        )
 
     def get_desc_for_comment(self):
         # type: () -> Optional[str]
@@ -292,9 +316,14 @@ class _StructTypeInfo(StructTypeInfoBase):
         comment = textwrap.dedent(f"""\
                 Factory function that parses a {class_name} from a BSONObj. A {class_name} parsed
                 this way participates in ownership of the data underlying the BSONObj.""")
-        return MethodInfo(class_name, 'parseSharingOwnership',
-                          ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], class_name,
-                          static=True, desc_for_comment=comment)
+        return MethodInfo(
+            class_name,
+            "parseSharingOwnership",
+            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            class_name,
+            static=True,
+            desc_for_comment=comment,
+        )
 
     def get_owned_deserializer_static_method(self):
         # type: () -> MethodInfo
@@ -302,9 +331,14 @@ class _StructTypeInfo(StructTypeInfoBase):
         comment = textwrap.dedent(f"""\
                 Factory function that parses a {class_name} from a BSONObj. A {class_name} parsed
                 this way takes ownership of the data underlying the BSONObj.""")
-        return MethodInfo(class_name, 'parseOwned',
-                          ['const IDLParserContext& ctxt', 'BSONObj&& bsonObject'], class_name,
-                          static=True, desc_for_comment=comment)
+        return MethodInfo(
+            class_name,
+            "parseOwned",
+            ["const IDLParserContext& ctxt", "BSONObj&& bsonObject"],
+            class_name,
+            static=True,
+            desc_for_comment=comment,
+        )
 
     def get_deserializer_static_method(self):
         # type: () -> MethodInfo
@@ -315,23 +349,32 @@ class _StructTypeInfo(StructTypeInfoBase):
                 ensure the validity any members of this struct that point-into the BSONObj (i.e.
                 unowned
                 objects).""")
-        return MethodInfo(class_name, 'parse',
-                          ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], class_name,
-                          static=True, desc_for_comment=comment)
+        return MethodInfo(
+            class_name,
+            "parse",
+            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            class_name,
+            static=True,
+            desc_for_comment=comment,
+        )
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'parseProtected',
-            ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], 'void')
+            common.title_case(self._struct.cpp_name),
+            "parseProtected",
+            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            "void",
+        )
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
-        args = ['BSONObjBuilder* builder']
+        args = ["BSONObjBuilder* builder"]
         if self._struct.query_shape_component:
             args.append("const SerializationOptions& options = {}")
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'serialize', args, 'void', const=True)
+            common.title_case(self._struct.cpp_name), "serialize", args, "void", const=True
+        )
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
@@ -339,7 +382,8 @@ class _StructTypeInfo(StructTypeInfoBase):
         if self._struct.query_shape_component:
             args.append("const SerializationOptions& options = {}")
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'toBSON', args, 'BSONObj', const=True)
+            common.title_case(self._struct.cpp_name), "toBSON", args, "BSONObj", const=True
+        )
 
     def get_op_msg_request_serializer_method(self):
         # type: () -> Optional[MethodInfo]
@@ -383,21 +427,32 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
     def get_op_msg_request_serializer_method(self):
         # type: () -> Optional[MethodInfo]
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'serialize',
-            ['const BSONObj& commandPassthroughFields = {}'], 'OpMsgRequest', const=True)
+            common.title_case(self._struct.cpp_name),
+            "serialize",
+            ["const BSONObj& commandPassthroughFields = {}"],
+            "OpMsgRequest",
+            const=True,
+        )
 
     def get_op_msg_request_deserializer_static_method(self):
         # type: () -> Optional[MethodInfo]
         class_name = common.title_case(self._struct.cpp_name)
-        return MethodInfo(class_name, 'parse',
-                          ['const IDLParserContext& ctxt', 'const OpMsgRequest& request'],
-                          class_name, static=True)
+        return MethodInfo(
+            class_name,
+            "parse",
+            ["const IDLParserContext& ctxt", "const OpMsgRequest& request"],
+            class_name,
+            static=True,
+        )
 
     def get_op_msg_request_deserializer_method(self):
         # type: () -> Optional[MethodInfo]
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'parseProtected',
-            ['const IDLParserContext& ctxt', 'const OpMsgRequest& request'], 'void')
+            common.title_case(self._struct.cpp_name),
+            "parseProtected",
+            ["const IDLParserContext& ctxt", "const OpMsgRequest& request"],
+            "void",
+        )
 
 
 class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
@@ -413,16 +468,23 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
     def get_serializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'serialize',
-            ['BSONObjBuilder* builder', 'const BSONObj& commandPassthroughFields = {}'], 'void',
-            const=True)
+            common.title_case(self._struct.cpp_name),
+            "serialize",
+            ["BSONObjBuilder* builder", "const BSONObj& commandPassthroughFields = {}"],
+            "void",
+            const=True,
+        )
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         # Commands that require namespaces require it as a parameter to serialize()
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'toBSON',
-            ['const BSONObj& commandPassthroughFields = {}'], 'BSONObj', const=True)
+            common.title_case(self._struct.cpp_name),
+            "toBSON",
+            ["const BSONObj& commandPassthroughFields = {}"],
+            "BSONObj",
+            const=True,
+        )
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -440,8 +502,8 @@ def _get_command_type_parameter(command, gen_header=False):
     # Use the storage type for the constructor argument since the generated code will use std::move.
     member_type = cpp_type_info.get_storage_type()
     result = f"{member_type} {common.camel_case(command.command_field.cpp_name)}"
-    if not gen_header or '&' in result:
-        result = 'const ' + result
+    if not gen_header or "&" in result:
+        result = "const " + result
     return result
 
 
@@ -468,27 +530,38 @@ class _CommandFromType(_CommandBaseTypeInfo):
         class_name = common.title_case(self._struct.cpp_name)
 
         arg = _get_command_type_parameter(self._command, gen_header)
-        return MethodInfo(class_name, class_name, [arg] + _get_required_parameters(self._struct),
-                          explicit=True)
+        return MethodInfo(
+            class_name, class_name, [arg] + _get_required_parameters(self._struct), explicit=True
+        )
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'serialize',
-            ['BSONObjBuilder* builder', 'const BSONObj& commandPassthroughFields = {}'], 'void',
-            const=True)
+            common.title_case(self._struct.cpp_name),
+            "serialize",
+            ["BSONObjBuilder* builder", "const BSONObj& commandPassthroughFields = {}"],
+            "void",
+            const=True,
+        )
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'toBSON',
-            ['const BSONObj& commandPassthroughFields = {}'], 'BSONObj', const=True)
+            common.title_case(self._struct.cpp_name),
+            "toBSON",
+            ["const BSONObj& commandPassthroughFields = {}"],
+            "BSONObj",
+            const=True,
+        )
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'parseProtected',
-            ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], 'void')
+            common.title_case(self._struct.cpp_name),
+            "parseProtected",
+            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            "void",
+        )
 
     def gen_getter_method(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -520,78 +593,96 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     @staticmethod
     def _get_nss_param(gen_header):
-        nss_param = 'NamespaceString nss'
+        nss_param = "NamespaceString nss"
         if not gen_header:
-            nss_param = 'const ' + nss_param
+            nss_param = "const " + nss_param
         return nss_param
 
     def get_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
         sc_arg = _get_serialization_ctx_arg()
-        return MethodInfo(class_name, class_name, [self._get_nss_param(gen_header), sc_arg],
-                          explicit=True)
+        return MethodInfo(
+            class_name, class_name, [self._get_nss_param(gen_header), sc_arg], explicit=True
+        )
 
     def get_required_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(
-            class_name, class_name,
-            [self._get_nss_param(gen_header)] + _get_required_parameters(self._struct))
+            class_name,
+            class_name,
+            [self._get_nss_param(gen_header)] + _get_required_parameters(self._struct),
+        )
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'serialize',
-            ['BSONObjBuilder* builder', 'const BSONObj& commandPassthroughFields = {}'], 'void',
-            const=True)
+            common.title_case(self._struct.cpp_name),
+            "serialize",
+            ["BSONObjBuilder* builder", "const BSONObj& commandPassthroughFields = {}"],
+            "void",
+            const=True,
+        )
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'toBSON',
-            ['const BSONObj& commandPassthroughFields = {}'], 'BSONObj', const=True)
+            common.title_case(self._struct.cpp_name),
+            "toBSON",
+            ["const BSONObj& commandPassthroughFields = {}"],
+            "BSONObj",
+            const=True,
+        )
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'parseProtected',
-            ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], 'void')
+            common.title_case(self._struct.cpp_name),
+            "parseProtected",
+            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            "void",
+        )
 
     def gen_getter_method(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('const NamespaceString& getNamespace() const { return _nss; }')
+        indented_writer.write_line("const NamespaceString& getNamespace() const { return _nss; }")
         if self._struct.non_const_getter:
-            indented_writer.write_line('NamespaceString& getNamespace() { return _nss; }')
+            indented_writer.write_line("NamespaceString& getNamespace() { return _nss; }")
 
     def gen_member(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('NamespaceString _nss;')
+        indented_writer.write_line("NamespaceString _nss;")
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         if self._struct.allow_global_collection_name:
             indented_writer.write_line(
-                '_nss.serializeCollectionName(builder, "%s"_sd);' % (self._command.name))
+                '_nss.serializeCollectionName(builder, "%s"_sd);' % (self._command.name)
+            )
         else:
-            indented_writer.write_line('invariant(!_nss.isEmpty());')
+            indented_writer.write_line("invariant(!_nss.isEmpty());")
             indented_writer.write_line(
-                'builder->append("%s"_sd, _nss.coll());' % (self._command.name))
+                'builder->append("%s"_sd, _nss.coll());' % (self._command.name)
+            )
         indented_writer.write_empty_line()
 
     def gen_namespace_check(self, indented_writer, db_name, element):
         # type: (writer.IndentedTextWriter, str, str) -> None
         # TODO: should the name of the first element be validated??
-        indented_writer.write_line('invariant(_nss.isEmpty());')
-        allow_global = 'true' if self._struct.allow_global_collection_name else 'false'
+        indented_writer.write_line("invariant(_nss.isEmpty());")
+        allow_global = "true" if self._struct.allow_global_collection_name else "false"
         indented_writer.write_line(
-            'auto collectionName = ctxt.checkAndAssertCollectionName(%s, %s);' % (element,
-                                                                                  allow_global))
+            "auto collectionName = ctxt.checkAndAssertCollectionName(%s, %s);"
+            % (element, allow_global)
+        )
         indented_writer.write_line(
-            '_nss = NamespaceStringUtil::deserialize(%s, collectionName);' % (db_name))
+            "_nss = NamespaceStringUtil::deserialize(%s, collectionName);" % (db_name)
+        )
         indented_writer.write_line(
             'uassert(ErrorCodes::InvalidNamespace, str::stream() << "Invalid namespace specified: "'
-            ' << _nss.toStringForErrorMsg(), _nss.isValid());')
+            " << _nss.toStringForErrorMsg(), _nss.isValid());"
+        )
 
 
 class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
@@ -606,55 +697,70 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     @staticmethod
     def _get_nss_param(gen_header):
-        nss_param = 'NamespaceStringOrUUID nssOrUUID'
+        nss_param = "NamespaceStringOrUUID nssOrUUID"
         if not gen_header:
-            nss_param = 'const ' + nss_param
+            nss_param = "const " + nss_param
         return nss_param
 
     def get_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
         sc_arg = _get_serialization_ctx_arg()
-        return MethodInfo(class_name, class_name, [self._get_nss_param(gen_header), sc_arg],
-                          explicit=True)
+        return MethodInfo(
+            class_name, class_name, [self._get_nss_param(gen_header), sc_arg], explicit=True
+        )
 
     def get_required_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(
-            class_name, class_name,
-            [self._get_nss_param(gen_header)] + _get_required_parameters(self._struct))
+            class_name,
+            class_name,
+            [self._get_nss_param(gen_header)] + _get_required_parameters(self._struct),
+        )
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'serialize',
-            ['BSONObjBuilder* builder', 'const BSONObj& commandPassthroughFields = {}'], 'void',
-            const=True)
+            common.title_case(self._struct.cpp_name),
+            "serialize",
+            ["BSONObjBuilder* builder", "const BSONObj& commandPassthroughFields = {}"],
+            "void",
+            const=True,
+        )
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'toBSON',
-            ['const BSONObj& commandPassthroughFields = {}'], 'BSONObj', const=True)
+            common.title_case(self._struct.cpp_name),
+            "toBSON",
+            ["const BSONObj& commandPassthroughFields = {}"],
+            "BSONObj",
+            const=True,
+        )
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'parseProtected',
-            ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], 'void')
+            common.title_case(self._struct.cpp_name),
+            "parseProtected",
+            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            "void",
+        )
 
     def gen_getter_method(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         indented_writer.write_line(
-            'const NamespaceStringOrUUID& getNamespaceOrUUID() const { return _nssOrUUID; }')
+            "const NamespaceStringOrUUID& getNamespaceOrUUID() const { return _nssOrUUID; }"
+        )
         if self._struct.non_const_getter:
             indented_writer.write_line(
-                'NamespaceStringOrUUID& getNamespaceOrUUID() { return _nssOrUUID; }')
+                "NamespaceStringOrUUID& getNamespaceOrUUID() { return _nssOrUUID; }"
+            )
 
     def gen_member(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('NamespaceStringOrUUID _nssOrUUID;')
+        indented_writer.write_line("NamespaceStringOrUUID _nssOrUUID;")
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -664,14 +770,17 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
     def gen_namespace_check(self, indented_writer, db_name, element):
         # type: (writer.IndentedTextWriter, str, str) -> None
         indented_writer.write_line(
-            'auto collOrUUID = ctxt.checkAndAssertCollectionNameOrUUID(%s);' % (element))
+            "auto collOrUUID = ctxt.checkAndAssertCollectionNameOrUUID(%s);" % (element)
+        )
         indented_writer.write_line(
-            '_nssOrUUID = std::holds_alternative<StringData>(collOrUUID) ? NamespaceStringUtil::deserialize(%s, get<StringData>(collOrUUID)) : NamespaceStringOrUUID(%s, get<UUID>(collOrUUID));'
-            % (db_name, db_name))
+            "_nssOrUUID = std::holds_alternative<StringData>(collOrUUID) ? NamespaceStringUtil::deserialize(%s, get<StringData>(collOrUUID)) : NamespaceStringOrUUID(%s, get<UUID>(collOrUUID));"
+            % (db_name, db_name)
+        )
         indented_writer.write_line(
             'uassert(ErrorCodes::InvalidNamespace, str::stream() << "Invalid namespace specified: "'
-            ' << _nssOrUUID.toStringForErrorMsg()'
-            ', !_nssOrUUID.isNamespaceString() || _nssOrUUID.nss().isValid());')
+            " << _nssOrUUID.toStringForErrorMsg()"
+            ", !_nssOrUUID.isNamespaceString() || _nssOrUUID.nss().isValid());"
+        )
 
 
 def get_struct_info(struct):

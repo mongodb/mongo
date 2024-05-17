@@ -48,7 +48,7 @@ def title_case(name):
     # Only capitalize the last part of a fully-qualified name
     pos = name.rfind("::")
     if pos > -1:
-        return name[:pos + 2] + name[pos + 2:pos + 3].upper() + name[pos + 3:]
+        return name[: pos + 2] + name[pos + 2 : pos + 3].upper() + name[pos + 3 :]
 
     return name[0:1].upper() + name[1:]
 
@@ -72,9 +72,9 @@ def _escape_template_string(template):
     # type: (str) -> str
     """Escape the '$' in template strings unless followed by '{'."""
     # See https://docs.python.org/2/library/string.html#template-strings
-    template = template.replace('${', '#{')
-    template = template.replace('$', '$$')
-    return template.replace('#{', '${')
+    template = template.replace("${", "#{")
+    template = template.replace("$", "$$")
+    return template.replace("#{", "${")
 
 
 def template_format(template, template_params=None):

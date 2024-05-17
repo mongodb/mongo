@@ -33,6 +33,7 @@ Represents the derived IDL specification after type resolution in the binding pa
 This is a lossy translation from the IDL Syntax tree as the IDL AST only contains information about
 the enums and structs that need code generated for them, and just enough information to do that.
 """
+
 from abc import ABCMeta, abstractmethod
 import enum
 from typing import Any, Dict, List, Optional
@@ -46,8 +47,9 @@ class IDLBoundSpec(object):
     def __init__(self, spec, error_collection):
         # type: (IDLAST, errors.ParserErrorCollection) -> None
         """Must specify either an IDL document or errors, not both."""
-        assert (spec is None and error_collection is not None) or (spec is not None
-                                                                   and error_collection is None)
+        assert (spec is None and error_collection is not None) or (
+            spec is not None and error_collection is None
+        )
         self.spec = spec
         self.errors = error_collection
 
@@ -292,7 +294,8 @@ class Field(common.SourceLocation):
         # type: () -> bool
         """Returns true if the IDL compiler should add a call to serialization options for this field."""
         return self.query_shape is not None and self.query_shape in [
-            QueryShapeFieldType.LITERAL, QueryShapeFieldType.ANONYMIZE
+            QueryShapeFieldType.LITERAL,
+            QueryShapeFieldType.ANONYMIZE,
         ]
 
     @property

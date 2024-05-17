@@ -38,6 +38,7 @@ from typing import Any, Dict
 if __package__ is None:
     import sys
     from os import path
+
     sys.path.append(path.dirname(path.abspath(__file__)))
     from context import idl
     import testcase
@@ -88,27 +89,32 @@ class TestImport(testcase.IDLTestcase):
 
         imports:
             - "b.idl"
-            """), idl.errors.ERROR_ID_DUPLICATE_NODE)
+            """),
+            idl.errors.ERROR_ID_DUPLICATE_NODE,
+        )
 
         self.assert_parse_fail(
             textwrap.dedent("""
         imports: "basetypes.idl"
-            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+            """),
+            idl.errors.ERROR_ID_IS_NODE_TYPE,
+        )
 
         self.assert_parse_fail(
             textwrap.dedent("""
         imports:
             a: "a.idl"
             b: "b.idl"
-            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+            """),
+            idl.errors.ERROR_ID_IS_NODE_TYPE,
+        )
 
     def test_import_positive(self):
         # type: () -> None
         """Postive import tests."""
 
         import_dict = {
-            "basetypes.idl":
-                textwrap.dedent("""
+            "basetypes.idl": textwrap.dedent("""
             global:
                 cpp_namespace: 'mongo'
 
@@ -135,8 +141,7 @@ class TestImport(testcase.IDLTestcase):
                     fields:
                         foo: string
             """),
-            "recurse1.idl":
-                textwrap.dedent("""
+            "recurse1.idl": textwrap.dedent("""
             imports:
                 - "basetypes.idl"
 
@@ -149,8 +154,7 @@ class TestImport(testcase.IDLTestcase):
                     is_view: false
 
             """),
-            "recurse2.idl":
-                textwrap.dedent("""
+            "recurse2.idl": textwrap.dedent("""
             imports:
                 - "recurse1.idl"
 
@@ -163,8 +167,7 @@ class TestImport(testcase.IDLTestcase):
                     is_view: false
 
             """),
-            "recurse1b.idl":
-                textwrap.dedent("""
+            "recurse1b.idl": textwrap.dedent("""
             imports:
                 - "basetypes.idl"
 
@@ -176,8 +179,7 @@ class TestImport(testcase.IDLTestcase):
                     deserializer: BSONElement::fake
                     is_view: false
             """),
-            "cycle1a.idl":
-                textwrap.dedent("""
+            "cycle1a.idl": textwrap.dedent("""
             global:
                 cpp_namespace: 'mongo'
 
@@ -208,8 +210,7 @@ class TestImport(testcase.IDLTestcase):
                         foo: string
                         foo1: bool
             """),
-            "cycle1b.idl":
-                textwrap.dedent("""
+            "cycle1b.idl": textwrap.dedent("""
             global:
                 cpp_namespace: 'mongo'
 
@@ -232,8 +233,7 @@ class TestImport(testcase.IDLTestcase):
                         foo: string
                         foo1: bool
             """),
-            "cycle2.idl":
-                textwrap.dedent("""
+            "cycle2.idl": textwrap.dedent("""
             global:
                 cpp_namespace: 'mongo'
 
@@ -275,7 +275,9 @@ class TestImport(testcase.IDLTestcase):
                 strict: false
                 fields:
                     foo: string
-            """), resolver=resolver)
+            """),
+            resolver=resolver,
+        )
 
         # Test nested import
         self.assert_bind(
@@ -294,7 +296,9 @@ class TestImport(testcase.IDLTestcase):
                     foo: string
                     foo1: int
                     foo2: double
-            """), resolver=resolver)
+            """),
+            resolver=resolver,
+        )
 
         # Test diamond import
         self.assert_bind(
@@ -315,7 +319,9 @@ class TestImport(testcase.IDLTestcase):
                     foo1: int
                     foo2: double
                     foo3: bool
-            """), resolver=resolver)
+            """),
+            resolver=resolver,
+        )
 
         # Test cycle import
         self.assert_bind(
@@ -333,7 +339,9 @@ class TestImport(testcase.IDLTestcase):
                 fields:
                     foo: string
                     foo1: bool
-            """), resolver=resolver)
+            """),
+            resolver=resolver,
+        )
 
         # Test self cycle import
         self.assert_bind(
@@ -350,15 +358,16 @@ class TestImport(testcase.IDLTestcase):
                 strict: false
                 fields:
                     foo: string
-            """), resolver=resolver)
+            """),
+            resolver=resolver,
+        )
 
     def test_import_negative(self):
         # type: () -> None
         """Negative import tests."""
 
         import_dict = {
-            "basetypes.idl":
-                textwrap.dedent("""
+            "basetypes.idl": textwrap.dedent("""
             global:
                 cpp_namespace: 'mongo'
 
@@ -388,8 +397,7 @@ class TestImport(testcase.IDLTestcase):
                         b1: 1
 
             """),
-            "bug.idl":
-                textwrap.dedent("""
+            "bug.idl": textwrap.dedent("""
             global:
                 cpp_namespace: 'mongo'
 
@@ -409,7 +417,10 @@ class TestImport(testcase.IDLTestcase):
             textwrap.dedent("""
         imports:
             - "notfound.idl"
-            """), idl.errors.ERROR_ID_BAD_IMPORT, resolver=resolver)
+            """),
+            idl.errors.ERROR_ID_BAD_IMPORT,
+            resolver=resolver,
+        )
 
         # Duplicate types
         self.assert_parse_fail(
@@ -423,7 +434,10 @@ class TestImport(testcase.IDLTestcase):
                 cpp_type: foo
                 bson_serialization_type: string
                 is_view: false
-            """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL, resolver=resolver)
+            """),
+            idl.errors.ERROR_ID_DUPLICATE_SYMBOL,
+            resolver=resolver,
+        )
 
         # Duplicate structs
         self.assert_parse_fail(
@@ -436,7 +450,10 @@ class TestImport(testcase.IDLTestcase):
                 description: foo
                 fields:
                     foo1: string
-            """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL, resolver=resolver)
+            """),
+            idl.errors.ERROR_ID_DUPLICATE_SYMBOL,
+            resolver=resolver,
+        )
 
         # Duplicate struct and type
         self.assert_parse_fail(
@@ -449,7 +466,10 @@ class TestImport(testcase.IDLTestcase):
                 description: foo
                 fields:
                     foo1: string
-            """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL, resolver=resolver)
+            """),
+            idl.errors.ERROR_ID_DUPLICATE_SYMBOL,
+            resolver=resolver,
+        )
 
         # Duplicate type and struct
         self.assert_parse_fail(
@@ -463,7 +483,10 @@ class TestImport(testcase.IDLTestcase):
                 cpp_type: foo
                 bson_serialization_type: string
                 is_view: false
-            """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL, resolver=resolver)
+            """),
+            idl.errors.ERROR_ID_DUPLICATE_SYMBOL,
+            resolver=resolver,
+        )
 
         # Duplicate enums
         self.assert_parse_fail(
@@ -478,7 +501,10 @@ class TestImport(testcase.IDLTestcase):
                 values:
                     a0: 0
                     b1: 1
-            """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL, resolver=resolver)
+            """),
+            idl.errors.ERROR_ID_DUPLICATE_SYMBOL,
+            resolver=resolver,
+        )
 
         # Import a file with errors
         self.assert_parse_fail(
@@ -493,9 +519,11 @@ class TestImport(testcase.IDLTestcase):
                 cpp_type: foo
                 bson_serialization_type: string
                 is_view: false
-            """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD, resolver=resolver)
+            """),
+            idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD,
+            resolver=resolver,
+        )
 
 
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     unittest.main()
