@@ -1653,11 +1653,10 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
-        "default",
-        "requires_all_feature_flags",
+        "non_deterministic",
+        "resharding_fuzzer",
         "require_npm",
         "random_name",
-        "feature_flag_guarded",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2296,11 +2295,10 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
-        "default",
-        "requires_all_feature_flags",
+        "non_deterministic",
+        "resharding_fuzzer",
         "require_npm",
         "random_name",
-        "feature_flag_guarded",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2330,7 +2328,10 @@ tasks:
           num_files: 10
           num_tasks: 5
           npm_command: resharding-fuzzer
-          jstestfuzz_vars: --opType timeseriesReshardCollection --useEsModules
+          jstestfuzz_vars: >-
+            --opType timeseriesReshardCollection --numDonors 3 --numRecipients 3 --inPlace yes
+            --electionMech stepup --electionRole donor --electionRole recipient
+            --useEsModules
           suite: resharding_fuzzer_idempotency
 
   ################################################
