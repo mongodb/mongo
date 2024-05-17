@@ -67,6 +67,11 @@ selector:
     # retry logic for this hook leads to breaking a test assertion.
     - jstests/concurrency/fsm_workloads/timeseries_mirrored_writes.js
 
+    # TODO SERVER-89838: Check metadata consistency hook detects different time series options on
+    # shards after collMod.
+    - jstests/concurrency/fsm_workloads/timeseries_collmod_granularity_update.js
+    - jstests/concurrency/fsm_workloads/timeseries_agg_out.js
+
     # TODO SERVER-89840: Inconsistent UUIDs for config.system.sessions across config shard and
     # removed/re-added shard.
     - jstests/concurrency/fsm_workloads/add_remove_shards_killop.js
