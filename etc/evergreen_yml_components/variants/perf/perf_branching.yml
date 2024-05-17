@@ -2,26 +2,24 @@
 # This is a subset of perf variants that are needed when copying over during the branching process.
 # See this doc proposal for more information https://docs.google.com/document/d/1hH7CQJbAFgr0DHxcWg11dy2TxKt7roDDgjlg49HRWbs/edit?usp=sharing
 
+definitions:
+  cron_sunday_thursday: &cron_sunday_thursday "0 0 * * 0,4"
+  high-value-workload-cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
+  linux-3-shard-cron: &linux-3-shard-cron "0 0 * * 4" # 00:00 on Thursday
+  linux-3-node-cron: &linux-3-node-cron "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
+  only-run-in-patch-cron: &only-run-in-patch-cron "0 0 29 2 1"
+  linux-mongo-perf-cron: &linux-mongo-perf-cron "0 0 * * 0,2,3,4,5"
+
 variables:
   - &amazon2_x86_compile_variant_dependency
     depends_on:
       - name: package_new_compile
         variant: amazon2-x86-compile
 
-  - &amazon2_x86_openssl111_compile_variant_dependency
-    depends_on:
-      - name: package_new_compile
-        variant: amazon2-x86-openssl111-compile
-
   - &amazon_linux2_arm64_compile_variant_dependency
     depends_on:
       - name: package_new_compile
         variant: amazon2-arm64-compile
-
-  - &amazon_linux2_x86_streams_compile_variant_dependency
-    depends_on:
-      - name: package_new_compile
-        variant: amazon2-x86-streams-compile
 
   - &amazon_linux2_arm64_mongocrypt_compile_variant_dependency
     depends_on:
@@ -57,11 +55,88 @@ variables:
       - py-tpcc
       - flamegraph
 
+  - perf_project_dir: &perf_project_dir dsi
+
+  - &linux_3_shard_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
+    - name: canaries_only
+    - name: change_streams_latency
+      cron: *high-value-workload-cron
+    - name: change_streams_listen_throughput
+      cron: *high-value-workload-cron
+    - name: change_streams_multi_mongos
+    - name: crud_workloads_majority
+    - name: crud_workloads_w1
+    - name: map_reduce_workloads
+    - name: misc_workloads
+    - name: mongos_large_catalog_workloads
+    - name: mongos_workloads
+      cron: *high-value-workload-cron
+    - name: move_chunk_workloads
+      cron: *high-value-workload-cron
+    - name: smoke_test
+    - name: tsbs_query_finance_sharded
+    - name: tsbs_query_finance_sharded_balancer
+    - name: tsbs_query_sharded
+    - name: tsbs_query_sharded_balancer
+    - name: ycsb.2023-09
+    - name: ycsb_read_concern_available.2023-09
+    - name: ycsb_single_thread
+    - name: ycsb_w1.2023-09
+
+  - &3node-intel-tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
+    - name: ycsb.2023-09
+    - name: ycsb_single_thread
+    - name: ycsb_60GB.2023-09
+    - name: ycsb_60GB.long.2023-09
+    - name: crud_workloads_majority
+    - name: smoke_test
+    - name: bestbuy_agg
+    - name: bestbuy_agg_merge_different_db
+    - name: bestbuy_agg_merge_same_db
+    - name: bestbuy_agg_merge_wordcount
+    - name: bestbuy_query
+    - name: tpcc_majority
+    - name: linkbench
+    - name: linkbench2
+      cron: *high-value-workload-cron
+    - name: tsbs_load
+      cron: *only-run-in-patch-cron
+    - name: tsbs_query
+    - name: mixed_workloads_genny_rate_limited_high_value
+      cron: *high-value-workload-cron
+    - name: load_test_high_value
+    - name: large_indexed_ins_high_value
+    - name: expressive_queries_high_value
+    - name: time_series_sort_high_value
+    - name: tsbs-expression-query
+
+  - &standalone-arm-expansions
+    mongodb_setup_release: 2022-11
+    mongodb_setup: mongo-perf-standalone.2023-02
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: workload_client_mongod_combined.2023-01
+    workload_setup: 2022-11
+    use_scons_cache: true
+    platform: linux
+    canaries: none
+    storageEngine: inMemory
+    project_dir: *perf_project_dir
+    compile_variant: amazon2-arm64-compile
+
+  - &standalone-intel-expansions
+    <<: *standalone-arm-expansions
+    infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
+    compile_variant: amazon2-x86-compile
+
 buildvariants:
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-atlas-M60-real.arm.aws.2023-11
     display_name: M60-Atlas ReplSet ARM AWS 2023-11
-    cron: &cron_sunday_thursday "0 0 * * 0,4"
+    cron: *cron_sunday_thursday
     modules: *perf_modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -73,7 +148,7 @@ buildvariants:
       infrastructure_provisioning_release: 2023-09
       workload_setup: 2022-11
       platform: linux
-      project_dir: &perf_project_dir dsi
+      project_dir: *perf_project_dir
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
     run_on:
@@ -97,7 +172,7 @@ buildvariants:
       - name: tsbs_load
       - name: tsbs_query
       - name: ycsb.2023-09
-        cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
+        cron: *high-value-workload-cron
       - name: ycsb_60GB.long.2023-09
 
   - <<: *amazon2_x86_compile_variant_dependency
@@ -170,13 +245,12 @@ buildvariants:
       - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
         cron: *high-value-workload-cron
 
-  - &shard-baseline
-    <<: *amazon_linux2_arm64_compile_variant_dependency
+  - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-shard.arm.aws.2023-11
     display_name: 3-Shard Cluster ARM AWS 2023-11
-    cron: &linux-3-shard-cron "0 0 * * 4" # 00:00 on Thursday
+    cron: *linux-3-shard-cron
     modules: *perf_modules
-    expansions: &shard-baseline-expansions
+    expansions:
       mongodb_setup_release: 2022-11
       mongodb_setup: shard
       infrastructure_provisioning_release: 2023-09
@@ -189,38 +263,12 @@ buildvariants:
       compile_variant: amazon2-arm64-compile
     run_on:
       - "rhel70-perf-shard"
-    tasks: &linux_3_shard_tasks
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-      - name: canaries_only
-      - name: change_streams_latency
-        cron: *high-value-workload-cron
-      - name: change_streams_listen_throughput
-        cron: *high-value-workload-cron
-      - name: change_streams_multi_mongos
-      - name: crud_workloads_majority
-      - name: crud_workloads_w1
-      - name: map_reduce_workloads
-      - name: misc_workloads
-      - name: mongos_large_catalog_workloads
-      - name: mongos_workloads
-        cron: *high-value-workload-cron
-      - name: move_chunk_workloads
-        cron: *high-value-workload-cron
-      - name: smoke_test
-      - name: tsbs_query_finance_sharded
-      - name: tsbs_query_finance_sharded_balancer
-      - name: tsbs_query_sharded
-      - name: tsbs_query_sharded_balancer
-      - name: ycsb.2023-09
-      - name: ycsb_read_concern_available.2023-09
-      - name: ycsb_single_thread
-      - name: ycsb_w1.2023-09
+    tasks: *linux_3_shard_tasks
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-node-replSet.arm.aws.2023-11
     display_name: 3-Node ReplSet ARM AWS 2023-11
-    cron: &linux-3-node-cron "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
+    cron: *linux-3-node-cron
     modules: *perf_modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -319,34 +367,7 @@ buildvariants:
       compile_variant: amazon2-x86-compile
     run_on:
       - "rhel70-perf-replset"
-    tasks: &3node-intel-tasks
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-      - name: ycsb.2023-09
-      - name: ycsb_single_thread
-      - name: ycsb_60GB.2023-09
-      - name: ycsb_60GB.long.2023-09
-      - name: crud_workloads_majority
-      - name: smoke_test
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_query
-      - name: tpcc_majority
-      - name: linkbench
-      - name: linkbench2
-        cron: *high-value-workload-cron
-      - name: tsbs_load
-        cron: &only-run-in-patch-cron "0 0 29 2 1"
-      - name: tsbs_query
-      - name: mixed_workloads_genny_rate_limited_high_value
-        cron: *high-value-workload-cron
-      - name: load_test_high_value
-      - name: large_indexed_ins_high_value
-      - name: expressive_queries_high_value
-      - name: time_series_sort_high_value
-      - name: tsbs-expression-query
+    tasks: *3node-intel-tasks
 
   # On PERF-730 we changed the initial sync tests to use two nodes instead of three. To avoid
   # losing history, the name remains unchanged, but the display_name reflects the change to 2-Node.
@@ -378,19 +399,8 @@ buildvariants:
     name: perf-mongo-perf-standalone.arm.aws.2023-11
     display_name: Mongo-Perf Standalone inMemory ARM AWS 2023-11
     modules: *perf_modules
-    cron: &linux-mongo-perf-cron "0 0 * * 0,2,3,4,5"
-    expansions: &standalone-arm-expansions
-      mongodb_setup_release: 2022-11
-      mongodb_setup: mongo-perf-standalone.2023-02
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: workload_client_mongod_combined.2023-01
-      workload_setup: 2022-11
-      use_scons_cache: true
-      platform: linux
-      canaries: none
-      storageEngine: inMemory
-      project_dir: *perf_project_dir
-      compile_variant: amazon2-arm64-compile
+    cron: *linux-mongo-perf-cron
+    expansions: *standalone-arm-expansions
     run_on:
       - "rhel70-perf-microbenchmarks"
     tasks:
@@ -425,16 +435,12 @@ buildvariants:
       - name: compound_wildcard_index_read_commands
       - name: tie-breaking-heuristics
 
-  - &linux-mongo-perf-standalone-intel
-    <<: *amazon2_x86_compile_variant_dependency
+  - <<: *amazon2_x86_compile_variant_dependency
     name: perf-mongo-perf-standalone.intel.aws.2023-11
     display_name: Mongo-Perf Standalone inMemory Intel AWS 2023-11
     cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *perf_modules
-    expansions: &standalone-intel-expansions
-      <<: *standalone-arm-expansions
-      infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
-      compile_variant: amazon2-x86-compile
+    expansions: *standalone-intel-expansions
     run_on:
       - "rhel70-perf-microbenchmarks"
     tasks:

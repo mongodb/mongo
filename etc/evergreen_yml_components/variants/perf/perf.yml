@@ -1,3 +1,11 @@
+definitions:
+  cron_query_perf_schedule: &cron_query_perf_schedule "0 0 * * 4" # 00:00 on Thursday
+  linux-1-node-repl-cron: &linux-1-node-repl-cron "0 0 * * 4" # 00:00 on Thursday
+  cron_sunday_thursday: &cron_sunday_thursday "0 0 * * 0,4"
+  linux-3-shard-cron: &linux-3-shard-cron "0 0 * * 4" # 00:00 on Thursday
+  linux-3-node-cron: &linux-3-node-cron "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
+  high-value-workload-cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
+
 variables:
   - &amazon2_x86_compile_variant_dependency
     depends_on:
@@ -48,11 +56,138 @@ variables:
       - py-tpcc
       - flamegraph
 
+  - perf_project_dir: &perf_project_dir dsi
+
+  - &classic_engine_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
+    - name: ycsb.2023-09
+    - name: ycsb_single_thread
+    - name: ycsb_60GB.2023-09
+    - name: ycsb_60GB.long.2023-09
+    - name: crud_workloads_majority
+    - name: bestbuy_agg
+    - name: bestbuy_agg_merge_different_db
+    - name: bestbuy_agg_merge_same_db
+    - name: bestbuy_agg_merge_wordcount
+    - name: bestbuy_query
+    - name: cursor_manager
+    - name: map_reduce_workloads
+    - name: tpcc
+    - name: tpcc_majority
+    - name: tpch_1_normalized
+    - name: tpch_1_denormalized
+    - name: tpch_10_normalized
+    - name: tpch_10_denormalized
+    - name: canaries_only
+
+  - &classic_engine_1nodereplset_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
+    - name: linkbench
+    - name: linkbench2
+    - name: snapshot_reads
+    - name: canaries_only
+
+  - &bonsai_standalone_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
+
+  - &bonsai_1nodereplset_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
+    - name: linkbench2
+    - name: snapshot_reads
+
+    # Same as standalone tasks, but with tasks required all feature flags added
+  - &mirobenchmarks-all-feature-flags-tasks
+    - name: big_collection
+    - name: genny_scale_InsertRemove
+    - name: genny_execution_UserAcquisition
+    - name: aggregation_read_commands
+    - name: aggregation_read_commands_large_dataset
+    - name: agg-query-comparison_read_commands
+    - name: agg-query-comparison_read_commands_high_value
+      cron: "0 0 * * 0,2,3,4,5" # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. resetting correct cron
+    - name: query_read_commands
+    - name: query_read_commands_large_dataset
+    - name: views-aggregation
+    - name: views-query
+    - name: where_read_commands
+    - name: update_read_commands
+    - name: insert_read_commands
+    - name: wildcard-index-read_read_commands
+    - name: wildcard-index-write_read_commands
+    - name: geo_read_commands
+    - name: misc_read_commands
+    - name: misc_custom_filter_default_read_commands
+    - name: misc_custom_filter_slow_or_sample_read_commands
+    - name: misc_custom_filter_complex_read_commands
+    - name: misc_custom_filter_whole_doc_read_commands
+    - name: misc_slowms_everything_read_commands
+    - name: singleThreaded_read_commands
+    - name: pipeline-updates
+    - name: javascript
+    - name: compound_wildcard_index_write_commands
+    - name: compound_wildcard_index_read_commands
+    - name: tie-breaking-heuristics
+
+  - tasks: &mongo-perf-bonsai-tasks
+      - name: agg-query-comparison_read_commands
+      - name: aggregation_read_commands
+      - name: big_collection
+      - name: query_read_commands
+      - name: query_read_commands_large_dataset
+
+  - &repl-arm-expansions
+    mongodb_setup_release: 2022-11
+    mongodb_setup: mongo-perf-replica.2023-02
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: workload_client_mongod_combined.2023-01
+    workload_setup: 2022-11
+    use_scons_cache: true
+    platform: linux
+    canaries: none
+    storageEngine: inMemory
+    project_dir: *perf_project_dir
+    compile_variant: amazon2-arm64-compile
+
+  - &repl-intel-expansions
+    <<: *repl-arm-expansions
+    infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
+    compile_variant: amazon2-x86-compile
+
+  - &standalone-intel-expansions # Update mongodb_setup to mongo-perf-standalone.2023-02 when reusing this anchor
+    mongodb_setup_release: 2022-11
+    mongodb_setup: mongo-perf-standalone-all-feature-flags.2023-02
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
+    workload_setup: 2022-11
+    use_scons_cache: true
+    platform: linux
+    canaries: none
+    storageEngine: inMemory
+    project_dir: *perf_project_dir
+    compile_variant: amazon2-x86-compile
+
+  - &3node-query-stats-rate-limit-expansions
+    mongodb_setup_release: 2022-11
+    mongodb_setup: replica-query-stats-rate-limit
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: replica
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: amazon2-arm64-compile
+    config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 1}'
+
 buildvariants:
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-standalone-classic-query-engine.intel.aws.2023-11
     display_name: Classic Query Engine Standalone Intel AWS 2023-11
-    cron: &cron_query_perf_schedule "0 0 * * 4" # 00:00 on Thursday
+    cron: *cron_query_perf_schedule
     modules: *perf_modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -61,34 +196,13 @@ buildvariants:
       infrastructure_provisioning: single-intel.2023-11
       workload_setup: 2022-11
       platform: linux
-      project_dir: &perf_project_dir dsi
+      project_dir: *perf_project_dir
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: amazon2-x86-compile
     run_on:
       - "rhel70-perf-single"
-    tasks: &classic_engine_tasks
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-      - name: ycsb.2023-09
-      - name: ycsb_single_thread
-      - name: ycsb_60GB.2023-09
-      - name: ycsb_60GB.long.2023-09
-      - name: crud_workloads_majority
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_query
-      - name: cursor_manager
-      - name: map_reduce_workloads
-      - name: tpcc
-      - name: tpcc_majority
-      - name: tpch_1_normalized
-      - name: tpch_1_denormalized
-      - name: tpch_10_normalized
-      - name: tpch_10_denormalized
-      - name: canaries_only
+    tasks: *classic_engine_tasks
 
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-standalone-sbe.intel.aws.2023-11
@@ -113,7 +227,7 @@ buildvariants:
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-1-node-replSet-classic-query-engine.intel.aws.2023-11
     display_name: Classic Query Engine Intel 1-Node ReplSet Intel AWS 2023-11
-    cron: &linux-1-node-repl-cron "0 0 * * 4" # 00:00 on Thursday
+    cron: *linux-1-node-repl-cron
     modules: *perf_modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -128,13 +242,7 @@ buildvariants:
       compile_variant: amazon2-x86-compile
     run_on:
       - "rhel70-perf-single"
-    tasks: &classic_engine_1nodereplset_tasks
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-      - name: linkbench
-      - name: linkbench2
-      - name: snapshot_reads
-      - name: canaries_only
+    tasks: *classic_engine_1nodereplset_tasks
 
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-1-node-replSet-sbe.intel.aws.2023-11
@@ -189,7 +297,7 @@ buildvariants:
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-atlas-M30-real.arm.aws.2023-11
     display_name: M30-Atlas ReplSet ARM AWS 2023-11
-    cron: &cron_sunday_thursday "0 0 * * 0,4"
+    cron: *cron_sunday_thursday
     modules: *perf_modules
     expansions:
       mongodb_setup: atlas
@@ -318,9 +426,7 @@ buildvariants:
       compile_variant: amazon2-arm64-compile
     run_on:
       - "rhel70-perf-single"
-    tasks: &bonsai_standalone_tasks
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
+    tasks: *bonsai_standalone_tasks
 
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-standalone-sampling-bonsai.intel.aws.2023-11
@@ -400,11 +506,7 @@ buildvariants:
       compile_variant: amazon2-x86-compile
     run_on:
       - "rhel70-perf-single"
-    tasks: &bonsai_1nodereplset_tasks
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-      - name: linkbench2
-      - name: snapshot_reads
+    tasks: *bonsai_1nodereplset_tasks
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-1-node-replSet-sampling-bonsai.arm.aws.2023-11
@@ -523,10 +625,10 @@ buildvariants:
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
       # Needed to allow enabling failpoints.
-      config_params_json: &config_params_enableTestCommmands '{"v":0, "enableTestCommands": true}'
+      config_params_json: '{"v":0, "enableTestCommands": true}'
     run_on:
       - "rhel70-perf-single"
-    tasks: &1node-test-commands-tasks
+    tasks:
       - name: startup
 
   - <<: *amazon_linux2_arm64_mongocrypt_compile_variant_dependency
@@ -611,7 +713,7 @@ buildvariants:
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-shard-heuristic-bonsai.arm.aws.2023-11
     display_name: Bonsai with Heuristic CE 3-Shard Cluster ARM AWS 2023-11
-    cron: &linux-3-shard-cron "0 0 * * 4" # 00:00 on Thursday
+    cron: *linux-3-shard-cron
     modules: *perf_modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -1037,18 +1139,7 @@ buildvariants:
     display_name: Mongo-Perf 1-Node ReplSet inMemory ARM AWS 2023-11
     cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *perf_modules
-    expansions: &repl-arm-expansions
-      mongodb_setup_release: 2022-11
-      mongodb_setup: mongo-perf-replica.2023-02
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: workload_client_mongod_combined.2023-01
-      workload_setup: 2022-11
-      use_scons_cache: true
-      platform: linux
-      canaries: none
-      storageEngine: inMemory
-      project_dir: *perf_project_dir
-      compile_variant: amazon2-arm64-compile
+    expansions: *repl-arm-expansions
     run_on:
       - "rhel70-perf-microbenchmarks"
     tasks:
@@ -1061,6 +1152,17 @@ buildvariants:
       - name: pipeline-updates
       - name: wildcard-index-write_read_commands
       - name: pipeline-updates
+
+  - <<: *linux-mongo-perf-repl-arm
+    name: perf-mongo-perf-repl-all-feature-flags.arm.aws.2023-01
+    display_name: Mongo-Perf 1-Node ReplSet inMemory all feature flags ARM AWS 2023-11
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *repl-arm-expansions
+      mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-mongo-perf-standalone-all-feature-flags.arm.aws.2023-11
@@ -1082,37 +1184,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-microbenchmarks"
     # Same as standalone tasks, but with tasks required all feature flags added
-    tasks: &mirobenchmarks-all-feature-flags-tasks
-      - name: big_collection
-      - name: genny_scale_InsertRemove
-      - name: genny_execution_UserAcquisition
-      - name: aggregation_read_commands
-      - name: aggregation_read_commands_large_dataset
-      - name: agg-query-comparison_read_commands
-      - name: agg-query-comparison_read_commands_high_value
-        cron: "0 0 * * 0,2,3,4,5" # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. resetting correct cron
-      - name: query_read_commands
-      - name: query_read_commands_large_dataset
-      - name: views-aggregation
-      - name: views-query
-      - name: where_read_commands
-      - name: update_read_commands
-      - name: insert_read_commands
-      - name: wildcard-index-read_read_commands
-      - name: wildcard-index-write_read_commands
-      - name: geo_read_commands
-      - name: misc_read_commands
-      - name: misc_custom_filter_default_read_commands
-      - name: misc_custom_filter_slow_or_sample_read_commands
-      - name: misc_custom_filter_complex_read_commands
-      - name: misc_custom_filter_whole_doc_read_commands
-      - name: misc_slowms_everything_read_commands
-      - name: singleThreaded_read_commands
-      - name: pipeline-updates
-      - name: javascript
-      - name: compound_wildcard_index_write_commands
-      - name: compound_wildcard_index_read_commands
-      - name: tie-breaking-heuristics
+    tasks: *mirobenchmarks-all-feature-flags-tasks
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-mongo-perf-standalone-classic-query-engine.arm.aws.2023-11
@@ -1243,12 +1315,7 @@ buildvariants:
       compile_variant: amazon2-arm64-compile
     run_on:
       - "rhel70-perf-microbenchmarks"
-    tasks: &mongo-perf-bonsai-tasks
-      - name: agg-query-comparison_read_commands
-      - name: aggregation_read_commands
-      - name: big_collection
-      - name: query_read_commands
-      - name: query_read_commands_large_dataset
+    tasks: *mongo-perf-bonsai-tasks
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-mongo-perf-standalone-heuristic-bonsai.arm.aws.2023-11
@@ -1273,27 +1340,13 @@ buildvariants:
       - "rhel70-perf-microbenchmarks"
     tasks: *mongo-perf-bonsai-tasks
 
-  - <<: *linux-mongo-perf-repl-arm
-    name: perf-mongo-perf-repl-all-feature-flags.arm.aws.2023-01
-    display_name: Mongo-Perf 1-Node ReplSet inMemory all feature flags ARM AWS 2023-11
-    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
-    expansions:
-      <<: *repl-arm-expansions
-      mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
-    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
-    # Add tasks to the anchor that this variant references
-    # If diverging from that list, add the entire list of desired tasks here
-
   - &linux-mongo-perf-repl-intel
     <<: *amazon2_x86_compile_variant_dependency
     name: perf-mongo-perf-repl.intel.aws.2023-11
     display_name: Mongo-Perf 1-Node ReplSet inMemory Intel AWS 2023-11
     cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *perf_modules
-    expansions: &repl-intel-expansions
-      <<: *repl-arm-expansions
-      infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
-      compile_variant: amazon2-x86-compile
+    expansions: *repl-intel-expansions
     run_on:
       - "rhel70-perf-microbenchmarks"
     tasks:
@@ -1305,24 +1358,24 @@ buildvariants:
       - name: wildcard-index-write_read_commands
       - name: pipeline-updates
 
+  - <<: *linux-mongo-perf-repl-intel
+    name: perf-mongo-perf-repl-all-feature-flags.intel.aws.2023-01
+    display_name: Mongo-Perf 1-Node ReplSet inMemory all feature flags Intel AWS 2023-11
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    modules: *perf_modules
+    expansions:
+      <<: *repl-intel-expansions
+      mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-mongo-perf-standalone-all-feature-flags.intel.aws.2023-01
     display_name: Mongo-Perf Standalone inMemory all feature flags Intel AWS 2023-11
     cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *perf_modules
-    expansions:
-      &standalone-intel-expansions # Update mongodb_setup to mongo-perf-standalone.2023-02 when reusing this anchor
-      mongodb_setup_release: 2022-11
-      mongodb_setup: mongo-perf-standalone-all-feature-flags.2023-02
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
-      workload_setup: 2022-11
-      use_scons_cache: true
-      platform: linux
-      canaries: none
-      storageEngine: inMemory
-      project_dir: *perf_project_dir
-      compile_variant: amazon2-x86-compile
+    expansions: *standalone-intel-expansions
     run_on:
       - "rhel70-perf-microbenchmarks"
     tasks: *mirobenchmarks-all-feature-flags-tasks
@@ -1445,18 +1498,6 @@ buildvariants:
     run_on:
       - "rhel70-perf-microbenchmarks"
     tasks: *mongo-perf-bonsai-tasks
-
-  - <<: *linux-mongo-perf-repl-intel
-    name: perf-mongo-perf-repl-all-feature-flags.intel.aws.2023-01
-    display_name: Mongo-Perf 1-Node ReplSet inMemory all feature flags Intel AWS 2023-11
-    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
-    modules: *perf_modules
-    expansions:
-      <<: *repl-intel-expansions
-      mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
-    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
-    # Add tasks to the anchor that this variant references
-    # If diverging from that list, add the entire list of desired tasks here
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-1-node-replSet-longRunning.arm.aws.2023-11
@@ -1597,7 +1638,7 @@ buildvariants:
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-node-replSet-query-settings.arm.aws.2023-11
     display_name: QuerySettings 3-Node ReplSet ARM AWS 2023-11
-    cron: &linux-3-node-cron "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
+    cron: *linux-3-node-cron
     modules: *perf_modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -1666,20 +1707,9 @@ buildvariants:
     <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-node-replSet-limited-1-query-stats.arm.aws.2023-11
     display_name: QueryStats, Rate Limited with 1 3-Node ReplSet ARM AWS 2023-11
-    cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
+    cron: *high-value-workload-cron
     modules: *perf_modules
-    expansions: &3node-query-stats-rate-limit-expansions
-      mongodb_setup_release: 2022-11
-      mongodb_setup: replica-query-stats-rate-limit
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: replica
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *perf_project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: amazon2-arm64-compile
-      config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 1}'
+    expansions: *3node-query-stats-rate-limit-expansions
     run_on:
       - "rhel70-perf-replset"
     tasks:
