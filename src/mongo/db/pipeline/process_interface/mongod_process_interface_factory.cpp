@@ -61,10 +61,8 @@ std::shared_ptr<MongoProcessInterface> MongoProcessInterfaceCreateImpl(Operation
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
     }
     if (ShardingState::get(opCtx)->enabled() && isInternalThreadOrClient) {
-        if (isInternalThreadOrClient) {
-            return std::make_shared<ShardServerProcessInterface>(
-                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
-        }
+        return std::make_shared<ShardServerProcessInterface>(
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
     } else if (auto executor = ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(opCtx)) {
         return std::make_shared<ReplicaSetNodeProcessInterface>(std::move(executor));
     }
