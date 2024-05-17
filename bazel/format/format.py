@@ -33,12 +33,14 @@ def main() -> int:
         print("python buildscripts/install_bazel.py")
         return 1
 
-    parser = argparse.ArgumentParser(prog='Format',
-                                     description='This script formats code in mongodb')
+    parser = argparse.ArgumentParser(
+        prog="Format", description="This script formats code in mongodb"
+    )
 
     parser.add_argument("--check", help="Run in check mode", default=False, action="store_true")
-    parser.add_argument("--prettier", help="Set the path to prettier", required=True,
-                        type=pathlib.Path)
+    parser.add_argument(
+        "--prettier", help="Set the path to prettier", required=True, type=pathlib.Path
+    )
 
     args = parser.parse_args()
     prettier_path: pathlib.Path = args.prettier.resolve()

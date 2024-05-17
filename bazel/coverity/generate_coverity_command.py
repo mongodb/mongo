@@ -4,7 +4,7 @@ import subprocess
 import io
 
 # assume we are always running from project root to find buildscripts
-sys.path.append('.')
+sys.path.append(".")
 
 from buildscripts.install_bazel import install_bazel
 
@@ -26,22 +26,28 @@ sys.stderr = orig_stderr
 # the cc_library and cc_binaries in our build. There is not a good way from
 # within the build to get all those targets, so we will generate the list via query
 # https://sig-product-docs.synopsys.com/bundle/coverity-docs/page/coverity-analysis/topics/building_with_bazel.html#build_with_bazel
-proc = subprocess.run([
-    bazel_executable, 
-    "aquery", 
-    '--config=local',
-    'mnemonic("CppCompile|LinkCompile", //src/mongo/...)'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+proc = subprocess.run(
+    [
+        bazel_executable,
+        "aquery",
+        "--config=local",
+        'mnemonic("CppCompile|LinkCompile", //src/mongo/...)',
+    ],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
 
 targets = []
 for line in proc.stdout.splitlines():
     if line.startswith("  Target: "):
-       targets.append(line.split()[-1])
+        targets.append(line.split()[-1])
 
 coverity_dir = os.path.dirname(__file__)
 analysis_dir = os.path.join(coverity_dir, "analysis")
 os.makedirs(analysis_dir, exist_ok=True)
 
-with open(os.path.join(coverity_dir, "analysis", "BUILD.bazel"), 'w') as buildfile:
+with open(os.path.join(coverity_dir, "analysis", "BUILD.bazel"), "w") as buildfile:
     buildfile.write("""\
 load("@rules_coverity//coverity:defs.bzl", "cov_gen_script")
 cov_gen_script(
@@ -49,27 +55,34 @@ cov_gen_script(
     deps=[
 """)
     for target in targets:
-        buildfile.write("""\
+        buildfile.write(
+            """\
         "%s",
-""" % target)
+"""
+            % target
+        )
 
     buildfile.write("""\
     ],
 )
 """)
 
-cmd = [
-    sys.executable, 
-    "./buildscripts/scons.py", 
-    ] + sys.argv + [
-    "BAZEL_INTEGRATION_DEBUG=1",
-    "\\$BUILD_ROOT/scons/\\$VARIANT_DIR/sconf_temp"]
+cmd = (
+    [
+        sys.executable,
+        "./buildscripts/scons.py",
+    ]
+    + sys.argv
+    + ["BAZEL_INTEGRATION_DEBUG=1", "\\$BUILD_ROOT/scons/\\$VARIANT_DIR/sconf_temp"]
+)
 
 # Run a lightwieght scons build to generate the bazel command.
 proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 for line in proc.stdout.splitlines():
     if "BAZEL_COMMAND:" in line:
-        # The script is intended to be have output placed into a bash variable, so we should 
+        # The script is intended to be have output placed into a bash variable, so we should
         # only ever print the bazel build command
-        cmd = line.split('BAZEL_COMMAND:')[-1].strip().split()[:-1] + ["//bazel/coverity/analysis:coverity_build"]
-        print(' '.join(cmd))
+        cmd = line.split("BAZEL_COMMAND:")[-1].strip().split()[:-1] + [
+            "//bazel/coverity/analysis:coverity_build"
+        ]
+        print(" ".join(cmd))
