@@ -1334,4 +1334,6 @@ last-lts:
     ticket: SERVER-89342
   - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
     ticket: SERVER-84623
+  - test_file: jstests/sharding/direct_shard_connection_auth.js
+    ticket: SERVER-89994
   suites: null
