@@ -32,16 +32,18 @@
 
 namespace mongo {
 std::string PlanExplainerExpress::getPlanSummary() const {
-    std::string ps = _iteratorStats->stageName();
+    StackStringBuilder ssb;
+
+    ssb << _iteratorStats->stageName();
 
     if (!_iteratorStats->indexKeyPattern().empty()) {
-        ps += " " + _iteratorStats->indexKeyPattern();
+        ssb << " " << _iteratorStats->indexKeyPattern();
     }
 
     if (!_writeOperationStats->stageName().empty()) {
-        ps += "," + _writeOperationStats->stageName();
+        ssb << "," << _writeOperationStats->stageName();
     }
-    return ps;
+    return ssb.str();
 }
 
 void PlanExplainerExpress::getSummaryStats(PlanSummaryStats* statsOut) const {
