@@ -2,6 +2,7 @@ import subprocess
 import sys
 import re
 
+
 def findMongoCertsFromStore(store):
     command = ["certutil", "-store", store]
     subject_pattern = re.compile(r"Subject:.*O=MongoDB")
@@ -21,16 +22,20 @@ def findMongoCertsFromStore(store):
             cns.append(cn_match.group(1))
     return cns
 
+
 def deleteCertsByCNFromStore(store, cns):
     command = ["certutil", "-delstore", "-f", store, "cn"]
     for cn in cns:
         command[4] = cn
         try:
-            print(f"Deleting 'CN={cn}' from the '{store}' certificate store:\n\t{' ' .join(command)}")
+            print(
+                f"Deleting 'CN={cn}' from the '{store}' certificate store:\n\t{' ' .join(command)}"
+            )
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError as e:
             print(f"Command {command} failed with error: {e}", file=sys.stderr)
             sys.exit(1)
+
 
 my_cns = findMongoCertsFromStore("My")
 root_cns = findMongoCertsFromStore("Root")

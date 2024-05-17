@@ -212,7 +212,6 @@ ignore = [
 [tool.ruff.format]
 exclude = [
     # allow-list: incrementally remove as each is formatted and locked down
-    "jstests/*",
     "site_scons/*",
     "src/*",
     ]
