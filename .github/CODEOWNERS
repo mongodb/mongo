@@ -206,9 +206,6 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/unittest/OWNERS.yml
 /src/mongo/unittest/**/* @10gen/server-service-architecture
 
-# The following patterns are parsed from ./src/mongo/util/OWNERS.yml
-/src/mongo/util/**/* @10gen/query
-
 # The following patterns are parsed from ./src/mongo/util/concurrency/OWNERS.yml
 /src/mongo/util/concurrency/**/idle_thread_block.* @10gen/server-service-architecture
 /src/mongo/util/concurrency/**/mutex.* @10gen/server-service-architecture
@@ -222,6 +219,9 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/util/net/OWNERS.yml
 /src/mongo/util/net/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/util/tracing_profiler/OWNERS.yml
+/src/mongo/util/tracing_profiler/**/* @10gen/query
 
 # The following patterns are parsed from ./src/mongo/watchdog/OWNERS.yml
 /src/mongo/watchdog/**/* @10gen/server-service-architecture
