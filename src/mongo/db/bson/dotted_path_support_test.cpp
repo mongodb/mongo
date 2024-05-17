@@ -198,9 +198,10 @@ TEST(ExtractAllElementsAlongPath, NestedObjectWithScalarValue) {
 TEST(ExtractAllElementsAlongPath, NestedMaxDepthObjectWithScalarValue) {
     BSONObj obj = BSON("a" << 1);
     std::string dotted_path = "a";
+    dotted_path.reserve(1 + BSONDepth::getMaxAllowableDepth() * 2);
     for (uint32_t i = 0; i < BSONDepth::getMaxAllowableDepth(); ++i) {
         obj = BSON("a" << obj);
-        dotted_path = "a." + dotted_path;
+        dotted_path.insert(0, "a.");
     }
 
     BSONElementSet actualElements;

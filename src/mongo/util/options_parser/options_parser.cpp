@@ -57,6 +57,7 @@
 #include <cstring>
 #include <exception>
 #include <fcntl.h>
+#include <fmt/format.h>
 #include <fstream>  // IWYU pragma: keep
 #include <iterator>
 #include <map>
@@ -994,7 +995,8 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
             // If this is not a special field name, and we are in a sub object, append our
             // current fieldName to the selector for the sub object we are traversing
             else {
-                dottedName = parentPath + '.' + fieldName;
+                using namespace fmt::literals;
+                dottedName = "{}.{}"_format(parentPath, fieldName);
             }
         }
 

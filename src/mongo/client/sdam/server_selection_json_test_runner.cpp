@@ -544,7 +544,7 @@ public:
         std::string result;
         for (size_t i = 0; i < errors.size(); ++i) {
             auto error = errors[i];
-            result = result + error.first + " - " + error.second;
+            result += error.first += " - "s += error.second;
             if (i != errors.size() - 1) {
                 result += "; ";
             }

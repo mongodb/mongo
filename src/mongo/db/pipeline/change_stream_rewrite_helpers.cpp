@@ -36,6 +36,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <cstddef>
+#include <fmt/format.h>
 #include <functional>
 #include <map>
 #include <ostream>
@@ -555,9 +556,10 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
                 // not need to check whether the predicate matches a missing field in this case.
                 static const std::vector<std::string> oplogFields = {"o.diff.d", "o.$unset"};
                 auto rewrittenEquality = std::make_unique<OrMatchExpression>();
+                using namespace fmt::literals;
                 for (auto&& oplogField : oplogFields) {
                     rewrittenEquality->add(std::make_unique<ExistsMatchExpression>(
-                        StringData(oplogField + "." + fieldName)));
+                        StringData("{}.{}"_format(oplogField, fieldName))));
                 }
                 return rewrittenEquality;
             };
