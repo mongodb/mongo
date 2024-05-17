@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/express/express_plan.h"
 #include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/transaction_resources.h"
@@ -37,17 +38,31 @@
 namespace mongo {
 namespace express {
 
+void releaseShardFilterResources(ScopedCollectionFilter&) {}
+void restoreShardFilterResources(ScopedCollectionFilter&) {}
+
+void releaseShardFilterResources(NoShardFilter&) {}
+void restoreShardFilterResources(NoShardFilter&) {}
+
+void releaseShardFilterResources(write_stage_common::PreWriteFilter& preWriteFilter) {
+    preWriteFilter.saveState();
+}
+
+void restoreShardFilterResources(write_stage_common::PreWriteFilter& preWriteFilter) {
+    preWriteFilter.restoreState();
+}
+
 void logRecordNotFound(OperationContext* opCtx,
                        const RecordId& rid,
                        const BSONObj& indexKey,
                        const BSONObj& keyPattern,
                        const NamespaceString& ns) {
-    // The express path does not yield between examining the index entry and fetching it, so it's
-    // not possible that the document was deleted during a yield after we first examined the index
-    // entry. It is possible that the record was deleted by a prepared transaction (race between
-    // document deletion & fetch). If we're ignoring prepare conflicts, then we simply return here.
-    // Otherwise, we return an error and write to the log with instructions on how to address
-    // potentially inconsistent data.
+    // The express path does not yield between examining the index entry and fetching it, so
+    // it's not possible that the document was deleted during a yield after we first examined
+    // the index entry. It is possible that the record was deleted by a prepared transaction
+    // (race between document deletion & fetch). If we're ignoring prepare conflicts, then we
+    // simply return here. Otherwise, we return an error and write to the log with instructions
+    // on how to address potentially inconsistent data.
     if (shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() !=
         PrepareConflictBehavior::kEnforce) {
         return;

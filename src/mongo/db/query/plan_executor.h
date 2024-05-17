@@ -91,7 +91,20 @@ public:
 
     boost::optional<ScopedCollectionFilter> getShardingFilter(OperationContext* opCtx) const;
 
+    const NamespaceString& nss() const {
+        return std::visit([](const auto& choice) -> const NamespaceString& { return nss(choice); },
+                          _collectionPtrOrAcquisition);
+    }
+
 private:
+    static const NamespaceString& nss(const CollectionPtr* collectionPtr) {
+        return (*collectionPtr)->ns();
+    }
+
+    static const NamespaceString& nss(const CollectionAcquisition& acquisition) {
+        return acquisition.nss();
+    }
+
     std::variant<const CollectionPtr*, CollectionAcquisition> _collectionPtrOrAcquisition;
 };
 

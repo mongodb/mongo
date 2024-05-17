@@ -269,6 +269,10 @@ public:
         return shouldReturnOldDocs() || shouldReturnNewDocs();
     }
 
+    ReturnDocOption getReturnDocs() const {
+        return _returnDocs;
+    }
+
     void setYieldPolicy(PlanYieldPolicy::YieldPolicy yieldPolicy) {
         _yieldPolicy = yieldPolicy;
     }

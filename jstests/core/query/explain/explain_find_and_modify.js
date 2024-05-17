@@ -272,6 +272,14 @@ function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentP
             // Sub-doc, recurse to match on it's fields
             assertExplainResultsMatch(
                 explainOut[key], expectedMatches[key], preMsg, totalFieldName);
+        } else if (key == "stage" && expectedMatches[key] == "UPDATE") {
+            // Express handles update-by-id post 8.0
+            let want = [expectedMatches[key], "EXPRESS_UPDATE"]
+            assert.contains(explainOut[key],
+                            want,
+                            preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +
+                                " does not match one of the expected values (" + want + ").");
+
         } else {
             assert.eq(explainOut[key],
                       expectedMatches[key],
