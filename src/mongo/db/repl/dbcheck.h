@@ -53,7 +53,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

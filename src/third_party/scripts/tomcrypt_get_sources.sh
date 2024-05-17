@@ -45,6 +45,7 @@ mkdir src/modes/cbc
 
 FILES=(
     hashes/helper/hash_memory.c
+    hashes/md5.c
     hashes/sha1.c
     hashes/sha2/sha256.c
     hashes/sha2/sha512.c

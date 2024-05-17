@@ -38,6 +38,7 @@ env.InjectThirdParty(libraries=[
     'croaring',
     'fmt',
     'immer',
+    'tomcrypt_md5',
     'murmurhash3',
     'safeint',
     'stemmer',

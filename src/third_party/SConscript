@@ -169,6 +169,12 @@ if "tom" in env["MONGO_CRYPTO"]:
         'CPPPATH': ['#/src/third_party/tomcrypt' + tomcryptSuffix + '/src/headers'],
     }
 
+if not use_system_version_of_library('tomcrypt'):
+    thirdPartyEnvironmentModifications['tomcrypt_md5'] = {
+        'CPPPATH': ['#/src/third_party/tomcrypt' + tomcryptSuffix + '/src/headers'],
+        'CPPDEFINES': ['LTC_NO_PROTOTYPES'] if env.TargetOSIs('windows') else [],
+    }
+
 if not use_system_version_of_library('stemmer'):
     thirdPartyEnvironmentModifications['stemmer'] = {
         'CPPPATH': ['#/src/third_party/libstemmer_c/include'],
@@ -508,6 +514,21 @@ if "tom" in env["MONGO_CRYPTO"]:
     ])
 
     tomcryptEnv.ShimLibrary(name="tomcrypt", )
+
+md5Env = env.Clone()
+if use_system_version_of_library("tomcrypt"):
+    md5Env = md5Env.Clone(SYSLIBDEPS=[
+        env['LIBDEPS_TOMCRYPT_SYSLIBDEP'],
+    ])
+else:
+    md5Env = md5Env.Clone()
+    md5Env.InjectThirdParty(libraries=['tomcrypt_md5'])
+    md5Env.SConscript('tomcrypt' + tomcryptSuffix + '/SConscript', exports={'env': md5Env})
+    md5Env = md5Env.Clone(LIBDEPS_INTERFACE=[
+        'tomcrypt' + tomcryptSuffix + '/tomcrypt_md5',
+    ])
+
+md5Env.ShimLibrary(name="tomcrypt_md5")
 
 # libunwind and tcmalloc are both added as global dependencies. Skip
 # inheriting global dependencies to avoid a circular dependency.

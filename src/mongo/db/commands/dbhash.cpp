@@ -75,7 +75,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
@@ -311,7 +310,7 @@ public:
         result.append("host", prettyHostName(opCtx->getClient()->getLocalPort()));
 
         md5_state_t globalState;
-        md5_init(&globalState);
+        md5_init_state(&globalState);
 
         std::map<std::string, std::string> collectionToHashMap;
         std::map<std::string, UUID> collectionToUUIDMap;
@@ -480,7 +479,7 @@ private:
         }
 
         md5_state_t st;
-        md5_init(&st);
+        md5_init_state(&st);
 
         try {
             MONGO_verify(nullptr != exec.get());

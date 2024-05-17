@@ -140,6 +140,9 @@ env.Library(
         'md5.cpp',
         'password_digest.cpp',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/third_party/shim_tomcrypt_md5',
+    ],
 )
 
 env.Library(
@@ -862,7 +865,6 @@ icuEnv.CppUnitTest(
         'log_with_sampling_test.cpp',
         'lru_cache_test.cpp',
         'md5_test.cpp',
-        'md5main.cpp',
         'concurrent_memory_aggregator_test.cpp',
         'memory_usage_tracker_test.cpp',
         'optional_util_test.cpp',
@@ -903,6 +905,7 @@ icuEnv.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/third_party/croaring/croaring',
+        '$BUILD_DIR/third_party/shim_tomcrypt_md5',
         'alarm',
         'background_job',
         'caching',
@@ -915,7 +918,6 @@ icuEnv.CppUnitTest(
         'future_util',
         'icu',
         'latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
-        'md5',
         'pcre_util',
         'pcre_wrapper',
         'periodic_runner_impl',

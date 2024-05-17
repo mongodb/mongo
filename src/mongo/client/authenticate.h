@@ -48,7 +48,6 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/future.h"
-#include "mongo/util/md5.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

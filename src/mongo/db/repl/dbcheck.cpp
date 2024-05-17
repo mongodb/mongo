@@ -73,7 +73,6 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -390,7 +389,7 @@ DbCheckHasher::DbCheckHasher(
       _dataThrottle(dataThrottle) {
 
     // Get the MD5 hasher set up.
-    md5_init(&_state);
+    md5_init_state(&_state);
 
     auto& collection = acquisition.coll.getCollectionPtr();
 

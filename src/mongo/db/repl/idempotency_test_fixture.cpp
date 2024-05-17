@@ -63,7 +63,6 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -345,7 +344,7 @@ std::string IdempotencyTest::computeDataHash(const CollectionPtr& collection) {
                                            InternalPlanner::IXSCAN_FETCH);
     ASSERT(nullptr != exec.get());
     md5_state_t st;
-    md5_init(&st);
+    md5_init_state(&st);
 
     PlanExecutor::ExecState state;
     BSONObj obj;

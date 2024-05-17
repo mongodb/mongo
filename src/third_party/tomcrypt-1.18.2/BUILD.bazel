@@ -3,6 +3,20 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 package(default_visibility = ["//visibility:public"])
 
 mongo_cc_library(
+    name = "tomcrypt_deps",
+    srcs = [
+        "src/misc/compare_testvector.c",
+        "src/misc/crypt/crypt_argchk.c",
+    ],
+    hdrs = glob([
+        "src/headers/*.h",
+    ]),
+    copts = [
+        "-Isrc/third_party/tomcrypt-1.18.2/src/headers",
+    ],
+)
+
+mongo_cc_library(
     name = "tomcrypt",
     srcs = [
         "src/ciphers/aes/aes.c",
@@ -15,8 +29,6 @@ mongo_cc_library(
         "src/mac/hmac/hmac_init.c",
         "src/mac/hmac/hmac_memory.c",
         "src/mac/hmac/hmac_process.c",
-        "src/misc/compare_testvector.c",
-        "src/misc/crypt/crypt_argchk.c",
         "src/misc/crypt/crypt_cipher_descriptor.c",
         "src/misc/crypt/crypt_cipher_is_valid.c",
         "src/misc/crypt/crypt_find_cipher.c",
@@ -51,5 +63,24 @@ mongo_cc_library(
     }),
     local_defines = [
         "LTC_NO_PROTOTYPES",
+    ],
+    deps = [
+        ":tomcrypt_deps",
+    ],
+)
+
+mongo_cc_library(
+    name = "tomcrypt_md5",
+    srcs = [
+        "src/hashes/md5.c",
+    ],
+    hdrs = glob([
+        "src/headers/*.h",
+    ]),
+    copts = [
+        "-Isrc/third_party/tomcrypt-1.18.2/src/headers",
+    ],
+    deps = [
+        ":tomcrypt_deps",
     ],
 )

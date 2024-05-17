@@ -42,7 +42,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/password_digest.h"
 
@@ -73,7 +72,7 @@ public:
         md5digest d;
         {
             md5_state_t st;
-            md5_init(&st);
+            md5_init_state(&st);
             md5_append(&st, (const md5_byte_t*)_nonce.c_str(), _nonce.size());
             md5_append(&st, (const md5_byte_t*)_username.c_str(), _username.size());
             md5_append(&st, (const md5_byte_t*)_password_digest.c_str(), _password_digest.size());

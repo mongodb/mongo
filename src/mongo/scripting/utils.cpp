@@ -40,7 +40,6 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/md5.hpp"
 
 namespace mongo {
 
@@ -52,7 +51,7 @@ static BSONObj native_hex_md5(const BSONObj& args, void* data) {
 
     md5digest d;
     md5_state_t st;
-    md5_init(&st);
+    md5_init_state(&st);
     md5_append(&st, reinterpret_cast<const md5_byte_t*>(sd.rawData()), sd.size());
     md5_finish(&st, d);
 

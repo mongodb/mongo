@@ -501,6 +501,7 @@ for pack in [
     ('intel_decimal128', 'intel decimal128'),
     ('bson', ),
     ('libmongocrypt', ),
+    ('tomcrypt', ),
     ('pcre2', ),
     ('protobuf', "Protocol Buffers"),
     ('snappy', ),
@@ -5211,6 +5212,9 @@ def doConfigure(myenv):
 
     if use_system_version_of_library("fmt"):
         conf.FindSysLibDep("fmt", ["fmt"])
+
+    if use_system_version_of_library("tomcrypt"):
+        conf.FindSysLibDep("tomcrypt", ["tomcrypt"])
 
     if use_system_version_of_library("libunwind"):
         conf.FindSysLibDep("unwind", ["unwind"])

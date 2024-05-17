@@ -79,7 +79,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
@@ -248,7 +247,7 @@ public:
 
         md5digest d;
         md5_state_t st;
-        md5_init(&st);
+        md5_init_state(&st);
 
         int n = 0;
 

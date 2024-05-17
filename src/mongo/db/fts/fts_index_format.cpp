@@ -50,7 +50,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/md5.hpp"
+#include "mongo/util/md5.h"
 #include "mongo/util/murmur3.h"
 #include "mongo/util/str.h"
 

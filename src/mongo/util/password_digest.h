@@ -32,7 +32,6 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/util/md5.hpp"
 
 namespace mongo {
 

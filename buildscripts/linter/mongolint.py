@@ -234,9 +234,6 @@ class Linter:
                     "src/mongo/shell/linenoise.h",
                     "src/mongo/shell/mk_wcwidth.cpp",
                     "src/mongo/shell/mk_wcwidth.h",
-                    "src/mongo/util/md5.cpp",
-                    "src/mongo/util/md5.h",
-                    "src/mongo/util/md5main.cpp",
                     "src/mongo/util/net/ssl_stream.cpp",
                     "src/mongo/util/scopeguard.h",
                 ]

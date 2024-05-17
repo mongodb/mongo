@@ -51,7 +51,6 @@
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
@@ -204,7 +203,7 @@ TEST(SBEColumnStoreEncoder, RoundTripConversionThroughSplitCellView) {
     //
     auto cellDigest = [&]() {
         md5_state_t digestState;
-        md5_init(&digestState);
+        md5_init_state(&digestState);
         md5_append(
             &digestState, reinterpret_cast<const md5_byte_t*>(cellBuffer.buf()), cellBuffer.len());
 

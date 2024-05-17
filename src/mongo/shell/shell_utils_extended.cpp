@@ -67,7 +67,6 @@
 #include "mongo/util/errno_util.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/password.h"
 #include "mongo/util/scopeguard.h"
@@ -287,7 +286,7 @@ BSONObj md5sumFile(const BSONObj& args, void* data) {
 
     md5digest d;
     md5_state_t st;
-    md5_init(&st);
+    md5_init_state(&st);
 
     enum { BUFLEN = 4 * 1024 };
     char buffer[BUFLEN];

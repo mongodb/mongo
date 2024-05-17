@@ -52,7 +52,6 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {
@@ -113,7 +112,7 @@ OpMsgRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringData nonc
         md5digest d;
         {
             md5_state_t st;
-            md5_init(&st);
+            md5_init_state(&st);
             md5_append(&st, reinterpret_cast<const md5_byte_t*>(nonce.rawData()), nonce.size());
             md5_append(&st, reinterpret_cast<const md5_byte_t*>(username.c_str()), username.size());
             md5_append(&st, reinterpret_cast<const md5_byte_t*>(digested.c_str()), digested.size());
