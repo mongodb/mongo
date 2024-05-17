@@ -32,15 +32,23 @@ import glob
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--change-dir', type=str, action='store',
-                    help="The directory to change into to perform the extraction.")
-parser.add_argument('--extraction-command', type=str, action='store',
-                    help="The command to use for the extraction.")
-parser.add_argument('--tarball', type=str, action='store',
-                    help="The tarball to perform the extraction on.")
 parser.add_argument(
-    '--move-output', type=str, action='append', help=
-    "Move an extracted entry to a new location after extraction. Format is colon separated, e.g. '--move-output=file/to/move:path/to/destination'. Can accept glob like wildcards."
+    "--change-dir",
+    type=str,
+    action="store",
+    help="The directory to change into to perform the extraction.",
+)
+parser.add_argument(
+    "--extraction-command", type=str, action="store", help="The command to use for the extraction."
+)
+parser.add_argument(
+    "--tarball", type=str, action="store", help="The tarball to perform the extraction on."
+)
+parser.add_argument(
+    "--move-output",
+    type=str,
+    action="append",
+    help="Move an extracted entry to a new location after extraction. Format is colon separated, e.g. '--move-output=file/to/move:path/to/destination'. Can accept glob like wildcards.",
 )
 args = parser.parse_args()
 
@@ -53,26 +61,28 @@ else:
     working_dir = None
     tarball = pathlib.Path(args.tarball).as_posix()
 
-shell = os.environ.get('SHELL', '/bin/bash')
+shell = os.environ.get("SHELL", "/bin/bash")
 
-if sys.platform == 'win32':
-    proc = subprocess.run(['C:/cygwin/bin/cygpath.exe', '-w', shell], text=True,
-                          capture_output=True)
+if sys.platform == "win32":
+    proc = subprocess.run(
+        ["C:/cygwin/bin/cygpath.exe", "-w", shell], text=True, capture_output=True
+    )
     bash = pathlib.Path(proc.stdout.strip())
-    cmd = [bash.as_posix(), '-c', f"{args.extraction_command} {tarball}"]
+    cmd = [bash.as_posix(), "-c", f"{args.extraction_command} {tarball}"]
 else:
-    cmd = [shell, '-c', f"{args.extraction_command} {tarball}"]
+    cmd = [shell, "-c", f"{args.extraction_command} {tarball}"]
 
 print(f"Extracting: {' '.join(cmd)}")
-proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                      cwd=working_dir)
+proc = subprocess.run(
+    cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=working_dir
+)
 
 print(proc.stdout)
 
 if args.move_output:
     for arg in args.move_output:
         try:
-            src, dst = arg.split(':')
+            src, dst = arg.split(":")
             print(f"Moving {src} to {dst}...")
             files_to_move = glob.glob(src, recursive=True)
             for file in files_to_move:

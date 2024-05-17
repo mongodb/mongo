@@ -213,7 +213,6 @@ ignore = [
 exclude = [
     # allow-list: incrementally remove as each is formatted and locked down
     "buildscripts/idl/*",
-    "evergreen/*",
     "jstests/*",
     "site_scons/*",
     "src/*",
