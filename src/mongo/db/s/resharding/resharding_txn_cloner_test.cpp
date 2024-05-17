@@ -167,9 +167,27 @@ class ReshardingTxnClonerTest : public ShardServerTestFixtureWithCatalogCacheLoa
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(operationContext());
         mongoDSessionCatalog->onStepUp(operationContext());
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
+
+        _executor = makeTaskExecutorForCloner();
+        _executor->startup();
+
+        _threadPool = std::make_shared<ThreadPool>([] {
+            ThreadPool::Options options;
+            options.poolName = "TestReshardCloneConfigTransactionsCancelableOpCtxPool";
+            options.minThreads = 1;
+            options.maxThreads = 1;
+            return options;
+        }());
+        _threadPool->startup();
     }
 
     void tearDown() override {
+        _executor->shutdown();
+        _executor->join();
+
+        _threadPool->shutdown();
+        _threadPool->join();
+
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ShardServerTestFixtureWithCatalogCacheLoaderMock::tearDown();
     }
@@ -402,32 +420,6 @@ protected:
                            : boost::none;
     }
 
-    std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutorForCloner() {
-        // The ReshardingTxnCloner expects there to already be a Client associated with the thread
-        // from the thread pool. We set up the ThreadPoolTaskExecutor identically to how the
-        // recipient's primary-only service is set up.
-        ThreadPool::Options threadPoolOptions;
-        threadPoolOptions.maxThreads = 1;
-        threadPoolOptions.threadNamePrefix = "TestReshardCloneConfigTransactions-";
-        threadPoolOptions.poolName = "TestReshardCloneConfigTransactionsThreadPool";
-        threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
-            auto* client = Client::getCurrent();
-            AuthorizationSession::get(*client)->grantInternalAuthorization(client);
-        };
-
-        auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-        hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(getServiceContext()));
-
-        auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
-            std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
-            executor::makeNetworkInterface(
-                "TestReshardCloneConfigTransactionsNetwork", nullptr, std::move(hookList)));
-        executor->startup();
-
-        return executor;
-    }
-
     std::shared_ptr<MongoProcessInterface> makeMongoProcessInterface() {
         return std::make_shared<ShardServerProcessInterface>(
             Grid::get(getServiceContext())->getExecutorPool()->getFixedExecutor());
@@ -435,34 +427,25 @@ protected:
 
     ExecutorFuture<void> runCloner(
         ReshardingTxnCloner& cloner,
-        std::shared_ptr<executor::ThreadPoolTaskExecutor> executor,
-        std::shared_ptr<executor::ThreadPoolTaskExecutor> cleanupExecutor,
         boost::optional<CancellationToken> customCancelToken = boost::none) {
         // Allows callers to control the cancellation of the cloner's run() function when specified.
         auto cancelToken = customCancelToken.has_value()
             ? customCancelToken.value()
             : operationContext()->getCancellationToken();
 
-        auto cancelableOpCtxExecutor = std::make_shared<ThreadPool>([] {
-            ThreadPool::Options options;
-            options.poolName = "TestReshardCloneConfigTransactionsCancelableOpCtxPool";
-            options.minThreads = 1;
-            options.maxThreads = 1;
-            return options;
-        }());
-        CancelableOperationContextFactory opCtxFactory(cancelToken, cancelableOpCtxExecutor);
+        CancelableOperationContextFactory opCtxFactory(cancelToken, _threadPool);
 
         // There isn't a guarantee that the reference count to `executor` has been decremented after
         // .run() returns. We schedule a trivial task on the task executor to ensure the callback's
         // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
         // triggering an invariant due to the task executor's thread having a Client still.
         return cloner
-            .run(executor,
-                 cleanupExecutor,
+            .run(_executor,
+                 _executor,
                  cancelToken,
                  std::move(opCtxFactory),
                  makeMongoProcessInterface())
-            .thenRunOn(executor)
+            .thenRunOn(_executor)
             .onCompletion([](auto x) { return x; });
     }
 
@@ -610,19 +593,50 @@ protected:
             << sessionTxnRecord.toBSON() << ", " << foundOp;
     }
 
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> getExecutor() {
+        return _executor;
+    }
+
 private:
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutorForCloner() {
+        // The ReshardingTxnCloner expects there to already be a Client associated with the thread
+        // from the thread pool. We set up the ThreadPoolTaskExecutor identically to how the
+        // recipient's primary-only service is set up.
+        ThreadPool::Options threadPoolOptions;
+        threadPoolOptions.maxThreads = 1;
+        threadPoolOptions.threadNamePrefix = "TestReshardCloneConfigTransactions-";
+        threadPoolOptions.poolName = "TestReshardCloneConfigTransactionsThreadPool";
+        threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+            Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
+            auto* client = Client::getCurrent();
+            AuthorizationSession::get(*client)->grantInternalAuthorization(client);
+        };
+
+        auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+        hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(getServiceContext()));
+
+        auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+            std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
+            executor::makeNetworkInterface(
+                "TestReshardCloneConfigTransactionsNetwork", nullptr, std::move(hookList)));
+
+        return executor;
+    }
+
     static HostAndPort makeHostAndPort(const ShardId& shardId) {
         return HostAndPort(str::stream() << shardId << ":123");
     }
 
     RAIIServerParameterControllerForTest controller{"reshardingTxnClonerProgressBatchSize", 1};
+
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
+    std::shared_ptr<ThreadPool> _threadPool;
 };
 
 TEST_F(ReshardingTxnClonerTest, MergeTxnNotOnRecipient) {
     for (auto state : getDurableTxnStatesAndBoostNone()) {
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         const auto sessionId = makeLogicalSessionIdForTest();
         TxnNumber txnNum = 3;
@@ -639,9 +653,8 @@ TEST_F(ReshardingTxnClonerTest, MergeTxnNotOnRecipient) {
 }
 
 TEST_F(ReshardingTxnClonerTest, MergeUnParsableTxn) {
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto future = runCloner(cloner, executor, executor);
+    auto future = runCloner(cloner);
 
     const auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNum = 3;
@@ -662,9 +675,8 @@ TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverMultiDocTxn) {
 
         seedTransactionOnRecipient(sessionId, recipientTxnNum, true);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         auto txn = SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -685,9 +697,8 @@ TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverRetryableWriteTxn) {
 
         seedTransactionOnRecipient(sessionId, recipientTxnNum, false);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         auto txn = SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -707,9 +718,8 @@ TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverRetryableWriteTxn) {
 
         seedTransactionOnRecipient(sessionId, txnNum, false);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         auto txn = SessionTxnRecord(sessionId, txnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -729,9 +739,8 @@ TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverMultiDocTxn) {
 
         seedTransactionOnRecipient(sessionId, txnNum, true);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         auto txn = SessionTxnRecord(sessionId, txnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -753,9 +762,8 @@ TEST_F(ReshardingTxnClonerTest, MergeOldTxnOverTxn) {
 
         seedTransactionOnRecipient(sessionId, recipientTxnNum, false);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         auto txn = SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -773,9 +781,8 @@ TEST_F(ReshardingTxnClonerTest, MergeMultiDocTransactionAndRetryableWrite) {
     const auto sessionIdMultiDocTxn = makeLogicalSessionIdForTest();
     TxnNumber txnNum = 3;
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto future = runCloner(cloner, executor, executor);
+    auto future = runCloner(cloner);
 
     auto sessionRecordRetryableWrite =
         SessionTxnRecord(sessionIdRetryableWrite, txnNum, repl::OpTime(), Date_t::now());
@@ -798,11 +805,10 @@ TEST_F(ReshardingTxnClonerTest, MergeMultiDocTransactionAndRetryableWrite) {
  */
 TEST_F(ReshardingTxnClonerTest, ClonerOneBatchThenCanceled) {
     const auto txns = makeSortedTxns(4);
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     auto opCtxToken = operationContext()->getCancellationToken();
     auto cancelSource = CancellationSource(opCtxToken);
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
         cancelSource.cancel();
@@ -825,9 +831,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
         ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
         ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[1]));
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
 
@@ -844,9 +849,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
         ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
         ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), lastLsid);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[0], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
 
@@ -870,10 +874,9 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[1]));
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     auto cancelSource = CancellationSource(operationContext()->getCancellationToken());
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     // The progress document is updated asynchronously after the session record is updated. We fake
     // the cloning operation being canceled to inspect the progress document after the first batch
@@ -900,7 +903,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), firstLsid);
 
     // Now we run the cloner again and give it the remaining documents.
-    future = runCloner(cloner, executor, executor);
+    future = runCloner(cloner);
 
     onCommandReturnTxnBatch(
         std::vector<BSONObj>(txns.begin() + 1, txns.end()), CursorId{0}, false /* isFirstBatch */);
@@ -922,10 +925,9 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[1]));
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     auto cancelSource = CancellationSource(operationContext()->getCancellationToken());
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommandReturnTxnBatch({txns.front()}, CursorId{123}, true /* isFirstBatch */);
 
@@ -955,7 +957,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
 
     // Simulate a resume on the new primary by creating a new fetcher that resumes after the lsid in
     // the progress document.
-    future = runCloner(cloner, executor, executor);
+    future = runCloner(cloner);
 
     BSONObj cmdObj;
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -984,7 +986,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
     // fetcher that resumes at the lsid from the first progress document. This verifies cloning is
     // idempotent on the cloning shard.
     cloner.updateProgressDocument_forTest(operationContext(), firstLsid);
-    future = runCloner(cloner, executor, executor);
+    future = runCloner(cloner);
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
         cmdObj = request.cmdObj.getOwned();
@@ -1012,9 +1014,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
 TEST_F(ReshardingTxnClonerTest, ClonerDoesNotUpdateProgressOnEmptyBatch) {
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[0], Timestamp::max());
-    auto future = runCloner(cloner, executor, executor);
+    auto future = runCloner(cloner);
 
     onCommandReturnTxnBatch({}, CursorId{0}, true /* isFirstBatch */);
 
@@ -1033,10 +1034,9 @@ TEST_F(ReshardingTxnClonerTest, WaitsOnPreparedTxnAndAutomaticallyRetries) {
     TxnNumber incomingTxnNumber = existingTxnNumber + 1;
     auto sessionTxnRecord = SessionTxnRecord{lsid, incomingTxnNumber, repl::OpTime{}, Date_t{}};
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     CancellationSource cancelSource;
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
 
@@ -1044,7 +1044,7 @@ TEST_F(ReshardingTxnClonerTest, WaitsOnPreparedTxnAndAutomaticallyRetries) {
     // Wait a little bit to increase the likelihood that the cloner has blocked on the prepared
     // transaction before the transaction is aborted.
     ASSERT_OK(
-        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+        getExecutor()->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
     ASSERT_FALSE(future.isReady());
 
     abortTxn(operationContext(), lsid, existingTxnNumber);
@@ -1075,10 +1075,9 @@ TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnPreparedTxn) {
     TxnNumber incomingTxnNumber = existingTxnNumber + 1;
     auto sessionTxnRecord = SessionTxnRecord{lsid, incomingTxnNumber, repl::OpTime{}, Date_t{}};
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     CancellationSource cancelSource;
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
 
@@ -1086,7 +1085,7 @@ TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnPreparedTxn) {
     // Wait a little bit to increase the likelihood that the applier has blocked on the prepared
     // transaction before the cancellation source is canceled.
     ASSERT_OK(
-        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+        getExecutor()->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
     ASSERT_FALSE(future.isReady());
 
     cancelSource.cancel();
@@ -1117,10 +1116,9 @@ TEST_F(ReshardingTxnClonerTest,
     auto sessionTxnRecord =
         SessionTxnRecord{retryableWriteLsid, retryableWriteTxnNumber, repl::OpTime{}, Date_t{}};
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     CancellationSource cancelSource;
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
 
@@ -1128,7 +1126,7 @@ TEST_F(ReshardingTxnClonerTest,
     // Wait a little bit to increase the likelihood that the cloner has blocked on the in progress
     // internal transaction before the transaction is aborted.
     ASSERT_OK(
-        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+        getExecutor()->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
     ASSERT_FALSE(future.isReady());
 
     abortTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
@@ -1162,10 +1160,9 @@ TEST_F(ReshardingTxnClonerTest,
     auto sessionTxnRecord =
         SessionTxnRecord{retryableWriteLsid, retryableWriteTxnNumber, repl::OpTime{}, Date_t{}};
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     CancellationSource cancelSource;
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
 
@@ -1173,7 +1170,7 @@ TEST_F(ReshardingTxnClonerTest,
     // Wait a little bit to increase the likelihood that the cloner has blocked on the in progress
     // internal transaction before the transaction is aborted.
     ASSERT_OK(
-        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+        getExecutor()->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
     ASSERT_FALSE(future.isReady());
 
     abortTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
@@ -1219,10 +1216,9 @@ TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnInProgressInternalTxnFor
     auto sessionTxnRecord =
         SessionTxnRecord{retryableWriteLsid, retryableWriteTxnNumber, repl::OpTime{}, Date_t{}};
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     CancellationSource cancelSource;
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
 
@@ -1230,7 +1226,7 @@ TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnInProgressInternalTxnFor
     // Wait a little bit to increase the likelihood that the applier has blocked on the prepared
     // transaction before the cancellation source is canceled.
     ASSERT_OK(
-        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+        getExecutor()->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
     ASSERT_FALSE(future.isReady());
 
     cancelSource.cancel();
