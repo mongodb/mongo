@@ -193,7 +193,8 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
             NamespaceStringOrUUID{nss.dbName(), uuid},
             cri.cm.getMinKeyShardIdWithSimpleCollation(),
             cri,
-            afterClusterTime);
+            afterClusterTime,
+            /*normalizeMissingCollation=*/true);
     });
 }
 

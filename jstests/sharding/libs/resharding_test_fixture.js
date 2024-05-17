@@ -315,8 +315,13 @@ export var ReshardingTest = class {
      * {min: <shardKeyValue0>, max: <shardKeyValue1>, shard: <shardName>} objects. The chunks must
      * form a partition of the {shardKey: MinKey} --> {shardKey: MaxKey} space.
      */
-    createShardedCollection(
-        {ns, shardKeyPattern, chunks, primaryShardName = this.donorShardNames[0]}) {
+    createShardedCollection({
+        ns,
+        shardKeyPattern,
+        chunks,
+        primaryShardName = this.donorShardNames[0],
+        collOptions = {}
+    }) {
         this._ns = ns;
         this._currentShardKey = Object.assign({}, shardKeyPattern);
 
@@ -332,7 +337,7 @@ export var ReshardingTest = class {
         this._primaryShardName = primaryShardName;
 
         CreateShardedCollectionUtil.shardCollectionWithChunks(
-            sourceCollection, shardKeyPattern, chunks);
+            sourceCollection, shardKeyPattern, chunks, collOptions);
 
         this._sourceCollectionUUID =
             getUUIDFromListCollections(sourceDB, sourceCollection.getName());

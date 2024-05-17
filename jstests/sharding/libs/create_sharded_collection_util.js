@@ -7,8 +7,9 @@ export var CreateShardedCollectionUtil = (function() {
      * @param chunks - an array of
      * {min: <shardKeyValue0>, max: <shardKeyValue1>, shard: <shardName>} objects. The chunks must
      * form a partition of the {shardKey: MinKey} --> {shardKey: MaxKey} space.
+     * @param shardCollOptions: options that are passed in to the shardCollection cmd.
      */
-    function shardCollectionWithChunks(collection, shardKey, chunks) {
+    function shardCollectionWithChunks(collection, shardKey, chunks, shardCollOptions) {
         assert(collection.getDB().getMongo().isMongos(),
                "collection must have an underlying connection to a mongos");
 
@@ -59,11 +60,12 @@ export var CreateShardedCollectionUtil = (function() {
         }
 
         assert.commandWorked(adminDB.runCommand({enableSharding: collection.getDB().getName()}));
-        assert.commandWorked(adminDB.runCommand({
+        assert.commandWorked(adminDB.runCommand(Object.merge({
             shardCollection: collection.getFullName(),
             key: shardKey,
             presplitHashedZones: false,
-        }));
+        },
+                                                             shardCollOptions)));
 
         // We disassociate the chunk ranges from the zones to allow removing the zones altogether.
         for (let chunk of chunks) {
