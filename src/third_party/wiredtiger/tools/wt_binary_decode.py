@@ -104,7 +104,7 @@ class PageStats:
         return self.start_txn_sz + self.stop_txn_sz
     
     @staticmethod
-    def csv_cols() -> list[str]:
+    def csv_cols() -> typing.List[str]:
         return [
             'num keys',
             'keys size',
@@ -126,7 +126,7 @@ class PageStats:
             'txn size'
         ]
 
-    def to_csv_cols(self) -> list[int]:
+    def to_csv_cols(self) -> typing.List[int]:
         return [
             self.num_keys,
             self.keys_sz,
