@@ -5,12 +5,15 @@ import os
 import shutil
 import argparse
 
-parser = argparse.ArgumentParser(description='Ninja Bazel builder.')
+parser = argparse.ArgumentParser(description="Ninja Bazel builder.")
 
-parser.add_argument('--ninja-file', type=str, help="The ninja file in use", default="build.ninja")
-parser.add_argument('--verbose', action='store_true', help="Turn on verbose mode")
-parser.add_argument('--integration-debug', action='store_true',
-                    help="Turn on extra debug output about the ninja-bazel integration")
+parser.add_argument("--ninja-file", type=str, help="The ninja file in use", default="build.ninja")
+parser.add_argument("--verbose", action="store_true", help="Turn on verbose mode")
+parser.add_argument(
+    "--integration-debug",
+    action="store_true",
+    help="Turn on extra debug output about the ninja-bazel integration",
+)
 
 args = parser.parse_args()
 
@@ -29,7 +32,7 @@ else:
 # the specific ninja file
 ninja_build_info = dict()
 try:
-    bazel_info_file = '.bazel_info_for_ninja.txt'
+    bazel_info_file = ".bazel_info_for_ninja.txt"
     with open(bazel_info_file) as f:
         ninja_build_info = json.load(f)
 except OSError as exc:
@@ -59,5 +62,6 @@ if args.verbose:
     extra_args = []
 else:
     extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
-bazel_proc = subprocess.run(ninja_build_info['bazel_cmd'] + extra_args + targets_to_build,
-                            check=True)
+bazel_proc = subprocess.run(
+    ninja_build_info["bazel_cmd"] + extra_args + targets_to_build, check=True
+)

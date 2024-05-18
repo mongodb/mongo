@@ -74,25 +74,17 @@ _DISTRO_PATTERN_MAP = {
 }
 
 _S3_HASH_MAPPING = {
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-ppc64le":
-        "dd21c75817533ff601bf797e64f0eb2f7f6b813af26c829f0bda30e328caef46",
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-s390x":
-        "6d72eabc1789b041bbe4cfc033bbac4491ec9938ef6da9899c0188ecf270a7f4",
-    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-amd64":
-        "f2ba5f721a995b54bab68c6b76a340719888aa740310e634771086b6d1528ecd",
-    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-arm64":
-        "69fa21cd2ccffc2f0970c21aa3615484ba89e3553ecce1233a9d8ad9570d170e",
-    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-amd64":
-        "d28b588ac0916abd6bf02defb5433f6eddf7cba35ffa808eabb65a44aab226f7",
-    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-arm64":
-        "861a16ba9979613e70bd3d2f9d9ab5e3b59fe79471c5753acdc9c431ab6c9d94",
-    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-windows-amd64.exe":
-        "d04555245a99dfb628e33da24e2b9198beb8f46d7e7661c313eb045f6a59f5e4",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-ppc64le": "dd21c75817533ff601bf797e64f0eb2f7f6b813af26c829f0bda30e328caef46",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-s390x": "6d72eabc1789b041bbe4cfc033bbac4491ec9938ef6da9899c0188ecf270a7f4",
+    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-amd64": "f2ba5f721a995b54bab68c6b76a340719888aa740310e634771086b6d1528ecd",
+    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-arm64": "69fa21cd2ccffc2f0970c21aa3615484ba89e3553ecce1233a9d8ad9570d170e",
+    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-amd64": "d28b588ac0916abd6bf02defb5433f6eddf7cba35ffa808eabb65a44aab226f7",
+    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-arm64": "861a16ba9979613e70bd3d2f9d9ab5e3b59fe79471c5753acdc9c431ab6c9d94",
+    "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-windows-amd64.exe": "d04555245a99dfb628e33da24e2b9198beb8f46d7e7661c313eb045f6a59f5e4",
 }
 
 
 class Globals:
-
     # key: scons target, value: {bazel target, bazel output}
     scons2bazel_targets: Dict[str, Dict[str, str]] = dict()
 
@@ -128,11 +120,11 @@ class Globals:
 
     @staticmethod
     def bazel_output(scons_node):
-        return Globals.scons2bazel_targets[str(scons_node).replace("\\", "/")]['bazel_output']
+        return Globals.scons2bazel_targets[str(scons_node).replace("\\", "/")]["bazel_output"]
 
     @staticmethod
     def bazel_target(scons_node):
-        return Globals.scons2bazel_targets[str(scons_node).replace("\\", "/")]['bazel_target']
+        return Globals.scons2bazel_targets[str(scons_node).replace("\\", "/")]["bazel_target"]
 
 
 def bazel_debug(msg: str):
@@ -140,12 +132,11 @@ def bazel_debug(msg: str):
 
 
 def bazel_target_emitter(
-        target: List[SCons.Node.Node], source: List[SCons.Node.Node],
-        env: SCons.Environment.Environment) -> Tuple[List[SCons.Node.Node], List[SCons.Node.Node]]:
+    target: List[SCons.Node.Node], source: List[SCons.Node.Node], env: SCons.Environment.Environment
+) -> Tuple[List[SCons.Node.Node], List[SCons.Node.Node]]:
     """This emitter will map any scons outputs to bazel outputs so copy can be done later."""
 
     for t in target:
-
         # scons isn't aware of bazel build definition files, so cache won't be invalidated when they change
         # force scons to always request bazel to build any converted targets
         # since bazel maintains its own cache, this won't result in redundant build executions
@@ -155,9 +146,9 @@ def bazel_target_emitter(
     return (target, source)
 
 
-def bazel_builder_action(env: SCons.Environment.Environment, target: List[SCons.Node.Node],
-                         source: List[SCons.Node.Node]):
-
+def bazel_builder_action(
+    env: SCons.Environment.Environment, target: List[SCons.Node.Node], source: List[SCons.Node.Node]
+):
     # now copy all the targets out to the scons tree, note that target is a
     # list of nodes so we need to stringify it for copyfile
     for t in target:
@@ -168,28 +159,37 @@ def bazel_builder_action(env: SCons.Environment.Environment, target: List[SCons.
 
 BazelCopyOutputsAction = SCons.Action.FunctionAction(
     bazel_builder_action,
-    {"cmdstr": "Copying $TARGET from bazel build directory.", "varlist": ['BAZEL_FLAGS_STR']},
+    {"cmdstr": "Copying $TARGET from bazel build directory.", "varlist": ["BAZEL_FLAGS_STR"]},
 )
 
 total_query_time = 0
 total_queries = 0
 
 
-def bazel_query_func(env: SCons.Environment.Environment, query_command_args: List[str],
-                     query_name: str = "query"):
+def bazel_query_func(
+    env: SCons.Environment.Environment, query_command_args: List[str], query_name: str = "query"
+):
     full_command = [Globals.bazel_executable] + query_command_args
     global total_query_time, total_queries
     start_time = time.time()
     # these args prune the graph we need to search through a bit since we only care about our
     # specific library target dependencies
-    full_command += ['--implicit_deps=False', '--tool_deps=False', '--include_aspects=False']
+    full_command += ["--implicit_deps=False", "--tool_deps=False", "--include_aspects=False"]
     # prevent remote connection and invocations since we just want to query the graph
     full_command += [
-        "--remote_executor=", "--remote_cache=", '--bes_backend=', '--bes_results_url='
+        "--remote_executor=",
+        "--remote_cache=",
+        "--bes_backend=",
+        "--bes_results_url=",
     ]
     bazel_debug(f"Running query: {' '.join(full_command)}")
-    results = subprocess.run(full_command, capture_output=True, text=True, cwd=env.Dir('#').abspath,
-                             env={**os.environ.copy(), **Globals.bazel_env_variables})
+    results = subprocess.run(
+        full_command,
+        capture_output=True,
+        text=True,
+        cwd=env.Dir("#").abspath,
+        env={**os.environ.copy(), **Globals.bazel_env_variables},
+    )
     delta = time.time() - start_time
     bazel_debug(f"Spent {delta} seconds running {query_name}")
     total_query_time += delta
@@ -199,16 +199,20 @@ def bazel_query_func(env: SCons.Environment.Environment, query_command_args: Lis
     if results.returncode != 0:
         print(results.stdout)
         print(results.stderr)
-        raise subprocess.CalledProcessError(results.returncode, full_command, results.stdout,
-                                            results.stderr)
+        raise subprocess.CalledProcessError(
+            results.returncode, full_command, results.stdout, results.stderr
+        )
     return results
 
 
 # the ninja tool has some API that doesn't support using SCons env methods
 # instead of adding more API to the ninja tool which has a short life left
 # we just add the unused arg _dup_env
-def ninja_bazel_builder(env: SCons.Environment.Environment, _dup_env: SCons.Environment.Environment,
-                        node: SCons.Node.Node) -> Dict[str, Any]:
+def ninja_bazel_builder(
+    env: SCons.Environment.Environment,
+    _dup_env: SCons.Environment.Environment,
+    node: SCons.Node.Node,
+) -> Dict[str, Any]:
     """
     Translator for ninja which turns the scons bazel_builder_action
     into a build node that ninja can digest.
@@ -224,15 +228,19 @@ def ninja_bazel_builder(env: SCons.Environment.Environment, _dup_env: SCons.Envi
         "inputs": ins,
         "rule": "BAZEL_COPY_RULE",
         "variables": {
-            "cmd":
-                ' && '.join([
+            "cmd": " && ".join(
+                [
                     f"$COPY {input_node.replace('/',os.sep)} {output_node}"
                     for input_node, output_node in zip(ins, outs)
-                ] + [
+                ]
+                + [
                     # Touch output files to make sure that the modified time of inputs is always older than the modified time of outputs.
-                    f"copy /b {output_node} +,, {output_node}" if env["PLATFORM"] ==
-                    "win32" else f"touch {output_node}" for output_node in outs
-                ])
+                    f"copy /b {output_node} +,, {output_node}"
+                    if env["PLATFORM"] == "win32"
+                    else f"touch {output_node}"
+                    for output_node in outs
+                ]
+            )
         },
     }
 
@@ -254,9 +262,13 @@ def perform_tty_bazel_build(bazel_cmd: str) -> None:
     import pty
 
     parent_fd, child_fd = pty.openpty()  # provide tty
-    bazel_proc = subprocess.Popen(bazel_cmd, stdin=child_fd, stdout=child_fd,
-                                  stderr=subprocess.STDOUT,
-                                  env={**os.environ.copy(), **Globals.bazel_env_variables})
+    bazel_proc = subprocess.Popen(
+        bazel_cmd,
+        stdin=child_fd,
+        stdout=child_fd,
+        stderr=subprocess.STDOUT,
+        env={**os.environ.copy(), **Globals.bazel_env_variables},
+    )
 
     os.close(child_fd)
     try:
@@ -284,9 +296,13 @@ def perform_tty_bazel_build(bazel_cmd: str) -> None:
 
 
 def perform_non_tty_bazel_build(bazel_cmd: str) -> None:
-    bazel_proc = subprocess.Popen(bazel_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                  env={**os.environ.copy(),
-                                       **Globals.bazel_env_variables}, text=True)
+    bazel_proc = subprocess.Popen(
+        bazel_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env={**os.environ.copy(), **Globals.bazel_env_variables},
+        text=True,
+    )
     # This loop will terminate when the process ends.
     while True:
         line = bazel_proc.stdout.readline()
@@ -308,7 +324,7 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool) -> None:
     else:
         extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
 
-    bazel_cmd = Globals.bazel_base_build_command + extra_args + ['//src/...']
+    bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
     bazel_debug(f"BAZEL_COMMAND: {' '.join(bazel_cmd)}")
     if env.GetOption("coverity-build"):
         print(
@@ -321,8 +337,12 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool) -> None:
     try:
         tty_import_fail = False
         try:
-            retry_call(perform_tty_bazel_build, [bazel_cmd], tries=Globals.max_retry_attempts,
-                       exceptions=(subprocess.CalledProcessError, ))
+            retry_call(
+                perform_tty_bazel_build,
+                [bazel_cmd],
+                tries=Globals.max_retry_attempts,
+                exceptions=(subprocess.CalledProcessError,),
+            )
         except ImportError:
             # Run the actual build outside of the except clause to avoid confusion in the stack trace,
             # otherwise, build failures on platforms that don't support tty will be displayed as import errors.
@@ -330,8 +350,12 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool) -> None:
             pass
 
         if tty_import_fail:
-            retry_call(perform_non_tty_bazel_build, [bazel_cmd], tries=Globals.max_retry_attempts,
-                       exceptions=(subprocess.CalledProcessError, ))
+            retry_call(
+                perform_non_tty_bazel_build,
+                [bazel_cmd],
+                tries=Globals.max_retry_attempts,
+                exceptions=(subprocess.CalledProcessError,),
+            )
     except subprocess.CalledProcessError as ex:
         print("ERROR: Bazel build failed:")
 
@@ -358,7 +382,7 @@ def create_bazel_builder(builder: SCons.Builder.Builder) -> SCons.Builder.Builde
 
 # TODO delete this builder when we have testlist support in bazel
 def create_program_builder(env: SCons.Environment.Environment) -> None:
-    env['BUILDERS']['BazelProgram'] = create_bazel_builder(env['BUILDERS']["Program"])
+    env["BUILDERS"]["BazelProgram"] = create_bazel_builder(env["BUILDERS"]["Program"])
 
 
 def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
@@ -371,19 +395,25 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
         return False
 
     if not running_in_evergreen and not os.path.exists(
-            f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt"):
+        f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt"
+    ):
         # Temporary logic to copy over the credentials for users that ran the installation steps using the old directory (/engflow/).
         if os.path.exists("/engflow/creds/engflow.crt") and os.path.exists(
-                "/engflow/creds/engflow.key"):
+            "/engflow/creds/engflow.key"
+        ):
             print(
                 "Moving EngFlow credentials from the legacy directory (/engflow/) to the new directory (~/.engflow/)."
             )
             try:
                 os.makedirs(f"/home/{getpass.getuser()}/.engflow/creds/", exist_ok=True)
-                shutil.move("/engflow/creds/engflow.crt",
-                            f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt")
-                shutil.move("/engflow/creds/engflow.key",
-                            f"/home/{getpass.getuser()}/.engflow/creds/engflow.key")
+                shutil.move(
+                    "/engflow/creds/engflow.crt",
+                    f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt",
+                )
+                shutil.move(
+                    "/engflow/creds/engflow.key",
+                    f"/home/{getpass.getuser()}/.engflow/creds/engflow.key",
+                )
                 with open(f"/home/{getpass.getuser()}/.bazelrc", "a") as bazelrc:
                     bazelrc.write(
                         f"build --tls_client_certificate=/home/{getpass.getuser()}/.engflow/creds/engflow.crt\n"
@@ -402,7 +432,8 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
         # Pull the external hostname of the system from aws
         try:
             response = requests.get(
-                "http://instance-data.ec2.internal/latest/meta-data/public-hostname")
+                "http://instance-data.ec2.internal/latest/meta-data/public-hostname"
+            )
             status_code = response.status_code
         except Exception as _:
             status_code = 500
@@ -426,12 +457,14 @@ ZIP_FILE=~/Downloads/engflow-mTLS.zip
 
 curl https://raw.githubusercontent.com/mongodb/mongo/master/buildscripts/setup_engflow_creds.sh -o setup_engflow_creds.sh
 chmod +x ./setup_engflow_creds.sh
-./setup_engflow_creds.sh {getpass.getuser()} {public_hostname} $ZIP_FILE\n""")
+./setup_engflow_creds.sh {getpass.getuser()} {public_hostname} $ZIP_FILE\n"""
+        )
         return False
 
-    if not running_in_evergreen and \
-        (not os.access(f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt", os.R_OK) or
-        not os.access(f"/home/{getpass.getuser()}/.engflow/creds/engflow.key", os.R_OK)):
+    if not running_in_evergreen and (
+        not os.access(f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt", os.R_OK)
+        or not os.access(f"/home/{getpass.getuser()}/.engflow/creds/engflow.key", os.R_OK)
+    ):
         print(
             "Invalid permissions set on ~/.engflow/creds/engflow.crt or ~/.engflow/creds/engflow.key"
         )
@@ -450,11 +483,11 @@ def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
     # create a json file which contains all the relevant info from this generation
     # that bazel will need to construct the correct command line for any given targets
     ninja_bazel_build_json = {
-        'bazel_cmd': Globals.bazel_base_build_command,
-        'defaults': [str(t) for t in SCons.Script.DEFAULT_TARGETS],
-        'targets': Globals.scons2bazel_targets
+        "bazel_cmd": Globals.bazel_base_build_command,
+        "defaults": [str(t) for t in SCons.Script.DEFAULT_TARGETS],
+        "targets": Globals.scons2bazel_targets,
     }
-    with open('.bazel_info_for_ninja.txt', 'w') as f:
+    with open(".bazel_info_for_ninja.txt", "w") as f:
         json.dump(ninja_bazel_build_json, f)
 
     # we also store the outputs in the env (the passed env is intended to be
@@ -468,7 +501,7 @@ def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
     ninja_bazel_outs = []
     ninja_bazel_ins = []
     for scons_t, bazel_t in Globals.scons2bazel_targets.items():
-        ninja_bazel_outs += [bazel_t['bazel_output']]
+        ninja_bazel_outs += [bazel_t["bazel_output"]]
         ninja_bazel_ins += env.NinjaGetInputs(env.File(scons_t))
 
     # This is to be used directly by ninja later during generation of the ninja file
@@ -514,12 +547,14 @@ def sha256_file(filename: str) -> str:
 def verify_s3_hash(s3_path: str, local_path: str) -> None:
     if s3_path not in _S3_HASH_MAPPING:
         raise Exception(
-            f"S3 path not found in hash mapping, unable to verify downloaded for s3 path: s3_path")
+            f"S3 path not found in hash mapping, unable to verify downloaded for s3 path: s3_path"
+        )
 
     hash = sha256_file(local_path)
     if hash != _S3_HASH_MAPPING[s3_path]:
         raise Exception(
-            f"Hash mismatch for {s3_path}, expected {_S3_HASH_MAPPING[s3_path]} but got {hash}")
+            f"Hash mismatch for {s3_path}, expected {_S3_HASH_MAPPING[s3_path]} but got {hash}"
+        )
 
 
 def find_distro_match(distro_str: str) -> str:
@@ -548,7 +583,8 @@ def timed_auto_install_bazel(env, libdep, shlib_suffix):
 def auto_install_bazel(env, libdep, shlib_suffix):
     # we are only interested in queries for shared library thin targets
     if not str(libdep).endswith(shlib_suffix) or not (
-            libdep.has_builder() and libdep.get_builder().get_name(env) == "ThinTarget"):
+        libdep.has_builder() and libdep.get_builder().get_name(env) == "ThinTarget"
+    ):
         return
 
     bazel_target = env["SCONS2BAZEL_TARGETS"].bazel_target(libdep)
@@ -557,13 +593,18 @@ def auto_install_bazel(env, libdep, shlib_suffix):
     query_results = env.CheckBazelDepsCache(bazel_target)
 
     if query_results is None:
-        bazel_query = ["cquery"] + env['BAZEL_FLAGS_STR'] + [
-            f"kind('extract_debuginfo', deps(@{bazel_target}))", "--output=files"
-        ]
+        bazel_query = (
+            ["cquery"]
+            + env["BAZEL_FLAGS_STR"]
+            + [f"kind('extract_debuginfo', deps(@{bazel_target}))", "--output=files"]
+        )
         try:
-            query_results = retry_call(env.RunBazelQuery, [bazel_query.copy()],
-                                       tries=Globals.max_retry_attempts,
-                                       exceptions=(subprocess.CalledProcessError, ))
+            query_results = retry_call(
+                env.RunBazelQuery,
+                [bazel_query.copy()],
+                tries=Globals.max_retry_attempts,
+                exceptions=(subprocess.CalledProcessError,),
+            )
         except subprocess.CalledProcessError as ex:
             print("ERROR: bazel libdeps query failed:")
             print(ex)
@@ -592,17 +633,19 @@ def auto_install_bazel(env, libdep, shlib_suffix):
         if not new_installed_files:
             new_installed_files = getattr(bazel_node.attributes, "AIB_INSTALLED_FILES", [])
         installed_files = getattr(bazel_libdep.attributes, "AIB_INSTALLED_FILES", [])
-        setattr(bazel_libdep.attributes, "AIB_INSTALLED_FILES",
-                new_installed_files + installed_files)
+        setattr(
+            bazel_libdep.attributes, "AIB_INSTALLED_FILES", new_installed_files + installed_files
+        )
 
 
 def load_bazel_builders(env):
     # === Builders ===
     create_program_builder(env)
 
-    if env.GetOption('ninja') != "disabled":
-        env.NinjaRule("BAZEL_COPY_RULE", "$env$cmd", description="Copy from Bazel",
-                      pool="local_pool")
+    if env.GetOption("ninja") != "disabled":
+        env.NinjaRule(
+            "BAZEL_COPY_RULE", "$env$cmd", description="Copy from Bazel", pool="local_pool"
+        )
 
 
 total_libdeps_linking_time = 0
@@ -620,7 +663,6 @@ ran_fetch = False
 
 # Required boilerplate function
 def exists(env: SCons.Environment.Environment) -> bool:
-
     # === Bazelisk ===
     global ran_fetch
 
@@ -628,16 +670,19 @@ def exists(env: SCons.Environment.Environment) -> bool:
         ran_fetch = True
 
         def setup_bazel_thread():
-
-            bazel_bin_dir = env.GetOption("evergreen-tmp-dir") if env.GetOption(
-                "evergreen-tmp-dir") else os.path.expanduser("~/.local/bin")
+            bazel_bin_dir = (
+                env.GetOption("evergreen-tmp-dir")
+                if env.GetOption("evergreen-tmp-dir")
+                else os.path.expanduser("~/.local/bin")
+            )
             if not os.path.exists(bazel_bin_dir):
                 os.makedirs(bazel_bin_dir)
 
             Globals.bazel_executable = install_bazel(bazel_bin_dir)
 
-            proc = subprocess.run([Globals.bazel_executable, "fetch", "//..."], capture_output=True,
-                                  text=True)
+            proc = subprocess.run(
+                [Globals.bazel_executable, "fetch", "//..."], capture_output=True, text=True
+            )
             if proc.returncode != 0:
                 print(f"ERROR: pre-fetching failed:\n{proc.stdout}\n{proc.stderr}")
 
@@ -661,20 +706,21 @@ def handle_bazel_program_exception(env, target, outputs):
                 second_ext = None
 
             if (second_ext is not None and second_ext + first_ext == prog_suf + dbg_suffix) or (
-                    second_ext is None and first_ext == prog_suf):
+                second_ext is None and first_ext == prog_suf
+            ):
                 bazel_program = True
                 scons_node_str = bazel_output_file.replace(
-                    f"{env['BAZEL_OUT_DIR']}/src",
-                    env.Dir("$BUILD_DIR").path.replace("\\", "/"))
+                    f"{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path.replace("\\", "/")
+                )
 
-                Globals.scons2bazel_targets[scons_node_str.replace('\\', '/')] = {
-                    'bazel_target': target, 'bazel_output': bazel_output_file.replace('\\', '/')
+                Globals.scons2bazel_targets[scons_node_str.replace("\\", "/")] = {
+                    "bazel_target": target,
+                    "bazel_output": bazel_output_file.replace("\\", "/"),
                 }
     return bazel_program
 
 
 def generate(env: SCons.Environment.Environment) -> None:
-
     if env["BAZEL_INTEGRATION_DEBUG"]:
         global bazel_debug
 
@@ -690,8 +736,9 @@ def generate(env: SCons.Environment.Environment) -> None:
     # === Architecture/platform ===
 
     # Bail if current architecture not supported for Bazel:
-    normalized_arch = platform.machine().lower().replace("aarch64", "arm64").replace(
-        "x86_64", "amd64")
+    normalized_arch = (
+        platform.machine().lower().replace("aarch64", "arm64").replace("x86_64", "amd64")
+    )
     normalized_os = sys.platform.replace("win32", "windows").replace("darwin", "macos")
     current_platform = f"{normalized_os}:{normalized_arch}:{env.ToolchainName()}"
     if current_platform not in _SUPPORTED_PLATFORM_MATRIX:
@@ -703,11 +750,11 @@ def generate(env: SCons.Environment.Environment) -> None:
 
     # We don't support DLL generation on Windows, but need shared object generation in dynamic-sdk mode
     # on linux.
-    linkstatic = env.GetOption("link-model") in [
-        "auto", "static"
-    ] or (normalized_os == "windows" and env.GetOption("link-model") == "dynamic-sdk")
+    linkstatic = env.GetOption("link-model") in ["auto", "static"] or (
+        normalized_os == "windows" and env.GetOption("link-model") == "dynamic-sdk"
+    )
 
-    allocator = env.get('MONGO_ALLOCATOR', 'tcmalloc-google')
+    allocator = env.get("MONGO_ALLOCATOR", "tcmalloc-google")
 
     distro_or_os = normalized_os
     if normalized_os == "linux":
@@ -716,14 +763,14 @@ def generate(env: SCons.Environment.Environment) -> None:
             distro_or_os = distro_id
 
     bazel_internal_flags = [
-        f'--//bazel/config:compiler_type={env.ToolchainName()}',
+        f"--//bazel/config:compiler_type={env.ToolchainName()}",
         f'--//bazel/config:opt={env.GetOption("opt")}',
         f'--//bazel/config:dbg={env.GetOption("dbg") == "on"}',
         f'--//bazel/config:separate_debug={True if env.GetOption("separate-debug") == "on" else False}',
         f'--//bazel/config:libunwind={env.GetOption("use-libunwind")}',
         f'--//bazel/config:use_gdbserver={False if env.GetOption("gdbserver") is None else True}',
         f'--//bazel/config:spider_monkey_dbg={True if env.GetOption("spider-monkey-dbg") == "on" else False}',
-        f'--//bazel/config:allocator={allocator}',
+        f"--//bazel/config:allocator={allocator}",
         f'--//bazel/config:use_lldbserver={False if env.GetOption("lldb-server") is None else True}',
         f'--//bazel/config:use_wait_for_debugger={False if env.GetOption("wait-for-debugger") is None else True}',
         f'--//bazel/config:use_ocsp_stapling={True if env.GetOption("ocsp-stapling") == "on" else False}',
@@ -733,16 +780,16 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--//bazel/config:build_grpc={True if env["ENABLE_GRPC_BUILD"] else False}',
         f'--//bazel/config:use_libcxx={env.GetOption("libc++") is not None}',
         f'--//bazel/config:detect_odr_violations={env.GetOption("detect-odr-violations") is not None}',
-        f'--//bazel/config:linkstatic={linkstatic}',
+        f"--//bazel/config:linkstatic={linkstatic}",
         f'--//bazel/config:use_diagnostic_latches={env.GetOption("use-diagnostic-latches") == "on"}',
         f'--//bazel/config:shared_archive={env.GetOption("link-model") == "dynamic-sdk"}',
         f'--//bazel/config:linker={env.GetOption("linker")}',
         f'--//bazel/config:streams_release_build={env.GetOption("streams-release-build") is not None}',
         f'--//bazel/config:build_enterprise={env.GetOption("modules") == "enterprise"}',
         f'--//bazel/config:visibility_support={env.GetOption("visibility-support")}',
-        f'--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}',
-        f'--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}',
-        '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
+        f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}",
+        f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}",
+        "--compilation_mode=dbg",  # always build this compilation mode as we always build with -g
     ]
 
     if env["DWARF_VERSION"]:
@@ -750,46 +797,55 @@ def generate(env: SCons.Environment.Environment) -> None:
 
     if normalized_os == "macos":
         minimum_macos_version = "11.0" if normalized_arch == "arm64" else "10.14"
-        bazel_internal_flags.append(f'--macos_minimum_os={minimum_macos_version}')
+        bazel_internal_flags.append(f"--macos_minimum_os={minimum_macos_version}")
 
     http_client_option = env.GetOption("enable-http-client")
     if http_client_option is not None:
         if http_client_option in ["on", "auto"]:
-            bazel_internal_flags.append(f'--//bazel/config:http_client=True')
+            bazel_internal_flags.append(f"--//bazel/config:http_client=True")
         elif http_client_option == "off":
-            bazel_internal_flags.append(f'--//bazel/config:http_client=False')
+            bazel_internal_flags.append(f"--//bazel/config:http_client=False")
 
     sanitizer_option = env.GetOption("sanitize")
 
     if sanitizer_option is not None:
         options = sanitizer_option.split(",")
-        formatted_options = [f'--//bazel/config:{_SANITIZER_MAP[opt]}=True' for opt in options]
+        formatted_options = [f"--//bazel/config:{_SANITIZER_MAP[opt]}=True" for opt in options]
         bazel_internal_flags.extend(formatted_options)
 
     # Disable RE for external developers and when executing on non-linux amd64/arm64 platforms
     is_external_developer = not os.path.exists("/opt/mongodbtoolchain")
-    if normalized_os != "linux" or normalized_arch not in ["arm64", "amd64"
-                                                           ] or is_external_developer:
-        bazel_internal_flags.append('--config=local')
+    if (
+        normalized_os != "linux"
+        or normalized_arch not in ["arm64", "amd64"]
+        or is_external_developer
+    ):
+        bazel_internal_flags.append("--config=local")
 
     # Disable remote execution for public release builds.
     if env.GetOption("release") == "on" and (
-            env.GetOption("cache-dir") is None
-            or env.GetOption("cache-dir") == "$BUILD_ROOT/scons/cache"):
-        bazel_internal_flags.append('--config=public-release')
+        env.GetOption("cache-dir") is None
+        or env.GetOption("cache-dir") == "$BUILD_ROOT/scons/cache"
+    ):
+        bazel_internal_flags.append("--config=public-release")
 
     evergreen_tmp_dir = env.GetOption("evergreen-tmp-dir")
     if normalized_os == "macos" and evergreen_tmp_dir:
         bazel_internal_flags.append(f"--sandbox_writable_path={evergreen_tmp_dir}")
 
-    Globals.max_retry_attempts = _CI_MAX_RETRY_ATTEMPTS if os.environ.get(
-        "CI") is not None else _LOCAL_MAX_RETRY_ATTEMPTS
+    Globals.max_retry_attempts = (
+        _CI_MAX_RETRY_ATTEMPTS if os.environ.get("CI") is not None else _LOCAL_MAX_RETRY_ATTEMPTS
+    )
 
     Globals.bazel_fetch_thread.join()
-    Globals.bazel_base_build_command = [
-        os.path.abspath(Globals.bazel_executable),
-        'build',
-    ] + bazel_internal_flags + shlex.split(env.get("BAZEL_FLAGS", ""))
+    Globals.bazel_base_build_command = (
+        [
+            os.path.abspath(Globals.bazel_executable),
+            "build",
+        ]
+        + bazel_internal_flags
+        + shlex.split(env.get("BAZEL_FLAGS", ""))
+    )
 
     log_dir = env.Dir("$BUILD_ROOT/scons/bazel").path
     os.makedirs(log_dir, exist_ok=True)
@@ -798,18 +854,22 @@ def generate(env: SCons.Environment.Environment) -> None:
 
     # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
     if normalized_arch == "ppc64le":
-        Globals.bazel_env_variables[
-            "JAVA_HOME"] = "/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
+        Globals.bazel_env_variables["JAVA_HOME"] = (
+            "/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
+        )
     elif normalized_arch == "s390x":
-        Globals.bazel_env_variables[
-            "JAVA_HOME"] = "/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x"
+        Globals.bazel_env_variables["JAVA_HOME"] = (
+            "/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x"
+        )
 
     # Store the bazel command line flags so scons can check if it should rerun the bazel targets
     # if the bazel command line changes.
-    env['BAZEL_FLAGS_STR'] = bazel_internal_flags + shlex.split(env.get("BAZEL_FLAGS", ""))
+    env["BAZEL_FLAGS_STR"] = bazel_internal_flags + shlex.split(env.get("BAZEL_FLAGS", ""))
 
-    if "--config=local" not in env['BAZEL_FLAGS_STR'] and "--config=public-release" not in env[
-            'BAZEL_FLAGS_STR']:
+    if (
+        "--config=local" not in env["BAZEL_FLAGS_STR"]
+        and "--config=public-release" not in env["BAZEL_FLAGS_STR"]
+    ):
         print(
             "Running bazel with remote execution enabled. To disable bazel remote execution, please add BAZEL_FLAGS=--config=local to the end of your scons command line invocation."
         )
@@ -830,26 +890,34 @@ def generate(env: SCons.Environment.Environment) -> None:
         out_dir_platform = "ppc"
 
     env["BAZEL_OUT_DIR"] = env.Dir(f"#/bazel-out/{out_dir_platform}-dbg/bin/").path.replace(
-        "\\", "/")
+        "\\", "/"
+    )
 
     # ThinTarget builder is a special bazel target and should not be prefixed with Bazel in the builder
     # name to exclude it from the other BazelBuilder's. This builder excludes any normal builder
     # mechanisms like scanners or emitters and functions as a pass through for targets which exist
     # only in bazel. It contains no dependency information and is not meant to fully function within
     # the scons dependency graph.
-    env['BUILDERS']["ThinTarget"] = SCons.Builder.Builder(
+    env["BUILDERS"]["ThinTarget"] = SCons.Builder.Builder(
         action=BazelCopyOutputsAction,
         emitter=SCons.Builder.ListEmitter([bazel_target_emitter]),
     )
 
-    cmd = ["aquery"] + env['BAZEL_FLAGS_STR'] + [
-        'mnemonic("StripDebuginfo|ExtractDebuginfo|Symlink|IdlcGenerator", (outputs("bazel-out/.*/bin/src/.*", deps(@//src/...))))'
-    ]
+    cmd = (
+        ["aquery"]
+        + env["BAZEL_FLAGS_STR"]
+        + [
+            'mnemonic("StripDebuginfo|ExtractDebuginfo|Symlink|IdlcGenerator", (outputs("bazel-out/.*/bin/src/.*", deps(@//src/...))))'
+        ]
+    )
 
     try:
-        results = retry_call(bazel_query_func, [env, cmd.copy(), "discover ThinTargets"],
-                             tries=Globals.max_retry_attempts,
-                             exceptions=(subprocess.CalledProcessError, ))
+        results = retry_call(
+            bazel_query_func,
+            [env, cmd.copy(), "discover ThinTargets"],
+            tries=Globals.max_retry_attempts,
+            exceptions=(subprocess.CalledProcessError,),
+        )
     except subprocess.CalledProcessError as ex:
         print("ERROR: bazel thin targets query failed:")
         print(ex)
@@ -880,17 +948,20 @@ def generate(env: SCons.Environment.Environment) -> None:
             continue
 
         scons_node_strs = [
-            bazel_output_file.replace(f"{env['BAZEL_OUT_DIR']}/src",
-                                      env.Dir("$BUILD_DIR").path.replace("\\", "/"))
+            bazel_output_file.replace(
+                f"{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path.replace("\\", "/")
+            )
             for bazel_output_file in outputs
         ]
-        scons_nodes = env.ThinTarget(target=scons_node_strs, source=outputs,
-                                     NINJA_GENSOURCE_INDEPENDENT=True)
+        scons_nodes = env.ThinTarget(
+            target=scons_node_strs, source=outputs, NINJA_GENSOURCE_INDEPENDENT=True
+        )
         env.NoCache(scons_nodes)
 
         for scons_node, bazel_output_file in zip(scons_nodes, outputs):
-            Globals.scons2bazel_targets[scons_node.path.replace('\\', '/')] = {
-                'bazel_target': target, 'bazel_output': bazel_output_file.replace('\\', '/')
+            Globals.scons2bazel_targets[scons_node.path.replace("\\", "/")] = {
+                "bazel_target": target,
+                "bazel_output": bazel_output_file.replace("\\", "/"),
             }
 
     for scons_node in Globals.scons2bazel_targets:
@@ -916,11 +987,11 @@ def generate(env: SCons.Environment.Environment) -> None:
     atexit.register(print_total_query_time)
 
     load_bazel_builders(env)
-    if env.GetOption('ninja') == "disabled":
-
+    if env.GetOption("ninja") == "disabled":
         # ninja will handle the build so do not launch the bazel batch thread
-        bazel_build_thread = threading.Thread(target=bazel_build_thread_func, args=(env, log_dir,
-                                                                                    env["VERBOSE"]))
+        bazel_build_thread = threading.Thread(
+            target=bazel_build_thread_func, args=(env, log_dir, env["VERBOSE"])
+        )
         bazel_build_thread.start()
 
         def wait_for_bazel(env):
@@ -937,7 +1008,8 @@ def generate(env: SCons.Environment.Environment) -> None:
         # need to force generated headers as targets as something may include the header, but its never listed explcitly,
         # so this forces scons to always copy headers to its build tree for use includes
         SCons.Script.BUILD_TARGETS += [
-            thintarget for thintarget in Globals.scons2bazel_targets.keys()
+            thintarget
+            for thintarget in Globals.scons2bazel_targets.keys()
             if thintarget.strip().endswith(".h")
         ]
 
@@ -947,6 +1019,6 @@ def generate(env: SCons.Environment.Environment) -> None:
     env.AddMethod(bazel_deps_add_query_cache, "AddBazelDepsCache")
     env.AddMethod(bazel_deps_check_link_query_cache, "CheckBazelLinkDepsCache")
     env.AddMethod(bazel_deps_add_link_query_cache, "AddBazelLinkDepsCache")
-    env.AddMethod(bazel_query_func, 'RunBazelQuery')
+    env.AddMethod(bazel_query_func, "RunBazelQuery")
     env.AddMethod(ninja_bazel_builder, "NinjaBazelBuilder")
     env.AddMethod(auto_install_bazel, "BazelAutoInstall")

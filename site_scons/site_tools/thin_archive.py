@@ -102,7 +102,8 @@ def generate(env):
         return
 
     env["ARFLAGS"] = SCons.Util.CLVar(
-        [arflag if arflag != "rc" else "rcsTD" for arflag in env["ARFLAGS"]])
+        [arflag if arflag != "rc" else "rcsTD" for arflag in env["ARFLAGS"]]
+    )
 
     # Disable running ranlib, since we added 's' above
     env["RANLIBCOM"] = ""

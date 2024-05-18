@@ -36,35 +36,56 @@ from typing import Callable, List, Dict
 # it's not really OOM-specific. We're keeping the OOM prefix to make the code change simpler.
 # (This custom retry logic will go away once the build is fully Bazelified).
 
-def command_spawn_func(sh: str, escape: Callable[[str], str], cmd: str, args: List, env: Dict,
-                       target: List, source: List):
+
+def command_spawn_func(
+    sh: str,
+    escape: Callable[[str], str],
+    cmd: str,
+    args: List,
+    env: Dict,
+    target: List,
+    source: List,
+):
     retries = 0
     success = False
 
     build_env = target[0].get_build_env()
-    max_retries = build_env.get('OOM_RETRY_ATTEMPTS', 10)
-    oom_max_retry_delay = build_env.get('OOM_RETRY_MAX_DELAY_SECONDS', 120)
+    max_retries = build_env.get("OOM_RETRY_ATTEMPTS", 10)
+    oom_max_retry_delay = build_env.get("OOM_RETRY_MAX_DELAY_SECONDS", 120)
 
     while not success and retries <= max_retries:
-
         try:
             start_time = time.time()
-            if sys.platform[:3] == 'win':
+            if sys.platform[:3] == "win":
                 # have to use shell=True for windows because of https://github.com/python/cpython/issues/53908
-                proc = subprocess.run(' '.join(args), env=env, close_fds=True, shell=True,
-                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                      check=True)
+                proc = subprocess.run(
+                    " ".join(args),
+                    env=env,
+                    close_fds=True,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=True,
+                )
             else:
-                proc = subprocess.run([sh, '-c', ' '.join(args)], env=env, close_fds=True,
-                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                      check=True)
+                proc = subprocess.run(
+                    [sh, "-c", " ".join(args)],
+                    env=env,
+                    close_fds=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=True,
+                )
         except subprocess.CalledProcessError as exc:
             print(f"{os.path.basename(__file__)} captured error:")
             print(exc.stdout)
             retries += 1
-            retry_delay = int((time.time() - start_time) +
-                                oom_max_retry_delay * random.random())
-            print(f"Failed while trying to build {target[0]}", )
+            retry_delay = int((time.time() - start_time) + oom_max_retry_delay * random.random())
+            print(
+                f"Failed while trying to build {target[0]}",
+            )
             if retries <= max_retries:
                 print(f"trying again in {retry_delay} seconds with retry attempt {retries}")
                 time.sleep(retry_delay)
@@ -79,27 +100,34 @@ def command_spawn_func(sh: str, escape: Callable[[str], str], cmd: str, args: Li
 
 
 def generate(env):
-
     original_command_execute = SCons.Action.CommandAction.execute
 
     def oom_retry_execute(command_action_instance, target, source, env, executor=None):
+        if (
+            "conftest" not in str(target[0])
+            and target[0].has_builder()
+            and target[0].get_builder().get_name(env)
+            in [
+                "Object",
+                "SharedObject",
+                "StaticObject",
+                "Program",
+                "StaticLibrary",
+                "SharedLibrary",
+            ]
+        ):
+            original_spawn = env["SPAWN"]
 
-        if 'conftest' not in str(target[0]) and target[0].has_builder() and target[0].get_builder(
-        ).get_name(env) in [
-                'Object', 'SharedObject', 'StaticObject', 'Program', 'StaticLibrary',
-                'SharedLibrary'
-        ]:
-
-            original_spawn = env['SPAWN']
-
-            env['SPAWN'] = functools.partial(command_spawn_func, target=target, source=source)
-            result = original_command_execute(command_action_instance, target, source, env,
-                                              executor)
-            env['SPAWN'] = original_spawn
+            env["SPAWN"] = functools.partial(command_spawn_func, target=target, source=source)
+            result = original_command_execute(
+                command_action_instance, target, source, env, executor
+            )
+            env["SPAWN"] = original_spawn
 
         else:
-            result = original_command_execute(command_action_instance, target, source, env,
-                                              executor)
+            result = original_command_execute(
+                command_action_instance, target, source, env, executor
+            )
         return result
 
     SCons.Action.CommandAction.execute = oom_retry_execute

@@ -22,6 +22,7 @@
 """
 Pseudo-builders for building and registering benchmarks.
 """
+
 from SCons.Script import Action
 
 from site_scons.mongo import insort_wrapper
@@ -32,7 +33,6 @@ def exists(env):
 
 
 def build_benchmark(env, target, source, **kwargs):
-
     bmEnv = env.Clone()
     bmEnv.InjectThirdParty(libraries=["benchmark"])
 
@@ -54,8 +54,9 @@ def build_benchmark(env, target, source, **kwargs):
         benchmark_test_components = {"tests"}
 
     if "AIB_COMPONENTS_EXTRA" in kwargs:
-        benchmark_test_components = set(
-            kwargs["AIB_COMPONENTS_EXTRA"]).union(benchmark_test_components)
+        benchmark_test_components = set(kwargs["AIB_COMPONENTS_EXTRA"]).union(
+            benchmark_test_components
+        )
 
     kwargs["AIB_COMPONENTS_EXTRA"] = list(benchmark_test_components)
 

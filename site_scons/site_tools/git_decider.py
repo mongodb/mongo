@@ -22,7 +22,6 @@
 
 
 def generate(env, **kwargs):
-
     # Grab the existing decider functions out of the environment
     # so we can invoke them when we can't use Git.
     base_decider = env.decide_target

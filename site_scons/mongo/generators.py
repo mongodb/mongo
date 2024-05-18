@@ -17,69 +17,68 @@ import hashlib
 def default_buildinfo_environment_data():
     data = (
         (
-            'distmod',
-            '$MONGO_DISTMOD',
+            "distmod",
+            "$MONGO_DISTMOD",
             True,
             True,
         ),
         (
-            'distarch',
-            '$MONGO_DISTARCH',
+            "distarch",
+            "$MONGO_DISTARCH",
             True,
             True,
         ),
         (
-            'cc',
-            '$CC_VERSION',
+            "cc",
+            "$CC_VERSION",
             True,
             False,
         ),
         (
-            'ccflags',
-            '$CCFLAGS',
+            "ccflags",
+            "$CCFLAGS",
             True,
             False,
         ),
         (
-            'cxx',
-            '$CXX_VERSION',
+            "cxx",
+            "$CXX_VERSION",
             True,
             False,
         ),
         (
-            'cxxflags',
-            '$CXXFLAGS',
+            "cxxflags",
+            "$CXXFLAGS",
             True,
             False,
         ),
         (
-            'linkflags',
-            '$LINKFLAGS',
+            "linkflags",
+            "$LINKFLAGS",
             True,
             False,
         ),
         (
-            'target_arch',
-            '$TARGET_ARCH',
+            "target_arch",
+            "$TARGET_ARCH",
             True,
             True,
         ),
         (
-            'target_os',
-            '$TARGET_OS',
+            "target_os",
+            "$TARGET_OS",
             True,
             False,
         ),
         (
-            'cppdefines',
-            '$CPPDEFINES',
+            "cppdefines",
+            "$CPPDEFINES",
             True,
             False,
         ),
     )
     return {
-        k: {'key': k, 'value': v, 'inBuildInfo': ibi, 'inVersion': iv}
-        for k, v, ibi, iv in data
+        k: {"key": k, "value": v, "inBuildInfo": ibi, "inVersion": iv} for k, v, ibi, iv in data
     }
 
 
@@ -92,48 +91,49 @@ def empty_buildinfo_environment_data():
 # Special cases - if debug is not enabled and optimization is not specified,
 # default to full optimizationm otherwise turn it off.
 def get_opt_options(env) -> str:
-    if env.GetOption('opt') == 'auto':
-        return "on" if not env.GetOption('dbg') == 'on' else "off"
+    if env.GetOption("opt") == "auto":
+        return "on" if not env.GetOption("dbg") == "on" else "off"
     else:
-        return env.GetOption('opt')
+        return env.GetOption("opt")
 
 
 def default_variant_dir_generator(target, source, env, for_signature):
-
-    if env.GetOption('cache') != None:
-        return 'cached'
+    if env.GetOption("cache") != None:
+        return "cached"
 
     # If an option should affect the variant directory, name it here.
     variant_options = [
-        'opt',
-        'dbg',
+        "opt",
+        "dbg",
     ]
 
     # Hash the named options and their values, and take the first 8 characters of the hash as
     # the variant name
     hasher = hashlib.md5()
     for option in variant_options:
-        hasher.update(option.encode('utf-8'))
-        if option == 'opt':
-            hasher.update(get_opt_options(env).encode('utf-8'))
+        hasher.update(option.encode("utf-8"))
+        if option == "opt":
+            hasher.update(get_opt_options(env).encode("utf-8"))
         else:
-            hasher.update(str(env.GetOption(option)).encode('utf-8'))
+            hasher.update(str(env.GetOption(option)).encode("utf-8"))
     variant_dir = str(hasher.hexdigest()[0:8])
 
     # If our option hash yields a well known hash, replace it with its name.
     known_variant_hashes = {
-        '343e6678': 'debug',
-        '85fcf9b0': 'opt',
-        '981ce870': 'debug',
-        '9fface73': 'optdebug',
-        'c52b1cc3': 'opt',
+        "343e6678": "debug",
+        "85fcf9b0": "opt",
+        "981ce870": "debug",
+        "9fface73": "optdebug",
+        "c52b1cc3": "opt",
     }
 
     return known_variant_hashes.get(variant_dir, variant_dir)
 
 
 def os_specific_variant_dir_generator(target, source, env, for_signature):
-    return '-'.join([
-        env['TARGET_OS'],
-        default_variant_dir_generator(target, source, env, for_signature),
-    ])
+    return "-".join(
+        [
+            env["TARGET_OS"],
+            default_variant_dir_generator(target, source, env, for_signature),
+        ]
+    )

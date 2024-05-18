@@ -59,7 +59,7 @@ class __CompilationDbNode(SCons.Node.Python.Value):
 
 
 def changed_since_last_build_node(child, target, prev_ni, node):
-    """ Dummy decider to force always building"""
+    """Dummy decider to force always building"""
     return True
 
 
@@ -100,7 +100,7 @@ def makeEmitCompilationDbEntry(comstr):
         env.AlwaysBuild(entry)
         env.NoCache(entry)
 
-        compiledb_target = env.get('COMPILEDB_TARGET')
+        compiledb_target = env.get("COMPILEDB_TARGET")
 
         if compiledb_target not in __COMPILATION_DB_ENTRIES:
             __COMPILATION_DB_ENTRIES[compiledb_target] = []
@@ -130,22 +130,26 @@ def CompilationDbEntryAction(target, source, env, **kw):
     # wrappers would be found. We extract the wrapper and put the command back
     # together.
     cmd_list = [
-        str(elem) for elem in env["__COMPILATIONDB_ENV"].subst_list(
-            env["__COMPILATIONDB_COMSTR"], target=env["__COMPILATIONDB_UTARGET"],
-            source=env["__COMPILATIONDB_USOURCE"])[0]
+        str(elem)
+        for elem in env["__COMPILATIONDB_ENV"].subst_list(
+            env["__COMPILATIONDB_COMSTR"],
+            target=env["__COMPILATIONDB_UTARGET"],
+            source=env["__COMPILATIONDB_USOURCE"],
+        )[0]
     ]
 
     if "CXX" in env["__COMPILATIONDB_COMSTR"]:
-        tool_subst = '$CXX'
+        tool_subst = "$CXX"
     else:
-        tool_subst = '$CC'
-    tool = env["__COMPILATIONDB_ENV"].subst(tool_subst, target=env["__COMPILATIONDB_UTARGET"],
-                                            source=env["__COMPILATIONDB_USOURCE"])
+        tool_subst = "$CC"
+    tool = env["__COMPILATIONDB_ENV"].subst(
+        tool_subst, target=env["__COMPILATIONDB_UTARGET"], source=env["__COMPILATIONDB_USOURCE"]
+    )
     tool_index = cmd_list.index(tool) + 1
     tool_list = cmd_list[:tool_index]
     cmd_list = cmd_list[tool_index:]
 
-    for wrapper_ignore in env.get('_COMPILATIONDB_IGNORE_WRAPPERS', []):
+    for wrapper_ignore in env.get("_COMPILATIONDB_IGNORE_WRAPPERS", []):
         wrapper = env.subst(wrapper_ignore, target=target, source=source)
         if wrapper in tool_list:
             tool_list.remove(wrapper)
@@ -153,9 +157,9 @@ def CompilationDbEntryAction(target, source, env, **kw):
 
     entry = {
         "directory": env.Dir("#").abspath,
-        "command": ' '.join(cmd_list),
+        "command": " ".join(cmd_list),
         "file": str(env["__COMPILATIONDB_USOURCE"][0]),
-        "output": shlex.quote(' '.join([str(t) for t in env["__COMPILATIONDB_UTARGET"]])),
+        "output": shlex.quote(" ".join([str(t) for t in env["__COMPILATIONDB_UTARGET"]])),
     }
 
     target[0].write(entry)
@@ -185,7 +189,6 @@ def ScanCompilationDb(node, env, path):
 
 
 def generate(env, **kwargs):
-
     static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
 
     env["COMPILATIONDB_COMSTR"] = kwargs.get(
@@ -216,13 +219,16 @@ def generate(env, **kwargs):
 
         # Assumes a dictionary emitter
         emitter = builder.emitter[suffix]
-        builder.emitter[suffix] = SCons.Builder.ListEmitter([
-            emitter,
-            makeEmitCompilationDbEntry(command),
-        ])
+        builder.emitter[suffix] = SCons.Builder.ListEmitter(
+            [
+                emitter,
+                makeEmitCompilationDbEntry(command),
+            ]
+        )
 
     env["BUILDERS"]["__COMPILATIONDB_Entry"] = SCons.Builder.Builder(
-        action=SCons.Action.Action(CompilationDbEntryAction, None), )
+        action=SCons.Action.Action(CompilationDbEntryAction, None),
+    )
 
     env["BUILDERS"]["__COMPILATIONDB_Database"] = SCons.Builder.Builder(
         action=SCons.Action.Action(WriteCompilationDb, "$COMPILATIONDB_COMSTR"),
@@ -233,9 +239,8 @@ def generate(env, **kwargs):
     )
 
     def CompilationDatabase(env, target):
-
         result = env.__COMPILATIONDB_Database(target=target, source=[])
-        env['COMPILEDB_TARGET'] = result[0].abspath
+        env["COMPILEDB_TARGET"] = result[0].abspath
 
         env.AlwaysBuild(result)
         env.NoCache(result)

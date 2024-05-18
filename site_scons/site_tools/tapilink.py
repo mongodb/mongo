@@ -46,7 +46,7 @@ def _add_emitter(builder):
         new_targets = []
         for t in target:
             base, ext = SCons.Util.splitext(str(t))
-            if not ext == env['SHLIBSUFFIX']:
+            if not ext == env["SHLIBSUFFIX"]:
                 continue
 
             tbd_target = (t.builder.target_factory or env.File)(base + ".tbd")
@@ -86,10 +86,12 @@ def _add_action(builder):
     # invoking TAPI proves to be expensive, we could address this by
     # instead post-processing the "real" .tbd file to strip out the
     # UUID, and then potentially even feed it into a hash algorithm.
-    builder.action = actions + SCons.Action.Action([
-        "$TAPI stubify -o ${TARGET.base}.tbd ${TARGET}",
-        "$TAPI stubify --no-uuids -o ${TARGET.base}.tbd.no_uuid ${TARGET}",
-    ])
+    builder.action = actions + SCons.Action.Action(
+        [
+            "$TAPI stubify -o ${TARGET.base}.tbd ${TARGET}",
+            "$TAPI stubify --no-uuids -o ${TARGET.base}.tbd.no_uuid ${TARGET}",
+        ]
+    )
 
 
 def exists(env):
@@ -98,7 +100,6 @@ def exists(env):
 
 
 def generate(env):
-
     if not exists(env):
         return
 

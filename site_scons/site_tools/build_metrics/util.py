@@ -21,9 +21,9 @@ def fullname(o):
         # then get o's class name
         name = o.__class__.__qualname__
     # if o is a method of builtin class, then module will be None
-    if module == 'builtins' or module is None:
+    if module == "builtins" or module is None:
         return name
-    return module + '.' + name
+    return module + "." + name
 
 
 # This section is an excerpt of the original
@@ -45,8 +45,9 @@ def mem_adjustment(mem_usage):
     # https://github.com/giampaolo/psutil/issues/1908
     try:
         if sys.platform == "darwin":
-            mem_adjust_version = subprocess.run(['sw_vers', '-productVersion'], capture_output=True,
-                                                text=True, check=False).stdout.split('.')[0]
+            mem_adjust_version = subprocess.run(
+                ["sw_vers", "-productVersion"], capture_output=True, text=True, check=False
+            ).stdout.split(".")[0]
             if int(mem_adjust_version) > 10:
                 return int(mem_usage / 10)
     except (IndexError, ValueError):

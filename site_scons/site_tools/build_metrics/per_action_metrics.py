@@ -22,7 +22,7 @@ class ProfiledFunction:
         self.original_func = original_func
         self.per_action_instance = per_action_instance
 
-        if hasattr(original_func, 'strfunction'):
+        if hasattr(original_func, "strfunction"):
             self.strfunction = original_func.strfunction
 
         if isinstance(self.original_func, SCons.Action.ActionCaller):
@@ -37,36 +37,35 @@ class ProfiledFunction:
         return str(self.original_func)
 
     def function_action_execute(self, target, source, env):
-
         task_metrics = {
-            'outputs': [str(t) for t in target],
-            'inputs': [str(s) for s in source],
-            'action': fullname(self.original_func),
-            'builder': target[0].get_builder().get_name(target[0].get_env()),
+            "outputs": [str(t) for t in target],
+            "inputs": [str(s) for s in source],
+            "action": fullname(self.original_func),
+            "builder": target[0].get_builder().get_name(target[0].get_env()),
         }
         profile = memory_profiler.LineProfiler(include_children=False)
 
-        task_metrics['start_time'] = time.time_ns()
+        task_metrics["start_time"] = time.time_ns()
         thread_start_time = time.thread_time_ns()
         return_value = profile(self.original_func)(target=target, source=source, env=env)
-        task_metrics['cpu_time'] = time.thread_time_ns() - thread_start_time
-        task_metrics['end_time'] = time.time_ns()
+        task_metrics["cpu_time"] = time.thread_time_ns() - thread_start_time
+        task_metrics["end_time"] = time.time_ns()
 
         memory_increases_per_line = []
-        for (file_where_code_is, lines_of_code) in profile.code_map.items():
-
+        for file_where_code_is, lines_of_code in profile.code_map.items():
             # skip the first item in the list because this is just the initial
             # memory state, and we are interested just in the increases
-            for (line_number, memory_usage) in list(lines_of_code)[1:]:
+            for line_number, memory_usage in list(lines_of_code)[1:]:
                 if memory_usage:
                     memory_increase = memory_usage[0]
                     memory_increases_per_line.append(memory_increase)
 
-        task_metrics['mem_usage'] = int(sum(memory_increases_per_line) * 1024 * 1024)
+        task_metrics["mem_usage"] = int(sum(memory_increases_per_line) * 1024 * 1024)
 
         self.per_action_instance.build_tasks_metrics.append(task_metrics)
-        task_metrics['array_index'] = self.per_action_instance.build_tasks_metrics.index(
-            task_metrics)
+        task_metrics["array_index"] = self.per_action_instance.build_tasks_metrics.index(
+            task_metrics
+        )
 
         return return_value
 
@@ -84,44 +83,53 @@ class PerActionMetrics(BuildMetricsCollector):
         # adjust things to take measurements
         original_command_execute = SCons.Action.CommandAction.execute
 
-        def build_metrics_CommandAction_execute(command_action_instance, target, source, env,
-                                                executor=None):
-            if 'conftest' not in str(target[0]):
-
+        def build_metrics_CommandAction_execute(
+            command_action_instance, target, source, env, executor=None
+        ):
+            if "conftest" not in str(target[0]):
                 # We use the SPAWN var to control the SCons proper execute to call our spawn.
                 # We set the spawn back after the proper execute is done
-                original_spawn = env['SPAWN']
-                env['SPAWN'] = functools.partial(self.command_spawn_func, target=target,
-                                                 source=source)
-                result = original_command_execute(command_action_instance, target, source, env,
-                                                  executor)
-                env['SPAWN'] = original_spawn
+                original_spawn = env["SPAWN"]
+                env["SPAWN"] = functools.partial(
+                    self.command_spawn_func, target=target, source=source
+                )
+                result = original_command_execute(
+                    command_action_instance, target, source, env, executor
+                )
+                env["SPAWN"] = original_spawn
             else:
-                result = original_command_execute(command_action_instance, target, source, env,
-                                                  executor)
+                result = original_command_execute(
+                    command_action_instance, target, source, env, executor
+                )
             return result
 
         SCons.Action.CommandAction.execute = build_metrics_CommandAction_execute
 
         original_function_action_execute = SCons.Action.FunctionAction.execute
 
-        def build_metrics_FunctionAction_execute(function_action_instance, target, source, env,
-                                                 executor=None):
-            if target and 'conftest' not in str(target[0]) and not isinstance(
-                    function_action_instance.execfunction, ProfiledFunction):
-
+        def build_metrics_FunctionAction_execute(
+            function_action_instance, target, source, env, executor=None
+        ):
+            if (
+                target
+                and "conftest" not in str(target[0])
+                and not isinstance(function_action_instance.execfunction, ProfiledFunction)
+            ):
                 # set our profiled function class as the function action call. Profiled function
                 # should look and behave exactly as the original function, besides the __call__
                 # behaving differently. We set back the original function for posterity just in case
                 original_func = function_action_instance.execfunction
                 function_action_instance.execfunction = ProfiledFunction(
-                    self, function_action_instance.execfunction)
-                original_function_action_execute(function_action_instance, target, source, env,
-                                                 executor)
+                    self, function_action_instance.execfunction
+                )
+                original_function_action_execute(
+                    function_action_instance, target, source, env, executor
+                )
                 function_action_instance.execfunction = original_func
             else:
-                return original_function_action_execute(function_action_instance, target, source,
-                                                        env, executor)
+                return original_function_action_execute(
+                    function_action_instance, target, source, env, executor
+                )
 
         SCons.Action.FunctionAction.execute = build_metrics_FunctionAction_execute
 
@@ -130,16 +138,16 @@ class PerActionMetrics(BuildMetricsCollector):
 
     def get_mem_cpu(self, proc):
         with proc.oneshot():
-            cpu = (proc.cpu_times().system + proc.cpu_times().user)
+            cpu = proc.cpu_times().system + proc.cpu_times().user
             mem = proc.memory_info().vms
         for p in proc.children(recursive=True):
             with p.oneshot():
-                cpu += (p.cpu_times().system + p.cpu_times().user)
+                cpu += p.cpu_times().system + p.cpu_times().user
                 mem += p.memory_info().vms
         return cpu, mem
 
     def track_process(self, proc, target):
-        """ Poll virtual memory of a process and children. """
+        """Poll virtual memory of a process and children."""
         try:
             peak_cpu, peak_mem = self.get_mem_cpu(proc)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -160,32 +168,31 @@ class PerActionMetrics(BuildMetricsCollector):
         return peak_cpu, peak_mem
 
     def command_spawn_func(self, sh, escape, cmd, args, env, target, source):
-
         task_metrics = {
-            'outputs': [str(t) for t in target],
-            'inputs': [str(s) for s in source],
-            'action': ' '.join(args),
-            'start_time': time.time_ns(),
-            'builder': target[0].get_builder().get_name(target[0].get_env()),
+            "outputs": [str(t) for t in target],
+            "inputs": [str(s) for s in source],
+            "action": " ".join(args),
+            "start_time": time.time_ns(),
+            "builder": target[0].get_builder().get_name(target[0].get_env()),
         }
 
-        if sys.platform[:3] == 'win':
+        if sys.platform[:3] == "win":
             # have to use shell=True for windows because of https://github.com/python/cpython/issues/53908
-            proc = psutil.Popen(' '.join(args), env=env, close_fds=True, shell=True)
+            proc = psutil.Popen(" ".join(args), env=env, close_fds=True, shell=True)
         else:
-            proc = psutil.Popen([sh, '-c', ' '.join(args)], env=env, close_fds=True)
+            proc = psutil.Popen([sh, "-c", " ".join(args)], env=env, close_fds=True)
 
         cpu_usage, mem_usage = self.track_process(proc, target[0])
         return_code = proc.wait()
 
-        task_metrics['end_time'] = time.time_ns()
-        task_metrics['cpu_time'] = int(cpu_usage * (10.0**9.0))
-        task_metrics['mem_usage'] = mem_adjustment(int(mem_usage))
+        task_metrics["end_time"] = time.time_ns()
+        task_metrics["cpu_time"] = int(cpu_usage * (10.0**9.0))
+        task_metrics["mem_usage"] = mem_adjustment(int(mem_usage))
 
         self.build_tasks_metrics.append(task_metrics)
-        task_metrics['array_index'] = self.build_tasks_metrics.index(task_metrics)
+        task_metrics["array_index"] = self.build_tasks_metrics.index(task_metrics)
 
         return return_code
 
     def finalize(self):
-        return 'build_tasks', self.build_tasks_metrics
+        return "build_tasks", self.build_tasks_metrics

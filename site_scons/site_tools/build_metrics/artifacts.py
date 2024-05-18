@@ -49,8 +49,11 @@ def _run_bloaty(bloaty, target) -> Optional[BinMetrics]:
         # -n 0 -> do not collapse small sections into a section named [Other]
         # --csv -> generate csv output to stdout
         # -d sections -> only list sections, not symbols
-        proc = subprocess.run([bloaty, "-n", "0", "--csv", "-d", "sections",
-                               str(target)], capture_output=True, universal_newlines=True)
+        proc = subprocess.run(
+            [bloaty, "-n", "0", "--csv", "-d", "sections", str(target)],
+            capture_output=True,
+            universal_newlines=True,
+        )
         if proc.returncode != 0:
             # if we run bloaty against a thin archive, it will fail. Detect
             # this and allow thin archives to pass, otherwise raise an
@@ -58,7 +61,8 @@ def _run_bloaty(bloaty, target) -> Optional[BinMetrics]:
             # Note that our thin_archive tool sets the thin_archive
             # attribute to True
             if proc.stderr.startswith("bloaty: unknown file type for file") and getattr(
-                    target.attributes, "thin_archive", False):
+                target.attributes, "thin_archive", False
+            ):
                 # this is a thin archive, pass it
                 return None
 
@@ -66,9 +70,9 @@ def _run_bloaty(bloaty, target) -> Optional[BinMetrics]:
 
         for row in csv.DictReader(proc.stdout.splitlines()):
             # sections,vmsize,filesize
-            section = row['sections']
-            vmsize = int(row['vmsize'])
-            filesize = int(row['filesize'])
+            section = row["sections"]
+            vmsize = int(row["vmsize"])
+            filesize = int(row["filesize"])
             binsize = BinSize(vmsize=vmsize, filesize=filesize)
             if section == ".text":
                 out["text"] = binsize
@@ -118,8 +122,10 @@ class Artifact(TypedDict, total=False):
 _PLATFORM_LIBMAGIC_BINARY_IDENTITIES = {
     "Windows": [(ArtifactType.LIBRARY, "executable (DLL)"), (ArtifactType.PROGRAM, "executable")],
     "Linux": [(ArtifactType.PROGRAM, "interpreter"), (ArtifactType.LIBRARY, "shared object")],
-    "Darwin": [(ArtifactType.PROGRAM, "Mach-O universal binary"),
-               (ArtifactType.LIBRARY, "linked shared library")],
+    "Darwin": [
+        (ArtifactType.PROGRAM, "Mach-O universal binary"),
+        (ArtifactType.LIBRARY, "linked shared library"),
+    ],
 }
 
 _ARTIFACT_TYPE_FROM_BUILDER = {
@@ -143,7 +149,6 @@ _EXTENSION_FALLBACK = {
     ".idl": ArtifactType.TEXT,
     ".so": ArtifactType.LIBRARY,
     ".o": ArtifactType.OBJECT,
-
     # Windows
     ".obj": ArtifactType.OBJECT,
     ".lib": ArtifactType.LIBRARY,
@@ -156,9 +161,9 @@ class CollectArtifacts(BuildMetricsCollector):
     def __init__(self, env):
         self._env = env
         self._env = env
-        self._build_dir = env.get("BUILD_METRICS_ARTIFACTS_DIR", env.Dir('#').abspath)
+        self._build_dir = env.get("BUILD_METRICS_ARTIFACTS_DIR", env.Dir("#").abspath)
         self._artifacts = []
-        self._bloaty_bin = env.get("BUILD_METRICS_BLOATY", env.WhereIs('bloaty'))
+        self._bloaty_bin = env.get("BUILD_METRICS_BLOATY", env.WhereIs("bloaty"))
         if self._bloaty_bin is None:
             self._bloaty_bin = "bloaty"
         self._metrics = {"total_artifact_size": 0, "num_artifacts": 0, "artifacts": []}

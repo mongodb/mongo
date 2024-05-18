@@ -65,7 +65,8 @@ TEST_LIST_BUILDER = SCons.Builder.Builder(
     action=SCons.Action.FunctionAction(
         test_list_builder_action,
         {"cmdstr": "Generating $TARGETS"},
-    ))
+    )
+)
 
 
 def exists(env):

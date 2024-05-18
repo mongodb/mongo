@@ -31,7 +31,8 @@ class CacheDirValidateWithMetrics(CacheDirValidate):
 
         size = os.path.getsize(target)
         cls.DATA["cache_artifacts"].append(
-            CacheArtifact(array_index=len(cls.DATA["cache_artifacts"]), name=target, size=size))
+            CacheArtifact(array_index=len(cls.DATA["cache_artifacts"]), name=target, size=size)
+        )
         cls.DATA["cache_size"] += size
         cls.SET.add(target)
 

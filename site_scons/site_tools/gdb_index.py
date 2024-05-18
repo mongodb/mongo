@@ -24,8 +24,7 @@ import SCons
 
 
 def _update_builder(env, builder):
-
-    verbose = '' if env.Verbose() else None
+    verbose = "" if env.Verbose() else None
 
     base_action = builder.action
     if not isinstance(base_action, SCons.Action.ListAction):
@@ -42,52 +41,56 @@ def _update_builder(env, builder):
     # no value in keeping them around, it will just waste disk space. Therefore they should be
     # removed as if they never existed from the task. The build system doesn't need to know about
     # them.
-    if env.get('DWARF_VERSION') <= 4:
-        base_action.list.extend([
-            SCons.Action.Action(
-                'touch ${TARGET}.gdb-index',
-                verbose,
-            ),
-            SCons.Action.Action(
-                '$GDB --batch-silent --quiet --nx --eval-command "save gdb-index ${TARGET.dir}" $TARGET',
-                "$GDB_INDEX_GEN_INDEX_STR",
-            ),
-            SCons.Action.Action(
-                '$OBJCOPY --add-section .gdb_index=${TARGET}.gdb-index --set-section-flags .gdb_index=readonly ${TARGET} ${TARGET}',
-                "$GDB_INDEX_ADD_SECTION_STR",
-            ),
-            SCons.Action.Action(
-                'rm -f ${TARGET}.gdb-index',
-                verbose,
-            ),
-        ])
+    if env.get("DWARF_VERSION") <= 4:
+        base_action.list.extend(
+            [
+                SCons.Action.Action(
+                    "touch ${TARGET}.gdb-index",
+                    verbose,
+                ),
+                SCons.Action.Action(
+                    '$GDB --batch-silent --quiet --nx --eval-command "save gdb-index ${TARGET.dir}" $TARGET',
+                    "$GDB_INDEX_GEN_INDEX_STR",
+                ),
+                SCons.Action.Action(
+                    "$OBJCOPY --add-section .gdb_index=${TARGET}.gdb-index --set-section-flags .gdb_index=readonly ${TARGET} ${TARGET}",
+                    "$GDB_INDEX_ADD_SECTION_STR",
+                ),
+                SCons.Action.Action(
+                    "rm -f ${TARGET}.gdb-index",
+                    verbose,
+                ),
+            ]
+        )
     else:
-        base_action.list.extend([
-            SCons.Action.Action(
-                'touch ${TARGET}.debug_names ${TARGET}.debug_str',
-                verbose,
-            ),
-            SCons.Action.Action(
-                '$GDB --batch-silent --quiet --nx --eval-command "save gdb-index -dwarf-5 ${TARGET.dir}" $TARGET',
-                "$GDB_INDEX_GEN_INDEX_STR",
-            ),
-            SCons.Action.Action(
-                '$OBJCOPY --dump-section .debug_str=${TARGET}.debug_str.new $TARGET',
-                verbose,
-            ),
-            SCons.Action.Action(
-                'cat ${TARGET}.debug_str >>${TARGET}.debug_str.new',
-                verbose,
-            ),
-            SCons.Action.Action(
-                '$OBJCOPY --add-section .debug_names=${TARGET}.debug_names --set-section-flags .debug_names=readonly --update-section .debug_str=${TARGET}.debug_str.new ${TARGET} ${TARGET}',
-                "$GDB_INDEX_ADD_SECTION_STR",
-            ),
-            SCons.Action.Action(
-                'rm -f ${TARGET}.debug_names ${TARGET}.debug_str.new ${TARGET}.debug_str',
-                verbose,
-            ),
-        ])
+        base_action.list.extend(
+            [
+                SCons.Action.Action(
+                    "touch ${TARGET}.debug_names ${TARGET}.debug_str",
+                    verbose,
+                ),
+                SCons.Action.Action(
+                    '$GDB --batch-silent --quiet --nx --eval-command "save gdb-index -dwarf-5 ${TARGET.dir}" $TARGET',
+                    "$GDB_INDEX_GEN_INDEX_STR",
+                ),
+                SCons.Action.Action(
+                    "$OBJCOPY --dump-section .debug_str=${TARGET}.debug_str.new $TARGET",
+                    verbose,
+                ),
+                SCons.Action.Action(
+                    "cat ${TARGET}.debug_str >>${TARGET}.debug_str.new",
+                    verbose,
+                ),
+                SCons.Action.Action(
+                    "$OBJCOPY --add-section .debug_names=${TARGET}.debug_names --set-section-flags .debug_names=readonly --update-section .debug_str=${TARGET}.debug_str.new ${TARGET} ${TARGET}",
+                    "$GDB_INDEX_ADD_SECTION_STR",
+                ),
+                SCons.Action.Action(
+                    "rm -f ${TARGET}.debug_names ${TARGET}.debug_str.new ${TARGET}.debug_str",
+                    verbose,
+                ),
+            ]
+        )
 
     builder.action = base_action
 
@@ -114,17 +117,17 @@ def exists(env):
         objcopy = env.get("OBJCOPY", None) or env.WhereIs("objcopy")
         gdb = env.get("GDB", None) or env.WhereIs("gdb")
         try:
-            dwarf_version = int(env.get('DWARF_VERSION'))
+            dwarf_version = int(env.get("DWARF_VERSION"))
         except ValueError:
             dwarf_version = None
 
         unset_vars = []
         if not objcopy:
-            unset_vars += ['OBJCOPY']
+            unset_vars += ["OBJCOPY"]
         if not gdb:
-            unset_vars += ['GDB']
+            unset_vars += ["GDB"]
         if not dwarf_version:
-            unset_vars += ['DWARF_VERSION']
+            unset_vars += ["DWARF_VERSION"]
 
         if not unset_vars:
             print("Enabled generation of gdb index into binaries.")

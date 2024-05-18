@@ -37,7 +37,8 @@ def generate(env, **kwargs):
         action=SCons.Action.Action(
             GZipAction,
             "$GZIPTOOL_COMSTR",
-        ))
+        )
+    )
     env["GZIPTOOL_COMSTR"] = kwargs.get(
         "GZIPTOOL_COMSTR",
         "Compressing $TARGET with gzip",

@@ -5,26 +5,27 @@ import re
 task_limiter_patterns = {}
 
 
-def setup_task_limiter(env, name, concurrency_ratio=0.75, builders=None, source_file_regex='.*',
-                       target_file_regex='.*'):
-
+def setup_task_limiter(
+    env, name, concurrency_ratio=0.75, builders=None, source_file_regex=".*", target_file_regex=".*"
+):
     global task_limiter_patterns
 
     task_limiter_patterns[name] = {}
-    task_limiter_patterns[name]['source'] = re.compile(source_file_regex)
-    task_limiter_patterns[name]['target'] = re.compile(target_file_regex)
+    task_limiter_patterns[name]["source"] = re.compile(source_file_regex)
+    task_limiter_patterns[name]["target"] = re.compile(target_file_regex)
 
     # We need to convert the ratio value into a int that corrlates to a specific
     # number of concurrent jobs allowed
     concurrency_ratio = float(concurrency_ratio)
     if concurrency_ratio <= 0.0:
         env.FatalError(
-            f"The concurrency ratio for {name} must be a positive, got {max_concurrency}")
+            f"The concurrency ratio for {name} must be a positive, got {max_concurrency}"
+        )
 
     if concurrency_ratio > 1.0:
         concurrency_ratio = 1.0
 
-    max_concurrency = env.GetOption('num_jobs') * concurrency_ratio
+    max_concurrency = env.GetOption("num_jobs") * concurrency_ratio
     max_concurrency = round(max_concurrency)
     if max_concurrency < 1.0:
         max_concurrency = 1.0
@@ -43,13 +44,13 @@ def setup_task_limiter(env, name, concurrency_ratio=0.75, builders=None, source_
 
         matched = False
         for s_file in source:
-            if re.search(task_limiter_patterns[name]['source'], s_file.path):
+            if re.search(task_limiter_patterns[name]["source"], s_file.path):
                 matched = True
                 break
 
         if not matched:
             for t_file in target:
-                if re.search(task_limiter_patterns[name]['target'], t_file.path):
+                if re.search(task_limiter_patterns[name]["target"], t_file.path):
                     matched = True
                     break
         if matched:
@@ -66,19 +67,21 @@ def setup_task_limiter(env, name, concurrency_ratio=0.75, builders=None, source_
 
     if isinstance(builders, dict):
         for target_builder, suffixes in builders.items():
-            builder = env['BUILDERS'][target_builder]
+            builder = env["BUILDERS"][target_builder]
             emitterdict = builder.builder.emitter
             for suffix in emitterdict.keys():
                 if not suffix in suffixes:
                     continue
                 base = emitterdict[suffix]
-                emitterdict[suffix] = SCons.Builder.ListEmitter([
-                    base,
-                    task_limiter_emitter,
-                ])
+                emitterdict[suffix] = SCons.Builder.ListEmitter(
+                    [
+                        base,
+                        task_limiter_emitter,
+                    ]
+                )
     else:
         for target_builder in builders:
-            builder = env['BUILDERS'][target_builder]
+            builder = env["BUILDERS"][target_builder]
             base_emitter = builder.emitter
             new_emitter = SCons.Builder.ListEmitter([base_emitter, task_limiter_emitter])
             builder.emitter = new_emitter
@@ -91,4 +94,4 @@ def exists(env):
 
 
 def generate(env):
-    env.AddMethod(setup_task_limiter, 'SetupTaskLimiter')
+    env.AddMethod(setup_task_limiter, "SetupTaskLimiter")

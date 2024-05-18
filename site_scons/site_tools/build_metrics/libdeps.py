@@ -9,13 +9,27 @@ import networkx
 dir_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(dir_path, "..", "..", "..", "buildscripts", "libdeps"))
 
-from buildscripts.libdeps.libdeps.analyzer import counter_factory, LibdepsGraphAnalysis, GaJsonPrinter
+from buildscripts.libdeps.libdeps.analyzer import (
+    counter_factory,
+    LibdepsGraphAnalysis,
+    GaJsonPrinter,
+)
 from buildscripts.libdeps.libdeps.graph import LibdepsGraph, CountTypes
 
-_ALLOWED_KEYS = set([
-    "NODE", "EDGE", "DIR_EDGE", "TRANS_EDGE", "DIR_PUB_EDGE", "PUB_EDGE", "PRIV_EDGE", "IF_EDGE",
-    "PROG", "LIB"
-])
+_ALLOWED_KEYS = set(
+    [
+        "NODE",
+        "EDGE",
+        "DIR_EDGE",
+        "TRANS_EDGE",
+        "DIR_PUB_EDGE",
+        "PUB_EDGE",
+        "PRIV_EDGE",
+        "IF_EDGE",
+        "PROG",
+        "LIB",
+    ]
+)
 
 
 class LibdepsCollector(BuildMetricsCollector):
@@ -29,11 +43,12 @@ class LibdepsCollector(BuildMetricsCollector):
     def _libdeps(graph_file):
         libdeps_graph = LibdepsGraph(graph=networkx.read_graphml(graph_file))
 
-        if libdeps_graph.graph['graph_schema_version'] == 1:
+        if libdeps_graph.graph["graph_schema_version"] == 1:
             libdeps_graph = networkx.reverse_view(libdeps_graph)
 
         return GaJsonPrinter(
-            LibdepsGraphAnalysis(counter_factory(libdeps_graph, CountTypes.ALL.name))).get_json()
+            LibdepsGraphAnalysis(counter_factory(libdeps_graph, CountTypes.ALL.name))
+        ).get_json()
 
     @staticmethod
     def _finalize(libdeps_graph_file):
@@ -44,7 +59,7 @@ class LibdepsCollector(BuildMetricsCollector):
         return out
 
     def finalize(self):
-        libdeps_graph_file = self._env.get('LIBDEPS_GRAPH_FILE')
+        libdeps_graph_file = self._env.get("LIBDEPS_GRAPH_FILE")
         out = {}
         if libdeps_graph_file is not None and os.path.exists(libdeps_graph_file.path):
             out = self._finalize(libdeps_graph_file.path)

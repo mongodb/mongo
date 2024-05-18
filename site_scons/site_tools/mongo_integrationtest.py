@@ -22,6 +22,7 @@
 """
 Pseudo-builders for building and registering integration tests.
 """
+
 from SCons.Script import Action
 
 from site_scons.mongo import insort_wrapper
@@ -48,8 +49,9 @@ def build_cpp_integration_test(env, target, source, **kwargs):
         integration_test_components = {"tests"}
 
     if "AIB_COMPONENTS_EXTRA" in kwargs:
-        kwargs["AIB_COMPONENTS_EXTRA"] = set(
-            kwargs["AIB_COMPONENTS_EXTRA"]).union(integration_test_components)
+        kwargs["AIB_COMPONENTS_EXTRA"] = set(kwargs["AIB_COMPONENTS_EXTRA"]).union(
+            integration_test_components
+        )
     else:
         kwargs["AIB_COMPONENTS_EXTRA"] = list(integration_test_components)
 
@@ -57,7 +59,7 @@ def build_cpp_integration_test(env, target, source, **kwargs):
     # mongo_test_execution.py for details on undecidability) because
     # we don't correctly express the dependency on the server
     # components required to run them.
-    kwargs['UNDECIDABLE_TEST'] = True
+    kwargs["UNDECIDABLE_TEST"] = True
 
     result = env.Program(target, source, **kwargs)
     env.RegisterTest("$INTEGRATION_TEST_LIST", result[0])

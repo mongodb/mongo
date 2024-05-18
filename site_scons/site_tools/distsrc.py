@@ -93,13 +93,13 @@ class DistSrcTarArchive(DistSrcArchive):
         )
 
     def append_file_contents(
-            self,
-            filename,
-            file_contents,
-            mtime=None,
-            mode=0o644,
-            uname="root",
-            gname="root",
+        self,
+        filename,
+        file_contents,
+        mtime=None,
+        mode=0o644,
+        uname="root",
+        gname="root",
     ):
         if mtime is None:
             mtime = time.time()
@@ -147,13 +147,13 @@ class DistSrcZipArchive(DistSrcArchive):
         )
 
     def append_file_contents(
-            self,
-            filename,
-            file_contents,
-            mtime=None,
-            mode=0o644,
-            uname="root",
-            gname="root",
+        self,
+        filename,
+        file_contents,
+        mtime=None,
+        mode=0o644,
+        uname="root",
+        gname="root",
     ):
         if mtime is None:
             mtime = time.time()
@@ -203,14 +203,16 @@ def distsrc_action_generator(source, target, env, for_signature):
             git_repo.git.add(all=True)
             # only commit changes if there are any
             if len(git_repo.index.diff("HEAD")) != 0:
-                with git_repo.git.custom_environment(GIT_COMMITTER_NAME="Evergreen",
-                                                     GIT_COMMITTER_EMAIL="evergreen@mongodb.com"):
+                with git_repo.git.custom_environment(
+                    GIT_COMMITTER_NAME="Evergreen", GIT_COMMITTER_EMAIL="evergreen@mongodb.com"
+                ):
                     git_repo.git.commit("--author='Evergreen <>'", "-m", "temp commit")
 
             # archive repo
             dist_src_prefix = env.get("MONGO_DIST_SRC_PREFIX")
-            git_repo.git.archive("--format", target_ext, "--output", target[0], "--prefix",
-                                 dist_src_prefix, "HEAD")
+            git_repo.git.archive(
+                "--format", target_ext, "--output", target[0], "--prefix", dist_src_prefix, "HEAD"
+            )
 
             # reset branch to original state
             git_repo.git.reset("--mixed", head_commit_sha)
@@ -232,7 +234,9 @@ def add_callback(env, fn):
 
 def generate(env, **kwargs):
     env.AddMethod(add_callback, "AddDistSrcCallback")
-    env["BUILDERS"]["__DISTSRC"] = SCons.Builder.Builder(generator=distsrc_action_generator, )
+    env["BUILDERS"]["__DISTSRC"] = SCons.Builder.Builder(
+        generator=distsrc_action_generator,
+    )
 
     def DistSrc(env, target, **kwargs):
         result = env.__DISTSRC(target=target, source=[], **kwargs)

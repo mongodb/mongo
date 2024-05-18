@@ -38,7 +38,7 @@ class MemoryMonitor(BuildMetricsCollector):
         self.system_memory_metrics["arithmetic_mean"] = mean
         self.system_memory_metrics["max"] = max_
 
-        return 'system_memory', self.system_memory_metrics
+        return "system_memory", self.system_memory_metrics
 
     def memory_monitor(self):
         while not self._stop:
@@ -53,7 +53,8 @@ class MemoryMonitor(BuildMetricsCollector):
         now_time = timestamp_now()
 
         self.system_memory_metrics["mem_over_time"].append(
-            {"timestamp": now_time, "memory": used_mem})
+            {"timestamp": now_time, "memory": used_mem}
+        )
 
 
 def used_memory():

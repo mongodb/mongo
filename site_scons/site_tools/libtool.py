@@ -24,7 +24,6 @@ import SCons
 
 
 def generate(env):
-
     env["AR"] = "libtool"
     env["ARCOM"] = "$AR -static -o $TARGET $ARFLAGS $SOURCES"
     env["ARFLAGS"] = ["-s", "-no_warning_for_no_symbols"]

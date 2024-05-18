@@ -20,6 +20,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 """Pseudo-builders for building workload simulators."""
+
 from SCons.Script import Action
 
 from site_scons.mongo import insort_wrapper
@@ -34,7 +35,7 @@ def build_workload_simulator(env, target, source, **kwargs):
         target = [target]
 
     for t in target:
-        if not t.endswith('_simulator'):
+        if not t.endswith("_simulator"):
             env.ConfError(f"WorkloadSimulator target `{t}' does not end in `_simulator'")
 
     libdeps = kwargs.get("LIBDEPS", env.get("LIBDEPS", [])).copy()

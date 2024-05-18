@@ -53,7 +53,6 @@ IDLCAction = SCons.Action.Action("$IDLCCOM", "$IDLCCOMSTR")
 
 
 def idl_scanner(node, env, path):
-
     # When generating ninja we only need to add the IDL_GLOBAL_DEPS
     # because the implicit dependencies will be picked up using the
     # deps=msvc method.
@@ -123,8 +122,9 @@ def generate(env):
         "$TARGET_ARCH",
     ]
     env["IDLCCOM"] = "$IDLC $IDLCFLAGS --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES"
-    env["IDLCCOMSTR"] = ("Generating ${TARGETS[0]}"
-                         if not env.get("VERBOSE", "").lower() in ['true', '1'] else None)
+    env["IDLCCOMSTR"] = (
+        "Generating ${TARGETS[0]}" if not env.get("VERBOSE", "").lower() in ["true", "1"] else None
+    )
     env["IDLCSUFFIX"] = ".idl"
 
     global IDL_GLOBAL_DEPS

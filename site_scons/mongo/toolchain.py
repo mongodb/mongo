@@ -12,16 +12,30 @@ def get_toolchain_ver(env, tool):
     # command gets executed (gcc vs /opt/mongodbtoolchain/bin/gcc).
     verstr = "version unknown"
     proc = None
-    if env.ToolchainIs('clang', 'gcc'):
-        proc = SCons.Action._subproc(env, env.subst("${%s} --version" % tool),
-                                     stdout=subprocess.PIPE, stderr='devnull', stdin='devnull',
-                                     universal_newlines=True, error='raise', shell=True)
+    if env.ToolchainIs("clang", "gcc"):
+        proc = SCons.Action._subproc(
+            env,
+            env.subst("${%s} --version" % tool),
+            stdout=subprocess.PIPE,
+            stderr="devnull",
+            stdin="devnull",
+            universal_newlines=True,
+            error="raise",
+            shell=True,
+        )
         verstr = proc.stdout.readline()
 
-    elif env.ToolchainIs('msvc') and env.TargetOSIs('windows'):
-        proc = SCons.Action._subproc(env, env.subst("${%s}" % tool), stdout='devnull',
-                                     stderr=subprocess.PIPE, stdin='devnull',
-                                     universal_newlines=True, error='raise', shell=True)
+    elif env.ToolchainIs("msvc") and env.TargetOSIs("windows"):
+        proc = SCons.Action._subproc(
+            env,
+            env.subst("${%s}" % tool),
+            stdout="devnull",
+            stderr=subprocess.PIPE,
+            stdin="devnull",
+            universal_newlines=True,
+            error="raise",
+            shell=True,
+        )
         verstr = proc.stderr.readline()
 
     # If we started a process, we should drain its stdout/stderr and wait for
@@ -29,4 +43,4 @@ def get_toolchain_ver(env, tool):
     if proc:
         proc.communicate()
 
-    return env.subst('${%s}: %s' % (tool, verstr))
+    return env.subst("${%s}: %s" % (tool, verstr))

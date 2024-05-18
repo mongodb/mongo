@@ -42,7 +42,7 @@ def exists(env):
         print(f"Error: ccache not found at {env['CCACHE']}")
         return False
 
-    if 'CCACHE_VERSION' in env and env['CCACHE_VERSION'] >= _ccache_version_min:
+    if "CCACHE_VERSION" in env and env["CCACHE_VERSION"] >= _ccache_version_min:
         return True
 
     pipe = SCons.Action._subproc(
@@ -73,7 +73,7 @@ def exists(env):
             validated = True
 
     if validated:
-        env['CCACHE_VERSION'] = ccache_version
+        env["CCACHE_VERSION"] = ccache_version
     else:
         print(
             f"Error: failed to verify ccache version >= {_ccache_version_min}, found {ccache_version}"
@@ -104,7 +104,7 @@ def generate(env):
 
     # Check whether icecream is requested and is a valid tool.
     if "ICECC" in env:
-        icecream = SCons.Tool.Tool('icecream')
+        icecream = SCons.Tool.Tool("icecream")
         icecream_enabled = bool(icecream) and icecream.exists(env)
     else:
         icecream_enabled = False
@@ -114,7 +114,7 @@ def generate(env):
     # hash can be calculated on them. This both reduces the amount of work ccache needs to
     # do and increases the likelihood of a cache hit.
     if env.ToolchainIs("clang"):
-        if not env.get('CCACHE_EXTRAFILES_USE_SOURCE_PATHS', False):
+        if not env.get("CCACHE_EXTRAFILES_USE_SOURCE_PATHS", False):
             env["ENV"].pop("CCACHE_CPP2", None)
             env["ENV"]["CCACHE_NOCPP2"] = "1"
             env.AppendUnique(CCFLAGS=["-frewrite-includes"])
@@ -122,7 +122,7 @@ def generate(env):
             env["ENV"].pop("CCACHE_NOCPP2", None)
             env["ENV"]["CCACHE_CPP2"] = "1"
     elif env.ToolchainIs("gcc"):
-        if icecream_enabled and not env.get('CCACHE_EXTRAFILES_USE_SOURCE_PATHS', False):
+        if icecream_enabled and not env.get("CCACHE_EXTRAFILES_USE_SOURCE_PATHS", False):
             # Newer versions of Icecream will drop -fdirectives-only from
             # preprocessor and compiler flags if it does not find a remote
             # build host to build on. ccache, on the other hand, will not
@@ -150,7 +150,8 @@ def generate(env):
     # hash result to prevent erroneous cache hits.
     if "CCACHE_EXTRAFILES" in env and env["CCACHE_EXTRAFILES"]:
         env["ENV"]["CCACHE_EXTRAFILES"] = ":".join(
-            [denyfile.path for denyfile in env["CCACHE_EXTRAFILES"]])
+            [denyfile.path for denyfile in env["CCACHE_EXTRAFILES"]]
+        )
 
     # Make a generator to expand to CCACHE in the case where we are
     # not a conftest. We don't want to use ccache for configure tests
@@ -163,10 +164,10 @@ def generate(env):
     # somehow anyway.
     def ccache_generator(target, source, env, for_signature):
         if "conftest" not in str(target[0]):
-            return '$CCACHE'
-        return ''
+            return "$CCACHE"
+        return ""
 
-    env['CCACHE_GENERATOR'] = ccache_generator
+    env["CCACHE_GENERATOR"] = ccache_generator
 
     # Add ccache to the relevant command lines. Wrap the reference to
     # ccache in the $( $) pattern so that turning ccache on or off

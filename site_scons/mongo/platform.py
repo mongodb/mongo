@@ -19,31 +19,31 @@ import platform
 # command-line. Treat this output as the value of HOST_OS
 def get_running_os_name():
     running_os = os.sys.platform
-    if running_os.startswith('linux'):
-        running_os = 'linux'
-    elif running_os.startswith('freebsd'):
-        running_os = 'freebsd'
-    elif running_os.startswith('openbsd'):
-        running_os = 'openbsd'
-    elif running_os == 'sunos5':
-        running_os = 'solaris'
-    elif running_os == 'win32':
-        running_os = 'windows'
-    elif running_os == 'darwin':
-        running_os = 'macOS'
+    if running_os.startswith("linux"):
+        running_os = "linux"
+    elif running_os.startswith("freebsd"):
+        running_os = "freebsd"
+    elif running_os.startswith("openbsd"):
+        running_os = "openbsd"
+    elif running_os == "sunos5":
+        running_os = "solaris"
+    elif running_os == "win32":
+        running_os = "windows"
+    elif running_os == "darwin":
+        running_os = "macOS"
     else:
-        running_os = 'unknown'
+        running_os = "unknown"
     return running_os
 
 
 def env_get_os_name_wrapper(self):
-    return self['TARGET_OS']
+    return self["TARGET_OS"]
 
 
 def is_os_raw(target_os, os_list_to_check):
-    darwin_os_list = ['macOS', 'tvOS', 'tvOS-sim', 'iOS', 'iOS-sim', 'watchOS', 'watchOS-sim']
-    linux_os_list = ['android', 'linux']
-    posix_os_list = ['openbsd', 'freebsd', 'solaris', 'emscripten'] + darwin_os_list + linux_os_list
+    darwin_os_list = ["macOS", "tvOS", "tvOS-sim", "iOS", "iOS-sim", "watchOS", "watchOS-sim"]
+    linux_os_list = ["android", "linux"]
+    posix_os_list = ["openbsd", "freebsd", "solaris", "emscripten"] + darwin_os_list + linux_os_list
 
     os_families = {
         "darwin": darwin_os_list,
@@ -66,7 +66,7 @@ def is_running_os(*os_list):
 
 
 def env_os_is_wrapper(self, *os_list):
-    return is_os_raw(self['TARGET_OS'], os_list)
+    return is_os_raw(self["TARGET_OS"], os_list)
 
 
 def is_arm_processor():

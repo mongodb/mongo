@@ -32,15 +32,15 @@ def _add_scanner(builder):
     def new_scanner(node, env, path, argument):
         # Use the path information that FindPathDirs gave us to resolve
         # the forced includes into nodes given the search path.
-        fis = [env.FindFile(f, path) for f in env.get('FORCEINCLUDES', [])]
+        fis = [env.FindFile(f, path) for f in env.get("FORCEINCLUDES", [])]
 
         # If all nodes could not be resolved, there are missing headers.
         if not all(fis):
             missing_headers = [
-                header for node, header in zip(fis, env.get('FORCEINCLUDES')) if not node
+                header for node, header in zip(fis, env.get("FORCEINCLUDES")) if not node
             ]
             errstring = f"Could not find force include header(s): {missing_headers} in any path in CPPPATH:\n"
-            for cpppath in env.get('CPPPATH', []):
+            for cpppath in env.get("CPPPATH", []):
                 errstring += f"\t{env.Dir(cpppath).path}\n"
 
             raise SCons.Errors.SConsEnvironmentError(errstring)
@@ -59,23 +59,25 @@ def _add_scanner(builder):
     # back from createObjBuilders.
     builder.builder.target_scanner = SCons.Scanner.Scanner(
         function=new_scanner,
-        path_function=SCons.Script.FindPathDirs('CPPPATH'),
+        path_function=SCons.Script.FindPathDirs("CPPPATH"),
         argument=builder.source_scanner,
     )
 
 
 def generate(env, **kwargs):
-    if not 'FORCEINCLUDEPREFIX' in env:
-        if 'msvc' in env.get('TOOLS', []):
-            env['FORCEINCLUDEPREFIX'] = '/FI'
+    if not "FORCEINCLUDEPREFIX" in env:
+        if "msvc" in env.get("TOOLS", []):
+            env["FORCEINCLUDEPREFIX"] = "/FI"
         else:
-            env['FORCEINCLUDEPREFIX'] = '-include '
+            env["FORCEINCLUDEPREFIX"] = "-include "
 
-    if not 'FORCEINCLUDESUFFIX' in env:
-        env['FORCEINCLUDESUFFIX'] = ''
+    if not "FORCEINCLUDESUFFIX" in env:
+        env["FORCEINCLUDESUFFIX"] = ""
 
     # Expand FORCEINCLUDES with the indicated prefixes and suffixes.
-    env['_FORCEINCLUDES'] = '${_concat(FORCEINCLUDEPREFIX, FORCEINCLUDES, FORCEINCLUDESUFFIX, __env__, lambda x: x, TARGET, SOURCE)}'
+    env["_FORCEINCLUDES"] = (
+        "${_concat(FORCEINCLUDEPREFIX, FORCEINCLUDES, FORCEINCLUDESUFFIX, __env__, lambda x: x, TARGET, SOURCE)}"
+    )
 
     env.Append(
         # It might be better if this went in _CPPINCFLAGS, but it
@@ -85,8 +87,9 @@ def generate(env, **kwargs):
         # only come after the include file search path arguments that
         # would enable discovery.
         CCFLAGS=[
-            '$_FORCEINCLUDES',
-        ])
+            "$_FORCEINCLUDES",
+        ]
+    )
 
     for object_builder in SCons.Tool.createObjBuilders(env):
         _add_scanner(object_builder)

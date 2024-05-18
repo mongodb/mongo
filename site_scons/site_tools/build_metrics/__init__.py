@@ -45,7 +45,7 @@ _METRICS_COLLECTORS = []
 
 def finalize_build_metrics(env):
     metrics = get_build_metric_dict()
-    metrics['end_time'] = time.time_ns()
+    metrics["end_time"] = time.time_ns()
     for m in _METRICS_COLLECTORS:
         start_time = timer()
         sys.stdout.write(f"Processing {m.get_name()}...")
@@ -57,20 +57,20 @@ def finalize_build_metrics(env):
     with open(os.path.join(os.path.dirname(__file__), "build_metrics_format.schema")) as f:
         validate(metrics, json.load(f))
 
-    build_metrics_file = env.GetOption('build-metrics')
-    if build_metrics_file == '-':
+    build_metrics_file = env.GetOption("build-metrics")
+    if build_metrics_file == "-":
         json.dump(metrics, sys.stdout, indent=4, sort_keys=True)
     else:
-        with open(build_metrics_file, 'w') as f:
+        with open(build_metrics_file, "w") as f:
             json.dump(metrics, f, indent=4, sort_keys=True)
-        with open(f"{os.path.splitext(build_metrics_file)[0]}-chrome-tracer.json", 'w') as f:
+        with open(f"{os.path.splitext(build_metrics_file)[0]}-chrome-tracer.json", "w") as f:
             json.dump(generate_chrome_tracer_json(metrics), f, indent=4)
 
 
 def generate_chrome_tracer_json(metrics):
     tracer_json = {"traceEvents": []}
     job_slots = []
-    task_stack = sorted(metrics['build_tasks'], reverse=True, key=lambda x: x['start_time'])
+    task_stack = sorted(metrics["build_tasks"], reverse=True, key=lambda x: x["start_time"])
 
     # Chrome trace organizes tasks per pids, so if we want to have a clean layout which
     # clearly shows concurrent processes, we are creating job slots by comparing start and
@@ -84,19 +84,19 @@ def generate_chrome_tracer_json(metrics):
     while task_stack:
         task = task_stack.pop()
         candidates = [
-            job_slot for job_slot in job_slots if job_slot[-1]['end_time'] < task['start_time']
+            job_slot for job_slot in job_slots if job_slot[-1]["end_time"] < task["start_time"]
         ]
         if candidates:
             # We need to find the best job_slot to add this next task too, so we look at the
             # end_times, the one with the lowest would have been the first one available. We just
             # arbitrarily guess the first one will be the best, then iterate to find out which
             # one is the best. We then add to the existing job_slot which best_candidate points to.
-            min_end = candidates[0][-1]['end_time']
+            min_end = candidates[0][-1]["end_time"]
             best_candidate = candidates[0]
             for candidate in candidates:
-                if candidate[-1]['end_time'] < min_end:
+                if candidate[-1]["end_time"] < min_end:
                     best_candidate = candidate
-                    min_end = candidate[-1]['end_time']
+                    min_end = candidate[-1]["end_time"]
 
             best_candidate.append(task)
         else:
@@ -106,24 +106,22 @@ def generate_chrome_tracer_json(metrics):
 
     for i, job_slot in enumerate(job_slots):
         for build_task in job_slot:
-
-            tracer_json['traceEvents'].append({
-                'name':
-                    build_task['outputs'][0] if build_task['outputs'] else build_task['builder'],
-                'cat':
-                    build_task['builder'],
-                'ph':
-                    'X',
-                'ts':
-                    build_task['start_time'] / 1000.0,
-                'dur': (build_task['end_time'] - build_task['start_time']) / 1000.0,
-                'pid':
-                    i,
-                'args': {
-                    "cpu": build_task['cpu_time'],
-                    "mem": build_task['mem_usage'],
-                },
-            })
+            tracer_json["traceEvents"].append(
+                {
+                    "name": build_task["outputs"][0]
+                    if build_task["outputs"]
+                    else build_task["builder"],
+                    "cat": build_task["builder"],
+                    "ph": "X",
+                    "ts": build_task["start_time"] / 1000.0,
+                    "dur": (build_task["end_time"] - build_task["start_time"]) / 1000.0,
+                    "pid": i,
+                    "args": {
+                        "cpu": build_task["cpu_time"],
+                        "mem": build_task["mem_usage"],
+                    },
+                }
+            )
 
     return tracer_json
 
@@ -147,8 +145,8 @@ def generate(env, **kwargs):
     metrics = get_build_metric_dict()
     p = psutil.Process(os.getpid())
 
-    metrics['start_time'] = int(p.create_time() * _SEC_TO_NANOSEC_FACTOR)
-    metrics['scons_command'] = " ".join([sys.executable] + sys.argv)
+    metrics["start_time"] = int(p.create_time() * _SEC_TO_NANOSEC_FACTOR)
+    metrics["scons_command"] = " ".join([sys.executable] + sys.argv)
 
     _METRICS_COLLECTORS = [
         MemoryMonitor(psutil.Process().memory_info().vms),
@@ -156,10 +154,10 @@ def generate(env, **kwargs):
         CollectArtifacts(env),
         SConsStats(),
         CacheDirCollector(),
-        LibdepsCollector(env)
+        LibdepsCollector(env),
     ]
 
-    env['CACHEDIR_CLASS'] = CacheDirValidateWithMetrics
+    env["CACHEDIR_CLASS"] = CacheDirValidateWithMetrics
 
 
 def exists(env):

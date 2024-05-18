@@ -76,10 +76,12 @@ class SConsStats(BuildMetricsCollector):
         post_build = _safe_list_get(memory_stats, 3, 0)
         if pre_read == 0 and post_read == 0 and pre_build == 0 and post_build == 0:
             print(
-                "WARNING: SConsStats read all memory statistics as 0. Did you pass --debug=memory?")
+                "WARNING: SConsStats read all memory statistics as 0. Did you pass --debug=memory?"
+            )
             return None
-        return MemoryMetrics(pre_read=pre_read, post_read=post_read, pre_build=pre_build,
-                             post_build=post_build)
+        return MemoryMetrics(
+            pre_read=pre_read, post_read=post_read, pre_build=pre_build, post_build=post_build
+        )
 
     def _finalize_counts(self) -> Optional[List[CountsMetrics]]:
         count_stats = SCons.Script.Main.count_stats.stats
@@ -108,8 +110,14 @@ class SConsStats(BuildMetricsCollector):
         for key, value in stats_table.items():
             out.append(
                 CountsMetrics(
-                    array_index=len(out), item_name=key, pre_read=value[0], post_read=value[1],
-                    pre_build=value[2], post_build=value[3]))
+                    array_index=len(out),
+                    item_name=key,
+                    pre_read=value[0],
+                    post_read=value[1],
+                    pre_build=value[2],
+                    post_build=value[3],
+                )
+            )
 
         return out
 
@@ -135,12 +143,19 @@ class SConsStats(BuildMetricsCollector):
         if SCons.Script.Main.num_jobs == 1:
             ct = SCons.Script.Main.cumulative_command_time
         else:
-            if SCons.Script.Main.last_command_end is None or SCons.Script.Main.first_command_start is None:
+            if (
+                SCons.Script.Main.last_command_end is None
+                or SCons.Script.Main.first_command_start is None
+            ):
                 ct = 0.0
             else:
                 ct = SCons.Script.Main.last_command_end - SCons.Script.Main.first_command_start
         scons_time = total_time - sconscript_time - ct
         # End section copied from SCons
 
-        return TimeMetrics(total=total_time, sconscript_exec=sconscript_time, scons_exec=scons_time,
-                           command_exec=ct)
+        return TimeMetrics(
+            total=total_time,
+            sconscript_exec=sconscript_time,
+            scons_exec=scons_time,
+            command_exec=ct,
+        )

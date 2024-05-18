@@ -20,13 +20,14 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 """Pseudo-builders for building and registering unit tests."""
+
 from SCons.Script import Action
 
 from site_scons.mongo import insort_wrapper
 
 LAST_TEST_GROUP = 0
 
-TEST_GROUPS = ['first', 'second', 'third', 'fourth']
+TEST_GROUPS = ["first", "second", "third", "fourth"]
 
 
 def exists(env):
@@ -34,14 +35,13 @@ def exists(env):
 
 
 def build_cpp_unit_test(env, target, source, **kwargs):
-
     global LAST_TEST_GROUP
 
     if not isinstance(target, list):
         target = [target]
 
     for t in target:
-        if not t.endswith('_test'):
+        if not t.endswith("_test"):
             env.ConfError(f"CppUnitTest target `{t}' does not end in `_test'")
 
     test_group = TEST_GROUPS[LAST_TEST_GROUP]
@@ -64,8 +64,9 @@ def build_cpp_unit_test(env, target, source, **kwargs):
         kwargs["AIB_COMPONENT"] = f"{test_group}-quarter-unittests"
 
     if "AIB_COMPONENTS_EXTRA" in kwargs:
-        kwargs["AIB_COMPONENTS_EXTRA"] = set(
-            kwargs["AIB_COMPONENTS_EXTRA"]).union(unit_test_components)
+        kwargs["AIB_COMPONENTS_EXTRA"] = set(kwargs["AIB_COMPONENTS_EXTRA"]).union(
+            unit_test_components
+        )
     else:
         kwargs["AIB_COMPONENTS_EXTRA"] = list(unit_test_components)
 
@@ -73,8 +74,9 @@ def build_cpp_unit_test(env, target, source, **kwargs):
     env.RegisterTest("$UNITTEST_LIST", result[0])
     env.Alias("$UNITTEST_ALIAS", result[0])
 
-    env.RegisterTest(f"$BUILD_ROOT/{test_group}_quarter_unittests.txt", result[0],
-                     generate_alias=False)
+    env.RegisterTest(
+        f"$BUILD_ROOT/{test_group}_quarter_unittests.txt", result[0], generate_alias=False
+    )
     env.Alias(f"install-{test_group}-quarter-unittests", result[0])
 
     return result
@@ -83,8 +85,10 @@ def build_cpp_unit_test(env, target, source, **kwargs):
 def generate(env):
     for test_group in TEST_GROUPS:
         env.TestList(f"$BUILD_ROOT/{test_group}_quarter_unittests.txt", source=[])
-        env.Alias(f"install-{test_group}-quarter-unittests",
-                  f"$BUILD_ROOT/{test_group}_quarter_unittests.txt")
+        env.Alias(
+            f"install-{test_group}-quarter-unittests",
+            f"$BUILD_ROOT/{test_group}_quarter_unittests.txt",
+        )
     env.TestList("$UNITTEST_LIST", source=[])
     env.AddMethod(build_cpp_unit_test, "CppUnitTest")
     env.Alias("$UNITTEST_ALIAS", "$UNITTEST_LIST")

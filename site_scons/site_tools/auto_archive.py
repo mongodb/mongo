@@ -142,7 +142,7 @@ def collect_transitive_files(env, entry):
     # Usage:
     # node = env.AutoInstall(...)
     # setattr(node[0].attributes, 'AIB_NO_ARCHIVE', True)
-    return sorted(f for f in files if not getattr(f.attributes, 'AIB_NO_ARCHIVE', False))
+    return sorted(f for f in files if not getattr(f.attributes, "AIB_NO_ARCHIVE", False))
 
 
 def auto_archive_gen(first_env, make_archive_script, pkg_fmt):
@@ -205,7 +205,6 @@ def archive_builder(source, target, env, for_signature):
 
     tar_cmd = env.WhereIs("tar")
     if archive_type == "tar" and tar_cmd:
-
         pigz_cmd = env.WhereIs("pigz")
         if pigz_cmd:
             # pigz is the parallel implementation of gizp,
@@ -215,7 +214,9 @@ def archive_builder(source, target, env, for_signature):
         else:
             compression_flags = "-z"
 
-        command_prefix = "{tar} -vc {compression_flags} -C {common_ancestor} -T {file_list} -f {archive_name}"
+        command_prefix = (
+            "{tar} -vc {compression_flags} -C {common_ancestor} -T {file_list} -f {archive_name}"
+        )
     else:
         command_prefix = "{python} {make_archive_script} {archive_type} {archive_name} {common_ancestor} {file_list}"
 
@@ -228,7 +229,7 @@ def archive_builder(source, target, env, for_signature):
         archive_name=archive_name,
         make_archive_script=make_archive_script,
         common_ancestor=common_ancestor,
-        file_list='',
+        file_list="",
     )
 
     # If we are just being invoked for our signature, we can omit the indirect dependencies
@@ -272,9 +273,9 @@ def archive_builder(source, target, env, for_signature):
     # callbacks in order and not via aggregation then this could be moved to a simple Textfile call.
     file_list = str(target[0].abspath) + ".filelist"
     os.makedirs(os.path.dirname(file_list), exist_ok=True)
-    with open(file_list, 'w') as f:
+    with open(file_list, "w") as f:
         for file in relative_files:
-            f.write(file + '\n')
+            f.write(file + "\n")
 
     cmd = command_prefix.format(
         tar=tar_cmd,
@@ -302,8 +303,10 @@ def generate(env):
         action=SCons.Action.CommandGeneratorAction(
             archive_builder,
             {"cmdstr": "Building package ${TARGETS[0]} from ${SOURCES[1:]}"}
-            if not env.Verbose() else {"cmdstr": ""},
-        ))
+            if not env.Verbose()
+            else {"cmdstr": ""},
+        )
+    )
     env.Append(BUILDERS={"AutoArchive": bld})
     env["AUTO_ARCHIVE_TARBALL_SUFFIX"] = env.get(
         "AUTO_ARCHIVE_TARBALL_SUFFIX",
@@ -326,4 +329,5 @@ def generate(env):
             "tar": (auto_archive_gen(env, make_archive_script, "tar"), False),
             "zip": (auto_archive_gen(env, make_archive_script, "zip"), False),
             "archive": (auto_archive_gen(env, make_archive_script, "auto"), False),
-        })
+        }
+    )
