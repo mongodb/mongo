@@ -29,8 +29,12 @@
 #ifndef HEADERUUID_645147E3_14CB_4DFC_8F05_16CE4D190C18_DEFINED
 #define HEADERUUID_645147E3_14CB_4DFC_8F05_16CE4D190C18_DEFINED
 
-#include <cstddef>
-#include <cstdint>
+/**
+ * Note: it's necessary to use C headers here instead of the preferred <cstddef> and <cstdint> so
+ * that this header is usable in Go projects.
+ */
+#include <stddef.h>  // NOLINT
+#include <stdint.h>  // NOLINT
 
 #pragma push_macro("MONGO_API_CALL")
 #undef MONGO_API_CALL
