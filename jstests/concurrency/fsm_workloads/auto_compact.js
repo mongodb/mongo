@@ -87,8 +87,10 @@ export const $config = (function() {
                 let res;
                 let retries = 0;
                 const maxRetries = 10;
+                const runOnce = Math.random() < 0.5;
                 while ((res = assert.commandWorkedOrFailedWithCode(
-                            db.adminCommand({autoCompact: true, freeSpaceTargetMB: 1}),
+                            db.adminCommand(
+                                {autoCompact: true, freeSpaceTargetMB: 1, runOnce: runOnce}),
                             ErrorCodes.ObjectIsBusy))
                                .code == ErrorCodes.ObjectIsBusy &&
                        retries < maxRetries) {
