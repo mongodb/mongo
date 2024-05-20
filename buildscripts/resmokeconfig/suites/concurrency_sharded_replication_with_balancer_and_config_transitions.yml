@@ -93,6 +93,11 @@ selector:
     - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
     - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_droptarget.js
 
+    # This test expects to catch QueryPlanKilled errors, but the config transition runCommand
+    # override retries on QueryPlanKilled errors to retain test coverage for transient errors
+    # caused by config transitions.
+    - jstests/concurrency/fsm_workloads/kill_rooted_or.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off

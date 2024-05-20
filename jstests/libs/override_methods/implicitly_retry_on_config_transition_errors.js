@@ -18,7 +18,11 @@ const kRetryableErrors = [
     {
         code: ErrorCodes.ConflictingOperationInProgress,
         errmsg: "Another ConfigsvrCoordinator with different arguments is already running"
-    }
+    },
+    // A query can be killed if it is still selecting a query plan after a config transition has
+    // completed range deletion and drops the collection. Since orphanCleanUpDelaySecs is set to be
+    // lower in testing than in production, dropCollection is scheduled almost immediately.
+    {code: ErrorCodes.QueryPlanKilled}
 ];
 
 // Commands known not to work with transitions so tests can fail immediately with a clear error.

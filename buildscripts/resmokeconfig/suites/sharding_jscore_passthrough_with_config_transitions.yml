@@ -63,6 +63,8 @@ selector:
     - assumes_balancer_off
     # MoveCollection changes the collection uuid.
     - assumes_stable_collection_uuid
+    # MoveCollection run by the config transition can kill open cursors.
+    - requires_getmore
 
 executor:
   archive:

@@ -2354,6 +2354,21 @@ tasks:
       - func: "run tests"
 
   - <<: *gen_task_template
+    name: aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions
+    # TODO SERVER-83445 Enable on non-all-feature-flag variants.
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "unsplittable_collections",
+      ]
+    depends_on:
+      - name: aggregation
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
     name: causally_consistent_jscore_passthrough_auth_gen
     tags:
       [
