@@ -1050,7 +1050,6 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
     }
     const auto type = OplogEntries_parse(IDLParserContext("type"), cmd.getStringField("type"));
     const IDLParserContext ctx("o",
-                               false /*apiStrict*/,
                                auth::ValidatedTenancyScope::get(opCtx),
                                entry.getTid(),
                                SerializationContext::stateDefault());

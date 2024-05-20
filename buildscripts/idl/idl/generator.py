@@ -314,12 +314,6 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
         self._writer.write_line("usedFields.set(%s);" % (_gen_field_usage_constant(field)))
         self._writer.write_empty_line()
 
-        if field.stability == "unstable":
-            self._writer.write_line(
-                "ctxt.checkAndthrowAPIStrictErrorIfApplicable(%s);" % (bson_element_variable)
-            )
-            self._writer.write_empty_line()
-
     def add_final_checks(self):
         # type: () -> None
         """Output the code to check for missing fields."""
@@ -1548,7 +1542,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 )
             )
             self._writer.write_line("const auto localObject = %s.Obj();" % (element_name))
-            return "%s::parse(tempContext, localObject)" % (ast_type.cpp_type,)
+            return "%s::parse(tempContext, localObject, dctx)" % (ast_type.cpp_type,)
         elif ast_type.deserializer and "BSONElement::" in ast_type.deserializer:
             method_name = writer.get_method_name(ast_type.deserializer)
             return "%s.%s()" % (element_name, method_name)
@@ -1800,7 +1794,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def _gen_variant_deserializer_from_obj(self, field, field_name, bson_element):
         def on_variant_alternative_match(variant_type):
-            value_expr = f"{variant_type.cpp_type}::parse(ctxt, {bson_element})"
+            value_expr = f"{variant_type.cpp_type}::parse(ctxt, {bson_element}, dctx)"
             if field.optional:
                 cpp_type_info = cpp_types.get_cpp_type(field)
                 value_expr = f"{cpp_type_info.get_getter_setter_type()}({value_expr})"
@@ -1897,7 +1891,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if field_type.is_struct:
                 # Do not generate a new parser context, reuse the current one since we are not
                 # entering a nested document.
-                expression = "%s::parse(ctxt, %s)" % (field_type.cpp_type, bson_object)
+                expression = "%s::parse(ctxt, %s, dctx)" % (field_type.cpp_type, bson_object)
             else:
                 method_name = writer.get_method_name_from_qualified_method_name(
                     field_type.deserializer
@@ -1980,7 +1974,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         tenant,
                     )
                 )
-                array_value = "%s::parse(tempContext, sequenceObject)" % (field.type.cpp_type,)
+                array_value = "%s::parse(tempContext, sequenceObject, dctx)" % (
+                    field.type.cpp_type,
+                )
             elif field.type.is_variant:
                 self._writer.write_line("%s _tmp;" % field.type.cpp_type)
                 self._gen_variant_deserializer_from_obj(
@@ -2246,6 +2242,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     True,
                     struct.is_catalog_ctxt,
                 )
+            if field.stability == "unstable":
+                with self._block("if (dctx) {", "}"):
+                    self._writer.write_line(
+                        f"dctx->markUnstableFieldPresent(fieldNames[static_cast<size_t>({_get_field_enum(f)})]);"
+                    )
             self._writer.write_line("return true;")
 
         with self._block("for (const auto& element :%s) {" % (bson_object), "}"):

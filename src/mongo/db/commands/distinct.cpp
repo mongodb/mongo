@@ -132,13 +132,9 @@ CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,
         ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
         : SerializationContext::stateCommandRequest();
 
-    auto distinctCommand = std::make_unique<DistinctCommandRequest>(
-        DistinctCommandRequest::parse(IDLParserContext("distinctCommandRequest",
-                                                       false /* apiStrict */,
-                                                       vts,
-                                                       nss.tenantId(),
-                                                       serializationContext),
-                                      cmdObj));
+    auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
+        IDLParserContext("distinctCommandRequest", vts, nss.tenantId(), serializationContext),
+        cmdObj));
 
     // Forbid users from passing 'querySettings' explicitly.
     uassert(7923000,

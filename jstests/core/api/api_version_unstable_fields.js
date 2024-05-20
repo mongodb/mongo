@@ -17,7 +17,7 @@ const unstableFieldsForAggregate = {
     isMapReduceCommand: false,
     $_requestReshardingResumeToken: false,
     explain: true,
-    runtimeConstants: {a: 1},
+    runtimeConstants: {localNow: new Date(), userRoles: [], clusterTime: Timestamp(1, 1)},
     collectionUUID: UUID(),
 };
 

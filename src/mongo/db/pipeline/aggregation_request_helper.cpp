@@ -91,10 +91,10 @@ AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
                                       bool apiStrict,
                                       const SerializationContext& serializationContext) {
     auto tenantId = vts.has_value() ? boost::make_optional(vts->tenantId()) : boost::none;
-    auto request = AggregateCommandRequest::parse(
-        IDLParserContext("aggregate", apiStrict, vts, std::move(tenantId), serializationContext),
+    auto request = idl::parseCommandDocument<AggregateCommandRequest>(
+        IDLParserContext("aggregate", vts, std::move(tenantId), serializationContext),
+        apiStrict,
         cmdObj);
-
     if (explainVerbosity) {
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "The '" << AggregateCommandRequest::kExplainFieldName

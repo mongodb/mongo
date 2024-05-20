@@ -166,7 +166,6 @@ RepresentativeQueryInfo createRepresentativeInfoFind(OperationContext* opCtx,
                                                      const boost::optional<TenantId>& tenantId) {
     auto findCommandRequest = std::make_unique<FindCommandRequest>(
         FindCommandRequest::parse(IDLParserContext("findCommandRequest",
-                                                   false /* apiStrict */,
                                                    auth::ValidatedTenancyScope::get(opCtx),
                                                    tenantId,
                                                    kSerializationContext),
@@ -219,7 +218,6 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
     const boost::optional<TenantId>& tenantId) {
     auto distinctCommandRequest = std::make_unique<DistinctCommandRequest>(
         DistinctCommandRequest::parse(IDLParserContext("distinctCommandRequest",
-                                                       false /* apiStrict */,
                                                        auth::ValidatedTenancyScope::get(opCtx),
                                                        tenantId,
                                                        kSerializationContext),
@@ -266,7 +264,6 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
                                                     const boost::optional<TenantId>& tenantId) {
     auto aggregateCommandRequest =
         AggregateCommandRequest::parse(IDLParserContext("aggregateCommandRequest",
-                                                        false /* apiStrict */,
                                                         auth::ValidatedTenancyScope::get(opCtx),
                                                         tenantId,
                                                         kSerializationContext),

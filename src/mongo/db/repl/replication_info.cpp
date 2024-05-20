@@ -410,13 +410,13 @@ public:
             opCtx, AdmissionContext::Priority::kExempt);
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
         const auto vts = auth::ValidatedTenancyScope::get(opCtx);
         const auto sc = vts != boost::none
             ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
             : SerializationContext::stateCommandRequest();
-        auto cmd = HelloCommand::parse(
-            IDLParserContext("hello", apiStrict, vts, dbName.tenantId(), sc), cmdObj);
+        const auto apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+        auto cmd = idl::parseCommandDocument<HelloCommand>(
+            IDLParserContext("hello", vts, dbName.tenantId(), sc), apiStrict, cmdObj);
 
         shardWaitInHello.execute(
             [&](const BSONObj& customArgs) { _handleHelloFailPoint(customArgs, opCtx, cmdObj); });

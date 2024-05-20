@@ -45,6 +45,7 @@
 namespace mongo {
 
 namespace {
+
 /**
  * For a vector of BSONType, return a string of comma separated names.
  *
@@ -232,12 +233,6 @@ void IDLParserContext::throwBadType(const BSONElement& element,
               str::stream() << "BSON field '" << path << "' is the wrong type '"
                             << typeName(element.type()) << "', expected types '[" << type_str
                             << "']");
-}
-
-void IDLParserContext::throwAPIStrictErrorIfApplicable(StringData fieldName) const {
-    uasserted(ErrorCodes::APIStrictError,
-              str::stream() << "BSON field '" << getElementPath(fieldName)
-                            << "' is not allowed with apiStrict:true.");
 }
 
 StringData IDLParserContext::checkAndAssertCollectionName(const BSONElement& element,

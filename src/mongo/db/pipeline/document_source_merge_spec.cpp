@@ -68,8 +68,7 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
               *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
         : boost::none;
     auto spec = NamespaceSpec::parse(
-        IDLParserContext(elem.fieldNameStringData(), false /* apiStrict */, vts, tenantId, sc),
-        elem.embeddedObject());
+        IDLParserContext(elem.fieldNameStringData(), vts, tenantId, sc), elem.embeddedObject());
     auto coll = spec.getColl();
     uassert(5786801,
             "{} 'into' field must specify a 'coll' that is not empty, null or undefined"_format(

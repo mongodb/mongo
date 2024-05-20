@@ -52,6 +52,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
@@ -290,23 +291,18 @@ public:
     static constexpr auto kOpMsgDollarDB = "$db"_sd;
     static constexpr auto kOpMsgDollarDBDefault = "admin"_sd;
 
-    explicit IDLParserContext(StringData fieldName) : IDLParserContext{fieldName, false} {}
-
-    IDLParserContext(StringData fieldName, bool apiStrict)
+    explicit IDLParserContext(StringData fieldName)
         : IDLParserContext{fieldName,
-                           apiStrict,
                            boost::optional<auth::ValidatedTenancyScope>{boost::none},
                            boost::optional<TenantId>{boost::none},
                            SerializationContext::stateDefault()} {}
 
     IDLParserContext(StringData fieldName,
-                     bool apiStrict,
                      const boost::optional<auth::ValidatedTenancyScope>& vts,
                      boost::optional<TenantId> tenantId,
                      const SerializationContext& serializationContext)
         : _serializationContext(serializationContext),
           _currentField(fieldName),
-          _apiStrict(apiStrict),
           _tenantId(std::move(tenantId)),
           _predecessor(nullptr),
           _validatedTenancyScope(vts) {}
@@ -325,7 +321,6 @@ public:
                      boost::optional<TenantId> tenantId)
         : _serializationContext(serializationContext),
           _currentField(fieldName),
-          _apiStrict(predecessor->_apiStrict),
           _tenantId(std::move(tenantId)),
           _predecessor(predecessor),
           _validatedTenancyScope(vts) {
@@ -414,23 +409,6 @@ public:
                                               std::span<const BSONType> types) const;
 
     /**
-     * Throw an 'APIStrictError' if the user command has 'apiStrict' field as true.
-     */
-    void checkAndthrowAPIStrictErrorIfApplicable(StringData fieldName) const {
-        if (_apiStrict) {
-            throwAPIStrictErrorIfApplicable(fieldName);
-        }
-    }
-
-    void checkAndthrowAPIStrictErrorIfApplicable(BSONElement element) const {
-        if (_apiStrict) {
-            throwAPIStrictErrorIfApplicable(element.fieldNameStringData());
-        }
-    }
-
-    void throwAPIStrictErrorIfApplicable(StringData fieldName) const;
-
-    /**
      * Check that the collection name in 'element' is valid. Throws an exception if not valid.
      * Returns the collection name otherwise.
      */
@@ -492,9 +470,6 @@ private:
     // Name of the current field that is being parsed.
     const StringData _currentField;
 
-    // Whether the 'apiStrict' parameter is set in the user request.
-    const bool _apiStrict = false;
-
     const boost::optional<TenantId> _tenantId;
 
     // Pointer to a parent parser context.
@@ -503,6 +478,38 @@ private:
     const IDLParserContext* _predecessor;
 
     const boost::optional<auth::ValidatedTenancyScope> _validatedTenancyScope;
+};
+
+/**
+ * This class is used to record information about deserialization which a caller can later use to
+ * perform extra parsing validation.
+ */
+class DeserializationContext {
+public:
+    /**
+     * Marks that an unstable struct field was parsed.
+     *
+     * This does not perform any validation whatsoever, including validating that this field is
+     * unstable or that it had already been marked present.
+     */
+    void markUnstableFieldPresent(StringData unstableFieldName) {
+        _unstableField = unstableFieldName;
+    }
+
+    /**
+     * Throws `ErrorCodes::APIStrictError` if an unstable field was encountered during
+     * deserialization.
+     */
+    void validateApiStrict() {
+        if (_unstableField) {
+            uasserted(ErrorCodes::APIStrictError,
+                      str::stream() << "BSON field '" << *_unstableField
+                                    << "' is not allowed with apiStrict:true.");
+        }
+    }
+
+private:
+    boost::optional<StringData> _unstableField;
 };
 
 /**
@@ -565,5 +572,49 @@ bool parseBoolean(BSONElement element);
  */
 template <typename E>
 constexpr inline size_t idlEnumCount = 0;
+
+namespace idl {
+
+/**
+ * Parse an IDL-defined struct from a document, throwing an exception if any unstable fields are
+ * encountered.
+ */
+template <typename T>
+T parseApiStrict(const IDLParserContext& ctx, const BSONObj& cmdObj) {
+    DeserializationContext dctx;
+    auto cmd = T::parse(ctx, cmdObj, &dctx);
+    dctx.validateApiStrict();
+    return cmd;
+}
+
+/**
+ * Parse an IDL-defined command from a command request document.
+ * If `apiStrict` is true and the command request contains any unstable fields, an
+ * exception will be thrown.
+ */
+template <typename T>
+T parseCommandDocument(const IDLParserContext& ctx, bool apiStrict, const BSONObj& cmdObj) {
+    if (apiStrict) {
+        return parseApiStrict<T>(ctx, cmdObj);
+    } else {
+        return T::parse(ctx, cmdObj);
+    }
+}
+
+/**
+ * Parse an IDL-defined command from a command request document.
+ * If `apiStrict` is true and the command request contains any unstable fields, an
+ * exception will be thrown.
+ */
+template <typename T>
+T parseCommandRequest(const IDLParserContext& ctx, bool apiStrict, const OpMsgRequest& req) {
+    DeserializationContext dctx;
+    auto cmd = T::parse(ctx, req, &dctx);
+    if (apiStrict) {
+        dctx.validateApiStrict();
+    }
+    return cmd;
+}
+}  // namespace idl
 
 }  // namespace mongo

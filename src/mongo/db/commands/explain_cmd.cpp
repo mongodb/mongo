@@ -198,9 +198,9 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
 
     // To enforce API versioning
-    auto cmdObj = ExplainCommandRequest::parse(
-        IDLParserContext(ExplainCommandRequest::kCommandName,
-                         APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+    auto cmdObj = idl::parseCommandRequest<ExplainCommandRequest>(
+        IDLParserContext(ExplainCommandRequest::kCommandName),
+        APIParameters::get(opCtx).getAPIStrict().value_or(false),
         request);
     auto const dbName = cmdObj.getDbName();
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();

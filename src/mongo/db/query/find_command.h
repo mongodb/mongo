@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/find_command_gen.h"
+#include "mongo/idl/idl_parser.h"
 
 namespace mongo {
 
@@ -52,10 +53,12 @@ public:
         _overrideNssOrUUID = NamespaceStringOrUUID{nss};
     }
 
-    static FindCommandRequest parse(const IDLParserContext& ctxt, const BSONObj& bsonObject) {
+    static FindCommandRequest parse(const IDLParserContext& ctxt,
+                                    const BSONObj& bsonObject,
+                                    DeserializationContext* dctx = nullptr) {
         NamespaceString localNS;
         FindCommandRequest object(localNS);
-        object.parseProtected(ctxt, bsonObject);
+        object.parseProtected(ctxt, bsonObject, dctx);
         return object;
     }
 

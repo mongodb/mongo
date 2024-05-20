@@ -204,7 +204,6 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              boost::optional<ExplainOptions::Verbosity> verbosity) {
     auto parsedMr =
         MapReduceCommandRequest::parse(IDLParserContext("mapReduce",
-                                                        false /* apiStrict */,
                                                         auth::ValidatedTenancyScope::get(opCtx),
                                                         dbName.tenantId(),
                                                         SerializationContext::stateDefault()),

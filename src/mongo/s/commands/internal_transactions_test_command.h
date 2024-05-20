@@ -126,8 +126,7 @@ public:
                                 auto findOpMsgRequest = OpMsgRequestBuilder::create(
                                     auth::ValidatedTenancyScope::get(opCtx), dbName, command);
                                 auto findCommand = FindCommandRequest::parse(
-                                    IDLParserContext("FindCommandRequest", false /* apiStrict */),
-                                    findOpMsgRequest.body);
+                                    IDLParserContext("FindCommandRequest"), findOpMsgRequest.body);
 
                                 auto docs = txnClient.exhaustiveFindSync(findCommand);
 

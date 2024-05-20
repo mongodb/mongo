@@ -520,7 +520,6 @@ void ParseAndRunCommand::_parseCommand() {
     CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
 
     _requestArgs = CommonRequestArgs::parse(IDLParserContext("request",
-                                                             false,
                                                              request.validatedTenancyScope,
                                                              request.getValidatedTenantId(),
                                                              request.getSerializationContext()),

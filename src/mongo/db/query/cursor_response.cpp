@@ -208,12 +208,11 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
 
     AnyCursorResponse response;
     try {
-        static constexpr bool apiStrict = false;
         const auto vts = tenantId
             ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
                   *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
             : boost::none;
-        IDLParserContext idlCtx("CursorResponse", apiStrict, vts, tenantId, serializationContext);
+        IDLParserContext idlCtx("CursorResponse", vts, tenantId, serializationContext);
         response = AnyCursorResponse::parse(idlCtx, cmdResponse);
     } catch (const DBException& e) {
         return e.toStatus();

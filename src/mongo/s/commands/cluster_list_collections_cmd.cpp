@@ -254,11 +254,10 @@ public:
         auto* authzSession = AuthorizationSession::get(opCtx->getClient());
         const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
         IDLParserContext ctxt("ListCollection",
-                              apiStrict,
                               auth::ValidatedTenancyScope::get(opCtx),
                               dbName.tenantId(),
                               SerializationContext::stateDefault());
-        auto request = ListCollections::parse(ctxt, cmdObj);
+        auto request = idl::parseCommandDocument<ListCollections>(ctxt, apiStrict, cmdObj);
         return authzSession->checkAuthorizedToListCollections(request).getStatus();
     }
 

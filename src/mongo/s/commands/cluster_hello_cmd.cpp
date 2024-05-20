@@ -167,7 +167,8 @@ public:
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
-        auto cmd = HelloCommand::parse({"hello", apiStrict}, cmdObj);
+        auto cmd =
+            idl::parseCommandDocument<HelloCommand>(IDLParserContext("hello"), apiStrict, cmdObj);
 
         routerWaitInHello.execute([&](const BSONObj& args) {
             if (args.hasElement("delayMillis")) {

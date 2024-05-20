@@ -119,7 +119,9 @@ class EchoCommand final : public TypedCommand<EchoCommand> {
 public:
     struct Request {
         static constexpr auto kCommandName = "echo"_sd;
-        static Request parse(const IDLParserContext&, const OpMsgRequest& request) {
+        static Request parse(const IDLParserContext&,
+                             const OpMsgRequest& request,
+                             DeserializationContext* dctx = nullptr) {
             return Request{request, request.parseDbName()};
         }
 

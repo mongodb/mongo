@@ -320,7 +320,7 @@ public:
             : SerializationContext::stateCommandRequest();
 
         auto request = CountCommandRequest::parse(
-            IDLParserContext("count", false /* apiStrict */, vts, dbName.tenantId(), sc), cmdObj);
+            IDLParserContext("count", vts, dbName.tenantId(), sc), cmdObj);
         auto curOp = CurOp::get(opCtx);
         curOp->beginQueryPlanningTimer();
         if (shouldDoFLERewrite(request)) {

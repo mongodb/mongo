@@ -207,10 +207,10 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
 
     // To enforce API versioning
-    auto cmdObj = ExplainCommandRequest::parse(
-        IDLParserContext(ExplainCommandRequest::kCommandName,
-                         APIParameters::get(opCtx).getAPIStrict().value_or(false)),
-        request.body);
+
+    const auto apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+    auto cmdObj = idl::parseCommandRequest<ExplainCommandRequest>(
+        IDLParserContext(ExplainCommandRequest::kCommandName), apiStrict, request);
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
     // This is the nested command which we are explaining. We need to propagate generic
     // arguments into the inner command since it is what is passed to the virtual

@@ -319,7 +319,11 @@ class _StructTypeInfo(StructTypeInfoBase):
         return MethodInfo(
             class_name,
             "parseSharingOwnership",
-            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            [
+                "const IDLParserContext& ctxt",
+                "const BSONObj& bsonObject",
+                "DeserializationContext* dctx = nullptr",
+            ],
             class_name,
             static=True,
             desc_for_comment=comment,
@@ -334,7 +338,11 @@ class _StructTypeInfo(StructTypeInfoBase):
         return MethodInfo(
             class_name,
             "parseOwned",
-            ["const IDLParserContext& ctxt", "BSONObj&& bsonObject"],
+            [
+                "const IDLParserContext& ctxt",
+                "BSONObj&& bsonObject",
+                "DeserializationContext* dctx = nullptr",
+            ],
             class_name,
             static=True,
             desc_for_comment=comment,
@@ -352,7 +360,11 @@ class _StructTypeInfo(StructTypeInfoBase):
         return MethodInfo(
             class_name,
             "parse",
-            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            [
+                "const IDLParserContext& ctxt",
+                "const BSONObj& bsonObject",
+                "DeserializationContext* dctx = nullptr",
+            ],
             class_name,
             static=True,
             desc_for_comment=comment,
@@ -363,7 +375,11 @@ class _StructTypeInfo(StructTypeInfoBase):
         return MethodInfo(
             common.title_case(self._struct.cpp_name),
             "parseProtected",
-            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            [
+                "const IDLParserContext& ctxt",
+                "const BSONObj& bsonObject",
+                "DeserializationContext* dctx = nullptr",
+            ],
             "void",
         )
 
@@ -440,7 +456,11 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
         return MethodInfo(
             class_name,
             "parse",
-            ["const IDLParserContext& ctxt", "const OpMsgRequest& request"],
+            [
+                "const IDLParserContext& ctxt",
+                "const OpMsgRequest& request",
+                "DeserializationContext* dctx = nullptr",
+            ],
             class_name,
             static=True,
         )
@@ -450,7 +470,11 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
         return MethodInfo(
             common.title_case(self._struct.cpp_name),
             "parseProtected",
-            ["const IDLParserContext& ctxt", "const OpMsgRequest& request"],
+            [
+                "const IDLParserContext& ctxt",
+                "const OpMsgRequest& request",
+                "DeserializationContext* dctx = nullptr",
+            ],
             "void",
         )
 
@@ -559,7 +583,11 @@ class _CommandFromType(_CommandBaseTypeInfo):
         return MethodInfo(
             common.title_case(self._struct.cpp_name),
             "parseProtected",
-            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            [
+                "const IDLParserContext& ctxt",
+                "const BSONObj& bsonObject",
+                "DeserializationContext* dctx = nullptr",
+            ],
             "void",
         )
 
@@ -640,7 +668,11 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
         return MethodInfo(
             common.title_case(self._struct.cpp_name),
             "parseProtected",
-            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            [
+                "const IDLParserContext& ctxt",
+                "const BSONObj& bsonObject",
+                "DeserializationContext* dctx = nullptr",
+            ],
             "void",
         )
 
@@ -744,7 +776,11 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
         return MethodInfo(
             common.title_case(self._struct.cpp_name),
             "parseProtected",
-            ["const IDLParserContext& ctxt", "const BSONObj& bsonObject"],
+            [
+                "const IDLParserContext& ctxt",
+                "const BSONObj& bsonObject",
+                "DeserializationContext* dctx = nullptr",
+            ],
             "void",
         )
 

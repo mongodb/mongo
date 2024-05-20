@@ -502,8 +502,7 @@ TEST_F(DocumentSourceMergeCursorsMultiTenancyTest, ShouldBeAbleToParseSerialized
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     const auto newParams = AsyncResultsMergerParams::parse(
-        IDLParserContext(
-            "$mergeCursors test", false, vts, tenantId, SerializationContext::stateDefault()),
+        IDLParserContext("$mergeCursors test", vts, tenantId, SerializationContext::stateDefault()),
         newSpec["$mergeCursors"].Obj());
 
     // Check that the namespace contains the tenantid prefix.
@@ -562,8 +561,7 @@ TEST_F(DocumentSourceMergeCursorsMultiTenancyAndFeatureFlagTest,
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     const auto newParams = AsyncResultsMergerParams::parse(
-        IDLParserContext(
-            "$mergeCursors test", false, vts, tenantId, SerializationContext::stateDefault()),
+        IDLParserContext("$mergeCursors test", vts, tenantId, SerializationContext::stateDefault()),
         newSpec["$mergeCursors"].Obj());
 
     // Check that the namespace doesn't contain the tenantid prefix.

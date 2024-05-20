@@ -66,9 +66,8 @@ GetMoreCommandRequest createGetMoreCommandRequest(
 }
 
 std::unique_ptr<GetMoreCommandRequest> parseFromBSON(const BSONObj& cmdObj) {
-    static constexpr bool apiStrict = false;
     return std::make_unique<GetMoreCommandRequest>(
-        GetMoreCommandRequest::parse(IDLParserContext("GetMoreCommandRequest", apiStrict), cmdObj));
+        GetMoreCommandRequest::parse(IDLParserContext("GetMoreCommandRequest"), cmdObj));
 }
 
 TEST(GetMoreRequestTest, ShouldParseAllKnownOptions) {

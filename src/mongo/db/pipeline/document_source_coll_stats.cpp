@@ -84,7 +84,6 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
         : boost::none;
     auto spec = DocumentSourceCollStatsSpec::parse(
         IDLParserContext(kStageName,
-                         false /* apiStrict */,
                          vts,
                          tenantId,
                          SerializationContext::stateCommandReply(pExpCtx->serializationCtxt)),

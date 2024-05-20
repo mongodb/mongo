@@ -2627,7 +2627,7 @@ TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
 
     auto opMsg = makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy);
     IDLParserContext ctxt(
-        "root", false, opMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
+        "root", opMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
 
     auto testStruct = BasicConcatenateWithDbCommand::parse(ctxt, opMsg);
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
@@ -2785,7 +2785,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
 
     const auto opMsg = makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy);
     IDLParserContext ctxt(
-        "root", false, opMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
+        "root", opMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
 
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, opMsg);
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
@@ -2872,7 +2872,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
 
     const auto opMsg = makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy);
     IDLParserContext ctxt(
-        "root", false, opMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
+        "root", opMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
 
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, opMsg);
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
@@ -4458,11 +4458,8 @@ TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
     const auto otherTenantId = TenantId(OID::gen());
     const auto otherOpMsg =
         makeOMRWithTenant(testDoc, otherTenantId, VTS::TenantProtocol::kDefault);
-    auto ctxt = IDLParserContext("root",
-                                 false,
-                                 otherOpMsg.validatedTenancyScope,
-                                 tenantId,
-                                 SerializationContext::stateDefault());
+    auto ctxt = IDLParserContext(
+        "root", otherOpMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
     ASSERT_THROWS_CODE(CommandWithNamespaceStruct::parse(ctxt, otherOpMsg), DBException, 8423379);
 }
 
@@ -4556,8 +4553,7 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
                     VTS::TenantProtocol::kDefault,
                     auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
             }
-            IDLParserContext ctxt(
-                "root", false, vts, tenantId, SerializationContext::stateDefault());
+            IDLParserContext ctxt("root", vts, tenantId, SerializationContext::stateDefault());
 
             const std::string ns1 = "db.coll1";
             const std::string ns2 = "a.b";
@@ -4620,8 +4616,7 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
                     VTS::TenantProtocol::kDefault,
                     auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
             }
-            IDLParserContext ctxt(
-                "root", false, vts, tenantId, SerializationContext::stateDefault());
+            IDLParserContext ctxt("root", vts, tenantId, SerializationContext::stateDefault());
 
             const std::string ns1 = "db.coll1";
             const std::string ns2 = "a.b";

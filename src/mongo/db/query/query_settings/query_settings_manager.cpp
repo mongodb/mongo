@@ -270,7 +270,6 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
     auto newSettings = QuerySettingsClusterParameterValue::parse(
         IDLParserContext("querySettingsParameterValue",
-                         false /* apiStrict */,
                          boost::none /* vts */,
                          tenantId,
                          SerializationContext::stateDefault()),

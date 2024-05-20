@@ -431,8 +431,7 @@ TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithMetrics) {
     BSONObj testDoc = BSON("_id" << 1);
     BSONObj metricsDoc = basicMetricsObj;
 
-    static constexpr bool apiStrict = false;
-    auto metrics = CursorMetrics::parse(IDLParserContext("CursorMetrics", apiStrict), metricsDoc);
+    auto metrics = CursorMetrics::parse(IDLParserContext("CursorMetrics"), metricsDoc);
 
     BSONObj expectedBody =
         BSON("cursor" << BSON("firstBatch" << BSON_ARRAY(testDoc) << "id" << CursorId(123) << "ns"

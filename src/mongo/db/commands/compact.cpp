@@ -108,8 +108,8 @@ public:
             ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
             : SerializationContext::stateCommandRequest();
 
-        auto params = CompactCommand::parse(
-            IDLParserContext("compact", false /*apiStrict*/, vts, dbName.tenantId(), sc), cmdObj);
+        auto params =
+            CompactCommand::parse(IDLParserContext("compact", vts, dbName.tenantId(), sc), cmdObj);
 
         _assertCanRunCompact(opCtx, params);
 

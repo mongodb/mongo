@@ -968,7 +968,6 @@ public:
 
             // We need to copy the serialization context from the request to the reply object
             CursorGetMoreReply::parse(IDLParserContext("CursorGetMoreReply",
-                                                       false /* apiStrict */,
                                                        auth::ValidatedTenancyScope::get(opCtx),
                                                        tenantId,
                                                        SerializationContext::stateCommandReply(

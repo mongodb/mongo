@@ -50,7 +50,7 @@ IndexHintSpecs parse(boost::optional<TenantId> tenantId,
     switch (element.type()) {
         case BSONType::Object: {
             IDLParserContext parserContext(
-                "IndexHintSpec", false /*apiStrict=*/, boost::none /*vts=*/, tenantId, context);
+                "IndexHintSpec", boost::none /*vts=*/, tenantId, context);
             return {IndexHintSpec::parse(parserContext, element.Obj())};
         }
         case BSONType::Array: {
@@ -59,7 +59,7 @@ IndexHintSpecs parse(boost::optional<TenantId> tenantId,
             result.reserve(elements.size());
             for (const auto& element : elements) {
                 IDLParserContext parserContext(
-                    "IndexHintSpec", false /*apiStrict=*/, boost::none /*vts=*/, tenantId, context);
+                    "IndexHintSpec", boost::none /*vts=*/, tenantId, context);
                 result.emplace_back(IndexHintSpec::parse(parserContext, element.Obj()));
             }
             return result;

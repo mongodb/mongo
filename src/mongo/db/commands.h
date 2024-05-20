@@ -1265,13 +1265,14 @@ private:
     static RequestType _parseRequest(OperationContext* opCtx,
                                      const DatabaseName& dbName,
                                      const BSONObj& cmdObj) {
-        return RequestType::parse(
-            IDLParserContext(RequestType::kCommandName,
-                             APIParameters::get(opCtx).getAPIStrict().value_or(false),
-                             auth::ValidatedTenancyScope::get(opCtx),
-                             dbName.tenantId(),
-                             SerializationContext::stateDefault()),
-            cmdObj);
+
+        bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+        auto ctx = IDLParserContext(RequestType::kCommandName,
+                                    auth::ValidatedTenancyScope::get(opCtx),
+                                    dbName.tenantId(),
+                                    SerializationContext::stateDefault());
+
+        return idl::parseCommandDocument<RequestType>(ctx, apiStrict, cmdObj);
     }
 
     RequestType _request;
@@ -1372,7 +1373,6 @@ private:
     static RequestType _parseRequest(OperationContext* opCtx,
                                      const Command* command,
                                      const OpMsgRequest& opMsgRequest) {
-
         bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
         // A command with 'apiStrict' cannot be invoked with alias.
@@ -1384,7 +1384,8 @@ private:
                                     << command->getName() << "' instead");
         }
 
-        return RequestType::parse(IDLParserContext(command->getName(), apiStrict), opMsgRequest);
+        return idl::parseCommandRequest<RequestType>(
+            IDLParserContext(command->getName()), apiStrict, opMsgRequest);
     }
 
     RequestType _request;

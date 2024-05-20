@@ -375,7 +375,6 @@ public:
                     firstBatch.push_back(ListIndexesReplyItem::parse(
                         IDLParserContext(
                             "ListIndexesReplyItem",
-                            false /* apiStrict */,
                             auth::ValidatedTenancyScope::get(opCtx),
                             nss.tenantId(),
                             SerializationContext::stateCommandReply(serializationContext)),
