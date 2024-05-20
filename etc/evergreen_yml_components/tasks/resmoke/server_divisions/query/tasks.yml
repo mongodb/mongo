@@ -981,7 +981,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *task_template
-    name: search_end_to_end_sharded_cluster
+    name: search_end_to_end_single_node
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
@@ -995,7 +995,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *task_template
-    name: search_end_to_end_single_node
+    name: search_end_to_end_sharded_cluster
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
