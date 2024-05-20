@@ -4203,7 +4203,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::isMemberImpl(value::Typ
         if (arrSet->size() == 0) {
             return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
         }
-        auto values = arrSet->values();
+        auto& values = arrSet->values();
         if (collator != nullptr) {
             // An ArraySet with a collation can lose information about its members that would be
             // necessary to answer membership queries using a different collation. We require that
