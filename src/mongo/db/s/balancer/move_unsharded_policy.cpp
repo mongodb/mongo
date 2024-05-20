@@ -402,6 +402,14 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
             return result;
         }
 
+        // Skip random moveCollections if at least one shard is draining, so we don't starve it of
+        // available shards to migrate data to.
+        auto drainingShardIter = std::find_if(
+            allShards.begin(), allShards.end(), [](const auto& stat) { return stat.isDraining; });
+        if (drainingShardIter != allShards.end()) {
+            return result;
+        }
+
         // Choosing to move a collection between shards removes them from the available shards,
         // which prevents them from being chosen for a random chunk migration, so allow skipping a
         // random moveCollection to avoid "starving" random chunk migrations with few shards. Note
