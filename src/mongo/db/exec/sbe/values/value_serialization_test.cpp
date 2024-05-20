@@ -517,4 +517,17 @@ TEST_F(ValueSerializeForKeyString, RoundtripWideRow) {
     }
     runTest(row);
 }
+
+// Test that roundtripping through KeyString works for ObjectIdType: ObjectId; bsonObjectId.
+TEST_F(ValueSerializeForKeyString, RoundtripObjectIdType) {
+    auto [objectIdTag, objectIdVal] = value::makeNewObjectId();
+
+    auto oid = OID::gen();
+    auto obj = BSON("" << oid);
+    auto oidStorage = obj.firstElement().value();
+
+    sbe::value::ValueGuard testDataGuard{objectIdTag, objectIdVal};
+    runTest({{objectIdTag, objectIdVal},
+             {value::TypeTags::bsonObjectId, value::bitcastFrom<const char*>(oidStorage)}});
+}
 }  // namespace mongo::sbe
