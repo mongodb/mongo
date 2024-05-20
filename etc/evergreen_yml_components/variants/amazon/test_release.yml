@@ -443,6 +443,7 @@ buildvariants:
           - amazon2-latest-large
       - name: streams
       - name: streams_kafka
+      - name: streams_kafka_gwproxy
 
   - <<: *enterprise-amazon2023-arm64-template
     name: enterprise-amazon2023-arm64-fuzzers

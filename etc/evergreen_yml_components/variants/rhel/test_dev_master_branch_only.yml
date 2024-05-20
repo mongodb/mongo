@@ -1070,6 +1070,7 @@ buildvariants:
       - name: .shard_split
       - name: streams
       - name: streams_kafka
+      - name: streams_kafka_gwproxy
       - name: vector_search
       - name: vector_search_auth
       - name: vector_search_ssl
