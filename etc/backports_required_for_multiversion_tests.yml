@@ -643,6 +643,8 @@ last-continuous:
     ticket: SERVER-89342
   - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
     ticket: SERVER-84623
+  - test_file: jstests/aggregation/group_by_objectid.js
+    ticket: SERVER-90173
   suites: null
 last-lts:
   all:
@@ -1344,4 +1346,6 @@ last-lts:
     ticket: SERVER-84623
   - test_file: jstests/sharding/direct_shard_connection_auth.js
     ticket: SERVER-89994
+  - test_file: jstests/aggregation/group_by_objectid.js
+    ticket: SERVER-90173
   suites: null
