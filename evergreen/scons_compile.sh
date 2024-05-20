@@ -126,6 +126,16 @@ if [ -n "${build_patch_id}" ]; then
   echo "Could not skip ${task_name} compile, compiling as normal"
 fi
 
+# --build-mongot is a compile flag used by the evergreen build variants that run end-to-end search
+# suites, as it downloads the necessary mongot binary.
+if [ "${build_mongot}" = "true" ]; then
+  if [ "${download_mongot_release}" = "true" ]; then
+    extra_args="$extra_args --build-mongot=release"
+  else
+    extra_args="$extra_args --build-mongot=latest"
+  fi
+fi
+
 set -o pipefail
 
 # Bind mount a new tmp directory to the real /tmp to circumvent "out of disk space" errors on ARM LTO compiles

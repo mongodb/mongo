@@ -848,7 +848,8 @@ add_option(
 --build-mongot is a compile flag used by the evergreen build variants that run end-to-end search
 suites, as it downloads the necessary mongot binary.
 '''
-add_option('build-mongot', action='store_true')
+add_option('build-mongot', choices=['latest', 'release'], default='latest', type='choice',
+           help='Installs the appropriate mongot for your architecture')
 
 try:
     with open("version.json", "r") as version_fp:
@@ -6662,8 +6663,13 @@ search suites. It downloads & bundles mongot with the other mongo binaries. Thes
 available to the build variants in question when the binaries are extracted via archive_dist_test
 during compilation.
 """
-
 if env.GetOption('build-mongot'):
+
+    # Can be 'latest' or 'release':
+    #  - 'latest' describes the binaries created by the most recent commit merged to 10gen/mongot.
+    #  - 'release' refers to the mongot binaries running in atlas prod.
+    binary_ver_str = env.GetOption('build-mongot')
+
     platform_str = ''
     if mongo_platform.is_running_os('linux'):
         platform_str = 'linux'
@@ -6687,7 +6693,7 @@ if env.GetOption('build-mongot'):
 
     env.Command(
         target=["mongot-localdev"], source=db_contrib_tool, action=[
-            f"$SOURCE setup-mongot-repro-env --platform={platform_str} --architecture={arch_str}",
+            f"$SOURCE setup-mongot-repro-env {binary_ver_str} --platform={platform_str} --architecture={arch_str}",
             f"mv build/mongot-localdev mongot-localdev"
         ], ENV=os.environ)
 
