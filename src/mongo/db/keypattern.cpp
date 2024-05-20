@@ -102,7 +102,7 @@ BSONObj KeyPattern::extendRangeBound(const BSONObj& bound, bool makeUpperInclusi
     while (pat.more()) {
         BSONElement patElt = pat.next();
         // for non 1/-1 field values, like {a : "hashed"}, treat order as ascending
-        int order = patElt.isNumber() ? patElt.numberInt() : 1;
+        int order = patElt.isNumber() ? patElt.safeNumberInt() : 1;
         // flip the order semantics if this is an upper bound
         if (makeUpperInclusive)
             order *= -1;
