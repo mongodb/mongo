@@ -52,7 +52,7 @@ export var MetadataConsistencyChecker = (function() {
             const inconsistencies = adminDB.checkMetadataConsistency(checkOptions).toArray();
             if (TestData.transitioningConfigShard && inconsistencies.length === 1 &&
                 inconsistencies[0].type === "MissingLocalCollection" &&
-                inconsistencies[0].shard === "config") {
+                (inconsistencies[0].details && inconsistencies[0].details.shard === "config")) {
                 // There is currently a known bug that can lead to this inconsistency on the config
                 // server. Ignore it temporarily to minimize evergreen redness while we work on the
                 // fix.
