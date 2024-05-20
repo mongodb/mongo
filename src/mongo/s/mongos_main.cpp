@@ -1018,8 +1018,6 @@ std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongos
 }
 
 ExitCode main(ServiceContext* serviceContext) {
-    serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds{10}));
-
     // We either have a setting where all processes are in localhost or none are
     const auto& configServers = mongosGlobalParams.configdbs.getServers();
     invariant(!configServers.empty());
@@ -1091,6 +1089,8 @@ ExitCode mongos_main(int argc, char* argv[]) {
         return ExitCode::abrupt;
     }
 
+    startSignalProcessingThread();
+
     try {
         setGlobalServiceContext(ServiceContext::make());
     } catch (...) {
@@ -1104,6 +1104,9 @@ ExitCode mongos_main(int argc, char* argv[]) {
     }
 
     const auto service = getGlobalServiceContext();
+    // This FastClockSourceFactory creates a background thread ClockSource. It must be set
+    // on ServiceContext before any other threads can get and use it.
+    service->setFastClockSource(FastClockSourceFactory::create(Milliseconds{10}));
 
     // Attempt to rotate the audit log pre-emptively on startup to avoid any potential conflicts
     // with existing log state. If this rotation fails, then exit nicely with failure
@@ -1131,8 +1134,6 @@ ExitCode mongos_main(int argc, char* argv[]) {
     try {
         if (!initialize_server_global_state::checkSocketPath())
             return ExitCode::abrupt;
-
-        startSignalProcessingThread();
 
         startAllocatorThread();
 
