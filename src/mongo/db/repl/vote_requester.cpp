@@ -107,8 +107,8 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
         requestVotesCmdBuilder.append("configTerm", _rsConfig.getConfigTerm());
     }
 
-    _lastWrittenOpTime.append(&requestVotesCmdBuilder, "lastWrittenOpTime");
-    _lastAppliedOpTime.append(&requestVotesCmdBuilder, "lastAppliedOpTime");
+    _lastWrittenOpTime.append("lastWrittenOpTime", &requestVotesCmdBuilder);
+    _lastAppliedOpTime.append("lastAppliedOpTime", &requestVotesCmdBuilder);
 
     const BSONObj requestVotesCmd = requestVotesCmdBuilder.obj();
 

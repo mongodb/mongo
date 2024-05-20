@@ -76,13 +76,13 @@ public:
             const auto vcConfigTimeTs = vcTime.configTime().asTimestamp();
             return mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
         }();
-        configOpTime.append(&result, "lastSeenConfigServerOpTime");
+        configOpTime.append("lastSeenConfigServerOpTime", &result);
 
         const auto topologyOpTime = [&]() {
             const auto vcTopologyTimeTs = vcTime.topologyTime().asTimestamp();
             return mongo::repl::OpTime(vcTopologyTimeTs, mongo::repl::OpTime::kUninitializedTerm);
         }();
-        topologyOpTime.append(&result, "lastSeenTopologyOpTime");
+        topologyOpTime.append("lastSeenTopologyOpTime", &result);
 
         const long long maxChunkSizeInBytes =
             grid->getBalancerConfiguration()->getMaxChunkSizeBytes();

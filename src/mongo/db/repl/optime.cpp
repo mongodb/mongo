@@ -56,8 +56,8 @@ OpTime OpTime::max() {
     return OpTime(Timestamp::max(), std::numeric_limits<long long>::max());
 }
 
-void OpTime::append(BSONObjBuilder* builder, const std::string& subObjName) const {
-    BSONObjBuilder opTimeBuilder(builder->subobjStart(subObjName));
+void OpTime::append(StringData fieldName, BSONObjBuilder* builder) const {
+    BSONObjBuilder opTimeBuilder(builder->subobjStart(fieldName));
     opTimeBuilder.append(kTimestampFieldName, _timestamp);
     opTimeBuilder.append(kTermFieldName, _term);
     opTimeBuilder.doneFast();
@@ -83,6 +83,10 @@ BSONObj OpTime::toBSON() const {
 // static
 OpTime OpTime::parse(const BSONObj& obj) {
     return uassertStatusOK(parseFromOplogEntry(obj));
+}
+
+OpTime OpTime::parse(const BSONElement& elem) {
+    return OpTime::parse(elem.Obj());
 }
 
 std::string OpTime::toString() const {

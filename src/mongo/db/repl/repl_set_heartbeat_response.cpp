@@ -100,15 +100,15 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
         builder->append(kPrimaryIdFieldName, _primaryId);
     }
     if (_appliedOpTimeSet) {
-        _appliedOpTime.append(builder, kAppliedOpTimeFieldName);
+        _appliedOpTime.append(kAppliedOpTimeFieldName, builder);
         builder->appendDate(kAppliedWallTimeFieldName, _appliedWallTime);
     }
     if (_writtenOpTimeSet) {
-        _writtenOpTime.append(builder, kWrittenOpTimeFieldName);
+        _writtenOpTime.append(kWrittenOpTimeFieldName, builder);
         builder->appendDate(kWrittenWallTimeFieldName, _writtenWallTime);
     }
     if (_durableOpTimeSet) {
-        _durableOpTime.append(builder, kDurableOpTimeFieldName);
+        _durableOpTime.append(kDurableOpTimeFieldName, builder);
         builder->appendDate(kDurableWallTimeFieldName, _durableWallTime);
     }
     if (_electableSet) {

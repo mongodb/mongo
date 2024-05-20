@@ -96,7 +96,7 @@ BSONObj BatchedCommandResponse::toBSON() const {
 
     if (_isLastOpSet) {
         if (_lastOp.getTerm() != repl::OpTime::kUninitializedTerm) {
-            _lastOp.append(&builder, "opTime");
+            _lastOp.append("opTime", &builder);
         } else {
             builder.append("opTime", _lastOp.getTimestamp());
         }
