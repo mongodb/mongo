@@ -1033,8 +1033,6 @@ void disableMongosTHPUnderTestingEnvironment() {
 }
 
 ExitCode main(ServiceContext* serviceContext) {
-    serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds{10}));
-
     // We either have a setting where all processes are in localhost or none are
     const auto& configServers = serverGlobalParams.configdbs.getServers();
     invariant(!configServers.empty());
@@ -1106,6 +1104,8 @@ ExitCode mongos_main(int argc, char* argv[]) {
         return ExitCode::abrupt;
     }
 
+    startSignalProcessingThread();
+
     disableMongosTHPUnderTestingEnvironment();
 
     try {
@@ -1121,6 +1121,9 @@ ExitCode mongos_main(int argc, char* argv[]) {
     }
 
     const auto service = getGlobalServiceContext();
+    // This FastClockSourceFactory creates a background thread ClockSource. It must be set
+    // on ServiceContext before any other threads can get and use it.
+    service->setFastClockSource(FastClockSourceFactory::create(Milliseconds{10}));
 
     if (audit::setAuditInterface) {
         audit::setAuditInterface(service);
@@ -1153,8 +1156,6 @@ ExitCode mongos_main(int argc, char* argv[]) {
     try {
         if (!initialize_server_global_state::checkSocketPath())
             return ExitCode::abrupt;
-
-        startSignalProcessingThread();
 
         return main(service);
     } catch (const DBException& e) {
