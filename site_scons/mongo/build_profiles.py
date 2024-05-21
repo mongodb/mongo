@@ -37,6 +37,7 @@ class BuildProfile:
     disable_warnings_as_errors: Optional[List]
     release: str
     jlink: float
+    libunwind: str
 
 
 def get_build_profile(type):
@@ -78,6 +79,7 @@ LINUX_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build has fast runtime speed & fast build time at the cost of debuggability.
     BuildProfileType.FAST: BuildProfile(
@@ -98,6 +100,7 @@ LINUX_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build has fast runtime speed & debuggability at the cost of build time.
     BuildProfileType.OPT: BuildProfile(
@@ -118,6 +121,7 @@ LINUX_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build leverages santizers & is the suggested build profile to use for development.
     BuildProfileType.SAN: BuildProfile(
@@ -138,6 +142,7 @@ LINUX_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build leverages thread sanitizers.
     BuildProfileType.TSAN: BuildProfile(
@@ -158,6 +163,7 @@ LINUX_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="off",
     ),
     # These options are the preferred settings for compiledb to generating compile_commands.json
     BuildProfileType.COMPILE_DB: BuildProfile(
@@ -178,6 +184,7 @@ LINUX_BUILD_PROFILES = {
         disable_warnings_as_errors=["source"],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # These options were the default settings before implementing build profiles.
     BuildProfileType.RELEASE: BuildProfile(
@@ -197,6 +204,7 @@ LINUX_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="on",
         jlink=0.01,
+        libunwind="auto",
     ),
 }
 
@@ -217,6 +225,7 @@ WINDOWS_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build has fast runtime speed & fast build time at the cost of debuggability.
     BuildProfileType.FAST: BuildProfile(
@@ -236,6 +245,7 @@ WINDOWS_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build has fast runtime speed & debuggability at the cost of build time.
     BuildProfileType.OPT: BuildProfile(
@@ -255,6 +265,7 @@ WINDOWS_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build leverages santizers & is the suggested build profile to use for development.
     BuildProfileType.SAN: None,
@@ -278,6 +289,7 @@ WINDOWS_BUILD_PROFILES = {
         disable_warnings_as_errors=["source"],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # These options were the default settings before implementing build profiles.
     BuildProfileType.RELEASE: BuildProfile(
@@ -295,6 +307,7 @@ WINDOWS_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="on",
         jlink=0.01,
+        libunwind="auto",
     ),
 }
 
@@ -315,6 +328,7 @@ MACOS_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build has fast runtime speed & fast build time at the cost of debuggability.
     BuildProfileType.FAST: BuildProfile(
@@ -335,6 +349,7 @@ MACOS_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build has fast runtime speed & debuggability at the cost of build time.
     BuildProfileType.OPT: BuildProfile(
@@ -355,6 +370,7 @@ MACOS_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build leverages santizers & is the suggested build profile to use for development.
     BuildProfileType.SAN: None,
@@ -379,6 +395,7 @@ MACOS_BUILD_PROFILES = {
         disable_warnings_as_errors=["source"],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # These options were the default settings before implementing build profiles.
     BuildProfileType.RELEASE: BuildProfile(
@@ -398,6 +415,7 @@ MACOS_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="on",
         jlink=0.01,
+        libunwind="auto",
     ),
 }
 
@@ -418,6 +436,7 @@ MACOS_ARM_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build has fast runtime speed & fast build time at the cost of debuggability.
     BuildProfileType.FAST: BuildProfile(
@@ -438,6 +457,7 @@ MACOS_ARM_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build has fast runtime speed & debuggability at the cost of build time.
     BuildProfileType.OPT: BuildProfile(
@@ -458,6 +478,7 @@ MACOS_ARM_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # This build leverages santizers & is the suggested build profile to use for development.
     BuildProfileType.SAN: None,
@@ -482,6 +503,7 @@ MACOS_ARM_BUILD_PROFILES = {
         disable_warnings_as_errors=["source"],
         release="off",
         jlink=0.99,
+        libunwind="auto",
     ),
     # These options were the default settings before implementing build profiles.
     BuildProfileType.RELEASE: BuildProfile(
@@ -501,5 +523,6 @@ MACOS_ARM_BUILD_PROFILES = {
         disable_warnings_as_errors=[],
         release="on",
         jlink=0.01,
+        libunwind="auto",
     ),
 }

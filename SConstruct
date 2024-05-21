@@ -764,7 +764,7 @@ add_option(
     "use-libunwind",
     choices=["on", "off", "auto"],
     const="on",
-    default="auto",
+    default=build_profile.libunwind,
     help="Enable libunwind for backtraces",
     nargs="?",
     type="choice",
