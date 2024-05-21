@@ -30,6 +30,7 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/environment.h"
@@ -139,15 +140,25 @@ TEST_F(MongodOptionsTest, RouterAndConfigServerWithCustomPorts) {
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 }
 
-TEST_F(MongodOptionsTest, MagicRestoreDefaultPort) {
+TEST_F(MongodOptionsTest, MagicRestoreNoReplicaSet) {
     env.setMagicRestore();
+    auto status = storeMongodOptions(env);
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(status.reason(), "Cannot start magic restore without --replSet");
+
+    env.setReplicaSet("rsName").setMagicRestore();
+    ASSERT_OK(storeMongodOptions(env));
+}
+
+TEST_F(MongodOptionsTest, MagicRestoreDefaultPort) {
+    env.setReplicaSet("rsName").setMagicRestore();
     ASSERT_OK(storeMongodOptions(env));
 
     ASSERT_EQ(serverGlobalParams.port, ServerGlobalParams::DefaultMagicRestorePort);
 }
 
 TEST_F(MongodOptionsTest, MagicRestoreUseProvidedPort) {
-    env.setMagicRestore().setPort(123);
+    env.setReplicaSet("rsName").setMagicRestore().setPort(123);
     ASSERT_OK(storeMongodOptions(env));
 
     ASSERT_EQ(serverGlobalParams.port, 123);

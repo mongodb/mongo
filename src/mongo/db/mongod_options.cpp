@@ -583,14 +583,6 @@ Status storeMongodOptions(const moe::Environment& params) {
                           str::stream() << "Cannot specify both --repair and --restore");
         }
     }
-    if (params.count("magicRestore") && params["magicRestore"].as<bool>() == true) {
-        storageGlobalParams.magicRestore = 1;
-
-        // Use an ephemeral port so that users don't connect to a node that is being restored.
-        if (!params.count("net.port")) {
-            serverGlobalParams.port = ServerGlobalParams::DefaultMagicRestorePort;
-        }
-    }
 
     if (params.count("maintenanceMode") &&
         gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
@@ -633,6 +625,19 @@ Status storeMongodOptions(const moe::Environment& params) {
         // WT. Non-WT storage engines will continue to perform regular capped collection handling
         // for the oplog collection, regardless of this parameter setting.
         storageGlobalParams.allowOplogTruncation = false;
+    }
+
+    if (params.count("magicRestore") && params["magicRestore"].as<bool>() == true) {
+        if (!replSettings.isReplSet()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Cannot start magic restore without --replSet.");
+        }
+        storageGlobalParams.magicRestore = 1;
+
+        // Use an ephemeral port so that users don't connect to a node that is being restored.
+        if (!params.count("net.port")) {
+            serverGlobalParams.port = ServerGlobalParams::DefaultMagicRestorePort;
+        }
     }
 
     serverGlobalParams.enableMajorityReadConcern = true;

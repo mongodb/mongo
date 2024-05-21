@@ -36,6 +36,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
@@ -114,13 +115,16 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     NoReadTimestamp no_timestamp = NoReadTimestamp::kFalse;
     if (allowUntimestampedWrite != RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce) {
         no_timestamp = NoReadTimestamp::kTrue;
-    } else if (MONGO_unlikely(gAllowUnsafeUntimestampedWrites &&
-                              getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
-                              !repl::ReplSettings::shouldRecoverFromOplogAsStandalone())) {
+    } else if (MONGO_unlikely((gAllowUnsafeUntimestampedWrites &&
+                               getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
+                               !repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) ||
+                              storageGlobalParams.magicRestore)) {
         // We can safely ignore setting this configuration option when recovering from the
         // oplog as standalone because:
         // 1. Replaying oplog entries write with a timestamp.
         // 2. The instance is put in read-only mode after oplog application has finished.
+        // Magic restore may need to perform untimestamped writes on timestamped tables as a part of
+        // the server automated restore procedure.
         no_timestamp = NoReadTimestamp::kTrue;
     }
 

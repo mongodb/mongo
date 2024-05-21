@@ -385,10 +385,10 @@ export class MagicRestoreUtils {
     /**
      * Combines writing objects to the named pipe and running magic restore.
      */
-    writeObjsAndRunMagicRestore(restoreConfiguration, entriesAfterBackup = [], options = {}) {
+    writeObjsAndRunMagicRestore(restoreConfiguration, entriesAfterBackup, options) {
         this.pointInTimeTimestamp = restoreConfiguration.pointInTimeTimestamp;
         if (this.pointInTimeTimestamp) {
-            assert(entriesAfterBackup);
+            assert(entriesAfterBackup.length > 0);
             this.isPit = true;
         }
         MagicRestoreUtils.writeObjsToMagicRestorePipe(
