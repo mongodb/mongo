@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <absl/container/btree_set.h>
 #include <cstdint>
 #include <iosfwd>
 #include <string>
@@ -53,6 +54,11 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
+namespace {
+static Mutex mutex = MONGO_MAKE_LATCH("CompactCmd::mutex");
+static absl::btree_set<NamespaceString> compactsRunning;
+}  // namespace
 
 using std::string;
 using std::stringstream;
@@ -112,6 +118,23 @@ public:
             CompactCommand::parse(IDLParserContext("compact", vts, dbName.tenantId(), sc), cmdObj);
 
         _assertCanRunCompact(opCtx, params);
+
+        {
+            // Do not allow concurrent compact operations on the same namespace as this
+            // concurrency will impact statistic gathering and can result in incorrect reporting.
+            stdx::lock_guard<Latch> lk(mutex);
+            if (compactsRunning.contains(nss)) {
+                uasserted(ErrorCodes::OperationFailed,
+                          str::stream() << "Compaction is already in progress for "
+                                        << nss.toStringForErrorMsg());
+            }
+            compactsRunning.emplace(nss);
+        }
+
+        ON_BLOCK_EXIT([&] {
+            stdx::lock_guard<Latch> lk(mutex);
+            compactsRunning.erase(nss);
+        });
 
         CompactOptions options{.dryRun = params.getDryRun(),
                                .freeSpaceTargetMB = params.getFreeSpaceTargetMB()};
