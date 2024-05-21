@@ -550,6 +550,22 @@ TEST(PipelineOptimizationTest, SortDoesNotSwapBeforeUnwindBecauseUnwindPathEqual
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, SortDoesNotSwapBeforeUnwindBecauseArrayIndexField) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a', includeArrayIndex: 'i'}}"
+        ",{$sort : {i: 1}}"
+        "]";
+    std::string outputPipe =
+        "[{$unwind : {path: '$a', includeArrayIndex: 'i'}}"
+        ",{$sort : {sortKey: {i: 1}}}"
+        "]";
+    std::string serializedPipe =
+        "[{$unwind : {path: '$a', includeArrayIndex: 'i'}}"
+        ",{$sort : {i: 1}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsSortDoesNotInterfere) {
     std::string inputPipe =
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "

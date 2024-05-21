@@ -103,6 +103,8 @@ last-continuous:
       ticket: SERVER-69933
     - test_file: jstests/aggregation/group_by_objectid.js
       ticket: SERVER-90173
+    - test_file: jstests/aggregation/unwind_sort.js
+      ticket: SERVER-90485
   suites: null
 last-lts:
   all:
@@ -188,4 +190,6 @@ last-lts:
       ticket: SERVER-69933
     - test_file: jstests/aggregation/group_by_objectid.js
       ticket: SERVER-90173
+    - test_file: jstests/aggregation/unwind_sort.js
+      ticket: SERVER-90485
   suites: null
