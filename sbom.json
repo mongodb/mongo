@@ -1,0 +1,1599 @@
+{
+    "bomFormat": "CycloneDX",
+    "specVersion": "1.5",
+    "serialNumber": "urn:uuid:6e50768b-f427-4b2f-b024-081b29d2d24f",
+    "version": 1,
+    "metadata": {
+        "timestamp": "2024-05-09T21:13:30Z",
+        "authors": [
+            {
+                "name": "MongoDB Inc."
+            }
+        ],
+        "component": {
+            "name": "mongodb/mongo",
+            "version": "master",
+            "type": "application",
+            "bom-ref": "2b272c5d-6c5e-401d-95c4-6449c06377c4"
+        }
+    },
+    "components": [
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "Abseil",
+            "version": "20230802.1",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:github/abseil/abseil-cpp@20230802.1",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "9a7f8063-694c-422f-9b45-afce4da0a7a1",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/abseil-cpp"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": ""
+            },
+            "name": "arximboldi/immer",
+            "version": "Unknown",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSL-1.0"
+                    }
+                }
+            ],
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Execution"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "6ad4fd2d-9f74-4a86-ae1f-b398476f2001",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/immer"
+                    }
+                ]
+            },
+            "scope": "required",
+            "purl": "pkg:github/arximboldi/immer@d98a68cd6c60e025547614ad0809f68fd816d740"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "Asio C++ Library",
+            "version": "1.12.2",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSL-1.0"
+                    }
+                }
+            ],
+            "purl": "pkg:github/chriskohlhoff/asio@asio-1-12-2",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "530e0b7a-b210-4d7d-8a33-a2159af55906",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/asio-master"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "benchmark",
+            "version": "v1.5.2",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:github/google/benchmark@v1.5.2",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "39c9f0dc-d64e-4e78-b67d-e0aec2aa9db4",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/benchmark"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "Boost C++ Libraries - boost",
+            "version": "1.79.0",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSL-1.0"
+                    }
+                }
+            ],
+            "purl": "pkg:github/boostorg/boost@boost-1.79.0",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "317370ce-b7fd-42f5-ad6c-b112290ba56e",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/boost"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "c-ares",
+            "version": "1.19.1",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:github/c-ares/c-ares@cares-1_19_1",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "f73838ea-2101-4f05-a9f7-3cc559ffbd95",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/cares"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: pypi"
+            },
+            "name": "concurrencytest",
+            "version": "0.1.2",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "GPL-3.0-or-later"
+                    }
+                }
+            ],
+            "purl": "pkg:pypi/concurrencytest@0.1.2",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Engines"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "9a96b7b3-3d8b-4fac-9fbb-1414b958a4bb",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/wiredtiger/test/3rdparty/concurrencytest-0.1.2-locally-modified"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "Cyrus SASL",
+            "version": "2.1.26",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-Attribution-HPND-disclaimer"
+                    }
+                }
+            ],
+            "purl": "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.26",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Server Security"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "5f7398a4-020b-41b5-9799-c0afe4b56d8e",
+            "scope": "optional"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "dcleblanc/SafeInt",
+            "version": "3.0.26",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:github/dcleblanc/SafeInt@3.0.26",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "fcf0746f-012c-4d36-b7f7-f5862d8874b4",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/SafeInt"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": ""
+            },
+            "name": "derickr/timelib",
+            "version": "Unknown",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Query Execution"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "7069a6e3-f63c-4fcb-9ea6-56d730b5416f",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/timelib"
+                    }
+                ]
+            },
+            "scope": "required",
+            "purl": "pkg:github/derickr/timelib"
+        },
+        {
+            "supplier": {
+                "name": "Organization: pypi"
+            },
+            "name": "discover",
+            "version": "0.4.0",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                }
+            ],
+            "purl": "pkg:pypi/discover@0.4.0",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Engines"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "5ba8cb50-f405-49eb-9222-c93ea77dc109",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/wiredtiger/test/3rdparty/discover-0.4.0"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "fmtlib/fmt",
+            "version": "7.1.3",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:github/fmtlib/fmt@7.1.3",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Server Security"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "713022c6-44d6-4f23-8b60-29540c3c94d8",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/fmt"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "google-re2",
+            "version": "2023-11-01",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                }
+            ],
+            "purl": "pkg:github/google/re2@2023-11-01",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "4414793b-f0cc-489a-894b-c36e8bd53c70",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/re2"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": ""
+            },
+            "name": "google/s2geometry",
+            "version": "Unknown",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Query Integration"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "3e22ba25-6a4e-48b9-98c2-c1308124be57",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/s2"
+                    }
+                ]
+            },
+            "scope": "required",
+            "purl": "pkg:google-code-archive/code.google.com/s2-geometry-library@c872048da5d1"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "google-snappy",
+            "version": "1.1.10",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                }
+            ],
+            "purl": "pkg:github/google/snappy@1.1.10",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "b0444e77-306b-4d83-98fa-a2ed25600e96",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/snappy"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "gperftools",
+            "version": "2.9.1",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                }
+            ],
+            "purl": "pkg:github/gperftools/gperftools@gperftools-2.9.1",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "dc04fc90-12ec-4e1d-9179-35fe770fb8d9",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/gperftools"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "grpc",
+            "version": "1.59.2",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:github/grpc/grpc@v1.59.2",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "c68e0e5a-3a38-420c-8c8f-d05235690485",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/grpc"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "ICU for C/C++ (ICU4C)",
+            "version": "57.1",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                },
+                {
+                    "license": {
+                        "name": "MIT v2 with Ad Clause License"
+                    }
+                },
+                {
+                    "license": {
+                        "name": "Public Domain"
+                    }
+                },
+                {
+                    "license": {
+                        "id": "BSD-2-Clause"
+                    }
+                }
+            ],
+            "purl": "pkg:github/unicode-org/icu@icu-release-57-1",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Query Execution"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "0c38c40b-af16-499e-b209-deca79a5f9a6",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/icu4c-57.1"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": ""
+            },
+            "name": "Intel Decimal Floating-Point Math Library",
+            "version": "v2.0 U1",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                }
+            ],
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Execution"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "725f3cde-d303-4f88-98a0-c1ba87fd2874",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/IntelRDFPMathLib20U1"
+                    }
+                ]
+            },
+            "scope": "required",
+            "purl": ""
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "jbeder/yaml-cpp",
+            "version": "0.6.3",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Server Security"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "0a36b797-cf5d-4526-bed2-1b4ba71ee9ec",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/yaml-cpp"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": ""
+            },
+            "name": "JSON-Schema-Test-Suite",
+            "version": "Unknown",
+            "licenses": [
+                {
+                    "license": {
+                        "name": "Unknown License"
+                    }
+                }
+            ],
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Query Optimization"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "d7fcc89c-afd4-4bb9-948b-a37b99331003",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/JSON-Schema-Test-Suite"
+                    }
+                ]
+            },
+            "scope": "excluded",
+            "purl": "pkg:github/json-schema-org/JSON-Schema-Test-Suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "libmongocrypt",
+            "version": "1.8.4",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:github/mongodb/libmongocrypt@8354ba537d11494cb0dee21ec6d32fe8ab548c52",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Server Security"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "2d63a55f-9dc5-4cb5-882a-0b55840de660",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/libmongocrypt"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "librdkafka - the Apache Kafka C/C++ client library",
+            "version": "2.0.2",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                },
+                {
+                    "license": {
+                        "name": "Xmlproc License"
+                    }
+                },
+                {
+                    "license": {
+                        "id": "ISC"
+                    }
+                },
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                },
+                {
+                    "license": {
+                        "name": "Public Domain"
+                    }
+                },
+                {
+                    "license": {
+                        "id": "Zlib"
+                    }
+                },
+                {
+                    "license": {
+                        "id": "BSD-2-Clause"
+                    }
+                },
+                {
+                    "license": {
+                        "name": "Andreas Stolcke License"
+                    }
+                }
+            ],
+            "purl": "pkg:github/edenhill/librdkafka@v2.0.2",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Atlas Streams"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "63f3908b-b45d-4189-9a70-f25119556da8",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/librdkafka"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "LibTomCrypt",
+            "version": "1.18.2",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "WTFPL"
+                    }
+                },
+                {
+                    "license": {
+                        "name": "Public Domain"
+                    }
+                }
+            ],
+            "purl": "pkg:github/libtom/libtomcrypt@v1.18.2",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Server Security"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "7a2d3674-01a2-485d-bb72-c7d4e3b9525b",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/tomcrypt-1.18.2"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "libunwind/libunwind",
+            "version": "v1.6.2",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:github/libunwind/libunwind@v1.6.2",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "87f97a85-eed6-4a57-b530-10579e882b70",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/unwind"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": ""
+            },
+            "name": "linenoise",
+            "version": "Unknown",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-2-Clause"
+                    }
+                }
+            ],
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Server Tooling & Methods"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "71d67290-dc21-4923-99b0-0a13ee7de2db",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": [
+                            "src/mongo/shell/linenoise.h",
+                            "src/mongo/shell/linenoise.cpp"
+                        ]
+                    }
+                ]
+            },
+            "scope": "required",
+            "purl": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "mongo-cxx-driver",
+            "version": "r3.7.1",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:github/mongodb/mongo-cxx-driver@r3.7.1",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Atlas Streams"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "656c828e-940d-481b-bf47-6bb67fdb161d",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "enterprise/src/streams/third_party/mongocxx"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "MongoDB C Driver",
+            "version": "1.23.0",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:github/mongodb/mongo-c-driver@1.23.0",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Server Security"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "f414e718-ed18-48a7-9077-61bcd8a096b2",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/libbson"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: debian"
+            },
+            "name": "Mozilla Firefox",
+            "version": "115.7.0esr",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MPL-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:deb/debian/firefox-esr@115.7.0esr-1",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Query Integration"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "41b1be32-40bb-4146-bc7c-bf007030fade",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/mozjs"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: nuget"
+            },
+            "name": "nlohmann.json.decomposed",
+            "version": "3.10.5",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:nuget/nlohmann.json.decomposed@3.10.5",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Engines"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "7e3b6aea-b1bd-4d0d-bac1-43422dee6a85",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/wiredtiger/test/3rdparty/nlohmann"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
+                "name": "Organization: pypi"
+            },
+            "name": "ocspbuilder",
+            "version": "0.10.2",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:pypi/ocspbuilder@0.10.2",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Server Security"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "dbd5d755-0a6b-43d8-8718-1e67df4d0e73",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/mock_ocsp_responder"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
+                "name": "Organization: pypi"
+            },
+            "name": "ocspresponder",
+            "version": "0.5.0",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:pypi/ocspresponder@0.5.0",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Server Security"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "975c38b7-7b90-428c-8c36-7eeac617e63b",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/mock_ocsp_responder"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "PCRE2",
+            "version": "10.40",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                },
+                {
+                    "license": {
+                        "name": "Public Domain"
+                    }
+                }
+            ],
+            "purl": "pkg:github/PCRE2Project/pcre2@pcre2-10.40",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Query Execution"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "ca413c3f-d9bc-44c0-b14b-b4e6cc5994cf",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/pcre2"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "Protobuf",
+            "version": "v4.25.0",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                }
+            ],
+            "purl": "pkg:github/protocolbuffers/protobuf@v4.25.0",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "5f66f96c-5fb9-4434-b04c-b71ef625d128",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/protobuf"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "RoaringBitmap/CRoaring",
+            "version": "v3.0.1",
+            "licenses": [
+                {
+                    "license": {
+                        "name": "Unknown License"
+                    }
+                }
+            ],
+            "purl": "pkg:github/RoaringBitmap/CRoaring@v3.0.1",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Query Execution"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "3dda5e60-a20a-4203-82c8-fb39417666e9",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/croaring"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": ""
+            },
+            "name": "SchemaStore/schemastore",
+            "version": "Unknown",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Query Optimization"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "c3ed2e40-6a4a-46b6-b421-65f8899ce320",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/schemastore.org"
+                    }
+                ]
+            },
+            "scope": "excluded",
+            "purl": "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "SCons - a Software Construction tool",
+            "version": "3.1.2",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:github/SCons/scons@3.1.2",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Build"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "144a085e-96cd-4061-acf6-262fd1b69abe",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/scons-3.1.2"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": ""
+            },
+            "name": "smhasher",
+            "version": "Unknown",
+            "licenses": [
+                {
+                    "license": {
+                        "name": "Unknown License"
+                    }
+                }
+            ],
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Execution"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "a6900036-9f89-42d0-bf45-3262a6edfa69",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/murmurhash3"
+                    }
+                ]
+            },
+            "scope": "required",
+            "purl": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb"
+        },
+        {
+            "supplier": {
+                "name": ""
+            },
+            "name": "Snowball Stemming Algorithms",
+            "version": "Unknown",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                }
+            ],
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Query Integration"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "1d32730a-1e5b-475d-9923-f8e28d57152e",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/libstemmer_c"
+                    }
+                ]
+            },
+            "scope": "required",
+            "purl": ""
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "subunit",
+            "version": "0.0.16",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:github/testing-cabal/subunit@0.0.16",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Engines"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "2bb8894c-b723-4658-a0e2-c87cd837f659",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/wiredtiger/test/3rdparty/python-subunit-0.0.16"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "tcmalloc",
+            "version": "20230227-snapshot-093ba93c",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:github/google/tcmalloc@093ba93c1bd6dca03b0a8334f06d01b019244291",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "255fbc5e-3df9-4b0a-9974-a470d3240354",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/tcmalloc"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "testing-cabal/extras",
+            "version": "0.0.3",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:github/testing-cabal/extras@0.0.3",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Engines"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "62226114-9f89-4fa3-95af-635beea6474e",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/wiredtiger/test/3rdparty/extras-0.0.3"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
+                "name": "Organization: pypi"
+            },
+            "name": "testscenarios",
+            "version": "0.4",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                },
+                {
+                    "license": {
+                        "id": "Apache-2.0"
+                    }
+                }
+            ],
+            "purl": "pkg:pypi/testscenarios@0.4",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Engines"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "f59e01b6-443b-41a5-be3c-41e0cc1d279f",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/wiredtiger/test/3rdparty/testscenarios-0.4"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "testtools",
+            "version": "0.9.34",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:github/testing-cabal/testtools@testtools-0.9.34",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Engines"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "c003d1c0-3828-4cee-8c92-dd75841cd720",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/wiredtiger/test/3rdparty/testtools-0.9.34"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
+                "name": ""
+            },
+            "name": "valgrind",
+            "version": "Unknown",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "GPL-2.0-or-later"
+                    }
+                }
+            ],
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Build"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "f10406eb-8a93-4695-91e9-cee00dc8237a",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/valgrind"
+                    }
+                ]
+            },
+            "scope": "required",
+            "purl": "pkg:sourceware/valgrind/@VALGRIND_3_17_0"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "zlib",
+            "version": "v1.3",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "Zlib"
+                    }
+                }
+            ],
+            "purl": "pkg:github/madler/zlib@v1.3",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "eb888ce9-e2b6-47f7-980e-b65e7d68e92a",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/zlib"
+                    }
+                ]
+            },
+            "scope": "required"
+        },
+        {
+            "supplier": {
+                "name": "Organization: github"
+            },
+            "name": "zstd",
+            "version": "1.5.5",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                },
+                {
+                    "license": {
+                        "id": "GPL-2.0-or-later"
+                    }
+                }
+            ],
+            "purl": "pkg:github/facebook/zstd@v1.5.5",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Service Arch"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "bc384adb-9013-4a4f-a248-d1d0f240aec2",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/zstandard"
+                    }
+                ]
+            },
+            "scope": "required"
+        }
+    ],
+    "dependencies": [
+        {
+            "ref": "2b272c5d-6c5e-401d-95c4-6449c06377c4",
+            "dependsOn": [
+                "9a7f8063-694c-422f-9b45-afce4da0a7a1",
+                "6ad4fd2d-9f74-4a86-ae1f-b398476f2001",
+                "530e0b7a-b210-4d7d-8a33-a2159af55906",
+                "39c9f0dc-d64e-4e78-b67d-e0aec2aa9db4",
+                "317370ce-b7fd-42f5-ad6c-b112290ba56e",
+                "f73838ea-2101-4f05-a9f7-3cc559ffbd95",
+                "9a96b7b3-3d8b-4fac-9fbb-1414b958a4bb",
+                "5f7398a4-020b-41b5-9799-c0afe4b56d8e",
+                "fcf0746f-012c-4d36-b7f7-f5862d8874b4",
+                "7069a6e3-f63c-4fcb-9ea6-56d730b5416f",
+                "5ba8cb50-f405-49eb-9222-c93ea77dc109",
+                "713022c6-44d6-4f23-8b60-29540c3c94d8",
+                "4414793b-f0cc-489a-894b-c36e8bd53c70",
+                "3e22ba25-6a4e-48b9-98c2-c1308124be57",
+                "b0444e77-306b-4d83-98fa-a2ed25600e96",
+                "dc04fc90-12ec-4e1d-9179-35fe770fb8d9",
+                "c68e0e5a-3a38-420c-8c8f-d05235690485",
+                "0c38c40b-af16-499e-b209-deca79a5f9a6",
+                "725f3cde-d303-4f88-98a0-c1ba87fd2874",
+                "0a36b797-cf5d-4526-bed2-1b4ba71ee9ec",
+                "d7fcc89c-afd4-4bb9-948b-a37b99331003",
+                "2d63a55f-9dc5-4cb5-882a-0b55840de660",
+                "63f3908b-b45d-4189-9a70-f25119556da8",
+                "7a2d3674-01a2-485d-bb72-c7d4e3b9525b",
+                "87f97a85-eed6-4a57-b530-10579e882b70",
+                "71d67290-dc21-4923-99b0-0a13ee7de2db",
+                "656c828e-940d-481b-bf47-6bb67fdb161d",
+                "f414e718-ed18-48a7-9077-61bcd8a096b2",
+                "41b1be32-40bb-4146-bc7c-bf007030fade",
+                "7e3b6aea-b1bd-4d0d-bac1-43422dee6a85",
+                "dbd5d755-0a6b-43d8-8718-1e67df4d0e73",
+                "975c38b7-7b90-428c-8c36-7eeac617e63b",
+                "ca413c3f-d9bc-44c0-b14b-b4e6cc5994cf",
+                "5f66f96c-5fb9-4434-b04c-b71ef625d128",
+                "3dda5e60-a20a-4203-82c8-fb39417666e9",
+                "c3ed2e40-6a4a-46b6-b421-65f8899ce320",
+                "144a085e-96cd-4061-acf6-262fd1b69abe",
+                "a6900036-9f89-42d0-bf45-3262a6edfa69",
+                "1d32730a-1e5b-475d-9923-f8e28d57152e",
+                "2bb8894c-b723-4658-a0e2-c87cd837f659",
+                "255fbc5e-3df9-4b0a-9974-a470d3240354",
+                "62226114-9f89-4fa3-95af-635beea6474e",
+                "f59e01b6-443b-41a5-be3c-41e0cc1d279f",
+                "c003d1c0-3828-4cee-8c92-dd75841cd720",
+                "f10406eb-8a93-4695-91e9-cee00dc8237a",
+                "eb888ce9-e2b6-47f7-980e-b65e7d68e92a",
+                "bc384adb-9013-4a4f-a248-d1d0f240aec2"
+            ]
+        }
+    ]
+}

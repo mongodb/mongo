@@ -42,7 +42,7 @@ components:
     open_hub_url: https://openhub.net/p/abseil
     release_monitoring_id: 115295
     local_directory_path: src/third_party/abseil-cpp
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-58675
 
   "Asio C++ Library":
@@ -50,7 +50,7 @@ components:
     open_hub_url: N/A
     release_monitoring_id: 117
     local_directory_path: src/third_party/asio-master
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-54659
 
   benchmark:
@@ -59,14 +59,14 @@ components:
     release_monitoring_id: 18299
     local_directory_path: src/third_party/benchmark
     is_test_only: true
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
 
   "Boost C++ Libraries - boost":
     homepage_url: https://www.boost.org/
     open_hub_url: https://www.openhub.net/p/boost
     release_monitoring_id: 6845
     local_directory_path: src/third_party/boost
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-70000
 
   concurrencytest:
@@ -75,14 +75,14 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/concurrencytest-0.1.2-locally-modified
     is_test_only: true
-    team_owner: "Wiredtiger"
+    team_owner: "Storage Engines"
 
   c-ares:
     homepage_url: https://c-ares.org/
     open_hub_url: https://www.openhub.net/p/c-ares
     release_monitoring_id: 5840
     local_directory_path: src/third_party/cares
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-74870
 
   RoaringBitmap/CRoaring:
@@ -98,7 +98,7 @@ components:
     release_monitoring_id: 13280
     # Empty since the library is linked and not in the source tree
     local_directory_path:
-    team_owner: "Security"
+    team_owner: "Server Security"
     upgrade_suppression: TODO SERVER-89876
 
   "dcleblanc/SafeInt":
@@ -106,7 +106,7 @@ components:
     open_hub_url: https://www.openhub.net/p/SafeInt
     release_monitoring_id: -1
     local_directory_path: src/third_party/SafeInt
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-79444
 
   derickr/timelib:
@@ -114,7 +114,7 @@ components:
     open_hub_url: N/A
     release_monitoring_id: -1
     local_directory_path: src/third_party/timelib
-    team_owner: "Query"
+    team_owner: "Query Execution"
 
   discover:
     homepage_url: https://pypi.org/project/discover/
@@ -122,14 +122,14 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/discover-0.4.0
     is_test_only: true
-    team_owner: "Wiredtiger"
+    team_owner: "Storage Engines"
 
   fmtlib/fmt:
     homepage_url: https://fmt.dev
     open_hub_url: https://www.openhub.net/p/fmtlib_fmt
     release_monitoring_id: 11526
     local_directory_path: src/third_party/fmt
-    team_owner: "Security"
+    team_owner: "Server Security"
     upgrade_suppression: TODO SERVER-57876
 
   google/s2geometry:
@@ -137,7 +137,7 @@ components:
     open_hub_url: N/A
     release_monitoring_id: -1
     local_directory_path: src/third_party/s2
-    team_owner: "Query"
+    team_owner: "Query Integration"
     # Note: Code in MongoDB is based on early release here - https://code.google.com/archive/p/s2-geometry-library/
 
   google-snappy:
@@ -145,7 +145,7 @@ components:
     open_hub_url: N/A
     release_monitoring_id: 4844
     local_directory_path: src/third_party/snappy
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-89716
 
   gperftools:
@@ -153,7 +153,7 @@ components:
     open_hub_url: https://www.openhub.net/p/google-perftools
     release_monitoring_id: 1238
     local_directory_path: src/third_party/gperftools
-    team_owner: "Storage Execution"
+    team_owner: "Service Arch"
     # TODO - fix the version number in Black Duck
     upgrade_suppression: TODO SERVER-67432
 
@@ -162,7 +162,7 @@ components:
     open_hub_url: https://www.openhub.net/p/grpc
     release_monitoring_id: 19117
     local_directory_path: src/third_party/grpc
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-75761
 
   "ICU for C/C++ (ICU4C)":
@@ -170,7 +170,7 @@ components:
     open_hub_url: https://www.openhub.net/p/icu4c
     release_monitoring_id: 16134
     local_directory_path: src/third_party/icu4c-57.1
-    team_owner: "Query"
+    team_owner: "Query Execution"
     vulnerability_suppression: TODO SERVER-49211
     upgrade_suppression: TODO SERVER-49211
 
@@ -194,7 +194,7 @@ components:
     open_hub_url: https://www.openhub.net/p/jbeder_yaml-cpp
     release_monitoring_id: 5284
     local_directory_path: src/third_party/yaml-cpp
-    team_owner: "Security"
+    team_owner: "Server Security"
     upgrade_suppression: TODO SERVER-60439
 
   JSON-Schema-Test-Suite:
@@ -203,7 +203,7 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/JSON-Schema-Test-Suite
     is_test_only: true
-    team_owner: "Query"
+    team_owner: "Query Optimization"
     # Note: This is a test-only library and not compiled into the server.
 
   libmongocrypt:
@@ -211,7 +211,7 @@ components:
     open_hub_url: N/A
     release_monitoring_id: -1
     local_directory_path: src/third_party/libmongocrypt
-    team_owner: "Security"
+    team_owner: "Server Security"
     # Note: libmongocrypt exists in Black Duck, but not OpenHub
 
   "librdkafka - the Apache Kafka C/C++ client library":
@@ -219,7 +219,7 @@ components:
     open_hub_url: https://openhub.net/p/librdkafka
     release_monitoring_id: 12573
     local_directory_path: src/third_party/librdkafka
-    team_owner: "Streams"
+    team_owner: "Atlas Streams"
     upgrade_suppression: TODO SERVER-79507
 
   linenoise:
@@ -228,7 +228,7 @@ components:
     release_monitoring_id: 5691
     local_directory_path:
       [src/mongo/shell/linenoise.h, src/mongo/shell/linenoise.cpp]
-    team_owner: "Server Tools and Methodology"
+    team_owner: "Server Tooling & Methods"
     upgrade_suppression: TODO SERVER-514767
 
   LibTomCrypt:
@@ -236,14 +236,14 @@ components:
     open_hub_url: https://www.openhub.net/p/libtomcrypt
     release_monitoring_id: 15563
     local_directory_path: src/third_party/tomcrypt-1.18.2
-    team_owner: "Security"
+    team_owner: "Server Security"
 
   libunwind/libunwind:
     homepage_url: http://www.nongnu.org/libunwind/
     open_hub_url: https://www.openhub.net/p/p_w_d10376
     release_monitoring_id: 1748
     local_directory_path: src/third_party/unwind
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-75786
 
   "MongoDB C Driver":
@@ -251,7 +251,7 @@ components:
     open_hub_url: https://www.openhub.net/p/mongo-c-driver
     release_monitoring_id: 10712
     local_directory_path: src/third_party/libbson
-    team_owner: "Security"
+    team_owner: "Server Security"
     upgrade_suppression: TODO SERVER-72019
     vulnerability_suppression: TODO SERVER-72019
 
@@ -260,7 +260,7 @@ components:
     open_hub_url: https://www.openhub.net/p/mongo-cxx-driver
     release_monitoring_id: 6167
     local_directory_path: enterprise/src/streams/third_party/mongocxx
-    team_owner: "Streams"
+    team_owner: "Atlas Streams"
     upgrade_suppression: TODO SERVER-90035
 
   "Mozilla Firefox":
@@ -268,7 +268,7 @@ components:
     open_hub_url: https://www.openhub.net/p/firefox
     release_monitoring_id: 16838
     local_directory_path: src/third_party/mozjs
-    team_owner: "Query"
+    team_owner: "Query Integration"
     upgrade_suppression: TODO SERVER-90310
 
   nlohmann.json.decomposed:
@@ -277,7 +277,7 @@ components:
     release_monitoring_id: 11152
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/nlohmann
     is_test_only: true
-    team_owner: "Wiredtiger"
+    team_owner: "Storage Engines"
 
   ocspbuilder:
     homepage_url: https://github.com/wbond/ocspbuilder
@@ -285,7 +285,7 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/mock_ocsp_responder
     is_test_only: true
-    team_owner: "Security"
+    team_owner: "Server Security"
     # Note: ocspbuilder exists in Black Duck, but not OpenHub
 
   ocspresponder:
@@ -294,7 +294,7 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/mock_ocsp_responder
     is_test_only: true
-    team_owner: "Security"
+    team_owner: "Server Security"
     # Note: ocspresponder exists in Black Duck, but not OpenHub
 
   PCRE2:
@@ -302,7 +302,7 @@ components:
     open_hub_url: https://www.openhub.net/p/pcre2
     release_monitoring_id: 5832
     local_directory_path: src/third_party/pcre2
-    team_owner: "Query"
+    team_owner: "Query Execution"
     upgrade_suppression: TODO SERVER-79445
 
   Protobuf:
@@ -310,7 +310,7 @@ components:
     open_hub_url: https://www.openhub.net/p/protobuf
     release_monitoring_id: 3715
     local_directory_path: src/third_party/protobuf
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-75761
 
   testscenarios:
@@ -319,14 +319,14 @@ components:
     release_monitoring_id: 13220
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/testscenarios-0.4
     is_test_only: true
-    team_owner: "Wiredtiger"
+    team_owner: "Storage Engines"
 
   google-re2:
     homepage_url: https://github.com/google/re2
     open_hub_url: https://www.openhub.net/p/google-re2
     release_monitoring_id: 10500
     local_directory_path: src/third_party/re2
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-75761
 
   testing-cabal/extras:
@@ -335,7 +335,7 @@ components:
     release_monitoring_id: 13192
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/extras-0.0.3
     is_test_only: true
-    team_owner: "Wiredtiger"
+    team_owner: "Storage Engines"
 
   SchemaStore/schemastore:
     homepage_url: https://www.schemastore.org/
@@ -343,7 +343,7 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/schemastore.org
     is_test_only: true
-    team_owner: "Query"
+    team_owner: "Query Optimization"
     # Note: This is a test-only library and not compiled into the server.
 
   "SCons - a Software Construction tool":
@@ -366,7 +366,7 @@ components:
     open_hub_url: https://www.openhub.net/p/Snowball_Stemming_Algorithms
     release_monitoring_id: 7853
     local_directory_path: src/third_party/libstemmer_c
-    team_owner: "Query"
+    team_owner: "Query Integration"
     upgrade_suppression: TODO SERVER-51478
 
   subunit:
@@ -375,14 +375,14 @@ components:
     release_monitoring_id: 85461
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/python-subunit-0.0.16
     is_test_only: true
-    team_owner: "Wiredtiger"
+    team_owner: "Storage Engines"
 
   unicode:
     homepage_url: http://www.unicode.org
     open_hub_url: N/A
     release_monitoring_id: 5045
     local_directory_path: src/third_party/unicode-8.0.0
-    team_owner: "Query"
+    team_owner: "Query Execution"
 
   valgrind:
     homepage_url: https://valgrind.org/
@@ -398,21 +398,21 @@ components:
     release_monitoring_id: 4047
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/testtools-0.9.34
     is_test_only: true
-    team_owner: "Wiredtiger"
+    team_owner: "Storage Engines"
 
   tcmalloc:
     homepage_url: https://github.com/google/tcmalloc
     open_hub_url: https://openhub.net/p/tcmalloc
     release_monitoring_id: -1 # (371589) but there are no version numbers
     local_directory_path: src/third_party/tcmalloc
-    team_owner: "Service Architecture"
+    team_owner: "Service Arch"
 
   zlib:
     homepage_url: https://www.zlib.net/
     open_hub_url: https://www.openhub.net/p/zlib
     release_monitoring_id: 5303
     local_directory_path: src/third_party/zlib
-    team_owner: "Storage Execution"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-90307
 
   zstd:
@@ -420,5 +420,5 @@ components:
     open_hub_url: https://www.openhub.net/p/zstd
     release_monitoring_id: 12083
     local_directory_path: src/third_party/zstandard
-    team_owner: "Storage Execution"
+    team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-88708
