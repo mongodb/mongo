@@ -191,39 +191,13 @@ std::unique_ptr<SeekableRecordCursor> initCursorAndAssertTsHasNotFallenOff(
     OperationContext* opCtx, const CollectionPtr& coll, Timestamp tsToCheck) {
     auto cursor = coll->getCursor(opCtx);
 
-    boost::optional<repl::OplogEntry> firstEntry;
-
-    const Timestamp earliestTimestamp = [&]() {
-        // For the oplog, we avoid looking at the first entry unless we have to. Change collections
-        // do not make an optimization to retrieve the oldest entry, so we will always use the
-        // cursor.
-        if (coll->ns().isOplog()) {
-            auto swEarliestOplogTimestamp =
-                coll->getRecordStore()->getEarliestOplogTimestamp(opCtx);
-            if (swEarliestOplogTimestamp.isOK()) {
-                return swEarliestOplogTimestamp.getValue();
-            }
-            if (swEarliestOplogTimestamp.getStatus().code() !=
-                ErrorCodes::OplogOperationUnsupported) {
-                uassertStatusOK(swEarliestOplogTimestamp);
-            }
-            // Fall through to use the cursor if the storage engine does not support this
-            // optimization.
-        }
-
-        firstEntry.emplace(getFirstEntry(cursor.get()));
-        return firstEntry->getTimestamp();
-    }();
+    const auto firstEntry = getFirstEntry(cursor.get());
+    const auto earliestTimestamp = firstEntry.getTimestamp();
 
     // Verify that the timestamp of the first observed oplog entry is earlier than or equal to
     // timestamp that should not have fallen off the oplog.
     if (earliestTimestamp <= tsToCheck) {
         return cursor;
-    }
-
-    // At this point we have to use the cursor to look at the first entry.
-    if (!firstEntry) {
-        firstEntry.emplace(getFirstEntry(cursor.get()));
     }
 
     // If the first entry we see in the oplog is the replset initialization, then it doesn't matter
@@ -232,13 +206,13 @@ std::unique_ptr<SeekableRecordCursor> initCursorAndAssertTsHasNotFallenOff(
     // NOTE: A change collection can be created at any moment as such it might not have replset
     // initialization message, as such this case is not fully applicable for the change collection.
     const bool isNewRS =
-        firstEntry->getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg)) &&
-        firstEntry->getOpType() == repl::OpTypeEnum::kNoop;
+        firstEntry.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg)) &&
+        firstEntry.getOpType() == repl::OpTypeEnum::kNoop;
 
     uassert(ErrorCodes::OplogQueryMinTsMissing,
             str::stream()
                 << "Specified timestamp has already fallen off the oplog for the input timestamp: "
-                << tsToCheck << ", first oplog entry: " << firstEntry->getEntry().toString(),
+                << tsToCheck << ", first oplog entry: " << firstEntry.getEntry().toString(),
             isNewRS);
 
     return cursor;
