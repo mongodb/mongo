@@ -5,8 +5,14 @@
  * @tags: [requires_wiredtiger, requires_persistence]
  */
 
-// Disable the checkpoint thread.
-const rst = new ReplSetTest({nodes: 1, nodeOptions: {syncdelay: 0}});
+// Disable the checkpoint thread and increase log verbosity of WT checkpoints.
+const rst = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {
+        syncdelay: 0,
+        setParameter: {logComponentVerbosity: tojson({storage: {wt: {wtCheckpoint: 1}}})}
+    }
+});
 rst.startSet();
 rst.initiate();
 
@@ -39,6 +45,13 @@ coll.drop();
 assert.commandWorked(db.adminCommand({fsync: 1}));
 }());
 
+function checkValidationResponse(res, numExpectedIndexes) {
+    jsTestLog(res);
+    assert.commandWorked(res);
+    assert(res.valid);
+    assert.eq(numExpectedIndexes, res.nIndexes);
+}
+
 // Validate with {background: true} skips validating indexes that are not part of the same
 // checkpoint that the collection is.
 (function() {
@@ -51,19 +64,15 @@ assert.commandWorked(db.adminCommand({fsync: 1}));
 assert.commandWorked(coll.createIndex({c: 1}));
 assert.commandWorked(coll.createIndex({d: 1}));
 
-let res = assert.commandWorked(db.runCommand({validate: collName, background: false}));
-assert(res.valid);
-assert.eq(5, res.nIndexes);
-
-res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert(res.valid);
-assert.eq(3, res.nIndexes);
+checkValidationResponse(db.runCommand({validate: collName, background: false}),
+                        /*numExpectedIndexes=*/ 5);
+checkValidationResponse(db.runCommand({validate: collName, background: true}),
+                        /*numExpectedIndexes=*/ 3);
 
 assert.commandWorked(db.adminCommand({fsync: 1}));
 
-res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert(res.valid);
-assert.eq(5, res.nIndexes);
+checkValidationResponse(db.runCommand({validate: collName, background: true}),
+                        /*numExpectedIndexes=*/ 5);
 
 coll.drop();
 assert.commandWorked(db.adminCommand({fsync: 1}));
@@ -78,22 +87,19 @@ assert.commandWorked(coll.createIndex({b: 1}));
 
 assert.commandWorked(db.adminCommand({fsync: 1}));
 
-let res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert(res.valid);
-assert.eq(3, res.nIndexes);
+checkValidationResponse(db.runCommand({validate: collName, background: true}),
+                        /*numExpectedIndexes=*/ 3);
 
 assert.commandWorked(coll.dropIndex({a: 1}));
 assert.commandWorked(coll.dropIndex({b: 1}));
 
-res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert(res.valid);
-assert.eq(3, res.nIndexes);
+checkValidationResponse(db.runCommand({validate: collName, background: true}),
+                        /*numExpectedIndexes=*/ 3);
 
 assert.commandWorked(db.adminCommand({fsync: 1}));
 
-res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert(res.valid);
-assert.eq(1, res.nIndexes);
+checkValidationResponse(db.runCommand({validate: collName, background: true}),
+                        /*numExpectedIndexes=*/ 1);
 }());
 
 rst.stopSet();
