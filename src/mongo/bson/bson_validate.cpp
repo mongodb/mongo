@@ -550,7 +550,10 @@ private:
     const char* _updateFrame(Cursor cursor) {
         auto obj = cursor.ptr;
         auto len = cursor.template read<int32_t>();
-        uassert(ErrorCodes::InvalidBSON, "Nested BSON object has to be at least 5 bytes", len >= 5);
+        uassert(
+            ErrorCodes::InvalidBSON,
+            fmt::format("Nested BSON object has to be at least 5 bytes (decoded length: {})", len),
+            len >= 5);
         _currFrame->end = obj + len;
 
         if constexpr (precise) {

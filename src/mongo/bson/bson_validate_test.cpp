@@ -84,6 +84,16 @@ void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
     bb->appendStr("asdf", /*withNUL*/ false);
 }
 
+/**
+ * Adds a BSONObj object, but with a invalid size smaller than the minimum 5 bytes the
+ * the validator expects.
+ */
+void appendObjectElementWithInvalidSize(const char* fieldName, BufBuilder* bb, int objectSize) {
+    bb->appendChar(Object);
+    bb->appendStr(fieldName, /*withNUL*/ true);
+    bb->appendNum(objectSize);
+}
+
 TEST(BSONValidate, Basic) {
     BSONObj x;
     ASSERT_TRUE(validateBSON(x).isOK());
@@ -568,7 +578,7 @@ TEST(BSONValidateFast, NonTopLevelId) {
                   "unknown _id");
 }
 
-TEST(BSONValidateFast, ErrorInNestedObjectWithId) {
+TEST(BSONValidateFast, UnterminatedStringErrorInNestedObjectWithId) {
     BufBuilder bb;
     BSONObjBuilder ob(bb);
     ob.append("x", 2.0);
@@ -582,6 +592,97 @@ TEST(BSONValidateFast, ErrorInNestedObjectWithId) {
     ASSERT_EQUALS(status.reason(),
                   "Not null terminated string in element with field name 'nested.2.invalid' "
                   "in object with _id: 1");
+}
+
+TEST(BSONValidateFast, UnterminatedStringErrorInNestedObjectWithoutId) {
+    BufBuilder bb;
+    BSONObjBuilder ob(bb);
+    ob.append("x", 2.0);
+    appendInvalidStringElement("invalid", &bb);
+    const BSONObj nestedInvalid = ob.done();
+    const BSONObj x = BSON("nested" << BSON_ARRAY("a"
+                                                  << "b" << nestedInvalid));
+    const Status status = validateBSON(x);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(status.reason(),
+                  "Not null terminated string in element with field name 'nested.2.invalid' "
+                  "in object with unknown _id");
+}
+
+TEST(BSONValidateFast, InvalidObjectWithInvalidSizeInNestedObjectWithId) {
+    BufBuilder bb;
+    BSONObjBuilder ob(bb);
+    ob.append("x", 2.0);
+    // Minimum size to pass validation is 5 bytes.
+    appendObjectElementWithInvalidSize("invalid", &bb, 4);
+    const BSONObj nestedInvalid = ob.done();
+    const BSONObj x = BSON("_id" << 1 << "nested"
+                                 << BSON_ARRAY("a"
+                                               << "b" << nestedInvalid));
+    const Status status = validateBSON(x);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(status.reason(),
+                  "Nested BSON object has to be at least 5 bytes (decoded length: 4) in element "
+                  "with field name 'nested.2..invalid' in object with _id: 1");
+}
+
+TEST(BSONValidateFast, InvalidObjectWithZeroSizeInNestedObjectWithId) {
+    BufBuilder bb;
+    BSONObjBuilder ob(bb);
+    ob.append("x", 2.0);
+    appendObjectElementWithInvalidSize("invalid", &bb, 0);
+    const BSONObj nestedInvalid = ob.done();
+    const BSONObj x = BSON("_id" << 1 << "nested"
+                                 << BSON_ARRAY("a"
+                                               << "b" << nestedInvalid));
+    const Status status = validateBSON(x);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(status.reason(),
+                  "Nested BSON object has to be at least 5 bytes (decoded length: 0) in element "
+                  "with field name 'nested.2..invalid' in object with _id: 1");
+}
+
+TEST(BSONValidateFast, InvalidObjectWithNegativeSizeInNestedObjectWithId) {
+    BufBuilder bb;
+    BSONObjBuilder ob(bb);
+    ob.append("x", 2.0);
+    appendObjectElementWithInvalidSize("invalid", &bb, -999);
+    const BSONObj nestedInvalid = ob.done();
+    const BSONObj x = BSON("_id" << 1 << "nested"
+                                 << BSON_ARRAY("a"
+                                               << "b" << nestedInvalid));
+    const Status status = validateBSON(x);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(status.reason(),
+                  "Nested BSON object has to be at least 5 bytes (decoded length: -999) in element "
+                  "with field name 'nested.2..invalid' in object with _id: 1");
+}
+
+TEST(BSONValidateFast, InvalidObjectWithNegativeSizeInNestedObjectWithIdWithoutArray) {
+    BufBuilder bb;
+    BSONObjBuilder ob(bb);
+    ob.append("x", 2.0);
+    appendObjectElementWithInvalidSize("invalid", &bb, -888);
+    const BSONObj nestedInvalid = ob.done();
+    const BSONObj x = BSON("_id" << 1 << "nested" << nestedInvalid);
+    const Status status = validateBSON(x);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(status.reason(),
+                  "Nested BSON object has to be at least 5 bytes (decoded length: -888) in element "
+                  "with field name 'nested..invalid' in object with _id: 1");
+}
+
+TEST(BSONValidateFast, InvalidObjectWithNegativeSizeInNestedObjectWithIdTopLevelField) {
+    BufBuilder bb;
+    BSONObjBuilder ob(bb);
+    ob.append("_id", 1);
+    appendObjectElementWithInvalidSize("invalid", &bb, -777);
+    const BSONObj x = ob.done();
+    const Status status = validateBSON(x);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(status.reason(),
+                  "Nested BSON object has to be at least 5 bytes (decoded length: -777) in element "
+                  "with field name '.invalid' in object with _id: 1");
 }
 
 TEST(BSONValidateFast, StringHasSomething) {
