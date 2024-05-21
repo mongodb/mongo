@@ -100,29 +100,8 @@ public:
         _uniquePtr.swap(other._uniquePtr);
     }
 
-    bool operator==(const unique_tracked_ptr<T>& other) {
-        return _uniquePtr == other._uniquePtr;
-    }
-
-    bool operator<(const unique_tracked_ptr<T>& other) {
-        return _uniquePtr < other._uniquePtr;
-    }
-
-    bool operator<=(const unique_tracked_ptr<T>& other) {
-        return _uniquePtr <= other._uniquePtr;
-    }
-
-    bool operator>(const unique_tracked_ptr<T>& other) {
-        return _uniquePtr > other._uniquePtr;
-    }
-
-    bool operator>=(const unique_tracked_ptr<T>& other) {
-        return _uniquePtr >= other._uniquePtr;
-    }
-
-    bool operator<=>(const unique_tracked_ptr<T>& other) {
-        return _uniquePtr <=> other._uniquePtr;
-    }
+    bool operator==(const unique_tracked_ptr&) const = default;
+    auto operator<=>(const unique_tracked_ptr&) const = default;
 
     explicit operator bool() const noexcept {
         return static_cast<bool>(_uniquePtr.get());
