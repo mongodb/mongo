@@ -290,24 +290,6 @@ export const checkHealthLog = (healthlog, query, numExpected, timeout = 60 * 100
         timeout);
 };
 
-export const checkHealthLogGTE = (healthlog, query, numExpected, timeout = 60 * 1000) => {
-    let query_count;
-    assert.soon(
-        function() {
-            query_count = healthlog.find(query).count();
-            if (query_count != numExpected) {
-                jsTestLog("health log query returned " + query_count + " entries, expected " +
-                          numExpected + "  query: " + tojson(query) +
-                          " found: " + tojson(healthlog.find(query).toArray()));
-            }
-            return query_count >= numExpected;
-        },
-        "health log query returned " + query_count + " entries, expected " + numExpected +
-            "  query: " + tojson(query) + " found: " + tojson(healthlog.find(query).toArray()) +
-            " HealthLog: " + tojson(healthlog.find().toArray()),
-        timeout);
-};
-
 // Temporarily restart the secondary as a standalone, inject an inconsistency and
 // restart it back as a secondary.
 export const injectInconsistencyOnSecondary = (replSet, dbName, cmd, noCleanData = true) => {

@@ -9,7 +9,6 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     checkHealthLog,
-    checkHealthLogGTE,
     logQueries,
     resetAndInsert,
     runDbCheck
@@ -51,19 +50,17 @@ assert.eq(primaryColl.find({}).count(), 0);
 assert.eq(secondaryDb.getCollection(collName).find({}).count(), 0);
 
 configureFailPoint(primary, "holdStableTimestampAtSpecificTimestamp", {timestamp: stableTimestamp});
-const primaryFailPoint = configureFailPoint(primary, "sleepAfterExtraIndexKeysHashing");
-const secondaryFailPoint =
-    configureFailPoint(secondary, "hangAfterGeneratingHashForExtraIndexKeysCheck");
 
-runDbCheck(replSet, primaryDb, collName, {
-    validateMode: "extraIndexKeysCheck",
-    secondaryIndex: "a_1",
-    maxDocsPerBatch: 20,
-    batchWriteConcern: {w: 1}
-});
-
-primaryFailPoint.wait({timesEntered: 2});
-secondaryFailPoint.wait();
+runDbCheck(replSet,
+           primaryDb,
+           collName,
+           {
+               validateMode: "extraIndexKeysCheck",
+               secondaryIndex: "a_1",
+               maxDocsPerBatch: 20,
+               batchWriteConcern: {w: 1}
+           },
+           true /*awaitCompletion*/);
 
 // Perform ungraceful shutdown of the secondary node and do not clean the db path directory.
 replSet.stop(
@@ -82,15 +79,12 @@ primary = replSet.getPrimary();
 const primaryHealthLog = primary.getDB("local").system.healthlog;
 const secondaryHealthLog = secondary.getDB("local").system.healthlog;
 
-// Check that the start and batch entries are warning logs since the node skips dbcheck during
-// startup recovery. Because of the failpoint on secondary, it will only have 1 batch entry before
-// it hangs. So there will not be a stop entry.
-// After PM-3489, it is possible that the secondary applied more batch entries because the secondary
-// could still fetch and persist oplogs while the oplog applier is hanging.
-checkHealthLogGTE(secondaryHealthLog, logQueries.duringStableRecovery, 2);
+// Check that the start, batch, and stop entries are warning logs since the node skips dbcheck
+// during startup recovery.
+checkHealthLog(secondaryHealthLog, logQueries.duringStableRecovery, 12);
 // Check that the initial sync node does not have other info or error/warning entries.
 checkHealthLog(secondaryHealthLog, logQueries.infoBatchQuery, 0);
-checkHealthLogGTE(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 2);
+checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 12);
 
 // Check that the primary logged an error health log entry for each document with missing index key.
 checkHealthLog(primaryHealthLog, logQueries.recordNotFoundQuery, nDocs);
