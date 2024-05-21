@@ -106,7 +106,8 @@ SbeSingleSolutionPlanner::SbeSingleSolutionPlanner(
                 opCtx, collections, *cq, *(_solution), _yieldPolicy.get());
         }
 
-        plan_cache_util::updatePlanCache(_opCtx, _collections, *cq, *_solution, *stage, data);
+        plan_cache_util::updateSbePlanCacheWithPinnedEntry(
+            _opCtx, _collections, *cq, *_solution, *stage, data);
     }
 
     // Prepare the SBE tree for execution.

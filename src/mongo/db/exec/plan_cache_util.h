@@ -30,8 +30,8 @@
 #pragma once
 
 #include <boost/none.hpp>
+#include <functional>
 #include <memory>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -42,51 +42,17 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
-#include "mongo/db/query/plan_cache_key_factory.h"
-#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_stage_builder_plan_data.h"
-#include "mongo/db/service_context.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/clock_source.h"
 
-namespace mongo {
-/**
- * Specifies how the multi-planner should interact with the plan cache.
- */
-enum class PlanCachingMode {
-    // Always write a cache entry for the winning plan to the plan cache, overwriting any
-    // previously existing cache entry for the query shape.
-    AlwaysCache,
-
-    // Write a cache entry for the query shape *unless* we encounter one of the following edge
-    // cases:
-    //  - Two or more plans tied for the win.
-    //  - The winning plan returned zero query results during the plan ranking trial period.
-    SometimesCache,
-
-    // Do not write to the plan cache.
-    NeverCache,
-};
-
-/**
- * Returns the stricter PlanCachingMode between 'lhs' and 'rhs'.
- */
-inline PlanCachingMode stricter(PlanCachingMode lhs, PlanCachingMode rhs) {
-    return std::max(lhs, rhs);
-}
-
-namespace plan_cache_util {
+namespace mongo::plan_cache_util {
 
 /**
  * Builds "DebugInfo" for storing in the classic plan cache.
@@ -100,30 +66,6 @@ plan_cache_debug_info::DebugInfo buildDebugInfo(
  */
 plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution);
 
-/*
- * Returns true if plan cache should be updated.
- */
-bool shouldUpdatePlanCache(OperationContext* opCtx,
-                           PlanCachingMode cachingMode,
-                           const CanonicalQuery& query,
-                           const plan_ranker::PlanRankingDecision& ranking,
-                           const PlanExplainer* winnerExplainer,
-                           const PlanExplainer* runnerUpExplainer,
-                           const QuerySolution* winningPlan);
-
-/**
- * Caches the best candidate execution plan for 'query' in Classic plan cache, chosen from the given
- * 'candidates' from Classic based on the 'ranking' decision, if the 'query' is of a type that can
- * be cached. Otherwise, does nothing.
- */
-void updateClassicPlanCacheFromClassicCandidates(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    PlanCachingMode cachingMode,
-    const CanonicalQuery& query,
-    std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
-    std::vector<plan_ranker::CandidatePlan>& candidates);
-
 /**
  * Caches the best candidate execution plan for 'query' in SBE plan cache, chosen from the given
  * 'candidates' from SBE based on the 'ranking' decision, if the 'query' is of a type that can be
@@ -131,7 +73,6 @@ void updateClassicPlanCacheFromClassicCandidates(
  */
 void updateSbePlanCacheFromSbeCandidates(OperationContext* opCtx,
                                          const MultipleCollectionAccessor& collections,
-                                         PlanCachingMode cachingMode,
                                          const CanonicalQuery& query,
                                          std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
                                          std::vector<sbe::plan_ranker::CandidatePlan>& candidates);
@@ -149,7 +90,6 @@ void updateSbePlanCacheFromSbeCandidates(OperationContext* opCtx,
 void updateSbePlanCacheFromClassicCandidates(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
-    PlanCachingMode cachingMode,
     const CanonicalQuery& query,
     const plan_ranker::PlanRankingDecision& ranking,
     const std::vector<plan_ranker::CandidatePlan>& candidates,
@@ -163,11 +103,90 @@ void updateSbePlanCacheFromClassicCandidates(
  * The given plan will be "pinned" to the cache and will not be subject to replanning. Once put into
  * the cache, the plan immediately becomes "active".
  */
-void updatePlanCache(OperationContext* opCtx,
-                     const MultipleCollectionAccessor& collections,
-                     const CanonicalQuery& query,
-                     const QuerySolution& solution,
-                     const sbe::PlanStage& root,
-                     stage_builder::PlanStageData stageData);
-}  // namespace plan_cache_util
-}  // namespace mongo
+void updateSbePlanCacheWithPinnedEntry(OperationContext* opCtx,
+                                       const MultipleCollectionAccessor& collections,
+                                       const CanonicalQuery& query,
+                                       const QuerySolution& solution,
+                                       const sbe::PlanStage& root,
+                                       stage_builder::PlanStageData stageData);
+
+
+/**
+ * A function object compatible with 'MultiPlanStage::OnPickBestPlan' which does nothing, leaving
+ * the plan cache unaltered.
+ */
+struct NoopPlanCacheWriter {
+    void operator()(const CanonicalQuery&,
+                    std::unique_ptr<plan_ranker::PlanRankingDecision>,
+                    std::vector<plan_ranker::CandidatePlan>&) const {}
+};
+
+/**
+ * A function object which, when invoked, updates the classic plan cache entry for query 'cq' based
+ * on the multi-planning results described by 'ranking' and 'candidates'.
+ *
+ * Does nothing if the query is not eligible for caching or the winning plan is illegal to cache.
+ */
+struct ClassicPlanCacheWriter {
+    ClassicPlanCacheWriter(OperationContext* opCtx,
+                           const VariantCollectionPtrOrAcquisition& collection)
+        : _opCtx(opCtx), _collection(collection) {}
+
+    void operator()(const CanonicalQuery& cq,
+                    std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
+                    std::vector<plan_ranker::CandidatePlan>& candidates) const;
+
+private:
+    OperationContext* _opCtx;
+    VariantCollectionPtrOrAcquisition _collection;
+};
+
+/**
+ * A function object which when invoked might update the classic plan cache. Whether the classic
+ * plan cache entry is written to depends on the following:
+ *  - Whether the query is a type that can be cached.
+ *  - Whether the winning plan is legal to cache.
+ *  - The 'Mode' configured by the caller. This 'Mode' configuration is what distinguishes this
+ *    class from the simpler 'ClassicPlanCacheWriter' above.
+ */
+class ConditionalClassicPlanCacheWriter {
+public:
+    enum class Mode {
+        // Always write a cache entry for the winning plan to the plan cache, overwriting any
+        // previously existing cache entry for the query shape.
+        AlwaysCache,
+
+        // Write a cache entry for the query shape *unless* we encounter one of the following edge
+        // cases:
+        //  - Two or more plans tied for the win.
+        //  - The winning plan returned zero query results during the plan ranking trial period.
+        SometimesCache,
+
+        // Do not write to the plan cache.
+        NeverCache,
+    };
+
+    static Mode alwaysOrNeverCacheMode(bool shouldCache) {
+        return shouldCache ? Mode::AlwaysCache : Mode::NeverCache;
+    }
+
+    ConditionalClassicPlanCacheWriter(Mode planCachingMode,
+                                      OperationContext* opCtx,
+                                      const VariantCollectionPtrOrAcquisition& collection)
+        : _planCachingMode{planCachingMode}, _opCtx{opCtx}, _collection{collection} {}
+
+    void operator()(const CanonicalQuery& cq,
+                    std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
+                    std::vector<plan_ranker::CandidatePlan>& candidates) const;
+
+protected:
+    bool shouldCacheBasedOnCachingMode(
+        const CanonicalQuery& cq,
+        const plan_ranker::PlanRankingDecision& ranking,
+        const std::vector<plan_ranker::CandidatePlan>& candidates) const;
+
+    const Mode _planCachingMode;
+    OperationContext* _opCtx;
+    VariantCollectionPtrOrAcquisition _collection;
+};
+}  // namespace mongo::plan_cache_util

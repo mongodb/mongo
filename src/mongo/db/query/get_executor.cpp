@@ -995,7 +995,7 @@ protected:
              !this->_cq->isSearchQuery())) {
             auto result = this->releaseResult();
             result->runtimePlanner = std::make_unique<crp_sbe::MultiPlanner>(
-                this->makePlannerData(), std::move(solutions), PlanCachingMode::AlwaysCache);
+                this->makePlannerData(), std::move(solutions), true /*shouldWriteToPlanCache*/);
             return result;
         } else {
             return this->buildSingleSolutionPlan(std::move(solutions[0]));
@@ -1145,7 +1145,7 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     if (numSolutions > 1) {
         invariant(!needsSubplanning && !decisionWorks);
         return std::make_unique<sbe::MultiPlanner>(
-            opCtx, collections, *canonicalQuery, PlanCachingMode::AlwaysCache, yieldPolicy);
+            opCtx, collections, *canonicalQuery, true /*shouldWriteToPlanCache*/, yieldPolicy);
     }
 
     // If the query can be run as sub-queries, the needSubplanning flag will be set to true and
@@ -1170,7 +1170,7 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
 
     if (internalQueryPlannerUseMultiplannerForSingleSolutions) {
         return std::make_unique<sbe::MultiPlanner>(
-            opCtx, collections, *canonicalQuery, PlanCachingMode::AlwaysCache, yieldPolicy);
+            opCtx, collections, *canonicalQuery, true /*shouldWriteToPlanCache*/, yieldPolicy);
     }
 
     // Runtime planning is not required.

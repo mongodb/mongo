@@ -41,12 +41,20 @@ namespace mongo::classic_runtime_planner_for_sbe {
 
 SubPlanner::SubPlanner(PlannerDataForSBE plannerData) : PlannerBase(std::move(plannerData)) {
     LOGV2_DEBUG(8542100, 5, "Using classic subplanner for SBE");
+
+    // We write the full composite plan to the SBE plan cache once classic subplanning is complete,
+    // without making use of the callbacks.
+    SubplanStage::PlanSelectionCallbacks planCacheWriters{
+        .onPickPlanForBranch = plan_cache_util::NoopPlanCacheWriter{},
+        .onPickPlanWholeQuery = plan_cache_util::NoopPlanCacheWriter{},
+    };
+
     _subplanStage =
         std::make_unique<SubplanStage>(cq()->getExpCtxRaw(),
                                        collections().getMainCollectionPtrOrAcquisition(),
                                        ws(),
                                        cq(),
-                                       PlanCachingMode::NeverCache);
+                                       std::move(planCacheWriters));
 
     auto trialPeriodYieldPolicy =
         makeClassicYieldPolicy(opCtx(),
@@ -64,12 +72,12 @@ SubPlanner::SubPlanner(PlannerDataForSBE plannerData) : PlannerBase(std::move(pl
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery) {
     auto sbePlanAndData = prepareSbePlanAndData(*_solution);
-    plan_cache_util::updatePlanCache(opCtx(),
-                                     collections(),
-                                     *cq(),
-                                     *_solution,
-                                     *sbePlanAndData.first.get(),
-                                     sbePlanAndData.second);
+    plan_cache_util::updateSbePlanCacheWithPinnedEntry(opCtx(),
+                                                       collections(),
+                                                       *cq(),
+                                                       *_solution,
+                                                       *sbePlanAndData.first.get(),
+                                                       sbePlanAndData.second);
 
     return prepareSbePlanExecutor(std::move(canonicalQuery),
                                   std::move(_solution),

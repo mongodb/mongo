@@ -130,7 +130,7 @@ public:
 
     /**
      * Use the MultiPlanRunner to pick the best plan for the query 'cq'.  Goes through
-     * normal planning to generate solutions and feeds them to the MPR.
+     * normal planning to generate solutions and feeds them to the 'MultiPlanStage'.
      *
      * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
@@ -153,10 +153,15 @@ public:
 
         ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 
-        // Fill out the MPR.
-        _mps.reset(new MultiPlanStage(_expCtx.get(), &collection.getCollection(), cq));
+        _mps = std::make_unique<MultiPlanStage>(_expCtx.get(),
+                                                &collection.getCollection(),
+                                                cq,
+                                                plan_cache_util::ClassicPlanCacheWriter{
+                                                    opCtx(),
+                                                    &collection.getCollection(),
+                                                });
         std::unique_ptr<WorkingSet> ws(new WorkingSet());
-        // Put each solution from the planner into the MPR.
+        // Put each solution from the planner into the 'MultiPlanStage'.
         for (size_t i = 0; i < solutions.size(); ++i) {
             auto&& root = stage_builder::buildClassicExecutableTree(
                 &_opCtx, &collection.getCollection(), *cq, *solutions[i], ws.get());

@@ -180,7 +180,7 @@ class MultiPlanner final : public PlannerBase {
 public:
     MultiPlanner(PlannerDataForSBE plannerData,
                  std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
-                 PlanCachingMode cachingMode,
+                 bool shouldWriteToPlanCache,
                  boost::optional<std::string> replanReason = boost::none);
 
     /**
@@ -193,15 +193,26 @@ public:
 
 private:
     using SbePlanAndData = std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>;
-    SbePlanAndData _buildSbePlanAndUpdatePlanCache(const QuerySolution* winningSolution,
-                                                   const plan_ranker::PlanRankingDecision& ranking);
 
     bool _shouldUseEofOptimization() const;
 
+    // Callback to pass to the 'MultiPlanStage'. Constructs an SBE plan for the winning plan,
+    // dealing with the possibility of a pushed-down agg pipeline. If '_shouldWriteToPlanCache' is
+    // true, writes the resulting SBE plan to the SBE plan cache.
+    void _buildSbePlanAndMaybeCache(const CanonicalQuery&,
+                                    std::unique_ptr<plan_ranker::PlanRankingDecision>,
+                                    std::vector<plan_ranker::CandidatePlan>&);
+
     std::unique_ptr<MultiPlanStage> _multiPlanStage;
-    PlanCachingMode _cachingMode;
+    const bool _shouldWriteToPlanCache;
     boost::optional<std::string> _replanReason;
-    // Temporary owner of query solution; ownership is surrenderred in makeExecutor().
+
+    // The SBE plan is constructed from the callback we pass to the 'MultiPlanStage' so that it can
+    // be used to construct a cache entry. Then it gets stashed here so that it can be subsequently
+    // used to create an SBE plan executor.
+    boost::optional<SbePlanAndData> _sbePlanAndData;
+
+    // Temporary owner of query solution; ownership is surrendered in makeExecutor().
     std::unique_ptr<QuerySolution> _winningSolution;
 };
 

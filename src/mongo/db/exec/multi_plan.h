@@ -48,37 +48,49 @@
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/plan_ranker_util.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/db/record_id.h"
 
 namespace mongo {
 
 extern FailPoint sleepWhileMultiplanning;
 
 /**
- * This stage outputs its mainChild, and possibly it's backup child
- * and also updates the cache.
+ * A PlanStage for performing runtime plan selection. The caller is expected to construct a
+ * 'MultiPlanStage', add candidate plans using the 'addPlan()' method, and then trigger runtime plan
+ * selection by calling the 'pickBestPlan()' method.
  *
- * Preconditions: Valid RecordId.
- *
- * Owns the query solutions and PlanStage roots for all candidate plans.
+ * Partial result sets for each candidate are maintained in separate buffers. Once plan selection is
+ * complete, the 'doWork()' method can be used to execute the winning plan. This will first unspool
+ * the buffered results associated with the winning plan and then will continue execution of the
+ * winning plan.
  */
 class MultiPlanStage final : public RequiresCollectionStage {
 public:
     static const char* kStageType;
 
     /**
-     * Takes no ownership.
+     * Callback function which gets called from 'pickBestPlan()'. The 'PlanRankingDecision' and
+     * vector of candidate plans describe the outcome of multi-planning.
+     */
+    using OnPickBestPlan = std::function<void(const CanonicalQuery&,
+                                              std::unique_ptr<plan_ranker::PlanRankingDecision>,
+                                              std::vector<plan_ranker::CandidatePlan>&)>;
+
+
+    /**
+     * Constructs a 'MultiPlanStage'.
      *
-     * If 'shouldCache' is true, writes a cache entry for the winning plan to the plan cache
-     * when possible. If 'shouldCache' is false, the plan cache will never be written.
+     * The 'onPickBestPlan()' callback is invoked once plan selection is complete, with parameters
+     * passed that describe the result of multi-planning. This ensures that the 'MultiPlanStage'
+     * does not interact with either the classic or SBE plan caches directly.
      */
     MultiPlanStage(ExpressionContext* expCtx,
                    VariantCollectionPtrOrAcquisition collection,
                    CanonicalQuery* cq,
-                   PlanCachingMode cachingMode = PlanCachingMode::AlwaysCache,
+                   OnPickBestPlan onPickBestPlan,
                    boost::optional<std::string> replanReason = boost::none);
 
     bool isEOF() final;
@@ -104,22 +116,25 @@ public:
                  WorkingSet* sharedWs);
 
     /**
-     * Runs all plans added by addPlan, ranks them, and picks a best.
-     * All further calls to work(...) will return results from the best plan.
+     * Runs all plans added by addPlan(), ranks them, and picks a best plan. All further calls to
+     * doWork() will return results from the best plan.
      *
-     * If 'yieldPolicy' is non-NULL, then all locks may be yielded in between round-robin
-     * works of the candidate plans. By default, 'yieldPolicy' is NULL and no yielding will
-     * take place.
+     * If 'yieldPolicy' is non-null, then all locks may be yielded in between round-robin works of
+     * the candidate plans. By default, 'yieldPolicy' is null and no yielding will take place.
      *
      * Returns a non-OK status if query planning fails. In particular, this function returns
      * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield.
      */
     Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
 
-    /** Return true if a best plan has been chosen  */
+    /**
+     * Returns true if a best plan has been chosen.
+     */
     bool bestPlanChosen() const;
 
-    /** Return the index of the best plan chosen, or boost::none if there is no such plan. */
+    /**
+     * Returns the index of the best plan chosen, or boost::none if there is no such plan.
+     */
     boost::optional<size_t> bestPlanIdx() const;
 
     /**
@@ -143,27 +158,6 @@ public:
      * Illegal to call if the best plan has not yet been selected.
      */
     bool bestSolutionEof() const;
-
-    /**
-     * Returns the PlanRankingDecision which captures scoring information from the trial period.
-     * Requires caching mode to be NeverCache and calling pickBestPlan() beforehand.
-     */
-    const plan_ranker::PlanRankingDecision& planRankingDecision() const {
-        tassert(8524800,
-                "The caching mode must be NeverCache to ensure planRankingDecision() is invoked by "
-                "Classic runtime planner for SBE",
-                _cachingMode == PlanCachingMode::NeverCache);
-        tassert(8524801, "Ranking decision must be determined by calling pickBestPlan()", _ranking);
-        return *_ranking;
-    }
-
-    /**
-     * Returns the candidate plans. Each candidate plan includes a child PlanStage tree and
-     * QuerySolution.
-     */
-    const std::vector<plan_ranker::CandidatePlan>& candidates() const {
-        return _candidates;
-    }
 
     /**
      * Returns true if a backup plan was picked.
@@ -215,22 +209,19 @@ private:
 
     static const int kNoSuchPlan = -1;
 
-    // Describes the cases in which we should write an entry for the winning plan to the plan cache.
-    const PlanCachingMode _cachingMode;
-
     // The query that we're trying to figure out the best solution to.
     // not owned here
     CanonicalQuery* _query;
 
+    // Callback provided by the caller to invoke, passing the results of the plan selection trial
+    // period.
+    OnPickBestPlan _onPickBestPlan;
+
     // Candidate plans. Each candidate includes a child PlanStage tree and QuerySolution. Ownership
-    // of all QuerySolutions is retained here, and will *not* be tranferred to the PlanExecutor that
-    // wraps this stage. Ownership of the PlanStages will be in PlanStage::_children which maps
+    // of all QuerySolutions is retained here, and will *not* be transferred to the PlanExecutor
+    // that wraps this stage. Ownership of the PlanStages will be in PlanStage::_children which maps
     // one-to-one with _candidates.
     std::vector<plan_ranker::CandidatePlan> _candidates;
-
-    // Captures scoring information from the trial period. Nullptr until 'pickBestPlan()' returns
-    // with an OK status. Requires '_cachingMode' to be NeverCache to retain the ownership.
-    std::unique_ptr<plan_ranker::PlanRankingDecision> _ranking;
 
     // Rejected plans in saved and detached state.
     std::vector<std::unique_ptr<PlanStage>> _rejected;

@@ -83,11 +83,11 @@ CandidatePlans SubPlanner::plan(
         // around in the YieldPolicy.
         ON_BLOCK_EXIT([this]() { _yieldPolicy->clearRegisteredPlans(); });
 
-        // We pass the SometimesCache option to the MPS because the SubplanStage currently does
-        // not use the 'CachedSolutionPlanner' eviction mechanism. We therefore are more
-        // conservative about putting a potentially bad plan into the cache in the subplan path.
-        MultiPlanner multiPlanner{
-            _opCtx, _collections, *cq, PlanCachingMode::SometimesCache, _yieldPolicy};
+        // The SBE runtime planners can only be used together with the SBE plan cache. The SBE
+        // plan cache always caches complete plans; therefore, we do not cache each branch of the
+        // $or separately.
+        const bool shouldWriteToPlanCache = false;
+        MultiPlanner multiPlanner{_opCtx, _collections, *cq, shouldWriteToPlanCache, _yieldPolicy};
         auto&& [candidates, winnerIdx] =
             multiPlanner.plan(plannerParams, std::move(solutions), std::move(roots));
         invariant(winnerIdx < candidates.size());
@@ -129,7 +129,8 @@ CandidatePlans SubPlanner::plan(
     // includes setting up the runtime environment and in particular getting a new "shardFilterer"
     // value, as the "shardFilterer" must not be stored in the plan cache (doing so would block
     // range deletion).
-    plan_cache_util::updatePlanCache(_opCtx, _collections, _cq, *compositeSolution, *root, data);
+    plan_cache_util::updateSbePlanCacheWithPinnedEntry(
+        _opCtx, _collections, _cq, *compositeSolution, *root, data);
 
     _trialRuntimeExecutor.prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/);
     root->open(false);
@@ -171,7 +172,7 @@ CandidatePlans SubPlanner::planWholeQuery(const QueryPlannerParams& plannerParam
     }
 
     MultiPlanner multiPlanner{
-        _opCtx, _collections, _cq, PlanCachingMode::AlwaysCache, _yieldPolicy};
+        _opCtx, _collections, _cq, true /*shouldWriteToPlanCache*/, _yieldPolicy};
     return multiPlanner.plan(plannerParams, std::move(solutions), std::move(roots));
 }
 }  // namespace mongo::sbe

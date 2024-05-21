@@ -32,6 +32,7 @@
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/bind_input_params.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/sbe_trial_runtime_executor.h"
@@ -190,10 +191,8 @@ std::unique_ptr<PlannerInterface> replan(PlannerDataForSBE plannerData,
                 "Query plan after replanning and its cache status",
                 "query"_attr = redact(plannerData.cq->toStringShort()),
                 "shouldCache"_attr = (shouldCache ? "yes" : "no"));
-    const auto cachingMode =
-        shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
     return std::make_unique<MultiPlanner>(
-        std::move(plannerData), std::move(solutions), cachingMode, std::move(replanReason));
+        std::move(plannerData), std::move(solutions), shouldCache, std::move(replanReason));
 }
 }  // namespace
 

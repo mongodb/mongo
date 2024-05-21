@@ -81,11 +81,25 @@ class OperationContext;
  */
 class SubplanStage final : public RequiresAllIndicesStage {
 public:
+    struct PlanSelectionCallbacks {
+        /**
+         * Called after plan selection is performed for an individual $or branch.
+         */
+        MultiPlanStage::OnPickBestPlan onPickPlanForBranch;
+
+        /**
+         * In some cases, the 'SubplanStage' may fall back to performing regular multi-planning for
+         * the entire query. In this case, it will call this callback rather than
+         * 'onPickPlanForBranch'.
+         */
+        MultiPlanStage::OnPickBestPlan onPickPlanWholeQuery;
+    };
+
     SubplanStage(ExpressionContext* expCtx,
                  VariantCollectionPtrOrAcquisition collection,
                  WorkingSet* ws,
                  CanonicalQuery* cq,
-                 PlanCachingMode cachingMode = PlanCachingMode::AlwaysCache);
+                 PlanSelectionCallbacks PlanSelectionCallbacks);
 
     static bool canUseSubplanning(const CanonicalQuery& query);
     static bool needsSubplanning(const CanonicalQuery& query) {
@@ -201,7 +215,8 @@ private:
     // Indicates whether i-th branch of the rooted $or query was planned from a cached solution.
     std::vector<bool> _branchPlannedFromCache;
 
-    PlanCachingMode _planCachingMode;
+    // Callbacks to pass through to 'MultiPlanStage'.
+    PlanSelectionCallbacks _planSelectionCallbacks;
 
     // Indicates whether the sub planner has fallen back to multi planning.
     bool _usesMultiplanning = false;

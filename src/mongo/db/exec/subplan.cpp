@@ -38,7 +38,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/subplan.h"
@@ -67,11 +66,11 @@ SubplanStage::SubplanStage(ExpressionContext* expCtx,
                            VariantCollectionPtrOrAcquisition collection,
                            WorkingSet* ws,
                            CanonicalQuery* cq,
-                           PlanCachingMode cachingMode)
+                           PlanSelectionCallbacks planSelectionCallbacks)
     : RequiresAllIndicesStage(kStageType, expCtx, collection),
       _ws(ws),
       _query(cq),
-      _planCachingMode(cachingMode) {
+      _planSelectionCallbacks(std::move(planSelectionCallbacks)) {
     invariant(cq);
     invariant(_query->getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
     invariant(_query->getPrimaryMatchExpression()->numChildren(),
@@ -143,8 +142,8 @@ Status SubplanStage::choosePlanWholeQuery(const QueryPlannerParams& plannerParam
 
         _usesMultiplanning = true;
 
-        _children.emplace_back(
-            new MultiPlanStage(expCtx(), collection(), _query, _planCachingMode));
+        _children.emplace_back(std::make_unique<MultiPlanStage>(
+            expCtx(), collection(), _query, _planSelectionCallbacks.onPickPlanWholeQuery));
 
         MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
@@ -220,14 +219,6 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
         -> StatusWith<std::unique_ptr<QuerySolution>> {
         _ws->clear();
 
-        // By default, '_planCachingMode' is set to AlwaysCache, but we pass the SometimesCache
-        // option to the MPS here, because the SubplanStage currently does not use the
-        // CachedPlanStage's eviction mechanism. We therefore are more conservative about putting a
-        // potentially bad plan into the cache in the subplan path. When using the sub planner for
-        // SBE, we set '_planCachingMode' to NeverCache since we don't want to use the classic plan
-        // cache for SBE queries. We use the stricter PlanCachingMode to determine this based on the
-        // value of '_planCachingMode'.
-        //
         // We temporarily add the MPS to _children to ensure that we pass down all save/restore
         // messages that can be generated if pickBestPlan yields.
         invariant(_children.empty());
@@ -235,7 +226,8 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
             expCtx(),
             collection(),
             cq,
-            stricter(PlanCachingMode::SometimesCache, _planCachingMode)));
+            // Copy the callback function object since we have to use it for multiple branches.
+            _planSelectionCallbacks.onPickPlanForBranch));
         ON_BLOCK_EXIT([&] {
             invariant(_children.size() == 1);  // Make sure nothing else was added to _children.
             _children.pop_back();

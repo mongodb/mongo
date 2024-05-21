@@ -37,7 +37,6 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <variant>
 
 #include <boost/optional/optional.hpp>
 
@@ -52,18 +51,15 @@
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
-#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/plan_ranker_util.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
@@ -136,11 +132,11 @@ MONGO_FAIL_POINT_DEFINE(sleepWhileMultiplanning);
 MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
                                VariantCollectionPtrOrAcquisition collection,
                                CanonicalQuery* cq,
-                               PlanCachingMode cachingMode,
+                               OnPickBestPlan onPickBestPlan,
                                boost::optional<std::string> replanReason)
     : RequiresCollectionStage(kStageType, expCtx, collection),
-      _cachingMode(cachingMode),
       _query(cq),
+      _onPickBestPlan(std::move(onPickBestPlan)),
       _bestPlanIdx(kNoSuchPlan),
       _backupPlanIdx(kNoSuchPlan) {
     _specificStats.replanReason = replanReason;
@@ -275,11 +271,11 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         return statusWithRanking.getStatus();
     }
 
-    _ranking = std::move(statusWithRanking.getValue());
+    auto ranking = std::move(statusWithRanking.getValue());
     // Since the status was ok there should be a ranking containing at least one successfully ranked
     // plan.
-    invariant(_ranking);
-    _bestPlanIdx = _ranking->candidateOrder[0];
+    invariant(ranking);
+    _bestPlanIdx = ranking->candidateOrder[0];
 
     MONGO_verify(_bestPlanIdx >= 0 && _bestPlanIdx < static_cast<int>(_candidates.size()));
 
@@ -300,7 +296,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
         LOGV2_DEBUG(20592, 5, "Winner has blocking stage, looking for backup plan...");
-        for (auto&& ix : _ranking->candidateOrder) {
+        for (auto&& ix : ranking->candidateOrder) {
             if (!_candidates[ix].solution->hasBlockingStage) {
                 LOGV2_DEBUG(20593, 5, "Backup child", "ix"_attr = ix);
                 _backupPlanIdx = ix;
@@ -309,19 +305,9 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
     }
 
-    const auto& coll = collection();
-    auto multipleCollection = coll.isAcquisition()
-        ? MultipleCollectionAccessor{coll.getAcquisition()}
-        : MultipleCollectionAccessor{coll.getCollectionPtr()};
-
-    if (_cachingMode != PlanCachingMode::NeverCache) {
-        plan_cache_util::updateClassicPlanCacheFromClassicCandidates(expCtx()->opCtx,
-                                                                     multipleCollection,
-                                                                     _cachingMode,
-                                                                     *_query,
-                                                                     std::move(_ranking),
-                                                                     _candidates);
-    }
+    // Invoke the callback provided on construction, passing 'ranking' and '_candidates' to describe
+    // the results of plan selection.
+    _onPickBestPlan(*_query, std::move(ranking), _candidates);
 
     removeRejectedPlans();
 

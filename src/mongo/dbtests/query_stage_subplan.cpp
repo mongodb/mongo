@@ -125,6 +125,26 @@ public:
         return _opCtx->getServiceContext();
     }
 
+    std::unique_ptr<SubplanStage> makeSubplanStage(const CollectionPtr& coll,
+                                                   CanonicalQuery* cq,
+                                                   WorkingSet& ws) {
+        auto callbacks = SubplanStage::PlanSelectionCallbacks{
+            .onPickPlanForBranch =
+                plan_cache_util::ConditionalClassicPlanCacheWriter{
+                    plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
+                    opCtx(),
+                    &coll,
+                },
+            .onPickPlanWholeQuery =
+                plan_cache_util::ClassicPlanCacheWriter{
+                    opCtx(),
+                    &coll,
+                },
+        };
+
+        return std::make_unique<SubplanStage>(_expCtx.get(), &coll, &ws, cq, std::move(callbacks));
+    }
+
 protected:
     /**
      * Parses the json string 'findCmd', specifying a find command, to a CanonicalQuery.
@@ -204,8 +224,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
     auto plannerParams = makePlannerParams(ctx.getCollection(), *cq);
 
     WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), &collection, &ws, cq.get()));
+    auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
     // Plan selection should succeed due to falling back on regular planning.
     NoopYieldPolicy yieldPolicy(_expCtx->opCtx, _clock);
@@ -243,8 +262,7 @@ void QueryStageSubplanTest::assertSubplanFromCache(QueryStageSubplanTest* test,
     internalQueryCacheDisableInactiveEntries.store(true);
 
     WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(test->expCtx(), &collection, &ws, cq.get()));
+    auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
     NoopYieldPolicy yieldPolicy(test->opCtx(), test->serviceContext()->getFastClockSource());
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
@@ -257,7 +275,7 @@ void QueryStageSubplanTest::assertSubplanFromCache(QueryStageSubplanTest* test,
     // If we repeat the same query, the plan for the first branch should have come from
     // the cache.
     ws.clear();
-    subplan.reset(new SubplanStage(test->expCtx(), &collection, &ws, cq.get()));
+    subplan = makeSubplanStage(collection, cq.get(), ws);
 
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
@@ -291,10 +309,10 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCacheWithWildcardIndex) {
 }
 
 /**
- * Ensure that the subplan stage doesn't create a plan cache entry if there are no query
- * results.
+ * Ensure that the subplan stage doesn't create a plan cache entry if there are no query results
+ * (when it is configured with the 'SometimesCache' policy for its per-branch callback).
  */
-TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
+TEST_F(QueryStageSubplanTest, QueryStageSubplanDoesNotCacheZeroResults) {
     dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
 
     addIndex(BSON("a" << 1 << "b" << 1));
@@ -303,7 +321,6 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
     // Exclude field 'c' from the wildcard index to make sure that the field has only one
     // relevant index.
     addIndexWithWildcardProjection(BSON("$**" << 1), BSON("c" << 0));
-
 
     for (int i = 0; i < 10; i++) {
         insert(BSON("a" << 1 << "b" << i << "c" << i));
@@ -326,8 +343,8 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
     auto plannerParams = makePlannerParams(ctx.getCollection(), *cq);
 
     WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), &collection, &ws, cq.get()));
+
+    auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
     NoopYieldPolicy yieldPolicy(_expCtx->opCtx, _clock);
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
@@ -341,7 +358,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
     // from the cache (because the first call to pickBestPlan() refrained from creating any
     // cache entries).
     ws.clear();
-    subplan.reset(new SubplanStage(_expCtx.get(), &collection, &ws, cq.get()));
+    subplan = makeSubplanStage(collection, cq.get(), ws);
 
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
@@ -383,8 +400,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
     auto plannerParams = makePlannerParams(collection, *cq);
 
     WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), &collection, &ws, cq.get()));
+    auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
     NoopYieldPolicy yieldPolicy(_expCtx->opCtx, _clock);
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
@@ -398,7 +414,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
     // from the cache (because the first call to pickBestPlan() refrained from creating any
     // cache entries).
     ws.clear();
-    subplan.reset(new SubplanStage(_expCtx.get(), &collection, &ws, cq.get()));
+    subplan = makeSubplanStage(collection, cq.get(), ws);
 
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
@@ -555,8 +571,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     auto plannerParams = makePlannerParams(collection, *cq);
 
     WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), &collection, &ws, cq.get()));
+    auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
     NoopYieldPolicy yieldPolicy(_expCtx->opCtx, _clock);
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
@@ -601,12 +616,12 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    SubplanStage subplanStage(_expCtx.get(), &coll, &workingSet, canonicalQuery.get());
+    auto subplanStage = makeSubplanStage(coll, canonicalQuery.get(), workingSet);
 
     AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(_expCtx->opCtx,
                                                  serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit,
-              subplanStage.pickBestPlan(plannerParams, &alwaysTimeOutPolicy));
+              subplanStage->pickBestPlan(plannerParams, &alwaysTimeOutPolicy));
 }
 
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
@@ -628,12 +643,12 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    SubplanStage subplanStage(_expCtx.get(), &coll, &workingSet, canonicalQuery.get());
+    auto subplanStage = makeSubplanStage(coll, canonicalQuery.get(), workingSet);
 
     AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(_expCtx->opCtx,
                                                             serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::QueryPlanKilled,
-              subplanStage.pickBestPlan(plannerParams, &alwaysPlanKilledYieldPolicy));
+              subplanStage->pickBestPlan(plannerParams, &alwaysPlanKilledYieldPolicy));
 }
 
 TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelection) {
@@ -662,18 +677,18 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    SubplanStage subplanStage(_expCtx.get(), &collection, &workingSet, canonicalQuery.get());
+    auto subplanStage = makeSubplanStage(collection, canonicalQuery.get(), workingSet);
 
     // Mimic a yield by saving the state of the subplan stage. Then, drop an index not being
     // used while yielded.
-    subplanStage.saveState();
+    subplanStage->saveState();
     collLock.reset();
     dropIndex(BSON("irrelevant" << 1));
 
     // Attempt to restore state. This should throw due the index drop. As a future improvement,
     // we may wish to make the subplan stage tolerate drops of indices it is not using.
     collLock.emplace(opCtx(), nss);
-    ASSERT_THROWS_CODE(subplanStage.restoreState(&collLock->getCollection()),
+    ASSERT_THROWS_CODE(subplanStage->restoreState(&collLock->getCollection()),
                        DBException,
                        ErrorCodes::QueryPlanKilled);
 }
@@ -709,21 +724,21 @@ TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSele
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    SubplanStage subplanStage(_expCtx.get(), &collection, &workingSet, canonicalQuery.get());
+    auto subplanStage = makeSubplanStage(collection, canonicalQuery.get(), workingSet);
 
     NoopYieldPolicy yieldPolicy(_expCtx->opCtx, serviceContext()->getFastClockSource());
-    ASSERT_OK(subplanStage.pickBestPlan(plannerParams, &yieldPolicy));
+    ASSERT_OK(subplanStage->pickBestPlan(plannerParams, &yieldPolicy));
 
     // Mimic a yield by saving the state of the subplan stage and dropping our lock. Then drop
     // an index not being used while yielded.
-    subplanStage.saveState();
+    subplanStage->saveState();
     collLock.reset();
     dropIndex(BSON("irrelevant" << 1));
 
     // Restoring state should succeed, since the plan selected by pickBestPlan() does not use
     // the index {irrelevant: 1}.
     collLock.emplace(opCtx(), nss);
-    subplanStage.restoreState(&collLock->getCollection());
+    subplanStage->restoreState(&collLock->getCollection());
 }
 
 }  // namespace

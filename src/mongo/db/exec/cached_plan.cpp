@@ -261,11 +261,17 @@ Status CachedPlanStage::replan(const QueryPlannerParams& plannerParams,
         return Status::OK();
     }
 
-    // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
-    // and so on. The working set will be shared by all candidate plans.
-    auto cachingMode = shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
-    _children.emplace_back(new MultiPlanStage(
-        expCtx(), collection(), _canonicalQuery, cachingMode, _specificStats.replanReason));
+    // Many solutions. Create a MultiPlanStage to pick the best, update the cache, and so on. The
+    // working set will be shared by all candidate plans.
+    _children.emplace_back(std::make_unique<MultiPlanStage>(
+        expCtx(),
+        collection(),
+        _canonicalQuery,
+        plan_cache_util::ConditionalClassicPlanCacheWriter{
+            plan_cache_util::ConditionalClassicPlanCacheWriter::alwaysOrNeverCacheMode(shouldCache),
+            opCtx(),
+            collection()},
+        _specificStats.replanReason));
     MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
     for (size_t ix = 0; ix < solutions.size(); ++ix) {

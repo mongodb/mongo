@@ -29,13 +29,32 @@
 
 #include "mongo/db/query/classic_runtime_planner/planner_interface.h"
 
-#include "mongo/util/assert_util.h"
-
 namespace mongo::classic_runtime_planner {
 
 SubPlanner::SubPlanner(PlannerData plannerData) : ClassicPlannerInterface(std::move(plannerData)) {
-    auto root = std::make_unique<SubplanStage>(
-        cq()->getExpCtxRaw(), collections().getMainCollectionPtrOrAcquisition(), ws(), cq());
+    SubplanStage::PlanSelectionCallbacks callbacks{
+        // This callback is invoked on a per $or branch basis. The callback is constructed in the
+        // "sometimes cache" mode. We currently do not support cached plan replanning for rooted $or
+        // queries. Therefore, we must be more conservative about putting a potentially bad plan
+        // into the cache in the subplan path.
+        //
+        // TODO SERVER-18777: Support replanning for rooted $or queries.
+        .onPickPlanForBranch =
+            plan_cache_util::ConditionalClassicPlanCacheWriter{
+                plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
+                opCtx(),
+                collections().getMainCollectionPtrOrAcquisition()},
+
+        .onPickPlanWholeQuery =
+            plan_cache_util::ClassicPlanCacheWriter{
+                opCtx(), collections().getMainCollectionPtrOrAcquisition()},
+    };
+
+    auto root = std::make_unique<SubplanStage>(cq()->getExpCtxRaw(),
+                                               collections().getMainCollectionPtrOrAcquisition(),
+                                               ws(),
+                                               cq(),
+                                               std::move(callbacks));
     _subplanStage = root.get();
     setRoot(std::move(root));
 }
