@@ -18,9 +18,6 @@ if (!TestData.embeddedRouter) {
 const st = new ShardingTest({
     shards: 1,
     mongosOptions: mongosOptions,
-    // The config server uses a session for internal operations, so raise the limit by 1 for a
-    // config shard.
-    shardOptions: {setParameter: {maxSessions: TestData.configShard ? 2 : 1}}
 });
 const shard0Primary = st.rs0.getPrimary();
 

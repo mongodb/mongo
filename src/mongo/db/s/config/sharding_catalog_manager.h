@@ -104,9 +104,9 @@ struct RemoveShardProgress {
      * jumbo chunks and databases within the shard
      */
     struct DrainingShardUsage {
-        const long long totalChunks;
-        const long long databases;
-        const long long jumboChunks;
+        long long totalChunks;
+        long long databases;
+        long long jumboChunks;
     };
 
     DrainingShardStatus status;
@@ -665,6 +665,12 @@ public:
      */
     Status upgradeDowngradeConfigSettings(OperationContext* opCtx);
 
+    /**
+     * Schedules an asynchronous unset of the addOrRemoveShardInProgress cluster parameter, in case
+     * a previous addShard/removeShard left it enabled after a failure or crash.
+     */
+    void scheduleAsyncUnblockDDLCoordinators(OperationContext* opCtx);
+
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version
@@ -976,8 +982,13 @@ private:
     // _kZoneOpLock
 
     /**
-     * Lock that guards changes to the set of shards in the cluster (ie addShard and removeShard
-     * requests).
+     * Lock that is held for the entire duration of an add/remove shard operation so that only one
+     * command can execute at a given time.
+     */
+    Lock::ResourceMutex _kAddRemoveShardLock;
+
+    /**
+     * Lock that is held in exclusive mode during the commit phase of an add/remove shard operation.
      */
     Lock::ResourceMutex _kShardMembershipLock;
 

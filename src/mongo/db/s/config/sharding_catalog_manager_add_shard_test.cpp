@@ -165,16 +165,21 @@ protected:
             globalFailPointRegistry().find("shardingCatalogManagerSkipNotifyClusterOnNewDatabases");
         _skipShardingEventNotificationFP->setMode(FailPoint::alwaysOn);
 
-        // Updating the cluster cardinality parameter requires the primary only services to have
-        // been set up.
+        // Updating the cluster cardinality parameter and blocking ShardingDDLCoordinators require
+        // the primary only services to have been set up.
         _skipUpdatingCardinalityParamFP =
             globalFailPointRegistry().find("skipUpdatingClusterCardinalityParameterAfterAddShard");
         _skipUpdatingCardinalityParamFP->setMode(FailPoint::alwaysOn);
+
+        _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP =
+            globalFailPointRegistry().find("skipBlockingDDLCoordinatorsDuringAddAndRemoveShard");
+        _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP->setMode(FailPoint::alwaysOn);
     }
 
     void tearDown() override {
         _skipShardingEventNotificationFP->setMode(FailPoint::off);
         _skipUpdatingCardinalityParamFP->setMode(FailPoint::off);
+        _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP->setMode(FailPoint::off);
         WaitForMajorityService::get(getServiceContext()).shutDown();
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         ConfigServerTestFixture::tearDown();
@@ -672,6 +677,7 @@ protected:
 
     FailPoint* _skipShardingEventNotificationFP;
     FailPoint* _skipUpdatingCardinalityParamFP;
+    FailPoint* _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP;
 };
 
 TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {

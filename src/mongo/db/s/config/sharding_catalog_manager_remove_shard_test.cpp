@@ -123,15 +123,20 @@ protected:
         TransactionCoordinatorService::get(operationContext())
             ->onShardingInitialization(operationContext(), true);
 
-        // Updating the cluster cardinality parameter requires the primary only services to have
-        // been set up.
-        _skipUpdatingCardinalityParamFP = globalFailPointRegistry().find(
-            "skipUpdatingClusterCardinalityParameterAfterRemoveShard");
+        // Updating the cluster cardinality parameter and blocking ShardingDDLCoordinators require
+        // the primary only services to have been set up.
+        _skipUpdatingCardinalityParamFP =
+            globalFailPointRegistry().find("skipUpdatingClusterCardinalityParameterAfterAddShard");
         _skipUpdatingCardinalityParamFP->setMode(FailPoint::alwaysOn);
+
+        _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP =
+            globalFailPointRegistry().find("skipBlockingDDLCoordinatorsDuringAddAndRemoveShard");
+        _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP->setMode(FailPoint::alwaysOn);
     }
 
     void tearDown() override {
         _skipUpdatingCardinalityParamFP->setMode(FailPoint::off);
+        _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP->setMode(FailPoint::off);
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         ConfigServerTestFixture::tearDown();
     }
@@ -159,6 +164,7 @@ protected:
     OID _clusterId;
     ReadWriteConcernDefaultsLookupMock _lookupMock;
     FailPoint* _skipUpdatingCardinalityParamFP;
+    FailPoint* _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP;
 };
 
 TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {

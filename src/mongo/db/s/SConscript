@@ -556,6 +556,7 @@ env.Library(
         'shardsvr_get_stats_for_balancing_command.cpp',
         'shardsvr_index_catalog_test_commands.cpp',
         'shardsvr_insert_global_index_key_command.cpp',
+        'shardsvr_join_ddl_coordinators_command.cpp',
         'shardsvr_join_migrations_command.cpp',
         'shardsvr_merge_all_chunks_on_shard_command.cpp',
         'shardsvr_merge_chunks_command.cpp',

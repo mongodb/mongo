@@ -50,6 +50,9 @@ selector:
     - config_shard_incompatible
     # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
     - assumes_balancer_off
+    # This suite performs balancing of unsharded collection in background using moveCollection that
+    # changes collections UUID
+    - assumes_stable_collection_uuid
 
 executor:
   archive:

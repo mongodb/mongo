@@ -779,6 +779,8 @@ error_codes:
       extra: TransactionParticipantFailedUnyieldInfo,
     }
 
+  - {code: 414, name: AddOrRemoveShardInProgress}
+
   # Error codes 4000-8999 are reserved.
 
   # Non-sequential error codes for compatibility only)

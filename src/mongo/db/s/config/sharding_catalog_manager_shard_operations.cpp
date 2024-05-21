@@ -106,6 +106,7 @@
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
 #include "mongo/db/server_options.h"
@@ -141,6 +142,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/request_types/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/s/request_types/shardsvr_join_migrations_request_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
@@ -169,9 +171,11 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAddShardBeforeUpdatingClusterCardinalityParameter);
 MONGO_FAIL_POINT_DEFINE(hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer);
+MONGO_FAIL_POINT_DEFINE(hangRemoveShardAfterDrainingDDL);
 MONGO_FAIL_POINT_DEFINE(hangRemoveShardBeforeUpdatingClusterCardinalityParameter);
 MONGO_FAIL_POINT_DEFINE(skipUpdatingClusterCardinalityParameterAfterAddShard);
 MONGO_FAIL_POINT_DEFINE(skipUpdatingClusterCardinalityParameterAfterRemoveShard);
+MONGO_FAIL_POINT_DEFINE(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard);
 
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -184,6 +188,9 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::kNoTimeout};
 
 const Seconds kRemoteCommandTimeout{60};
+
+constexpr StringData kAddOrRemoveShardInProgressRecoveryDocumentId =
+    "addOrRemoveShardInProgressRecovery"_sd;
 
 /**
  * Generates a unique name to be given to a newly added shard.
@@ -226,6 +233,150 @@ StatusWith<std::string> generateNewShardName(OperationContext* opCtx, Shard* con
     }
 
     return Status(ErrorCodes::OperationFailed, "unable to generate new shard name");
+}
+
+void waitUntilReadyToBlockNewDDLCoordinators(OperationContext* opCtx) {
+    const auto wouldJoinCoordinatorsBlock = [](OperationContext* opCtx) -> bool {
+        // Check that all shards will be able to join ongoing DDLs quickly.
+        const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+        ShardsvrJoinDDLCoordinators cmd;
+        cmd.setDbName(DatabaseName::kAdmin);
+
+        // Attach a short MaxTimeMS. If _shardsvrJoinDDLOperations fails with MaxTimeMSExpired on
+        // some shard, then it means that some long-running ShardingDDLCoordinators is executing.
+        BSONObjBuilder bob;
+        cmd.serialize(&bob, BSON(CommonRequestArgs::kMaxTimeMSFieldName << 30000));
+
+        try {
+            const auto responses = sharding_util::sendCommandToShards(
+                opCtx, DatabaseName::kAdmin, bob.obj(), allShards, executor);
+        } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>&) {
+            // Return true if any of the shards failed with MaxTimeMSExpired.
+            return true;
+        }
+
+        return false;
+    };
+
+    while (true) {
+        if (wouldJoinCoordinatorsBlock(opCtx)) {
+            LOGV2(5687901,
+                  "Add/remove shard requires all DDL operations on the cluster to quiesce before it"
+                  "can proceed safely. 30 seconds have passed without DDLs quiescing. Waiting for "
+                  "DDL operations to quiesce before continuing.");
+            continue;
+        }
+        return;
+    }
+}
+
+void setAddOrRemoveShardInProgressClusterParam(OperationContext* opCtx, bool newState) {
+    while (true) {
+        try {
+            ConfigsvrSetClusterParameter setClusterParameter(
+                BSON("addOrRemoveShardInProgress" << BSON("inProgress" << newState)));
+            setClusterParameter.setDbName(DatabaseName::kAdmin);
+
+            DBDirectClient client(opCtx);
+            BSONObj res;
+            client.runCommand(DatabaseName::kAdmin, setClusterParameter.toBSON({}), res);
+            uassertStatusOK(getStatusFromWriteCommandReply(res));
+            break;
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
+            // Retry on ErrorCodes::ConflictingOperationInProgress errors, which can be caused by an
+            // already running unrelated setClusterParameter.
+            opCtx->sleepFor(Milliseconds(500));
+            continue;
+        }
+    }
+}
+
+void joinOngoingShardingDDLCoordinatorsOnShards(OperationContext* opCtx) {
+    const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+    ShardsvrJoinDDLCoordinators cmd;
+    cmd.setDbName(DatabaseName::kAdmin);
+
+    sharding_util::sendCommandToShards(
+        opCtx, DatabaseName::kAdmin, cmd.toBSON({}), allShards, executor);
+}
+
+// Sets the addOrRemoveShardInProgress cluster parameter to prevent new ShardingDDLCoordinators from
+// starting, and then drains the ongoing ones. Must be called under the _kAddRemoveShardLock lock.
+void blockDDLCoordinatorsAndDrain(OperationContext* opCtx) {
+    if (MONGO_unlikely(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard.shouldFail())) {
+        return;
+    }
+
+    // Before we block new ShardingDDLCoordinator creations, first do a best-effort check that
+    // there's no currently running one. If there is any, we wait until there is none. This is to
+    // reduce impact to concurrent DDL operations.
+    waitUntilReadyToBlockNewDDLCoordinators(opCtx);
+
+    // Persist a recovery document before we set the addOrRemoveShardInProgress cluster parameter.
+    // This way, in case of crash, the new primary node will unset the parameter.
+    {
+        DBDirectClient client(opCtx);
+        write_ops::checkWriteErrors(client.insert(write_ops::InsertCommandRequest(
+            NamespaceString::kServerConfigurationNamespace,
+            {BSON("_id" << kAddOrRemoveShardInProgressRecoveryDocumentId)})));
+    }
+
+    // Prevent new DDL coordinators from starting across the cluster.
+    LOGV2(5687902,
+          "Requesting all shards to block any new DDL cluster-wide in order to perform topology "
+          "changes");
+    setAddOrRemoveShardInProgressClusterParam(opCtx, true);
+
+
+    // Wait for any ongoing DDL coorinator to finish.
+    LOGV2(5687903, "Draining ongoing ShardingDDLCoordinators for topology change");
+    joinOngoingShardingDDLCoordinatorsOnShards(opCtx);
+    LOGV2(5687904, "Drained ongoing ShardingDDLCoordinators for topology change");
+}
+
+// Unsets the addOrRemoveShardInProgress cluster parameter. Must be called under the
+// _kAddRemoveShardLock lock.
+void unblockDDLCoordinators(OperationContext* opCtx) {
+    if (MONGO_unlikely(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard.shouldFail())) {
+        return;
+    }
+
+    // Allow new DDL coordinators to start across the cluster.
+    setAddOrRemoveShardInProgressClusterParam(opCtx, false);
+    LOGV2(5687905, "Unblocked new ShardingDDLCoordinators after topology change");
+
+    // Delete the recovery document.
+    {
+        DBDirectClient client(opCtx);
+        write_ops::checkWriteErrors(client.remove(write_ops::DeleteCommandRequest(
+            NamespaceString::kServerConfigurationNamespace,
+            {{BSON("_id" << kAddOrRemoveShardInProgressRecoveryDocumentId), false /* multi */}})));
+    }
+}
+
+// If an add/removeShard recovery document is present on kServerConfigurationNamespace, unset the
+// addOrRemoveShardInProgress cluster parameter. Must be called under the _kAddRemoveShardLock lock.
+void resetDDLBlockingForTopologyChangeIfNeeded(OperationContext* opCtx) {
+    // Check if we need to run recovery at all.
+    {
+        DBDirectClient client(opCtx);
+        const auto recoveryDoc =
+            client.findOne(NamespaceString::kServerConfigurationNamespace,
+                           BSON("_id" << kAddOrRemoveShardInProgressRecoveryDocumentId));
+        if (recoveryDoc.isEmpty()) {
+            // No need to do anything.
+            return;
+        }
+    }
+
+    // Unset the addOrRemoveShardInProgress cluster parameter.
+    LOGV2(5687906, "Resetting addOrRemoveShardInProgress cluster parameter after failure");
+    unblockDDLCoordinators(opCtx);
+    LOGV2(5687907, "Resetted addOrRemoveShardInProgress cluster parameter after failure");
 }
 
 }  // namespace
@@ -883,6 +1034,12 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
+    Lock::ExclusiveLock addRemoveShardLock(opCtx, _kAddRemoveShardLock);
+
+    // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
+    // failed addShard/removeShard operation.
+    resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
+
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
     // so that no add/remove shard operation and its set cluster cardinality parameter operation can
     // interleave with the ones below. Release the shard membership lock before initiating the
@@ -915,6 +1072,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         return existingShard.getValue()->getName();
     }
+
+    shardMembershipLock.unlock();
+    clusterCardinalityParameterLock.unlock();
 
     const std::shared_ptr<Shard> shard{shardRegistry->createConnection(shardConnectionString)};
     auto targeter = shard->getTargeter();
@@ -1074,6 +1234,13 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             }
         }
 
+        // Block new ShardingDDLCoordinators on the cluster and join ongoing ones.
+        ScopeGuard unblockDDLCoordinatorsGuard([&] { scheduleAsyncUnblockDDLCoordinators(opCtx); });
+        if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            blockDDLCoordinatorsAndDrain(opCtx);
+        }
+
         // Tick clusterTime to get a new topologyTime for this mutation of the topology.
         auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
 
@@ -1082,6 +1249,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         LOGV2(21942,
               "Going to insert new entry for shard into config.shards",
               "shardType"_attr = shardType.toString());
+
+        clusterCardinalityParameterLock.lock();
+        shardMembershipLock.lock();
 
         _addShardInTransaction(
             opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList));
@@ -1113,6 +1283,14 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // Release the shard membership lock since the set cluster parameter operation below
         // require taking this lock.
         shardMembershipLock.unlock();
+
+        // Unblock ShardingDDLCoordinators on the cluster.
+        if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            unblockDDLCoordinators(opCtx);
+        }
+        unblockDDLCoordinatorsGuard.dismiss();
+
         auto updateStatus = _updateClusterCardinalityParameterAfterAddShardIfNeeded(
             clusterCardinalityParameterLock, opCtx);
         if (!updateStatus.isOK()) {
@@ -1160,6 +1338,12 @@ boost::optional<RemoveShardProgress> checkCollectionsAreEmpty(
 
 RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                         const ShardId& shardId) {
+    Lock::ExclusiveLock addRemoveShardLock(opCtx, _kAddRemoveShardLock);
+
+    // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
+    // failed addShard/removeShard operation.
+    resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
+
     const auto name = shardId.toString();
     audit::logRemoveShard(opCtx->getClient(), name);
 
@@ -1252,29 +1436,31 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.
-    const auto chunkCount = uassertStatusOK(
-        _runCountCommandOnConfig(opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name))));
+    const auto getDrainingProgress = [&]() -> RemoveShardProgress::DrainingShardUsage {
+        const auto chunkCount = uassertStatusOK(
+            _runCountCommandOnConfig(opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name))));
 
-    const auto databaseCount =
-        uassertStatusOK(_runCountCommandOnConfig(opCtx,
-                                                 NamespaceString::kConfigDatabasesNamespace,
-                                                 BSON(DatabaseType::kPrimaryFieldName << name)));
+        const auto databaseCount = uassertStatusOK(
+            _runCountCommandOnConfig(opCtx,
+                                     NamespaceString::kConfigDatabasesNamespace,
+                                     BSON(DatabaseType::kPrimaryFieldName << name)));
 
-    const auto jumboCount = uassertStatusOK(_runCountCommandOnConfig(
-        opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name) << ChunkType::jumbo(true))));
+        const auto jumboCount = uassertStatusOK(_runCountCommandOnConfig(
+            opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name) << ChunkType::jumbo(true))));
 
-    if (chunkCount > 0 || databaseCount > 0) {
+        return {chunkCount, databaseCount, jumboCount};
+    };
+
+    auto drainingProgress = getDrainingProgress();
+    if (drainingProgress.totalChunks > 0 || drainingProgress.databases > 0) {
         // Still more draining to do
         LOGV2(21946,
               "removeShard: draining",
-              "chunkCount"_attr = chunkCount,
-              "databaseCount"_attr = databaseCount,
-              "jumboCount"_attr = jumboCount);
+              "chunkCount"_attr = drainingProgress.totalChunks,
+              "databaseCount"_attr = drainingProgress.databases,
+              "jumboCount"_attr = drainingProgress.jumboChunks);
 
-        return {RemoveShardProgress::ONGOING,
-                boost::optional<RemoveShardProgress::DrainingShardUsage>(
-                    {chunkCount, databaseCount, jumboCount}),
-                boost::none};
+        return {RemoveShardProgress::ONGOING, drainingProgress, boost::none};
     }
 
     if (shardId == ShardId::kConfigServerId) {
@@ -1308,7 +1494,32 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
             return {RemoveShardProgress::PENDING_DATA_CLEANUP, boost::none, pendingRangeDeletions};
         }
+    }
 
+    // Prevent new ShardingDDLCoordinators operations from starting across the cluster.
+    ScopeGuard unblockDDLCoordinatorsGuard([&] { scheduleAsyncUnblockDDLCoordinators(opCtx); });
+    if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        blockDDLCoordinatorsAndDrain(opCtx);
+    }
+
+    hangRemoveShardAfterDrainingDDL.pauseWhileSet(opCtx);
+
+    // Now that DDL operations are not executing, recheck that this shard truly does not own any
+    // chunks nor database.
+    drainingProgress = getDrainingProgress();
+    if (drainingProgress.totalChunks > 0 || drainingProgress.databases > 0) {
+        // Still more draining to do
+        LOGV2(5687909,
+              "removeShard: more draining to do after having blocked DDLCoordinators",
+              "chunkCount"_attr = drainingProgress.totalChunks,
+              "databaseCount"_attr = drainingProgress.databases,
+              "jumboCount"_attr = drainingProgress.jumboChunks);
+
+        return {RemoveShardProgress::ONGOING, drainingProgress, boost::none};
+    }
+
+    if (shardId == ShardId::kConfigServerId) {
         // Drop all tracked databases locally now that all user data has been drained so the config
         // server can transition back to catalog shard mode without requiring users to manually drop
         // them.
@@ -1403,6 +1614,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Release the shard membership lock since the set cluster parameter operation below
     // require taking this lock.
     shardMembershipLock.unlock();
+
+    // Unset the addOrRemoveShardInProgress cluster parameter. Note that _removeShardInTransaction
+    // has already waited for the commit to be majority-acknowledged.
+    if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        unblockDDLCoordinators(opCtx);
+    }
+    unblockDDLCoordinatorsGuard.dismiss();
 
     // The shard which was just removed must be reflected in the shard registry, before the replica
     // set monitor is removed, otherwise the shard would be referencing a dropped RSM.
@@ -2114,6 +2333,42 @@ void ShardingCatalogManager::_removeShardInTransaction(OperationContext* opCtx,
     txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
 
     txn.run(opCtx, removeShardFn);
+}
+
+void ShardingCatalogManager::scheduleAsyncUnblockDDLCoordinators(OperationContext* opCtx) {
+    if (!mongo::feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return;
+    }
+
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    const auto serviceContext = opCtx->getServiceContext();
+    AsyncTry([this, serviceContext] {
+        ThreadClient tc{"resetDDLBlockingForTopologyChange",
+                        serviceContext->getService(ClusterRole::ShardServer)};
+        auto uniqueOpCtx{tc->makeOperationContext()};
+        auto opCtx{uniqueOpCtx.get()};
+
+        // Take _kAddRemoveShardLock to ensure that the reset does not interleave with a new
+        // addShard/removeShard command.
+        Lock::ExclusiveLock addRemoveShardLock(opCtx, _kAddRemoveShardLock);
+        resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
+    })
+        .until([serviceContext](Status status) {
+            // Retry until success or until this node is no longer the primary.
+            const bool primary =
+                repl::ReplicationCoordinator::get(serviceContext)->getMemberState().primary();
+            return status.isOK() || !primary;
+        })
+        .withDelayBetweenIterations(Seconds(1))
+        .on(executor, CancellationToken::uncancelable())
+        .onError([](Status status) {
+            LOGV2_WARNING(
+                5687908,
+                "Failed to reset addOrRemoveShardInProgress cluster parameter after failure",
+                "error"_attr = status.toString());
+        })
+        .getAsync([](auto) {});
 }
 
 }  // namespace mongo

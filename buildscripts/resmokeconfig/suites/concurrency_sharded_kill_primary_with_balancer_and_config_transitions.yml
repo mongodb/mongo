@@ -74,7 +74,6 @@ selector:
     - jstests/concurrency/fsm_workloads/agg_lookup_in_txn.js
     - jstests/concurrency/fsm_workloads/agg_out.js
     - jstests/concurrency/fsm_workloads/agg_sort.js
-    - jstests/concurrency/fsm_workloads/random_DDL_operations.js
     - jstests/concurrency/fsm_workloads/rename_sharded_collection.js
     - jstests/concurrency/fsm_workloads/rename_capped_collection_chain.js
     - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js

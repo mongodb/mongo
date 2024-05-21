@@ -179,3 +179,10 @@ feature_flags:
     default: true
     version: 8.0
     shouldBeFCVGated: true
+  featureFlagStopDDLCoordinatorsDuringTopologyChanges:
+    description: "Feature flag to stop ShardingDDLCoordinators during sharding topology changes (i.e.
+                  addShard and removeShard)."
+    cpp_varname: feature_flags::gStopDDLCoordinatorsDuringTopologyChanges
+    default: true
+    version: 8.1
+    shouldBeFCVGated: true

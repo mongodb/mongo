@@ -194,6 +194,9 @@ selector:
     - assumes_balancer_off
     # Fast count doesn't filter orphan documents
     - requires_fastcount
+    # This suite performs balancing of unsharded collection in background using moveCollection that
+    # changes collections UUID
+    - assumes_stable_collection_uuid
 
 executor:
   archive:

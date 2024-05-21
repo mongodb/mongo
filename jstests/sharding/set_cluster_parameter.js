@@ -245,19 +245,17 @@ if (!TestData.configShard) {
             assert.commandWorked(
                 st2.s.adminCommand({addShard: newShard2.getURL(), name: newShard2Name}));
 
-            // After adding the shard there must be only one cluster parameter: the one set on the
-            // rs clusterParameter1.
+            // After adding the shard there the clusterParameter set on the rs clusterParameter1
+            // must have been adopted by the whole cluster.
             checkClusterParameters(clusterParameter1Name,
                                    clusterParameter1Value,
                                    st2.configRS.getPrimary(),
                                    newShard2.getPrimary());
 
-            assert.eq(1,
-                      newShard2.getPrimary()
+            assert.eq(st2.configRS.getPrimary()
                           .getCollection('config.clusterParameters')
-                          .countDocuments({}));
-            assert.eq(1,
-                      st2.configRS.getPrimary()
+                          .countDocuments({}),
+                      newShard2.getPrimary()
                           .getCollection('config.clusterParameters')
                           .countDocuments({}));
         }
