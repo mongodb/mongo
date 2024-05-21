@@ -1,6 +1,7 @@
 // @tags: [
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
+//   requires_getmore,
 // ]
 
 let t = db.remove8;
