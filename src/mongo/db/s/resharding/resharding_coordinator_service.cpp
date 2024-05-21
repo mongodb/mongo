@@ -793,7 +793,7 @@ makeFlushRoutingTableCacheUpdatesOptions(const NamespaceString& nss,
     auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.dbName());
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args, kMajorityWriteConcern);
     auto opts =
         std::make_shared<async_rpc::AsyncRPCOptions<FlushRoutingTableCacheUpdatesWithWriteConcern>>(
             exec, token, cmd, args);
@@ -1559,7 +1559,7 @@ createShardsvrCommitReshardCollectionOptions(const NamespaceString& nss,
     ShardsvrCommitReshardCollection cmd(nss);
     cmd.setDbName(DatabaseName::kAdmin);
     cmd.setReshardingUUID(reshardingUUID);
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args, kMajorityWriteConcern);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitReshardCollection>>(
         exec, token, cmd, args);
     return opts;
@@ -2575,7 +2575,7 @@ void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
     // In case the recipient is running a legacy binary, swallow the error.
     try {
         GenericArguments args;
-        async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+        async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args, kMajorityWriteConcern);
         const auto opts =
             std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrNotifyShardingEventRequest>>(
                 **executor, _ctHolder->getStepdownToken(), request, args);
@@ -2623,7 +2623,8 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
                     nss, notMatchingThisUUID);
 
                 GenericArguments args;
-                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(
+                    args, kMajorityWriteConcern);
                 auto opts = std::make_shared<async_rpc::AsyncRPCOptions<
                     ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernRequest>>(
                     **executor, _ctHolder->getStepdownToken(), cmd, args);
@@ -2715,7 +2716,7 @@ void ReshardingCoordinator::_establishAllDonorsAsParticipants(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
     GenericArguments args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args, kMajorityWriteConcern);
     auto opts = makeFlushRoutingTableCacheUpdatesOptions(
         _coordinatorDoc.getSourceNss(), **executor, _ctHolder->getStepdownToken(), args);
     opts->cmd.setDbName(DatabaseName::kAdmin);
@@ -2726,7 +2727,7 @@ void ReshardingCoordinator::_establishAllRecipientsAsParticipants(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
     GenericArguments args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args, kMajorityWriteConcern);
     auto opts = makeFlushRoutingTableCacheUpdatesOptions(
         _coordinatorDoc.getTempReshardingNss(), **executor, _ctHolder->getStepdownToken(), args);
     opts->cmd.setDbName(DatabaseName::kAdmin);
@@ -2788,7 +2789,7 @@ void ReshardingCoordinator::_tellAllParticipantsToAbort(
     ShardsvrAbortReshardCollection abortCmd(_coordinatorDoc.getReshardingUUID(), isUserAborted);
     abortCmd.setDbName(DatabaseName::kAdmin);
     GenericArguments args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args, kMajorityWriteConcern);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrAbortReshardCollection>>(
         **executor, _ctHolder->getStepdownToken(), abortCmd, args);
     _sendCommandToAllParticipants(executor, opts);
