@@ -67,11 +67,6 @@ selector:
     # retry logic for this hook leads to breaking a test assertion.
     - jstests/concurrency/fsm_workloads/timeseries_mirrored_writes.js
 
-    # TODO SERVER-89838: Check metadata consistency hook detects different time series options on
-    # shards after collMod.
-    - jstests/concurrency/fsm_workloads/timeseries_collmod_granularity_update.js
-    - jstests/concurrency/fsm_workloads/timeseries_agg_out.js
-
     # TODO SERVER-89840: Inconsistent UUIDs for config.system.sessions across config shard and
     # removed/re-added shard.
     - jstests/concurrency/fsm_workloads/add_remove_shards_killop.js
@@ -92,6 +87,7 @@ selector:
     - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js
     - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
     - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_droptarget.js
+    - jstests/concurrency/fsm_workloads/timeseries_agg_out.js
 
     # This test expects to catch QueryPlanKilled errors, but the config transition runCommand
     # override retries on QueryPlanKilled errors to retain test coverage for transient errors
