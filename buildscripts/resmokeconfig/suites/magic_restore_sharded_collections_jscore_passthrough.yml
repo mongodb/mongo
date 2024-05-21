@@ -1,4 +1,4 @@
-test_kind: js_test
+test_kind: magic_restore_js_test
 
 selector:
   roots:
@@ -69,6 +69,7 @@ selector:
     # Int types within an array type in BSON get their type changed when passed into a C++ function from Javascript.
     - jstests/core/query/type/type_array.js
     - jstests/core/timeseries/timeseries_internal_bounded_sort_compound_mixed_types.js
+    - jstests/core/json_schema/unique_items.js
 
     # Uses documents that are too close to max BSON size for us to support passing to C++ as a BSON array.
     - jstests/core/max_doc_size.js
@@ -81,6 +82,15 @@ selector:
     # config server node on a different port than the configuration we pass in. We will have a
     # targeted test that handles this case for correctness.
     - jstests/core/query/query_settings/query_settings_size_limits.js
+
+    # Spawns a separate shell program which is not compatible with try/catch wrapping.
+    - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js
+
+    # Uses invalid views which causes listCollections to fail in the data consistency checker.
+    - jstests/core/views/invalid_system_views.js
+    - jstests/core/views/views_validation.js
+    - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
+    - jstests/core/catalog/list_collections_no_views.js
 
     # BF-33295. Magic restore fails in burn_in tasks with NamespaceNotFound error
     - jstests/core/query/sort/sortj.js
@@ -100,11 +110,15 @@ selector:
     - requires_profiling
     # Capped collections cannot be sharded
     - requires_capped
+    - uses_parallel_shell
 
 executor:
   config:
     shell_options:
-      eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/noop_assertions.js");
+        await import("jstests/libs/override_methods/noop_drop.js");
   hooks:
     - class: MagicRestoreEveryN
       n: 20
