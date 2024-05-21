@@ -706,8 +706,7 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
     invariant(_work);
     invariant(!_work->in().empty());
 
-    TrafficRecorder::get(_serviceContext)
-        .observe(session(), _serviceContext->getPreciseClockSource()->now(), _work->in());
+    TrafficRecorder::get(_serviceContext).observe(session(), _work->in(), _serviceContext);
 
     _work->decompressRequest();
 
@@ -760,8 +759,7 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
 
     toSink = work.compressResponse(toSink);
 
-    TrafficRecorder::get(_serviceContext)
-        .observe(session(), _serviceContext->getPreciseClockSource()->now(), toSink);
+    TrafficRecorder::get(_serviceContext).observe(session(), toSink, _serviceContext);
 
     work.setOut(std::move(toSink));
 }

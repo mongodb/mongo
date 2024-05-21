@@ -322,8 +322,8 @@ void TrafficRecorder::stop() {
 }
 
 void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
-                              Date_t now,
-                              const Message& message) {
+                              const Message& message,
+                              ServiceContext* svcCtx) {
     if (shouldAlwaysRecordTraffic) {
         {
             stdx::lock_guard<Latch> lk(_mutex);
@@ -338,7 +338,8 @@ void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
             }
         }
 
-        invariant(_recording->pushRecord(ts, now, _recording->order.addAndFetch(1), message));
+        invariant(_recording->pushRecord(
+            ts, svcCtx->getPreciseClockSource()->now(), _recording->order.addAndFetch(1), message));
         return;
     }
 
@@ -354,7 +355,8 @@ void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
     }
 
     // Try to record the message
-    if (recording->pushRecord(ts, now, recording->order.addAndFetch(1), message)) {
+    if (recording->pushRecord(
+            ts, svcCtx->getPreciseClockSource()->now(), recording->order.addAndFetch(1), message)) {
         return;
     }
 
