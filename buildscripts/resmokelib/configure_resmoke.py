@@ -519,6 +519,8 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
         )
         if not setup_success:
             print("Failed to create file to send otel metrics to. Continuing.")
+    except (KeyboardInterrupt, SystemExit):
+        raise
     except:
         # We want this as a catch all exception
         # If there is some problem setting up metrics we don't want resmoke to fail
