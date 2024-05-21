@@ -10,23 +10,32 @@ export function getConn(connStr) {
     }
 }
 
-export function shouldSkipCommand(conn, _commandName, commandObj, func, makeFuncArgs) {
-    // Finding connected nodes and sendCommandToInitialSyncNodeInReplSet will send
-    // hello/isMaster, replSetGetStatus, getShardMap, and listShards to `conn` (the primary or the
-    // mongos) to discover the topology and find the initial sync node(s), and since runCommand is
-    // overriden with maybeSendCommandToInitialSyncNodes, this would result in infinite recursion,
-    // so we need to instead skip trying to send these commands to the initial sync node.
-    if (_commandName == "isMaster" || _commandName == "hello" || _commandName == "ismaster" ||
-        _commandName == "replSetGetStatus" || _commandName == "getShardMap" ||
-        _commandName == "listShards") {
-        return true;
+export function shouldSkipCommand(_commandName, commandObj) {
+    let skippedCommands = {
+        // These commands are skipped because finding connected nodes and
+        // sendCommandToInitialSyncNodeInReplSet will send
+        // hello/isMaster, replSetGetStatus, getShardMap, and listShards to `conn` (the primary or
+        // the mongos) to discover the topology and find the initial sync node(s), and since
+        // runCommand is overriden with maybeSendCommandToInitialSyncNodes, this would result in
+        // infinite recursion, so we need to instead skip trying to send these commands to the
+        // initial sync node.
+        "isMaster": true,
+        "hello": true,
+        "ismaster": true,
+        "replSetGetStatus": true,
+        "getShardMap": true,
+        "listShards": true,
+        // Ignore getLog/waitForFailpoint to avoid waiting for a log
+        // message or a failpoint to be hit on the initial sync node.
+        "getLog": true,
+        "waitForFailPoint": true,
+        "configureFailPoint": true,
+        // Ignore fsync to avoid locking the initial sync node without unlocking.
+        "fsync": true,
+        "fsyncUnlock": true,
     }
 
-    // Ignore getLog/waitForFailpoint to avoid waiting for a log
-    // message or a failpoint to be hit on the initial sync node.
-    // Ignore fsync to avoid locking the initial sync node without unlocking.
-    if (_commandName == "getLog" || _commandName == "waitForFailPoint" || _commandName == "fsync" ||
-        _commandName == "fsyncUnlock" || _commandName == "configureFailpoint") {
+    if (_commandName in skippedCommands) {
         return true;
     }
 
@@ -52,7 +61,7 @@ export function sendCommandToInitialSyncNodeInReplSet(
         // on.
         try {
             jsTestLog("Attempting to forward command to " + rsType +
-                      " initial sync node: " + _commandName);
+                      " initial sync node: " + _commandName + " (this may end up being a no-op)");
             func.apply(initialSyncConn, makeFuncArgs(commandObj));
         } catch (exp) {
             jsTest.log("Unable to apply command " + _commandName + ": " + tojson(commandObj) +
