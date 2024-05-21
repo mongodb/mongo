@@ -1376,7 +1376,16 @@ tasks:
 
 - <<: *gen_task_template
   name: noPassthrough_gen
-  tags: ["assigned_to_jira_team_server_execution", "release_critical", "incompatible_mac", "misc_js", "no_debug_mode"]
+  tags:
+    [
+      "assigned_to_jira_team_server_execution",
+      "release_critical",
+      "incompatible_mac",
+      "incompatible_ppc",
+      "incompatible_s390x",
+      "misc_js",
+      "no_debug_mode"
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
