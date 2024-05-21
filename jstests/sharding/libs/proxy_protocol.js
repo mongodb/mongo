@@ -59,8 +59,23 @@ export class ProxyProtocolServer {
         clearRawMongoProgramOutput();
 
         this.pid = _startMongoProgram({args: args});
-
-        assert(checkProgram(this.pid));
+        // We assume proxyprotocol.create_server has run (and possibly error'd) before the 3
+        // second sleep finishes. When `checkProgram` asserts true, we assume that the
+        // proxyprotocol server is up and running.
+        sleep(3000);
+        if (!checkProgram(this.pid)["alive"]) {
+            // TODO the fuser and ps here act as diagnostics for future cases of port collision.
+            // After more occurences of "address in use", we'll be able to figure out which
+            // program is using the same port, and this can be removed.
+            jsTestLog("Printing info from ports " + this.ingress_port);
+            let fuserArgs = ["/bin/sh", "-c", "fuser -v -n tcp " + this.ingress_port];
+            let psArgs = ["/bin/sh", "-c", "ps -ef | grep " + this.ingress_port];
+            _startMongoProgram({args: fuserArgs});
+            _startMongoProgram({args: psArgs});
+            // Give time for fuser to finish running.
+            sleep(3000);
+            assert(false, "Failed to create a ProxyProtocolServer.");
+        }
 
         // Wait for the web server to start
         assert.soon(function() {
