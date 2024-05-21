@@ -281,11 +281,19 @@ if not use_system_version_of_library('grpc'):
         ],
     }
 
+# Vendored libunwind can be configured to use liblzma for decompressing
+# minidebuginfo sections, but we disable that feature via
+# `unwind/scripts/host-config.sh`. If vendored libunwind ever needs
+# minidebuginfo support, we'd say so here, and we'd dynamically link with
+# system lzma. Until then, it would be an unnecessary dynamic dependency.
+# However, the system libunwind is assumed to need `lzma` unconditionally.
+vendored_libunwind_needs_lzma = False
+
 if use_system_libunwind:
     thirdPartyEnvironmentModifications['unwind'] = {
         'SYSLIBDEPS_PRIVATE': [env['LIBDEPS_UNWIND_SYSLIBDEP'], env['LIBDEPS_LZMA_SYSLIBDEP']],
     }
-elif use_vendored_libunwind:
+elif use_vendored_libunwind and vendored_libunwind_needs_lzma:
     thirdPartyEnvironmentModifications['unwind'] = {
         'SYSLIBDEPS_PRIVATE': [env['LIBDEPS_LZMA_SYSLIBDEP']],
     }
@@ -382,7 +390,11 @@ if use_libunwind:
                 thirdPartyEnvironmentModifications['unwind'][k] = v
 
         unwindEnv.AddMethod(registerConsumerModifications, 'RegisterConsumerModifications')
-        unwindEnv.SConscript('unwind/SConscript', exports={'env': unwindEnv})
+        unwindEnv.SConscript(
+            'unwind/SConscript', exports={
+                'env': unwindEnv,
+                'vendored_libunwind_needs_lzma': vendored_libunwind_needs_lzma,
+            })
         unwindEnv.Append(LIBDEPS_INTERFACE=[
             'unwind/unwind',
         ])
