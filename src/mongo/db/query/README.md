@@ -17,7 +17,7 @@ satisfy it, and to actually compute the results. It is primarily exposed through
 - Optimizer
 - Execution engine
 - Sharding
-- Views
+- [Views][views]
 
 ## Features
 
@@ -78,3 +78,4 @@ satisfy it, and to actually compute the results. It is primarily exposed through
 [canonicalquery]: canonical_query.h
 [liteparsedpipeline]: ../pipeline/lite_parsed_pipeline.h
 [expressioncontext]: ../pipeline/expression_context.h
+[views]: README_views.md
