@@ -258,7 +258,7 @@ public:
     }
 
     static uint64_t deltaDouble(BSONElement val, BSONElement prev, double scaleFactor) {
-        uint8_t scaleIndex = 0;
+        size_t scaleIndex = 0;
         for (; scaleIndex < Simple8bTypeUtil::kScaleMultiplier.size(); ++scaleIndex) {
             if (Simple8bTypeUtil::kScaleMultiplier[scaleIndex] == scaleFactor)
                 break;

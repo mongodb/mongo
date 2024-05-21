@@ -159,7 +159,7 @@ void applyChild(const UpdateNode& child,
     // If the child is an internal node, it may have created 'pathToCreate' and moved 'pathToCreate'
     // to the end of 'pathTaken'. We should advance 'element' to the end of 'pathTaken'.
     if (updateNodeApplyParams->pathTaken->size() > pathTakenSizeBefore) {
-        for (auto i = pathTakenSizeBefore; i < updateNodeApplyParams->pathTaken->size(); ++i) {
+        for (size_t i = pathTakenSizeBefore; i < updateNodeApplyParams->pathTaken->size(); ++i) {
             applyParams->element = getChild(
                 applyParams->element, updateNodeApplyParams->pathTaken->fieldRef().getPart(i));
             invariant(applyParams->element.ok());

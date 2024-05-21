@@ -105,7 +105,7 @@ boost::optional<uint8_t> Simple8bTypeUtil::calculateDecimalShiftMultiplier(doubl
     }
     // Try multiplying by selected powers of 10 until we do not have any decimal digits. If we
     // always have leftover digits, return none.
-    for (uint8_t i = 0; i < kScaleMultiplier.size(); ++i) {
+    for (size_t i = 0; i < kScaleMultiplier.size(); ++i) {
         double scaleMultiplier = kScaleMultiplier[i];
         double valTimesMultiplier = val * scaleMultiplier;
         // Checks for both overflows

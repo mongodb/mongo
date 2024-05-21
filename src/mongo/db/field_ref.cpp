@@ -329,7 +329,7 @@ StringData FieldRef::dottedSubstring(FieldIndex startPart, FieldIndex endPart) c
 bool FieldRef::equalsDottedField(StringData other) const {
     StringData rest = other;
 
-    for (FieldIndex i = 0; i < _parts.size(); i++) {
+    for (size_t i = 0; i < _parts.size(); i++) {
         StringData part = getPart(i);
 
         if (!rest.startsWith(part))
