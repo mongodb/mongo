@@ -80,7 +80,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(SleepDbCheckInBatch);
-MONGO_FAIL_POINT_DEFINE(hangAfterGeneratingHashForExtraIndexKeysCheck);
+MONGO_FAIL_POINT_DEFINE(secondaryHangAfterExtraIndexKeysHashing);
 
 namespace {
 
@@ -937,13 +937,12 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
 
                     uassertStatusOK(hasher->hashForExtraIndexKeysCheck(
                         opCtx, collection.get(), batchStart, batchEnd));
-                    if (MONGO_unlikely(
-                            hangAfterGeneratingHashForExtraIndexKeysCheck.shouldFail())) {
+                    if (MONGO_unlikely(secondaryHangAfterExtraIndexKeysHashing.shouldFail())) {
                         LOGV2_DEBUG(3083200,
                                     3,
-                                    "Hanging due to hangAfterGeneratingHashForExtraIndexKeysCheck "
+                                    "Hanging due to secondaryHangAfterExtraIndexKeysHashing "
                                     "failpoint");
-                        hangAfterGeneratingHashForExtraIndexKeysCheck.pauseWhileSet(opCtx);
+                        secondaryHangAfterExtraIndexKeysHashing.pauseWhileSet(opCtx);
                     }
                     break;
                 }

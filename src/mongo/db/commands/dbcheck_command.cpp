@@ -108,7 +108,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeExtraIndexKeysCheck);
 MONGO_FAIL_POINT_DEFINE(hangBeforeReverseLookupCatalogSnapshot);
 MONGO_FAIL_POINT_DEFINE(hangAfterReverseLookupCatalogSnapshot);
 MONGO_FAIL_POINT_DEFINE(hangBeforeExtraIndexKeysHashing);
-MONGO_FAIL_POINT_DEFINE(sleepAfterExtraIndexKeysHashing);
+MONGO_FAIL_POINT_DEFINE(primaryHangAfterExtraIndexKeysHashing);
 
 namespace mongo {
 
@@ -693,11 +693,10 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
 
         // 3. Run hashing algorithm.
         Status hashStatus = _hashExtraIndexKeysCheck(opCtx, &batchStats);
-        if (MONGO_unlikely(sleepAfterExtraIndexKeysHashing.shouldFail())) {
-            LOGV2_DEBUG(3083201,
-                        3,
-                        "Sleeping for 1 second due to sleepAfterExtraIndexKeysHashing failpoint");
-            opCtx->sleepFor(Milliseconds(1000));
+        if (MONGO_unlikely(primaryHangAfterExtraIndexKeysHashing.shouldFail())) {
+            LOGV2_DEBUG(
+                3083201, 3, "Hanging due to primaryHangAfterExtraIndexKeysHashing failpoint");
+            primaryHangAfterExtraIndexKeysHashing.pauseWhileSet(opCtx);
         }
         if (!hashStatus.isOK()) {
             LOGV2_DEBUG(7844902,

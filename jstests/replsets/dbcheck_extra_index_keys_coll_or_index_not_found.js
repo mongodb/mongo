@@ -7,6 +7,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {
     awaitDbCheckCompletion,
     checkHealthLog,
@@ -431,6 +432,94 @@ function keyNotFoundDuringReverseLookup(nDocs) {
     skipUpdatingIndexDocumentSecondary.off();
 }
 
+function runIndexBuild(dbName, collName, indexSpec) {
+    jsTest.log("Index build request starting...");
+    db.getSiblingDB(dbName).runCommand({createIndexes: collName, indexes: [indexSpec]});
+}
+
+function dbCheckDuringIndexBuild(docSuffix) {
+    jsTestLog(
+        "Testing that dbcheck will generate a health log entry when index build has not completed yet.");
+
+    resetAndInsert(replSet, primaryDB, collName, defaultNumDocs, docSuffix);
+
+    let joinIndexBuild;
+    const indexBuildFailPoint = configureFailPoint(primaryDB, "hangAfterSettingUpIndexBuild");
+
+    try {
+        joinIndexBuild = startParallelShell(
+            funWithArgs(runIndexBuild, dbName, collName, {key: {a: 1}, name: "a_1"}), primary.port);
+        indexBuildFailPoint.wait();
+
+        runDbCheck(replSet, primaryDB, collName, {
+            validateMode: "extraIndexKeysCheck",
+            secondaryIndex: "a_1",
+            maxDocsPerBatch: 20,
+            batchWriteConcern: writeConcern
+        });
+        checkHealthLog(primaryHealthLog, {"operation": "dbCheckStop"}, 1);
+    } finally {
+        indexBuildFailPoint.off();
+    }
+
+    joinIndexBuild();
+
+    // Check that the primary logged a warning health log entry because the index did not exist when
+    // dbcheck started.
+    checkHealthLog(primaryHealthLog, logQueries.indexNotFoundWarningQuery, 1);
+    // Check that there are no other warning/error health logs on the primary.
+    checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 1);
+
+    // Check that there are no warning/error health logs on the secondary.
+    checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
+}
+
+function indexDropAfterFirstBatch(docSuffix) {
+    jsTestLog(
+        "Testing that dbcheck will generate a health log entry when index is dropped in the middle of dbcheck.");
+
+    resetAndInsert(replSet, primaryDB, collName, defaultNumDocs, docSuffix);
+    assert.commandWorked(primaryDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {a: 1}, name: 'a_1'}],
+    }));
+    replSet.awaitReplication();
+
+    const primaryHangAfterHashing =
+        configureFailPoint(primaryDB, "primaryHangAfterExtraIndexKeysHashing");
+    const secondaryHangAfterHashing =
+        configureFailPoint(secondaryDB, "secondaryHangAfterExtraIndexKeysHashing");
+
+    let dbCheckParameters = {
+        validateMode: "extraIndexKeysCheck",
+        secondaryIndex: "a_1",
+        maxDocsPerBatch: 20,
+        batchWriteConcern: writeConcern
+    };
+    runDbCheck(replSet, primaryDB, collName, dbCheckParameters);
+
+    primaryHangAfterHashing.wait();
+    secondaryHangAfterHashing.wait();
+
+    assert.commandWorked(primaryDB.runCommand({dropIndexes: collName, index: "a_1"}));
+
+    primaryHangAfterHashing.off();
+    secondaryHangAfterHashing.off();
+    awaitDbCheckCompletion(replSet, primaryDB);
+
+    // Check that the primary logged an info batch for the first batch before the index was dropped.
+    checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, 1);
+    // Check that the primary logged a warning entry because of the index drop.
+    checkHealthLog(primaryHealthLog, logQueries.indexNotFoundWarningQuery, 1);
+    // Check that there are no other errors/warnings on the primary.
+    checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 1);
+
+    // Check that the secondary has an info batch for the first batch.
+    checkHealthLog(secondaryHealthLog, logQueries.infoBatchQuery, 1);
+    // Check that there are no errors/warnings on the primary.
+    checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
+}
+
 // Test with integer index entries (1, 2, 3, etc.), single character string entries ("1",
 // "2", "3", etc.), and long string entries ("1aaaaaaaaaa")
 [null,
@@ -444,6 +533,8 @@ function keyNotFoundDuringReverseLookup(nDocs) {
         collNotFoundDuringHashing(docSuffix);
         collNotFoundDuringReverseLookup(docSuffix);
         allIndexKeysNotFoundDuringReverseLookup(10, docSuffix);
+        dbCheckDuringIndexBuild(docSuffix);
+        indexDropAfterFirstBatch(docSuffix);
     });
 
 keysChangedBeforeHashing();
