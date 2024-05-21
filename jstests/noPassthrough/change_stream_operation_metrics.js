@@ -105,14 +105,14 @@ let nextId = nDocs;
     const cur = primaryDB[collName].watch([], {fullDocument: "updateLookup"});
 
     assertMetrics(primary, (metrics) => {
-        // The first aggregate operation should not read anything yet.
-        assert.eq(metrics[dbName].primaryMetrics.docBytesRead, 0);
-        assert.eq(metrics[dbName].primaryMetrics.docUnitsRead, 0);
+        // The first aggregate operation will read from the top of the oplog, size not guaranteed.
+        assert.gt(metrics[dbName].primaryMetrics.docBytesRead, 0);
+        assert.gt(metrics[dbName].primaryMetrics.docUnitsRead, 0);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 0);
     });
 
-    // Ensure that while nothing is returned from the change stream, the server still measures no
-    // read activity.
+    // Ensure that while nothing is returned from the change stream, the server measures no read
+    // activity.
     clearMetrics(primary);
     assert(!cur.hasNext());
     assertMetrics(primary, (metrics) => {
@@ -188,8 +188,8 @@ let nextId = nDocs;
     let res = cur.next();
     assert.docEq(newDoc, res.fullDocument, res);
     assertMetrics(primary, (metrics) => {
-        // Reads at least one entry from the oplog, one from the collection, and then returns one
-        // large response document.
+        // Performs at least three seeks (oplog, _id index, collection), reads at least one entry
+        // from the oplog, once from the collection, and then returns one large response document.
         assert.gte(metrics[dbName].primaryMetrics.docBytesRead, 0);
         assert.gte(metrics[dbName].primaryMetrics.docUnitsRead, 2);
         assert.eq(metrics[dbName].primaryMetrics.idxEntryBytesRead, 3);
@@ -203,18 +203,17 @@ let nextId = nDocs;
     const cur = secondaryDB[collName].watch([], {fullDocument: "updateLookup"});
 
     assertMetrics(secondary, (metrics) => {
-        // The first aggregate operation should not read anything from the oplog.
-        assert.eq(metrics[dbName].secondaryMetrics.docBytesRead, 0);
-        assert.eq(metrics[dbName].secondaryMetrics.docUnitsRead, 0);
+        // The first aggregate operation will read one document from the oplog, size not guaranteed.
+        assert.gt(metrics[dbName].secondaryMetrics.docBytesRead, 0);
+        assert.gt(metrics[dbName].secondaryMetrics.docUnitsRead, 0);
         assert.eq(metrics[dbName].secondaryMetrics.docUnitsReturned, 0);
     });
 
-    // Ensure that while nothing is returned from the change stream, the server still measures read
+    // Ensure that while nothing is returned from the change stream, the server measures no read
     // activity.
     clearMetrics(secondary);
     assert(!cur.hasNext());
     assertMetrics(secondary, (metrics) => {
-        // Calling hasNext should continue to not read anything.
         assert.eq(metrics[dbName].secondaryMetrics.docBytesRead, 0);
         assert.eq(metrics[dbName].secondaryMetrics.docUnitsRead, 0);
         assert.eq(metrics[dbName].secondaryMetrics.docUnitsReturned, 0);
