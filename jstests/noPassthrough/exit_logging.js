@@ -2,6 +2,7 @@
  * Tests that various forms of normal and abnormal shutdown write to the log files as expected.
  * @tags: [
  *   requires_sharding,
+ *   incompatible_aubsan,
  * ]
  */
 
@@ -66,11 +67,6 @@ function runAllTests(launcher) {
 
 if (_isWindows()) {
     print("SKIPPING TEST ON WINDOWS");
-    quit();
-}
-
-if (_isAddressSanitizerActive()) {
-    print("SKIPPING TEST ON ADDRESS SANITIZER BUILD");
     quit();
 }
 

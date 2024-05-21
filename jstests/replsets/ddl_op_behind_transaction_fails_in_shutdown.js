@@ -15,15 +15,6 @@
  * @tags: [requires_persistence, uses_prepare_transaction, uses_transactions]
  */
 
-const isCodeCoverageEnabled = buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage');
-const isSanitizerEnabled = buildInfo().buildEnvironment.ccflags.includes('-fsanitize');
-const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
-
-if (slowTestVariant) {
-    jsTestLog("Skipping test on slow test variant");
-    quit();
-}
-
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
@@ -35,6 +26,18 @@ const dbName = "test";
 const collName = "ddl_op_behind_prepared_transaction_fails_in_shutdown";
 let primary = rst.getPrimary();
 const testDB = primary.getDB(dbName);
+
+const buildInfo = assert.commandWorked(testDB.runCommand({"buildInfo": 1}));
+const isCodeCoverageEnabled = buildInfo.buildEnvironment.ccflags.includes('-ftest-coverage');
+const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
+const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
+
+if (slowTestVariant) {
+    jsTestLog("Skipping test on slow test variant");
+    rst.stopSet(true /*use default exit signal*/, false /*forRestart*/, {skipValidation: true});
+    quit();
+}
+
 const testColl = testDB.getCollection(collName);
 const txnDoc = {
     _id: 100

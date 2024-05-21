@@ -12,13 +12,6 @@
 //   temp_disabled_embedded_router_mongo_bridge,
 // ]
 
-// Check the build flags to determine whether we are running in a code-coverage variant. These
-// variants are sufficiently slow as to interfere with the operation of this test, so we skip them.
-if (buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage')) {
-    jsTestLog("Skipping the test case run with code-coverage enabled");
-    quit();
-}
-
 const st = new ShardingTest({
     shards: 2,
     mongos: 2,
@@ -29,6 +22,16 @@ const st = new ShardingTest({
         setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
     }
 });
+
+const buildInfo = assert.commandWorked(st.s0.adminCommand({"buildInfo": 1}));
+
+// Check the build flags to determine whether we are running in a code-coverage variant. These
+// variants are sufficiently slow as to interfere with the operation of this test, so we skip them.
+if (buildInfo.buildEnvironment.ccflags.includes('-ftest-coverage')) {
+    st.stop();
+    jsTestLog("Skipping the test case run with code-coverage enabled");
+    quit();
+}
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];

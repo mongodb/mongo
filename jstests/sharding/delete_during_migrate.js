@@ -7,11 +7,14 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [resource_intensive]
  */
-const isCodeCoverageEnabled = buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage');
-const isSanitizerEnabled = buildInfo().buildEnvironment.ccflags.includes('-fsanitize');
-const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
 
 var st = new ShardingTest({shards: 2, mongos: 1});
+
+const buildInfo = assert.commandWorked(st.s0.adminCommand({"buildInfo": 1}));
+
+const isCodeCoverageEnabled = buildInfo.buildEnvironment.ccflags.includes('-ftest-coverage');
+const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
+const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
 
 var dbname = "test";
 var coll = "foo";

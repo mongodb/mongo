@@ -41,6 +41,8 @@ variables:
     depends_on:
       - name: archive_dist_test_debug
         variant: &linux_debug_aubsan_compile_variant_name linux-debug-aubsan-compile-required
+      - name: archive_jstestshell
+        variant: *linux_debug_aubsan_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
@@ -417,6 +419,7 @@ buildvariants:
       # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
       test_flags: >-
         --runAllFeatureFlagTests
+        --excludeWithAnyTags=incompatible_aubsan
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
@@ -448,6 +451,7 @@ buildvariants:
       # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
       test_flags: >-
         --runAllFeatureFlagTests
+        --excludeWithAnyTags=incompatible_aubsan
     tasks:
       - name: .multiversion_fuzzer
       - name: .multiversion_passthrough
@@ -476,6 +480,7 @@ buildvariants:
         --use-diagnostic-latches=on
       test_flags: >-
         --benchmarkRepetitions=1
+        --excludeWithAnyTags=incompatible_aubsan
       compile_variant: *rhel80-debug-aubsan-benchmarks
     tasks:
       - name: compile_upload_benchmarks_TG

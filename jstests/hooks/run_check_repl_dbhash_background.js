@@ -32,6 +32,7 @@ TestData.traceExceptions = false;
 // operations in this test that aren't resilient to interruptions.
 TestData.disableImplicitSessions = true;
 
+const buildInfo = assert.commandWorked(db.runCommand({"buildInfo": 1}));
 const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
 
@@ -335,7 +336,7 @@ function checkReplDbhashBackgroundThread(hosts) {
             // engine cache is full. Since dbHash holds open a read snapshot for an extended period
             // of time and pulls all collection data into cache, the storage engine may abort the
             // operation if it needs to free up space. Try again after space has been freed.
-            if (e.code === ErrorCodes.WriteConflict && buildInfo().debug) {
+            if (e.code === ErrorCodes.WriteConflict && buildInfo.debug) {
                 hasTransientError = true;
             }
 

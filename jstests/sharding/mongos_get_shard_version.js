@@ -9,9 +9,13 @@
 // the test to fail because retrying the interrupted splitChunk command won't ever succeed. To check
 // whether the server has been compiled with the code coverage flag, we assume the compiler flags
 // used to build the mongo shell are the same as the ones used to build the server.
-const isCodeCoverageEnabled = buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage');
+
+const st = new ShardingTest({shards: 2});
+const buildInfo = assert.commandWorked(st.s.adminCommand({"buildInfo": 1}));
+const isCodeCoverageEnabled = buildInfo.buildEnvironment.ccflags.includes('-ftest-coverage');
 const isStepdownSuite = TestData.runningWithConfigStepdowns;
 if (isStepdownSuite && isCodeCoverageEnabled) {
+    st.stop();
     print('Skipping test during stepdown suite because splitChunk command would take too long');
     quit();
 }
@@ -20,7 +24,6 @@ if (isStepdownSuite && isCodeCoverageEnabled) {
 // query collecting the routing table metadata to fail due to max document size exceeded).
 TestData.skipCheckRoutingTableConsistency = true;
 
-const st = new ShardingTest({shards: 2});
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;

@@ -15,7 +15,9 @@
 import {EncryptedClient, kSafeContentField} from "jstests/fle2/libs/encrypted_client_util.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
-if (!(buildInfo().modules.includes("enterprise"))) {
+const buildInfo = assert.commandWorked(db.runCommand({"buildInfo": 1}));
+
+if (!(buildInfo.modules.includes("enterprise"))) {
     jsTestLog("Skipping test as it requires the enterprise module");
     quit();
 }

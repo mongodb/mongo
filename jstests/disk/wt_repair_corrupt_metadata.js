@@ -30,6 +30,9 @@ let runTest = function(mongodOptions) {
 
     let mongod = startMongodOnExistingPath(dbpath, mongodOptions);
 
+    const buildInfo = assert.commandWorked(mongod.getDB(baseName).adminCommand({"buildInfo": 1}));
+    const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize')
+
     // Force a checkpoint and make a copy of the turtle file.
     assert.commandWorked(mongod.getDB(baseName).adminCommand({fsync: 1}));
     jsTestLog("Making copy of metadata file before creating the collection: " +
@@ -67,7 +70,7 @@ let runTest = function(mongodOptions) {
 
     // Corrupt the .turtle file in a very specific way such that the log sequence numbers are
     // invalid.
-    if (_isAddressSanitizerActive()) {
+    if (isSanitizerEnabled) {
         jsTestLog("Skipping log file corruption because the address sanitizer is active.");
         return;
     }

@@ -360,12 +360,14 @@ if (typeof TestData == "undefined") {
 }
 
 function _optimizationsEnabled(flags) {
-    const sanitizeMatch = /(\s|^)-O2(\s|$)/.exec(getBuildInfo()["buildEnvironment"]["ccflags"]);
-    return Boolean(sanitizeMatch);
+    const buildInfo = globalThis.db._runCommandWithoutApiStrict({buildInfo: 1});
+    const optimizationsMatch = /(\s|^)-O2(\s|$)/.exec(buildInfo["buildEnvironment"]["ccflags"]);
+    return Boolean(optimizationsMatch);
 }
 
 function __sanitizeMatch(flag) {
-    var sanitizeMatch = /-fsanitize=([^\s]+) /.exec(getBuildInfo()["buildEnvironment"]["ccflags"]);
+    const buildInfo = globalThis.db._runCommandWithoutApiStrict({buildInfo: 1});
+    const sanitizeMatch = /-fsanitize=([^\s]+) /.exec(buildInfo["buildEnvironment"]["ccflags"]);
     if (flag && sanitizeMatch && RegExp(flag).exec(sanitizeMatch[1])) {
         return true;
     } else {

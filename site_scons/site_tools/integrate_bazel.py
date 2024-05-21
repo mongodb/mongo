@@ -808,7 +808,7 @@ def generate(env: SCons.Environment.Environment) -> None:
 
     sanitizer_option = env.GetOption("sanitize")
 
-    if sanitizer_option is not None:
+    if sanitizer_option is not None and sanitizer_option != "":
         options = sanitizer_option.split(",")
         formatted_options = [f"--//bazel/config:{_SANITIZER_MAP[opt]}=True" for opt in options]
         bazel_internal_flags.extend(formatted_options)

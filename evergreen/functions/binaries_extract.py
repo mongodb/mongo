@@ -50,6 +50,11 @@ parser.add_argument(
     action="append",
     help="Move an extracted entry to a new location after extraction. Format is colon separated, e.g. '--move-output=file/to/move:path/to/destination'. Can accept glob like wildcards.",
 )
+parser.add_argument(
+    "--optional",
+    action="store_true",
+    help="Should this fail if extraction fails. Useful for optional success.",
+)
 args = parser.parse_args()
 
 if args.change_dir:
@@ -92,4 +97,6 @@ if args.move_output:
             print(f"Bad format, needs to be glob like paths in the from 'src:dst', got: {arg}")
             raise exc
 
+if args.optional:
+    sys.exit(0)
 sys.exit(proc.returncode)

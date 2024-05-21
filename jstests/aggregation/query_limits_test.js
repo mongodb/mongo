@@ -9,7 +9,8 @@
  *   not_allowed_with_signed_security_token,
  *   # Can't use multiplanning, as it leads to query serialization that fails because of max BSON
  *   # size.
- *   does_not_support_multiplanning_single_solutions
+ *   does_not_support_multiplanning_single_solutions,
+ *   incompatible_aubsan,
  * ]
  */
 

@@ -1236,7 +1236,12 @@ tasks:
           gen_task: powercycle_smoke_skip_compile_gen
 
   - name: powercycle_smoke
-    tags: ["assigned_to_jira_team_devprod_correctness", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "default",
+        "incompatible_tsan",
+      ]
     exec_timeout_secs: 7200 # 2 hour timeout for the task overall
     depends_on:
       - name: archive_dist_test_debug

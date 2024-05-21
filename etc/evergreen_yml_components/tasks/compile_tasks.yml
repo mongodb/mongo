@@ -1208,6 +1208,37 @@ tasks:
           compiling_for_test: true
           separate_debug: off
 
+  - name: archive_jstestshell
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "do scons setup"
+      - func: "f_expansions_write"
+      - func: "scons compile"
+        vars:
+          targets: archive-jstestshell
+          compiling_for_test: true
+          separate_debug: on
+          task_compile_flags: >-
+            PREFIX=dist-test
+            --link-model=static
+            --use-diagnostic-latches=off
+            --dbg=on
+            --opt=on
+            --sanitize=
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-jstestshell.${ext|tgz}
+          remote_file: ${mongo_jstestshell}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: ${content_type|application/gzip}
+          display_name: Jstestshell
+
   - name: stitch_support_create_lib
     tags:
       [
@@ -1289,6 +1320,8 @@ tasks:
         "assigned_to_jira_team_server_security",
         "release_critical",
         "incompatible_community",
+        "incompatible_tsan",
+        "incompatible_aubsan",
         "requires_compile_variant",
         "requires_large_host_debug_mode",
         "crypt",

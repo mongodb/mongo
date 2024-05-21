@@ -2065,7 +2065,7 @@ if env.ToolchainIs('clang'):
         env.FatalError("Error: A clang --gcov build must have either --opt=debug or --opt=on to " +
                        "prevent crashes due to excessive stack usage")
 
-    if has_option('sanitize') and optBuild not in ("on", "debug"):
+    if has_option('sanitize') and get_option('sanitize') != "" and optBuild not in ("on", "debug"):
         env.FatalError("Error: A clang --sanitize build must have either --opt=debug or --opt=on " +
                        "to prevent crashes due to excessive stack usage")
 
@@ -2422,7 +2422,7 @@ if link_model.startswith("dynamic"):
         env.AppendUnique(LINKFLAGS=["-Wl,--no-as-needed"])
 
         # Using zdefs doesn't work at all with the sanitizers
-        if not has_option('sanitize'):
+        if not has_option('sanitize') and get_option('sanitize') != "":
 
             if link_model == "dynamic-strict":
                 env.AppendUnique(SHLINKFLAGS=["-Wl,-z,defs"])
@@ -4151,7 +4151,7 @@ def doConfigure(myenv):
 
         conf.Finish()
 
-    if has_option('sanitize'):
+    if has_option('sanitize') and get_option('sanitize') != "":
 
         if not myenv.ToolchainIs('clang', 'gcc'):
             env.FatalError('sanitize is only supported with clang or gcc')

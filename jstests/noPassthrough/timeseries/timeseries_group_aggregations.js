@@ -16,10 +16,12 @@ assert.neq(null, bpConn, "mongod was unable to start up");
 // Only run this test for debug=off opt=on without sanitizers active, since this test runs lots of
 // queries.
 function isSlowBuild(db) {
-    const debugBuild = db.adminCommand("buildInfo").debug;
-    return debugBuild || !_optimizationsEnabled() || _isAddressSanitizerActive() ||
-        _isLeakSanitizerActive() || _isThreadSanitizerActive() ||
-        _isUndefinedBehaviorSanitizerActive();
+    const buildInfo = db.adminCommand("buildInfo");
+    const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize')
+    const optimizationsEnabled = buildInfo.buildEnvironment.ccflags.includes('-O2')
+    const debugBuild = buildInfo.debug;
+
+    return debugBuild || !optimizationsEnabled || isSanitizerEnabled;
 }
 
 const classicDb = classicConn.getDB(jsTestName());

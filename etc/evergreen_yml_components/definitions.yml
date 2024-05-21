@@ -241,6 +241,17 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
+  "fetch jstestshell": &fetch_jstestshell
+    command: s3.get
+    display_name: "fetch jstestshell"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_jstestshell}
+      bucket: mciuploads
+      local_file: src/mongodb-jstestshell.tgz
+      optional: true
+
   "write mongo binary URL to downstream_expansions.yml": &echo_mongo_binary_url
     command: subprocess.exec
     params:
@@ -263,6 +274,20 @@ functions:
         - "src/evergreen/run_python_script.sh"
         - "evergreen/functions/binaries_extract.py"
         - "--tarball=mongo-binaries.tgz"
+        - "--extraction-command=${decompress}"
+        - "--change-dir=${extraction_change_dir}"
+        - "${move_outputs}"
+
+  "extract jstestshell": &extract_jstestshell
+    command: subprocess.exec
+    display_name: "extract jstestshell"
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "evergreen/functions/binaries_extract.py"
+        - "--optional"
+        - "--tarball=mongodb-jstestshell.tgz"
         - "--extraction-command=${decompress}"
         - "--change-dir=${extraction_change_dir}"
         - "${move_outputs}"
@@ -672,7 +697,9 @@ functions:
     - *fetch_venv
     - *adjust_venv
     - *fetch_binaries
+    - *fetch_jstestshell
     - *extract_binaries
+    - *extract_jstestshell
     - *get_buildnumber
     - *f_expansions_write
     - *set_up_credentials
