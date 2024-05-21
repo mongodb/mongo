@@ -73,6 +73,7 @@ GLOBAL_TASK_FACTOR_OVERRIDES = {
     r"replica_sets_reconfig_kill_primary_jscore_passthrough.*": 0.25,
     r"sharded_causally_consistent_jscore_passthrough.*": 0.75,
     r"sharded_collections_jscore_passthrough.*": 0.75,
+    r"shard.*uninitialized_fcv_jscore_passthrough.*": 0.25,
 }
 
 

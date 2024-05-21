@@ -11,7 +11,7 @@ import {
 function maybeSendCommandToInitialSyncNodes(
     conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
     // Skip forwarding incompatible commands to initial sync node.
-    if (shouldSkipCommand(conn, _commandName, commandObj, func, makeFuncArgs)) {
+    if (shouldSkipCommand(_commandName, commandObj)) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 

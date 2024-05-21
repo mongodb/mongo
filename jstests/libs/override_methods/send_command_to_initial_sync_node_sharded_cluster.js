@@ -12,7 +12,12 @@ import {
 function maybeSendCommandToInitialSyncNodesShardedCluster(
     conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
     // Skip forwarding incompatible commands to initial sync node.
-    if (shouldSkipCommand(conn, _commandName, commandObj, func, makeFuncArgs)) {
+    if (shouldSkipCommand(_commandName, commandObj)) {
+        return func.apply(conn, makeFuncArgs(commandObj));
+    }
+
+    // Only forward commands to initial sync nodes half of the time to reduce the workload.
+    if (Math.random() < 0.5) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 

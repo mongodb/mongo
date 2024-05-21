@@ -1694,7 +1694,7 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
         vars:
-          use_large_distro: "true"
+          use_xlarge_distro: "true"
 
   - <<: *gen_task_template
     name: sharding_api_version_jscore_passthrough_gen
@@ -1728,7 +1728,7 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
         vars:
-          use_large_distro: "true"
+          use_xlarge_distro: "true"
 
   - <<: *gen_task_template
     name: sharding_txns_uninitialized_fcv_jscore_passthrough_gen
@@ -1747,7 +1747,7 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
         vars:
-          use_large_distro: "true"
+          use_xlarge_distro: "true"
 
   - name: tla_plus
     tags: ["assigned_to_jira_team_server_repl", "experimental"]
