@@ -219,41 +219,40 @@ bool checkIdIndexExists(OperationContext* opCtx, const Collection* coll) {
     return false;
 }
 
-Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
-    LOGV2(4805002, "Building missing _id index", logAttrs(*collection));
+Status buildMissingIdIndex(OperationContext* opCtx, const NamespaceString nss) {
     MultiIndexBlock indexer;
     // This method is called in startup recovery so we can safely build the id index in foreground
     // mode. This prevents us from yielding a MODE_X lock (which is disallowed).
     indexer.setIndexBuildMethod(IndexBuildMethod::kForeground);
+    CollectionWriter collWriter(opCtx, nss);
+    LOGV2(4805002, "Building missing _id index", logAttrs(*collWriter));
 
-    ScopeGuard abortOnExit([&] {
-        CollectionWriter collWriter(collection);
-        indexer.abortIndexBuild(opCtx, collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
-    });
+    ScopeGuard abortOnExit(
+        [&] { indexer.abortIndexBuild(opCtx, collWriter, MultiIndexBlock::kNoopOnCleanUpFn); });
 
-    CollectionPtr collPtr(collection);
-    const auto indexCatalog = collection->getIndexCatalog();
-    const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec(collPtr);
+    const auto indexCatalog = collWriter->getIndexCatalog();
+    const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec(collWriter.get());
 
-    CollectionWriter collWriter(collection);
     auto swSpecs = indexer.init(opCtx, collWriter, idIndexSpec, MultiIndexBlock::kNoopOnInitFn);
     if (!swSpecs.isOK()) {
         return swSpecs.getStatus();
     }
 
-    auto status = indexer.insertAllDocumentsInCollection(opCtx, collPtr);
+    auto status = indexer.insertAllDocumentsInCollection(opCtx, collWriter.get());
     if (!status.isOK()) {
         return status;
     }
 
-    status = indexer.checkConstraints(opCtx, collPtr);
+    status = indexer.checkConstraints(opCtx, collWriter.get());
     if (!status.isOK()) {
         return status;
     }
 
     WriteUnitOfWork wuow(opCtx);
-    status = indexer.commit(
-        opCtx, collection, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn);
+    status = indexer.commit(opCtx,
+                            collWriter.getWritableCollection(opCtx),
+                            MultiIndexBlock::kNoopOnCreateEachFn,
+                            MultiIndexBlock::kNoopOnCommitFn);
     wuow.commit();
     abortOnExit.dismiss();
     return status;
@@ -295,9 +294,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
         if (requiresIndex && !hasAutoIndexIdField && !checkIdIndexExists(opCtx, coll)) {
             LOGV2(21001, "Collection is missing an _id index", logAttrs(*coll));
             if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
-                auto writableCollection =
-                    catalog->lookupCollectionByUUIDForMetadataWrite(opCtx, coll->uuid());
-                auto status = buildMissingIdIndex(opCtx, writableCollection);
+                auto status = buildMissingIdIndex(opCtx, coll->ns());
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,
                                 "Could not build an _id index on collection",
@@ -633,14 +630,14 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
         for (const auto& entry : nsToIndexNameObjMap) {
             const auto collNss = entry.first;
 
-            auto collection = catalog->lookupCollectionByNamespace(opCtx, collNss);
             for (const auto& indexName : entry.second.first) {
                 LOGV2(21004, "Rebuilding index", logAttrs(collNss), "index"_attr = indexName);
             }
 
+            CollectionWriter collWriter(opCtx, collNss);
             std::vector<BSONObj> indexSpecs = entry.second.second;
             fassert(40592,
-                    rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kNo));
+                    rebuildIndexesOnCollection(opCtx, collWriter, indexSpecs, RepairData::kNo));
         }
     }
 
@@ -884,13 +881,8 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
                                StorageEngine::LastShutdownState lastShutdownState,
                                BSONObjBuilder* startupTimeElapsedBuilder) {
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    Lock::GlobalWrite lk(opCtx);
 
-    // Use the BatchedCollectionCatalogWriter so all Collection writes to the in-memory catalog are
-    // done in a single copy-on-write of the catalog. This avoids quadratic behavior where we
-    // iterate over every collection and perform writes where the catalog would be copied every
-    // time.
-    BatchedCollectionCatalogWriter catalog(opCtx);
+    Lock::GlobalWrite lk(opCtx);
 
     // Create the FCV document for the first time, if necessary. Replica set nodes only initialize
     // the FCV when the replica set is first initiated or by data replication.

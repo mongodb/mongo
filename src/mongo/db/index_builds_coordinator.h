@@ -230,7 +230,7 @@ public:
      */
     StatusWith<std::pair<long long, long long>> rebuildIndexesForRecovery(
         OperationContext* opCtx,
-        const NamespaceString& nss,
+        CollectionWriter& collWriter,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
         RepairData repair);
@@ -567,7 +567,7 @@ private:
      * recreated.
      */
     Status _startIndexBuildForRecovery(OperationContext* opCtx,
-                                       const NamespaceString& nss,
+                                       CollectionWriter& collWriter,
                                        const std::vector<BSONObj>& specs,
                                        const UUID& buildUUID,
                                        IndexBuildProtocol protocol);

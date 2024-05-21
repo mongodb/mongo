@@ -98,7 +98,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(const Collection* collection,
 }
 
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  const Collection* collection,
+                                  CollectionWriter& collWriter,
                                   const std::vector<BSONObj>& indexSpecs,
                                   RepairData repair) {
     // Skip the rest if there are no indexes to rebuild.
@@ -109,19 +109,15 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
     IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     UUID buildUUID = UUID::gen();
     auto swRebuild = indexBuildsCoord->rebuildIndexesForRecovery(
-        opCtx, collection->ns(), indexSpecs, buildUUID, repair);
+        opCtx, collWriter, indexSpecs, buildUUID, repair);
     if (!swRebuild.isOK()) {
         return swRebuild.getStatus();
     }
 
     auto [numRecords, dataSize] = swRebuild.getValue();
 
-    auto rs = collection->getRecordStore();
-
     // Update the record store stats after finishing and committing the index builds.
-    WriteUnitOfWork wuow(opCtx);
-    rs->updateStatsAfterRepair(opCtx, numRecords, dataSize);
-    wuow.commit();
+    collWriter->getRecordStore()->updateStatsAfterRepair(opCtx, numRecords, dataSize);
 
     return Status::OK();
 }

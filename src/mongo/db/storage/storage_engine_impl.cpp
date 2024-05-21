@@ -124,11 +124,6 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
       _collectionCatalogCleanupTimestampListener(
           TimestampMonitor::TimestampType::kOldest,
           [](OperationContext* opCtx, Timestamp timestamp) {
-              // We take the global lock so there can be no concurrent
-              // BatchedCollectionCatalogWriter and we are thus safe to perform writes.
-              //
-              // No need to hold the RSTL lock nor acquire a flow control ticket. This doesn't care
-              // about the replica state of the node and the operations aren't replicated.
               Lock::GlobalLock lk{
                   opCtx,
                   MODE_IX,
@@ -311,7 +306,6 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
 
     const auto loadingFromUncleanShutdownOrRepair =
         lastShutdownState == LastShutdownState::kUnclean || _options.forRepair;
-    BatchedCollectionCatalogWriter catalogBatchWriter{opCtx};
     // Use the stable timestamp as minValid. We know for a fact that the collection exist at
     // this point and is in sync. If we use an earlier timestamp than replication rollback we
     // may be out-of-order for the collection catalog managing this namespace.

@@ -675,29 +675,28 @@ bool IndexBuildsCoordinator::isCreateIndexesErrorSafeToIgnore(
 
 StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndexesForRecovery(
     OperationContext* opCtx,
-    const NamespaceString& nss,
+    CollectionWriter& collWriter,
     const std::vector<BSONObj>& specs,
     const UUID& buildUUID,
     RepairData repair) {
 
     const auto protocol = IndexBuildProtocol::kSinglePhase;
-    auto status = _startIndexBuildForRecovery(opCtx, nss, specs, buildUUID, protocol);
+    auto status = _startIndexBuildForRecovery(opCtx, collWriter, specs, buildUUID, protocol);
     if (!status.isOK()) {
         return status;
     }
 
-    CollectionWriter collection(opCtx, nss);
-
     // Complete the index build.
-    return _runIndexRebuildForRecovery(opCtx, collection, buildUUID, repair);
+    return _runIndexRebuildForRecovery(opCtx, collWriter, buildUUID, repair);
 }
 
 Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
+                                                           CollectionWriter& collWriter,
                                                            const std::vector<BSONObj>& specs,
                                                            const UUID& buildUUID,
                                                            IndexBuildProtocol protocol) {
-    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X));
+    invariant(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collWriter->ns(), MODE_X));
 
     std::vector<std::string> indexNames;
     for (auto& spec : specs) {
@@ -711,7 +710,6 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         indexNames.push_back(name);
     }
 
-    CollectionWriter collection(opCtx, nss);
     {
         // These steps are combined into a single WUOW to ensure there are no commits without the
         // indexes for repair.
@@ -719,12 +717,12 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
 
         // We need to initialize the collection to rebuild the indexes. The collection may already
         // be initialized when rebuilding multiple unfinished indexes on the same collection.
-        if (!collection->isInitialized()) {
-            collection.getWritableCollection(opCtx)->init(opCtx);
+        if (!collWriter->isInitialized()) {
+            collWriter.getWritableCollection(opCtx)->init(opCtx);
         }
 
         if (storageGlobalParams.repair) {
-            Status status = _dropIndexesForRepair(opCtx, collection, indexNames);
+            Status status = _dropIndexesForRepair(opCtx, collWriter, indexNames);
             if (!status.isOK()) {
                 return status;
             }
@@ -732,19 +730,19 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
             // Unfinished index builds that are not resumable will drop and recreate the index table
             // using the same ident to avoid doing untimestamped writes to the catalog.
             for (const auto& indexName : indexNames) {
-                auto indexCatalog = collection.getWritableCollection(opCtx)->getIndexCatalog();
+                auto indexCatalog = collWriter.getWritableCollection(opCtx)->getIndexCatalog();
                 auto writableEntry = indexCatalog->getWritableEntryByName(
                     opCtx,
                     indexName,
                     IndexCatalog::InclusionPolicy::kUnfinished |
                         IndexCatalog::InclusionPolicy::kFrozen);
                 Status status = indexCatalog->resetUnfinishedIndexForRecovery(
-                    opCtx, collection.getWritableCollection(opCtx), writableEntry);
+                    opCtx, collWriter.getWritableCollection(opCtx), writableEntry);
                 if (!status.isOK()) {
                     return status;
                 }
 
-                const auto durableBuildUUID = collection->getIndexBuildUUID(indexName);
+                const auto durableBuildUUID = collWriter->getIndexBuildUUID(indexName);
 
                 // A build UUID is present if and only if we are rebuilding a two-phase build.
                 invariant((protocol == IndexBuildProtocol::kTwoPhase) ==
@@ -758,7 +756,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         }
 
         auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-            buildUUID, collection->uuid(), nss.dbName(), specs, protocol);
+            buildUUID, collWriter->uuid(), collWriter->ns().dbName(), specs, protocol);
 
         Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
         if (!status.isOK()) {
@@ -771,10 +769,10 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         // All indexes are dropped during repair and should be rebuilt normally.
         options.forRecovery = !storageGlobalParams.repair;
         status = _indexBuildsManager.setUpIndexBuild(
-            opCtx, collection, specs, buildUUID, MultiIndexBlock::kNoopOnInitFn, options);
+            opCtx, collWriter, specs, buildUUID, MultiIndexBlock::kNoopOnInitFn, options);
         if (!status.isOK()) {
             // An index build failure during recovery is fatal.
-            logFailure(status, nss, replIndexBuildState);
+            logFailure(status, collWriter->ns(), replIndexBuildState);
             fassertNoTrace(51086, status);
         }
 
@@ -2299,11 +2297,10 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
 
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID);
-    invariant(collection);
-    const auto& nss = collection->ns();
+    CollectionWriter collWriter(opCtx, collectionUUID);
+    invariant(collWriter);
     const auto protocol = IndexBuildProtocol::kTwoPhase;
-    return _startIndexBuildForRecovery(opCtx, nss, specs, buildUUID, protocol);
+    return _startIndexBuildForRecovery(opCtx, collWriter, specs, buildUUID, protocol);
 }
 
 void IndexBuildsCoordinator::_waitIfNewIndexBuildsBlocked(OperationContext* opCtx,

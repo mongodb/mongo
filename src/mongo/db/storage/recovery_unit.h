@@ -859,6 +859,15 @@ public:
      */
     virtual void setCacheMaxWaitTimeout(Milliseconds) {}
 
+    /**
+     * Returns true if currently managed by a WriteUnitOfWork.
+     *
+     * TODO: might should be removed after SERVER-90704
+     */
+    bool inUnitOfWork() const {
+        return _inUnitOfWork();
+    }
+
 protected:
     RecoveryUnit() = default;
 

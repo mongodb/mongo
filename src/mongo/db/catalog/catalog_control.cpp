@@ -56,6 +56,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -80,13 +81,6 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
     // Open all databases and repopulate the CollectionCatalog.
     LOGV2(20276, "openCatalog: reopening all databases");
 
-    // Applies all Collection writes to the in-memory catalog in a single copy-on-write to the
-    // catalog. This avoids quadratic behavior where we iterate over every collection and perform
-    // writes where the catalog would be copied every time. boost::optional is used to be able to
-    // finish the write batch when encountering the oplog as other systems except immediate
-    // visibility for the oplog.
-    boost::optional<BatchedCollectionCatalogWriter> catalogWriter(opCtx);
-
     auto databaseHolder = DatabaseHolder::get(opCtx);
     std::vector<DatabaseName> databasesToOpen = storageEngine->listDatabases();
     for (auto&& dbName : databasesToOpen) {
@@ -94,9 +88,12 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db,
                   str::stream() << "failed to reopen database " << dbName.toStringForErrorMsg());
-        for (auto&& collNss : catalogWriter.value()->getAllCollectionNamesFromDb(opCtx, dbName)) {
+        for (auto&& collNss :
+             CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName)) {
             // Note that the collection name already includes the database component.
-            auto collection = catalogWriter.value()->lookupCollectionByNamespace(opCtx, collNss);
+            auto collection =
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
+                                                                                           collNss);
             invariant(collection,
                       str::stream() << "failed to get valid collection pointer for namespace "
                                     << collNss.toStringForErrorMsg());
@@ -109,12 +106,8 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
                 // minimum valid timestamp set where the last DDL operation occured earlier. This is
                 // fine as this is just an optimization when to avoid reading the catalog from WT.
                 auto minValid = std::min(stableTimestamp, it->second);
-                auto writableCollection =
-                    catalogWriter.value()->lookupCollectionByUUIDForMetadataWrite(
-                        opCtx, collection->uuid());
-                writableCollection->setMinimumValidSnapshot(minValid);
-                // Update the pointer in the outer scope as we just requested a writable instance
-                collection = writableCollection;
+
+                collection->setMinimumValidSnapshot(minValid);
             }
 
             if (collection->getTimeseriesOptions()) {
@@ -137,13 +130,7 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
             // to the oplog.
             if (collNss.isOplog()) {
                 LOGV2(20277, "openCatalog: updating cached oplog pointer");
-
-                // The oplog collection must be visible when establishing for repl. Finish our
-                // batched catalog write and continue on a new batch afterwards.
-                catalogWriter.reset();
-
                 repl::establishOplogRecordStoreForLogging(opCtx, collection->getRecordStore());
-                catalogWriter.emplace(opCtx);
             }
         }
     }
@@ -279,10 +266,6 @@ void openCatalog(OperationContext* opCtx,
     for (const auto& entry : nsToIndexNameObjMap) {
         NamespaceString collNss(entry.first);
 
-        auto collection = catalog->lookupCollectionByNamespace(opCtx, collNss);
-        invariant(collection,
-                  str::stream() << "couldn't get collection " << collNss.toStringForErrorMsg());
-
         for (const auto& indexName : entry.second.first) {
             LOGV2(20275,
                   "openCatalog: rebuilding index",
@@ -290,8 +273,10 @@ void openCatalog(OperationContext* opCtx,
                   "index"_attr = indexName);
         }
 
+        CollectionWriter collWriter(opCtx, collNss);
+
         const std::vector<BSONObj>& indexSpecs = entry.second.second;
-        fassert(40690, rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kNo));
+        fassert(40690, rebuildIndexesOnCollection(opCtx, collWriter, indexSpecs, RepairData::kNo));
     }
 
     // Once all unfinished index builds have been dropped and the catalog has been reloaded, resume

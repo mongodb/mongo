@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/validate_results.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/rebuild_indexes.h"
@@ -83,13 +84,13 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
     }
 
     opCtx->checkForInterrupt();
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-    auto swIndexNameObjs = getIndexNameObjs(collection);
+    CollectionWriter collWriter(opCtx, nss);
+    auto swIndexNameObjs = getIndexNameObjs(&(*collWriter));
     if (!swIndexNameObjs.isOK())
         return swIndexNameObjs.getStatus();
 
     std::vector<BSONObj> indexSpecs = swIndexNameObjs.getValue().second;
-    Status status = rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kYes);
+    Status status = rebuildIndexesOnCollection(opCtx, collWriter, indexSpecs, RepairData::kYes);
     if (!status.isOK())
         return status;
 
@@ -116,14 +117,12 @@ void openDbAndRepairIndexSpec(OperationContext* opCtx, const DatabaseName& dbNam
         auto colls = CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName);
 
         for (const auto& nss : colls) {
-            auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-                opCtx, nss);
-
             writeConflictRetry(opCtx, "repairInvalidIndexOptions", nss, [&] {
-                WriteUnitOfWork wuow(opCtx);
+                auto cw = CollectionWriter(opCtx, nss);
 
+                WriteUnitOfWork wuow(opCtx);
                 std::vector<std::string> indexesWithInvalidOptions =
-                    coll->repairInvalidIndexOptions(opCtx);
+                    cw.getWritableCollection(opCtx)->repairInvalidIndexOptions(opCtx);
 
                 for (const auto& indexWithInvalidOptions : indexesWithInvalidOptions) {
                     LOGV2_WARNING(7610902,
@@ -238,27 +237,29 @@ Status repairCollection(OperationContext* opCtx,
         status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
     }
 
-
-    // Need to lookup from catalog again because the old collection object was invalidated by
-    // repairRecordStore.
-    auto collection =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
-
     // If data was modified during repairRecordStore, we know to rebuild indexes without needing
     // to run an expensive collection validation.
     if (status.code() == ErrorCodes::DataModifiedByRepair) {
         invariant(StorageRepairObserver::get(opCtx->getServiceContext())->isDataInvalidated(),
-                  "Collection '{}' ({})"_format(toStringForLogging(collection->ns()),
-                                                collection->uuid().toString()));
+                  "Collection '{}' ({})"_format(toStringForLogging(nss),
+                                                CollectionCatalog::get(opCtx)
+                                                    ->lookupCollectionByNamespace(opCtx, nss)
+                                                    ->uuid()
+                                                    .toString()));
 
         // If we are a replica set member in standalone mode and we have unfinished indexes,
         // drop them before rebuilding any completed indexes. Since we have already made
         // invalidating modifications to our data, it is safe to just drop the indexes entirely
         // to avoid the risk of the index rebuild failing.
         if (getReplSetMemberInStandaloneMode(opCtx->getServiceContext())) {
-            if (auto status = dropUnfinishedIndexes(opCtx, collection); !status.isOK()) {
+            CollectionWriter cw(opCtx, nss);
+            WriteUnitOfWork wuow(opCtx);
+            if (auto status = dropUnfinishedIndexes(opCtx, cw.getWritableCollection(opCtx));
+                !status.isOK()) {
                 return status;
             }
+
+            wuow.commit();
         }
 
         return rebuildIndexesForNamespace(opCtx, nss, engine);
@@ -268,7 +269,15 @@ Status repairCollection(OperationContext* opCtx,
 
     // Run collection validation to avoid unnecessarily rebuilding indexes on valid collections
     // with consistent indexes. Initialize the collection prior to validation.
-    collection->init(opCtx);
+    {
+        auto cw = CollectionWriter(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        auto collection = cw.getWritableCollection(opCtx);
+        if (!collection->isInitialized()) {
+            collection->init(opCtx);
+        }
+        wuow.commit();
+    }
 
     ValidateResults validateResults;
     BSONObjBuilder output;

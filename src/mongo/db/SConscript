@@ -1538,10 +1538,8 @@ env.Library(
         'rebuild_indexes.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        'catalog/index_key_validate',
-        'index_builds_coordinator_interface',
-        'server_base',
-        'shard_role_api',
+        'catalog/collection_catalog', 'catalog/index_key_validate',
+        'index_builds_coordinator_interface', 'server_base', 'shard_role', 'shard_role_api'
     ],
 )
 

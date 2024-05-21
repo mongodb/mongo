@@ -64,7 +64,6 @@ ServiceContext* setupServiceContext() {
 
 void createCollections(OperationContext* opCtx, int numCollections) {
     Lock::GlobalLock globalLk(opCtx, MODE_X);
-    BatchedCollectionCatalogWriter batched(opCtx);
 
     for (auto i = 0; i < numCollections; i++) {
         const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
@@ -94,28 +93,6 @@ void BM_CollectionCatalogWrite(benchmark::State& state) {
     }
 }
 
-void BM_CollectionCatalogWriteBatchedWithGlobalExclusiveLock(benchmark::State& state) {
-    auto serviceContext = setupServiceContext();
-    ThreadClient threadClient(serviceContext->getService());
-    ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
-
-    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*threadClient.get());
-        threadClient.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
-    createCollections(opCtx.get(), state.range(0));
-
-    Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
-    BatchedCollectionCatalogWriter batched(opCtx.get());
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {});
-    }
-}
-
 void BM_CollectionCatalogCreateDropCollection(benchmark::State& state) {
     auto serviceContext = setupServiceContext();
     ThreadClient threadClient(serviceContext->getService());
@@ -134,29 +111,6 @@ void BM_CollectionCatalogCreateDropCollection(benchmark::State& state) {
                 opCtx.get(), std::make_shared<CollectionMock>(uuid, nss), boost::none);
             catalog.deregisterCollection(opCtx.get(), uuid, false, boost::none);
         });
-    }
-}
-
-void BM_CollectionCatalogCreateNCollectionsBatched(benchmark::State& state) {
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-
-        auto serviceContext = setupServiceContext();
-        ThreadClient threadClient(serviceContext->getService());
-        ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
-
-        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
-        BatchedCollectionCatalogWriter batched(opCtx.get());
-
-        auto numCollections = state.range(0);
-        for (auto i = 0; i < numCollections; i++) {
-            const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-                "collection_catalog_bm", std::to_string(i));
-            CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
-                catalog.registerCollection(
-                    opCtx.get(), std::make_shared<CollectionMock>(nss), boost::none);
-            });
-        }
     }
 }
 
@@ -236,9 +190,7 @@ void BM_CollectionCatalogIterateCollections(benchmark::State& state) {
 }
 
 BENCHMARK(BM_CollectionCatalogWrite)->Ranges({{{1}, {100'000}}});
-BENCHMARK(BM_CollectionCatalogWriteBatchedWithGlobalExclusiveLock)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_CollectionCatalogCreateDropCollection)->Ranges({{{1}, {100'000}}});
-BENCHMARK(BM_CollectionCatalogCreateNCollectionsBatched)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_CollectionCatalogCreateNCollections)->Ranges({{{1}, {32'768}}});
 BENCHMARK(BM_CollectionCatalogLookupCollectionByNamespace)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_CollectionCatalogLookupCollectionByUUID)->Ranges({{{1}, {100'000}}});

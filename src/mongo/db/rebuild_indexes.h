@@ -37,11 +37,12 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
 class Collection;
-class CollectionPtr;
+class NamespaceString;
 class OperationContext;
 
 typedef std::pair<std::vector<std::string>, std::vector<BSONObj>> IndexNameObjs;
@@ -67,16 +68,8 @@ StatusWith<IndexNameObjs> getIndexNameObjs(
  */
 enum class RepairData { kYes, kNo };
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  const Collection* collection,
+                                  CollectionWriter& collWriter,
                                   const std::vector<BSONObj>& indexSpecs,
                                   RepairData repair);
-
-/**
- * Rebuilds the indexes provided by the 'indexSpecs' on the given collection.
- * One example usage is when a 'dropIndex' command is rolled back. The dropped index must be remade.
- */
-Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  const Collection* collection,
-                                  const std::vector<BSONObj>& indexSpecs);
 
 }  // namespace mongo

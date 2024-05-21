@@ -149,9 +149,6 @@ public:
 
     /**
      * Like latest() above.
-     *
-     * Bypasses batched writing and should not be used in a context where there might be an ongoing
-     * batched write.
      */
     static std::shared_ptr<const CollectionCatalog> latest(ServiceContext* svcCtx);
 
@@ -748,17 +745,6 @@ private:
     void _replaceViewsForDatabase(const DatabaseName& dbName, ViewsForDatabase&& views);
 
     /**
-     * Returns true if this CollectionCatalog instance is part of an ongoing batched catalog write.
-     */
-    bool _isCatalogBatchWriter() const;
-
-    /**
-     * Returns true if we can saftely skip performing copy-on-write on the provided collection
-     * instance.
-     */
-    bool _alreadyClonedForBatchedWriter(const std::shared_ptr<Collection>& collection) const;
-
-    /**
      * Throws 'WriteConflictException' if given namespace is already registered with the catalog, as
      * either a view or collection. The results will include namespaces which have been registered
      * by preCommitHooks on other threads, but which have not truly been committed yet.
@@ -868,31 +854,6 @@ private:
 
     // Tracks usage of collection usage features (e.g. capped).
     Stats _stats;
-};
-
-/**
- * RAII class to perform multiple writes to the CollectionCatalog on a single copy of the
- * CollectionCatalog instance. Requires the global lock to be held in exclusive write mode (MODE_X)
- * for the lifetime of this object.
- */
-class BatchedCollectionCatalogWriter {
-public:
-    BatchedCollectionCatalogWriter(OperationContext* opCtx);
-    ~BatchedCollectionCatalogWriter();
-
-    BatchedCollectionCatalogWriter(const BatchedCollectionCatalogWriter&) = delete;
-    BatchedCollectionCatalogWriter(BatchedCollectionCatalogWriter&&) = delete;
-
-    const CollectionCatalog* operator->() const {
-        return _batchedInstance;
-    }
-
-private:
-    OperationContext* _opCtx;
-    // Store base when we clone the CollectionCatalog so we can verify that there has been no other
-    // writers during the batching.
-    std::shared_ptr<CollectionCatalog> _base = nullptr;
-    const CollectionCatalog* _batchedInstance = nullptr;
 };
 
 }  // namespace mongo
