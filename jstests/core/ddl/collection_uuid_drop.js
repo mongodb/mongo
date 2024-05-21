@@ -11,8 +11,8 @@
  * ]
  */
 const testDB = db.getSiblingDB(jsTestName());
-const coll = testDB["coll"];
 assert.commandWorked(testDB.dropDatabase());
+const coll = testDB["coll"];
 
 const createCollection = function(coll) {
     assert.commandWorked(coll.insert({_id: 0}));
