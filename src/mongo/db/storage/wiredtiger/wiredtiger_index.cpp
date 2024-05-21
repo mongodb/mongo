@@ -410,7 +410,9 @@ bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
 Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const key_string::Value& key) {
     invariant(unique());
 
-    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, false);
+    // Allow overwrite because it's faster and this is a read-only cursor.
+    constexpr bool allowOverwrite = true;
+    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, allowOverwrite);
     WT_CURSOR* c = curwrap.get();
 
     if (isDup(opCtx, c, curwrap.getSession(), key)) {
@@ -947,7 +949,9 @@ public:
           _collectionUUID(idx.getCollectionUUID()),
           _metrics(&ResourceConsumption::MetricsCollector::get(opCtx)),
           _key(idx.getKeyStringVersion()) {
-        _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, false);
+        // Allow overwrite because it's faster and this is a read-only cursor.
+        constexpr bool allowOverwrite = true;
+        _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, allowOverwrite);
     }
 
     boost::optional<IndexKeyEntry> next(KeyInclusion keyInclusion) override {
@@ -1054,7 +1058,9 @@ public:
 
     void restore() override {
         if (!_cursor) {
-            _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, false);
+            // Allow overwrite because it's faster and this is a read-only cursor.
+            constexpr bool allowOverwrite = true;
+            _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, allowOverwrite);
         }
 
         // Ensure an active session exists, so any restored cursors will bind to it

@@ -59,6 +59,9 @@ WiredTigerCursor::WiredTigerCursor(WiredTigerRecoveryUnit& ru,
     _isCheckpoint =
         (_ru->getTimestampReadSource() == WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
 
+    // Passing nullptr is significantly faster for WiredTiger than passing an empty string.
+    const char* configStr = nullptr;
+
     // If we have uncommon cursor options, use a costlier string builder.
     if (_ru->getReadOnce() || _isCheckpoint) {
         str::stream builder;
@@ -83,11 +86,13 @@ WiredTigerCursor::WiredTigerCursor(WiredTigerRecoveryUnit& ru,
         }
 
         _config = builder;
+        configStr = _config.c_str();
     } else {
         // Add this option without a trailing comma. This enables an optimization in WiredTiger to
         // skip parsing the config string if this is the only option. See SERVER-43232 for details.
         if (!allowOverwrite) {
             _config = kOverwriteFalse.toString();
+            configStr = kOverwriteFalse.data();
         }
     }
 
@@ -98,7 +103,7 @@ WiredTigerCursor::WiredTigerCursor(WiredTigerRecoveryUnit& ru,
     }
 
     try {
-        _cursor = _session->getNewCursor(uri, _config.c_str());
+        _cursor = _session->getNewCursor(uri, configStr);
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
         // A WiredTiger table will not be available in the latest checkpoint if the checkpoint
         // thread hasn't run after the initial WiredTiger table was created.
