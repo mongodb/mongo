@@ -227,5 +227,6 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/watchdog/**/* @10gen/server-service-architecture
 
 # The following patterns are parsed from ./src/third_party/OWNERS.yml
+/src/third_party/**/* @10gen/server-security
 /src/third_party/**/SConscript @10gen/devprod-build
 /src/third_party/**/*.bazel @10gen/devprod-build

@@ -3,6 +3,9 @@
 # During the bazel conversion this makes sense to be the build team
 version: 1.0.0
 filters:
+  - "*":
+    approvers:
+      - 10gen/server-security
   - "SConscript":
     approvers:
       - 10gen/devprod-build
