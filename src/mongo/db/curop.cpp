@@ -443,9 +443,9 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
 
         try {
             // If we need them, try to fetch the storage stats. We use an unlimited timeout here,
-            // but the lock acquisition could still be interrupted, which we catch, log, and
-            // re-throw. We need to be careful of the priority, it has to match that of this
-            // operation. If we choose a fixed priority other than kExempt (e.g., kNormal), it may
+            // but the lock acquisition could still be interrupted, which we catch and log.
+            // We need to be careful of the priority, it has to match that of this operation.
+            // If we choose a fixed priority other than kExempt (e.g., kNormal), it may
             // be lower than the operation's current priority, which would cause an exception to be
             // thrown.
             const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
@@ -455,8 +455,6 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
                           "Failed to gather storage statistics for query stats",
                           "opId"_attr = opCtx()->getOpID(),
                           "error"_attr = redact(ex));
-            ex.addContext("Failed to gather storage statistics for query stats");
-            throw;
         }
 
         if (_debug.storageStats) {
