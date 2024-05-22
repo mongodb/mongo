@@ -1,0 +1,17 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "croaring",
+    srcs = [
+        "dist/roaring.c",
+        "dist/roaring.h",
+    ],
+    hdrs = [
+        "dist/roaring.hh",
+    ],
+    includes = [
+        "dist",
+    ],
+)
