@@ -6,8 +6,6 @@
  *   requires_sharding,
  *   assumes_balancer_off,
  *   does_not_support_causal_consistency,
- *   # TODO (SERVER-56879): Support add/remove shards in new DDL paths
- *   does_not_support_add_remove_shards,
  *   # The mutex mechanism used in BulkWrite and drop states does not support stepdown
  *   does_not_support_stepdowns,
  *   # Can be removed once PM-1965-Milestone-1 is completed.

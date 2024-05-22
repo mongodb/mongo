@@ -550,6 +550,8 @@ error_codes:
     # handle the error.
     - {code: 413, name: TransactionParticipantFailedUnyield, extra: TransactionParticipantFailedUnyieldInfo}
 
+    - {code: 414, name: AddOrRemoveShardInProgress}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

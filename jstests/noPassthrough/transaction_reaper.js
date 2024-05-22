@@ -51,6 +51,7 @@ function Sharding(lifetime) {
 
     // Remove the session created by the above shardCollection
     this.st.s.getDB("config").system.sessions.remove({});
+    this.getTransactionConn().getDB("config").transactions.remove({});
 }
 
 Sharding.prototype.stop = function() {

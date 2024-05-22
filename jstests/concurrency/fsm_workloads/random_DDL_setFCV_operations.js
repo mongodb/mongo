@@ -7,8 +7,6 @@
  * @tags: [
  *   requires_sharding,
  *   config_shard_incompatible,
- *   # TODO (SERVER-56879) Support add/remove shards in new DDL paths
- *   does_not_support_add_remove_shards,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
  *   # TODO (SERVER-88539) Remove the 'assumes_balancer_off' tag

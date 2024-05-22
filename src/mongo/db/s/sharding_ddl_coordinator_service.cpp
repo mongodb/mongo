@@ -69,6 +69,7 @@
 #include "mongo/db/s/rename_collection_coordinator.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/set_allow_migrations_coordinator.h"
+#include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/untrack_unsplittable_collection_coordinator.h"
 #include "mongo/logv2/log.h"
@@ -323,18 +324,27 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
     const auto patchedCoorDoc = coorDoc.addFields(coorMetadata.toBSON());
 
     auto [coordinator, created] = [&] {
-        try {
-            auto [coordinator, created] =
-                PrimaryOnlyService::getOrCreateInstance(opCtx, patchedCoorDoc, checkOptions);
-            return std::make_pair(
-                checked_pointer_cast<ShardingDDLCoordinator>(std::move(coordinator)),
-                std::move(created));
-        } catch (const DBException& ex) {
-            LOGV2_ERROR(5390512,
-                        "Failed to create instance of sharding DDL coordinator",
-                        "coordinatorId"_attr = coorMetadata.getId(),
-                        "reason"_attr = redact(ex));
-            throw;
+        while (true) {
+            try {
+                auto [coordinator, created] =
+                    PrimaryOnlyService::getOrCreateInstance(opCtx, patchedCoorDoc, checkOptions);
+                return std::make_pair(
+                    checked_pointer_cast<ShardingDDLCoordinator>(std::move(coordinator)),
+                    std::move(created));
+            } catch (const ExceptionFor<ErrorCodes::AddOrRemoveShardInProgress>&) {
+                LOGV2_WARNING(5687900,
+                              "Cannot start sharding DDL coordinator because a topology change is "
+                              "in progress. Will retry after backoff.");
+                // Backoff
+                opCtx->sleepFor(Seconds(1));
+                continue;
+            } catch (const DBException& ex) {
+                LOGV2_ERROR(5390512,
+                            "Failed to create instance of sharding DDL coordinator",
+                            "coordinatorId"_attr = coorMetadata.getId(),
+                            "reason"_attr = redact(ex));
+                throw;
+            }
         }
     }();
 
@@ -353,4 +363,19 @@ void ShardingDDLCoordinatorService::_transitionToRecovered(WithLock lk, Operatio
     _recoveredOrCoordinatorCompletedCV.notify_all();
 }
 
+void ShardingDDLCoordinatorService::checkIfConflictsWithOtherInstances(
+    OperationContext* opCtx,
+    BSONObj initialState,
+    const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
+    auto* addOrRemoveShardInProgressParam =
+        ServerParameterSet::getClusterParameterSet()
+            ->get<ClusterParameterWithStorage<AddOrRemoveShardInProgressParam>>(
+                "addOrRemoveShardInProgress");
+    const auto addOrRemoveShardInProgressVal =
+        addOrRemoveShardInProgressParam->getValue(boost::none).getInProgress();
+
+    uassert(ErrorCodes::AddOrRemoveShardInProgress,
+            "Cannot start ShardingDDLCoordinator because a topology change is in progress",
+            !addOrRemoveShardInProgressVal);
+}
 }  // namespace mongo

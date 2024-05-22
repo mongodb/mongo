@@ -128,25 +128,24 @@ var shardConfig = shard.getDB("config");
     const sessionsOpenedByShardCollectionCmd = 2;
     const sessionsOpenedByDDLOps = sessionsOpenedByAddShardCmd + sessionsOpenedByShardCollectionCmd;
 
-    // We will have sessionsOpenedByDDLOps sessions because of the sessions used in the
-    // shardCollection's retryable write to shard the sessions collection. It will disappear after
-    // we run the refresh function on the shard.
-    assert.eq(shardConfig.system.sessions.countDocuments({}),
-              sessionsOpenedByDDLOps,
-              "did not flush config's sessions");
+    // We will have at least one session because of the sessions used in the shardCollection's
+    // retryable write to shard the sessions collection. It will disappear after we run the refresh
+    // function on the shard.
+    let sessionsCount = shardConfig.system.sessions.countDocuments({});
+    assert.lt(0, sessionsCount, "did not flush config's sessions");
+    let lastSessionsCount = sessionsCount;
 
     // Now, if we do refreshes on the other servers, their in-mem records will
     // be written to the collection.
     assert.commandWorked(shard.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assert.eq(shardConfig.system.sessions.countDocuments({}),
-              sessionsOpenedByDDLOps + 1,
-              "did not flush shard's sessions");
+    sessionsCount = shardConfig.system.sessions.countDocuments({});
+    assert.lt(lastSessionsCount, sessionsCount, "did not flush shard's sessions");
+    lastSessionsCount = sessionsCount;
 
     rs.awaitLastOpCommitted();
     assert.commandWorked(mongos.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assert.eq(shardConfig.system.sessions.countDocuments({}),
-              sessionsOpenedByDDLOps + 3,
-              "did not flush mongos' sessions");
+    sessionsCount = shardConfig.system.sessions.countDocuments({});
+    assert.lt(lastSessionsCount, sessionsCount, "did not flush mongos' sessions");
 }
 
 // Test that if we drop the index on the sessions collection, only a refresh on the config

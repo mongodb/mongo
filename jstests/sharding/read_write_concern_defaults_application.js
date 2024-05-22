@@ -178,6 +178,7 @@ let testCases = {
     _shardsvrEndMigrationBlockingOperation: {skip: "internal command"},
     _shardsvrGetStatsForBalancing: {skip: "internal command"},
     _shardsvrInsertGlobalIndexKey: {skip: "internal command"},
+    _shardsvrJoinDDLCoordinators: {skip: "internal command"},
     _shardsvrDeleteGlobalIndexKey: {skip: "internal command"},
     _shardsvrWriteGlobalIndexKeys: {skip: "internal command"},
     _shardsvrJoinMigrations: {skip: "internal command"},

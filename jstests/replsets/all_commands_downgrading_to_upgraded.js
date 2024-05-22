@@ -117,6 +117,7 @@ const allCommands = {
     _shardsvrEndMigrationBlockingOperation: {skip: isAnInternalCommand},
     _shardsvrGetStatsForBalancing: {skip: isAnInternalCommand},
     _shardsvrInsertGlobalIndexKey: {skip: isAnInternalCommand},
+    _shardsvrJoinDDLCoordinators: {skip: isAnInternalCommand},
     _shardsvrDeleteGlobalIndexKey: {skip: isAnInternalCommand},
     _shardsvrWriteGlobalIndexKeys: {skip: isAnInternalCommand},
     _shardsvrJoinMigrations: {skip: isAnInternalCommand},

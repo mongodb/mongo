@@ -110,6 +110,7 @@ const allCommands = {
     _shardsvrDeleteGlobalIndexKey: {skip: isPrimaryOnly},
     _shardsvrWriteGlobalIndexKeys: {skip: isPrimaryOnly},
     _shardsvrJoinMigrations: {skip: isAnInternalCommand},
+    _shardsvrJoinDDLCoordinators: {skip: isPrimaryOnly},
     _shardsvrMergeAllChunksOnShard: {skip: isPrimaryOnly},
     _shardsvrMovePrimary: {skip: isPrimaryOnly},
     _shardsvrMovePrimaryEnterCriticalSection: {skip: isPrimaryOnly},

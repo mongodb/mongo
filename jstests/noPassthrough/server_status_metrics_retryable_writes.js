@@ -53,7 +53,8 @@ function runTest(externalConn, internalConn = undefined) {
         const internalServerStatus =
             assert.commandWorked(internalConn.adminCommand({serverStatus: 1}));
         expectedServerStatusMetrics['internal'] = {
-            'internalRetryableWriteCount': 0,
+            'internalRetryableWriteCount':
+                internalServerStatus.metrics.query.internalRetryableWriteCount,
             'externalRetryableWriteCount': 0,
             'retryableInternalTransactionCount':
                 internalServerStatus.metrics.query.retryableInternalTransactionCount

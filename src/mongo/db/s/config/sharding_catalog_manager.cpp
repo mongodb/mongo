@@ -681,6 +681,7 @@ ShardingCatalogManager::ShardingCatalogManager(
       _executorForAddShard(std::move(addShardExecutor)),
       _localConfigShard(std::move(localConfigShard)),
       _localCatalogClient(std::move(localCatalogClient)),
+      _kAddRemoveShardLock("addRemoveShardLock"),
       _kShardMembershipLock("shardMembershipLock"),
       _kClusterCardinalityParameterLock("clusterCardinalityParameterLock"),
       _kChunkOpLock("chunkOpLock"),
