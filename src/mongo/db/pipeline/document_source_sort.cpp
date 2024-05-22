@@ -40,7 +40,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -289,53 +288,63 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
     return GetNextResult{_sortExecutor->getNext().second};
 }
 
-void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
-                                                 const SerializationOptions& opts) const {
-    tassert(9028700, "_timeSorter is nullptr", _timeSorter);
-    tassert(
-        6369900, "$_internalBoundedSort should not absorb a $limit", !_sortExecutor->hasLimit());
-
-    // {$_internalBoundedSort: {sortKey, bound}}
-    auto sortKey = _sortExecutor->sortPattern().serialize(
-        SortPattern::SortKeySerialization::kForPipelineSerialization, opts);
-
-    MutableDocument mutDoc{Document{{
-        {"$_internalBoundedSort"_sd,
-         Document{
-             {{"sortKey"_sd, std::move(sortKey)},
-              {"bound"_sd, _timeSorter->serializeBound(opts)},
-              {"limit"_sd, opts.serializeLiteral(static_cast<long long>(_timeSorter->limit()))}}}},
-    }}};
-
-    if (opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        mutDoc["totalDataSizeSortedBytesEstimate"] =
-            opts.serializeLiteral(static_cast<long long>(_timeSorter->stats().bytesSorted()));
-        mutDoc["usedDisk"] = opts.serializeLiteral(_timeSorter->stats().spilledRanges() > 0);
-        mutDoc["spills"] =
-            opts.serializeLiteral(static_cast<long long>(_timeSorter->stats().spilledRanges()));
-        mutDoc["spilledDataStorageSize"] =
-            opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
-    }
-
-    array.push_back(Value{mutDoc.freeze()});
+boost::intrusive_ptr<DocumentSource> DocumentSourceSort::clone(
+    const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
+    return create(newExpCtx ? newExpCtx : pExpCtx,
+                  getSortKeyPattern(),
+                  _sortExecutor->getLimit(),
+                  _sortExecutor->getMaxMemoryBytes());
 }
 
-void DocumentSourceSort::serializeForCloning(std::vector<Value>& array,
-                                             const SerializationOptions& opts) const {
-    MutableDocument mutDoc(_sortExecutor->sortPattern().serialize(
-        SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
-    if (_sortExecutor->hasLimit()) {
-        mutDoc[kInternalLimit] =
-            opts.serializeLiteral(static_cast<long long>(_sortExecutor->getLimit()));
+void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
+                                          const SerializationOptions& opts) const {
+    auto explain = opts.verbosity;
+
+    if (_timeSorter) {
+        tassert(6369900,
+                "$_internalBoundedSort should not absorb a $limit",
+                !_sortExecutor->hasLimit());
+
+        // {$_internalBoundedSort: {sortKey, bound}}
+        auto sortKey = _sortExecutor->sortPattern().serialize(
+            SortPattern::SortKeySerialization::kForPipelineSerialization, opts);
+
+        MutableDocument mutDoc{Document{{
+            {"$_internalBoundedSort"_sd,
+             Document{{{"sortKey"_sd, std::move(sortKey)},
+                       {"bound"_sd, _timeSorter->serializeBound(opts)},
+                       {"limit"_sd,
+                        opts.serializeLiteral(static_cast<long long>(_timeSorter->limit()))}}}},
+        }}};
+
+        if (explain >= ExplainOptions::Verbosity::kExecStats) {
+            mutDoc["totalDataSizeSortedBytesEstimate"] =
+                opts.serializeLiteral(static_cast<long long>(_timeSorter->stats().bytesSorted()));
+            mutDoc["usedDisk"] = opts.serializeLiteral(_timeSorter->stats().spilledRanges() > 0);
+            mutDoc["spills"] =
+                opts.serializeLiteral(static_cast<long long>(_timeSorter->stats().spilledRanges()));
+            mutDoc["spilledDataStorageSize"] = opts.serializeLiteral(
+                static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
+        }
+
+        array.push_back(Value{mutDoc.freeze()});
+        return;
     }
-    array.push_back(Value(DOC(kStageName << mutDoc.freeze())));
-}
-
-void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
-                                                const SerializationOptions& opts) const {
-    tassert(9028701, "SerializationOptions do not specify verbosity", opts.verbosity);
-
     uint64_t limit = _sortExecutor->getLimit();
+
+
+    if (!explain) {  // one Value for $sort and maybe a Value for $limit
+        MutableDocument inner(_sortExecutor->sortPattern().serialize(
+            SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
+        array.push_back(Value(DOC(kStageName << inner.freeze())));
+
+        if (_sortExecutor->hasLimit()) {
+            auto limitSrc = DocumentSourceLimit::create(pExpCtx, limit);
+            limitSrc->serializeToArray(array, opts);
+        }
+        return;
+    }
+
     MutableDocument mutDoc(DOC(
         kStageName << DOC("sortKey" << _sortExecutor->sortPattern().serialize(
                                            SortPattern::SortKeySerialization::kForExplain, opts)
@@ -344,7 +353,7 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
                                             ? opts.serializeLiteral(static_cast<long long>(limit))
                                             : Value()))));
 
-    if (opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (explain >= ExplainOptions::Verbosity::kExecStats) {
         auto& stats = _sortExecutor->stats();
 
         mutDoc["totalDataSizeSortedBytesEstimate"] =
@@ -354,26 +363,8 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
     }
-    array.push_back(Value(mutDoc.freeze()));
-}
 
-void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
-                                          const SerializationOptions& opts) const {
-    if (_timeSorter) {
-        serializeForBoundedSort(array, opts);
-    } else if (opts.verbosity) {
-        serializeWithVerbosity(array, opts);
-    } else if (opts.serializeForCloning) {
-        serializeForCloning(array, opts);
-    } else {
-        MutableDocument mutDoc(_sortExecutor->sortPattern().serialize(
-            SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
-        array.push_back(Value(DOC(kStageName << mutDoc.freeze())));
-        if (_sortExecutor->hasLimit()) {
-            auto limitSrc = DocumentSourceLimit::create(pExpCtx, _sortExecutor->getLimit());
-            limitSrc->serializeToArray(array, opts);
-        }
-    }
+    array.push_back(Value(mutDoc.freeze()));
 }
 
 boost::optional<long long> DocumentSourceSort::getLimit() const {
@@ -439,25 +430,9 @@ void DocumentSourceSort::addVariableRefs(std::set<Variables::Id>* refs) const {
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
-    BSONElement spec, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(15973, "the $sort key specification must be an object", spec.type() == Object);
-
-    auto specObj = spec.Obj();
-    auto sortOrder = specObj;
-
-    uint64_t limit{0};
-    auto internalLimit = specObj[kInternalLimit];
-    if (internalLimit) {
-        const auto limitStatus = internalLimit.parseIntegerElementToNonNegativeLong();
-        uassert(9028702,
-                str::stream() << "invalid $_internalLimit value: "
-                              << limitStatus.getStatus().reason(),
-                limitStatus.isOK());
-        limit = limitStatus.getValue();
-
-        sortOrder = sortOrder.removeField(kInternalLimit);
-    }
-    return create(pExpCtx, {sortOrder, pExpCtx}, limit);
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    uassert(15973, "the $sort key specification must be an object", elem.type() == Object);
+    return create(pExpCtx, elem.embeddedObject());
 }
 
 intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(

@@ -78,7 +78,6 @@ public:
     static constexpr StringData kMin = "min"_sd;
     static constexpr StringData kMax = "max"_sd;
     static constexpr StringData kOffset = "offsetSeconds"_sd;
-    static constexpr StringData kInternalLimit = "$_internalLimit"_sd;
 
     struct SortableDate {
         Date_t date;
@@ -106,6 +105,9 @@ public:
 
     void serializeToArray(std::vector<Value>& array,
                           const SerializationOptions& opts = SerializationOptions{}) const final;
+
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
     GetModPathsReturn getModifiedPaths() const final {
         // A $sort does not modify any paths.
@@ -248,13 +250,6 @@ private:
     Value serialize(const SerializationOptions& opts) const final {
         MONGO_UNREACHABLE_TASSERT(7484302);  // Should call serializeToArray instead.
     }
-
-    /**
-     * Helper functions used by serializeToArray() to serialize this stage.
-     */
-    void serializeForBoundedSort(std::vector<Value>& array, const SerializationOptions& opts) const;
-    void serializeWithVerbosity(std::vector<Value>& array, const SerializationOptions& opts) const;
-    void serializeForCloning(std::vector<Value>& array, const SerializationOptions& opts) const;
 
     /**
      * Before returning anything, we have to consume all input and sort it. This method consumes all
