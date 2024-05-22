@@ -25,7 +25,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                  num_rs_nodes_per_shard=1, num_mongos=1, enable_balancer=True, auth_options=None,
                  configsvr_options=None, shard_options=None, cluster_logging_prefix=None,
                  config_shard=None, use_auto_bootstrap_procedure=None, embedded_router=False,
-                 replica_set_endpoint=False, random_migrations=False, launch_mongot=False):
+                 replica_set_endpoint=False, random_migrations=False, launch_mongot=False,
+                 set_cluster_parameter=None):
         """Initialize ShardedClusterFixture with different options for the cluster processes.
 
         :param embedded_router - True if this ShardedCluster is running in "embedded router mode". Today, this means that:
@@ -68,6 +69,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
         self.embedded_router_mode = embedded_router
         self.replica_endpoint_mode = replica_set_endpoint
+        self.set_cluster_parameter = set_cluster_parameter
 
         # Options for roles - shardsvr, configsvr.
         self.configsvr_options = self.fixturelib.make_historic(
@@ -243,7 +245,20 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         for shard in self.shards:
             self.refresh_logical_session_cache(shard)
 
+        if self.set_cluster_parameter:
+            self.run_set_cluster_parameter()
+
         self.is_ready = True
+
+    def run_set_cluster_parameter(self):
+        """Set a cluster parameter for the fixture."""
+        client = interface.build_client(self, self.auth_options)
+        command_request = {
+            "setClusterParameter": {
+                self.set_cluster_parameter["parameter"]: self.set_cluster_parameter["value"]
+            },
+        }
+        client.admin.command(command_request)
 
     # TODO SERVER-76343 remove the join_migrations parameter and the if clause depending on it.
     def stop_balancer(self, timeout_ms=300000, join_migrations=True):
