@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 
-#include <functional>
+#include <absl/functional/bind_front.h>
 
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
@@ -52,7 +52,7 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
         6215001, 5, "Using classic multi-planner for SBE", "replanReason"_attr = _replanReason);
 
     // Set up the callback that 'MultiPlanStage' will call to write to the SBE plan cache.
-    auto planCacheWriter = std::bind_front(&MultiPlanner::_buildSbePlanAndMaybeCache, this);
+    auto planCacheWriter = absl::bind_front(&MultiPlanner::_buildSbePlanAndMaybeCache, this);
 
     _multiPlanStage =
         std::make_unique<MultiPlanStage>(cq()->getExpCtxRaw(),
