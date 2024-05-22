@@ -4,6 +4,40 @@
 # should continue to run ONLY on a new LTS release (v7.0, v6.0 etc.) branch projects
 # and should NOT run on a new rapid release (v7.1, v7.2 etc.) branch projects
 
+variables:
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_x86_dynamic_compile_variant_dependency
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: linux-x86-dynamic-compile
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_x86_generic_expansions
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    large_distro_name: rhel80-medium
+    core_analyzer_distro_name: rhel80-xlarge
+    num_scons_link_jobs_available: 0.99
+    compile_variant: *linux_x86_dynamic_compile_variant_name
+
 buildvariants:
   - name: enterprise-rhel-80-64-bit-inmem
     display_name: Enterprise RHEL 8.0 (inMemory)
@@ -78,3 +112,63 @@ buildvariants:
       - name: .ssl
       - name: .updatefuzzer
       - name: generate_buildid_to_debug_symbols_mapping
+
+  - <<: *linux_x86_dynamic_compile_variant_dependency
+    name: &enterprise-rhel-80-64-bit-large-txns-format enterprise-rhel-80-64-bit-large-txns-format
+    display_name: "Enterprise RHEL 8.0 (large transactions format)"
+    tags: []
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+    run_on:
+      - rhel80-small
+    expansions:
+      <<: *linux_x86_generic_expansions
+      test_flags: >-
+        --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
+        --excludeWithAnyTags=exclude_from_large_txns
+    tasks:
+      - name: auth_gen
+      - name: auth_audit_gen
+      - name: causally_consistent_jscore_txns_passthrough
+      - name: change_streams
+      - name: change_streams_whole_db_passthrough
+      - name: change_streams_whole_cluster_passthrough
+      - name: concurrency_replication_gen
+      - name: concurrency_replication_multi_stmt_txn_gen
+      - name: concurrency_sharded_replication_gen
+      - name: concurrency_sharded_replication_with_balancer_gen
+      - name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
+      - name: concurrency_sharded_local_read_write_multi_stmt_txn_gen
+      - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
+      - name: concurrency_sharded_multi_stmt_txn_gen
+      - name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
+      - name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
+      - name: concurrency_sharded_with_stepdowns_gen
+      - name: concurrency_sharded_with_stepdowns_and_balancer_gen
+      - name: concurrency_sharded_initial_sync_gen
+      - name: initial_sync_fuzzer_gen
+      - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
+      - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
+      - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+      - name: jsCore
+      - name: jsCore_txns
+      - name: .multi_shard
+      - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+      - name: multiversion_auth_gen
+      - name: multiversion_gen
+      - name: noPassthrough_gen
+      - name: .replica_sets !.multi_oplog !.large
+      - name: .replica_sets !.multi_oplog .large
+        distros:
+          - rhel80-medium
+      - name: .replica_sets .encrypt
+      - name: .resharding_fuzzer
+      - name: .rollbackfuzzer
+      - name: .sharding .txns
+      - name: sharding_gen
+      - name: sharding_auth_audit_gen
+      - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
+      - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
+      - name: sharding_csrs_continuous_config_stepdown_gen
+      - name: sharded_multi_stmt_txn_jscore_passthrough_gen
+        distros:
+          - rhel80-medium
