@@ -162,6 +162,14 @@ private:
 };
 
 /**
+ * In order to more easily debug failures in the dependency graph between initializers,
+ * the --initializerShuffleSeed option specifies the shuffle order used to sort the initializer
+ * graph. However, we have not yet parsed the server options, and so the parameter's value is
+ * extracted here.
+ */
+unsigned extractRandomSeedFromOptions(const std::vector<std::string>& argsList);
+
+/**
  * Get the process-global initializer object.
  */
 Initializer& getGlobalInitializer();

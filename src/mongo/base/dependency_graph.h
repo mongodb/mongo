@@ -78,13 +78,14 @@ public:
      * Throws with `ErrorCodes::BadValue` if any node in the graph names a
      * prerequisite that is missing from the graph.
      */
-    std::vector<std::string> topSort(std::vector<std::string>* cycle = nullptr) const;
+    std::vector<std::string> topSort(unsigned randomSeed,
+                                     std::vector<std::string>* cycle = nullptr) const;
 
     Payload* find(const std::string& name);
 
 private:
     struct Node {
-        stdx::unordered_set<std::string> prerequisites;
+        std::set<std::string> prerequisites;
         std::unique_ptr<Payload> payload;
     };
 
@@ -93,7 +94,7 @@ private:
      * added via addInitializer will either be absent from this map or be present with
      * NodeData::fn set to a false-ish value.
      */
-    stdx::unordered_map<std::string, Node> _nodes;
+    std::map<std::string, Node> _nodes;
 };
 
 }  // namespace mongo

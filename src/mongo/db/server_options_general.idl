@@ -164,3 +164,8 @@ configs:
         arg_vartype: Switch
         source: [ cli, ini ]
         hidden: true
+    initializerShuffleSeed:
+        description: "Sets random seed used to shuffle initializers (for testing)"
+        arg_vartype: Unsigned
+        source: [ cli ]
+        hidden: true

@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <fmt/ranges.h>  // IWYU pragma: keep
+#include <random>
 #include <string>
 #include <vector>
 
@@ -44,9 +45,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
@@ -56,33 +60,64 @@ size_t count(const C& c, const T& value) {
     return std::count(c.begin(), c.end(), value);
 }
 
-TEST(DependencyGraphTest, InsertNullPayloadOkay) {
+class DependencyGraphTest : public unittest::Test {
+public:
+    void setUp() override {
+        unsigned seed = std::random_device{}();
+        LOGV2(8991202, "Running test with seed", "seed"_attr = seed);
+        _gen.seed(seed);
+    }
+
+    std::mt19937& prng() {
+        return _gen;
+    }
+
+private:
+    std::mt19937 _gen;
+};
+
+TEST_F(DependencyGraphTest, InsertNullPayloadOkay) {
     DependencyGraph graph;
     graph.addNode("A", {}, {});
 }
 
-TEST(DependencyGraphTest, InsertSameNameTwiceFails) {
+TEST_F(DependencyGraphTest, InsertSameNameTwiceFails) {
     DependencyGraph graph;
     graph.addNode("A", {}, {});
     ASSERT_THROWS_CODE(graph.addNode("A", {}, {}), DBException, 50999);
 }
 
-TEST(DependencyGraphTest, TopSortEmptyGraph) {
+TEST_F(DependencyGraphTest, TopSortEmptyGraph) {
     DependencyGraph graph;
-    std::vector<std::string> nodeNames = graph.topSort();
+    std::vector<std::string> nodeNames = graph.topSort(prng()());
     ASSERT_EQUALS(nodeNames.size(), 0u);
 }
 
-TEST(DependencyGraphTest, TopSortGraphNoDeps) {
+TEST_F(DependencyGraphTest, TopSortGraphNoDeps) {
     DependencyGraph graph;
     graph.addNode("A", {}, {});
     graph.addNode("B", {}, {});
     graph.addNode("C", {}, {});
-    auto nodeNames = graph.topSort();
+    auto nodeNames = graph.topSort(prng()());
     ASSERT_EQ(nodeNames.size(), 3);
     ASSERT_EQ(count(nodeNames, "A"), 1);
     ASSERT_EQ(count(nodeNames, "B"), 1);
     ASSERT_EQ(count(nodeNames, "C"), 1);
+}
+
+TEST_F(DependencyGraphTest, TopSortGraphSameShuffle) {
+    auto makeGraph = [] {
+        DependencyGraph graph;
+        graph.addNode("1", {}, {});
+        graph.addNode("A", {"1"}, {});
+        graph.addNode("B", {"1"}, {});
+        graph.addNode("C", {"1"}, {});
+        graph.addNode("D", {"1"}, {});
+        graph.addNode("E", {"1"}, {});
+        graph.addNode("F", {"1"}, {});
+        return graph.topSort(123456);
+    };
+    ASSERT_EQ(makeGraph(), makeGraph());
 }
 
 /**
@@ -105,7 +140,7 @@ void checkDiamondTopology(const std::vector<std::string>& nodeNames) {
         fmt::format("{}", fmt::join(nodeNames.begin(), nodeNames.end(), " ")), "^A (B C|C B) D$");
 }
 
-TEST(DependencyGraphTest, TopSortWithDiamondPrerequisites) {
+TEST_F(DependencyGraphTest, TopSortWithDiamondPrerequisites) {
     /*
      * Top-sorting a simple diamond specified using prerequisites.
      * See checkDiamondTopology for topology.
@@ -115,10 +150,10 @@ TEST(DependencyGraphTest, TopSortWithDiamondPrerequisites) {
     graph.addNode("B", {"A"}, {});
     graph.addNode("C", {"A"}, {});
     graph.addNode("D", {"B", "C"}, {});
-    checkDiamondTopology(graph.topSort());
+    checkDiamondTopology(graph.topSort(prng()()));
 }
 
-TEST(DependencyGraphTest, TopSortWithDiamondDependents) {
+TEST_F(DependencyGraphTest, TopSortWithDiamondDependents) {
     /*
      * Same diamond topology as preceding test, but specified using dependents.
      */
@@ -127,10 +162,10 @@ TEST(DependencyGraphTest, TopSortWithDiamondDependents) {
     graph.addNode("B", {}, {"D"});
     graph.addNode("C", {}, {"D"});
     graph.addNode("D", {}, {});
-    checkDiamondTopology(graph.topSort());
+    checkDiamondTopology(graph.topSort(prng()()));
 }
 
-TEST(DependencyGraphTest, TopSortWithDiamondGeneral1) {
+TEST_F(DependencyGraphTest, TopSortWithDiamondGeneral1) {
     /*
      * Same diamond topology, specified completely by prerequisites and
      * dependents declared on B and C.
@@ -140,10 +175,10 @@ TEST(DependencyGraphTest, TopSortWithDiamondGeneral1) {
     graph.addNode("B", {"A"}, {"D"});
     graph.addNode("C", {"A"}, {"D"});
     graph.addNode("D", {}, {});
-    checkDiamondTopology(graph.topSort());
+    checkDiamondTopology(graph.topSort(prng()()));
 }
 
-TEST(DependencyGraphTest, TopSortWithDiamondGeneral2) {
+TEST_F(DependencyGraphTest, TopSortWithDiamondGeneral2) {
     /*
      * Same diamond topology, specified completely by prerequisites and
      * dependents declared on A and D.
@@ -153,10 +188,10 @@ TEST(DependencyGraphTest, TopSortWithDiamondGeneral2) {
     graph.addNode("B", {}, {});
     graph.addNode("C", {}, {});
     graph.addNode("D", {"C", "B"}, {});
-    checkDiamondTopology(graph.topSort());
+    checkDiamondTopology(graph.topSort(prng()()));
 }
 
-TEST(DependencyGraphTest, TopSortWithDiamondGeneral3) {
+TEST_F(DependencyGraphTest, TopSortWithDiamondGeneral3) {
     /*
      * Same diamond topology, specified by redundant but coherent constraints.
      */
@@ -165,10 +200,10 @@ TEST(DependencyGraphTest, TopSortWithDiamondGeneral3) {
     graph.addNode("B", {"A"}, {"D"});
     graph.addNode("C", {"A"}, {"D"});
     graph.addNode("D", {"C", "B"}, {});
-    checkDiamondTopology(graph.topSort());
+    checkDiamondTopology(graph.topSort(prng()()));
 }
 
-TEST(DependencyGraphTest, TopSortWithDiamondAndCycle) {
+TEST_F(DependencyGraphTest, TopSortWithDiamondAndCycle) {
     /*
      * Cyclic graph. Should fail.
      *
@@ -193,14 +228,14 @@ TEST(DependencyGraphTest, TopSortWithDiamondAndCycle) {
     auto check = [](auto&& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::GraphContainsCycle) << ex.toString();
     };
-    ASSERT_THROWS_WITH_CHECK(graph.topSort(&cycle), DBException, check);
+    ASSERT_THROWS_WITH_CHECK(graph.topSort(prng()(), &cycle), DBException, check);
     ASSERT_EQ(cycle.size(), 3);
     ASSERT_EQ(count(cycle, "B"), 1);
     ASSERT_EQ(count(cycle, "D"), 1);
     ASSERT_EQ(count(cycle, "E"), 1);
 }
 
-TEST(DependencyGraphTest, TopSortFailsWhenMissingPrerequisite) {
+TEST_F(DependencyGraphTest, TopSortFailsWhenMissingPrerequisite) {
     /*
      * If a node names a never-declared prerequisite, topSort should fail.
      */
@@ -210,10 +245,10 @@ TEST(DependencyGraphTest, TopSortFailsWhenMissingPrerequisite) {
         ASSERT_EQ(ex.code(), ErrorCodes::BadValue) << ex.toString();
         ASSERT_STRING_CONTAINS(ex.reason(), "node B depends on missing node A");
     };
-    ASSERT_THROWS_WITH_CHECK(graph.topSort(), DBException, check);
+    ASSERT_THROWS_WITH_CHECK(graph.topSort(prng()()), DBException, check);
 }
 
-TEST(DependencyGraphTest, TopSortFailsWhenMissingDependent) {
+TEST_F(DependencyGraphTest, TopSortFailsWhenMissingDependent) {
     /*
      * If a node names a never-declared dependent, topSort should fail.
      */
@@ -223,7 +258,7 @@ TEST(DependencyGraphTest, TopSortFailsWhenMissingDependent) {
         ASSERT_EQ(ex.code(), ErrorCodes::BadValue) << ex.toString();
         ASSERT_STRING_CONTAINS(ex.reason(), "node B was mentioned but never added");
     };
-    ASSERT_THROWS_WITH_CHECK(graph.topSort(), DBException, check);
+    ASSERT_THROWS_WITH_CHECK(graph.topSort(prng()()), DBException, check);
 }
 
 std::vector<std::vector<std::string>> allPermutations(std::vector<std::string> vec,
@@ -249,7 +284,7 @@ void doUntilAllSeen(const Expectations& expected, F&& f) {
     }
 }
 
-TEST(DependencyGraphTest, TopSortShufflesNodes) {
+TEST_F(DependencyGraphTest, TopSortShufflesNodes) {
     /*
      * Make sure all node orderings can appear as outputs.
      */
@@ -261,10 +296,10 @@ TEST(DependencyGraphTest, TopSortShufflesNodes) {
         graph.addNode(s, {}, {});
     }
     doUntilAllSeen(allPermutations(graphNodes, 0, graphNodes.size()),
-                   [&] { return graph.topSort(); });
+                   [&] { return graph.topSort(prng()()); });
 }
 
-TEST(DependencyGraphTest, TopSortShufflesChildren) {
+TEST_F(DependencyGraphTest, TopSortShufflesChildren) {
     /*
      * Make sure all child orderings can appear as outputs.
      */
@@ -279,7 +314,7 @@ TEST(DependencyGraphTest, TopSortShufflesChildren) {
     }
     // Permute only the children.
     doUntilAllSeen(allPermutations(graphNodes, 1, graphNodes.size()),
-                   [&] { return graph.topSort(); });
+                   [&] { return graph.topSort(prng()()); });
 }
 
 }  // namespace

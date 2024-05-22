@@ -29,6 +29,7 @@
 
 #include <fmt/format.h>
 #include <iostream>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
@@ -49,6 +50,21 @@
 
 
 namespace mongo {
+
+namespace {
+/**
+ * If certain args are present, we cannot print anything.
+ */
+bool mustRunSilently(const auto& args) {
+    static constexpr std::array q{
+        "--quiet"_sd,
+        "--list"_sd,  // Avoid crosstalk with unit test names
+    };
+    return std::any_of(args.begin(), args.end(), [&](StringData a) {
+        return std::any_of(q.begin(), q.end(), [&](StringData s) { return a.starts_with(s); });
+    });
+}
+}  // namespace
 
 class Initializer::Graph {
 public:
@@ -91,8 +107,8 @@ public:
      * - Throws with `ErrorCodes::BadValue` if the graph is incomplete.
      *   That is, a node named in a dependency edge was never added.
      */
-    std::vector<std::string> topSort() const {
-        return _graph.topSort();
+    std::vector<std::string> topSort(unsigned randomSeed) const {
+        return _graph.topSort(randomSeed);
     }
 
 private:
@@ -142,8 +158,12 @@ void Initializer::executeInitializers(const std::vector<std::string>& args) {
         _transition(State::kNeverInitialized, State::kUninitialized);  // freeze
     _transition(State::kUninitialized, State::kInitializing);
 
-    if (_sortedNodes.empty())
-        _sortedNodes = _graph->topSort();
+    if (_sortedNodes.empty()) {
+        auto seed = extractRandomSeedFromOptions(args);
+        if (!mustRunSilently(args))
+            LOGV2(8991200, "Shuffling initializers", "seed"_attr = seed);
+        _sortedNodes = _graph->topSort(seed);
+    }
 
     InitializerContext context(args);
 
@@ -194,6 +214,35 @@ InitializerFunction Initializer::getInitializerFunctionForTesting(const std::str
     return node ? node->initFn : nullptr;
 }
 
+unsigned extractRandomSeedFromOptions(const std::vector<std::string>& args) {
+    using namespace fmt::literals;
+    const std::string targetArg{"--initializerShuffleSeed"};
+    const auto errMsg = "Value must be specified for {}"_format(targetArg);
+
+    for (size_t i = 0; i < args.size(); i++) {
+        StringData arg = args[i];
+        std::string val;
+        if (!arg.starts_with(targetArg))
+            continue;
+        arg.remove_prefix(targetArg.size());
+        if (arg.empty()) {
+            // --initializerShuffleSeed 123456
+            uassert(ErrorCodes::InvalidOptions, errMsg, i + 1 < args.size());
+            val = args[i + 1];
+        } else {
+            // --initializerShuffleSeed=123456
+            uassert(ErrorCodes::InvalidOptions, errMsg, arg.starts_with("="));
+            arg.remove_prefix(1);
+            val = std::string{arg};
+        }
+
+        unsigned seed;
+        uassertStatusOK(NumberParser{}(val, &seed));
+        return seed;
+    }
+
+    return std::random_device{}();
+}
 
 Initializer& getGlobalInitializer() {
     static auto g = new Initializer;

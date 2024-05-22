@@ -108,7 +108,12 @@ configs:
     arg_vartype: Switch
     source: [ cli, ini ]
     hidden: true
-
+  "initializerShuffleSeed":
+      description: "Sets random seed used to shuffle initializers (for testing)"
+      arg_vartype: Unsigned
+      source: [ cli ]
+      hidden: true
+  
   "disableJavaScriptJIT":
     description: "disable the Javascript Just In Time compiler"
     arg_vartype: Switch

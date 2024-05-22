@@ -106,6 +106,9 @@ struct ServerGlobalParams {
     // Can be paired with --objcheck so that extra BSON validation occurs.
     bool crashOnInvalidBSONError = false;  // --crashOnInvalidBSONError
 
+    // When specified, deterministically reproduces the execution order of mongo initializers.
+    unsigned initializerShuffleSeed = 0;  // --initializerShuffleSeed
+
     int defaultProfile = 0;  // --profile
     boost::optional<BSONObj> defaultProfileFilter;
     AtomicWord<int> slowMS{100};           // --time in ms that is "slow"

@@ -38,9 +38,11 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/string_data.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/logv2/log.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
@@ -297,6 +299,50 @@ TEST_F(InitializerTest, CannotAddWhenFrozen) {
     ASSERT_THROWS_CODE(initializer.addInitializer("A", initNoop, nullptr, {}, {}),
                        DBException,
                        ErrorCodes::CannotMutateObject);
+}
+
+TEST(RandomSeedTest, ProducesRandomOutput) {
+    const auto randomMean = [](size_t n, auto&& generator) -> double {
+        double sum = 0.0;
+        for (auto i = n; i; --i)
+            sum += generator();
+        return sum / n;
+    };
+
+    auto gen = [&] {
+        return extractRandomSeedFromOptions({"input1", "input2"});
+    };
+
+    static const double expectedMean = 0.5 * std::numeric_limits<unsigned>::max();
+    ASSERT_APPROX_EQUAL(randomMean(10000, gen), expectedMean, .1 * expectedMean);
+}
+
+TEST(RandomSeedTest, RandomSeedParsing) {
+    const std::string opt{"--initializerShuffleSeed"};
+    const unsigned seed = 123456;
+    struct Spec {
+        std::vector<std::string> args;
+        boost::optional<ErrorCodes::Error> code;
+        unsigned seed = 0;
+    };
+    const Spec specs[] = {
+        {{"input1", "input2", opt, std::to_string(seed)}, {}, seed},
+        {{"input1", "input2", "{}={}"_format(opt, seed)}, {}, seed},
+        {{"input1", "input2", opt}, ErrorCodes::InvalidOptions},
+        {{"input1", "input2", "{}="_format(opt)}, ErrorCodes::FailedToParse},
+        {{"input1", "input2", opt, "abcd"}, ErrorCodes::FailedToParse},
+        {{"input1", "input2", "{}={}"_format(opt, "abcd")}, ErrorCodes::FailedToParse},
+    };
+
+    for (auto&& spec : specs) {
+        LOGV2(8991201, "Evaluating test case", "args"_attr = spec.args);
+        if (spec.seed) {
+            ASSERT_EQ(extractRandomSeedFromOptions(spec.args), spec.seed);
+        } else {
+            ASSERT_THROWS_CODE(
+                extractRandomSeedFromOptions(spec.args), DBException, spec.code.value());
+        }
+    }
 }
 
 }  // namespace

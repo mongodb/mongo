@@ -93,14 +93,15 @@ void throwGraphContainsCycle(Iter first, Iter last, std::vector<std::string>* cy
 
 }  // namespace
 
-std::vector<std::string> DependencyGraph::topSort(std::vector<std::string>* cycle) const {
+std::vector<std::string> DependencyGraph::topSort(unsigned randomSeed,
+                                                  std::vector<std::string>* cycle) const {
     // Topological sort via repeated depth-first traversal.
     // All nodes must have an initFn before running topSort, or we return BadValue.
     struct Element {
         const std::string& name() const {
             return nodeIter->first;
         }
-        stdx::unordered_map<std::string, Node>::const_iterator nodeIter;
+        std::map<std::string, Node>::const_iterator nodeIter;
         std::vector<Element*> children;
         std::vector<Element*>::iterator membership;  // Position of this in `elements`.
     };
@@ -156,8 +157,7 @@ std::vector<std::string> DependencyGraph::topSort(std::vector<std::string>* cycl
 
     // Shuffle the inputs to improve test coverage of undeclared dependencies.
     {
-        std::random_device slowSeedGen;
-        std::mt19937 generator(slowSeedGen());
+        std::mt19937 generator(randomSeed);
         std::shuffle(elements.begin(), elements.end(), generator);
         for (Element* e : elements)
             std::shuffle(e->children.begin(), e->children.end(), generator);

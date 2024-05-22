@@ -157,6 +157,12 @@ Status storeMongoShellOptions(const moe::Environment& params,
         serverGlobalParams.crashOnInvalidBSONError = true;
     }
 
+    // Common to the server and shell, deterministically reproduces the execution order of mongo
+    // initializers.
+    if (params.count("initializerShuffleSeed")) {
+        serverGlobalParams.initializerShuffleSeed = 0;
+    }
+
     if (params.count("port")) {
         shellGlobalParams.port = params["port"].as<string>();
     }
