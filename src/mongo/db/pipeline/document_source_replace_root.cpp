@@ -196,6 +196,18 @@ bool ReplaceRootTransformation::pushDotRenamedMatchBefore(Pipeline::SourceContai
     return false;
 }
 
+Pipeline::SourceContainer::iterator ReplaceRootTransformation::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    // Attempt to push match stage before replaceRoot/replaceWith stage.
+    if (pushDotRenamedMatchBefore(itr, container)) {
+        // Optimize the previous stage. If this is the first stage, optimize the current stage
+        // instead.
+        return itr == container->begin() ? itr : std::prev(itr);
+    }
+
+    return std::next(itr);
+}
+
 REGISTER_DOCUMENT_SOURCE(replaceRoot,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceReplaceRoot::createFromBson,

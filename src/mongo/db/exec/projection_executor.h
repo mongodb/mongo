@@ -79,6 +79,11 @@ public:
         }
     }
 
+    Pipeline::SourceContainer::iterator doOptimizeAt(
+        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) override {
+        return std::next(itr);
+    }
+
     /**
      * Add any dependencies needed by this projection or any sub-expressions to 'deps'.
      */
