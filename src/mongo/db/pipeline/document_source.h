@@ -355,7 +355,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
         tassert(7406001, "expCtx passed to clone must not be null", expCtx);
         std::vector<Value> serializedDoc;
-        serializeToArray(serializedDoc);
+        serializeToArray(serializedDoc, SerializationOptions{.serializeForCloning = true});
         tassert(5757900,
                 str::stream() << "DocumentSource " << getSourceName()
                               << " should have serialized to exactly one document. This stage may "
