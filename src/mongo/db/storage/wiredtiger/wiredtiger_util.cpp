@@ -1130,7 +1130,7 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                     << ". reason: " << wiredtiger_strerror(ret));
     }
     bob->append("uri", uri);
-    bob->append("wiredTiger version", wiredtiger_version(NULL, NULL, NULL));
+    bob->append("version", wiredtiger_version(NULL, NULL, NULL));
     invariant(cursor);
     ON_BLOCK_EXIT([&] { cursor->close(cursor); });
 
