@@ -29,8 +29,6 @@ DEFAULT_DBTEST_EXECUTABLE = os.path.join(os.curdir, "dbtest")
 DEFAULT_MONGO_EXECUTABLE = "mongo"
 DEFAULT_MONGOD_EXECUTABLE = "mongod"
 DEFAULT_MONGOS_EXECUTABLE = "mongos"
-# TODO SERVER-85977 potentially replace with "mongot" if possible to add a symlink from raw path
-# below as part of setup-mongot-repro.
 DEFAULT_MONGOT_EXECUTABLE = "mongot-localdev/mongot"
 
 DEFAULT_BENCHMARK_REPETITIONS = 3

@@ -846,11 +846,16 @@ add_option(
     help="Configures the path to the evergreen configured tmp directory.",
     default=None,
 )
-"""
---build-mongot is a compile flag used by the evergreen build variants that run end-to-end search
-suites, as it downloads the necessary mongot binary.
-"""
-add_option("build-mongot", action="store_true")
+
+# --build-mongot is a compile flag used by the evergreen build variants that run end-to-end search
+# suites, as it downloads the necessary mongot binary.
+add_option(
+    "build-mongot",
+    choices=["latest", "release"],
+    default=None,
+    type="choice",
+    help="Installs the appropriate mongot for your architecture",
+)
 
 try:
     with open("version.json", "r") as version_fp:
@@ -6800,17 +6805,20 @@ if has_option("cache"):
         addNoCacheEmitter(env["BUILDERS"]["SharedLibrary"])
         addNoCacheEmitter(env["BUILDERS"]["SharedArchive"])
         addNoCacheEmitter(env["BUILDERS"]["LoadableModule"])
-"""
-mongot is a MongoDB-specific process written as a wrapper around Lucene. Using Lucene, mongot
-indexes MongoDB databases to provide our customers with full text search capabilities.
 
---build-mongot is utilized as a compile flag by the evergreen build variants that run end-to-end
-search suites. It downloads & bundles mongot with the other mongo binaries. These binaries become
-available to the build variants in question when the binaries are extracted via archive_dist_test
-during compilation.
-"""
-
+# mongot is a MongoDB-specific process written as a wrapper around Lucene. Using Lucene, mongot
+# indexes MongoDB databases to provide our customers with full text search capabilities.
+#
+# --build-mongot is utilized as a compile flag by the evergreen build variants that run end-to-end
+# search suites. It downloads & bundles mongot with the other mongo binaries. These binaries become
+# available to the build variants in question when the binaries are extracted via archive_dist_test
+# during compilation.
 if env.GetOption("build-mongot"):
+    # '--build-mongot` can be 'latest' or'release'
+    #  - 'latest' describes the binaries created by the most recent commit merged to 10gen/mongot.
+    #  - 'release' refers to the mongot binaries running in atlas prod.
+    binary_ver_str = env.GetOption("build-mongot")
+
     platform_str = ""
     if mongo_platform.is_running_os("linux"):
         platform_str = "linux"
@@ -6840,7 +6848,7 @@ if env.GetOption("build-mongot"):
         target=["mongot-localdev"],
         source=db_contrib_tool,
         action=[
-            f"$SOURCE setup-mongot-repro-env --platform={platform_str} --architecture={arch_str}",
+            f"$SOURCE setup-mongot-repro-env {binary_ver_str} --platform={platform_str} --architecture={arch_str}",
             f"mv build/mongot-localdev mongot-localdev",
         ],
         ENV=os.environ,
