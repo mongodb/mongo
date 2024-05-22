@@ -1,9 +1,9 @@
-# Common mongo-specific bazel build rules intended to be used in individual BUILD files in the "src/" subtree.
-load("@poetry//:dependencies.bzl", "dependency")
-
 # config selection
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+
+# Common mongo-specific bazel build rules intended to be used in individual BUILD files in the "src/" subtree.
+load("@poetry//:dependencies.bzl", "dependency")
 load("//bazel:separate_debug.bzl", "CC_SHARED_LIBRARY_SUFFIX", "SHARED_ARCHIVE_SUFFIX", "WITH_DEBUG_SUFFIX", "extract_debuginfo", "extract_debuginfo_binary")
 
 # https://learn.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=msvc-170
@@ -806,26 +806,53 @@ UNDEFINED_SANITIZER_DEFINES = select({
 # have renamed the flag.
 # However, this flag cannot be included when using the fuzzer sanitizer
 # if we want to suppress errors to uncover new ones.
+
+# this is a workaround, dive deeper with the folowing
+# TODO: https://jira.mongodb.org/browse/SERVER-90130
+
+UBSAN_EXPANSION_MINUS_VPTR = ",".join(
+    [
+        "alignment",
+        "array-bounds",
+        "bool",
+        "builtin",
+        "enum",
+        "float-cast-overflow",
+        "integer-divide-by-zero",
+        "nonnull-attribute",
+        "null",
+        "pointer-overflow",
+        "return",
+        "returns-nonnull-attribute",
+        "shift-base",
+        "shift-exponent",
+        "signed-integer-overflow",
+        "unreachable",
+        "vla-bound",
+    ],
+)
+
 UNDEFINED_SANITIZER_COPTS = select({
+    "//bazel/config:sanitize_undefined_static_link_settings": ["-fsanitize=" + UBSAN_EXPANSION_MINUS_VPTR + ",vptr"],
+    "//bazel/config:sanitize_undefined_dynamic_link_settings": ["-fno-sanitize=vptr", "-fsanitize=" + UBSAN_EXPANSION_MINUS_VPTR],
+    "//conditions:default": [],
+}) + select({
     ("//bazel/config:sanitize_undefined_without_fuzzer_settings"): ["-fno-sanitize-recover"],
     ("//conditions:default"): [],
 }) + select({
-    ("//bazel/config:sanitize_undefined_dynamic_link_settings"): ["-fno-sanitize=vptr"],
-    ("//conditions:default"): [],
-}) + select({
     "//bazel/config:ubsan_enabled": [
-        "-fsanitize=undefined",
         "-fsanitize-blacklist=$(location //etc:ubsan_denylist_h)",
     ],
     "//bazel/config:ubsan_disabled": [],
 }, no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "undefined")
 
 UNDEFINED_SANITIZER_LINKFLAGS = select({
+    "//bazel/config:sanitize_undefined_static_link_settings": ["-fsanitize=" + UBSAN_EXPANSION_MINUS_VPTR + ",vptr"],
+    "//bazel/config:sanitize_undefined_dynamic_link_settings": ["-fno-sanitize=vptr", "-fsanitize=" + UBSAN_EXPANSION_MINUS_VPTR],
+    "//bazel/config:ubsan_disabled": [],
+}) + select({
     ("//bazel/config:sanitize_undefined_dynamic_link_settings"): ["-fno-sanitize=vptr"],
     ("//conditions:default"): [],
-}) + select({
-    ("//bazel/config:ubsan_enabled"): ["-fsanitize=undefined"],
-    ("//bazel/config:ubsan_disabled"): [],
 }, no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "undefined")
 
 REQUIRED_SETTINGS_DYNAMIC_LINK_ERROR_MESSAGE = (

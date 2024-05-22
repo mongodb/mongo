@@ -1,3 +1,4 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load(
     "//bazel/config:configs.bzl",
     "allocator",
@@ -35,7 +36,6 @@ load(
     "use_wiredtiger",
     "visibility_support",
 )
-load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -1312,7 +1312,15 @@ selects.config_setting_group(
     name = "sanitize_undefined_dynamic_link_settings",
     match_all = [
         ":ubsan_enabled",
-        ":linkdynamic_required_settings",
+        ":linkstatic_disabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "sanitize_undefined_static_link_settings",
+    match_all = [
+        ":ubsan_enabled",
+        ":linkstatic_enabled",
     ],
 )
 
