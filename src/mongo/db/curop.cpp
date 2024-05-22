@@ -645,7 +645,8 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 
     Milliseconds totalBlockedTime;
     std::tie(totalBlockedTime, _debug.waitForTicketDurationMillis) = _getAndSumBlockedTimeTotal();
-    auto workingMillis = Milliseconds(executionTimeMillis) - totalBlockedTime - _blockedTimeAtStart;
+    auto workingMillis =
+        Milliseconds(executionTimeMillis) - (totalBlockedTime - _blockedTimeAtStart);
     // Round up to zero if necessary to allow precision errors from FastClockSource used by flow
     // control ticketholder.
     _debug.workingTimeMillis = (workingMillis < Milliseconds(0) ? Milliseconds(0) : workingMillis);
