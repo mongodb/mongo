@@ -151,8 +151,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGroupBase::optimize() {
     // and the collection access could be still eligible for lowering to SBE, thus we must reset the
     // context's 'sbeCompatible' flag back to its original value at the end of the 'optimize()'
     // call.
-    //
-    // TODO SERVER-XXXXX: replace this hack with a proper per-stage tracking of SBE compatibility.
     auto& idExpressions = _groupProcessor.getMutableIdExpressions();
     auto expCtx = idExpressions[0]->getExpressionContext();
     auto origSbeCompatibility = expCtx->sbeCompatibility;
