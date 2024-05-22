@@ -153,6 +153,7 @@ buildvariants:
     - windows-vsCurrent-large
   - name: replica_sets_ese_gen
   - name: sasl
+  - name: sasl_windows_cyrussasl
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
   - name: .sharding .txns

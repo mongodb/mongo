@@ -2209,6 +2209,13 @@ functions:
       content_type: text/plain
       display_name: Resmoke.py Invocation for Local Usage
 
+  "cleanup external auth test artifacts":
+  - *f_expansions_write
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "./src/evergreen/sasl_windows_cyrussasl_teardown.sh"
 
 # Pre task steps
 pre:
@@ -2239,13 +2246,13 @@ post:
 - func: "cleanup FUSE watchdog"
 - func: "cleanup environment"
 - func: "cleanup jepsen docker test"
+- func: "cleanup external auth test artifacts"
 
 # Timeout steps
 timeout:
 - func: "f_expansions_write"
 - func: "run hang analyzer"
 - func: "wait for resmoke to shutdown"
-
 
 #######################################
 #               Tasks                 #
@@ -5012,6 +5019,20 @@ tasks:
     vars:
       suite: external_auth
       resmoke_args: --includeWithAnyTags=requires_domain_controller
+
+- <<: *task_template
+  name: sasl_windows_cyrussasl
+  tags: ["assigned_to_jira_team_server_security", "sasl", "experimental"]
+  commands:
+  - func: "f_expansions_write"
+  - func: "do setup"
+  - func: "f_expansions_write"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/sasl_windows_cyrussasl_setup.sh"
+  - func: "run tests"
 
 - <<: *task_template
   name: jsCore

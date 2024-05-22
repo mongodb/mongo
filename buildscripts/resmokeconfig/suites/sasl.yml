@@ -3,6 +3,8 @@ test_kind: js_test
 selector:
   roots:
   - src/mongo/db/modules/*/jstests/sasl/*.js
+  exclude_files:
+  - src/mongo/db/modules/enterprise/jstests/sasl/sasl_plugins.js
 
 # sasl tests start their own mongod's.
 executor:
