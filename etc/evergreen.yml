@@ -1860,6 +1860,14 @@ functions:
         - "src/evergreen/run_python_script.sh"
         - "buildscripts/sync_repo_with_copybara.py --expansion-file ../expansions.yml"
 
+  "cleanup external auth test artifacts":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/sasl_windows_cyrussasl_teardown.sh"
+
 # Pre task steps
 pre:
   - func: "set task expansion macros"
@@ -1885,6 +1893,7 @@ post:
   - func: "umount shared scons directory"
   - func: "cleanup FUSE watchdog"
   - func: "cleanup environment"
+  - func: "cleanup external auth test artifacts"
 
 # Timeout steps
 timeout:
@@ -5470,6 +5479,22 @@ tasks:
     vars:
       resmoke_args: --suites=sasl --storageEngine=wiredTiger
 
+- <<: *task_template
+  name: sasl_windows_cyrussasl
+  tags: []
+  commands:
+  - func: "f_expansions_write"
+  - func: "do setup"
+  - func: "f_expansions_write"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/sasl_windows_cyrussasl_setup.sh"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sasl_windows_cyrussasl --storageEngine=wiredTiger
+
 - <<: *gen_task_template
   name: sharding_gen
   tags: ["sharding", "common"]
@@ -8610,6 +8635,7 @@ buildvariants:
     - name: .replica_sets .multi_oplog
     - name: replica_sets_ese_gen
     - name: sasl
+    - name: sasl_windows_cyrussasl
     - name: server_discovery_and_monitoring_json_test_TG
     - name: server_selection_json_test_TG
     - name: .sharding .txns
@@ -8785,6 +8811,7 @@ buildvariants:
   - name: .read_write_concern
   - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
+  - name: sasl_windows_cyrussasl
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs
