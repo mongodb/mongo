@@ -322,6 +322,9 @@ public:
 
     /** Only basic (not strong) exception safety for this copy-assign. */
     DecorationBuffer& operator=(const DecorationBuffer& other) {
+        if (this == &other) {
+            return *this;
+        }
         auto& reg = _reg();
         size_t n = reg.size();
         for (size_t i = 0; i != n; ++i) {

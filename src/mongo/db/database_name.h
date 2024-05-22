@@ -512,6 +512,9 @@ protected:
         }
 
         Storage& operator=(const Storage& other) {
+            if (this == &other) {
+                return *this;
+            }
             deallocate();
             copy(other);
             if (other.isDynamicAlloc()) {

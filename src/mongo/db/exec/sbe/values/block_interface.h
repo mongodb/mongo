@@ -48,7 +48,7 @@ namespace mongo::sbe::value {
  */
 class DeblockedTagVals {
 public:
-    DeblockedTagVals() {}
+    DeblockedTagVals() = default;
 
     // 'tags' and 'vals' point to an array of 'count' elements respectively.
     DeblockedTagVals(size_t count,
@@ -58,14 +58,6 @@ public:
                      bool isDense = false)
         : _count(count), _tags(tags), _vals(vals), _tag(tag), _isDense(isDense) {
         tassert(7949501, "Values must exist", count > 0 || (tags == nullptr && vals == nullptr));
-    }
-    DeblockedTagVals& operator=(const DeblockedTagVals& other) {
-        _count = other._count;
-        _tags = other._tags;
-        _vals = other._vals;
-        _tag = other._tag;
-        _isDense = other._isDense;
-        return *this;
     }
 
     std::pair<TypeTags, Value> operator[](size_t idx) const {

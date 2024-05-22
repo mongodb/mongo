@@ -279,6 +279,10 @@ struct SecureAllocatorDomain {
         SecureHandle(const SecureHandle& other) : _t(_new(*other)) {}
 
         SecureHandle& operator=(const SecureHandle& other) {
+            if (this == &other) {
+                return *this;
+            }
+
             if (_t) {
                 *_t = *other;
             } else {
