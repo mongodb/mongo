@@ -83,6 +83,7 @@ post:
 - func: "cleanup FUSE watchdog"
 - func: "cleanup environment"
 - func: "cleanup jepsen docker test"
+- func: "cleanup external auth test artifacts"
 
 # Timeout steps
 timeout:
