@@ -88,17 +88,20 @@ namespace change_stream_filter {
  * against the possibility of stale string references.
  */
 std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const MatchExpression* userMatch,
+    std::vector<BSONObj>& bsonObj) {
     // The transaction unwind filter is the same as the operation filter applied to the oplog. This
     // includes a namespace filter, which ensures that it will discard all documents that would be
     // filtered out by the default 'ns' filter this stage gets initialized with.
-    auto unwindFilter = std::make_unique<AndMatchExpression>(buildOperationFilter(expCtx, nullptr));
+    auto unwindFilter =
+        std::make_unique<AndMatchExpression>(buildOperationFilter(expCtx, nullptr, bsonObj));
 
     // To correctly handle filtering out entries of direct write operations on orphaned documents,
     // we include a filter for "fromMigrate" flagged operations, unless "fromMigrate" events are
     // explicitly requested in the spec.
     if (!expCtx->changeStreamSpec->getShowMigrationEvents()) {
-        unwindFilter->add(buildNotFromMigrateFilter(expCtx, userMatch));
+        unwindFilter->add(buildNotFromMigrateFilter(expCtx, userMatch, bsonObj));
     }
 
     // Attempt to rewrite the user's filter and combine it with the standard operation filter. We do
@@ -106,8 +109,8 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
     // transaction events do not have these fields until we populate them from the commitTransaction
     // event. We already applied these predicates during the oplog scan, so we know that they match.
     static const std::set<std::string> excludedFields = {"clusterTime", "lsid", "txnNumber"};
-    if (auto rewrittenMatch =
-            change_stream_rewrite::rewriteFilterForFields(expCtx, userMatch, {}, excludedFields)) {
+    if (auto rewrittenMatch = change_stream_rewrite::rewriteFilterForFields(
+            expCtx, userMatch, bsonObj, {}, excludedFields)) {
         unwindFilter->add(std::move(rewrittenMatch));
     }
     return MatchExpression::optimize(std::move(unwindFilter));
@@ -132,8 +135,9 @@ std::unique_ptr<MatchExpression> buildEndOfTransactionFilter(
 boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction>
 DocumentSourceChangeStreamUnwindTransaction::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::vector<BSONObj> bsonObj = std::vector<BSONObj>{};
     std::unique_ptr<MatchExpression> matchExpr =
-        change_stream_filter::buildUnwindTransactionFilter(expCtx, nullptr);
+        change_stream_filter::buildUnwindTransactionFilter(expCtx, nullptr, bsonObj);
     return new DocumentSourceChangeStreamUnwindTransaction(matchExpr->serialize(), expCtx);
 }
 
@@ -608,8 +612,9 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction:
 
     // Build a filter which discards unwound transaction operations which would have been filtered
     // out later in the pipeline by the user's $match filter.
+    std::vector<BSONObj> bsonObj = std::vector<BSONObj>{};
     auto unwindTransactionFilter = change_stream_filter::buildUnwindTransactionFilter(
-        pExpCtx, matchStage->getMatchExpression());
+        pExpCtx, matchStage->getMatchExpression(), bsonObj);
 
     // Replace the default filter with the new, more restrictive one. Note that the resulting
     // expression must be serialized then deserialized to ensure it does not retain unsafe

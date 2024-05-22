@@ -61,7 +61,9 @@ public:
     static constexpr StringData kStageName = "$_internalChangeStreamOplogMatch"_sd;
 
     DocumentSourceChangeStreamOplogMatch(Timestamp clusterTime,
-                                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         std::unique_ptr<MatchExpression> opLogMatchFilter,
+                                         std::vector<BSONObj> backingBsonObjs);
 
     DocumentSourceChangeStreamOplogMatch(const DocumentSourceChangeStreamOplogMatch& other,
                                          const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
@@ -116,6 +118,10 @@ private:
     // fields. The filter in a serialized DocumentSourceOplogMatch is considered final, so there is
     // no need to re-create it.
     boost::optional<Timestamp> _clusterTime;
+
+    // Stores the BSONObj used in building the OplogMatch MatchExpression. The BSONObj need to be
+    // kept for the query runtime.
+    std::vector<BSONObj> _backingBsonObjs;
 
     // Used to avoid infinte optimization loops. Note that we do not serialize this field, because
     // we assume that DocumentSourceOplogMatch is always serialized after optimization.
