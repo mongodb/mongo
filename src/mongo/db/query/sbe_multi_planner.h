@@ -61,10 +61,10 @@ public:
     MultiPlanner(OperationContext* opCtx,
                  const MultipleCollectionAccessor& collections,
                  CanonicalQuery& cq,
-                 PlanCachingMode cachingMode,
+                 bool shouldWriteToPlanCache,
                  PlanYieldPolicySBE* yieldPolicy)
         : BaseRuntimePlanner{opCtx, collections, cq, yieldPolicy},
-          _cachingMode{cachingMode},
+          _shouldWriteToPlanCache{shouldWriteToPlanCache},
           _maxNumResults{0},
           _maxNumReads{0} {}
 
@@ -141,8 +141,7 @@ private:
         std::unique_ptr<mongo::plan_ranker::PlanRankingDecision> decision,
         std::vector<plan_ranker::CandidatePlan> candidates) const;
 
-    // Describes the cases in which we should write an entry for the winning plan to the plan cache.
-    const PlanCachingMode _cachingMode;
+    const bool _shouldWriteToPlanCache;
     size_t _maxNumResults;
     size_t _maxNumReads;
 };

@@ -383,7 +383,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
             createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
 
         MultiPlanner planner{
-            std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
+            std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
         auto exec = planner.makeExecutor(std::move(cq));
         assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
 
@@ -418,7 +418,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
             auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
                 200 /*resultDocCount*/, plannerData.cq);
             MultiPlanner planner{
-                std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
+                std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
             auto exec = planner.makeExecutor(std::move(cq));
             ASSERT_EQ(exec->getPlanExplainer().getVersion(), "2");
         }
@@ -429,7 +429,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
             auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
                 50 /*resultDocCount*/, plannerData.cq);
             MultiPlanner planner{
-                std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
+                std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
             auto exec = planner.makeExecutor(std::move(cq));
             ASSERT_EQ(exec->getPlanExplainer().getVersion(), "1");
         }
@@ -450,7 +450,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbePlanCacheIsUpdatedDuringEofOptimizati
             auto [solutions, expectedSums] =
                 createVirtualScanQuerySolutionsForDefaultFilter(kDocCount, plannerData.cq);
             MultiPlanner planner{
-                std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
+                std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
             auto exec = planner.makeExecutor(std::move(cq));
             ASSERT_EQ(exec->getPlanExplainer().getVersion(), "1");
             queryResult = getResultDocumentsAndAssertExecState(kDocCount, exec.get());
@@ -533,7 +533,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, CachedPlannerReplansOnFailureMemoryLimit
             createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
 
         MultiPlanner planner{
-            std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
+            std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
         auto exec = planner.makeExecutor(std::move(cq));
         assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
 
@@ -582,7 +582,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, CachedPlannerReplansOnHittingMaxNumReads
             createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
 
         MultiPlanner planner{
-            std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
+            std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
         auto exec = planner.makeExecutor(std::move(cq));
         assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
 

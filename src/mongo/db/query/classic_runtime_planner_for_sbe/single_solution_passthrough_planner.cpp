@@ -62,12 +62,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPl
     if (!_isFromPlanCache) {
         // Create a pinned plan cache entry.
         tassert(8779800, "expected 'solution' not to be null", _solution);
-        plan_cache_util::updatePlanCache(opCtx(),
-                                         collections(),
-                                         *cq(),
-                                         *_solution,
-                                         *_sbePlanAndData.first,
-                                         _sbePlanAndData.second);
+        plan_cache_util::updateSbePlanCacheWithPinnedEntry(opCtx(),
+                                                           collections(),
+                                                           *cq(),
+                                                           *_solution,
+                                                           *_sbePlanAndData.first,
+                                                           _sbePlanAndData.second);
     }
     return prepareSbePlanExecutor(std::move(canonicalQuery),
                                   std::move(_solution),

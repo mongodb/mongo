@@ -35,7 +35,11 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
                            std::vector<std::unique_ptr<QuerySolution>> solutions)
     : ClassicPlannerInterface(std::move(plannerData)) {
     auto stage = std::make_unique<MultiPlanStage>(
-        cq()->getExpCtxRaw(), collections().getMainCollectionPtrOrAcquisition(), cq());
+        cq()->getExpCtxRaw(),
+        collections().getMainCollectionPtrOrAcquisition(),
+        cq(),
+        plan_cache_util::ClassicPlanCacheWriter{opCtx(),
+                                                collections().getMainCollectionPtrOrAcquisition()});
     _multiplanStage = stage.get();
     for (auto&& solution : solutions) {
         solution->indexFilterApplied = plannerParams().indexFiltersApplied;

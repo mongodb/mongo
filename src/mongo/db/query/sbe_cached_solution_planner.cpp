@@ -303,9 +303,7 @@ CandidatePlans CachedSolutionPlanner::replan(const QueryPlannerParams& plannerPa
         roots.push_back(buildExecutableTree(*solution));
     }
 
-    const auto cachingMode =
-        shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
-    MultiPlanner multiPlanner{_opCtx, _collections, _cq, cachingMode, _yieldPolicy};
+    MultiPlanner multiPlanner{_opCtx, _collections, _cq, shouldCache, _yieldPolicy};
     auto&& [candidates, winnerIdx] =
         multiPlanner.plan(plannerParams, std::move(solutions), std::move(roots));
     auto explainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
