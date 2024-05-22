@@ -67,12 +67,10 @@ bool isTransactionCommand(Service* service, StringData cmdName) {
     return command->isTransactionCommand();
 }
 
-void validateWriteConcernForTransaction(Service* service,
-                                        const WriteConcernOptions& wcResult,
-                                        StringData cmdName) {
+void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, const Command* cmd) {
     uassert(ErrorCodes::InvalidOptions,
             "writeConcern is not allowed within a multi-statement transaction",
-            wcResult.usedDefaultConstructedWC || isTransactionCommand(service, cmdName));
+            wcResult.usedDefaultConstructedWC || cmd->isTransactionCommand());
 }
 
 bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLevel) {
@@ -81,40 +79,47 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
         readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern;
 }
 
+namespace {
+const CommandNameAtom killCursorsAtom("killCursors");
+const CommandNameAtom prepareTransactionAtom(PrepareTransaction::kCommandName);
+const CommandNameAtom commitTransactionAtom(CommitTransaction::kCommandName);
+const CommandNameAtom abortTransactionAtom(AbortTransaction::kCommandName);
+}  // namespace
+
 void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,
-                            Service* service,
-                            StringData cmdName,
+                            Command* command,
                             const std::vector<NamespaceString>& namespaces,
                             bool allowTransactionsOnConfigDatabase) {
+
     if (sessionOptions.getAutocommit()) {
-        CommandHelpers::canUseTransactions(
-            service, namespaces, cmdName, allowTransactionsOnConfigDatabase);
+        CommandHelpers::canUseTransactions(namespaces, command, allowTransactionsOnConfigDatabase);
     }
 
     if (!sessionOptions.getAutocommit() && sessionOptions.getTxnNumber()) {
         uassert(ErrorCodes::NotARetryableWriteCommand,
                 "txnNumber may only be provided for multi-document transactions and retryable "
                 "write commands. autocommit:false was not provided, and {} is not a retryable "
-                "write command."_format(cmdName),
-                isRetryableWriteCommand(service, cmdName));
+                "write command."_format(command->getName()),
+                command->supportsRetryableWrite());
     }
 
     if (sessionOptions.getStartTransaction()) {
+        auto atom = command->getNameAtom();
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot run killCursors as the first operation in a multi-document transaction.",
-                cmdName != "killCursors");
+                atom != killCursorsAtom);
 
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot start a transaction with a prepare",
-                cmdName != PrepareTransaction::kCommandName);
+                atom != prepareTransactionAtom);
 
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot start a transaction with a commit",
-                cmdName != CommitTransaction::kCommandName);
+                atom != commitTransactionAtom);
 
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot start a transaction with an abort",
-                cmdName != AbortTransaction::kCommandName);
+                atom != abortTransactionAtom);
     }
 }
 

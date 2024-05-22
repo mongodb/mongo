@@ -488,6 +488,11 @@ private:
     repl::OpTime _lastOpAfterRun;
 };
 
+namespace {
+const CommandNameAtom helloAtom("hello");
+const CommandNameAtom isMasterAtom("isMaster");
+}  // namespace
+
 class ExecCommandDatabase {
 public:
     explicit ExecCommandDatabase(HandleRequest::ExecutionContext& execContext)
@@ -569,8 +574,8 @@ public:
     }
 
     bool isHello() const {
-        return _execContext.getCommand()->getName() == "hello"_sd ||
-            _execContext.getCommand()->getName() == "isMaster"_sd;
+        auto atom = _execContext.getCommand()->getNameAtom();
+        return atom == helloAtom || atom == isMasterAtom;
     }
 
     const CommonRequestArgs& getCommonRequestArgs() const {
@@ -929,6 +934,18 @@ void CheckoutSessionAndInvokeCommand::_cleanupTransaction(
     }
 }
 
+namespace {
+const CommandNameAtom createAtom("create");
+const CommandNameAtom shardSvrAtom("_shardsvrCreateCollection");
+const CommandNameAtom createIndexesAtom("createIndexes");
+
+bool isCreate(const Command* cmd) {
+    auto atom = cmd->getNameAtom();
+    return atom == createAtom || atom == shardSvrAtom || atom == createIndexesAtom;
+}
+}  // namespace
+
+
 void CheckoutSessionAndInvokeCommand::_checkOutSession() {
     auto& execContext = _ecd->getExecutionContext();
     auto opCtx = execContext.getOpCtx();
@@ -1066,16 +1083,13 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         // Note: _shardsvrCreateCollection is used to run the 'create' command on the primary in
         // case of sharded cluster
         // TODO(SERVER-46971): Consider how to extend this check to other commands.
-        auto cmdName = command->getName();
         auto readConcernSupport = invocation->supportsReadConcern(
             readConcernArgs.getLevel(), readConcernArgs.isImplicitDefault());
-        if (readConcernArgs.hasLevel() &&
-            (cmdName == "create"_sd || cmdName == "_shardsvrCreateCollection"_sd ||
-             cmdName == "createIndexes"_sd)) {
+        if (readConcernArgs.hasLevel() && isCreate(command)) {
             if (!readConcernSupport.readConcernSupport.isOK()) {
                 uassertStatusOK(readConcernSupport.readConcernSupport.withContext(
                     "Command {} does not support this transaction's {}"_format(
-                        cmdName, readConcernArgs.toString())));
+                        command->getName(), readConcernArgs.toString())));
             }
         }
     }
@@ -1369,8 +1383,7 @@ void RunCommandAndWaitForWriteConcern::_setup() {
         _extractedWriteConcern.emplace(
             uassertStatusOK(extractWriteConcern(opCtx, request.body, _isInternalClient())));
         if (_ecd->getSessionOptions().getAutocommit()) {
-            validateWriteConcernForTransaction(
-                opCtx->getService(), *_extractedWriteConcern, invocation->definition()->getName());
+            validateWriteConcernForTransaction(*_extractedWriteConcern, invocation->definition());
         }
 
         // Ensure that the WC being set on the opCtx has provenance.
@@ -1640,11 +1653,8 @@ void ExecCommandDatabase::_initiateCommand() {
          serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) ||
         client->isFromSystemConnection();
 
-    validateSessionOptions(_sessionOptions,
-                           opCtx->getService(),
-                           command->getName(),
-                           _invocation->allNamespaces(),
-                           allowTransactionsOnConfigDatabase);
+    validateSessionOptions(
+        _sessionOptions, command, _invocation->allNamespaces(), allowTransactionsOnConfigDatabase);
 
     if (auto& commentField = _requestArgs.getComment()) {
         stdx::lock_guard<Client> lk(*client);
@@ -1890,6 +1900,11 @@ void ExecCommandDatabase::_initiateCommand() {
     command->incrementCommandsExecuted();
 }
 
+namespace {
+const CommandNameAtom aggregateAtom("aggregate");
+const CommandNameAtom getMoreAtom("getMore");
+}  // namespace
+
 void ExecCommandDatabase::_commandExec() {
     auto opCtx = _execContext.getOpCtx();
     auto& request = _execContext.getRequest();
@@ -2071,12 +2086,12 @@ bool ExecCommandDatabase::_canRetryCommand(const Status& execError) {
     }
 
     // Can not rerun the command when executing a GetMore command as the cursor may already be lost.
-    const auto isRunningGetMoreCmd = _execContext.getCommand()->getName() == "getMore";
+    const auto isRunningGetMoreCmd = _execContext.getCommand()->getNameAtom() == getMoreAtom;
 
     // Can not rerun the command when executing an aggregation that runs $mergeCursors as it may
     // have consumed the cursors within.
     const auto isAggregateWithMergeCursors = [&]() {
-        if (_execContext.getCommand()->getName() != "aggregate") {
+        if (_execContext.getCommand()->getNameAtom() != aggregateAtom) {
             return false;
         }
 

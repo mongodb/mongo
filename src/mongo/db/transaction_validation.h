@@ -54,9 +54,8 @@ bool isTransactionCommand(Service* service, StringData cmdName);
 /**
  * Throws if the given write concern is not allowed in a transaction.
  */
-void validateWriteConcernForTransaction(Service* service,
-                                        const WriteConcernOptions& wcResult,
-                                        StringData cmdName);
+void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult,
+                                        const Command* command);
 
 /**
  * Returns true if the given readConcern level is valid for use in a transaction.
@@ -67,8 +66,7 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
  * Throws if the given session options are invalid for the given command and target namespace.
  */
 void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,
-                            Service* service,
-                            StringData cmdName,
+                            Command* command,
                             const std::vector<NamespaceString>& namespaces,
                             bool allowTransactionsOnConfigDatabase);
 

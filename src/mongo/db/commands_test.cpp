@@ -78,6 +78,18 @@ using namespace fmt::literals;
 using service_context_test::RoleOverride;
 using service_context_test::ServerRoleIndex;
 
+TEST(Commands, CommandNameAtom) {
+    CommandNameAtom foo("foo"_sd), bar("bar"_sd), baz("baz"_sd), foo2("foo"_sd), baz2("baz"_sd),
+        bar2("bar"_sd);
+
+    ASSERT_EQ(foo, foo2);
+    ASSERT_EQ(bar, bar2);
+    ASSERT_EQ(baz, baz2);
+    ASSERT_LT(foo, bar);
+    ASSERT_LT(foo, baz);
+    ASSERT_LT(bar, baz);
+}
+
 TEST(Commands, appendCommandStatusOK) {
     BSONObjBuilder actualResult;
     CommandHelpers::appendCommandStatusNoThrow(actualResult, Status::OK());

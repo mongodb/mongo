@@ -590,11 +590,7 @@ void ParseAndRunCommand::_parseCommand() {
     if (_invocation->allNamespaces().size() > 1) {
         namespaces = _invocation->allNamespaces();
     }
-    validateSessionOptions(_osi,
-                           opCtx->getService(),
-                           command->getName(),
-                           namespaces,
-                           allowTransactionsOnConfigDatabase);
+    validateSessionOptions(_osi, command, namespaces, allowTransactionsOnConfigDatabase);
 
     _wc.emplace(uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body)));
 
@@ -782,7 +778,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     }
 
     if (TransactionRouter::get(opCtx)) {
-        validateWriteConcernForTransaction(opCtx->getService(), *_parc->_wc, _parc->_commandName);
+        validateWriteConcernForTransaction(*_parc->_wc, command);
     }
 
     if (supportsWriteConcern) {
