@@ -105,9 +105,11 @@ assert.eq(CodeUnauthorized, res.code);
 
 // Test renaming system.users collection with __system
 assert(adminDB.auth('rootier', 'password'));
-jsTestLog("Test that with __system you CAN rename to/from system.users");
+jsTestLog("Test that with __system you CANNOT rename to/from system.users");
 res = adminDB.system.users.renameCollection("users", true);
-assert.eq(1, res.ok, tojson(res));
+assert.eq(0, res.ok, tojson(res));
+assert.eq(ErrorCodes.IllegalOperation, res.code);
+
 // At this point, all the user documents are gone, so further activity may be unauthorized,
 // depending on cluster configuration.  So, this is the end of the test.
 MongoRunner.stopMongod(conn, {user: 'userAdmin', pwd: 'password'});
