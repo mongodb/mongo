@@ -306,8 +306,8 @@ TEST(DependenciesToProjectionTest, SortFieldPaths) {
                            "a-bear.",
                            "a🌲",
                            "b",
-                           "b.a"
-                           "b.aa"
+                           "b.a",
+                           "b.aa",
                            "b.🌲d"};
     auto fields = arrayToSet(array);
     // our custom sort will restore the ordering above
