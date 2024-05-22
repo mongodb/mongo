@@ -12,6 +12,8 @@ executor:
       - ValidateCollections
   config:
     shell_options:
+      eval: >-
+        await import('jstests/libs/override_methods/config_transitions.js');
       global_vars:
         TestData:
           # Other fuzzers test commands against sharded clusters with logical session ids.
