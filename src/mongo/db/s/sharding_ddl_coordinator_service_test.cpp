@@ -281,4 +281,21 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
     ASSERT(stepUpFuture.isReady());
 }
 
+TEST_F(ShardingDDLCoordinatorServiceTest, CoordinatorCreationMustFailOnSecondaries) {
+    auto opCtx = makeOperationContext();
+
+    // Reaching a steady state to start the test
+    ddlService()->waitForRecoveryCompletion(opCtx.get());
+
+    stepDown();
+
+    ASSERT_THROWS_CODE(ddlService()->getOrCreateInstance(opCtx.get(), BSONObj()),
+                       DBException,
+                       ErrorCodes::NotWritablePrimary);
+
+    ASSERT_THROWS_CODE(ddlService()->waitForRecoveryCompletion(opCtx.get()),
+                       DBException,
+                       ErrorCodes::NotWritablePrimary);
+}
+
 }  // namespace mongo
