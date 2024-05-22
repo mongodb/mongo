@@ -24,7 +24,7 @@ if arch not in supported_archs:
 
 macnotary_name = f"darwin_{supported_archs[arch]}"
 
-if os.environ["project"] == "mongodb-mongo-master-nightly":
+if os.environ["project"] in ["mongodb-mongo-master-nightly", "mongo-release"]:
     signing_type = "notarizeAndSign"
 else:
     signing_type = "sign"
