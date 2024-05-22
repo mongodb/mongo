@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 
@@ -104,7 +105,7 @@ public:
     }
 
     bool isJumbo() const {
-        return _jumbo;
+        return _jumbo.load();
     }
 
     /**
@@ -137,7 +138,7 @@ private:
 
     // Indicates whether this chunk should be treated as jumbo and not attempted to be moved or
     // split
-    mutable bool _jumbo;
+    AtomicWord<bool> _jumbo;
 };
 
 class Chunk {
