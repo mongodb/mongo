@@ -3805,7 +3805,9 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
                     "field": {
                         "$const": "$foo"
                     },
-                    input: {"?": "?"}
+                    input: {
+                        $const: {"?": "?"}
+                    }
                 }
             }
         })",
@@ -3868,11 +3870,13 @@ TEST(ExpressionGetFieldTest, GetFieldWithDynamicFieldExpressionSerializesCorrect
                             "to": {
                                 "$const": "string"
                             },
-                            "format": "?"
+                            "format": {"$const": "?"}
                         }
                     },
                     "input": {
-                         "?": "?"
+                        "$const": {
+                            "?": "?"
+                        }
                     }
                 }
             }
@@ -3935,7 +3939,9 @@ TEST(ExpressionGetFieldTest, GetFieldWithDynamicFieldExpressionSerializesCorrect
                             }
                         }
                     },
-                    input: {"?": "?"}
+                    input: {
+                        $const: {"?": "?"}
+                    }
                 }
             }
         })",
@@ -3998,7 +4004,9 @@ TEST(ExpressionGetFieldTest, GetFieldWithDynamicFieldExpressionSerializesCorrect
                             }
                         }
                     },
-                    input: {"?": "?"}
+                    input: {
+                        $const: {"?": "?"}
+                    }
                 }
             }
         })",
@@ -4069,8 +4077,8 @@ TEST(ExpressionGetFieldTest, GetFieldWithDynamicFieldExpressionSerializesCorrect
                             }
                         }
                     },
-                    "input": {
-                        "?": "?"
+                    input: {
+                        $const: {"?": "?"}
                     }
                 }
             }
@@ -4120,7 +4128,9 @@ TEST(ExpressionGetFieldTest, GetFieldWithDynamicFieldExpressionSerializesCorrect
             "ignoredField": {
                 "$getField": {
                     "field": "$foo",
-                    "input": {"?": "?"}
+                    input: {
+                        $const: {"?": "?"}
+                    }
                 }
             }
         })",

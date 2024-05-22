@@ -186,8 +186,12 @@ TEST_F(AggCmdShapeTest, IncludesLet) {
                 "coll": "testColl"
             },
             "let": {
-                "x":  1,
-                "y": "?"
+                "x": {
+                    "$const": 1
+                },
+                "y": {
+                    "$const": "?"
+                }
             },
             "command": "aggregate",
             "pipeline": [
@@ -216,7 +220,7 @@ TEST_F(AggCmdShapeTest, StableQueryShapeHashValue) {
 
     auto serializationContext = SerializationContext::stateCommandRequest();
     const auto hash = shape->sha256Hash(_operationContext.get(), serializationContext);
-    ASSERT_EQ("254568FE55B9677A2AC9DA7B921EADB44AAEE7CF38DEE8DD379E34BD04FE6906",
+    ASSERT_EQ("F5C9B81418515DE73EA3F500F7BBB7AD5ED60D4DD9E5F645825730BC0E633BF2",
               hash.toHexString());
 }
 

@@ -119,17 +119,15 @@ Value ExpressionConstant::serializeConstant(const SerializationOptions& opts,
     if (val.missing()) {
         return Value("$$REMOVE"_sd);
     }
-    // Debug and representative serialization policies do not wrap constants with $const in order to
-    // reduce verbosity/size of the resulting query shape. The $const is not usually needed to
-    // disambiguate in these cases, since we almost never choose a value which could be misconstrued
-    // as an expression, such as a string starting with a '$' or an object with a $-prefixed field
-    // name. One of the few cases where wrapping is necessary is when you pass an array to an
-    // accumulator through a $literal, e.g. $push: {$literal: [1, a]}, as removing the wrapper would
-    // cause the query to error out as accumulators are unary operators.
+    // It's safer to wrap constants in $const when generating representative shapes to avoid
+    // ambiguity when re-parsing (SERVER-88296, SERVER-85376). However, we allow certain expressions
+    // to override this behavior in order to reduce shape verbosity if the expression takes many
+    // constant arguments (e.g. variadic expressions - SERVER-84159).
+    // Debug shapes never wrap constants in $const to reduce shape size (and because re-parsing
+    // support is not a consideration there).
     if ((opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) ||
         (wrapRepresentativeValue &&
-         opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue &&
-         val.isArray())) {
+         opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue)) {
         return Value(DOC("$const" << opts.serializeLiteral(val)));
     }
 
@@ -4229,9 +4227,18 @@ Value ExpressionNary::serialize(const SerializationOptions& options) const {
     const size_t nOperand = _children.size();
     vector<Value> array;
     /* build up the array */
-    for (size_t i = 0; i < nOperand; i++)
-        array.push_back(_children[i]->serialize(options));
-
+    for (size_t i = 0; i < nOperand; i++) {
+        // If this input is a constant, bypass the standard serialization that wraps the
+        // representative value in $const. This does not lead to ambiguity for variadic operators
+        // but avoids bloating the representative shape for operators that have many inputs.
+        ExpressionConstant const* exprConst = dynamic_cast<ExpressionConstant*>(_children[i].get());
+        if (exprConst) {
+            array.push_back(exprConst->serializeConstant(
+                options, exprConst->getValue(), false /* wrapRepresentativeValue */));
+        } else {
+            array.push_back(_children[i]->serialize(options));
+        }
+    }
     return Value(DOC(getOpName() << array));
 }
 
