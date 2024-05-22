@@ -1030,9 +1030,7 @@ const allCommands = {
         skip: "requires additional authentication setup",
     },
     makeSnapshot: {
-        isAdminCommand: true,
-        command: {makeSnapshot: 1},
-        doesNotRunOnMongos: true,
+        skip: isAnInternalCommand,
     },
     mapReduce: {
         setUp: function(conn) {
