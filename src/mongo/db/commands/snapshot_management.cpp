@@ -43,10 +43,10 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/vector_clock.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -86,9 +86,8 @@ public:
 
         Lock::GlobalLock lk(opCtx, MODE_IX);
 
-        const auto currentTime = VectorClock::get(opCtx)->getTime();
-        const auto name = currentTime.clusterTime().asTimestamp();
-        result.append("name", static_cast<long long>(name.asULL()));
+        const auto latestTs = repl::StorageInterface::get(opCtx)->getLatestOplogTimestamp(opCtx);
+        result.append("name", static_cast<long long>(latestTs.asULL()));
 
         return true;
     }
