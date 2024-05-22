@@ -105,14 +105,12 @@ void doThrowIfNotRunningWithMongotHostConfigured() {
         globalMongotParams.enabled);
 }
 
-boost::optional<long long> computeInitialBatchSize(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const DocsNeededBounds minBounds,
-    const DocsNeededBounds maxBounds,
-    const boost::optional<int64_t> userBatchSize,
-    bool isStoredSource) {
+long long computeInitialBatchSize(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  const DocsNeededBounds minBounds,
+                                  const DocsNeededBounds maxBounds,
+                                  const boost::optional<int64_t> userBatchSize,
+                                  bool isStoredSource) {
     // TODO SERVER-63765 Allow cursor establishment for sharded clusters when userBatchSize is 0.
-    // TODO SERVER-89494 Enable non-extractable limit queries.
     double oversubscriptionFactor = 1;
     if (!isStoredSource) {
         oversubscriptionFactor =
@@ -122,20 +120,34 @@ boost::optional<long long> computeInitialBatchSize(
                 .getOversubscriptionFactor();
     }
 
-    return visit(
-        OverloadedVisitor{
-            [oversubscriptionFactor](long long minVal,
-                                     long long maxVal) -> boost::optional<long long> {
-                if (minVal == maxVal) {
-                    long long batchSize = std::ceil(minVal * oversubscriptionFactor);
-                    return std::max(batchSize, kMinimumMongotBatchSize);
-                }
-                return boost::none;
-            },
-            [](auto& minVal, auto& maxVal) -> boost::optional<long long> { return boost::none; },
-        },
-        minBounds,
-        maxBounds);
+    auto applyOversubscription = [oversubscriptionFactor](long long batchSize) -> long long {
+        return std::ceil(batchSize * oversubscriptionFactor);
+    };
+
+    return visit(OverloadedVisitor{
+                     [applyOversubscription](long long minVal, long long maxVal) {
+                         return std::max(applyOversubscription(minVal), kMinimumMongotBatchSize);
+                     },
+                     [applyOversubscription](long long minVal, docs_needed_bounds::Unknown maxVal) {
+                         // Since maxVal is Unknown, we don't have a strict extractable limit, so we
+                         // should request at least the default batchSize.
+                         return std::max(applyOversubscription(minVal), kDefaultMongotBatchSize);
+                     },
+                     [applyOversubscription](docs_needed_bounds::Unknown minVal, long long maxVal) {
+                         return std::clamp(applyOversubscription(maxVal),
+                                           kMinimumMongotBatchSize,
+                                           kDefaultMongotBatchSize);
+                     },
+                     [applyOversubscription](auto& minVal, auto& maxVal) {
+                         // This is the NeedAll case or the min and max are both Unknown case, so we
+                         // use the default batchSize. Above, we don't apply the oversubscription to
+                         // the default batchSize since it's used as an upper/lower constraint;
+                         // here, it's used here as a true default, so we do apply oversubscription.
+                         return applyOversubscription(kDefaultMongotBatchSize);
+                     },
+                 },
+                 minBounds,
+                 maxBounds);
 }
 }  // namespace
 

@@ -43,10 +43,16 @@ MongotMockStateGuard getMongotMockState(ServiceContext* svc) {
 }
 
 bool checkUserCommandMatchesExpectedCommand(const BSONObj& userCmd, const BSONObj& expectedCmd) {
-    // Check that the given command matches the expected command's values.
-    for (auto&& elem : expectedCmd) {
-        if (!SimpleBSONElementComparator::kInstance.evaluate(userCmd[elem.fieldNameStringData()] ==
-                                                             elem)) {
+    // Recursively checks that the given command matches the expected command's values. The given
+    // command must include all expected fields, but may have superfluous (unexpected) fields.
+    for (auto&& expectedElem : expectedCmd) {
+        auto&& userElem = userCmd[expectedElem.fieldNameStringData()];
+        if (expectedElem.isABSONObj()) {
+            if (!userElem.isABSONObj() ||
+                !checkUserCommandMatchesExpectedCommand(userElem.Obj(), expectedElem.Obj())) {
+                return false;
+            }
+        } else if (!SimpleBSONElementComparator::kInstance.evaluate(userElem == expectedElem)) {
             return false;
         }
     }
