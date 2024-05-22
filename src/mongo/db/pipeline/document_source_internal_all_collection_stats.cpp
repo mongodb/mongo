@@ -93,6 +93,9 @@ DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNex
             } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
                 // We don't want to retrieve data for views, only for collections.
                 continue;
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // The collection no longer exists.
+                continue;
             }
         }
     }
