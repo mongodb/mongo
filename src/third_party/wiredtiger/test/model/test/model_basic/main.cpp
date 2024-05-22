@@ -1276,6 +1276,41 @@ test_model_oldest_wt(void)
 }
 
 /*
+ * test_model_debug_log_verify_wt --
+ *     Test the debug log based verification.
+ */
+static void
+test_model_debug_log_verify_wt(void)
+{
+    model::kv_database database;
+    model::kv_table_ptr table = database.create_table("table");
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    const char *uri = "table:table";
+
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "debug-log";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_check(
+      session->create(session, uri, "key_format=Q,value_format=Q,log=(enabled=false)"));
+
+    /* Insert a few key-value pairs to check that the debug log parser unpacks numbers correctly. */
+    for (uint64_t i = 0; i < 10 * WT_MILLION; i = (i * 7) + 1)
+        wt_model_insert_both(table, uri, model::data_value(i), model::data_value(2 * i));
+
+    /* Checkpoint and clean up. */
+    wt_model_ckpt_create_both(nullptr);
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+
+    /* Verify using the debug log. */
+    verify_using_debug_log(opts, test_home.c_str(), true);
+}
+
+/*
  * usage --
  *     Print usage help for the program.
  */
@@ -1341,6 +1376,7 @@ main(int argc, char *argv[])
         test_model_truncate_column_fix_wt(true);
         test_model_oldest();
         test_model_oldest_wt();
+        test_model_debug_log_verify_wt();
     } catch (std::exception &e) {
         std::cerr << "Test failed with exception: " << e.what() << std::endl;
         ret = EXIT_FAILURE;
