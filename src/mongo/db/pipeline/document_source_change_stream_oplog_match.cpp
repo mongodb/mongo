@@ -78,6 +78,7 @@ namespace change_stream_filter {
 std::unique_ptr<MatchExpression> buildOplogMatchFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Timestamp startFromInclusive,
+    std::vector<BSONObj>& backingBsonObjs,
     const MatchExpression* userMatch = nullptr) {
     tassert(6394401,
             "Expected changeStream spec to be present while building the oplog match filter",
@@ -85,23 +86,24 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
 
     // Start building the oplog filter by adding predicates that apply to every entry.
     auto oplogFilter = std::make_unique<AndMatchExpression>();
-    oplogFilter->add(buildTsFilter(expCtx, startFromInclusive, userMatch));
+    oplogFilter->add(buildTsFilter(expCtx, startFromInclusive, userMatch, backingBsonObjs));
+
     if (!expCtx->changeStreamSpec->getShowMigrationEvents()) {
-        oplogFilter->add(buildNotFromMigrateFilter(expCtx, userMatch));
+        oplogFilter->add(buildNotFromMigrateFilter(expCtx, userMatch, backingBsonObjs));
     }
 
     // Create an $or filter which only captures relevant events in the oplog.
     auto eventFilter = std::make_unique<OrMatchExpression>();
-    eventFilter->add(buildOperationFilter(expCtx, userMatch));
-    eventFilter->add(buildInvalidationFilter(expCtx, userMatch));
-    eventFilter->add(buildTransactionFilter(expCtx, userMatch));
-    eventFilter->add(buildInternalOpFilter(expCtx, userMatch));
+    eventFilter->add(buildOperationFilter(expCtx, userMatch, backingBsonObjs));
+    eventFilter->add(buildInvalidationFilter(expCtx, userMatch, backingBsonObjs));
+    eventFilter->add(buildTransactionFilter(expCtx, userMatch, backingBsonObjs));
+    eventFilter->add(buildInternalOpFilter(expCtx, userMatch, backingBsonObjs));
 
     // We currently do not support opening a change stream on a view namespace. So we only need to
     // add this filter when the change stream type is whole-db or whole cluster.
     if (expCtx->changeStreamSpec->getShowExpandedEvents() &&
         expCtx->ns.isCollectionlessAggregateNS()) {
-        eventFilter->add(buildViewDefinitionEventFilter(expCtx, userMatch));
+        eventFilter->add(buildViewDefinitionEventFilter(expCtx, userMatch, backingBsonObjs));
     }
 
     // Build the final $match filter to be applied to the oplog.
@@ -114,9 +116,12 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
 }  // namespace change_stream_filter
 
 DocumentSourceChangeStreamOplogMatch::DocumentSourceChangeStreamOplogMatch(
-    Timestamp clusterTime, const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceMatch(change_stream_filter::buildOplogMatchFilter(expCtx, clusterTime),
-                          expCtx) {
+    Timestamp clusterTime,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::unique_ptr<MatchExpression> opLogMatchFilter,
+    std::vector<BSONObj> backingBsonObjs)
+    : DocumentSourceMatch(std::move(opLogMatchFilter), expCtx),
+      _backingBsonObjs(std::move(backingBsonObjs)) {
     _clusterTime = clusterTime;
     expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
 }
@@ -125,7 +130,11 @@ boost::intrusive_ptr<DocumentSourceChangeStreamOplogMatch>
 DocumentSourceChangeStreamOplogMatch::create(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              const DocumentSourceChangeStreamSpec& spec) {
     auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
-    return make_intrusive<DocumentSourceChangeStreamOplogMatch>(resumeToken.clusterTime, expCtx);
+    std::vector<BSONObj> backingBsonObjs;
+    auto opLogMatchFilter = change_stream_filter::buildOplogMatchFilter(
+        expCtx, resumeToken.clusterTime, backingBsonObjs);
+    return make_intrusive<DocumentSourceChangeStreamOplogMatch>(
+        resumeToken.clusterTime, expCtx, std::move(opLogMatchFilter), std::move(backingBsonObjs));
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceChangeStreamOplogMatch::createFromBson(
@@ -210,11 +219,15 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOpti
     tassert(5687204, "Attempt to rewrite an interalOplogMatch after deserialization", _clusterTime);
 
     // Recreate the change stream filter with additional predicates from the user's $match.
+    std::vector<BSONObj> backingBsonObjs;
     auto filterWithUserPredicates = change_stream_filter::buildOplogMatchFilter(
-        pExpCtx, *_clusterTime, matchStage->getMatchExpression());
+        pExpCtx, *_clusterTime, backingBsonObjs, matchStage->getMatchExpression());
 
     // Set the internal DocumentSourceMatch state to the new filter.
     rebuild(filterWithUserPredicates->serialize());
+
+    // After serializing the predicate, remove all the BSONObjs from _backingBsonObjs.
+    _backingBsonObjs.clear();
 
     // Continue optimization at the next change stream stage.
     return nextChangeStreamStageItr;
