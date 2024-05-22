@@ -9,8 +9,10 @@ env.Library(
     target="geometry",
     source=["hash.cpp", "shapes.cpp", "big_polygon.cpp", "r2_region_coverer.cpp"],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base", "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/storage/key_string", "$BUILD_DIR/third_party/s2/s2"
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/common",
+        "$BUILD_DIR/mongo/db/storage/key_string",
+        "$BUILD_DIR/third_party/s2/s2",
     ],
 )
 
@@ -42,9 +44,9 @@ env.CppUnitTest(
 )
 
 env.Benchmark(
-    target='hash_bm',
+    target="hash_bm",
     source=[
-        'hash_bm.cpp',
+        "hash_bm.cpp",
     ],
-    LIBDEPS=['geometry'],
+    LIBDEPS=["geometry"],
 )

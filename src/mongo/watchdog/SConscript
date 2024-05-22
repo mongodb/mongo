@@ -1,62 +1,62 @@
 # -*- mode: python -*-
 
-Import('env')
+Import("env")
 
 env.Library(
-    target='watchdog',
+    target="watchdog",
     source=[
-        'watchdog.cpp',
+        "watchdog.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
     ],
 )
 
 env.Library(
-    target='watchdog_register',
+    target="watchdog_register",
     source=[
-        'watchdog_register.cpp',
+        "watchdog_register.cpp",
     ],
 )
 
 env.Library(
-    target='watchdog_mongod',
+    target="watchdog_mongod",
     source=[
-        'watchdog_mongod.cpp',
-        'watchdog_mongod.idl',
+        "watchdog_mongod.cpp",
+        "watchdog_mongod.idl",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        'watchdog',
-        'watchdog_register',
+        "$BUILD_DIR/mongo/db/commands/server_status_core",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/storage/storage_options",
+        "watchdog",
+        "watchdog_register",
     ],
 )
 
 env.Library(
-    target='watchdog_mock',
+    target="watchdog_mock",
     source=[
-        'watchdog_mock.cpp',
+        "watchdog_mock.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
+        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 
 env.CppUnitTest(
-    target='watchdog_test',
+    target="watchdog_test",
     source=[
-        'watchdog_test.cpp',
+        "watchdog_test.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_non_d',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        'watchdog',
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "$BUILD_DIR/mongo/util/clock_source_mock",
+        "watchdog",
     ],
 )

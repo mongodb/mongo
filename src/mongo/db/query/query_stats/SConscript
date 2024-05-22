@@ -1,65 +1,67 @@
 # -*- mode: python -*-
 
-Import([
-    "env",
-    "get_option",
-])
+Import(
+    [
+        "env",
+        "get_option",
+    ]
+)
 
 env = env.Clone()
 
 env.Library(
-    target='rate_limiting',
+    target="rate_limiting",
     source=[
-        'rate_limiting.cpp',
+        "rate_limiting.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/clock_sources',
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/util/clock_sources",
     ],
 )
 
 env.Library(
-    target='query_stats_parse',
+    target="query_stats_parse",
     source=[
-        'transform_algorithm.idl',
+        "transform_algorithm.idl",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/server_base',
+        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 
 env.Library(
-    target='query_stats',
+    target="query_stats",
     source=[
-        'aggregated_metric.cpp',
-        'key.cpp',
-        'optimizer_metrics_stats_entry.cpp',
-        'query_stats_entry.cpp',
-        'query_stats.cpp',
-        'supplemental_metrics_stats.cpp',
+        "aggregated_metric.cpp",
+        "key.cpp",
+        "optimizer_metrics_stats_entry.cpp",
+        "query_stats_entry.cpp",
+        "query_stats.cpp",
+        "supplemental_metrics_stats.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/profile_filter',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/query/cursor_response_idl',
-        '$BUILD_DIR/mongo/db/query/memory_util',
-        '$BUILD_DIR/mongo/db/query/query_knobs',
-        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
-        '$BUILD_DIR/mongo/db/server_options',
-        '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/processinfo',
-        'query_stats_parse',
-        'rate_limiting',
+        "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/profile_filter",
+        "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/mongo/db/query/cursor_response_idl",
+        "$BUILD_DIR/mongo/db/query/memory_util",
+        "$BUILD_DIR/mongo/db/query/query_knobs",
+        "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
+        "$BUILD_DIR/mongo/db/server_options",
+        "$BUILD_DIR/mongo/db/stats/counters",
+        "$BUILD_DIR/mongo/rpc/client_metadata",
+        "$BUILD_DIR/mongo/util/fail_point",
+        "$BUILD_DIR/mongo/util/net/network",
+        "$BUILD_DIR/mongo/util/processinfo",
+        "query_stats_parse",
+        "rate_limiting",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 
@@ -85,35 +87,35 @@ env.CppUnitTest(
 )
 
 env.Benchmark(
-    target='rate_limiting_bm',
+    target="rate_limiting_bm",
     source=[
-        'rate_limiting_bm.cpp',
+        "rate_limiting_bm.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/mongo/util/processinfo',
-        'rate_limiting',
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/unittest/unittest",
+        "$BUILD_DIR/mongo/util/processinfo",
+        "rate_limiting",
     ],
 )
 
 env.Benchmark(
-    target='shapifying_bm',
+    target="shapifying_bm",
     source=[
-        'shapifying_bm.cpp',
+        "shapifying_bm.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/db/query/canonical_query',
-        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context_non_d',
-        '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/mongo/util/processinfo',
-        'query_stats',
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/db/query/canonical_query",
+        "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "$BUILD_DIR/mongo/rpc/client_metadata",
+        "$BUILD_DIR/mongo/unittest/unittest",
+        "$BUILD_DIR/mongo/util/processinfo",
+        "query_stats",
     ],
 )

@@ -5,67 +5,67 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target='views',
+    target="views",
     source=[
-        'util.cpp',
-        'view.cpp',
-        'view_graph.cpp',
+        "util.cpp",
+        "view.cpp",
+        "view_graph.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
-        '$BUILD_DIR/mongo/db/server_base',
+        "$BUILD_DIR/mongo/db/query/collation/collator_factory_interface",
+        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 
 env.Library(
-    target='view_catalog_helpers',
+    target="view_catalog_helpers",
     source=[
-        'view_catalog_helpers.cpp',
+        "view_catalog_helpers.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/pipeline/aggregation',
-        'resolved_view',
-        'views',
+        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
+        "$BUILD_DIR/mongo/db/pipeline/aggregation",
+        "resolved_view",
+        "views",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/storage/storage_options',
+        "$BUILD_DIR/mongo/db/storage/storage_options",
     ],
 )
 
 env.Library(
-    target='resolved_view',
+    target="resolved_view",
     source=[
-        'resolved_view.cpp',
+        "resolved_view.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper',
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util",
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
     ],
 )
 
 env.CppUnitTest(
-    target='db_views_test',
+    target="db_views_test",
     source=[
-        'resolved_view_test.cpp',
-        'view_catalog_test.cpp',
-        'view_definition_test.cpp',
-        'view_graph_test.cpp',
+        "resolved_view_test.cpp",
+        "view_catalog_test.cpp",
+        "view_definition_test.cpp",
+        "view_graph_test.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
-        '$BUILD_DIR/mongo/db/multitenancy',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/shard_role',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        'view_catalog_helpers',
-        'views',
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
+        "$BUILD_DIR/mongo/db/multitenancy",
+        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/repl/replmocks",
+        "$BUILD_DIR/mongo/db/shard_role",
+        "$BUILD_DIR/mongo/unittest/unittest",
+        "view_catalog_helpers",
+        "views",
     ],
 )

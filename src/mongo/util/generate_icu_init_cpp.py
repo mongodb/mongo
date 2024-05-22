@@ -34,10 +34,16 @@ import sys
 
 def main(argv):
     parser = optparse.OptionParser()
-    parser.add_option('-o', '--output', action='store', dest='output_cpp_file',
-                      help='path to output cpp file')
-    parser.add_option('-i', '--input', action='store', dest='input_data_file',
-                      help='input ICU data file, in common format (.dat)')
+    parser.add_option(
+        "-o", "--output", action="store", dest="output_cpp_file", help="path to output cpp file"
+    )
+    parser.add_option(
+        "-i",
+        "--input",
+        action="store",
+        dest="input_data_file",
+        help="input ICU data file, in common format (.dat)",
+    )
     (options, args) = parser.parse_args(argv)
     if len(args) > 1:
         parser.error("too many arguments")
@@ -49,7 +55,7 @@ def main(argv):
 
 
 def generate_cpp_file(data_file_path, cpp_file_path):
-    source_template = '''// AUTO-GENERATED FILE DO NOT EDIT
+    source_template = """// AUTO-GENERATED FILE DO NOT EDIT
 // See generate_icu_init_cpp.py.
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
@@ -111,12 +117,13 @@ MONGO_INITIALIZER_GENERAL(LoadICUData, (), ("BeginStartupOptionHandling"))(
 }
 
 }  // namespace mongo
-'''
-    decimal_encoded_data = ''
-    with open(data_file_path, 'rb') as data_file:
-        decimal_encoded_data = ','.join([str(byte) for byte in data_file.read()])
-    with open(cpp_file_path, 'w') as cpp_file:
+"""
+    decimal_encoded_data = ""
+    with open(data_file_path, "rb") as data_file:
+        decimal_encoded_data = ",".join([str(byte) for byte in data_file.read()])
+    with open(cpp_file_path, "w") as cpp_file:
         cpp_file.write(source_template % dict(decimal_encoded_data=decimal_encoded_data))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main(sys.argv)

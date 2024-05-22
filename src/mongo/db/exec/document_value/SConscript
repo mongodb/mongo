@@ -3,40 +3,40 @@
 Import("env")
 
 env.Library(
-    target='document_value',
+    target="document_value",
     source=[
-        'document.cpp',
-        'document_comparator.cpp',
-        'document_metadata_fields.cpp',
-        'value.cpp',
-        'value_comparator.cpp',
+        "document.cpp",
+        "document_comparator.cpp",
+        "document_metadata_fields.cpp",
+        "value.cpp",
+        "value_comparator.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/pipeline/field_path',
-        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/pipeline/field_path",
+        "$BUILD_DIR/mongo/db/query/datetime/date_time_support",
     ],
 )
 
 env.Library(
-    target='document_value_test_util',
+    target="document_value_test_util",
     source=[
-        'document_value_test_util.cpp',
+        "document_value_test_util.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/unittest',
-        'document_value',
+        "$BUILD_DIR/mongo/unittest/unittest",
+        "document_value",
     ],
 )
 
 env.Benchmark(
-    target='document_bm',
+    target="document_bm",
     source=[
-        'document_bm.cpp',
+        "document_bm.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/server_base',
-        'document_value',
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/server_base",
+        "document_value",
     ],
 )

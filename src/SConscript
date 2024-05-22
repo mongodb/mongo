@@ -5,9 +5,9 @@
 
 import SCons
 
-Import('env')
-Import('module_sconscripts')
-Import('use_libunwind')
+Import("env")
+Import("module_sconscripts")
+Import("use_libunwind")
 
 env = env.Clone()
 
@@ -16,13 +16,14 @@ env = env.Clone()
 # or libstdx or similar.
 env.AppendUnique(
     LIBDEPS_GLOBAL=[
-        '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/third_party/shim_unwind' if use_libunwind else [],
-    ], )
+        "$BUILD_DIR/third_party/shim_allocator",
+        "$BUILD_DIR/third_party/shim_unwind" if use_libunwind else [],
+    ],
+)
 
 # NOTE: We must do third_party first as it adds methods to the environment
 # that we need in the mongo sconscript
-env.SConscript('third_party/SConscript', exports=['env'])
+env.SConscript("third_party/SConscript", exports=["env"])
 
 # Ensure our subsequent modifications are not shared with the
 # third_party env. Normally that SConscript would have done a clone,
@@ -32,18 +33,20 @@ env = env.Clone()
 
 # Inject common dependencies from third_party globally for all core mongo code
 # and modules.
-env.InjectThirdParty(libraries=[
-    'abseil-cpp',
-    'boost',
-    'croaring',
-    'fmt',
-    'immer',
-    'tomcrypt_md5',
-    'murmurhash3',
-    'safeint',
-    'stemmer',
-    'variant',
-])
+env.InjectThirdParty(
+    libraries=[
+        "abseil-cpp",
+        "boost",
+        "croaring",
+        "fmt",
+        "immer",
+        "tomcrypt_md5",
+        "murmurhash3",
+        "safeint",
+        "stemmer",
+        "variant",
+    ]
+)
 
 # It would be somewhat better if this could be applied down in
 # `src/mongo/SConscript`, since the goal of doing it here rather than
@@ -52,15 +55,15 @@ env.InjectThirdParty(libraries=[
 # `src/mongo/SConscript`` would also exclude applying it for modules,
 # and we do want this enabled for enterprise.
 
-if env.ToolchainIs('gcc'):
+if env.ToolchainIs("gcc"):
     # With GCC, use the implicit fallthrough flag variant that doesn't
     # care about your feeble attempts to use comments to explain yourself.
-    env.AddToCCFLAGSIfSupported('-Wimplicit-fallthrough=5')
-elif env.ToolchainIs('clang'):
-    env.AddToCCFLAGSIfSupported('-Wimplicit-fallthrough')
+    env.AddToCCFLAGSIfSupported("-Wimplicit-fallthrough=5")
+elif env.ToolchainIs("clang"):
+    env.AddToCCFLAGSIfSupported("-Wimplicit-fallthrough")
 
 # Run the core mongodb SConscript.
-env.SConscript('mongo/SConscript', exports=['env'])
+env.SConscript("mongo/SConscript", exports=["env"])
 
 # Run SConscripts for any modules in play
-env.SConscript(module_sconscripts, exports=['env'])
+env.SConscript(module_sconscripts, exports=["env"])

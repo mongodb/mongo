@@ -1,23 +1,25 @@
 # -*- mode: python; -*-
 
-Import([
-    "env",
-])
+Import(
+    [
+        "env",
+    ]
+)
 
 env = env.Clone()
 
 compass_installer = "install_compass"
-if env.TargetOSIs('windows'):
+if env.TargetOSIs("windows"):
     compass_installer = "Install-Compass.ps1"
 
-if env.TargetOSIs('posix'):
-    env.AddPostAction(compass_installer, Chmod('$TARGET', 0o755))
+if env.TargetOSIs("posix"):
+    env.AddPostAction(compass_installer, Chmod("$TARGET", 0o755))
 
 env.AutoInstall(
-    target='$PREFIX_BINDIR',
+    target="$PREFIX_BINDIR",
     source=[
         compass_installer,
     ],
-    AIB_COMPONENT='dist',
-    AIB_ROLE='runtime',
+    AIB_COMPONENT="dist",
+    AIB_ROLE="runtime",
 )

@@ -1,47 +1,49 @@
 # -*- mode: python -*-
 
-Import([
-    "env",
-    "get_option",
-])
+Import(
+    [
+        "env",
+        "get_option",
+    ]
+)
 
 env = env.Clone()
 
 env.Library(
-    target='query_shape',
+    target="query_shape",
     source=[
-        'query_shape.cpp',
-        'shape_helpers.cpp',
+        "query_shape.cpp",
+        "shape_helpers.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        '$BUILD_DIR/mongo/db/pipeline/field_path',
-        '$BUILD_DIR/mongo/db/server_base',
-        'query_shape_common',
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+        "$BUILD_DIR/mongo/db/pipeline/field_path",
+        "$BUILD_DIR/mongo/db/server_base",
+        "query_shape_common",
     ],
 )
 
 env.Library(
-    target='query_shape_hash',
+    target="query_shape_hash",
     source=[
-        'query_shape_hash.idl',
+        "query_shape_hash.idl",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/crypto/sha256_block',
+        "$BUILD_DIR/mongo/crypto/sha256_block",
     ],
 )
 
 env.Library(
-    target='query_shape_common',
+    target="query_shape_common",
     source=[
-        'query_shape.idl',
-        'serialization_options.cpp',
+        "query_shape.idl",
+        "serialization_options.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        '$BUILD_DIR/mongo/db/pipeline/field_path',
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+        "$BUILD_DIR/mongo/db/pipeline/field_path",
     ],
 )
 

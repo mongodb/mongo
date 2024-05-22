@@ -34,21 +34,21 @@ env.Library(
         "scoped_timer.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/net/network',
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/util/net/network",
     ],
 )
 
 env.Library(
-    target='js_function',
+    target="js_function",
     source=[
-        'js_function.cpp',
+        "js_function.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/query/query_knobs',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/scripting/scripting_common',
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/db/query/query_knobs",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/scripting/scripting_common",
     ],
 )
 
@@ -68,57 +68,57 @@ env.Library(
 )
 
 sortExecutorEnv = env.Clone()
-sortExecutorEnv.InjectThirdParty(libraries=['snappy'])
+sortExecutorEnv.InjectThirdParty(libraries=["snappy"])
 sortExecutorEnv.Library(
-    target='sort_executor',
+    target="sort_executor",
     source=[
-        'sort_executor.cpp',
-        'sort_key_comparator.cpp',
+        "sort_executor.cpp",
+        "sort_key_comparator.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/sort_pattern',
-        '$BUILD_DIR/mongo/db/sorter/sorter_stats',
-        'working_set',
+        "$BUILD_DIR/mongo/db/query/sort_pattern",
+        "$BUILD_DIR/mongo/db/sorter/sorter_stats",
+        "working_set",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/sorter/sorter_base',
-        '$BUILD_DIR/mongo/db/storage/encryption_hooks',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/third_party/shim_snappy',
+        "$BUILD_DIR/mongo/db/sorter/sorter_base",
+        "$BUILD_DIR/mongo/db/storage/encryption_hooks",
+        "$BUILD_DIR/mongo/db/storage/storage_options",
+        "$BUILD_DIR/third_party/shim_snappy",
     ],
 )
 
 env.Library(
-    target='projection_executor',
+    target="projection_executor",
     source=[
-        'add_fields_projection_executor.cpp',
-        'exclusion_projection_executor.cpp',
-        'inclusion_projection_executor.cpp',
-        'projection_executor_builder.cpp',
-        'projection_executor_utils.cpp',
-        'projection_node.cpp',
+        "add_fields_projection_executor.cpp",
+        "exclusion_projection_executor.cpp",
+        "inclusion_projection_executor.cpp",
+        "projection_executor_builder.cpp",
+        "projection_executor_utils.cpp",
+        "projection_node.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query_expressions',
+        "$BUILD_DIR/mongo/db/query_expressions",
     ],
 )
 
 env.Library(
-    target='stagedebug_cmd',
+    target="stagedebug_cmd",
     source=[
-        'stagedebug_cmd.cpp',
+        "stagedebug_cmd.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/index/index_access_method",
         "$BUILD_DIR/mongo/db/query_exec",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
     ],
 )
 
 env.CppUnitTest(
-    target='db_exec_test',
+    target="db_exec_test",
     source=[
         "document_value/document_comparator_test.cpp",
         "document_value/document_metadata_fields_test.cpp",

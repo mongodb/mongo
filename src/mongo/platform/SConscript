@@ -1,41 +1,42 @@
 # -*- mode: python -*-
 
-Import([
-    "env",
-    "get_option",
-])
+Import(
+    [
+        "env",
+        "get_option",
+    ]
+)
 
 env = env.Clone()
 env.CppUnitTest(
-    target='platform_test',
+    target="platform_test",
     source=[
-        'atomic_proxy_test.cpp',
-        'atomic_test.cpp',
-        'bits_test.cpp',
-        'endian_test.cpp',
-        'int128_test.cpp',
-        'mutex_test.cpp',
-        'process_id_test.cpp',
-        'random_test.cpp',
-        'source_location_test.cpp',
-        'stack_locator_test.cpp',
-        'decimal128_test.cpp',
-        'decimal128_bson_test.cpp',
-        'overflow_arithmetic_test.cpp',
-        'waitable_atomic_test.cpp',
+        "atomic_proxy_test.cpp",
+        "atomic_test.cpp",
+        "bits_test.cpp",
+        "endian_test.cpp",
+        "int128_test.cpp",
+        "mutex_test.cpp",
+        "process_id_test.cpp",
+        "random_test.cpp",
+        "source_location_test.cpp",
+        "stack_locator_test.cpp",
+        "decimal128_test.cpp",
+        "decimal128_bson_test.cpp",
+        "overflow_arithmetic_test.cpp",
+        "waitable_atomic_test.cpp",
     ],
 )
 
 env.Benchmark(
-    target='endian_bm',
+    target="endian_bm",
     source=[
-        'endian_bm.cpp',
+        "endian_bm.cpp",
     ],
     LIBDEPS=[],
 )
 
 if get_option("link-model") == "dynamic":
-
     visibility_test1 = env.BazelProgram(
         target="visibility_test1",
         source=[
@@ -71,24 +72,24 @@ if get_option("link-model") == "dynamic":
     env.RegisterTest("$UNITTEST_LIST", visibility_test2[0])
 
 env.CppUnitTest(
-    target='rwmutex_test',
+    target="rwmutex_test",
     source=[
-        'rwmutex_test.cpp',
+        "rwmutex_test.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        "$BUILD_DIR/mongo/base",
     ],
 )
 
 env.Benchmark(
-    target='rwmutex_bm',
+    target="rwmutex_bm",
     source=[
-        'rwmutex_bm.cpp',
+        "rwmutex_bm.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/service_context_non_d',
-        '$BUILD_DIR/mongo/util/processinfo',
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "$BUILD_DIR/mongo/util/processinfo",
     ],
 )

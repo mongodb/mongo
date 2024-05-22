@@ -33,7 +33,7 @@ import argparse
 import sys
 import yaml
 
-help_epilog="""
+help_epilog = """
 The error_codes_spec YAML document is a mapping containing two toplevel fields:
 
     `error_categories`: sequence of string - The error category names
@@ -47,32 +47,35 @@ The error_codes_spec YAML document is a mapping containing two toplevel fields:
                             the ErrorCode.
 """
 
+
 def init_parser():
     global parser
     parser = argparse.ArgumentParser(
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=__doc__,
-            epilog=help_epilog)
-    parser.add_argument('--verbose',
-            action='store_true',
-            help='extra debug logging to stderr')
-    parser.add_argument('error_codes_spec',
-            help='YAML file describing error codes and categories')
-    parser.add_argument('template_file',
-            help='Cheetah template file')
-    parser.add_argument('output_file')
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+        epilog=help_epilog,
+    )
+    parser.add_argument("--verbose", action="store_true", help="extra debug logging to stderr")
+    parser.add_argument("error_codes_spec", help="YAML file describing error codes and categories")
+    parser.add_argument("template_file", help="Cheetah template file")
+    parser.add_argument("output_file")
+
 
 verbose = False
 
 
 def render_template(template_path, **kw):
-    '''Renders the template file located at template_path, using the variables defined by kw, and
-       returns the result as a string'''
+    """Renders the template file located at template_path, using the variables defined by kw, and
+    returns the result as a string"""
 
     template = Template.compile(
         file=template_path,
-        compilerSettings=dict(directiveStartToken="//#", directiveEndToken="//#",
-                              commentStartToken="//##"), baseclass=dict, useCache=False)
+        compilerSettings=dict(
+            directiveStartToken="//#", directiveEndToken="//#", commentStartToken="//##"
+        ),
+        baseclass=dict,
+        useCache=False,
+    )
     return str(template(**kw))
 
 
@@ -83,13 +86,17 @@ class ErrorCode:
         self.extra = extra
         self.extraIsOptional = extraIsOptional
         if extra:
-            split = extra.split('::')
+            split = extra.split("::")
             if not split[0]:
-                die("Error for %s with extra info %s: fully qualified namespaces aren't supported" %
-                    (name, extra))
+                die(
+                    "Error for %s with extra info %s: fully qualified namespaces aren't supported"
+                    % (name, extra)
+                )
             if split[0] == "mongo":
-                die("Error for %s with extra info %s: don't include the mongo namespace" % (name,
-                                                                                            extra))
+                die(
+                    "Error for %s with extra info %s: don't include the mongo namespace"
+                    % (name, extra)
+                )
             if len(split) > 1:
                 self.extra_class = split.pop()
                 self.extra_ns = "::".join(split)
@@ -103,6 +110,7 @@ class ErrorClass:
     def __init__(self, name, codes):
         self.name = name
         self.codes = codes
+
 
 def main():
     init_parser()
@@ -119,51 +127,55 @@ def main():
 
     # Render the templates to the output files.
     if verbose:
-        print(f'rendering {template_file} => {output_file}')
-    text = render_template(template_file,
-            codes=error_codes,
-            categories=error_classes,
-            )
-    with open(output_file, 'w') as outfile:
+        print(f"rendering {template_file} => {output_file}")
+    text = render_template(
+        template_file,
+        codes=error_codes,
+        categories=error_classes,
+    )
+    with open(output_file, "w") as outfile:
         outfile.write(text)
+
 
 def die(message=None):
     sys.stderr.write(message or "Fatal error\n")
     sys.exit(1)
 
+
 def usage(message=None):
     parser.error(message)
     # writes a usage message and exits the program dies
 
+
 def parse_error_definitions_from_file(errors_filename):
     error_codes = []
     error_classes = []
-    with open(errors_filename, 'r') as errors_file:
+    with open(errors_filename, "r") as errors_file:
         doc = yaml.safe_load(errors_file)
 
     if verbose:
         yaml.dump(doc, sys.stderr)
 
     cats = {}
-    for v in doc['error_categories']:
+    for v in doc["error_categories"]:
         cats[v] = []
 
-    for v in doc['error_codes']:
+    for v in doc["error_codes"]:
         assert type(v) is dict
-        name, code = v['name'], v['code']
+        name, code = v["name"], v["code"]
         extraIsOptional = False
 
-        if 'extraIsOptional' in v:
-            extraIsOptional = v['extraIsOptional']
+        if "extraIsOptional" in v:
+            extraIsOptional = v["extraIsOptional"]
 
-        if 'categories' in v:
-            for cat in v['categories']:
-                assert cat in cats, f'invalid category {cat} for code {name}'
+        if "categories" in v:
+            for cat in v["categories"]:
+                assert cat in cats, f"invalid category {cat} for code {name}"
                 cats[cat].append(name)
 
         kw = {}
-        if 'extra' in v:
-            kw['extra'] = v['extra']
+        if "extra" in v:
+            kw["extra"] = v["extra"]
 
         error_codes.append(ErrorCode(name, code, **kw, extraIsOptional=extraIsOptional))
 
@@ -173,6 +185,7 @@ def parse_error_definitions_from_file(errors_filename):
     error_codes.sort(key=lambda x: x.code)
 
     return error_codes, error_classes
+
 
 def check_for_conflicts(error_codes, error_classes):
     failed = has_duplicate_error_codes(error_codes)
@@ -193,7 +206,8 @@ def has_duplicate_error_codes(error_codes):
     for curr in sorted_by_name[1:]:
         if curr.name == prev.name:
             sys.stdout.write(
-                'Duplicate name %s with codes %s and %s\n' % (curr.name, curr.code, prev.code))
+                "Duplicate name %s with codes %s and %s\n" % (curr.name, curr.code, prev.code)
+            )
             failed = True
         prev = curr
 
@@ -201,7 +215,8 @@ def has_duplicate_error_codes(error_codes):
     for curr in sorted_by_code[1:]:
         if curr.code == prev.code:
             sys.stdout.write(
-                'Duplicate code %s with names %s and %s\n' % (curr.code, curr.name, prev.name))
+                "Duplicate code %s with names %s and %s\n" % (curr.code, curr.name, prev.name)
+            )
             failed = True
         prev = curr
 
@@ -215,7 +230,7 @@ def has_duplicate_error_classes(error_classes):
     prev_name = names[0]
     for name in names[1:]:
         if prev_name == name:
-            sys.stdout.write('Duplicate error class name %s\n' % name)
+            sys.stdout.write("Duplicate error class name %s\n" % name)
             failed = True
         prev_name = name
     return failed
@@ -229,11 +244,11 @@ def has_missing_error_codes(error_codes, error_classes):
             try:
                 code_names[name].categories.append(category.name)
             except KeyError:
-                sys.stdout.write('Undeclared error code %s in class %s\n' % (name, category.name))
+                sys.stdout.write("Undeclared error code %s in class %s\n" % (name, category.name))
                 failed = True
 
     return failed
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -1,7 +1,7 @@
 # -*- mode: python -*-
 Import("env")
 Import("debugBuild")
-Import('use_libunwind')
+Import("use_libunwind")
 
 env = env.Clone()
 
@@ -9,32 +9,34 @@ env = env.Clone()
 # As part of install, we may need to install the CRT DLL but if it is not installed, we cannot run
 # the installer if we dynamically linked against it.
 #
-bad_flags = [a for a in env['CCFLAGS'] if a.startswith("/M")]
+bad_flags = [a for a in env["CCFLAGS"] if a.startswith("/M")]
 
 for flag in bad_flags:
-    env['CCFLAGS'].remove(flag)
+    env["CCFLAGS"].remove(flag)
 
 if debugBuild:
-    env['CCFLAGS'].append("/MTd")
+    env["CCFLAGS"].append("/MTd")
 else:
-    env['CCFLAGS'].append("/MT")
+    env["CCFLAGS"].append("/MT")
 
-env.Append(LIBS=[
-    'msi',
-    'user32',
-])
+env.Append(
+    LIBS=[
+        "msi",
+        "user32",
+    ]
+)
 
 ca = env.SharedLibrary(
-    target='mongoca',
+    target="mongoca",
     source=[
-        'customaction.cpp',
-        'customaction.def',
+        "customaction.cpp",
+        "customaction.def",
     ],
     # We don't want any special allocator here either.
     LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/third_party/shim_unwind',
+        "$BUILD_DIR/third_party/shim_allocator",
+        "$BUILD_DIR/third_party/shim_unwind",
     ],
-    AIB_COMPONENT='msi-util',
-    AIB_ROLE='runtime',
+    AIB_COMPONENT="msi-util",
+    AIB_ROLE="runtime",
 )

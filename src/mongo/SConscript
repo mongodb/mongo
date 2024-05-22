@@ -2,100 +2,107 @@
 
 import re
 
-Import([
-    "env",
-    "has_option",
-    "get_option",
-    "use_libunwind",
-    "version_extra",
-    "version_parts",
-])
+Import(
+    [
+        "env",
+        "has_option",
+        "get_option",
+        "use_libunwind",
+        "version_extra",
+        "version_parts",
+    ]
+)
 
 env = env.Clone()
 
 env.InjectMongoIncludePaths()
 
-env.AppendUnique(FORCEINCLUDES=[
-    'mongo/platform/basic.h',
-], )
+env.AppendUnique(
+    FORCEINCLUDES=[
+        "mongo/platform/basic.h",
+    ],
+)
 
 env.SConscript(
     dirs=[
-        'base',
-        'bson',
-        'client',
-        'crypto',
-        'db',
-        'dbtests',
-        'embedded',
-        'executor',
-        'idl',
-        'installer',
-        'logv2',
-        'platform',
-        'resmoke',
-        'rpc',
-        's',
-        'scripting',
-        'shell',
-        'stdx',
-        'tools',
-        'transport',
-        'unittest',
-        'util',
-        'watchdog',
+        "base",
+        "bson",
+        "client",
+        "crypto",
+        "db",
+        "dbtests",
+        "embedded",
+        "executor",
+        "idl",
+        "installer",
+        "logv2",
+        "platform",
+        "resmoke",
+        "rpc",
+        "s",
+        "scripting",
+        "shell",
+        "stdx",
+        "tools",
+        "transport",
+        "unittest",
+        "util",
+        "watchdog",
     ],
     exports=[
-        'env',
+        "env",
     ],
 )
 
 config_header_substs = (
-    ('@mongo_config_altivec_vec_vbpermq_output_index@',
-     'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
-    ('@mongo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
-    ('@mongo_config_use_tracing_profiler@', 'MONGO_CONFIG_USE_TRACING_PROFILER'),
-    ('@mongo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
-    ('@mongo_config_have_explicit_bzero@', 'MONGO_CONFIG_HAVE_EXPLICIT_BZERO'),
-    ('@mongo_config_have_fips_mode_set@', 'MONGO_CONFIG_HAVE_FIPS_MODE_SET'),
-    ('@mongo_config_have_header_unistd_h@', 'MONGO_CONFIG_HAVE_HEADER_UNISTD_H'),
-    ('@mongo_config_have_memset_s@', 'MONGO_CONFIG_HAVE_MEMSET_S'),
-    ('@mongo_config_have_posix_monotonic_clock@', 'MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
-    ('@mongo_config_have_pthread_setname_np@', 'MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
-    ('@mongo_config_have_ssl_ec_key_new@', 'MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW'),
-    ('@mongo_config_have_ssl_set_ecdh_auto@', 'MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO'),
-    ('@mongo_config_have_strnlen@', 'MONGO_CONFIG_HAVE_STRNLEN'),
-    ('@mongo_config_max_extended_alignment@', 'MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT'),
-    ('@mongo_config_ocsp_stapling_enabled@', 'MONGO_CONFIG_OCSP_STAPLING_ENABLED'),
-    ('@mongo_config_optimized_build@', 'MONGO_CONFIG_OPTIMIZED_BUILD'),
-    ('@mongo_config_ssl_has_asn1_any_definitions@', 'MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
-    ('@mongo_config_ssl_provider@', 'MONGO_CONFIG_SSL_PROVIDER'),
-    ('@mongo_config_ssl@', 'MONGO_CONFIG_SSL'),
-    ('@mongo_config_usdt_enabled@', 'MONGO_CONFIG_USDT_ENABLED'),
-    ('@mongo_config_usdt_provider@', 'MONGO_CONFIG_USDT_PROVIDER'),
-    ('@mongo_config_use_libunwind@', 'MONGO_CONFIG_USE_LIBUNWIND'),
-    ('@mongo_config_use_raw_latches@', 'MONGO_CONFIG_USE_RAW_LATCHES'),
-    ('@mongo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
-    ('@mongo_config_grpc@', 'MONGO_CONFIG_GRPC'),
-    ('@mongo_config_glibc_rseq@', 'MONGO_CONFIG_GLIBC_RSEQ'),
-    ('@mongo_config_tcmalloc_google@', 'MONGO_CONFIG_TCMALLOC_GOOGLE'),
-    ('@mongo_config_tcmalloc_gperf@', 'MONGO_CONFIG_TCMALLOC_GPERF'),
+    (
+        "@mongo_config_altivec_vec_vbpermq_output_index@",
+        "MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX",
+    ),
+    ("@mongo_config_debug_build@", "MONGO_CONFIG_DEBUG_BUILD"),
+    ("@mongo_config_use_tracing_profiler@", "MONGO_CONFIG_USE_TRACING_PROFILER"),
+    ("@mongo_config_have_execinfo_backtrace@", "MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE"),
+    ("@mongo_config_have_explicit_bzero@", "MONGO_CONFIG_HAVE_EXPLICIT_BZERO"),
+    ("@mongo_config_have_fips_mode_set@", "MONGO_CONFIG_HAVE_FIPS_MODE_SET"),
+    ("@mongo_config_have_header_unistd_h@", "MONGO_CONFIG_HAVE_HEADER_UNISTD_H"),
+    ("@mongo_config_have_memset_s@", "MONGO_CONFIG_HAVE_MEMSET_S"),
+    ("@mongo_config_have_posix_monotonic_clock@", "MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK"),
+    ("@mongo_config_have_pthread_setname_np@", "MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP"),
+    ("@mongo_config_have_ssl_ec_key_new@", "MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW"),
+    ("@mongo_config_have_ssl_set_ecdh_auto@", "MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO"),
+    ("@mongo_config_have_strnlen@", "MONGO_CONFIG_HAVE_STRNLEN"),
+    ("@mongo_config_max_extended_alignment@", "MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT"),
+    ("@mongo_config_ocsp_stapling_enabled@", "MONGO_CONFIG_OCSP_STAPLING_ENABLED"),
+    ("@mongo_config_optimized_build@", "MONGO_CONFIG_OPTIMIZED_BUILD"),
+    ("@mongo_config_ssl_has_asn1_any_definitions@", "MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS"),
+    ("@mongo_config_ssl_provider@", "MONGO_CONFIG_SSL_PROVIDER"),
+    ("@mongo_config_ssl@", "MONGO_CONFIG_SSL"),
+    ("@mongo_config_usdt_enabled@", "MONGO_CONFIG_USDT_ENABLED"),
+    ("@mongo_config_usdt_provider@", "MONGO_CONFIG_USDT_PROVIDER"),
+    ("@mongo_config_use_libunwind@", "MONGO_CONFIG_USE_LIBUNWIND"),
+    ("@mongo_config_use_raw_latches@", "MONGO_CONFIG_USE_RAW_LATCHES"),
+    ("@mongo_config_wiredtiger_enabled@", "MONGO_CONFIG_WIREDTIGER_ENABLED"),
+    ("@mongo_config_grpc@", "MONGO_CONFIG_GRPC"),
+    ("@mongo_config_glibc_rseq@", "MONGO_CONFIG_GLIBC_RSEQ"),
+    ("@mongo_config_tcmalloc_google@", "MONGO_CONFIG_TCMALLOC_GOOGLE"),
+    ("@mongo_config_tcmalloc_gperf@", "MONGO_CONFIG_TCMALLOC_GPERF"),
 )
 
 
 def makeConfigHeaderDefine(self, key):
     val = "// #undef {0}".format(key)
-    if key in self['CONFIG_HEADER_DEFINES']:
-        val = "#define {0} {1}".format(key, self['CONFIG_HEADER_DEFINES'][key])
+    if key in self["CONFIG_HEADER_DEFINES"]:
+        val = "#define {0} {1}".format(key, self["CONFIG_HEADER_DEFINES"][key])
     return val
 
 
 env.AddMethod(makeConfigHeaderDefine)
 
 generateConfigHeaderFile = env.Substfile(
-    'config.h.in',
-    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs])
-env.Alias('generated-sources', generateConfigHeaderFile)
+    "config.h.in",
+    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs],
+)
+env.Alias("generated-sources", generateConfigHeaderFile)
 
 # NOTE: The 'base' library does not really belong here. Its presence
 # here is temporary. Do not add to this library, do not remove from
@@ -103,18 +110,20 @@ env.Alias('generated-sources', generateConfigHeaderFile)
 baseEnv = env.Clone()
 
 if use_libunwind == True:
-    baseEnv.InjectThirdParty('unwind')
-baseEnv.InjectThirdParty('intel_decimal128')
+    baseEnv.InjectThirdParty("unwind")
+baseEnv.InjectThirdParty("intel_decimal128")
 
 quick_exit_env = baseEnv.Clone()
-if has_option('gcov'):
-    quick_exit_env.Append(CPPDEFINES=[
-        'MONGO_GCOV',
-    ], )
+if has_option("gcov"):
+    quick_exit_env.Append(
+        CPPDEFINES=[
+            "MONGO_GCOV",
+        ],
+    )
 quick_exit_obj = quick_exit_env.LibraryObject(
-    target='quick_exit',
+    target="quick_exit",
     source=[
-        'util/quick_exit.cpp',
+        "util/quick_exit.cpp",
     ],
 )[0]
 
@@ -128,148 +137,148 @@ if has_option("wait-for-debugger"):
     debugger_env.Append(CPPDEFINES=["WAIT_FOR_DEBUGGER"])
 
 debugger_obj = debugger_env.LibraryObject(
-    target='debugger',
+    target="debugger",
     source=[
-        'util/debugger.cpp',
+        "util/debugger.cpp",
     ],
 )[0]
 
 baseEnv.Library(
-    target='base',
+    target="base",
     source=[
-        'base/data_range.cpp',
-        'base/data_range_cursor.cpp',
-        'base/data_type.cpp',
-        'base/data_type_string_data.cpp',
-        'base/data_type_terminated.cpp',
-        'base/dependency_graph.cpp',
-        'base/error_codes.cpp',
-        'base/error_extra_info.cpp',
-        'base/init.cpp',
-        'base/initializer.cpp',
-        'base/parse_number.cpp',
-        'base/shim.cpp',
-        'base/status.cpp',
-        'base/string_data.cpp',
-        'base/string_data_comparator.cpp',
-        'base/validate_locale.cpp',
-        'bson/bson_comparator_interface_base.cpp',
-        'bson/bson_depth.cpp',
-        'bson/bsonelement.cpp',
-        'bson/bsonelementvalue.cpp',
-        'bson/bsonmisc.cpp',
-        'bson/bsonobj.cpp',
-        'bson/bsonobjbuilder.cpp',
-        'bson/bsontypes.cpp',
-        'bson/json.cpp',
-        'bson/oid.cpp',
-        'bson/simple_bsonelement_comparator.cpp',
-        'bson/simple_bsonobj_comparator.cpp',
-        'bson/timestamp.cpp',
-        'bson/util/builder.cpp',
-        'logv2/attributes.cpp',
-        'logv2/bson_formatter.cpp',
-        'logv2/console.cpp',
-        'logv2/file_rotate_sink.cpp',
-        'logv2/json_formatter.cpp',
-        'logv2/log_component.cpp',
-        'logv2/log_component_settings.cpp',
-        'logv2/log_detail.cpp',
-        'logv2/log_domain.cpp',
-        'logv2/log_domain_global.cpp',
-        'logv2/log_domain_internal.cpp',
-        'logv2/log_manager.cpp',
-        'logv2/log_service.cpp',
-        'logv2/log_severity.cpp',
-        'logv2/log_tag.cpp',
-        'logv2/log_util.cpp',
-        'logv2/plain_formatter.cpp',
-        'logv2/ramlog.cpp',
-        'logv2/redaction.cpp',
-        'logv2/shared_access_fstream.cpp',
-        'logv2/text_formatter.cpp',
-        'platform/waitable_atomic.cpp',
-        'platform/decimal128.cpp',
-        'platform/int128.cpp',
-        'platform/mutex.cpp',
-        'platform/posix_fadvise.cpp',
-        'platform/process_id.cpp',
-        'platform/random.cpp',
-        'platform/rwmutex.cpp',
-        'platform/shared_library.cpp',
-        'platform/shared_library_${TARGET_OS_FAMILY}.cpp',
-        'platform/stack_locator.cpp',
-        'platform/stack_locator_${TARGET_OS}.cpp',
-        'platform/strcasestr.cpp',
-        'platform/strnlen.cpp',
-        'util/allocator.cpp',
-        'util/assert_util.cpp',
-        'util/base64.cpp',
-        'util/boost_assert_impl.cpp',
-        'util/chunked_memory_aggregator.cpp',
-        'util/concurrency/idle_thread_block.cpp',
-        'util/concurrency/thread_name.cpp',
-        'util/concurrent_memory_aggregator.cpp',
-        'util/duration.cpp',
-        'util/errno_util.cpp',
-        'util/exception_filter_win32.cpp',
-        'util/exit.cpp',
-        'util/file.cpp',
-        'util/hex.cpp',
-        'util/itoa.cpp',
-        'util/platform_init.cpp',
-        'util/shared_buffer_fragment_builder.cpp',
-        'util/shell_exec.cpp',
-        'util/signal_handlers_synchronous.cpp',
-        'util/stacktrace.cpp',
-        'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
-        'util/stacktrace_somap.cpp',
-        'util/stacktrace_threads.cpp',
-        'util/str.cpp',
-        'util/str_escape.cpp',
-        'util/system_clock_source.cpp',
-        'util/system_tick_source.cpp',
-        'util/testing_proctor.cpp',
-        'util/text.cpp',
-        'util/thread_safety_context.cpp',
-        'util/time_support.cpp',
-        'util/timer.cpp',
-        'util/uuid.cpp',
-        'util/version.cpp',
+        "base/data_range.cpp",
+        "base/data_range_cursor.cpp",
+        "base/data_type.cpp",
+        "base/data_type_string_data.cpp",
+        "base/data_type_terminated.cpp",
+        "base/dependency_graph.cpp",
+        "base/error_codes.cpp",
+        "base/error_extra_info.cpp",
+        "base/init.cpp",
+        "base/initializer.cpp",
+        "base/parse_number.cpp",
+        "base/shim.cpp",
+        "base/status.cpp",
+        "base/string_data.cpp",
+        "base/string_data_comparator.cpp",
+        "base/validate_locale.cpp",
+        "bson/bson_comparator_interface_base.cpp",
+        "bson/bson_depth.cpp",
+        "bson/bsonelement.cpp",
+        "bson/bsonelementvalue.cpp",
+        "bson/bsonmisc.cpp",
+        "bson/bsonobj.cpp",
+        "bson/bsonobjbuilder.cpp",
+        "bson/bsontypes.cpp",
+        "bson/json.cpp",
+        "bson/oid.cpp",
+        "bson/simple_bsonelement_comparator.cpp",
+        "bson/simple_bsonobj_comparator.cpp",
+        "bson/timestamp.cpp",
+        "bson/util/builder.cpp",
+        "logv2/attributes.cpp",
+        "logv2/bson_formatter.cpp",
+        "logv2/console.cpp",
+        "logv2/file_rotate_sink.cpp",
+        "logv2/json_formatter.cpp",
+        "logv2/log_component.cpp",
+        "logv2/log_component_settings.cpp",
+        "logv2/log_detail.cpp",
+        "logv2/log_domain.cpp",
+        "logv2/log_domain_global.cpp",
+        "logv2/log_domain_internal.cpp",
+        "logv2/log_manager.cpp",
+        "logv2/log_service.cpp",
+        "logv2/log_severity.cpp",
+        "logv2/log_tag.cpp",
+        "logv2/log_util.cpp",
+        "logv2/plain_formatter.cpp",
+        "logv2/ramlog.cpp",
+        "logv2/redaction.cpp",
+        "logv2/shared_access_fstream.cpp",
+        "logv2/text_formatter.cpp",
+        "platform/waitable_atomic.cpp",
+        "platform/decimal128.cpp",
+        "platform/int128.cpp",
+        "platform/mutex.cpp",
+        "platform/posix_fadvise.cpp",
+        "platform/process_id.cpp",
+        "platform/random.cpp",
+        "platform/rwmutex.cpp",
+        "platform/shared_library.cpp",
+        "platform/shared_library_${TARGET_OS_FAMILY}.cpp",
+        "platform/stack_locator.cpp",
+        "platform/stack_locator_${TARGET_OS}.cpp",
+        "platform/strcasestr.cpp",
+        "platform/strnlen.cpp",
+        "util/allocator.cpp",
+        "util/assert_util.cpp",
+        "util/base64.cpp",
+        "util/boost_assert_impl.cpp",
+        "util/chunked_memory_aggregator.cpp",
+        "util/concurrency/idle_thread_block.cpp",
+        "util/concurrency/thread_name.cpp",
+        "util/concurrent_memory_aggregator.cpp",
+        "util/duration.cpp",
+        "util/errno_util.cpp",
+        "util/exception_filter_win32.cpp",
+        "util/exit.cpp",
+        "util/file.cpp",
+        "util/hex.cpp",
+        "util/itoa.cpp",
+        "util/platform_init.cpp",
+        "util/shared_buffer_fragment_builder.cpp",
+        "util/shell_exec.cpp",
+        "util/signal_handlers_synchronous.cpp",
+        "util/stacktrace.cpp",
+        "util/stacktrace_${TARGET_OS_FAMILY}.cpp",
+        "util/stacktrace_somap.cpp",
+        "util/stacktrace_threads.cpp",
+        "util/str.cpp",
+        "util/str_escape.cpp",
+        "util/system_clock_source.cpp",
+        "util/system_tick_source.cpp",
+        "util/testing_proctor.cpp",
+        "util/text.cpp",
+        "util/thread_safety_context.cpp",
+        "util/time_support.cpp",
+        "util/timer.cpp",
+        "util/uuid.cpp",
+        "util/version.cpp",
         debugger_obj,
         quick_exit_obj,
     ],
     # NOTE: This library *must not* depend on any libraries than
     # the ones declared here. Do not add to this list.
     LIBDEPS=[
-        '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-        '$BUILD_DIR/third_party/shim_abseil',
-        '$BUILD_DIR/third_party/shim_boost',
-        '$BUILD_DIR/third_party/shim_fmt',
+        "$BUILD_DIR/third_party/murmurhash3/murmurhash3",
+        "$BUILD_DIR/third_party/shim_abseil",
+        "$BUILD_DIR/third_party/shim_boost",
+        "$BUILD_DIR/third_party/shim_fmt",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/third_party/shim_intel_decimal128',
-        'stdx/stdx',
-        'util/boost_assert_shim',
+        "$BUILD_DIR/third_party/shim_intel_decimal128",
+        "stdx/stdx",
+        "util/boost_assert_shim",
     ],
-    AIB_COMPONENT='platform',
+    AIB_COMPONENT="platform",
 )
 
 # Stage the top-level mongodb banners
 
-distsrc = env.Dir('#distsrc')
+distsrc = env.Dir("#distsrc")
 env.AutoInstall(
-    target='$PREFIX',
+    target="$PREFIX",
     source=[
-        distsrc.File('README'),
+        distsrc.File("README"),
         # TODO: we need figure out what to do when we use a different
         # THIRD-PARTY-NOTICES for example, with Embedded
-        distsrc.File('THIRD-PARTY-NOTICES'),
-        distsrc.File('MPL-2'),
+        distsrc.File("THIRD-PARTY-NOTICES"),
+        distsrc.File("MPL-2"),
     ],
-    AIB_COMPONENT='common',
-    AIB_COMPONENTS_EXTRA=['dist', 'dist-test'],
-    AIB_ROLE='base',
+    AIB_COMPONENT="common",
+    AIB_COMPONENTS_EXTRA=["dist", "dist-test"],
+    AIB_ROLE="base",
 )
 
 # If no module has introduced a file named LICENSE-Enterprise.txt then this
@@ -278,30 +287,30 @@ enterprise_license = [
     banner for banner in env["MODULE_BANNERS"] if banner.name == "LICENSE-Enterprise.txt"
 ]
 if not enterprise_license:
-    env.Append(MODULE_BANNERS=[distsrc.File('LICENSE-Community.txt')])
+    env.Append(MODULE_BANNERS=[distsrc.File("LICENSE-Community.txt")])
 
 # All module banners get staged to the top level of the tarfile, so we
 # need to fail if we are going to have a name collision.
-module_banner_filenames = set([f.name for f in env['MODULE_BANNERS']])
-if not len(module_banner_filenames) == len(env['MODULE_BANNERS']):
+module_banner_filenames = set([f.name for f in env["MODULE_BANNERS"]])
+if not len(module_banner_filenames) == len(env["MODULE_BANNERS"]):
     # TODO: Be nice and identify conflicts in error.
     env.FatalError("ERROR: Filename conflicts exist in module banners.")
 
 env.AutoInstall(
-    target='$PREFIX',
-    source=env.get('MODULE_BANNERS', []),
-    AIB_COMPONENT='common',
-    AIB_COMPONENTS_EXTRA=['dist', 'dist-test'],
-    AIB_ROLE='base',
+    target="$PREFIX",
+    source=env.get("MODULE_BANNERS", []),
+    AIB_COMPONENT="common",
+    AIB_COMPONENTS_EXTRA=["dist", "dist-test"],
+    AIB_ROLE="base",
 )
 
-if env.TargetOSIs('darwin', 'macOS'):
+if env.TargetOSIs("darwin", "macOS"):
     env.AutoInstall(
-        target='$PREFIX',
+        target="$PREFIX",
         source=[
-            env.File('#/etc/macos_mongodb.plist'),
+            env.File("#/etc/macos_mongodb.plist"),
         ],
-        AIB_COMPONENT='common',
-        AIB_COMPONENTS_EXTRA=['dist', 'dist-test'],
-        AIB_ROLE='base',
+        AIB_COMPONENT="common",
+        AIB_COMPONENTS_EXTRA=["dist", "dist-test"],
+        AIB_ROLE="base",
     )

@@ -8,7 +8,9 @@ Import("wiredtiger")
 
 env = env.Clone()
 
-env.AppendUnique(CPPPATH=["$BUILD_DIR/mongo/embedded"], )
+env.AppendUnique(
+    CPPPATH=["$BUILD_DIR/mongo/embedded"],
+)
 
 # Inject this before we call the SDK directory SConscripts so that
 # they can both use it.
@@ -17,13 +19,13 @@ sdkEnv = env.Clone()
 
 
 def mongo_export_file_generator(target, source, env, for_signature):
-    if env.ToolchainIs('msvc'):
+    if env.ToolchainIs("msvc"):
         script = env.File(env.subst("${TARGET.base}.def", target=target))
         return script.get_csig() if for_signature else "/DEF:" + str(script)
-    elif env.TargetOSIs('darwin'):
+    elif env.TargetOSIs("darwin"):
         script = env.File(env.subst("${TARGET.base}.exported_symbols_list", target=target))
         return script.get_csig() if for_signature else "-Wl,-exported_symbols_list," + str(script)
-    elif env.TargetOSIs('posix'):
+    elif env.TargetOSIs("posix"):
         script = env.File(env.subst("${TARGET.base}.version_script", target=target))
         return script.get_csig() if for_signature else "-Wl,--version-script," + str(script)
     else:
@@ -34,17 +36,17 @@ def mongo_export_file_generator(target, source, env, for_signature):
 # dynamic build, we would end up building the normal library with an export map
 # but many of its symbols should in fact be coming from other libraries, and we
 # get odd ODR-esque violations. UBSAN caught this. Thanks UBSAN!
-if get_option('link-model') == 'dynamic-sdk':
-    sdkEnv['MONGO_EXPORT_FILE_SHLINKFLAGS'] = mongo_export_file_generator
+if get_option("link-model") == "dynamic-sdk":
+    sdkEnv["MONGO_EXPORT_FILE_SHLINKFLAGS"] = mongo_export_file_generator
 
 env.SConscript(
     dirs=[
-        'stitch_support',
+        "stitch_support",
     ],
     exports={
-        'env': sdkEnv,
+        "env": sdkEnv,
     },
 )
 
 yamlEnv = env.Clone()
-yamlEnv.InjectThirdParty(libraries=['yaml'])
+yamlEnv.InjectThirdParty(libraries=["yaml"])

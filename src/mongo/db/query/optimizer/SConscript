@@ -9,7 +9,7 @@ env.SConscript(
         "algebra",
     ],
     exports=[
-        'env',
+        "env",
     ],
 )
 
@@ -132,94 +132,94 @@ env.Library(
 
 # Heavyweight test utils (depend on pipeline).
 env.Library(
-    target='unit_test_pipeline_utils',
+    target="unit_test_pipeline_utils",
     source=[
-        'utils/unit_test_pipeline_utils.cpp',
+        "utils/unit_test_pipeline_utils.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/pipeline/abt_translation',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/db/query/canonical_query',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'unit_test_utils',
+        "$BUILD_DIR/mongo/db/pipeline/abt_translation",
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/db/query/canonical_query",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "unit_test_utils",
     ],
 )
 
 env.CppUnitTest(
-    target='optimizer_test',
+    target="optimizer_test",
     source=[
-        'bool_expression_test.cpp',
-        'explain_paths_exprs_test.cpp',
-        'explain_query_params_test.cpp',
-        'index_union_optimizer_test.cpp',
-        'logical_rewriter_optimizer_test.cpp',
-        'optimizer_test.cpp',
-        'physical_rewriter_optimizer_test.cpp',
-        'physical_rewriter_parallelism_test.cpp',
-        'reference_tracker_test.cpp',
-        'remove_orphans_requirement_test.cpp',
-        'rewrites/const_eval_test.cpp',
-        'rewrites/path_optimizer_test.cpp',
-        'unit_test_infra_test.cpp',
+        "bool_expression_test.cpp",
+        "explain_paths_exprs_test.cpp",
+        "explain_query_params_test.cpp",
+        "index_union_optimizer_test.cpp",
+        "logical_rewriter_optimizer_test.cpp",
+        "optimizer_test.cpp",
+        "physical_rewriter_optimizer_test.cpp",
+        "physical_rewriter_parallelism_test.cpp",
+        "reference_tracker_test.cpp",
+        "remove_orphans_requirement_test.cpp",
+        "rewrites/const_eval_test.cpp",
+        "rewrites/path_optimizer_test.cpp",
+        "unit_test_infra_test.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe',  # needed to register extended type destruction for MakeObjSpec :(
-        'unit_test_utils',
+        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
+        "unit_test_utils",
     ],
 )
 
 env.CppUnitTest(
-    target='interval_simplify_test',
+    target="interval_simplify_test",
     source=[
-        'interval_simplify_test.cpp',
+        "interval_simplify_test.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_non_d',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'optimizer',
-        'unit_test_pipeline_utils',
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "optimizer",
+        "unit_test_pipeline_utils",
     ],
 )
 
 env.CppUnitTest(
-    target='optimizer_failure_test',
+    target="optimizer_failure_test",
     source=[
-        'optimizer_failure_test.cpp',
+        "optimizer_failure_test.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        'unit_test_utils',
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "unit_test_utils",
     ],
 )
 
 env.Benchmark(
-    target='path_lower_bm',
+    target="path_lower_bm",
     source=[
-        'rewrites/path_lower_bm.cpp',
+        "rewrites/path_lower_bm.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        'optimizer_rewrites',
-        'unit_test_utils',
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/unittest/unittest",
+        "optimizer_rewrites",
+        "unit_test_utils",
     ],
 )
 
 optimizer_gdb_test_program = env.Program(
-    target='optimizer_gdb_test_program',
+    target="optimizer_gdb_test_program",
     source=[
-        'optimizer_gdb_test_program.cpp',
+        "optimizer_gdb_test_program.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_non_d',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'optimizer',
-        'unit_test_utils',
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "optimizer",
+        "unit_test_utils",
     ],
-    AIB_COMPONENT='pretty-printer-tests',
-    AIB_COMPONENTS_EXTRA=['dist-test'],
+    AIB_COMPONENT="pretty-printer-tests",
+    AIB_COMPONENTS_EXTRA=["dist-test"],
 )
 optimizer_gdb_test_program_installed = env.GetAutoInstalledFiles(optimizer_gdb_test_program[0])
 
-env.PrettyPrinterTest('optimizer_gdb_test.py', TEST_PROGRAM=optimizer_gdb_test_program_installed)
+env.PrettyPrinterTest("optimizer_gdb_test.py", TEST_PROGRAM=optimizer_gdb_test_program_installed)

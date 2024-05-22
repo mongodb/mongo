@@ -212,12 +212,6 @@ ignore = [
     "F841", # unused-variable
     ]
 
-[tool.ruff.format]
-exclude = [
-    # allow-list: incrementally remove as each is formatted and locked down
-    "src/*",
-    ]
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

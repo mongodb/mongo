@@ -1,5 +1,5 @@
-Import('env')
-Import('use_libunwind')
+Import("env")
+Import("use_libunwind")
 
 from buildscripts.toolchains import DEFAULT_DATA_FILE, ToolchainConfig, ToolchainPlatform
 
@@ -7,15 +7,15 @@ toolchain_clang_tidy_dev_found = False
 toolchain_found = False
 base_toolchain_bin = None
 try:
-    toolchain_config = ToolchainConfig(DEFAULT_DATA_FILE, ToolchainPlatform('default'))
+    toolchain_config = ToolchainConfig(DEFAULT_DATA_FILE, ToolchainPlatform("default"))
     toolchain_found = toolchain_config.base_path.exists()
-    base_toolchain_bin = (toolchain_config.base_path / toolchain_config.aliases['stable'] / 'bin')
-    base_revision_path = (base_toolchain_bin / 'clang-tidy').resolve().parent.parent
+    base_toolchain_bin = toolchain_config.base_path / toolchain_config.aliases["stable"] / "bin"
+    base_revision_path = (base_toolchain_bin / "clang-tidy").resolve().parent.parent
 
-    tidy_include = base_revision_path / 'include'
-    tidy_lib = base_revision_path / 'lib'
+    tidy_include = base_revision_path / "include"
+    tidy_lib = base_revision_path / "lib"
 
-    toolchain_clang_tidy_dev_found = (tidy_include / 'clang-tidy' / 'ClangTidy.h').exists()
+    toolchain_clang_tidy_dev_found = (tidy_include / "clang-tidy" / "ClangTidy.h").exists()
 
 except FileNotFoundError:
     pass
@@ -33,92 +33,92 @@ env = env.Clone()
 
 # TODO SERVER-73731
 # Instead of hardcoding these flags, we should load the flags used by the toolchain here
-env['CXX'] = [f'{base_toolchain_bin}/g++']
-env['SHCXX'] = [f'{base_toolchain_bin}/g++']
-env['LINK'] = [f'{base_toolchain_bin}/g++']
-env['SHLINK'] = [f'{base_toolchain_bin}/g++']
-env['CPPPATH'] = [str(tidy_include)]
-env['LIBPATH'] = []
-env['CPPFLAGS'] = []
-env['CCFLAGS'] = [
-    '-DGTEST_HAS_RTTI=0',
-    '-D_GNU_SOURCE',
-    '-D__STDC_CONSTANT_MACROS',
-    '-D__STDC_FORMAT_MACROS',
-    '-D__STDC_LIMIT_MACROS',
-    '-fPIC',
-    '-fvisibility-inlines-hidden',
-    '-Werror=date-time',
-    '-Wall',
-    '-Wextra',
-    '-Wno-unused-parameter',
-    '-Wwrite-strings',
-    '-Wcast-qual',
-    '-Wno-missing-field-initializers',
-    '-pedantic',
-    '-Wno-long-long',
-    '-Wimplicit-fallthrough',
-    '-Wno-maybe-uninitialized',
-    '-Wno-class-memaccess',
-    '-Wno-redundant-move',
-    '-Wno-noexcept-type',
-    '-Wdelete-non-virtual-dtor',
-    '-Wsuggest-override',
-    '-Wno-comment',
-    '-fdiagnostics-color',
-    '-ffunction-sections',
-    '-fdata-sections',
-    '-fno-common',
-    '-Woverloaded-virtual',
-    '-fno-strict-aliasing',
-    '-O3',
-    '-g2',
-    '-DNDEBUG',
-    '-fPIC',
-    '-fno-exceptions',
-    '-fno-rtti',
-    '-std=c++17',
+env["CXX"] = [f"{base_toolchain_bin}/g++"]
+env["SHCXX"] = [f"{base_toolchain_bin}/g++"]
+env["LINK"] = [f"{base_toolchain_bin}/g++"]
+env["SHLINK"] = [f"{base_toolchain_bin}/g++"]
+env["CPPPATH"] = [str(tidy_include)]
+env["LIBPATH"] = []
+env["CPPFLAGS"] = []
+env["CCFLAGS"] = [
+    "-DGTEST_HAS_RTTI=0",
+    "-D_GNU_SOURCE",
+    "-D__STDC_CONSTANT_MACROS",
+    "-D__STDC_FORMAT_MACROS",
+    "-D__STDC_LIMIT_MACROS",
+    "-fPIC",
+    "-fvisibility-inlines-hidden",
+    "-Werror=date-time",
+    "-Wall",
+    "-Wextra",
+    "-Wno-unused-parameter",
+    "-Wwrite-strings",
+    "-Wcast-qual",
+    "-Wno-missing-field-initializers",
+    "-pedantic",
+    "-Wno-long-long",
+    "-Wimplicit-fallthrough",
+    "-Wno-maybe-uninitialized",
+    "-Wno-class-memaccess",
+    "-Wno-redundant-move",
+    "-Wno-noexcept-type",
+    "-Wdelete-non-virtual-dtor",
+    "-Wsuggest-override",
+    "-Wno-comment",
+    "-fdiagnostics-color",
+    "-ffunction-sections",
+    "-fdata-sections",
+    "-fno-common",
+    "-Woverloaded-virtual",
+    "-fno-strict-aliasing",
+    "-O3",
+    "-g2",
+    "-DNDEBUG",
+    "-fPIC",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "-std=c++17",
 ]
-env['LINKFLAGS'] = []
-env['SHLINKFLAGS'] = [
-    '-fPIC',
-    '-fvisibility-inlines-hidden',
-    '-Werror=date-time',
-    '-Wall',
-    '-Wextra',
-    '-Wno-unused-parameter',
-    '-Wwrite-strings',
-    '-Wcast-qual',
-    '-Wno-missing-field-initializers',
-    '-pedantic',
-    '-Wno-long-long',
-    '-Wimplicit-fallthrough',
-    '-Wno-maybe-uninitialized',
-    '-Wno-class-memaccess',
-    '-Wno-redundant-move',
-    '-Wno-noexcept-type',
-    '-Wdelete-non-virtual-dtor',
-    '-Wsuggest-override',
-    '-Wno-comment',
-    '-fdiagnostics-color',
-    '-ffunction-sections',
-    '-fdata-sections',
-    '-fno-common',
-    '-Woverloaded-virtual',
-    '-fno-strict-aliasing',
-    '-O3',
-    '-DNDEBUG',
-    '-Wl,-z,nodelete',
-    f'-Wl,-rpath-link,{tidy_lib}',
-    '-Wl,-O3',
-    '-Wl,--gc-sections',
-    '-shared',
+env["LINKFLAGS"] = []
+env["SHLINKFLAGS"] = [
+    "-fPIC",
+    "-fvisibility-inlines-hidden",
+    "-Werror=date-time",
+    "-Wall",
+    "-Wextra",
+    "-Wno-unused-parameter",
+    "-Wwrite-strings",
+    "-Wcast-qual",
+    "-Wno-missing-field-initializers",
+    "-pedantic",
+    "-Wno-long-long",
+    "-Wimplicit-fallthrough",
+    "-Wno-maybe-uninitialized",
+    "-Wno-class-memaccess",
+    "-Wno-redundant-move",
+    "-Wno-noexcept-type",
+    "-Wdelete-non-virtual-dtor",
+    "-Wsuggest-override",
+    "-Wno-comment",
+    "-fdiagnostics-color",
+    "-ffunction-sections",
+    "-fdata-sections",
+    "-fno-common",
+    "-Woverloaded-virtual",
+    "-fno-strict-aliasing",
+    "-O3",
+    "-DNDEBUG",
+    "-Wl,-z,nodelete",
+    f"-Wl,-rpath-link,{tidy_lib}",
+    "-Wl,-O3",
+    "-Wl,--gc-sections",
+    "-shared",
     r'-Wl,-rpath,"\$$ORIGIN/../lib"',
 ]
-env['CXXFLAGS'] = []
-env['CFLAGS'] = []
-env['FORCEINCLUDES'] = []
-env['LIBDEPS_TAG_EXPANSIONS'] = []
+env["CXXFLAGS"] = []
+env["CFLAGS"] = []
+env["FORCEINCLUDES"] = []
+env["LIBDEPS_TAG_EXPANSIONS"] = []
 
 mongo_custom_check = env.SharedLibrary(
     target="mongo_tidy_checks",
@@ -147,17 +147,17 @@ mongo_custom_check = env.SharedLibrary(
         "MongoStringDataConstRefCheck.cpp",
     ],
     LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/third_party/shim_unwind',
+        "$BUILD_DIR/third_party/shim_allocator",
+        "$BUILD_DIR/third_party/shim_unwind",
     ],
-    AIB_COMPONENT='mongo-tidy-checks',
+    AIB_COMPONENT="mongo-tidy-checks",
 )
 
 env.AutoInstall(
-    target='$PREFIX_LIBDIR',
+    target="$PREFIX_LIBDIR",
     source=mongo_custom_check,
-    AIB_ROLE='runtime',
-    AIB_COMPONENT='mongo-tidy-checks',
+    AIB_ROLE="runtime",
+    AIB_COMPONENT="mongo-tidy-checks",
 )
 mongo_tidy_module = env.GetAutoInstalledFiles(mongo_custom_check[0])[0]
 
@@ -165,4 +165,4 @@ mongo_tidy_module = env.GetAutoInstalledFiles(mongo_custom_check[0])[0]
 # loading the module, we add the module to the compiledb alias.
 env.Alias("compiledb", mongo_tidy_module)
 
-env.SConscript('tests/SConscript', exports=['env', 'mongo_tidy_module', 'base_toolchain_bin'])
+env.SConscript("tests/SConscript", exports=["env", "mongo_tidy_module", "base_toolchain_bin"])

@@ -4,33 +4,33 @@ Import("env")
 
 env = env.Clone()
 env.Library(
-    target='tracing_profiler',
+    target="tracing_profiler",
     source=[
-        'internal/cycleclock.cpp',
-        'internal/profiler_internal.cpp',
+        "internal/cycleclock.cpp",
+        "internal/profiler_internal.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        "$BUILD_DIR/mongo/db/commands/server_status_core",
     ],
 )
 
 env.CppUnitTest(
-    target='tracing_profiler_test',
+    target="tracing_profiler_test",
     source=[
-        'profiler_test.cpp',
+        "profiler_test.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler',
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler",
     ],
 )
 
 env.Benchmark(
-    target='tracing_profiler_bm',
+    target="tracing_profiler_bm",
     source=[
-        'profiler_bm.cpp',
+        "profiler_bm.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler',
+        "$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler",
     ],
 )

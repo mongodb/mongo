@@ -5,76 +5,76 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target='query_settings',
+    target="query_settings",
     source=[
-        'index_hints_serialization.cpp',
-        'query_framework_serialization.cpp',
-        'query_settings.idl',
+        "index_hints_serialization.cpp",
+        "query_framework_serialization.cpp",
+        "query_settings.idl",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/namespace_spec',
-        '$BUILD_DIR/mongo/db/query/index_hint',
-        '$BUILD_DIR/mongo/db/query/query_knobs',
-        '$BUILD_DIR/mongo/db/query/query_shape/query_shape_hash',
-        '$BUILD_DIR/mongo/db/server_base',
+        "$BUILD_DIR/mongo/db/namespace_spec",
+        "$BUILD_DIR/mongo/db/query/index_hint",
+        "$BUILD_DIR/mongo/db/query/query_knobs",
+        "$BUILD_DIR/mongo/db/query/query_shape/query_shape_hash",
+        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 
 env.Library(
-    target='manager',
+    target="manager",
     source=[
-        'query_settings_cluster_parameter.idl',
-        'query_settings_manager.cpp',
+        "query_settings_cluster_parameter.idl",
+        "query_settings_manager.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/crypto/sha256_block',
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/query/query_knobs',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/idl/cluster_server_parameter',
-        'query_settings',
+        "$BUILD_DIR/mongo/crypto/sha256_block",
+        "$BUILD_DIR/mongo/db/commands/server_status_core",
+        "$BUILD_DIR/mongo/db/concurrency/exception_util",
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/query/query_knobs",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/idl/cluster_server_parameter",
+        "query_settings",
     ],
 )
 
 env.Library(
-    target='utils',
+    target="utils",
     source=[
-        'query_settings_hash.cpp',
-        'query_settings_utils.cpp',
+        "query_settings_hash.cpp",
+        "query_settings_utils.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/query/canonical_query',
-        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
-        'manager',
+        "$BUILD_DIR/mongo/db/query/canonical_query",
+        "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
+        "manager",
     ],
 )
 
 env.CppUnitTest(
-    target='query_settings_serialization_test',
+    target="query_settings_serialization_test",
     source=[
-        'index_hints_serialization_test.cpp',
-        'query_framework_serialization_test.cpp',
+        "index_hints_serialization_test.cpp",
+        "query_framework_serialization_test.cpp",
     ],
     LIBDEPS=[
-        'query_settings',
+        "query_settings",
     ],
 )
 
 env.Benchmark(
-    target='query_settings_lookup_bm',
+    target="query_settings_lookup_bm",
     source=[
-        'query_settings_lookup_bm.cpp',
+        "query_settings_lookup_bm.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/canonical_query',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/service_context_non_d',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/util/processinfo',
-        'manager',
-        'utils',
+        "$BUILD_DIR/mongo/db/query/canonical_query",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "$BUILD_DIR/mongo/util/processinfo",
+        "manager",
+        "utils",
     ],
 )

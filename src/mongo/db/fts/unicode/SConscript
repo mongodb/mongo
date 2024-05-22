@@ -14,7 +14,7 @@ env.Command(
     action="$PYTHON ${SOURCES[0]} ${SOURCES[1]} $TARGETS",
 )
 
-env.Alias('generated-sources', "codepoints_casefold.cpp")
+env.Alias("generated-sources", "codepoints_casefold.cpp")
 
 env.Command(
     target="codepoints_delimiter_list.cpp",
@@ -26,7 +26,7 @@ env.Command(
     action="$PYTHON ${SOURCES[0]} ${SOURCES[1]} $TARGETS",
 )
 
-env.Alias('generated-sources', "codepoints_delimiter_list.cpp")
+env.Alias("generated-sources", "codepoints_delimiter_list.cpp")
 
 env.Command(
     target="codepoints_diacritic_list.cpp",
@@ -38,31 +38,31 @@ env.Command(
     action="$PYTHON ${SOURCES[0]} ${SOURCES[1]} $TARGETS",
 )
 
-env.Alias('generated-sources', "codepoints_diacritic_list.cpp")
+env.Alias("generated-sources", "codepoints_diacritic_list.cpp")
 
 env.Library(
-    target='unicode',
+    target="unicode",
     source=[
-        'codepoints_casefold.cpp',
-        'codepoints_delimiter_list.cpp',
-        'codepoints_diacritic_list.cpp',
-        'codepoints_diacritic_map.cpp',
-        'string.cpp',
+        "codepoints_casefold.cpp",
+        "codepoints_delimiter_list.cpp",
+        "codepoints_diacritic_list.cpp",
+        "codepoints_diacritic_map.cpp",
+        "string.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/shell/linenoise_utf8',
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/shell/linenoise_utf8",
     ],
 )
 
 env.CppUnitTest(
-    target='db_fts_unicode_test',
+    target="db_fts_unicode_test",
     source=[
-        'byte_vector_test.cpp',
-        'codepoints_test.cpp',
-        'string_test.cpp',
+        "byte_vector_test.cpp",
+        "codepoints_test.cpp",
+        "string_test.cpp",
     ],
     LIBDEPS=[
-        'unicode',
+        "unicode",
     ],
 )
