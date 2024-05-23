@@ -4,6 +4,9 @@
  *
  * @tags: [
  *   requires_fcv_80,
+ *   # Slow Windows machines cause this test to be flakey. Further reducing the number of samples we
+ *   # take would make the test less useful on Linux variants so we just don't run on Windows.
+ *   incompatible_with_windows_tls,
  *   temp_disabled_embedded_router_known_issues,
  * ]
  */
