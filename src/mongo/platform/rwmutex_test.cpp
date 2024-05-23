@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
+#include <shared_mutex>
 #include <vector>
 
 #include "mongo/platform/rwmutex.h"
 #include "mongo/platform/waitable_atomic.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
@@ -219,6 +223,139 @@ TEST_F(WriteRarelyRWMutexTest, MultiWriter) {
 
     auto readLock = rwMutex.readLock();
     ASSERT_EQ(counter, kTargetValue);
+}
+
+TEST(RWMutex, OneWriterAtAnyTime) {
+    RWMutex mutex;
+    stdx::unique_lock lk(mutex);
+    ASSERT_FALSE(hasWaiters_forTest(mutex));
+    ASSERT_TRUE(isWriteIntentSet_forTest(mutex));
+
+    unittest::ThreadAssertionMonitor monitor;
+    auto writer = monitor.spawn([&] {
+        std::lock_guard anotherLk(mutex);
+        ASSERT_FALSE(lk.owns_lock());
+    });
+
+    // Best effort to allow `writer` to start and try to exclusively acquire `mutex`.
+    sleepFor(Microseconds(5));
+
+    lk.unlock();
+    // Allow `writer` to proceed with acquiring the lock.
+    monitor.notifyDone();
+    writer.join();
+}
+
+TEST(RWMutex, WriterWaitsForReader) {
+    RWMutex mutex;
+    std::shared_lock lk(mutex);  // NOLINT
+    ASSERT_FALSE(hasWaiters_forTest(mutex));
+    ASSERT_FALSE(isWriteIntentSet_forTest(mutex));
+
+    unittest::ThreadAssertionMonitor monitor;
+    auto writer = monitor.spawn([&] {
+        std::lock_guard lk(mutex);
+        ASSERT_EQ(getReadersCount_forTest(mutex), 0);
+    });
+
+    while (!hasWaiters_forTest(mutex)) {
+        // Wait until the writer notices the reader and proceeds to wait for it to retire.
+    }
+    ASSERT_TRUE(isWriteIntentSet_forTest(mutex));
+
+    lk.unlock();
+    // Let the writer proceed with acquiring the lock.
+    monitor.notifyDone();
+    writer.join();
+}
+
+TEST(RWMutex, NewReaderWaitsForWriter) {
+    RWMutex mutex;
+    stdx::unique_lock lk(mutex);
+    ASSERT_FALSE(hasWaiters_forTest(mutex));
+
+    unittest::ThreadAssertionMonitor monitor;
+    auto reader = monitor.spawn([&] {
+        std::shared_lock lk(mutex);  // NOLINT
+        ASSERT_FALSE(isWriteIntentSet_forTest(mutex));
+    });
+
+    while (!hasWaiters_forTest(mutex)) {
+        // The reader should start waiting on the mutex shortly, so keep checking.
+    }
+
+    lk.unlock();
+    // The reader may now acquire the lock and make progress.
+    monitor.notifyDone();
+    reader.join();
+}
+
+DEATH_TEST(RWMutex, TooManyReaders, "invariant") {
+    RWMutex mutex;
+    addReaders_forTest(mutex, RWMutex::kReadersOverflowMask - 1);
+    // The following must hit an invariant since it exceeds the maximum number of readers locks.
+    mutex.lock_shared();
+}
+
+TEST(RWMutex, MultipleReaders) {
+    const auto kNumReaders = 16;
+    unittest::Barrier barrier(kNumReaders);
+
+    RWMutex mutex;
+    std::vector<unittest::JoinThread> readers;
+    for (auto i = 0; i < kNumReaders; ++i) {
+        readers.emplace_back([&] {
+            std::shared_lock lk(mutex);  // NOLINT
+            barrier.countDownAndWait();
+        });
+    }
+}
+
+TEST(RWMutex, MultipleReadersAndWriters) {
+    // Starts `kNumWorkers` worker threads and have them loop for a total of `kNumIterations`.
+    // Worker threads assign a global order to their local loop, and decide on acquiring a read or a
+    // write lock based on this global order: if the order is divisible by one thousand, the thread
+    // will acquire a write lock, and otherwise it will acquire a read lock. Each worker ensures
+    // that there are no readers or writers when successfully acquiring a read or a write lock,
+    // respectively.
+    const size_t kNumWorkers = 8;
+    const size_t kNumIterations = 5'000'000;
+
+    RWMutex mutex;
+    Atomic<size_t> counter{0};
+    Atomic<int> readers, writers;
+
+    unittest::Barrier barrier(kNumWorkers);
+    std::vector<stdx::thread> workers(kNumWorkers);
+
+    unittest::ThreadAssertionMonitor monitor;
+    for (auto& worker : workers) {
+        worker = monitor.spawn([&] {
+            barrier.countDownAndWait();
+            while (true) {
+                const auto iteration = counter.fetchAndAdd(1);
+                if (iteration >= kNumIterations)
+                    return;
+
+                if (iteration % 1'000 == 0) {
+                    stdx::lock_guard writeLk(mutex);
+                    ASSERT_EQ(readers.loadRelaxed(), 0);
+                    writers.fetchAndAddRelaxed(1);
+                    ON_BLOCK_EXIT([&] { writers.fetchAndSubtractRelaxed(1); });
+                } else {
+                    std::shared_lock readLk(mutex);  // NOLINT
+                    ASSERT_EQ(writers.loadRelaxed(), 0);
+                    readers.fetchAndAddRelaxed(1);
+                    ON_BLOCK_EXIT([&] { readers.fetchAndSubtractRelaxed(1); });
+                }
+            }
+        });
+    }
+
+    monitor.notifyDone();
+    for (auto& worker : workers) {
+        worker.join();
+    }
 }
 
 }  // namespace

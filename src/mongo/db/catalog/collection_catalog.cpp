@@ -46,6 +46,7 @@
 #include <exception>
 #include <list>
 #include <mutex>
+#include <shared_mutex>
 
 #include "collection_catalog.h"
 
@@ -77,6 +78,7 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -107,7 +109,7 @@ constexpr auto kNumDurableCatalogScansDueToMissingMapping = "numScansDueToMissin
 class LatestCollectionCatalog {
 public:
     std::shared_ptr<CollectionCatalog> load() const {
-        std::lock_guard lk(_mutex);
+        std::shared_lock lk(_mutex);  // NOLINT
         return _catalog;
     }
 
@@ -126,7 +128,7 @@ public:
     }
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("LatestCollectionCatalog::_mutex");
+    mutable RWMutex _mutex;
     // TODO SERVER-56428: Replace with std::atomic<std::shared_ptr> when supported in our toolchain
     std::shared_ptr<CollectionCatalog> _catalog = std::make_shared<CollectionCatalog>();
 };
