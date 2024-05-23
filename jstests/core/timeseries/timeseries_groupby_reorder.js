@@ -392,3 +392,124 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
                         [{"groupCount": 1}],
                         true /* excludeMeta */);
 })();
+
+// Validates the $project followed by $group scenarios, where the $project may project out/modify
+// the fields being used by the $group stage.
+(function testMetaGroupKey_WithProjectStagePrefix() {
+    const t = new Date();
+    const docs = [
+        {time: t, myMeta: 1, val: 3},
+        {time: t, myMeta: 3, val: 4},
+        {time: t, myMeta: 1, val: 5},
+    ];
+
+    //
+    // Tests with inclusion projections.
+    //
+    runGroupRewriteTest(docs,
+                        [{$project: {myMeta: 1}}, {$group: {_id: null, o: {$max: "$time"}}}],
+                        [{_id: null, o: null}],
+                        false /* excludeMeta */);
+    runGroupRewriteTest(docs,
+                        [{$project: {myMeta: 1}}, {$group: {_id: null, o: {$max: "$val"}}}],
+                        [{_id: null, o: null}],
+                        false /* excludeMeta */);
+    runGroupRewriteTest(docs,
+                        [{$project: {myMeta: 1}}, {$group: {_id: null, o: {$max: "$myMeta"}}}],
+                        [{_id: null, o: 3}],
+                        false /* excludeMeta */);
+    runGroupRewriteTest(
+        docs,
+        [{$project: {myMeta: 1}}, {$group: {_id: {x: "$myMeta"}, o: {$max: "$myMeta"}}}],
+        [{_id: {x: 1}, o: 1}, {_id: {x: 3}, o: 3}],
+        false /* excludeMeta */);
+    runGroupRewriteTest(
+        docs,
+        [{$project: {myMeta: 1}}, {$group: {_id: {x: "$myMeta"}, o: {$max: "$val"}}}],
+        [{_id: {x: 1}, o: null}, {_id: {x: 3}, o: null}],
+        false /* excludeMeta */);
+    runGroupRewriteTest(
+        docs,
+        [{$project: {myMeta: 1}}, {$group: {_id: {meta: "$myMeta"}, c: {$count: {}}}}],
+        [{_id: {meta: 1}, c: 2}, {_id: {meta: 3}, c: 1}],
+        false /* excludeMeta */);
+
+    //
+    // Tests with exclusion projections.
+    //
+    runGroupRewriteTest(docs,
+                        [
+                            {$project: {myMeta: 0}},
+                            {$addFields: {m: "$myMeta"}},
+                            {$group: {_id: null, o: {$max: "$m"}}}
+                        ],
+                        [{_id: null, o: null}],
+                        false /* excludeMeta */);
+    runGroupRewriteTest(docs,
+                        [{$project: {myMeta: 0}}, {$group: {_id: "$myMeta", o: {$max: "$val"}}}],
+                        [{_id: null, o: 5}],
+                        false /* excludeMeta */);
+    runGroupRewriteTest(
+        docs,
+        [{$project: {myMeta: 0}}, {$group: {_id: {x: "$myMeta"}, o: {$max: "$val"}}}],
+        [{_id: {x: null}, o: 5}],
+        false /* excludeMeta */);
+    runGroupRewriteTest(
+        docs,
+        [{$project: {myMeta: 0, val: 0}}, {$group: {_id: {x: "$myMeta"}, o: {$max: "$val"}}}],
+        [{_id: {x: null}, o: null}],
+        false /* excludeMeta */);
+    runGroupRewriteTest(docs,
+                        [{$project: {myMeta: 0}}, {$group: {_id: null, o: {$max: "$val"}}}],
+                        [{_id: null, o: 5}],
+                        false /* excludeMeta */);
+    runGroupRewriteTest(docs,
+                        [{$project: {myMeta: 0}}, {$group: {_id: null, c: {$count: {}}}}],
+                        [{_id: null, c: 3}],
+                        false /* excludeMeta */);
+})();
+
+// Validates the $addFields/$project(with computed fields) followed by $group scenarios, where the
+// projection may project out/modify the fields being used by the $group stage.
+(function testMetaGroupKey_WithComputedMetaPrefix() {
+    const t = new Date();
+    const docs = [
+        {time: t, myMeta: 1, val: 3},
+        {time: t, myMeta: 3, val: 4},
+        {time: t, myMeta: 1, val: 5},
+    ];
+    runGroupRewriteTest(docs,
+                        [{$project: {time: "$myMeta"}}, {$group: {_id: null, o: {$max: "$time"}}}],
+                        [{_id: null, o: 3}],
+                        false /* excludeMeta */);
+    runGroupRewriteTest(docs,
+                        [{$project: {val: "$myMeta"}}, {$group: {_id: null, o: {$max: "$val"}}}],
+                        [{_id: null, o: 3}],
+                        false /* excludeMeta */);
+    runGroupRewriteTest(docs,
+                        [{$addFields: {myMeta: "5"}}, {$group: {_id: null, o: {$max: "$myMeta"}}}],
+                        [{_id: null, o: "5"}],
+                        false /* excludeMeta */);
+
+    runGroupRewriteTest(
+        docs,
+        [{$addFields: {myMeta: "x"}}, {$group: {_id: "$myMeta", o: {$max: "$val"}}}],
+        [{_id: "x", o: 5}],
+        false /* excludeMeta */);
+    runGroupRewriteTest(docs,
+                        [
+                            {$addFields: {myMeta: "y"}},
+                            {$project: {val: "$myMeta"}},
+                            {$group: {_id: {x: "$myMeta"}, o: {$max: "$val"}}}
+                        ],
+                        [{_id: {x: null}, o: "y"}],
+                        false /* excludeMeta */);
+    runGroupRewriteTest(docs,
+                        [
+                            {$addFields: {myMeta: "$val"}},
+                            {$project: {val: 0}},
+                            {$group: {_id: {x: "$myMeta"}, o: {$max: "$val"}}}
+                        ],
+                        [{_id: {x: 3}, o: null}, {_id: {x: 4}, o: null}, {_id: {x: 5}, o: null}],
+                        false /* excludeMeta */);
+})();

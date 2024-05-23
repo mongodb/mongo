@@ -115,11 +115,12 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
 
     // The $match on meta is not moved before $_internalUnpackBucket since the field is excluded.
     auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(1u, serialized.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{ $_internalUnpackBucket: { include: [ \"_id\", \"data\" ], "
-                               "timeField: \"foo\", metaField: \"myMeta\", bucketMaxSpanSeconds: "
-                               "3600, eventFilter: { myMeta: { $gte: 0 } } } }"),
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{ $_internalUnpackBucket: { include: [ '_id', 'data' ], "
+                               "timeField: 'foo', metaField: 'myMeta', bucketMaxSpanSeconds: "
+                               "3600} }"),
                       serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {myMeta: {$gte: 0}}}"), serialized[1]);
 }
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
