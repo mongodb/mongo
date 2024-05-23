@@ -16,6 +16,7 @@ const kRetry = false;
 // collections don't hit MovePrimaryInProgress errors.
 const kRetryableErrors = [
     {code: ErrorCodes.MovePrimaryInProgress},
+    {code: ErrorCodes.ReshardCollectionInProgress},
     {
         code: ErrorCodes.ConflictingOperationInProgress,
         errmsg: "Another ConfigsvrCoordinator with different arguments is already running"
@@ -23,6 +24,8 @@ const kRetryableErrors = [
     // A query can be killed if it is still selecting a query plan after a config transition has
     // completed range deletion and drops the collection. Since orphanCleanUpDelaySecs is set to be
     // lower in testing than in production, dropCollection is scheduled almost immediately.
+    // Similarly, the collection rename step in resharding (moveCollection) can cause a query to
+    // get killed.
     {code: ErrorCodes.QueryPlanKilled}
 ];
 

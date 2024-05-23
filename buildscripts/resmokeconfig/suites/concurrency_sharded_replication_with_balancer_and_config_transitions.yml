@@ -66,6 +66,47 @@ selector:
     # infrastructure. See SERVER-77039 for full details.
     - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
+    # Uses getmores. This suite executes random moveCollections in the background that cause open
+    # cursors on the collection to be killed.
+    - jstests/concurrency/fsm_workloads/agg_base.js
+    - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
+    - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/create_index_background.js
+    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
+    - jstests/concurrency/fsm_workloads/create_index_background_unique.js
+    - jstests/concurrency/fsm_workloads/create_index_background_unique_capped.js
+    - jstests/concurrency/fsm_workloads/globally_managed_cursors.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_ordered_bulk.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_text.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_unordered_bulk.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_upsert.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_where.js
+    - jstests/concurrency/fsm_workloads/invalidated_cursors.js
+    - jstests/concurrency/fsm_workloads/kill_aggregation.js
+    - jstests/concurrency/fsm_workloads/kill_rooted_or.js
+    - jstests/concurrency/fsm_workloads/list_indexes.js
+    - jstests/concurrency/fsm_workloads/query_stats_concurrent.js
+    - jstests/concurrency/fsm_workloads/query_stats_enable_disable.js
+    - jstests/concurrency/fsm_workloads/reindex.js
+    - jstests/concurrency/fsm_workloads/reindex_background.js
+    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+    - jstests/concurrency/fsm_workloads/remove_multiple_documents.js
+    - jstests/concurrency/fsm_workloads/server_status_with_time_out_cursors.js
+    - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
+    - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
+    - jstests/concurrency/fsm_workloads/updateOne_with_sort_update_queue.js
+    - jstests/concurrency/fsm_workloads/updateOne_with_sort_update_queue_unindexed.js
+    - jstests/concurrency/fsm_workloads/update_where.js
+    - jstests/concurrency/fsm_workloads/yield.js
+    - jstests/concurrency/fsm_workloads/yield_fetch.js
+    - jstests/concurrency/fsm_workloads/yield_geo_near_dedup.js
+    - jstests/concurrency/fsm_workloads/yield_rooted_or.js
+    - jstests/concurrency/fsm_workloads/yield_sort.js
+    - jstests/concurrency/fsm_workloads/yield_sort_merge.js
+    - jstests/concurrency/fsm_workloads/yield_text.js
+    - jstests/concurrency/fsm_workloads/yield_with_drop.js
+
     # TODO SERVER-89555: Timeseries collections hit movePrimaryInProgress errors and the temporary
     # retry logic for this hook leads to breaking a test assertion.
     - jstests/concurrency/fsm_workloads/timeseries_mirrored_writes.js
@@ -90,6 +131,10 @@ selector:
     - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_droptarget.js
     - jstests/concurrency/fsm_workloads/timeseries_agg_out.js
 
+    # TODO (SERVER-90737): Re-enable schema_validator_with_expr_variables.js in
+    # concurrency_sharded_replication_with_balancer_and_config_transitions suite.
+    - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
@@ -102,7 +147,7 @@ selector:
     - config_shard_incompatible
     - assumes_stable_shard_list
 
-    # This suites execute random moveCollections in the background that cause open cursors on the
+    # This suite executes random moveCollections in the background that cause open cursors on the
     # collection to be killed.
     - requires_getmore
 

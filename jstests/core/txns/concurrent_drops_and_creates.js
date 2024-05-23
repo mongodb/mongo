@@ -151,10 +151,18 @@ assert.commandWorked(testDB2.runCommand({create: collNameB}));
 // We can insert to collection B in the transaction as the transaction does not have a collection on
 // this namespace (even as it exist at latest). A collection will be implicitly created and we will
 // fail to commit this transaction with a WriteConflict error.
+const expectedErrorCodes = [ErrorCodes.WriteConflict];
+if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateCollectionInPreparedTransactions")) {
+    // If collection A and collection B live on different shards, this transaction would require
+    // two phase commit. And if this feature flag is not enabled, the transaction would fail with
+    // a OperationNotSupportedInTransaction error instead of a WriteConflict error.
+    expectedErrorCodes.push(ErrorCodes.OperationNotSupportedInTransaction);
+}
+
 retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
     assert.commandWorked(sessionCollB.insert({}));
 }, txnOptions);
 
-assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
+assert.commandFailedWithCode(session.commitTransaction_forTesting(), expectedErrorCodes);
 
 session.endSession();

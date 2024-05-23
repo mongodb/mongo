@@ -14,7 +14,10 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 export const $config = (function() {
     const shardedCollName = i => `sharded_${i}`;
     const unshardedCollName = i => `unsharded_${i}`;
-    const collCount = 50;
+    // The config transition suites involve moving unsharded collections in and out of the config
+    // server. Having up to 50 unsharded collections to move may make this test take too long to run
+    // and get killed by resmoke.
+    const collCount = TestData.transitioningConfigShard ? 10 : 50;
     const threadCount = 10;
     const collPerThread = collCount / threadCount;
     const timeField = 'time';

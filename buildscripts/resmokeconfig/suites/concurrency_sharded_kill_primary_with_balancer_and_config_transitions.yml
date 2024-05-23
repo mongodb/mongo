@@ -110,12 +110,15 @@ selector:
     - jstests/concurrency/fsm_workloads/kill_aggregation.js
     - jstests/concurrency/fsm_workloads/kill_rooted_or.js
 
-    # Uses getmores.
+    # Uses getmores. This suite executes random moveCollections in the background that cause open
+    # cursors on the collection to be killed.
     - jstests/concurrency/fsm_workloads/agg_base.js
+    - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
     - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
     - jstests/concurrency/fsm_workloads/create_capped_collection.js
     - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
     - jstests/concurrency/fsm_workloads/create_index_background.js
+    - jstests/concurrency/fsm_workloads/create_index_background_unique.js
     - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
     - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
     - jstests/concurrency/fsm_workloads/globally_managed_cursors.js
@@ -130,6 +133,8 @@ selector:
     - jstests/concurrency/fsm_workloads/reindex_background.js
     - jstests/concurrency/fsm_workloads/remove_multiple_documents.js
     - jstests/concurrency/fsm_workloads/server_status_with_time_out_cursors.js
+    - jstests/concurrency/fsm_workloads/updateOne_with_sort_update_queue.js
+    - jstests/concurrency/fsm_workloads/updateOne_with_sort_update_queue_unindexed.js
     - jstests/concurrency/fsm_workloads/update_where.js
     - jstests/concurrency/fsm_workloads/yield.js
     - jstests/concurrency/fsm_workloads/yield_fetch.js
@@ -187,7 +192,7 @@ selector:
     - config_shard_incompatible
     - assumes_stable_shard_list
 
-    # This suites execute random moveCollections in the background that cause open cursors on the
+    # This suite executes random moveCollections in the background that cause open cursors on the
     # collection to be killed.
     - requires_getmore
 

@@ -149,10 +149,6 @@ selector:
     - config_shard_incompatible
     - assumes_stable_shard_list
 
-    # This suites execute random moveCollections in the background that cause open cursors on the
-    # collection to be killed.
-    - requires_getmore
-
 executor:
   archive:
     hooks:
