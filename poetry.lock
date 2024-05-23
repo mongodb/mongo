@@ -869,13 +869,13 @@ typing-extensions = ">=3.10.0"
 
 [[package]]
 name = "evergreen-py"
-version = "3.6.22"
+version = "3.6.26"
 description = "Python client for the Evergreen API"
 optional = false
-python-versions = ">=3.9,<4.0"
+python-versions = "<4.0,>=3.9"
 files = [
-    {file = "evergreen_py-3.6.22-py3-none-any.whl", hash = "sha256:6cbc14c43fd464681fc4e228147feff5e295db705d7745ee571a8ba8bf662695"},
-    {file = "evergreen_py-3.6.22.tar.gz", hash = "sha256:d5a56d66765542c56c54b2c937dc18eb1af7d8d189a3804052c5a26f33f3742e"},
+    {file = "evergreen_py-3.6.26-py3-none-any.whl", hash = "sha256:71d717195d386dba4583e8a35c4e9be8b34e5192c725a6d5ba8181e701affe83"},
+    {file = "evergreen_py-3.6.26.tar.gz", hash = "sha256:20854a9b27c5f24fab1ad7f855bac7231971eb978a2c56a4e41d38b745f84634"},
 ]
 
 [package.dependencies]
@@ -4281,4 +4281,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "5e4c3efcad5d92501d4c494eeccc4bdf140389c4c237cfe54000d86e49a3cc41"
+content-hash = "601cd9a2c5ba9a409c4529d63f3cc054f26557f53dbfed2e68176a8ed7e20d16"

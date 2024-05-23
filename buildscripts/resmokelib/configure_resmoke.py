@@ -516,6 +516,7 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.EVERGREEN_VERSION_ID = config.pop("version_id")
     _config.EVERGREEN_WORK_DIR = config.pop("work_dir")
     _config.EVERGREEN_PROJECT_CONFIG_PATH = config.pop("evg_project_config_path")
+    _config.EVERGREEN_REQUESTER = config.pop("requester")
 
     # otel info
     _config.OTEL_TRACE_ID = config.pop("otel_trace_id")
@@ -767,3 +768,4 @@ def detect_evergreen_config(
     parsed_args.version_id = expansions.get("version_id", None)
     parsed_args.work_dir = expansions.get("workdir", None)
     parsed_args.evg_project_config_path = expansions.get("evergreen_config_file_path", None)
+    parsed_args.requester = expansions.get("requester", None)

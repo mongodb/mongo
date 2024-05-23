@@ -11,7 +11,7 @@ import os.path
 import random
 import subprocess
 import sys
-from typing import List, NamedTuple
+from typing import Any, List, NamedTuple
 
 import buildscripts.resmokelib.testing.tags as _tags
 from buildscripts.resmokelib import config
@@ -570,6 +570,17 @@ class _Selector(object):
 
         return self.sort_tests(*test_list.get_tests())
 
+    def group(self, selector_config, tests):
+        """Group the list of tests.
+
+        Args:
+            selector_config: a _SelectorConfig instance.
+            tests: a list of tests to modify
+        Returns:
+            A list of tests, this list can contain other lists with groups of tests.
+        """
+        return tests
+
     @staticmethod
     def sort_tests(tests, excluded):
         """Sort the tests before returning them."""
@@ -661,15 +672,13 @@ class _MultiJSTestSelector(_JSTestSelector):
     E.g. [[test1.js, test2.js], [test3.js, test4.js]].
     """
 
-    def select(self, selector_config):
-        """Select the tests as follows.
+    def group(self, selector_config, tests):
+        """Group the tests as follows.
 
         1. Create a corpus of tests to group by concatenating shuffled lists of raw tests
            until we exceed "total_tests" number of tests.
         2. Slice the corpus into "group_size" lists, put these lists in "grouped_tests".
         """
-        tests, excluded = _JSTestSelector.select(self, selector_config)
-
         group_size = selector_config.group_size
         multi = selector_config.group_count_multiplier
 
@@ -696,7 +705,7 @@ class _MultiJSTestSelector(_JSTestSelector):
                 start = 0
             grouped_tests.append(corpus[start : start + group_size])
             start += group_size
-        return grouped_tests, excluded
+        return grouped_tests
 
     @staticmethod
     def sort_tests(tests, excluded):
@@ -903,7 +912,9 @@ _SELECTOR_REGISTRY = {
 }
 
 
-def filter_tests(test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FILE_EXPLORER):
+def filter_tests(
+    test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FILE_EXPLORER
+) -> tuple[List[str], List[str]]:
     """Filter the tests according to a specified configuration.
 
     Args:
@@ -918,3 +929,23 @@ def filter_tests(test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FI
     selector = selector_class(test_file_explorer)
     selector_config = selector_config_class(**selector_config)
     return selector.select(selector_config)
+
+
+def group_tests(
+    test_kind, selector_config, test_list, test_file_explorer=_DEFAULT_TEST_FILE_EXPLORER
+) -> List[Any]:
+    """Group the test list according to a specified configuration.
+
+    Args:
+        test_kind: the test kind, from _SELECTOR_REGISTRY.
+        selector_config: a dict containing the selector configuration.
+        test_list: input test list to group.
+        test_file_explorer: the TestFileExplorer to use. Using a TestFileExplorer other than
+        the default one should not be needed except for mocking purposes.
+    """
+    if test_kind not in _SELECTOR_REGISTRY:
+        raise ValueError("Unknown test kind '{}'".format(test_kind))
+    selector_config_class, selector_class = _SELECTOR_REGISTRY[test_kind]
+    selector = selector_class(test_file_explorer)
+    selector_config = selector_config_class(**selector_config)
+    return selector.group(selector_config, test_list)

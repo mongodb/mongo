@@ -9,6 +9,7 @@ from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import selector as _selector
 from buildscripts.resmokelib.testing import report as _report
 from buildscripts.resmokelib.testing import summary as _summary
+from buildscripts.resmokelib.utils import evergreen_conn
 
 # Map of error codes that could be seen. This is collected from:
 # * dbshell.cpp
@@ -122,7 +123,41 @@ class Suite(object):
                 raise TypeError("Expected dictionary of arguments to mongos")
             return [mongos_options], []
 
-        return _selector.filter_tests(test_kind, selector_config)
+        tests, excluded = _selector.filter_tests(test_kind, selector_config)
+
+        # Do not filter tests from evergreen when running locally.
+        # If there are no tests, return early
+        if not _config.EVERGREEN_TASK_ID or not tests:
+            tests = _selector.group_tests(test_kind, selector_config, tests)
+            return tests, excluded
+
+        evg_api = evergreen_conn.get_evergreen_api()
+        try:
+            result = evg_api.select_tests(
+                str(_config.EVERGREEN_PROJECT_NAME),
+                str(_config.EVERGREEN_VARIANT_NAME),
+                str(_config.EVERGREEN_REQUESTER),
+                str(_config.EVERGREEN_TASK_ID),
+                str(_config.EVERGREEN_TASK_NAME),
+                tests,
+            )
+        except Exception as ex:
+            print(
+                "ERROR: failure using the select tests evergreen endpoint with the following arguments:"
+            )
+            print(f"Project name: {str(_config.EVERGREEN_PROJECT_NAME)}")
+            print(f"Variant name: {str(_config.EVERGREEN_VARIANT_NAME)}")
+            print(f"Requester: {str(_config.EVERGREEN_REQUESTER)}")
+            print(f"Task ID: {str(_config.EVERGREEN_TASK_ID)}")
+            print(f"Task name: {str(_config.EVERGREEN_TASK_NAME)}")
+            print(f"Tests: {tests}")
+            raise ex
+        evergreen_filtered_tests = result["tests"]
+        evergreen_excluded_tests = set(evergreen_filtered_tests).symmetric_difference(set(tests))
+        print(f"Evergreen excluded the following tests: {evergreen_filtered_tests}")
+        excluded.extend(evergreen_excluded_tests)
+        tests = _selector.group_tests(test_kind, selector_config, evergreen_filtered_tests)
+        return tests, excluded
 
     def get_name(self):
         """Return the name of the test suite."""

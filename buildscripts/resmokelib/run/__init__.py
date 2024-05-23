@@ -1928,6 +1928,13 @@ class RunPlugin(PluginInterface):
         )
 
         evergreen_options.add_argument(
+            "--requester",
+            dest="requester",
+            metavar="REQUESTER",
+            help="Sets the requester of the task.",
+        )
+
+        evergreen_options.add_argument(
             "--taskWorkDir",
             dest="work_dir",
             metavar="TASK_WORK_DIR",
