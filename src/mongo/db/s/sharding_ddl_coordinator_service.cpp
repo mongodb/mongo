@@ -229,13 +229,6 @@ void ShardingDDLCoordinatorService::waitForOngoingCoordinatorsToFinish(
     }
 }
 
-void ShardingDDLCoordinatorService::_onServiceInitialization() {
-    stdx::lock_guard lg(_mutex);
-    invariant(_state == State::kPaused);
-    invariant(_numCoordinatorsToWait == 0);
-    _state = State::kRecovering;
-}
-
 void ShardingDDLCoordinatorService::_onServiceTermination() {
     stdx::lock_guard lg(_mutex);
     _state = State::kPaused;
@@ -268,11 +261,7 @@ size_t ShardingDDLCoordinatorService::_countCoordinatorDocs(OperationContext* op
 void ShardingDDLCoordinatorService::waitForRecoveryCompletion(OperationContext* opCtx) const {
     stdx::unique_lock lk(_mutex);
     opCtx->waitForConditionOrInterrupt(
-        _recoveredOrCoordinatorCompletedCV, lk, [this]() { return _state != State::kRecovering; });
-
-    uassert(ErrorCodes::NotWritablePrimary,
-            "Not primary when trying to create a DDL coordinator",
-            _state != State::kPaused);
+        _recoveredOrCoordinatorCompletedCV, lk, [this]() { return _state == State::kRecovered; });
 }
 
 ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
@@ -287,18 +276,14 @@ ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
                       "Found Sharding DDL Coordinators to rebuild",
                       "numCoordinators"_attr = numCoordinators);
             }
-
-            pauseShardingDDLCoordinatorServiceOnRecovery.pauseWhileSet();
-
-            {
+            if (numCoordinators > 0) {
                 stdx::lock_guard lg(_mutex);
-                invariant(_state == State::kRecovering);
-                invariant(_numCoordinatorsToWait == 0);
-                if (numCoordinators > 0) {
-                    _numCoordinatorsToWait = numCoordinators;
-                } else {
-                    _transitionToRecovered(lg, opCtx.get());
-                }
+                _state = State::kRecovering;
+                _numCoordinatorsToWait = numCoordinators;
+            } else {
+                pauseShardingDDLCoordinatorServiceOnRecovery.pauseWhileSet();
+                stdx::lock_guard lg(_mutex);
+                _transitionToRecovered(lg, opCtx.get());
             }
         })
         .onError([this](const Status& status) {

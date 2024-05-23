@@ -422,8 +422,6 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     savedInstances.clear();
     newThenOldScopedExecutor.reset();
 
-    _onServiceInitialization();
-
     PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic.pauseWhileSet();
 
     // Now wait for the first write of the new term to be majority committed, so that we know
