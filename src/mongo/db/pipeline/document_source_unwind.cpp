@@ -122,19 +122,16 @@ bool DocumentSourceUnwind::canPushSortBack(const DocumentSourceSort* sort) const
     // otherwise when we swap the limit and unwind, we could end up providing fewer results to the
     // user than expected.
     if (!sort->hasLimit() || _unwindProcessor->getPreserveNullAndEmptyArrays()) {
-        auto unwindPath = _unwindProcessor->getUnwindFullPath();
+        auto modifiedPaths = getModifiedPaths();
 
         // Checks if any of the $sort's paths depend on the unwind path (or vice versa).
         SortPattern sortKeyPattern = sort->getSortKeyPattern();
-        bool sortPathMatchesUnwindPath =
+        bool sortDependsOnUnwind =
             std::any_of(sortKeyPattern.begin(), sortKeyPattern.end(), [&](auto& sortKey) {
                 // If 'sortKey' is a $meta expression, we can do the swap.
-                if (!sortKey.fieldPath)
-                    return false;
-                return expression::bidirectionalPathPrefixOf(unwindPath,
-                                                             sortKey.fieldPath->fullPath());
+                return sortKey.fieldPath && modifiedPaths.canModify(*sortKey.fieldPath);
             });
-        return !sortPathMatchesUnwindPath;
+        return !sortDependsOnUnwind;
     }
     return false;
 }
