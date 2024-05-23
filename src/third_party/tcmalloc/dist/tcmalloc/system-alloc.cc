@@ -426,11 +426,27 @@ int MapFixedNoReplaceFlagAvailable() {
 
     // Try to map over ptr.  If we get a different address, we don't have
     // MAP_FIXED_NOREPLACE.
-    void* ptr2 = mmap(ptr, kPageSize, PROT_NONE,
+    //
+    // We try to specify a region that overlaps with ptr, but adjust the start
+    // downward so it doesn't.  This allows us to detect if the pre-4.19 bug
+    // (https://github.com/torvalds/linux/commit/7aa867dd89526e9cfd9714d8b9b587c016eaea34)
+    // is present.
+    uintptr_t uptr = reinterpret_cast<uintptr_t>(ptr);
+    TC_CHECK_GT(uptr, kPageSize);
+    void* target = reinterpret_cast<void*>(uptr - kPageSize);
+
+    void* ptr2 = mmap(target, 2 * kPageSize, PROT_NONE,
                       MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     const bool rejected = ptr2 == MAP_FAILED;
     if (!rejected) {
-      munmap(ptr2, kPageSize);
+      if (ptr2 == target) {
+        // [ptr2, 2 * kPageSize] overlaps with [ptr, kPageSize], so we only need
+        // to unmap [ptr2, kPageSize].  The second call to munmap below will
+        // unmap the rest.
+        munmap(ptr2, kPageSize);
+      } else {
+        munmap(ptr2, 2 * kPageSize);
+      }
     }
     munmap(ptr, kPageSize);
 
