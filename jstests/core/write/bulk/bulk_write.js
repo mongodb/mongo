@@ -38,10 +38,14 @@ assert.eq(coll.find().itcount(), 1);
 assert.eq(coll1.find().itcount(), 0);
 coll.drop();
 
-// Make sure ops and nsInfo can take arrays properly
+// Make sure ops and nsInfo can take arrays properly and perform writes to the correct namespace.
 res = db.adminCommand({
     bulkWrite: 1,
-    ops: [{insert: 1, document: {skey: "MongoDB"}}, {insert: 0, document: {skey: "MongoDB"}}],
+    ops: [
+        {insert: 1, document: {skey: "MongoDB"}},
+        {insert: 0, document: {skey: "MongoDB"}},
+        {insert: 1, document: {_id: 1}}
+    ],
     nsInfo: [{ns: "test.coll"}, {ns: "test.coll1"}]
 });
 
@@ -49,7 +53,7 @@ assert.commandWorked(res);
 assert.eq(res.nErrors, 0, "bulkWrite command response: " + tojson(res));
 
 assert.eq(coll.find().itcount(), 1);
-assert.eq(coll1.find().itcount(), 1);
+assert.eq(coll1.find().itcount(), 2);
 coll.drop();
 coll1.drop();
 

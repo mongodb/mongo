@@ -305,7 +305,7 @@ private:
 };
 
 typedef std::function<const NSTargeter&(const WriteOp& writeOp)> GetTargeterFn;
-typedef std::function<int(const WriteOp& writeOp)> GetWriteSizeFn;
+typedef std::function<int(const WriteOp& writeOp, ShardId& shard)> GetWriteSizeFn;
 
 // Utility function to merge write concern errors received from various shards.
 boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(

@@ -255,6 +255,78 @@ TEST_F(BulkWriteOpTest, TargetSingleOp) {
         BulkWriteCommandRequest({BulkWriteDeleteOp(0, BSON("x" << 1))}, {NamespaceInfoEntry(nss)}));
 }
 
+// Test only sending required nsInfo in a child batch to mongod.
+TEST_F(BulkWriteOpTest, TargetSucceedsNsInfoOver16MB) {
+    ShardId shardId("shard");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpoint(
+        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterFullRange(nss, endpoint));
+    // Need to have a targeter per namespace.
+    for (int i = 0; i < 70000; ++i) {
+        // Max namespace length is 256, 5 characters for the 'db_1.' and 5 characters for a 5 digit
+        // number.
+        auto maxNsLength = "db_1." + std::string(245, 'c') + std::to_string(i);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(maxNsLength);
+        targeters.push_back(initTargeterFullRange(nss, endpoint));
+    }
+
+    OpMsgBuilder msgBuilder;
+
+    // Make a document sequence for nsInfo > 16MB. Each ns is 255 bytes so this is 17.85MB without
+    // accounting for BSON array overhead size.
+    OpMsgBuilder::DocSequenceBuilder sequenceBuilder = msgBuilder.beginDocSequence("nsInfo");
+    for (size_t docID = 0; docID < 70000; docID++) {
+        BSONObjBuilder docBuilder = sequenceBuilder.appendBuilder();
+        auto maxNsLength =
+            "db_1.255_long_ns_255_long_ns_255_long_ns_255_long_ns_255_long_ns_255_long_ns_255_long_"
+            "ns_255_long_ns_255_long_ns_255_long_ns_255_long_ns_255_long_ns_255_long_ns_255_long_"
+            "ns_255_long_ns_255_long_ns_255_long_ns_255_long_ns_255_long_ns_255_long_ns_255_" +
+            std::to_string(docID);
+        docBuilder.append("ns", std::move(maxNsLength));
+    }
+    sequenceBuilder.done();
+
+    // Create a document sequence for insert ops, each targeting a different namespace.
+    OpMsgBuilder::DocSequenceBuilder opsSequenceBuilder = msgBuilder.beginDocSequence("ops");
+    for (size_t docID = 0; docID < 50000; docID++) {
+        BSONObjBuilder docBuilder = opsSequenceBuilder.appendBuilder();
+        docBuilder.appendNumber("insert", static_cast<long long>(50000 - docID));
+        std::string data(255, 'a');
+        docBuilder.append("document",
+                          BSON("_id" << static_cast<long long>(docID) << "a" << std::move(data)));
+    }
+    opsSequenceBuilder.done();
+
+    msgBuilder.setBody(fromjson(R"({
+        bulkWrite: 0,
+        writeConcern: {w: "majority"},
+        $db: "admin"
+    })"));
+
+    Message req = msgBuilder.finishWithoutSizeChecking();
+
+    auto request = OpMsgRequest::parse(req);
+    auto op = BulkWriteCommandRequest::parse(IDLParserContext{"testBulkWriteParse"}, request);
+
+    BulkWriteOp bulkWriteOp(_opCtx, op);
+
+    TargetedBatchMap targeted;
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+
+    auto& batch = targeted.begin()->second;
+    // If we do not only send the nsInfo required for the batch this function will throw and the
+    // test will fail due to being over BSON max obj size.
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
+
+    // Each insert op is done to a unique nsInfo. We should make a child batch with the same size
+    // nsInfo as ops.
+    ASSERT_EQ(childRequest.getNsInfo().size(), childRequest.getOps().size());
+}
+
 // Test targeting a single op with target error.
 TEST_F(BulkWriteOpTest, TargetSingleOpError) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
@@ -1108,6 +1180,103 @@ TEST_F(BulkWriteOpTest, BuildChildRequestFromTargetedWriteBatch) {
     ASSERT_EQUALS(childRequest.getNsInfo()[1].getNs(), request.getNsInfo()[1].getNs());
 }
 
+// Tests that a targeted write batch to be sent to a shard is correctly converted to a
+// bulk command request. When we need to replace the nsInfoIdx in the ops.
+TEST_F(BulkWriteOpTest, BuildChildRequestFromTargetedWriteBatchDifferentNsInfoOrder) {
+    ShardId shardA("shardA");
+    ShardId shardB("shardB");
+    NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("foster.the.people");
+    NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("sonate.pacifique");
+    NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("final.namespace");
+
+    // Two different endpoints targeting the same shard for the two namespaces.
+    ShardEndpoint endpoint0(
+        shardA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpoint1(
+        shardB,
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
+                                  boost::optional<CollectionIndexes>(boost::none)),
+        boost::none);
+    ShardEndpoint endpoint2(
+        shardB,
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
+                                  boost::optional<CollectionIndexes>(boost::none)),
+        boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterFullRange(nss0, endpoint0));
+    targeters.push_back(initTargeterFullRange(nss1, endpoint1));
+    targeters.push_back(initTargeterFullRange(nss2, endpoint2));
+
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteInsertOp(1, BSON("x" << 1)),                                  // to nss 1
+            BulkWriteInsertOp(1, BSON("x" << 2)),                                  // to nss 1
+            BulkWriteInsertOp(2, BSON("x" << 3)),                                  // to nss 2
+            BulkWriteUpdateOp(1, BSON("x" << 1), BSON("$set" << BSON("y" << 2))),  // to nss 1
+            BulkWriteDeleteOp(0, BSON("x" << 1)),                                  // to nss 0
+        },
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
+
+    // Randomly set bypass document validation.
+    request.setOrdered(true);
+    request.setBypassDocumentValidation(time(nullptr) % 2 == 0);
+    LOGV2(9005000,
+          "Bypass document validation set randomly",
+          "bypassDocumentValidation"_attr = request.getBypassDocumentValidation());
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    // Get operations on shardB be the operations to nss1 and nss2.
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+
+    auto& batch = targeted.begin()->second;
+
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
+
+    ASSERT_EQUALS(childRequest.getOrdered(), request.getOrdered());
+    ASSERT_EQUALS(childRequest.getBypassDocumentValidation(),
+                  request.getBypassDocumentValidation());
+
+    ASSERT_EQUALS(childRequest.getNsInfo().size(), 2u);
+    ASSERT_EQUALS(childRequest.getOps().size(), 4u);
+
+    // The first child batch targets nss1 and nss2 only, so we should end up with the indexes [0, 0,
+    // 1, 0]
+    const auto& childOp0 = BulkWriteCRUDOp(childRequest.getOps()[0]);
+    ASSERT_EQUALS(childOp0.getNsInfoIdx(), 0);
+    const auto& childOp1 = BulkWriteCRUDOp(childRequest.getOps()[1]);
+    ASSERT_EQUALS(childOp1.getNsInfoIdx(), 0);
+    const auto& childOp2 = BulkWriteCRUDOp(childRequest.getOps()[2]);
+    ASSERT_EQUALS(childOp2.getNsInfoIdx(), 1);
+    const auto& childOp3 = BulkWriteCRUDOp(childRequest.getOps()[3]);
+    ASSERT_EQUALS(childOp3.getNsInfoIdx(), 0);
+
+    // request.nsInfo[0] should be the same as childRequest.nsInfo[1]
+    ASSERT_EQUALS(childRequest.getNsInfo()[0].getShardVersion(), endpoint1.shardVersion);
+    ASSERT_EQUALS(childRequest.getNsInfo()[0].getNs(), request.getNsInfo()[1].getNs());
+    ASSERT_EQUALS(childRequest.getNsInfo()[1].getShardVersion(), endpoint1.shardVersion);
+    ASSERT_EQUALS(childRequest.getNsInfo()[1].getNs(), request.getNsInfo()[2].getNs());
+
+
+    // Target again to get a batch for the operations to shard A.
+    targeted.clear();
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+
+    auto secondBatch = targeted.begin()->second.get();
+    childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *secondBatch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
+
+    ASSERT_EQUALS(childRequest.getNsInfo().size(), 1u);
+    ASSERT_EQUALS(childRequest.getOps().size(), 1u);
+    const auto& childOp = BulkWriteCRUDOp(childRequest.getOps()[0]);
+    const auto& origOp = BulkWriteCRUDOp(request.getOps()[4]);
+    ASSERT_BSONOBJ_EQ(childOp.toBSON(), origOp.toBSON());
+    ASSERT_EQUALS(childRequest.getNsInfo()[0].getNs(), request.getNsInfo()[0].getNs());
+}
+
 // Tests that stmtIds are correctly attached to bulkWrite requests when the operations
 // are ordered.
 TEST_F(BulkWriteOpTest, TestOrderedOpsNoExistingStmtIds) {
@@ -1769,27 +1938,14 @@ TEST_F(BulkWriteOpTest, TestGetBaseChildBatchCommandSizeEstimate) {
     _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
     _opCtx->setTxnNumber(TxnNumber(0));
 
-    // A trivial empty bulkWrite request with a namespace.
-    BulkWriteCommandRequest request({}, {NamespaceInfoEntry(nss)});
+    // A trivial empty bulkWrite request.
+    BulkWriteCommandRequest request({}, {});
     request.setDbName(DatabaseName::kAdmin);
 
     BulkWriteOp bulkWriteOp(_opCtx, request);
 
     // Get a base size estimate.
     auto baseSizeEstimate = bulkWriteOp.getBaseChildBatchCommandSizeEstimate();
-
-    // When mongos actually sends out child batches to the shards, it may attach shardVersion,
-    // databaseVersion, timeseries bucket namespace and the `isTimeseriesCollection` field to
-    // namespace entries. And it may also attach generic fields like lsid, txnNumber and
-    // writeConcern.
-    auto& nsEntry = request.getNsInfo()[0];
-    const ShardVersion shardVersion =
-        ShardVersionFactory::make(ChunkVersion::IGNORED(), CollectionIndexes());
-    const DatabaseVersion dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
-    nsEntry.setShardVersion(shardVersion);
-    nsEntry.setDatabaseVersion(dbVersion);
-    nsEntry.setNs(nss.makeTimeseriesBucketsNamespace());
-    nsEntry.setIsTimeseriesNamespace(true);
 
     BSONObjBuilder builder;
     request.serialize(&builder);
