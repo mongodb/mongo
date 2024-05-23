@@ -390,7 +390,8 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     auto entry = assertGet(cache->getEntry(key));
     ASSERT_FALSE(entry->isActive);
     const size_t firstQueryWorks = getBestPlanWorks(mps.get());
-    ASSERT_EQ(firstQueryWorks, entry->works);
+    ASSERT(entry->readsOrWorks);
+    ASSERT_EQ(firstQueryWorks, entry->readsOrWorks->rawValue());
 
     // Run the multi-planner again. The index scan will again win, but the number of works
     // will be greater, since {foo: 5} appears more frequently in the collection.
@@ -401,7 +402,8 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     ASSERT_EQ(cache->size(), 1U);
     entry = assertGet(cache->getEntry(key));
     ASSERT_FALSE(entry->isActive);
-    ASSERT_EQ(firstQueryWorks * 2, entry->works);
+    ASSERT(entry->readsOrWorks);
+    ASSERT_EQ(firstQueryWorks * 2, entry->readsOrWorks->rawValue());
 
     // Run the exact same query again. This will still take more works than 'works', and
     // should cause the cache entry's 'works' to be doubled again.
@@ -409,14 +411,14 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     ASSERT_EQ(cache->size(), 1U);
     entry = assertGet(cache->getEntry(key));
     ASSERT_FALSE(entry->isActive);
-    ASSERT_EQ(firstQueryWorks * 2 * 2, entry->works);
+    ASSERT_EQ(firstQueryWorks * 2 * 2, entry->readsOrWorks->rawValue());
 
     // Run the query yet again. This time, an active cache entry should be created.
     mps = runMultiPlanner(_expCtx.get(), nss, coll, 5);
     ASSERT_EQ(cache->size(), 1U);
     entry = assertGet(cache->getEntry(key));
     ASSERT_TRUE(entry->isActive);
-    ASSERT_EQ(getBestPlanWorks(mps.get()), entry->works);
+    ASSERT_EQ(getBestPlanWorks(mps.get()), entry->readsOrWorks->rawValue());
 }
 
 TEST_F(QueryStageMultiPlanTest, MPSDoesCreatesActiveEntryWhenInactiveEntriesDisabled) {

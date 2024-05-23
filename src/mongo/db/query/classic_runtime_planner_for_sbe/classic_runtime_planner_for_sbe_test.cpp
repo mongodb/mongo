@@ -713,7 +713,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, CachedPlannerReplansOnHittingMaxNumReads
                     entry->timeOfCreation,
                     entry->isActive,
                     entry->securityLevel,
-                    1 /*works*/,
+                    NumReads{1},
                     *entry->debugInfo);
             auto mockPlanCacheHolder = std::make_unique<
                 CachedPlanHolder<sbe::CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>>(

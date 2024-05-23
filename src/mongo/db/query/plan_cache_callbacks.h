@@ -156,12 +156,12 @@ public:
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
         size_t newWorks) const final {
         invariant(oldEntry);
-        invariant(oldEntry->works);
+        invariant(oldEntry->readsOrWorks);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logReplaceActiveCacheEntry(_cq.toStringShort(),
                                                std::move(queryHash),
                                                std::move(planCacheKey),
-                                               oldEntry->works.get(),
+                                               oldEntry->readsOrWorks->rawValue(),
                                                newWorks);
     }
 
@@ -169,12 +169,12 @@ public:
                                 const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
                                 size_t newWorks) const final {
         invariant(oldEntry);
-        invariant(oldEntry->works);
+        invariant(oldEntry->readsOrWorks);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logNoop(_cq.toStringShort(),
                             std::move(queryHash),
                             std::move(planCacheKey),
-                            oldEntry->works.get(),
+                            oldEntry->readsOrWorks->rawValue(),
                             newWorks);
     }
 
@@ -182,12 +182,12 @@ public:
                                const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
                                size_t newWorks) const final {
         invariant(oldEntry);
-        invariant(oldEntry->works);
+        invariant(oldEntry->readsOrWorks);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logIncreasingWorkValue(_cq.toStringShort(),
                                            std::move(queryHash),
                                            std::move(planCacheKey),
-                                           oldEntry->works.get(),
+                                           oldEntry->readsOrWorks->rawValue(),
                                            newWorks);
     }
 
@@ -195,12 +195,12 @@ public:
                              const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
                              size_t newWorks) const final {
         invariant(oldEntry);
-        invariant(oldEntry->works);
+        invariant(oldEntry->readsOrWorks);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logPromoteCacheEntry(_cq.toStringShort(),
                                          std::move(queryHash),
                                          std::move(planCacheKey),
-                                         oldEntry->works.get(),
+                                         oldEntry->readsOrWorks->rawValue(),
                                          newWorks);
     }
 
@@ -210,7 +210,7 @@ public:
         const CachedPlanType& newPlan,
         size_t newWorks) const final {
         tassert(8983101, "Expected oldEntry to not be null", oldEntry);
-        tassert(8983102, "Expected oldEntry to be pinned", !oldEntry->works);
+        tassert(8983102, "Expected oldEntry to be pinned", !oldEntry->readsOrWorks);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         auto newEntryDebugInfo = buildDebugInfo();
         log_detail::logUnexpectedPinnedCacheEntry(_cq.toStringShort(),

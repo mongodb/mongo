@@ -328,7 +328,8 @@ void BM_PlanCacheClassic(benchmark::State& state) {
         .parsedFind = ParsedFindCommandParams{
             .findCommand = std::move(findCommand),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
-    auto decision = createDecision(1U);
+    const size_t nWorks = 1;
+    auto decision = createDecision(nWorks);
     auto callbacks = createCallback(*cq, *decision);
 
     auto params = extractFromBmParams(bmParams);
@@ -407,7 +408,7 @@ void BM_PlanCacheClassic(benchmark::State& state) {
     // Add the entry into the cache, which at first sets it to be "inactive".
     ASSERT_OK(planCache->set(planCacheKey,
                              soln->cacheData->clone(),
-                             *decision,
+                             NumWorks{nWorks},
                              Date_t{},
                              &callbacks,
                              PlanSecurityLevel::kNotSensitive));
@@ -416,7 +417,7 @@ void BM_PlanCacheClassic(benchmark::State& state) {
     // We need to add the entry once more to activate it so that it would be used.
     ASSERT_OK(planCache->set(planCacheKey,
                              soln->cacheData->clone(),
-                             *decision,
+                             NumWorks{nWorks},
                              Date_t{},
                              &callbacks,
                              PlanSecurityLevel::kNotSensitive));

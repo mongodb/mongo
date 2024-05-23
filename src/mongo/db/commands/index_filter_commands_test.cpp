@@ -299,8 +299,8 @@ private:
 
         auto cacheData = std::make_unique<SolutionCacheData>();
         cacheData->tree = std::make_unique<PlanCacheIndexTree>();
-        auto decision = createDecision(1U);
-        auto decisionPtr = decision.get();
+        const size_t nWorks = 1;
+        auto decision = createDecision(nWorks);
         auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
             return plan_cache_util::buildDebugInfo(*cq, std::move(decision));
         };
@@ -312,7 +312,7 @@ private:
         ASSERT_OK(_classicPlanCache->set(
             makeClassicKey(*cq),
             std::move(cacheData),
-            *decisionPtr,
+            NumWorks{nWorks},
             _operationContext.get()->getServiceContext()->getPreciseClockSource()->now(),
             &callbacks,
             PlanSecurityLevel::kNotSensitive,
@@ -338,7 +338,8 @@ private:
                 stage_builder::Environment(std::make_unique<sbe::RuntimeEnvironment>()),
                 std::make_unique<stage_builder::PlanStageStaticData>()),
             0 /*hash*/);
-        auto decision = createDecision(1U);
+        const size_t nWorks = 1;
+        auto decision = createDecision(nWorks);
         auto querySolution = std::make_unique<QuerySolution>();
 
         auto buildDebugInfoFn = [soln =
@@ -357,7 +358,7 @@ private:
         ASSERT_OK(_sbePlanCache->set(
             makeSbeKey(*cq),
             std::move(cacheData),
-            *decision,
+            NumWorks{nWorks},
             _operationContext.get()->getServiceContext()->getPreciseClockSource()->now(),
             &callbacks,
             PlanSecurityLevel::kNotSensitive,

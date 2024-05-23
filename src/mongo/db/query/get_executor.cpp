@@ -879,7 +879,7 @@ private:
             stageData.debugInfo = cacheEntry->debugInfo;
 
             auto result = releaseResult();
-            result->setDecisionWorks(cacheEntry->decisionWorks);
+            result->setDecisionWorks(cacheEntry->decisionWorks());
             result->setRecoveredPinnedCacheEntry(cacheEntry->isPinned());
             result->emplace(std::make_pair(std::move(root), std::move(stageData)));
             result->setQueryPlannerParams(std::move(_plannerParams));

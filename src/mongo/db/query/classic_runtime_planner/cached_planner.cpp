@@ -39,7 +39,7 @@ CachedPlanner::CachedPlanner(PlannerData plannerData,
                                                   collections().getMainCollectionPtrOrAcquisition(),
                                                   ws(),
                                                   cq(),
-                                                  cachedSolution->decisionWorks.value(),
+                                                  cachedSolution->decisionWorks().value(),
                                                   buildExecutableTree(*_querySolution));
     _cachedPlanStage = root.get();
     setRoot(std::move(root));
