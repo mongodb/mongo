@@ -234,6 +234,11 @@ struct SerializationOptions {
     // elements. Otherwise, serializes InMatchExpressions using the original (unsorted) list of
     // elements. This flag has no effect on other types of MatchExpressions.
     bool inMatchExprSortAndDedupElements = true;
+
+    // Whether to serialize a DocumentSource instance such that the serialized spec can
+    // be used to clone the DocumentSource instance. When 'serializeForCloning' is true, all other
+    // options in this struct should be set to their default values.
+    bool serializeForCloning{false};
 };
 
 }  // namespace mongo

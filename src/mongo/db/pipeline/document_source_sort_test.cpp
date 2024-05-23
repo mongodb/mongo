@@ -82,14 +82,20 @@ protected:
         _sort = DocumentSourceSort::createFromBson(specElement, getExpCtx());
         checkBsonRepresentation(spec);
     }
-    DocumentSourceSort* sort() {
-        return dynamic_cast<DocumentSourceSort*>(_sort.get());
+
+    void setSort(intrusive_ptr<DocumentSource> sort) {
+        _sort = std::move(sort);
     }
+
     /** Assert that iterator state accessors consistently report the source is exhausted. */
     void assertEOF() const {
         ASSERT(_sort->getNext().isEOF());
         ASSERT(_sort->getNext().isEOF());
         ASSERT(_sort->getNext().isEOF());
+    }
+
+    DocumentSourceSort* sort() {
+        return dynamic_cast<DocumentSourceSort*>(_sort.get());
     }
 
 private:
@@ -178,6 +184,39 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
         sort()->distributedPlanLogic()->mergingStages.begin()->get()));
 }
 
+TEST_F(DocumentSourceSortTest, ParseableSerialization) {
+    // Test that SerializationOptions.serializeForCloning works as expected for $sort stage.
+    auto expCtx = getExpCtx();
+    createSort(BSON("a" << 1));
+
+    ASSERT(!sort()->getLimit());
+    Pipeline::SourceContainer container;
+    container.push_back(sort());
+
+    container.push_back(DocumentSourceLimit::create(expCtx, 2));
+    sort()->optimizeAt(container.begin(), &container);
+    ASSERT_EQUALS(container.size(), 1U);
+    ASSERT_EQUALS(*sort()->getLimit(), 2);
+
+    vector<Value> arr;
+    sort()->serializeToArray(arr, SerializationOptions{.serializeForCloning = true});
+    ASSERT_EQUALS(arr.size(), 1U);
+    ASSERT_VALUE_EQ(arr[0], Value(fromjson("{$sort: {a: 1, $_internalLimit: 2}}")));
+
+    // Test that the serialized spec can be parsed to construct a clone of the DocumentSourceSort
+    // instance.
+    BSONObj spec = arr[0].getDocument().toBson();
+    BSONElement specElement = spec.firstElement();
+    auto sort2Source = DocumentSourceSort::createFromBson(specElement, expCtx);
+    auto sort2 = dynamic_cast<DocumentSourceSort*>(sort2Source.get());
+    ASSERT_EQUALS(*sort2->getLimit(), 2);
+
+    arr.clear();
+    sort2->serializeToArray(arr, SerializationOptions{.serializeForCloning = true});
+    ASSERT_EQUALS(arr.size(), 1U);
+    ASSERT_VALUE_EQ(arr[0], Value(fromjson("{$sort: {a: 1, $_internalLimit: 2}}")));
+}
+
 TEST_F(DocumentSourceSortTest, DoesNotPushProjectBeforeSelf) {
     Pipeline::SourceContainer container;
     createSort(BSON("_id" << 1));
@@ -241,15 +280,14 @@ TEST_F(DocumentSourceSortTest, DetectsDependencyOnMeta) {
 class DocumentSourceSortExecutionTest : public DocumentSourceSortTest {
 public:
     void checkResults(deque<DocumentSource::GetNextResult> inputDocs,
-                      BSONObj sortSpec,
+                      DocumentSourceSort* sort,
                       string expectedResultSetString) {
-        createSort(sortSpec);
         auto source = DocumentSourceMock::createForTest(inputDocs, getExpCtx());
-        sort()->setSource(source.get());
+        sort->setSource(source.get());
 
         // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
-        for (auto output = sort()->getNext(); output.isAdvanced(); output = sort()->getNext()) {
+        for (auto output = sort->getNext(); output.isAdvanced(); output = sort->getNext()) {
             // Get the current result.
             resultSet.push_back(output.releaseDocument());
         }
@@ -276,86 +314,97 @@ protected:
 };
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldGiveNoOutputIfGivenNoInputs) {
-    checkResults({}, BSON("a" << 1), "[]");
+    createSort(BSON("a" << 1));
+    checkResults({}, sort(), "[]");
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldGiveOneOutputIfGivenOneInput) {
-    checkResults({Document{{"_id", 0}, {"a", 1}}}, BSON("a" << 1), "[{_id:0,a:1}]");
+    createSort(BSON("a" << 1));
+    checkResults({Document{{"_id", 0}, {"a", 1}}}, sort(), "[{_id:0,a:1}]");
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldSortTwoInputsAccordingToOneFieldAscending) {
+    createSort(BSON("a" << 1));
     checkResults({Document{{"_id", 0}, {"a", 2}}, Document{{"_id", 1}, {"a", 1}}},
-                 BSON("a" << 1),
+                 sort(),
                  "[{_id:1,a:1},{_id:0,a:2}]");
 }
 
 /** Sort spec with a descending field. */
 TEST_F(DocumentSourceSortExecutionTest, DescendingOrder) {
+    createSort(BSON("a" << -1));
     checkResults({Document{{"_id", 0}, {"a", 2}}, Document{{"_id", 1}, {"a", 1}}},
-                 BSON("a" << -1),
+                 sort(),
                  "[{_id:0,a:2},{_id:1,a:1}]");
 }
 
 /** Sort spec with a dotted field. */
 TEST_F(DocumentSourceSortExecutionTest, DottedSortField) {
+    createSort(BSON("a.b" << 1));
     checkResults({Document{{"_id", 0}, {"a", Document{{"b", 2}}}},
                   Document{{"_id", 1}, {"a", Document{{"b", 1}}}}},
-                 BSON("a.b" << 1),
+                 sort(),
                  "[{_id:1,a:{b:1}},{_id:0,a:{b:2}}]");
 }
 
 /** Sort spec with a compound key. */
 TEST_F(DocumentSourceSortExecutionTest, CompoundSortSpec) {
+    createSort(BSON("a" << 1 << "b" << 1));
     checkResults({Document{{"_id", 0}, {"a", 1}, {"b", 3}},
                   Document{{"_id", 1}, {"a", 1}, {"b", 2}},
                   Document{{"_id", 2}, {"a", 0}, {"b", 4}}},
-                 BSON("a" << 1 << "b" << 1),
+                 sort(),
                  "[{_id:2,a:0,b:4},{_id:1,a:1,b:2},{_id:0,a:1,b:3}]");
 }
 
 /** Sort spec with a compound key and descending order. */
 TEST_F(DocumentSourceSortExecutionTest, CompoundSortSpecAlternateOrder) {
+    createSort(BSON("a" << -1 << "b" << 1));
     checkResults({Document{{"_id", 0}, {"a", 1}, {"b", 3}},
                   Document{{"_id", 1}, {"a", 1}, {"b", 2}},
                   Document{{"_id", 2}, {"a", 0}, {"b", 4}}},
-                 BSON("a" << -1 << "b" << 1),
+                 sort(),
                  "[{_id:1,a:1,b:2},{_id:0,a:1,b:3},{_id:2,a:0,b:4}]");
 }
 
 /** Sort spec with a compound key and descending order. */
 TEST_F(DocumentSourceSortExecutionTest, CompoundSortSpecAlternateOrderSecondField) {
+    createSort(BSON("a" << 1 << "b" << -1));
     checkResults({Document{{"_id", 0}, {"a", 1}, {"b", 3}},
                   Document{{"_id", 1}, {"a", 1}, {"b", 2}},
                   Document{{"_id", 2}, {"a", 0}, {"b", 4}}},
-                 BSON("a" << 1 << "b" << -1),
+                 sort(),
                  "[{_id:2,a:0,b:4},{_id:0,a:1,b:3},{_id:1,a:1,b:2}]");
 }
 
 /** Sorting different types is not supported. */
 TEST_F(DocumentSourceSortExecutionTest, InconsistentTypeSort) {
+    createSort(BSON("a" << 1));
     checkResults({Document{{"_id", 0}, {"a", 1}}, Document{{"_id", 1}, {"a", "foo"_sd}}},
-                 BSON("a" << 1),
+                 sort(),
                  "[{_id:0,a:1},{_id:1,a:\"foo\"}]");
 }
 
 /** Sorting different numeric types is supported. */
 TEST_F(DocumentSourceSortExecutionTest, MixedNumericSort) {
+    createSort(BSON("a" << 1));
     checkResults({Document{{"_id", 0}, {"a", 2.3}}, Document{{"_id", 1}, {"a", 1}}},
-                 BSON("a" << 1),
+                 sort(),
                  "[{_id:1,a:1},{_id:0,a:2.3}]");
 }
 
 /** Ordering of a missing value. */
 TEST_F(DocumentSourceSortExecutionTest, MissingValue) {
-    checkResults({Document{{"_id", 0}, {"a", 1}}, Document{{"_id", 1}}},
-                 BSON("a" << 1),
-                 "[{_id:1},{_id:0,a:1}]");
+    createSort(BSON("a" << 1));
+    checkResults(
+        {Document{{"_id", 0}, {"a", 1}}, Document{{"_id", 1}}}, sort(), "[{_id:1},{_id:0,a:1}]");
 }
 
 /** Ordering of a null value. */
 TEST_F(DocumentSourceSortExecutionTest, NullValue) {
+    createSort(BSON("a" << 1));
     checkResults({Document{{"_id", 0}, {"a", 1}}, Document{{"_id", 1}, {"a", BSONNULL}}},
-                 BSON("a" << 1),
+                 sort(),
                  "[{_id:1,a:null},{_id:0,a:1}]");
 }
 
@@ -368,9 +417,8 @@ TEST_F(DocumentSourceSortExecutionTest, TextScore) {
     MutableDocument second(Document{{"_id", 1}});
     second.metadata().setTextScore(20);
 
-    checkResults({first.freeze(), second.freeze()},
-                 BSON("$computed0" << metaTextScore),
-                 "[{_id:1},{_id:0}]");
+    createSort(BSON("$computed0" << metaTextScore));
+    checkResults({first.freeze(), second.freeze()}, sort(), "[{_id:1},{_id:0}]");
 }
 
 /**
@@ -382,26 +430,48 @@ TEST_F(DocumentSourceSortExecutionTest, RandMeta) {
     MutableDocument second(Document{{"_id", 1}});
     second.metadata().setRandVal(0.02);
 
-    checkResults({first.freeze(), second.freeze()},
-                 BSON("$computed0" << BSON("$meta"
-                                           << "randVal")),
-                 "[{_id:1},{_id:0}]");
+    createSort(BSON("$computed0" << BSON("$meta"
+                                         << "randVal")));
+    checkResults({first.freeze(), second.freeze()}, sort(), "[{_id:1},{_id:0}]");
 }
 
 /** A missing nested object within an array returns an empty array. */
 TEST_F(DocumentSourceSortExecutionTest, MissingObjectWithinArray) {
+    createSort(BSON("a.b" << 1));
     checkResults({Document{{"_id", 0}, {"a", DOC_ARRAY(1)}},
                   Document{{"_id", 1}, {"a", DOC_ARRAY(DOC("b" << 1))}}},
-                 BSON("a.b" << 1),
+                 sort(),
                  "[{_id:0,a:[1]},{_id:1,a:[{b:1}]}]");
 }
 
 /** Compare nested values from within an array. */
 TEST_F(DocumentSourceSortExecutionTest, ExtractArrayValues) {
+    createSort(BSON("a.b" << 1));
     checkResults({Document{{"_id", 0}, {"a", DOC_ARRAY(DOC("b" << 1) << DOC("b" << 2))}},
                   Document{{"_id", 1}, {"a", DOC_ARRAY(DOC("b" << 1) << DOC("b" << 0))}}},
-                 BSON("a.b" << 1),
+                 sort(),
                  "[{_id:1,a:[{b:1},{b:0}]},{_id:0,a:[{b:1},{b:2}]}]");
+}
+
+TEST_F(DocumentSourceSortExecutionTest, ParseableSerialization) {
+    // Test that the serialized spec created with SerializationOptions.serializeForCloning option
+    // can be parsed to construct a clone of the DocumentSourceSort instance.
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = fromjson("{$sort: {a: 1, $_internalLimit: 2}}");
+    BSONElement specElement = spec.firstElement();
+    setSort(DocumentSourceSort::createFromBson(specElement, getExpCtx()));
+    ASSERT_EQUALS(*sort()->getLimit(), 2);
+    checkResults({Document{{"_id", 0}, {"a", 1}},
+                  Document{{"_id", 1}, {"a", 2}},
+                  Document{{"_id", 2}, {"a", 3}}},
+                 sort(),
+                 "[{_id:0,a:1},{_id:1,a:2}]");
+
+    vector<Value> arr;
+    sort()->serializeToArray(arr, SerializationOptions{.serializeForCloning = true});
+    ASSERT_EQUALS(arr.size(), 1U);
+    ASSERT_VALUE_EQ(arr[0], Value(fromjson("{$sort: {a: 1, $_internalLimit: 2}}")));
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
