@@ -402,11 +402,6 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
         new ClientCursor(std::move(cursorParams), cursorId, opCtx, now));
 
-    // Register this cursor for lookup by transaction.
-    if (opCtx->getLogicalSessionId() && opCtx->getTxnNumber()) {
-        invariant(opCtx->getLogicalSessionId());
-    }
-
     // Transfer ownership of the cursor to '_cursorMap'.
     auto partition = _cursorMap->lockOnePartition(cursorId);
     ClientCursor* unownedCursor = clientCursor.release();
