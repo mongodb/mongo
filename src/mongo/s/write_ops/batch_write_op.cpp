@@ -130,7 +130,6 @@ bool isNewBatchRequiredUnordered(
  * Helper to determine whether a number of targeted writes require a new targeted batch.
  */
 bool wouldMakeBatchesTooBig(const std::vector<std::unique_ptr<TargetedWrite>>& writes,
-                            int writeSizeBytes,
                             const TargetedBatchMap& batchMap) {
     for (auto&& write : writes) {
         TargetedBatchMap::const_iterator it = batchMap.find(write->endpoint.shardName);
@@ -144,7 +143,8 @@ bool wouldMakeBatchesTooBig(const std::vector<std::unique_ptr<TargetedWrite>>& w
             return true;
         }
 
-        if (it->second->getEstimatedSizeBytes() + writeSizeBytes > BSONObjMaxUserSize) {
+        invariant(write->estimatedSizeBytes > 0);
+        if (it->second->getEstimatedSizeBytes() + write->estimatedSizeBytes > BSONObjMaxUserSize) {
             // Batch would be too big
             return true;
         }
@@ -408,9 +408,11 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             }
         }
 
-        const auto estWriteSizeBytes = getWriteSizeFn(writeOp);
+        for (auto&& write : writes) {
+            write->estimatedSizeBytes = getWriteSizeFn(writeOp, write->endpoint.shardName);
+        }
 
-        if (wouldMakeBatchesTooBig(writes, estWriteSizeBytes, batchMap)) {
+        if (wouldMakeBatchesTooBig(writes, batchMap)) {
             invariant(!batchMap.empty());
             writeOp.resetWriteToReady();
             break;
@@ -506,6 +508,8 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             nsEndpointMap[targeter.getNS()].insert(&write->endpoint);
             nsShardIdMap[targeter.getNS()].insert(shardId);
 
+            auto estWriteSizeBytes = write->estimatedSizeBytes;
+
             batchIt->second->addWrite(std::move(write), estWriteSizeBytes);
         }
 
@@ -546,8 +550,8 @@ StatusWith<WriteType> BatchWriteOp::targetBatch(const NSTargeter& targeter,
         recordTargetErrors,
         // getTargeterFn:
         [&](const WriteOp& writeOp) -> const NSTargeter& { return targeter; },
-        // getWriteSizeFn:
-        [&](const WriteOp& writeOp) {
+        // assignWriteSizeFn:
+        [&](const WriteOp& writeOp, ShardId& shard) {
             // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
             // corresponding to the statements that got routed to each individual shard, so they
             // need to be accounted in the potential request size so it does not exceed the max BSON
