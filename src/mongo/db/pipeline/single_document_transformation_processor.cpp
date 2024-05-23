@@ -41,7 +41,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
 
 SingleDocumentTransformationProcessor::SingleDocumentTransformationProcessor(
     std::unique_ptr<TransformerInterface> parsedTransform)

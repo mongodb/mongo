@@ -59,8 +59,6 @@ namespace mongo {
 namespace {
 
 using PushNodeTest = UpdateTestFixture;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
 
 TEST(PushNodeTest, EachClauseWithNonArrayObjectFails) {
     auto update = fromjson("{$push: {x: {$each: {'0': 1}}}}");

@@ -137,7 +137,6 @@ using ce::HeuristicEstimator;
 using ce::HistogramEstimator;
 using ce::SamplingEstimator;
 using cost_model::CostEstimatorImpl;
-using cost_model::CostModelManager;
 
 static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
     boost::intrusive_ptr<ExpressionContext> expCtx,

@@ -46,7 +46,6 @@ namespace {
 using namespace mongo;
 using std::begin;
 using std::end;
-using std::swap;
 
 TEST(DataTypeValidated, BSONValidationEnabled) {
     bool wasEnabled = serverGlobalParams.objcheck;

@@ -57,7 +57,6 @@
 namespace mongo {
 namespace ExpressionTests {
 namespace {
-using boost::intrusive_ptr;
 using std::vector;
 
 namespace Object {

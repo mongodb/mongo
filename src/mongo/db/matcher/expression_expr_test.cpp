@@ -59,7 +59,6 @@ namespace mongo {
 
 namespace {
 
-using unittest::assertGet;
 
 const double kNaN = std::numeric_limits<double>::quiet_NaN();
 

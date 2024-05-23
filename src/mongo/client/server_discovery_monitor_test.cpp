@@ -76,7 +76,6 @@ namespace {
 
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandResponse;
-using executor::ThreadPoolExecutorTest;
 using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
 
 class ServerDiscoveryMonitorTestFixture : public unittest::Test {

@@ -162,10 +162,8 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
-using write_ops::InsertCommandRequest;
 namespace {
 std::unique_ptr<FindCommandRequest> createFindCommand(
     const intrusive_ptr<ExpressionContext>& expCtx,

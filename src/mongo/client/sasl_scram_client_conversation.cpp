@@ -49,7 +49,6 @@
 namespace mongo {
 
 using std::string;
-using std::unique_ptr;
 
 StatusWith<bool> SaslSCRAMClientConversation::step(StringData inputData, std::string* outputData) {
     _step++;

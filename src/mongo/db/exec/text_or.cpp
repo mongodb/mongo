@@ -52,9 +52,7 @@ namespace mongo {
 
 using std::string;
 using std::unique_ptr;
-using std::vector;
 
-using fts::FTSSpec;
 
 const char* TextOrStage::kStageType = "TEXT_OR";
 

@@ -105,7 +105,6 @@
 
 
 namespace mongo {
-using repl::DurableOplogEntry;
 using repl::MutableOplogEntry;
 using ChangeStreamPreImageRecordingMode = repl::ReplOperation::ChangeStreamPreImageRecordingMode;
 

@@ -54,7 +54,6 @@
 namespace mongo::stats {
 namespace {
 
-using unittest::assertGet;
 
 /**
  * Fixture for tests, which do not need to exercise the multi-threading capabilities of the cache

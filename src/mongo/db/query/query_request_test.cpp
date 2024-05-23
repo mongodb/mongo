@@ -83,7 +83,6 @@ namespace mongo {
 namespace {
 
 using std::unique_ptr;
-using unittest::assertGet;
 
 static const NamespaceString testns =
     NamespaceString::createNamespaceString_forTest("testdb.testcoll");

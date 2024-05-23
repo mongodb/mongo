@@ -38,7 +38,6 @@
 
 namespace {
 
-using mongo::ErrorCodes;
 using mongo::Status;
 
 namespace moe = mongo::optionenvironment;

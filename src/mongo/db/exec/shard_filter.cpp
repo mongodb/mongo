@@ -49,9 +49,7 @@
 
 namespace mongo {
 
-using std::shared_ptr;
 using std::unique_ptr;
-using std::vector;
 
 // static
 const char* ShardFilterStage::kStageType = "SHARDING_FILTER";

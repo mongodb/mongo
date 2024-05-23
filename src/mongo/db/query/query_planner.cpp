@@ -594,7 +594,6 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
 }
 }  // namespace
 
-using std::numeric_limits;
 using std::unique_ptr;
 
 namespace dps = ::mongo::dotted_path_support;

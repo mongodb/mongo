@@ -59,7 +59,6 @@
 namespace mongo {
 
 using executor::NetworkTestEnv;
-using unittest::assertGet;
 
 ShardingTestFixtureCommon::ShardingTestFixtureCommon() = default;
 

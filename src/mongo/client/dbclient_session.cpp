@@ -93,10 +93,7 @@
 
 namespace mongo {
 
-using std::endl;
-using std::map;
 using std::string;
-using std::unique_ptr;
 
 MONGO_FAIL_POINT_DEFINE(dbClientSessionDisableChecksum);
 

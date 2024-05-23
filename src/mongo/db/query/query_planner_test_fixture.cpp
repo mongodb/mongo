@@ -68,7 +68,6 @@
 
 namespace mongo {
 
-using unittest::assertGet;
 
 void QueryPlannerTest::setUp() {
     nss = NamespaceString::createNamespaceString_forTest("test.collection");

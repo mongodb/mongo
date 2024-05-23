@@ -43,7 +43,6 @@
 namespace mongo {
 namespace {
 
-using unittest::assertGet;
 
 TEST(CollectionType, Empty) {
     ASSERT_THROWS(CollectionType(BSONObj()), DBException);

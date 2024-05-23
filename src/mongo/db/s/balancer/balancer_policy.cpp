@@ -71,9 +71,7 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(balancerShouldReturnRandomMigrations);
 
-using std::map;
 using std::numeric_limits;
-using std::set;
 using std::string;
 using std::vector;
 using namespace fmt::literals;

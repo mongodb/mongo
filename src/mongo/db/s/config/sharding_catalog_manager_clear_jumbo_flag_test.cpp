@@ -51,7 +51,6 @@
 namespace mongo {
 namespace {
 
-using unittest::assertGet;
 
 const KeyPattern kKeyPattern(BSON("x" << 1));
 

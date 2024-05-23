@@ -55,7 +55,6 @@
 namespace mongo {
 namespace ExpressionTests {
 namespace {
-using boost::intrusive_ptr;
 using std::string;
 
 /**

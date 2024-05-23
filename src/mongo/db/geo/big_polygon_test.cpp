@@ -49,7 +49,6 @@ namespace {
 
 using namespace mongo;
 using std::string;
-using std::unique_ptr;
 using std::vector;
 
 // Helper to build a vector of S2Point

@@ -69,10 +69,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(serverPingMonitorFailWithHostUnreachable);
 MONGO_FAIL_POINT_DEFINE(serverPingMonitorSetRTT);
 
-using executor::NetworkInterface;
-using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutor;
-using executor::ThreadPoolTaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 using CallbackHandle = TaskExecutor::CallbackHandle;
 

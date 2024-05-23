@@ -48,7 +48,6 @@
 
 namespace mongo {
 using boolean_simplification::BitsetTreeNode;
-using boolean_simplification::Maxterm;
 using boolean_simplification::Minterm;
 
 namespace {

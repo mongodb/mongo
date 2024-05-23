@@ -47,8 +47,6 @@ namespace mongo {
 namespace {
 
 using RenameNodeTest = UpdateTestFixture;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
 
 TEST(RenameNodeTest, PositionalNotAllowedInFromField) {
     auto update = fromjson("{$rename: {'a.$': 'b'}}");

@@ -94,7 +94,6 @@ namespace {
 
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
 
 typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 

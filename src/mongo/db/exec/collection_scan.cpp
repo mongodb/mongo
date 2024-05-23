@@ -73,7 +73,6 @@
 namespace mongo {
 
 using std::unique_ptr;
-using std::vector;
 
 namespace {
 bool shouldIncludeStartRecord(const CollectionScanParams& params) {

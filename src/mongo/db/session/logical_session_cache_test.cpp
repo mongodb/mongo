@@ -69,7 +69,6 @@ const Milliseconds kSessionTimeout =
 const Milliseconds kForceRefresh{kLogicalSessionRefreshMillisDefault};
 
 using SessionList = std::list<LogicalSessionId>;
-using unittest::EnsureFCV;
 
 /**
  * Test fixture that sets up a session cache attached to a mock service liaison

@@ -44,7 +44,6 @@
 
 namespace mongo {
 namespace {
-using std::set;
 using std::string;
 
 template <size_t ArrayLen>

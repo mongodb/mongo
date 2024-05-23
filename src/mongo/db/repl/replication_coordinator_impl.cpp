@@ -239,7 +239,6 @@ using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using EventHandle = executor::TaskExecutor::EventHandle;
-using executor::NetworkInterface;
 using NextAction = Fetcher::NextAction;
 
 void lockAndCall(stdx::unique_lock<Latch>* lk, const std::function<void()>& fn) {

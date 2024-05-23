@@ -53,9 +53,6 @@
 
 
 using namespace mongo;
-using std::cout;
-using std::endl;
-using std::unique_ptr;
 using std::vector;
 
 namespace {

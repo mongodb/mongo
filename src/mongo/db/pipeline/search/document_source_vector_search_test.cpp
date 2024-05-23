@@ -41,7 +41,6 @@
 namespace mongo {
 namespace {
 
-using boost::intrusive_ptr;
 using DocumentSourceVectorSearchTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceVectorSearchTest, NotAllowedInTransaction) {

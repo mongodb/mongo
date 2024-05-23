@@ -59,8 +59,6 @@
 
 namespace mongo {
 
-using std::dec;
-using std::hex;
 using std::string;
 
 const double BSONElement::kLongLongMaxPlusOneAsDouble =

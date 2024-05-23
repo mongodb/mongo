@@ -60,7 +60,6 @@ using mongo::BSONElement;
 using mongo::BSONObj;
 using mongo::BSONObjBuilder;
 using mongo::BSONObjIterator;
-using mongo::ConnectionString;
 using mongo::HostAndPort;
 using mongo::MockDBClientConnection;
 using mongo::MockRemoteDBServer;

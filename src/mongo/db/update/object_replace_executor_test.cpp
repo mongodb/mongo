@@ -50,8 +50,6 @@ namespace mongo {
 namespace {
 
 using ObjectReplaceExecutorTest = UpdateTestFixture;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
 
 TEST_F(ObjectReplaceExecutorTest, Noop) {
     auto obj = fromjson("{a: 1, b: 2}");

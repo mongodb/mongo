@@ -70,7 +70,6 @@ namespace mongo {
 namespace auth {
 
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
 
 using AuthRequest = StatusWith<RemoteCommandRequest>;
 

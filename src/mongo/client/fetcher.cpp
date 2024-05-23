@@ -59,7 +59,6 @@ namespace mongo {
 namespace {
 
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
 
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 const char* kCursorFieldName = "cursor";

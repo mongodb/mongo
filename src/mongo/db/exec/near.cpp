@@ -40,7 +40,6 @@
 namespace mongo {
 
 using std::unique_ptr;
-using std::vector;
 
 /**
  * Holds a generic search result with a distance computed in some fashion.

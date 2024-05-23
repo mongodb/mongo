@@ -90,7 +90,6 @@ constexpr auto kWorkerThreadRunTime = Milliseconds{1000};
 // Run time + generous scheduling time slice
 constexpr auto kShutdownTime = Milliseconds{kWorkerThreadRunTime.count() + 50};
 
-using unittest::JoinThread;
 
 /* This implements the portions of the transport::Reactor based on ASIO, but leaves out
  * the methods not needed by ServiceExecutors.

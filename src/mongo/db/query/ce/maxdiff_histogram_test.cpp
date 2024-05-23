@@ -53,8 +53,6 @@ namespace mongo::optimizer::ce {
 namespace {
 namespace value = sbe::value;
 
-using stats::ArrayHistogram;
-using stats::Bucket;
 using stats::DataDistribution;
 using stats::genFixedValueArray;
 using stats::getDataDistribution;

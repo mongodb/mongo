@@ -84,7 +84,6 @@
 
 namespace mongo {
 using namespace fmt::literals;
-using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using std::vector;

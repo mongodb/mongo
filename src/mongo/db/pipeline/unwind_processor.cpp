@@ -35,9 +35,7 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
 using std::string;
-using std::vector;
 
 UnwindProcessor::UnwindProcessor(const FieldPath& unwindPath,
                                  bool preserveNullAndEmptyArrays,

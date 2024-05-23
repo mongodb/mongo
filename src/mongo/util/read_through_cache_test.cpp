@@ -56,8 +56,6 @@
 namespace mongo {
 namespace {
 
-using unittest::assertGet;
-
 // The structure for testing is intentionally made movable, but non-copyable
 struct CachedValue {
     CachedValue(int counter) : counter(counter) {}

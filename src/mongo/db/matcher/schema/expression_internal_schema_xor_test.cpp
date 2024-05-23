@@ -48,7 +48,6 @@
 namespace mongo {
 namespace {
 
-using std::unique_ptr;
 
 TEST(InternalSchemaXorOp, MatchesNothingWhenHasNoClauses) {
     InternalSchemaXorMatchExpression internalSchemaXorOp;

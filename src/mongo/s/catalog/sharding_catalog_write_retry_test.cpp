@@ -81,14 +81,9 @@
 namespace mongo {
 namespace {
 
-using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
-using executor::TaskExecutor;
-using std::set;
 using std::string;
 using std::vector;
-using unittest::assertGet;
 
 using InsertRetryTest = ShardingTestFixture;
 using UpdateRetryTest = ShardingTestFixture;

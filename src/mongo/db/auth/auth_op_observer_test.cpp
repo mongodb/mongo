@@ -67,8 +67,6 @@
 namespace mongo {
 namespace {
 
-using repl::OplogEntry;
-using unittest::assertGet;
 
 class AuthOpObserverTest : public ServiceContextMongoDTest {
 public:

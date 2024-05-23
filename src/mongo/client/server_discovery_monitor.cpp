@@ -72,7 +72,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(overrideMaxAwaitTimeMS);
 
-using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutor;
 using executor::ThreadPoolTaskExecutor;
