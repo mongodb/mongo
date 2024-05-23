@@ -192,7 +192,7 @@ def main():
         "# If bazel is not installed, run the following:",
         "#  python buildscripts/install_bazel.py",
         "# The documentation for the OWNERS.yml files can be found here:",
-        "# https://github.com/10gen/mongo/blob/master/docs/owners_format.md",
+        "# https://github.com/10gen/mongo/blob/master/docs/owners/owners_format.md",
         "",
     ]
 
@@ -204,7 +204,10 @@ def main():
         print(
             "Please refer to the docs to see the spec for OWNERS.yml files here :", file=sys.stderr
         )
-        print("https://github.com/10gen/mongo/blob/master/docs/owners_format.md", file=sys.stderr)
+        print(
+            "https://github.com/10gen/mongo/blob/master/docs/owners/owners_format.md",
+            file=sys.stderr,
+        )
         raise ex
 
     old_contents = ""

@@ -4,7 +4,7 @@
 # If bazel is not installed, run the following:
 #  python buildscripts/install_bazel.py
 # The documentation for the OWNERS.yml files can be found here:
-# https://github.com/10gen/mongo/blob/master/docs/owners_format.md
+# https://github.com/10gen/mongo/blob/master/docs/owners/owners_format.md
 
 # The following patterns are parsed from ./OWNERS.yml
 OWNERS.yml @IamXander
@@ -59,6 +59,15 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./buildscripts/tracing_profiler/OWNERS.yml
 /buildscripts/tracing_profiler/**/* @10gen/query
+
+# The following patterns are parsed from ./docs/OWNERS.yml
+/docs/**/bazel.md @10gen/devprod-build
+/docs/**/build_system_reference.md @10gen/devprod-build
+/docs/**/build_system.md @10gen/devprod-build
+/docs/**/building.md @10gen/devprod-build
+/docs/**/poetry_execution.md @10gen/devprod-correctness
+/docs/**/linting.md @10gen/devprod-build
+/docs/owners/** @10gen/devprod-correctness
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/OWNERS.yml
 /jstests/concurrency/fsm_workloads/**/server_status.js @10gen/server-service-architecture

@@ -1,0 +1,23 @@
+version: 1.0.0
+filters:
+  - "bazel.md":
+    approvers:
+      - 10gen/devprod-build
+  - "build_system_reference.md":
+    approvers:
+      - 10gen/devprod-build
+  - "build_system.md":
+    approvers:
+      - 10gen/devprod-build
+  - "building.md":
+    approvers:
+      - 10gen/devprod-build
+  - "poetry_execution.md":
+    approvers:
+      - 10gen/devprod-correctness
+  - "linting.md":
+    approvers:
+      - 10gen/devprod-build
+  - "owners/**":
+    approvers:
+      - 10gen/devprod-correctness
