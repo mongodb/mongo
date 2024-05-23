@@ -56,10 +56,8 @@ selector:
   - jstests/core/max_doc_size.js
   - jstests/core/query/find/find_getmore_bsonsize.js
 
-  # This test does a large number of write operations and can cause magic restore to take a
-  # long time. If the restore duration exceeds 5 minutes, the restore node will throw away
-  # durable history that is required to do PIT reads for consistency checks.
-  - jstests/core/query/query_settings/query_settings_size_limits.js
+  # Spawns a separate shell program which is not compatible with try/catch wrapping.
+  - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js
 
   # Spawns a separate shell program which is not compatible with try/catch wrapping.
   - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js
@@ -69,9 +67,6 @@ selector:
   - jstests/core/views/views_validation.js
   - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
   - jstests/core/catalog/list_collections_no_views.js
-
-  # BF-33295. Magic restore fails in burn_in tasks with NamespaceNotFound error
-  - jstests/core/query/sort/sortj.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
@@ -95,6 +90,9 @@ executor:
   fixture:
     class: ReplicaSetFixture
     mongod_options:
+      set_parameters:
+        minSnapshotHistoryWindowInSeconds: 3600
+      oplogSize: 2048
     all_nodes_electable: true
     num_nodes: 1
     use_replica_set_connection_string: true
