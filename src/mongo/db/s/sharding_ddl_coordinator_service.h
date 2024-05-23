@@ -125,6 +125,7 @@ private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;
 
+    void _onServiceInitialization() override;
     void _onServiceTermination() override;
     size_t _countCoordinatorDocs(OperationContext* opCtx);
 
