@@ -39,3 +39,27 @@ a4f458fe4d7a44eba056f5c150753e73067c8e4d
 
 # SERVER-88970 Formatted all yaml using prettier
 35db3811d8f749edd5b79ba910adcbc1ceb54cc4
+
+# SERVER-90570: Ruff format buildscripts
+9d997a9f44cd43a8dec7c2a17fa2dbcd875e92f6
+
+# SERVER-90571: Ruff format buildscripts/idl
+a2fbc8ed83f576703cce96ebb5e680cc70aac4d8
+
+# SERVER-90572: Ruff format evergreen
+ec4a2cefe8cafee7bc9a5e91756c2e65f1ecf307
+
+# SERVER-90573: Ruff format bazel
+60af39291961535329b7ab6bec3b4f161dd1d0fa
+
+# SERVER-90615: Ruff format src
+af7d6593172a8a0ce01027a52d19de1d0215fb5b
+
+# SERVER-90616: Ruff format jstests
+9fc353de97f77520be552ddf8a6d44448f4e40d4
+
+# SERVER-90617: Ruff format site_scons
+0cd9cfa93f7cbfee24b19f6795ae366d5fa94625
+
+# SERVER-90719: Ruff format SConstruct
+c25ff7cb2f755b8b11b2b7b85189599b162a4059
