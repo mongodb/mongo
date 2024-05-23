@@ -21,6 +21,11 @@ variables:
       - name: package_new_compile
         variant: amazon2-arm64-compile
 
+  - &amazon_linux2_arm64_openssl111_compile_variant_dependency
+    depends_on:
+      - name: package_new_compile
+        variant: amazon2-arm64-openssl111-compile
+
   - &amazon_linux2_arm64_mongocrypt_compile_variant_dependency
     depends_on:
       - name: package_new_compile
@@ -368,6 +373,29 @@ buildvariants:
     run_on:
       - "rhel70-perf-replset"
     tasks: *3node-intel-tasks
+
+  - <<: *amazon_linux2_arm64_openssl111_compile_variant_dependency
+    name: perf-3-node-replSet.arm.aws.2024-05
+    display_name: 3-Node ReplSet ARM AWS 2024-05
+    cron: *linux-3-node-cron
+    modules: *perf_modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica.2024-05
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: replica.2024-05
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *perf_project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: amazon2-arm64-openssl111-compile
+    run_on:
+      - "rhel70-perf-replset"
+    tasks:
+      - *schedule_patch_auto_tasks_task
+      - *schedule_variant_auto_tasks_task
+      - name: smoke_test
 
   # On PERF-730 we changed the initial sync tests to use two nodes instead of three. To avoid
   # losing history, the name remains unchanged, but the display_name reflects the change to 2-Node.
