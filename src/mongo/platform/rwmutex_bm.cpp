@@ -108,6 +108,24 @@ private:
 };
 
 template <typename DataType>
+class RWMutexController {
+public:
+    explicit RWMutexController(DataType value) {
+        stdx::unique_lock lk(_mutex);
+        _data = value;
+    }
+
+    auto read() const {
+        std::shared_lock lk(_mutex);  // NOLINT
+        return _data;
+    }
+
+private:
+    mutable RWMutex _mutex;
+    DataType _data;
+};
+
+template <typename DataType>
 class ResourceMutexController {
 public:
     explicit ResourceMutexController(DataType value)
@@ -160,6 +178,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(RWMutexBm, SharedMutex, SharedMutexController)(bench
 BENCHMARK_TEMPLATE_DEFINE_F(RWMutexBm, Mutex, MutexController)(benchmark::State& s) {
     run(s);
 }
+BENCHMARK_TEMPLATE_DEFINE_F(RWMutexBm, RWMutex, RWMutexController)(benchmark::State& s) {
+    run(s);
+}
 BENCHMARK_TEMPLATE_DEFINE_F(RWMutexBm, ResourceMutex, ResourceMutexController)
 (benchmark::State& s) {
     run(s);
@@ -169,6 +190,7 @@ const auto kMaxThreads = ProcessInfo::getNumLogicalCores() * 2;
 BENCHMARK_REGISTER_F(RWMutexBm, WriteRarelyRWMutex)->ThreadRange(1, kMaxThreads);
 BENCHMARK_REGISTER_F(RWMutexBm, SharedMutex)->ThreadRange(1, kMaxThreads);
 BENCHMARK_REGISTER_F(RWMutexBm, Mutex)->ThreadRange(1, kMaxThreads);
+BENCHMARK_REGISTER_F(RWMutexBm, RWMutex)->ThreadRange(1, kMaxThreads);
 #if REGISTER_RESOURCE_MUTEX_BENCHMARKS
 BENCHMARK_REGISTER_F(RWMutexBm, ResourceMutex)->ThreadRange(1, kMaxThreads);
 #endif

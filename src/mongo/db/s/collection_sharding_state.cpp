@@ -43,6 +43,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
@@ -116,9 +117,8 @@ private:
 
     // Adding entries to `_collections` is expected to be very infrequent and far apart (collection
     // creation), so the majority of accesses to this map are read-only and benefit from using a
-    // shared mutex type for synchronization. The selected `std::shared_mutex` primitive prefers
-    // writers over readers so it is the appropriate choice for this use-case.
-    mutable std::shared_mutex _mutex;  // NOLINT
+    // shared mutex type for synchronization.
+    mutable RWMutex _mutex;
 
     // Entries of the _collections map must never be deleted or replaced. This is to guarantee that
     // a 'nss' is always associated to the same 'ResourceMutex'.
