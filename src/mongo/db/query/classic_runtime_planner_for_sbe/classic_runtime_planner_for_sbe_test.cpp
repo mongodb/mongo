@@ -57,6 +57,10 @@ namespace {
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.collection");
 const BSONObj kFindFilter = fromjson("{a: {$gte: 0}, b: {$gte: 0}}");
 const BSONObj kAddFieldsSpec = fromjson(R"({sum: {$add: ["$a", "$b"]}})");
+
+const BSONObj kRootedOrFilter =
+    fromjson("{$or: [{a: {$lte: 10}, b: {$gte: 10}}, {c: {$lte: 90}, d: {$gte: 90}}]}");
+
 /**
  * Fixture for classic_runtime_planner_for_sbe::PlannerInterface implementations. As a test query,
  * it uses an aggregation pipeline [{$match: <match statement>}, {$addFields: <addFields statement>]
@@ -103,21 +107,21 @@ protected:
             .pipeline = std::move(pipeline)});
         cq->setSbeCompatible(true);
 
-        auto opCtx = operationContext();
-        _collections.emplace(acquireCollectionMaybeLockFree(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kRead)));
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        // Whether or not to use the SBE plan cache depends on "featureFlagSbeFull".
+        const bool useSbePlanCache = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
 
         auto params = std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForTest{});
         params->mainCollectionInfo.indexes = _indices;
-        PlannerDataForSBE plannerData{expCtx->opCtx,
+        PlannerDataForSBE plannerData{operationContext(),
                                       cq.get(),
                                       std::make_unique<WorkingSet>(),
                                       *_collections,
                                       std::move(params),
                                       PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                       /* cachedPlanHash */ boost::none,
-                                      makeYieldPolicy()};
+                                      makeYieldPolicy(),
+                                      useSbePlanCache};
         return std::make_pair(std::move(cq), std::move(plannerData));
     }
 
@@ -195,34 +199,60 @@ protected:
                         << indexName);
     }
 
-    // Creates indexes {a: 1} and {b: 1}, inserts 100 docs with {a: i, b: i}
+    void acquireCollectionForRead() {
+        auto opCtx = operationContext();
+        _collections.emplace(acquireCollectionMaybeLockFree(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kRead)));
+    }
+
+    /**
+     * Creates indexes {a: 1}, {b: 1}, {c: 1}, {d: 1} and inserts 100 docs with {a: i, b: i, c: i,
+     * d: i}.
+     *
+     * Acquires the collection in read mode and clears both the SBE and classic plan caches.
+     */
     void setUpSubPlannerTest() {
         auto opCtx = operationContext();
 
         createIndexOnEmptyCollection(opCtx, BSON("a" << 1), "a_1");
         createIndexOnEmptyCollection(opCtx, BSON("b" << 1), "b_1");
+        createIndexOnEmptyCollection(opCtx, BSON("c" << 1), "c_1");
+        createIndexOnEmptyCollection(opCtx, BSON("d" << 1), "d_1");
 
         std::vector<InsertStatement> docs;
         for (int i = 0; i < 100; ++i) {
-            docs.emplace_back(InsertStatement(BSON("_id" << OID::gen() << "a" << i << "b" << i)));
+            docs.emplace_back(InsertStatement(
+                BSON("_id" << OID::gen() << "a" << i << "b" << i << "c" << i << "d" << i)));
         }
 
         ASSERT_OK(storageInterface()->insertDocuments(opCtx, kNss, docs));
+
+        acquireCollectionForRead();
+        // Clear both plan caches in order to make sure that we don't see cache entries from
+        // previous runs.
+        sbe::getPlanCache(operationContext()).clear();
+        getClassicPlanCache().clear();
     }
 
-    // Creates the subplanner with a rooted or filter and returns the PlanExecutor.
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getExecutorWithSubPlanning() {
-        // createPlannerDataForSBE adds a cqPipeline with an $addFields stage.
-        auto [cq, plannerData] = createPlannerData(
-            fromjson("{$or: [{a: {$lte: 10}, b: {$gte: 10}}, {a: {$lte: 90}, b: {$gte: 90}}]}"));
-        SubPlanner planner{std::move(plannerData)};
+    /**
+     * Creates the subplanner with a rooted $or filter and returns the resulting PlanExecutor.
+     * Asserts that the subplanner reports the given number of per-$or branch multi-planner
+     * invocations.
+     */
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getExecutorWithSubPlanning(
+        int expectedPerBranchMultiplans) {
+        // createPlannerDataForSBE adds a cqPipeline with an $addFields stage. Based on the data, we
+        // expect the plan for the first branch to use the "a" index and the plan for the second
+        // branch to use the "d" index.
+        auto [cq, plannerData] = createPlannerData(kRootedOrFilter);
 
+        SubPlanner planner{std::move(plannerData)};
+        ASSERT_EQ(planner.numPerBranchMultiplans(), expectedPerBranchMultiplans);
         auto exec = planner.makeExecutor(std::move(cq));
         assertPlanExecutorReturnsCorrectSums({20, 180}, exec.get());
         return exec;
     }
-
-    boost::intrusive_ptr<ExpressionContext> expCtx;
 
     std::pair<std::vector<std::unique_ptr<QuerySolution>>, std::vector<int>>
     createVirtualScanQuerySolutionsForDefaultFilter(int resultDocCount, const CanonicalQuery* cq) {
@@ -269,26 +299,33 @@ protected:
         return {std::move(solutions), std::move(expectedSums)};
     }
 
-    // Inserts 'resultDocCount' number of docs with {a: i, b: 1} which is the same as the
-    // outputs from the VirtualScanNode from createVirtualScanQuerySolutionsForDefaultFilter().
-    void insertTestDocuments(int resultDocCount) {
+    /**
+     * Inserts 200 documents with {a: i, b: 1} which is the same as the outputs from the
+     * VirtualScanNode from createVirtualScanQuerySolutionsForDefaultFilter(). Also responsible for
+     * acquiring the test collection.
+     */
+    void setUpCachedPlannerTest() {
         auto opCtx = operationContext();
         std::vector<InsertStatement> docs;
-        for (int i = 1; i <= resultDocCount; ++i) {
+        for (int i = 1; i <= 200; ++i) {
             docs.emplace_back(InsertStatement(BSON("_id" << OID::gen() << "a" << i << "b" << 1)));
         }
 
         ASSERT_OK(storageInterface()->insertDocuments(opCtx, kNss, docs));
+
+        acquireCollectionForRead();
     }
 
-    // Helper to run unit tests in two configurations: once with featureFlagSbeFull disabled, and
-    // then once again with featureFlagSbeFull enabled.
-    //
-    // TODO SERVER-90496: Ideally, this can be done by calling the base 'run' function twice in the
-    // test fixture's implementation of 'run()'. This is non-trivial because it requires making it
-    // so that all setup and teardown code is executed exactly once (as opposed to once for each
-    // time 'run' is called) as some set up/tear down code runs when constructing/destructing the
-    // test fixture itself. Clean up the setUp()/tearDown() functions to allow for this.
+    /**
+     * Helper to run unit tests in two configurations: once with featureFlagSbeFull disabled, and
+     * then once again with featureFlagSbeFull enabled.
+     *
+     * TODO SERVER-90496: Ideally, this can be done by calling the base 'run' function twice in the
+     * test fixture's implementation of 'run()'. This is non-trivial because it requires making it
+     * so that all setup and teardown code is executed exactly once (as opposed to once for each
+     * time 'run' is called) as some set up/tear down code runs when constructing/destructing the
+     * test fixture itself. Clean up the setUp()/tearDown() functions to allow for this.
+     */
     void testSbeFullOnAndOffFn(std::function<void(bool)> testFn) {
         try {
             for (auto value : {false, true}) {
@@ -303,6 +340,29 @@ protected:
             throw;
         }
     }
+
+    PlanCache& getClassicPlanCache() {
+        auto&& collQueryInfo = CollectionQueryInfo::get(_collections->getMainCollection());
+        auto cache = collQueryInfo.getPlanCache();
+        ASSERT(cache);
+        return *cache;
+    }
+
+    /**
+     * The plan cache size functions exposed by the plan caches themselves may express the size in
+     * terms of number of bytes rather than number of entries, depending on whether the plan cache
+     * maximum size is set in units of bytes or entry count.
+     *
+     * This template function ensures that there is always a an easy way to count the number of
+     * entries in either the SBE or classic plan caches.
+     */
+    int numEntriesInCache(auto&& planCache) {
+        int count = 0;
+        planCache.forEach([&](const auto&, const auto&) { ++count; });
+        return count;
+    }
+
+    boost::intrusive_ptr<ExpressionContext> expCtx;
 
 private:
     std::unique_ptr<PlanYieldPolicySBE> makeYieldPolicy() {
@@ -320,6 +380,8 @@ private:
 };
 
 TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesCacheEntry) {
+    acquireCollectionForRead();
+
     testSbeFullOnAndOffFn([&](bool sbeFullEnabled) {
         static const std::vector<BSONArray> kDocs = {
             BSON_ARRAY(int64_t{0} << BSON("a" << 1 << "b" << 2)),
@@ -372,6 +434,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
 }
 
 TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
+    acquireCollectionForRead();
+
     testSbeFullOnAndOffFn([&](bool sbeFullEnabled) {
         // Ensures that cache entries are available immediately.
         bool previousQueryKnobValue = internalQueryCacheDisableInactiveEntries.swap(true);
@@ -410,10 +474,13 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
         // EOF optimization is not used in debug builds.
         return;
     }
+
+    acquireCollectionForRead();
+
     testSbeFullOnAndOffFn([&](bool sbeFullEnabled) {
-        {  // When the query has 200 result documents, no plan will reach EOF during multi-planner,
-           // so
-            // we should use SBE.
+        {
+            // When the query has 200 result documents, no plan will reach EOF during multi-planner,
+            // so we should use SBE.
             auto [cq, plannerData] = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
             auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
                 200 /*resultDocCount*/, plannerData.cq);
@@ -423,7 +490,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
             ASSERT_EQ(exec->getPlanExplainer().getVersion(), "2");
         }
 
-        {  // When the query has only 50 result documents, winning plan will reach EOF during
+        {
+            // When the query has only 50 result documents, winning plan will reach EOF during
             // multi-planner, so we should use the Classic Engine.
             auto [cq, plannerData] = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
             auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
@@ -441,6 +509,9 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbePlanCacheIsUpdatedDuringEofOptimizati
         // EOF optimization is not used in debug builds.
         return;
     }
+
+    acquireCollectionForRead();
+
     testSbeFullOnAndOffFn([&](bool sbeFullEnabled) {
         static const int kDocCount = 50;
         // Run the query twice to ensure active cache entry.
@@ -482,7 +553,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbePlanCacheIsUpdatedDuringEofOptimizati
 TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerPicksMoreEfficientPlanForEachBranch) {
     setUpSubPlannerTest();
     testSbeFullOnAndOffFn([&](bool sbeFullEnabled) {
-        auto exec = getExecutorWithSubPlanning();
+        auto exec = getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
         PlanSummaryStats stats;
         exec->getPlanExplainer().getSummaryStats(&stats);
 
@@ -492,32 +563,66 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerPicksMoreEfficientPlanForEachB
         ASSERT_EQ(21, stats.totalKeysExamined);
         ASSERT_TRUE(std::find(stats.indexesUsed.begin(), stats.indexesUsed.end(), "a_1") !=
                     stats.indexesUsed.end());
-        ASSERT_TRUE(std::find(stats.indexesUsed.begin(), stats.indexesUsed.end(), "b_1") !=
+        ASSERT_TRUE(std::find(stats.indexesUsed.begin(), stats.indexesUsed.end(), "d_1") !=
                     stats.indexesUsed.end());
     });
 }
 
-TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerPicksCachedPlanForWholeQuery) {
+TEST_F(ClassicRuntimePlannerForSbeTest,
+       SubPlannerPicksCachedPlanForWholeQueryWhenSbePlanCacheEnabled) {
+    // 'SubPlanner' uses the SBE plan cache when "SBE full" is enabled.
+    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
     setUpSubPlannerTest();
-    testSbeFullOnAndOffFn([&](bool sbeFullEnabled) {
-        auto exec = getExecutorWithSubPlanning();
 
-        {  // Run CachedPlanner to execute the cached plan.
-            auto [cq, plannerData] = createPlannerData(fromjson(
-                "{$or: [{a: {$lte: 10}, b: {$gte: 10}}, {a: {$lte: 90}, b: {$gte: 90}}]}"));
-            auto planCacheKey =
-                plan_cache_key_factory::make(*plannerData.cq,
-                                             plannerData.collections,
-                                             canonical_query_encoder::Optimizer::kSbeStageBuilders);
-            auto&& planCache = sbe::getPlanCache(operationContext());
-            auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
-            ASSERT_TRUE(cacheEntry);
-            auto cachedPlanner =
-                makePlannerForCacheEntry(std::move(plannerData), std::move(cacheEntry));
-            auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
-            assertPlanExecutorReturnsCorrectSums({20, 180}, cachedExec.get());
-        }
-    });
+    auto exec = getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+
+    // When "featureFlagSbeFull" is enabled, the subplanner should write a single entry to the SBE
+    // plan cache and should not write to the classic cache.
+    auto&& sbePlanCache = sbe::getPlanCache(operationContext());
+    ASSERT_EQ(numEntriesInCache(sbePlanCache), 1ull);
+    ASSERT_EQ(numEntriesInCache(getClassicPlanCache()), 0ull);
+
+    // Run CachedPlanner to execute the cached plan.
+    auto [cq, plannerData] = createPlannerData(kRootedOrFilter);
+    auto planCacheKey =
+        plan_cache_key_factory::make(*plannerData.cq,
+                                     plannerData.collections,
+                                     canonical_query_encoder::Optimizer::kSbeStageBuilders);
+
+    auto cacheEntry = sbePlanCache.getCacheEntryIfActive(planCacheKey);
+    ASSERT_TRUE(cacheEntry);
+    auto cachedPlanner = makePlannerForCacheEntry(std::move(plannerData), std::move(cacheEntry));
+    auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
+    assertPlanExecutorReturnsCorrectSums({20, 180}, cachedExec.get());
+}
+
+TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerCachesEachBranchWhenSbePlanCacheEnabled) {
+    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", false);
+    setUpSubPlannerTest();
+
+    getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+
+    // When "featureFlagSbeFull" is *not* enabled, the subplanner should write two entries to the
+    // classic cache -- one for each branch. It should not write to the SBE plan cache.
+    ASSERT_EQ(numEntriesInCache(getClassicPlanCache()), 2ull);
+    ASSERT_EQ(numEntriesInCache(sbe::getPlanCache(operationContext())), 0ull);
+
+    // If we subplan a second time, we should still see multi-planning since the cache entries are
+    // inactive.
+    getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+
+    // The third time, the active cache entries will get used and we should not see any
+    // multi-planning for either $or branch.
+    getExecutorWithSubPlanning(0);
+
+    // If we clear the classic cache, then we should see multi-planning again and the cache should
+    // be repopulated afterwards.
+    getClassicPlanCache().clear();
+    ASSERT_EQ(numEntriesInCache(getClassicPlanCache()), 0ull);
+    ASSERT_EQ(numEntriesInCache(sbe::getPlanCache(operationContext())), 0ull);
+    getExecutorWithSubPlanning(2);
+    ASSERT_EQ(numEntriesInCache(getClassicPlanCache()), 2ull);
+    ASSERT_EQ(numEntriesInCache(sbe::getPlanCache(operationContext())), 0ull);
 }
 
 TEST_F(ClassicRuntimePlannerForSbeTest, CachedPlannerReplansOnFailureMemoryLimitExceeded) {
@@ -525,7 +630,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, CachedPlannerReplansOnFailureMemoryLimit
     bool previousQueryKnobValue = internalQueryCacheDisableInactiveEntries.swap(true);
     ON_BLOCK_EXIT([&] { internalQueryCacheDisableInactiveEntries.store(previousQueryKnobValue); });
 
-    insertTestDocuments(200);
+    setUpCachedPlannerTest();
 
     testSbeFullOnAndOffFn([&](bool sbeFullEnabled) {
         auto [cq, plannerData] = createPlannerData();
@@ -574,7 +679,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, CachedPlannerReplansOnHittingMaxNumReads
     bool previousQueryKnobValue = internalQueryCacheDisableInactiveEntries.swap(true);
     ON_BLOCK_EXIT([&] { internalQueryCacheDisableInactiveEntries.store(previousQueryKnobValue); });
 
-    insertTestDocuments(200);
+    setUpCachedPlannerTest();
 
     testSbeFullOnAndOffFn([&](bool sbeFullEnabled) {
         auto [cq, plannerData] = createPlannerData();
