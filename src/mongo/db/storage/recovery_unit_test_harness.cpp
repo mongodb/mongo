@@ -109,6 +109,15 @@ public:
     void rollback(OperationContext* opCtx) override {}
 };
 
+class ThrowsOnRollbackTestChange final : public RecoveryUnit::Change {
+public:
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {}
+
+    void rollback(OperationContext* opCtx) override {
+        uasserted(ErrorCodes::OperationFailed, "rollback handler threw exception");
+    }
+};
+
 TEST_F(RecoveryUnitTestHarness, CommitUnitOfWork) {
     Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
@@ -347,6 +356,33 @@ DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
     ru->beginUnitOfWork(opCtx->readOnly());
     ru->registerChangeForTwoPhaseDrop(std::make_unique<ThrowsOnCommitTestChange>());
     ru->commitUnitOfWork();
+}
+
+DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
+                   LogRollbackHandlerTypeBeforeTerminatingOnException,
+                   "\"F\".*\"STORAGE\".*9010900.*Custom rollback "
+                   "failed.*changeName.*ThrowsOnRollbackTestChange") {
+    ru->beginUnitOfWork(opCtx->readOnly());
+    ru->registerChange(std::make_unique<ThrowsOnRollbackTestChange>());
+    ru->abortUnitOfWork();
+}
+
+DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
+                   LogRollbackHandlerTypeBeforeTerminatingOnExceptionCatalogVisibility,
+                   "\"F\".*\"STORAGE\".*9010901.*Custom rollback "
+                   "failed.*changeName.*ThrowsOnRollbackTestChange") {
+    ru->beginUnitOfWork(opCtx->readOnly());
+    ru->registerChangeForCatalogVisibility(std::make_unique<ThrowsOnRollbackTestChange>());
+    ru->abortUnitOfWork();
+}
+
+DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
+                   LogRollbackHandlerTypeBeforeTerminatingOnExceptionTwoPhaseDrop,
+                   "\"F\".*\"STORAGE\".*9010902.*Custom rollback "
+                   "failed.*changeName.*ThrowsOnRollbackTestChange") {
+    ru->beginUnitOfWork(opCtx->readOnly());
+    ru->registerChangeForTwoPhaseDrop(std::make_unique<ThrowsOnRollbackTestChange>());
+    ru->abortUnitOfWork();
 }
 
 }  // namespace

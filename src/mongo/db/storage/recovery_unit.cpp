@@ -219,11 +219,10 @@ void RecoveryUnit::_executeRollbackHandlers() {
                _changesForTwoPhaseDrop.empty()));
     bool debugLoggingTwoEnabled =
         logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2));
-    try {
-        for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
-             it != end;
-             ++it) {
-            Change* change = it->get();
+    for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend(); it != end;
+         ++it) {
+        Change* change = it->get();
+        try {
             if (debugLoggingTwoEnabled) {
                 LOGV2_DEBUG(22245,
                             2,
@@ -231,13 +230,21 @@ void RecoveryUnit::_executeRollbackHandlers() {
                             "changeName"_attr = redact(demangleName(typeid(*change))));
             }
             change->rollback(_opCtx);
+        } catch (...) {
+            LOGV2_FATAL_CONTINUE(9010900,
+                                 "Custom rollback failed. Refer to log message with ID 6384300 for "
+                                 "exception details.",
+                                 "changeName"_attr = redact(demangleName(typeid(*change))));
+            std::terminate();
         }
+    }
 
-        for (Changes::const_reverse_iterator it = _changesForTwoPhaseDrop.rbegin(),
-                                             end = _changesForTwoPhaseDrop.rend();
-             it != end;
-             ++it) {
-            Change* change = it->get();
+    for (Changes::const_reverse_iterator it = _changesForTwoPhaseDrop.rbegin(),
+                                         end = _changesForTwoPhaseDrop.rend();
+         it != end;
+         ++it) {
+        Change* change = it->get();
+        try {
             if (debugLoggingTwoEnabled) {
                 LOGV2_DEBUG(7789502,
                             2,
@@ -245,13 +252,21 @@ void RecoveryUnit::_executeRollbackHandlers() {
                             "changeName"_attr = redact(demangleName(typeid(*change))));
             }
             change->rollback(_opCtx);
+        } catch (...) {
+            LOGV2_FATAL_CONTINUE(9010902,
+                                 "Custom rollback failed. Refer to log message with ID 6384300 for "
+                                 "exception details.",
+                                 "changeName"_attr = redact(demangleName(typeid(*change))));
+            std::terminate();
         }
+    }
 
-        for (Changes::const_reverse_iterator it = _changesForCatalogVisibility.rbegin(),
-                                             end = _changesForCatalogVisibility.rend();
-             it != end;
-             ++it) {
-            Change* change = it->get();
+    for (Changes::const_reverse_iterator it = _changesForCatalogVisibility.rbegin(),
+                                         end = _changesForCatalogVisibility.rend();
+         it != end;
+         ++it) {
+        Change* change = it->get();
+        try {
             if (debugLoggingTwoEnabled) {
                 LOGV2_DEBUG(5255702,
                             2,
@@ -259,14 +274,18 @@ void RecoveryUnit::_executeRollbackHandlers() {
                             "changeName"_attr = redact(demangleName(typeid(*change))));
             }
             change->rollback(_opCtx);
+        } catch (...) {
+            LOGV2_FATAL_CONTINUE(9010901,
+                                 "Custom rollback failed. Refer to log message with ID 6384300 for "
+                                 "exception details.",
+                                 "changeName"_attr = redact(demangleName(typeid(*change))));
+            std::terminate();
         }
-
-        _changesForTwoPhaseDrop.clear();
-        _changesForCatalogVisibility.clear();
-        _changes.clear();
-    } catch (...) {
-        std::terminate();
     }
+
+    _changesForTwoPhaseDrop.clear();
+    _changesForCatalogVisibility.clear();
+    _changes.clear();
 }
 
 void RecoveryUnit::_setState(State newState) {
