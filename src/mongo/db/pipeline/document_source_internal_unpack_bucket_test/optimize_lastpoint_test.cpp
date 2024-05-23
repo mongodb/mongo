@@ -207,7 +207,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
                                 "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
                                 "{$first: '$control'}, data: {$first: '$data'}}}",
                                 "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
                                 "{$sort: {'m.a': 1, t: -1}}",
                                 "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"});
     assertExpectedLastpointOpt(getExpCtx(),
@@ -221,7 +221,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
                                 "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
                                 "{$first: '$control'}, data: {$first: '$data'}}}",
                                 "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
                                 "{$group: {_id: '$m.a', lastpoint: {$top: {output: {b: '$b', c: "
                                 "'$c'}, sortBy: {'m.a': 1, t: -1}}}}}"});
     assertExpectedLastpointOpt(
@@ -236,7 +236,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
          "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
          "{$first: '$control'}, data: {$first: '$data'}}}",
          "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-         "'m', bucketMaxSpanSeconds: 60}}",
+         "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
          "{$group: {_id: '$m.a', lastpoint: {$topN: {n: {$const: 1}, output: {b: '$b', c: '$c'}, "
          "sortBy: {'m.a': 1, t: -1}}}}}"});
 }
@@ -254,7 +254,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
                                 "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
                                 "{$first: '$control'}, data: {$first: '$data'}}}",
                                 "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
                                 "{$sort: {'m.a': -1, t: -1}}",
                                 "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"});
     assertExpectedLastpointOpt(getExpCtx(),
@@ -268,7 +268,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
                                 "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
                                 "{$first: '$control'}, data: {$first: '$data'}}}",
                                 "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
                                 "{$group: {_id: '$m.a', lastpoint: {$top: {output: {b: '$b', c: "
                                 "'$c'}, sortBy: {'m.a': -1, t: -1}}}}}"});
     assertExpectedLastpointOpt(
@@ -283,7 +283,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
          "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
          "{$first: '$control'}, data: {$first: '$data'}}}",
          "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-         "'m', bucketMaxSpanSeconds: 60}}",
+         "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
          "{$group: {_id: '$m.a', lastpoint: {$topN: {n: {$const: 1}, output: {b: '$b', c: "
          "'$c'}, sortBy: {'m.a': -1, t: -1}}}}}"});
 }
@@ -300,7 +300,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithMetaSubfieldAscen
                                 "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
                                 "{$first: '$control'}, data: {$first: '$data'}}}",
                                 "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
                                 "{$sort: {'m.a': 1, t: 1}}",
                                 "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"});
     assertExpectedLastpointOpt(getExpCtx(),
@@ -314,7 +314,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithMetaSubfieldAscen
                                 "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
                                 "{$first: '$control'}, data: {$first: '$data'}}}",
                                 "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
                                 "{$group: {_id: '$m.a', lastpoint: {$bottom: {output: {b: '$b', c: "
                                 "'$c'}, sortBy: {'m.a': 1, t: 1}}}}}"});
     assertExpectedLastpointOpt(
@@ -329,7 +329,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithMetaSubfieldAscen
          "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
          "{$first: '$control'}, data: {$first: '$data'}}}",
          "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-         "'m', bucketMaxSpanSeconds: 60}}",
+         "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
          "{$group: {_id: '$m.a', lastpoint: {$bottomN: {n: {$const: 1}, output: {b: '$b', c: "
          "'$c'}, sortBy: {'m.a': 1, t: 1}}}}}"});
 }
@@ -347,7 +347,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
                                 "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
                                 "{$first: '$control'}, data: {$first: '$data'}}}",
                                 "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
                                 "{$sort: {'m.a': -1, t: 1}}",
                                 "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"});
     assertExpectedLastpointOpt(getExpCtx(),
@@ -361,7 +361,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
                                 "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
                                 "{$first: '$control'}, data: {$first: '$data'}}}",
                                 "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
                                 "{$group: {_id: '$m.a', lastpoint: {$bottom: {output: {b: '$b', c: "
                                 "'$c'}, sortBy: {'m.a': -1, t: 1}}}}}"});
     assertExpectedLastpointOpt(getExpCtx(),
@@ -375,7 +375,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
                                 "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
                                 "{$first: '$control'}, data: {$first: '$data'}}}",
                                 "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "'m', bucketMaxSpanSeconds: 60, sbeCompatible: false}}",
                                 "{$group: {_id: '$m.a', lastpoint: {$bottomN: {n: {$const: 1}, "
                                 "output: {b: '$b', c: '$c'}, sortBy: {'m.a': -1, t: 1}}}}}"});
 }
@@ -397,7 +397,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithComputedMetaProje
          "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: {$first: '$control'}, data: "
          "{$first: '$data'}, abc: {$first: '$abc'}, def: {$first: '$def'}}}",
          "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
-         "bucketMaxSpanSeconds: 60, computedMetaProjFields: ['abc', 'def']}}",
+         "bucketMaxSpanSeconds: 60, computedMetaProjFields: ['abc', 'def'], sbeCompatible: false}}",
          "{$sort: {'m.a': -1, t: 1}}",
          "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"});
 
@@ -415,7 +415,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithComputedMetaProje
          "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: {$first: '$control'}, data: "
          "{$first: '$data'}, abc: {$first: '$abc'}, def: {$first: '$def'}}}",
          "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
-         "bucketMaxSpanSeconds: 60, computedMetaProjFields: ['abc', 'def']}}",
+         "bucketMaxSpanSeconds: 60, computedMetaProjFields: ['abc', 'def'], sbeCompatible: false}}",
          "{$sort: {'m.a': -1, t: 1}}",
          "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}, def: {$last: '$def'}}}"});
 }

@@ -745,5 +745,40 @@ TEST(AddFieldsProjectionExecutorExecutionTest, ExtractComputedProjectionShouldNo
     ASSERT_DOCUMENT_EQ(expectedProjection, addFields.serializeTransformation(boost::none));
 }
 
+TEST(AddFieldsProjectionExecutorExecutionTest, ProjectionSpecNameHasOldFieldName) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    AddFieldsProjectionExecutor addFields(expCtx);
+    addFields.parse(
+        fromjson("{myMeta: {$sum: ['$myMeta.first', '$myMeta.second']}, otherField: {$sum: "
+                 "['$someOtherField', 1]}}"));
+
+    const std::set<StringData> reservedNames{};
+    auto [extractedAddFields, deleteFlag] =
+        addFields.extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(extractedAddFields.nFields(), 1);
+    ASSERT_EQ(deleteFlag, false);
+    auto expectedAddFields = fromjson("{meta: {$sum: ['$meta.first', '$meta.second'] }}");
+    ASSERT_BSONOBJ_EQ(expectedAddFields, extractedAddFields);
+}
+
+TEST(AddFieldsProjectionExecutorExecutionTest,
+     ProjectionSpecNameHasOldFieldNameUsedInOtherProjectSpec) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    AddFieldsProjectionExecutor addFields(expCtx);
+    auto inputProjection = fromjson(
+        "{myMeta: {$sum: ['$myMeta.first', '$myMeta.second']}, otherField: {$sum: ['$myMeta', "
+        "{$const: 1}]}}");
+    addFields.parse(inputProjection);
+
+    const std::set<StringData> reservedNames{};
+    auto [extractedAddFields, deleteFlag] =
+        addFields.extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(extractedAddFields.nFields(), 0);
+    ASSERT_EQ(deleteFlag, false);
+    ASSERT_DOCUMENT_EQ(Document{inputProjection}, addFields.serializeTransformation(boost::none));
+}
+
 }  // namespace
 }  // namespace mongo::projection_executor

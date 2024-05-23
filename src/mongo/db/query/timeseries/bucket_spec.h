@@ -124,11 +124,18 @@ public:
         return _computedMetaProjFields;
     }
 
+    bool doesBucketSpecProvideField(const std::string& field) const {
+        // When BucketSpec is in include mode, the should be present in the '_fieldSet'.
+        return _fieldSet.contains(field) == (_behavior == BucketSpec::Behavior::kInclude);
+    }
+
+    bool doesBucketSpecProvideFieldWithoutModification(const std::string& field) const {
+        return doesBucketSpecProvideField(field) && !fieldIsComputed(field);
+    }
+
     // Remove fields that the predicate function evaluates to true for.
-    void eraseIfPredTrueFromComputedMetaProjFields(const std::function<bool(std::string)> pred) {
-        std::erase_if(_computedMetaProjFields, [&](const std::string& computedMetaProjField) {
-            return pred(computedMetaProjField);
-        });
+    void eraseIfPredTrueFromComputedMetaProjFields(std::function<bool(const std::string&)> pred) {
+        std::erase_if(_computedMetaProjFields, pred);
     }
 
     void setUsesExtendedRange(bool usesExtendedRange) {

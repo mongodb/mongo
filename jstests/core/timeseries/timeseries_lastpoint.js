@@ -186,6 +186,14 @@ const casesNoLastpointOptimization = [
         {$addFields: {mm: {$add: [1, "$m"]}}},
         {$group: {_id: "$mm", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}
     ],
+
+    // Fields computed from 'metaField' cannot be used in the $group stage. Pushing down the
+    // computed fields 'mm' would disable the last point optimization, as the optimization relies
+    // that the 'control' block summaries which may have been invlidated by the $addFields pushdown.
+    [
+        {$addFields: {mm: {$add: [42, "$m"]}}},
+        {$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x", "$mm"]}}}}
+    ],
 ];
 
 // Cases when the lastpoint optimization does apply. When there is no suitable index, the plan is:
@@ -314,16 +322,7 @@ const casesLastpointOptimization = [
             {$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {t: 1}, output: ["$x"]}}}}
         ],
         expectedResult: [{_id: 1, acc: [[lpx1]]}]
-    },
-
-    // Fields computed from 'metaField' can be used in the acc.
-    {
-        pipeline: [
-            {$addFields: {mm: {$add: [42, "$m"]}}},
-            {$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x", "$mm"]}}}}
-        ],
-        expectedResult: [{_id: 1, acc: [lpx1, 1 + 42]}, {_id: 2, acc: [lpx2, 2 + 42]}]
-    },
+    }
 ];
 
 // When there is a suitable index, DISTINCT_SCAN optimization should kick in. We only sanity test

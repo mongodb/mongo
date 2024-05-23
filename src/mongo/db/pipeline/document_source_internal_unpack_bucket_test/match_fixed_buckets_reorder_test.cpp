@@ -48,7 +48,7 @@ using InternalUnpackBucketMatchFixedBucketTest = AggregationContextFixture;
 
 auto unpackSpecObj = fromjson(R"({
             $_internalUnpackBucket: { 
-                include: ['a', 'b', 'c', 'foo'], timeField: 'foo', 
+                exclude: [], timeField: 'foo', 
                 metaField: 'meta1', 
                 bucketMaxSpanSeconds: 3600,
                 fixedBuckets: true
@@ -106,7 +106,7 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewriteNegat
     auto matchSpecObj = BSON("$match" << BSON("foo" << BSON("$gt" << date)));
     auto serializedUnpackObj = fromjson(R"({
             $_internalUnpackBucket: { 
-                include: ['a', 'b', 'c', 'foo'], timeField: 'foo', 
+                include: ['b', 'c', 'foo', 'meta1'], timeField: 'foo', 
                 metaField: 'meta1', 
                 bucketMaxSpanSeconds: 3600,
                 wholeBucketFilter: {'control.min.foo': { $gt: new Date(1351242000000) }},
@@ -136,6 +136,16 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewriteNegat
         auto serialized = pipeline->serializeToBson();
         ASSERT_EQ(3, serialized.size());
         ASSERT_TRUE(serialized[0].hasField("$match"));
+        auto serializedUnpackObj = fromjson(R"({
+            $_internalUnpackBucket: { 
+                exclude: [], timeField: 'foo', 
+                metaField: 'meta1', 
+                bucketMaxSpanSeconds: 3600,
+                wholeBucketFilter: {'control.min.foo': { $gt: new Date(1351242000000) }},
+                eventFilter: { 'foo': { $gt: new Date(1351242000000) } },
+                fixedBuckets: true
+            }
+        })");
         ASSERT_BSONOBJ_EQ(serializedUnpackObj, serialized[1]);
         ASSERT_BSONOBJ_EQ(limitSpecObj, serialized[2]);
     }

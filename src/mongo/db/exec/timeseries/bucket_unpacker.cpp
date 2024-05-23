@@ -665,11 +665,8 @@ void BucketUnpacker::eraseUnneededComputedMetaProjFields() {
     //  Similarly, for exclusion spec, if the current computed field is part of the exclude fields,
     //  the computed fields should not be available after the current unpack stage. This can happen
     //  if there was a $project stage after a $addFields stage.
-    bool removeIfInFieldSet = _spec.behavior() == BucketSpec::Behavior::kExclude;
-    auto conditionToErase = [&](const std::string& computedField) {
-        return _spec.fieldSet().contains(computedField) == removeIfInFieldSet;
-    };
-    _spec.eraseIfPredTrueFromComputedMetaProjFields(conditionToErase);
+    _spec.eraseIfPredTrueFromComputedMetaProjFields(
+        [&](const std::string& field) { return !_spec.doesBucketSpecProvideField(field); });
 }
 
 void BucketUnpacker::setBucketSpec(BucketSpec&& bucketSpec) {
