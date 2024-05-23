@@ -269,6 +269,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::LockBusy:
                 case ErrorCodes::NamespaceNotFound:
                 case ErrorCodes::NotImplemented:
+                case ErrorCodes::OplogOperationUnsupported:
                 case ErrorCodes::OplogQueryMinTsMissing:
                 case ErrorCodes::ReshardCollectionAborted:
                 case ErrorCodes::ReshardCollectionInProgress:
