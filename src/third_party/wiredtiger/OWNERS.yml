@@ -1,0 +1,3 @@
+version: 1.0.0
+options:
+  no_parent_owners: true
