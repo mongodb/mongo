@@ -57,7 +57,8 @@ struct PlannerDataForSBE final : public PlannerData {
                       std::unique_ptr<QueryPlannerParams> plannerParams,
                       PlanYieldPolicy::YieldPolicy yieldPolicy,
                       boost::optional<size_t> cachedPlanHash,
-                      std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy)
+                      std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
+                      bool useSbePlanCache)
         : PlannerData(opCtx,
                       cq,
                       std::move(workingSet),
@@ -65,9 +66,13 @@ struct PlannerDataForSBE final : public PlannerData {
                       std::move(plannerParams),
                       yieldPolicy,
                       cachedPlanHash),
-          sbeYieldPolicy(std::move(sbeYieldPolicy)) {}
+          sbeYieldPolicy(std::move(sbeYieldPolicy)),
+          useSbePlanCache(useSbePlanCache) {}
 
     std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
+
+    // If true, runtime planners will use the SBE plan cache rather than the classic plan cache.
+    const bool useSbePlanCache;
 };
 
 class PlannerBase : public PlannerInterface {
@@ -147,6 +152,10 @@ protected:
         return std::move(_plannerData);
     }
 
+    bool useSbePlanCache() const {
+        return _plannerData.useSbePlanCache;
+    }
+
 private:
     PlannerDataForSBE _plannerData;
 };
@@ -216,6 +225,22 @@ private:
     std::unique_ptr<QuerySolution> _winningSolution;
 };
 
+/**
+ * Uses the classic sub-planner to construct a plan for a rooted $or query. Subplanning involves
+ * selecting an indexed access path independently for each branch of a rooted $or query. See
+ * 'SubplanStage' for details.
+ *
+ * The plan caching strategy differs depending on whether we are using the classic plan cache or the
+ * SBE plan cache. When using the classic plan cache, we write a separate plan cache entry for each
+ * branch of the $or. This requires threading a callback through the 'SubplanStage' to write to the
+ * classic plan cache; the callback will get involved whenever multi-planning for a particular $or
+ * branch completes.
+ *
+ * The SBE plan cache requires that we cache entire plans -- it does not support stitching partial
+ * cached plans together to create a composite plan. When the SBE plan cache is on, we therefore do
+ * not plumb through a callback as described above. Instead, this class takes on the responsibility
+ * of constructing the complete SBE plan for the query and writing it to the SBE plan cache.
+ */
 class SubPlanner final : public PlannerBase {
 public:
     SubPlanner(PlannerDataForSBE plannerData);
@@ -228,10 +253,22 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
         std::unique_ptr<CanonicalQuery> canonicalQuery) override;
 
+    /**
+     * Returns the number of times that an individual $or branch was multi-planned during the
+     * subplanning process.
+     */
+    int numPerBranchMultiplans() const {
+        return _numPerBranchMultiplans;
+    }
+
 private:
+    SubplanStage::PlanSelectionCallbacks makeCallbacks();
+
     std::unique_ptr<SubplanStage> _subplanStage;
-    // Temporary owner of query solution; ownership is surrenderred in makeExecutor().
+    // Temporary owner of query solution; ownership is surrendered in makeExecutor().
     std::unique_ptr<QuerySolution> _solution;
+
+    int _numPerBranchMultiplans = 0;
 };
 
 /**
