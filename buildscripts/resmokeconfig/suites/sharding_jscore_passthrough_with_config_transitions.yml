@@ -1,5 +1,8 @@
 # Based on the sharding_jscore_passthrough suite. Runs continuous config transitions
 # from a config shard to a dedicated config server.
+config_variables:
+  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
+
 test_kind: js_test
 
 selector:
@@ -83,6 +86,7 @@ executor:
   hooks:
     - class: ContinuousConfigShardTransition
       random_balancer_on: false
+      move_primary_comment: *movePrimaryComment
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
       shell_options:
@@ -104,4 +108,8 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagReshardingForTimeseries: true
+        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
+          data:
+            comment: *movePrimaryComment
+          mode: alwaysOn
     num_rs_nodes_per_shard: 1

@@ -1,6 +1,9 @@
 # Based on the concurrency_sharded_multi_stmt_txn_with_balancer and
 # concurrency_sharded_replication_with_balancer_and_transitions suites. This suite runs continuous
 # background config transitions and wraps test state functions in multi document transactions.
+config_variables:
+  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
+
 test_kind: fsm_workload_test
 
 selector:
@@ -169,9 +172,11 @@ executor:
           traceExceptions: false
           runningWithBalancer: true
           transitioningConfigShard: true
+          shardCollectionProbability: 0.5
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousConfigShardTransition
+      move_primary_comment: *movePrimaryComment
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHashInBackground
     - class: CheckReplDBHash
@@ -211,6 +216,10 @@ executor:
           mode: alwaysOn
         balancerMigrationsThrottlingMs: 100
         featureFlagReshardingForTimeseries: true
+        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
+          data:
+            comment: *movePrimaryComment
+          mode: alwaysOn
     num_rs_nodes_per_shard: 3
     # Use 3 shards so there's always at least two for workloads with manual migrations, etc.
     num_shards: 3

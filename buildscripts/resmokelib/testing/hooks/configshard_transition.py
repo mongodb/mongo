@@ -3,6 +3,7 @@
 import time
 import threading
 import random
+import re
 import pymongo.errors
 
 from buildscripts.resmokelib import errors
@@ -23,7 +24,14 @@ class ContinuousConfigShardTransition(interface.Hook):
 
     STOPS_FIXTURE = False
 
-    def __init__(self, hook_logger, fixture, auth_options=None, random_balancer_on=True):
+    def __init__(
+        self,
+        hook_logger,
+        fixture,
+        auth_options=None,
+        random_balancer_on=True,
+        move_primary_comment=None,
+    ):
         interface.Hook.__init__(
             self, hook_logger, fixture, ContinuousConfigShardTransition.DESCRIPTION
         )
@@ -31,6 +39,7 @@ class ContinuousConfigShardTransition(interface.Hook):
         self._transition_thread = None
         self._auth_options = auth_options
         self._random_balancer_on = random_balancer_on
+        self._move_primary_comment = move_primary_comment
 
     def before_suite(self, test_report):
         """Before suite."""
@@ -42,7 +51,12 @@ class ContinuousConfigShardTransition(interface.Hook):
             raise errors.ServerFailure(msg)
 
         self._transition_thread = _TransitionThread(
-            self.logger, lifecycle, self._fixture, self._auth_options, self._random_balancer_on
+            self.logger,
+            lifecycle,
+            self._fixture,
+            self._auth_options,
+            self._random_balancer_on,
+            self._move_primary_comment,
         )
         self.logger.info("Starting the transition thread.")
         self._transition_thread.start()
@@ -80,14 +94,33 @@ class _TransitionThread(threading.Thread):
     _ILLEGAL_OPERATION = 20
     _SHARD_NOT_FOUND = 70
     _OPERATION_FAILED = 96
+    _RESHARD_COLLECTION_ABORTED = 341
+    _RESHARD_COLLECTION_IN_PROGRESS = 338
+    _LOCK_BUSY = 46
 
-    def __init__(self, logger, stepdown_lifecycle, fixture, auth_options, random_balancer_on):
+    _UNMOVABLE_NAMESPACE_REGEXES = [
+        r"\.system\.",
+        r"enxcol_\..*\.esc",
+        r"enxcol_\..*\.ecc",
+        r"enxcol_\..*\.ecoc",
+    ]
+
+    def __init__(
+        self,
+        logger,
+        stepdown_lifecycle,
+        fixture,
+        auth_options,
+        random_balancer_on,
+        move_primary_comment,
+    ):
         threading.Thread.__init__(self, name="TransitionThread")
         self.logger = logger
         self.__lifecycle = stepdown_lifecycle
         self._fixture = fixture
         self._auth_options = auth_options
         self._random_balancer_on = random_balancer_on
+        self._move_primary_comment = move_primary_comment
         self._client = fixture_interface.build_client(self._fixture, self._auth_options)
         self._current_mode = self._current_fixture_mode()
         self._should_wait_for_balancer_round = False
@@ -176,9 +209,46 @@ class _TransitionThread(threading.Thread):
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 
-    def _is_expected_move_error_code(self, code):
+    def _is_expected_move_collection_error(self, err, namespace):
+        if err.code == self._NAMESPACE_NOT_FOUND:
+            # A concurrent dropDatabase or dropCollection could have removed the database before we
+            # run moveCollection.
+            return True
+
+        if err.code == self._BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE:
+            # Ongoing background operations (e.g. index builds) will prevent moveCollection until
+            # they complete.
+            return True
+
+        if err.code == self._RESHARD_COLLECTION_ABORTED:
+            # Tests with interruptions may interrupt moveCollection operation, causing it to get
+            # aborted.
+            return True
+
+        if err.code == self._RESHARD_COLLECTION_IN_PROGRESS:
+            # Tests with interruptions may interrupt the transition thread while running
+            # moveCollection, leading the thread to retry and hit ReshardCollectionInProgress.
+            # Also, if random balancing is on, the balancer will also move unsharded collections
+            # (both tracked and untracked). So the moveCollection operation initiated by the
+            # balancer may conflict with the moveCollection operation initiated by this hook.
+            return True
+
+        if err.code == self._ILLEGAL_OPERATION:
+            if "Can't move an internal resharding collection" in str(err):
+                return True
+            if "Cannot remove from a capped collection in a multi-document transaction" in str(err):
+                # TODO (SERVER-89826): Investigate errors related to moving capped collection that
+                # are part of multi-document transactions.
+                return True
+            for regex in self._UNMOVABLE_NAMESPACE_REGEXES:
+                if re.search(regex, namespace):
+                    return True
+
+        return False
+
+    def _is_expected_move_primary_error_code(self, code):
         if code == self._NAMESPACE_NOT_FOUND:
-            # A concurrent drop Database could have removed the database before we run movePrimary/moveCollection.
+            # A concurrent dropDatabase could have removed the database before we run movePrimary.
             return True
 
         if code == self._CONFLICTING_OPERATION_IN_PROGRESS:
@@ -186,14 +256,20 @@ class _TransitionThread(threading.Thread):
             # movePrimary, leading the thread to retry and hit ConflictingOperationInProgress.
             return True
 
-        if code == self._BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE:
-            # Ongoing background operations (e.g. index builds) will prevent moveCollection until they complete.
+        if code == self._LOCK_BUSY:
+            # If there is an in-progress moveCollection operation, movePrimary would fail to acquire
+            # the DDL lock.
             return True
 
         if code == 7120202:
             # Tests with stepdowns might interrupt the movePrimary during the cloning phase,
             # but the _shardsvrClongCatalogData command is not idempotent so the coordinator
             # will fail the request if cloning has started.
+            return True
+
+        if code == 9046501:
+            # This is an error thrown by a failpoint inside movePrimary when there are still user
+            # collections to clone.
             return True
 
         return False
@@ -217,7 +293,7 @@ class _TransitionThread(threading.Thread):
 
         return False
 
-    def _get_collections_with_chunks_on_config(self):
+    def _get_tracked_collections_on_config(self):
         return list(
             self._client.config.collections.aggregate(
                 [
@@ -240,37 +316,114 @@ class _TransitionThread(threading.Thread):
             )
         )
 
+    def _get_untracked_collections_on_config(self):
+        untracked_collections = []
+        databases = list(
+            self._client.config.databases.aggregate(
+                [
+                    {
+                        "$match": {"primary": "config"},
+                    }
+                ]
+            )
+        )
+        for database in databases:
+            for collection in self._client.get_database(database["_id"]).list_collections():
+                namespace = database["_id"] + "." + collection["name"]
+                coll_doc = self._client.config.collections.find_one({"_id": namespace})
+                if not coll_doc:
+                    collection["_id"] = namespace
+                    untracked_collections.append(collection)
+        return untracked_collections
+
     def _move_collection_all_from_config(self, collections):
         for collection in collections:
             namespace = collection["_id"]
             destination = self._get_non_config_shard_id()
             self.logger.info("Running moveCollection for " + namespace + " to " + destination)
-            self._client.admin.command({"moveCollection": namespace, "toShard": destination})
+            try:
+                self._client.admin.command({"moveCollection": namespace, "toShard": destination})
+            except pymongo.errors.OperationFailure as err:
+                if not self._is_expected_move_collection_error(err, namespace):
+                    raise err
+                self.logger.info(
+                    "Ignoring error when moving the collection '" + namespace + "': " + str(err)
+                )
+                if err.code == self._RESHARD_COLLECTION_IN_PROGRESS:
+                    self.logger.info(
+                        "Skip moving the other collections since there is already a resharding "
+                        + "operation in progress"
+                    )
+                    return
 
     def _move_primary_all_from_config(self, databases):
         for database in databases:
             destination = self._get_non_config_shard_id()
-            self.logger.info("Running movePrimary for " + database + " to " + destination)
-            self._client.admin.command({"movePrimary": database, "to": destination})
+            try:
+                self.logger.info("Running movePrimary for " + database + " to " + destination)
+                cmd_obj = {"movePrimary": database, "to": destination}
+                if self._move_primary_comment:
+                    cmd_obj["comment"] = self._move_primary_comment
+                self._client.admin.command(cmd_obj)
+            except pymongo.errors.OperationFailure as err:
+                if not self._is_expected_move_primary_error_code(err.code):
+                    raise err
+                self.logger.info(
+                    "Ignoring error when moving the database '" + database + "': " + str(err)
+                )
 
-    def _drain_config_for_ongoing_transition(self, transition_result):
-        colls_with_chunks_on_config = self._get_collections_with_chunks_on_config()
-        self.logger.info(
-            "Collections with chunks on config server: " + str(colls_with_chunks_on_config)
-        )
-        try:
-            if not self._random_balancer_on:
-                # Chunk migration will not move the chunk for an
-                # unsplittable collection unless random balancing is on,
-                # so we need to move them ourselves.
-                colls_to_move = [
-                    coll for coll in colls_with_chunks_on_config if "unsplittable" in coll
-                ]
-                self._move_collection_all_from_config(colls_to_move)
-            self._move_primary_all_from_config(transition_result["dbsToMove"])
-        except pymongo.errors.OperationFailure as err:
-            if not self._is_expected_move_error_code(err.code):
-                raise err
+    def _drain_config_for_ongoing_transition(self, num_rounds, transition_result):
+        tracked_colls = self._get_tracked_collections_on_config()
+        sharded_colls = []
+        tracked_unsharded_colls = []
+        for coll in tracked_colls:
+            if "unsplittable" in coll:
+                tracked_unsharded_colls.append(coll)
+            else:
+                sharded_colls.append(coll)
+        untracked_unsharded_colls = self._get_untracked_collections_on_config()
+
+        if num_rounds % 10 == 0:
+            self.logger.info("Draining the config shard: " + str({"num_rounds": num_rounds}))
+            self.logger.info(
+                "Sharded collections on config server: "
+                + str({"count": len(sharded_colls), "collections": sharded_colls})
+            )
+            self.logger.info(
+                "Tracked unsharded collections on config server: "
+                + str(
+                    {"count": len(tracked_unsharded_colls), "collections": tracked_unsharded_colls}
+                )
+            )
+            self.logger.info(
+                "Untracked unsharded collections on config server: "
+                + str(
+                    {
+                        "count": len(untracked_unsharded_colls),
+                        "collections": untracked_unsharded_colls,
+                    }
+                )
+            )
+            self.logger.info(
+                "Databases on config server: "
+                + str(
+                    {
+                        "count": len(transition_result["dbsToMove"]),
+                        "collections": transition_result["dbsToMove"],
+                    }
+                )
+            )
+
+        # If random balancing is on, the balancer will also move unsharded collections (both tracked
+        # and untracked). However, random balancing is a test-only setting. In production, users are
+        # expected to move unsharded collections manually. So even when random balancing is on,
+        # still move collections half of the time.
+        should_move = not self._random_balancer_on or random.random() < 0.5
+        if should_move:
+            self._move_collection_all_from_config(
+                tracked_unsharded_colls + untracked_unsharded_colls
+            )
+        self._move_primary_all_from_config(transition_result["dbsToMove"])
 
     def _get_balancer_status_on_shard_not_found(self, prev_round_interrupted):
         try:
@@ -303,6 +456,7 @@ class _TransitionThread(threading.Thread):
         start_time = time.time()
         last_balancer_status = None
         prev_round_interrupted = False
+        num_draining_rounds = -1
 
         while True:
             try:
@@ -359,7 +513,8 @@ class _TransitionThread(threading.Thread):
                     if self._client.config.chunks.count_documents({"shard": "config"}) == 0:
                         self._should_wait_for_balancer_round = True
                 elif res["state"] == "ongoing":
-                    self._drain_config_for_ongoing_transition(res)
+                    num_draining_rounds += 1
+                    self._drain_config_for_ongoing_transition(num_draining_rounds, res)
 
                 prev_round_interrupted = False
                 time.sleep(1)
@@ -373,10 +528,8 @@ class _TransitionThread(threading.Thread):
                     raise errors.ServerFailure(msg)
             except pymongo.errors.OperationFailure as err:
                 # Some workloads add and remove shards so removing the config shard may fail transiently.
-                if (
-                    err.code in [self._ILLEGAL_OPERATION]
-                    and err.errmsg
-                    and "would remove the last shard" in err.errmsg
+                if err.code in [self._ILLEGAL_OPERATION] and "would remove the last shard" in str(
+                    err
                 ):
                     # Abort the transition attempt and make the hook try again later.
                     return False
@@ -449,11 +602,7 @@ class _TransitionThread(threading.Thread):
                 # transition, addShard will fail because it will not be able to connect. The error
                 # code return is not retryable (it is OperationFailed), so we check the specific
                 # error message as well.
-                if (
-                    err.code in [self._OPERATION_FAILED]
-                    and err.errmsg
-                    and "Connection refused" in err.errmsg
-                ):
+                if err.code in [self._OPERATION_FAILED] and "Connection refused" in str(err):
                     self.logger.info(
                         "Connection refused when transitioning from dedicated config "
                         "server, will retry. err: " + str(err)
