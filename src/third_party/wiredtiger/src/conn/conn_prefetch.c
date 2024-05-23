@@ -38,7 +38,7 @@ __wt_prefetch_create(WT_SESSION_IMPL *session, const char *cfg[])
 
     F_SET(conn, WT_CONN_PREFETCH_RUN);
 
-    session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL | WT_SESSION_PREFETCH_THREAD;
+    session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
     WT_ERR(__wt_thread_group_create(session, &conn->prefetch_threads, "prefetch-server",
       WT_PREFETCH_THREAD_COUNT, WT_PREFETCH_THREAD_COUNT, session_flags, __wt_prefetch_thread_chk,
       __wt_prefetch_thread_run, NULL));
@@ -76,6 +76,9 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     WT_UNUSED(thread);
     WT_ASSERT(session, session->id != 0);
     conn = S2C(session);
+
+    /* Mark the session as a prefetch thread session. */
+    F_SET(session, WT_SESSION_PREFETCH_THREAD);
 
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
