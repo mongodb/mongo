@@ -343,6 +343,18 @@ Status onUpdateHeapProfilingSampleIntervalBytes(long long newValue) {
     return Status::OK();
 }
 
+Status validateHeapProfilingSampleIntervalBytes(long long newValue,
+                                                const boost::optional<TenantId>& tenantId) {
+    const long long heapProfilerMinRate = 10000;  // 10kB
+    if (newValue == 0 || newValue >= heapProfilerMinRate) {
+        return Status::OK();
+    }
+
+    return {ErrorCodes::BadValue,
+            "heapProfilingSampleIntervalBytes must have a minimum rate of {} bytes or be disabled "
+            "with a rate of 0."_format(heapProfilerMinRate)};
+}
+
 namespace {
 
 MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults, (), ("BeginStartupOptionHandling"))

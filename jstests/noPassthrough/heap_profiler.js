@@ -1,5 +1,7 @@
 // Exercises the basic heap profiler path.
 
+const minProfilingRate = 10000;
+
 function testHeapProfilerOnStartup(opts) {
     let db;
     try {
@@ -28,7 +30,7 @@ function testHeapProfilerOnRuntime() {
     const adminDb = db.getDB('admin');
 
     jsTestLog("Heap profile stats are present when sample interval bytes > 0");
-    adminDb.runCommand({setParameter: 1, heapProfilingSampleIntervalBytes: 1});
+    adminDb.runCommand({setParameter: 1, heapProfilingSampleIntervalBytes: minProfilingRate});
     assert.soon(() => {
         const ss = adminDb.serverStatus();
 
@@ -42,8 +44,32 @@ function testHeapProfilerOnRuntime() {
     assert.soon(() => {
         const ss = adminDb.serverStatus();
 
-        return !ss.hasOwnProperty("heapProfile")
+        return !ss.hasOwnProperty("heapProfile");
     }, "Heap profile serverStatus section was found when it should be disabled");
+
+    MongoRunner.stopMongod(db);
+}
+
+function testHeapProfilerRespectsMemoryLimit() {
+    let db;
+    try {
+        db = MongoRunner.runMongod({
+            setParameter:
+                {heapProfilingSampleIntervalBytes: minProfilingRate, heapProfilingMaxObjects: 2}
+        });
+    } catch (err) {
+        jsTestLog("Heap profiler is not available on this platform.");
+        quit();
+    }
+
+    const adminDb = db.getDB('admin');
+
+    jsTestLog("Heap profiler auto-disables itself after hitting the max object limit.");
+    assert.soon(() => {
+        const res = adminDb.runCommand({getParameter: 1, "heapProfilingSampleIntervalBytes": 1});
+
+        return res["ok"] === 1 && res["heapProfilingSampleIntervalBytes"].toNumber() === 0;
+    }, "Heap profile was not disabled after hitting maximum objects limit.");
 
     MongoRunner.stopMongod(db);
 }
@@ -58,10 +84,12 @@ assert(buildInfo.hasOwnProperty("allocator"));
 
 if (buildInfo.allocator === "tcmalloc-google") {
     jsTestLog("Testing tcmalloc-google heap profiler");
-    testHeapProfilerOnStartup({setParameter: {heapProfilingSampleIntervalBytes: 1}});
+    testHeapProfilerOnStartup({setParameter: {heapProfilingSampleIntervalBytes: minProfilingRate}});
     testHeapProfilerOnRuntime();
+    testHeapProfilerRespectsMemoryLimit();
 } else if (buildInfo.allocator === "tcmalloc-gperf") {
     jsTestLog("Testing tcmalloc-gperf heap profiler");
-    testHeapProfilerOnStartup(
-        {setParameter: {heapProfilingEnabled: 1, heapProfilingSampleIntervalBytes: 1}});
+    testHeapProfilerOnStartup({
+        setParameter: {heapProfilingEnabled: 1, heapProfilingSampleIntervalBytes: minProfilingRate}
+    });
 }

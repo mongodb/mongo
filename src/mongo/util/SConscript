@@ -415,6 +415,7 @@ if tcmallocAttrs:
             "$BUILD_DIR/mongo/base",
             "$BUILD_DIR/mongo/db/commands/server_status_core",
             "$BUILD_DIR/mongo/db/server_base",
+            "processinfo",
             "tcmalloc_set_parameter",
         ],
     )

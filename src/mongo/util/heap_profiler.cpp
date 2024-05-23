@@ -59,6 +59,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
 
@@ -774,17 +775,23 @@ private:
         if (_logGeneralStats.compareAndSwap(&expected, false)) {
             LOGV2(8592504,
                   "Generating heap profiler serverStatus",
-                  "heapProfilingSampleIntervalBytes"_attr = HeapProfilingSampleIntervalBytes);
+                  "heapProfilingSampleIntervalBytes"_attr = HeapProfilingSampleIntervalBytes,
+                  "maximumSampledObjects"_attr = _maxSampledObjects);
         }
 
         stdx::lock_guard lk(heapProfiler->_mutex);
 
         // Get a live snapshot profile of the current heap usage
         int64_t totalActiveBytes = 0;
+        size_t activeSamples = 0;
         std::vector<StackInfo*> stackInfos;
         std::set<StackInfo*, ByStackNum> activeStacks;
+        bool disabled = false;
         tcmalloc::MallocExtension::SnapshotCurrent(tcmalloc::ProfileType::kHeap)
             .Iterate([&](const auto& sample) {
+                if (disabled)
+                    return;
+                activeSamples++;
                 totalActiveBytes += sample.sum;
                 _sampleBytesAllocated += sample.allocated_size;
                 // Compute backtrace hash of sample stack
@@ -801,7 +808,23 @@ private:
                     stackInfos.push_back(stackInfo.get());
                     stackInfo->activeBytes = sample.sum;
                 }
+
+                if (activeSamples > _maxSampledObjects) {
+                    LOGV2(9060100,
+                          "Exceeded active sample maximum, disabling heap profiler",
+                          "activeSamples"_attr = activeSamples);
+
+                    uassertStatusOK(ServerParameterSet::getNodeParameterSet()
+                                        ->get<IDLServerParameterWithStorage<
+                                            ServerParameterType::kStartupAndRuntime,
+                                            long long>>("heapProfilingSampleIntervalBytes")
+                                        ->setValue(0, boost::none));
+                    disabled = true;
+                }
             });
+
+        if (disabled)
+            return;
 
         BSONObjBuilder(builder.subobjStart("stats"))
             .appendNumber("totalActiveBytes", static_cast<long long>(totalActiveBytes))
@@ -851,6 +874,14 @@ private:
     size_t _sampleBytesAllocated = 0;
     stdx::unordered_map<uint32_t, std::unique_ptr<StackInfo>> _stackInfoMap;
     Atomic<bool> _logGeneralStats = true;
+    // Either use the user-configured maximum, or the heuristic that each tcmalloc sample takes up a
+    // page-- do not exceed 5% of pages in the system.
+    const size_t _maxSampledObjects =
+        HeapProfilingMaxObjects != 0 ? HeapProfilingMaxObjects : []() {
+            return (static_cast<float>(ProcessInfo::getMemSizeMB() * (1024 * 1024)) /
+                    static_cast<float>(ProcessInfo::getPageSize())) *
+                0.05;
+        }();
 
     // In order to reduce load on ftdc we track the stacks we deem important enough to emit
     // once a stack is deemed "important" it remains important from that point on.
