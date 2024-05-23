@@ -18,6 +18,15 @@ import {
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
+    if (TestData.killShards || TestData.terminateShards) {
+        // The transaction API does not abort internal transactions that are interrupted (by
+        // kill or terminate) after they have started to commit. The initial retry of that
+        // transaction after the interrupt would abort the open transaction, but all retries after
+        // that would block, so we lower the transactionLifetimeLimitSeconds so those retries do not
+        // block indefinitely (24 hours).
+        $config.data.lowerTransactionLifetimeLimitSeconds = true;
+    }
+
     $config.data.expectDirtyDocs = {
         // The client is either not using a session or is using a session without retryable writes
         // enabled. Therefore, when a write is interrupted due to stepdown/kill/terminate, they

@@ -158,6 +158,7 @@ executor:
         TestData:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
+          killShards: true
           useActionPermittedFile: true
           runningWithBalancer: true
           fsmPreOverridesLoadedCallback:
