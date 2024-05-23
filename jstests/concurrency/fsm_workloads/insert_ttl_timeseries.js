@@ -182,6 +182,7 @@ export const $config = (function() {
         }, 'Expected oldest documents to be removed', timeoutMS);
 
         if (TestData.runningWithBalancer) {
+            assert.commandWorked(db.adminCommand({balancerStart: 1, maxTimeMS: 600000}));
             BalancerHelper.enableBalancerForCollection(db, db[collName].getFullName());
         }
     }
