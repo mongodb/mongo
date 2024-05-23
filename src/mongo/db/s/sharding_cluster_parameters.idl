@@ -80,5 +80,5 @@ server_parameters:
       cpp_varname: addOrRemoveShardInProgress
       redact: false
       condition:
-        min_fcv: 8.1
+        min_fcv: 8.0
 

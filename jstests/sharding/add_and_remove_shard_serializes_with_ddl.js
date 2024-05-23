@@ -4,7 +4,7 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   featureFlagStopDDLCoordinatorsDuringTopologyChanges,
- *   requires_fcv_81,
+ *   requires_fcv_80,
  * ]
  */
 
