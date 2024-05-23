@@ -535,11 +535,12 @@ class _InitialSyncThread(threading.Thread):
         # perform a write and wait for it to replicate to all nodes. If any nodes were in rollback
         # they would need to finish in order to apply the new write.
         client_conn = fixture.get_driver_connection_url()
+        # maxTimeMS: 0 below means don't time out.
         js_cmds = """
             const conn = '{}';
             try {{
                 const rst = new ReplSetTest(conn);
-                assert.commandWorked(rst.getPrimary().getDB("admin").runCommand({{appendOplogNote: 1, data: {{a: 2}}}}));
+                assert.commandWorked(rst.getPrimary().getDB("admin").runCommand({{appendOplogNote: 1, data: {{a: 2}}, maxTimeMS: 0}}));
                 rst.awaitReplication();
             }} catch (e) {{
                 jsTestLog("WaitForReplication got error: " + tojson(e));
