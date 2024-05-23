@@ -546,8 +546,6 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
     bool busy, visible;
 
     busy = false;
-    /* Pre-fetch queue flags on a ref need to be checked while holding the pre-fetch lock. */
-    __wt_spin_lock(session, &S2C(session)->prefetch_lock);
 
     /*
      * There may be cursors in the tree walking the list of child pages. The parent is locked, so
@@ -575,7 +573,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
             break;
     }
     WT_INTL_FOREACH_END;
-    __wt_spin_unlock(session, &S2C(session)->prefetch_lock);
+
     if (busy)
         return (__wt_set_return(session, EBUSY));
 

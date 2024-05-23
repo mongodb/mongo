@@ -120,7 +120,6 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
         WT_PREFETCH_ASSERT(
           session, F_ISSET_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH), prefetch_skipped_no_flag_set);
-        F_CLR_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH);
         __wt_spin_unlock(session, &conn->prefetch_lock);
 
         /*
@@ -135,6 +134,11 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         if (!F_ISSET(conn, WT_CONN_DATA_CORRUPTION) && pe->ref->page_del == NULL)
             WT_WITH_DHANDLE(session, pe->dhandle, ret = __wt_prefetch_page_in(session, pe));
 
+        /*
+         * It is now safe to clear the flag. The prefetch worker is done interacting with the ref
+         * and the associated internal page can be safely evicted from now on.
+         */
+        F_CLR_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH);
         (void)__wt_atomic_subv32(&((WT_BTREE *)pe->dhandle->handle)->prefetch_busy, 1);
         WT_ERR(ret);
 
@@ -179,6 +183,11 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
         WT_ERR(EBUSY);
     }
 
+    /*
+     * On top of indicating the leaf page is now in the prefetch queue, the prefetch flag also
+     * guarantees the corresponding internal page cannot be evicted until prefetch has processed the
+     * leaf page. This flag is checked when eviction reviews an internal page for active children.
+     */
     F_SET_ATOMIC_8(ref, WT_REF_FLAG_PREFETCH);
     TAILQ_INSERT_TAIL(&conn->pfqh, pe, q);
     ++conn->prefetch_queue_count;
