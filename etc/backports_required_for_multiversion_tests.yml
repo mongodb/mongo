@@ -611,6 +611,10 @@ last-continuous:
     ticket: SERVER-90173
   - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
     ticket: SERVER-86674
+  - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
+    ticket: SERVER-87961
+  - test_file: jstests/core/timeseries/timeseries_lastpoint.js
+    ticket: SERVER-87961
   suites: null
 last-lts:
   all:
@@ -1276,4 +1280,8 @@ last-lts:
     ticket: SERVER-90173
   - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
     ticket: SERVER-86674
+  - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
+    ticket: SERVER-87961
+  - test_file: jstests/core/timeseries/timeseries_lastpoint.js
+    ticket: SERVER-87961
   suites: null
