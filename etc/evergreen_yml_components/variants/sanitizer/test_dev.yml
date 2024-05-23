@@ -153,6 +153,8 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --link-model=dynamic
         --use-diagnostic-latches=on
+      build_mongot: true
+      download_mongot_release: true
       compile_variant: *linux-debug-aubsan-compile-required
       test_flags: >-
         --excludeWithAnyTags=incompatible_aubsan
@@ -251,6 +253,7 @@ buildvariants:
       - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - rhel80-large
+      - name: .search_e2e_tests
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
     name: &rhel80-debug-aubsan-experimental rhel80-debug-aubsan-experimental

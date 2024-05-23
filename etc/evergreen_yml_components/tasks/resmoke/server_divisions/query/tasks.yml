@@ -987,6 +987,7 @@ tasks:
         "assigned_to_jira_team_server_query_integration",
         "experimental",
         "incompatible_windows",
+        "search_e2e_tests",
       ]
     commands:
       - func: "do setup"
@@ -1001,6 +1002,7 @@ tasks:
         "assigned_to_jira_team_server_query_integration",
         "experimental",
         "incompatible_windows",
+        "search_e2e_tests",
       ]
     commands:
       - func: "do setup"
