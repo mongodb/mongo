@@ -157,6 +157,7 @@ executor:
         TestData:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
+          killShards: true
           useActionPermittedFile: true
           runningWithBalancer: true
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");

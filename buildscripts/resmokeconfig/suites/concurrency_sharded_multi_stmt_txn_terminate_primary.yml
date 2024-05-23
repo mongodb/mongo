@@ -197,6 +197,7 @@ executor:
           runningWithConfigStepdowns: true
           runningWithSessions: true
           runningWithShardStepdowns: true
+          terminateShards: true
           traceExceptions: false
           useActionPermittedFile: true
   hooks:
