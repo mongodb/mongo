@@ -727,7 +727,7 @@ TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto bucketAutoStage = DocumentSourceBucketAuto::create(
         expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
 
-    string largeStr(maxMemoryUsageBytes / 2, 'x');
+    string largeStr(maxMemoryUsageBytes / 5, 'x');
     auto mock =
         DocumentSourceMock::createForTest({Document{{"a", 0}, {"largeStr", largeStr}},
                                            DocumentSource::GetNextResult::makePauseExecution(),

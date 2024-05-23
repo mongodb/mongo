@@ -518,7 +518,7 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
     auto sort =
         DocumentSourceSort::create(expCtx, {BSON("_id" << -1), expCtx}, 0, maxMemoryUsageBytes);
 
-    string largeStr(maxMemoryUsageBytes / 2, 'x');
+    string largeStr(maxMemoryUsageBytes / 5, 'x');
     auto mock =
         DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
                                            DocumentSource::GetNextResult::makePauseExecution(),

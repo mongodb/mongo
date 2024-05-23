@@ -59,11 +59,19 @@ void SorterStats::incrementSpilledRanges() {
 }
 
 void SorterStats::setSpilledRanges(uint64_t spills) {
-    invariant(_spilledRanges == 0);
-    _spilledRanges = spills;
-    if (_sorterTracker) {
-        _sorterTracker->spilledRanges.fetchAndAdd(spills);
+    if (spills == _spilledRanges) {
+        return;
     }
+
+    if (_sorterTracker) {
+        if (spills > _spilledRanges) {
+            _sorterTracker->spilledRanges.fetchAndAdd(spills - _spilledRanges);
+        } else {
+            _sorterTracker->spilledRanges.fetchAndSubtract(_spilledRanges - spills);
+        }
+    }
+
+    _spilledRanges = spills;
 }
 
 uint64_t SorterStats::spilledRanges() const {
