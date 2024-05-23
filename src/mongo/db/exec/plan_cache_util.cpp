@@ -56,6 +56,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/overloaded_visitor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -153,12 +154,23 @@ void updateClassicPlanCacheFromClassicCandidates(
     winningPlan.solution->cacheData->indexFilterApplied = winningPlan.solution->indexFilterApplied;
     winningPlan.solution->cacheData->solutionHash = winningPlan.solution->hash();
     auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
+
+    ReadsOrWorks nWorks =
+        visit(OverloadedVisitor{[&](const plan_ranker::StatsDetails& details) -> ReadsOrWorks {
+                                    return ReadsOrWorks{
+                                        NumWorks{details.candidatePlanStats[0]->common.works}};
+                                },
+                                [](const plan_ranker::SBEStatsDetails& details) -> ReadsOrWorks {
+                                    MONGO_UNREACHABLE;
+                                }},
+              ranking->stats);
+
     uassertStatusOK(
         CollectionQueryInfo::get(collection)
             .getPlanCache()
             ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
                   winningPlan.solution->cacheData->clone(),
-                  *ranking,
+                  nWorks,
                   opCtx->getServiceContext()->getPreciseClockSource()->now(),
                   &callbacks,
                   isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
@@ -184,11 +196,21 @@ void updateSbePlanCache(OperationContext* opCtx,
         callbacks{query, buildDebugInfoFn, printCachedPlanFn};
 
     auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
+
+    ReadsOrWorks nReads =
+        visit(OverloadedVisitor{[&](const plan_ranker::StatsDetails& details) -> ReadsOrWorks {
+                                    return NumReads{details.candidatePlanStats[0]->common.works};
+                                },
+                                [](const plan_ranker::SBEStatsDetails& details) -> ReadsOrWorks {
+                                    return NumReads{calculateNumberOfReads(
+                                        details.candidatePlanStats[0].get())};
+                                }},
+              ranking.stats);
     uassertStatusOK(sbe::getPlanCache(opCtx).set(
         plan_cache_key_factory::make(
             query, collections, canonical_query_encoder::Optimizer::kSbeStageBuilders),
         std::move(cachedPlan),
-        ranking,
+        nReads,
         opCtx->getServiceContext()->getPreciseClockSource()->now(),
         &callbacks,
         isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,

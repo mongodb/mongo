@@ -199,7 +199,7 @@ std::unique_ptr<PlannerInterface> replan(PlannerDataForSBE plannerData,
 std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
     PlannerDataForSBE plannerData, std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder) {
     AllIndicesRequiredChecker indexExistenceChecker{plannerData.collections};
-    const auto& decisionReads = cachedPlanHolder->decisionWorks;
+    const auto& decisionReads = cachedPlanHolder->decisionReads();
     auto sbePlan = std::move(cachedPlanHolder->cachedPlan->root);
     auto planStageData = std::move(cachedPlanHolder->cachedPlan->planStageData);
     planStageData.debugInfo = cachedPlanHolder->debugInfo;

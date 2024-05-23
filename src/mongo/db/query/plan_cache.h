@@ -92,6 +92,76 @@ enum class PlanSecurityLevel {
 };
 
 /**
+ * Each cache entry stores a value indicating how much "work" the plan required. This is used
+ * for evaluating whether re-planning is necessary. This value is sometimes measured in 'works' and
+ * other times measured in total storage engine reads.
+ */
+struct NumReads {
+    constexpr static StringData kName = "reads"_sd;
+    size_t value;
+};
+struct NumWorks {
+    constexpr static StringData kName = "works"_sd;
+    size_t value;
+};
+
+/**
+ * Sum type representing a decision cost value in units of either works or reads.
+ */
+struct ReadsOrWorks {
+    ReadsOrWorks(NumReads reads) : data(reads) {}
+    ReadsOrWorks(NumWorks works) : data(works) {}
+
+    size_t numReads() const {
+        tassert(
+            8908810, "Expected variant to hold numReads", std::holds_alternative<NumReads>(data));
+        return std::get<NumReads>(data).value;
+    }
+
+    size_t numWorks() const {
+        tassert(
+            8908811, "Expected variant to hold numWorks", std::holds_alternative<NumWorks>(data));
+        return std::get<NumWorks>(data).value;
+    }
+
+    /**
+     * Creates a ReadsOrWorks of the same unit/type but with a new raw value.
+     */
+    ReadsOrWorks createFrom(size_t val) const {
+        return visit(OverloadedVisitor{
+                         [&](const NumWorks&) { return ReadsOrWorks{NumWorks{val}}; },
+                         [&](const NumReads&) { return ReadsOrWorks{NumReads{val}}; },
+                     },
+                     data);
+    }
+
+    /**
+     * Returns the numeric value associated with this ReadsOrWorks.
+     */
+    size_t rawValue() const {
+        return visit(
+            OverloadedVisitor{
+                [&](const auto& numX) { return numX.value; },
+            },
+            data);
+    }
+
+    /**
+     * Returns the unit used as a string, which can be used for human-readable output.
+     */
+    StringData type() const {
+        return visit(
+            OverloadedVisitor{
+                [&](const auto& numX) { return std::decay_t<decltype(numX)>::kName; },
+            },
+            data);
+    }
+
+    std::variant<NumReads, NumWorks> data;
+};
+
+
+/**
  * Information returned from a get(...) query.
  */
 template <class CachedPlanType, class DebugInfoType>
@@ -103,14 +173,32 @@ private:
 public:
     CachedPlanHolder(const PlanCacheEntryBase<CachedPlanType, DebugInfoType>& entry)
         : cachedPlan(entry.cachedPlan->clone()),
-          decisionWorks(entry.works),
+          decisionReadsOrWorks(entry.readsOrWorks),
           debugInfo(entry.debugInfo) {}
 
     /**
      * Indicates whether or not the cached plan is pinned to cache.
      */
     bool isPinned() const {
-        return !decisionWorks;
+        return !decisionReadsOrWorks;
+    }
+
+    /**
+     * Returns number of reads used in deciding on the winning plan for this cache entry, if
+     * applicable.
+     */
+    boost::optional<size_t> decisionReads() const {
+        return decisionReadsOrWorks ? boost::optional<size_t>(decisionReadsOrWorks->numReads())
+                                    : boost::none;
+    }
+
+    /**
+     * Returns number of works used in deciding on the winning plan for this cache entry, if
+     * applicable.
+     */
+    boost::optional<size_t> decisionWorks() const {
+        return decisionReadsOrWorks ? boost::optional<size_t>(decisionReadsOrWorks->numWorks())
+                                    : boost::none;
     }
 
     // A cached plan that can be used to reconstitute the complete execution plan from cache.
@@ -119,7 +207,7 @@ public:
     // The number of work cycles taken to decide on a winning plan when the plan was first
     // cached. The value of boost::none indicates that the plan is pinned to the cache and
     // is not subject to replanning.
-    const boost::optional<size_t> decisionWorks;
+    const boost::optional<ReadsOrWorks> decisionReadsOrWorks;
 
     // Per-plan cache entry information that is used for debugging purpose. Shared across all plans
     // recovered from the same cached entry.
@@ -142,7 +230,7 @@ public:
                                          Date_t timeOfCreation,
                                          bool isActive,
                                          PlanSecurityLevel securityLevel,
-                                         size_t works,
+                                         ReadsOrWorks readsOrWorks,
                                          DebugInfoType debugInfo) {
         // If the cumulative size of the plan caches is estimated to remain within a predefined
         // threshold, then include additional debug info which is not strictly necessary for
@@ -170,7 +258,7 @@ public:
                                                 planCacheCommandKey,
                                                 isActive,
                                                 securityLevel,
-                                                works,
+                                                readsOrWorks,
                                                 std::move(debugInfoOpt)));
     }
 
@@ -208,7 +296,7 @@ public:
      * and are not subject to replanning.
      */
     bool isPinned() const {
-        return !works;
+        return !readsOrWorks;
     }
 
     /**
@@ -223,7 +311,7 @@ public:
                                                 planCacheCommandKey,
                                                 isActive,
                                                 securityLevel,
-                                                works,
+                                                readsOrWorks,
                                                 debugInfo));
     }
 
@@ -272,7 +360,7 @@ public:
     //
     // If boost::none the cached entry is pinned to cached. Pinned entries are always active
     // and are not subject to replanning.
-    const boost::optional<size_t> works;
+    const boost::optional<ReadsOrWorks> readsOrWorks;
 
     // Optional debug info containing plan cache entry information that is used strictly as
     // debug information. Read-only and shared between all plans recovered from this entry.
@@ -294,7 +382,7 @@ private:
                        uint32_t planCacheCommandKey,
                        bool isActive,
                        PlanSecurityLevel securityLevel,
-                       boost::optional<size_t> works,
+                       boost::optional<ReadsOrWorks> works,
                        std::shared_ptr<const DebugInfoType> debugInfo)
         : cachedPlan(std::move(cachedPlan)),
           timeOfCreation(timeOfCreation),
@@ -303,7 +391,7 @@ private:
           planCacheCommandKey(planCacheCommandKey),
           isActive(isActive),
           securityLevel(securityLevel),
-          works(works),
+          readsOrWorks(works),
           debugInfo(std::move(debugInfo)),
           estimatedEntrySizeBytes(_estimateObjectSizeInBytes()) {
         tassert(6108300, "A plan cache entry should never be empty", this->cachedPlan);
@@ -422,41 +510,30 @@ public:
      */
     Status set(const KeyType& key,
                std::unique_ptr<CachedPlanType> cachedPlan,
-               const plan_ranker::PlanRankingDecision& why,
+               ReadsOrWorks newReadsOrWorks,
                Date_t now,
                const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks,
                PlanSecurityLevel securityLevel,
                boost::optional<double> worksGrowthCoefficient = boost::none) {
         invariant(cachedPlan);
 
-        if (why.scores.size() != why.candidateOrder.size()) {
-            return Status(ErrorCodes::BadValue,
-                          "number of scores in decision must match viable candidates");
-        }
-
-        auto newWorks =
-            visit(OverloadedVisitor{[](const plan_ranker::StatsDetails& details) {
-                                        return details.candidatePlanStats[0]->common.works;
-                                    },
-                                    [](const plan_ranker::SBEStatsDetails& details) {
-                                        return calculateNumberOfReads(
-                                            details.candidatePlanStats[0].get());
-                                    }},
-                  why.stats);
-
         auto oldEntryWithPartitionLock = this->getWithPartitionLock(key);
         // Can't use reference to structured bindings in a lambda until C++20 so manually
         // destructure it here.
         auto partitionLock = std::move(oldEntryWithPartitionLock.second);
         auto oldEntryWithStatus = std::move(oldEntryWithPartitionLock.first);
-        auto [queryHash, planCacheKey, isNewEntryActive, shouldBeCreated, increasedWorks] = [&]() {
+        auto [queryHash,
+              planCacheKey,
+              isNewEntryActive,
+              shouldBeCreated,
+              increasedReadsOrWorks] = [&]() {
             if (internalQueryCacheDisableInactiveEntries.load()) {
                 // All entries are always active.
                 return std::make_tuple(key.queryHash(),
                                        key.planCacheKeyHash(),
                                        true /* isNewEntryActive  */,
                                        true /* shouldBeCreated  */,
-                                       boost::optional<size_t>(boost::none));
+                                       boost::optional<ReadsOrWorks>(boost::none));
             } else {
                 tassert(6007020,
                         "LRU store must get value or NoSuchKey error code",
@@ -468,8 +545,8 @@ public:
                     key,
                     // Deference the pointer, then the shared_ptr, and then back to a raw pointer.
                     hasOldEntry ? &**oldEntryWithStatus.getValue() : nullptr,
+                    newReadsOrWorks,
                     *cachedPlan.get(),
-                    newWorks,
                     worksGrowthCoefficient.get_value_or(internalQueryCacheWorksGrowthCoefficient),
                     callbacks);
 
@@ -486,7 +563,7 @@ public:
                                        planCacheKey,
                                        newState.shouldBeActive,
                                        newState.shouldBeCreated,
-                                       newState.increasedWorks);
+                                       newState.increasedReadsOrWorks);
             }
         }();
 
@@ -500,16 +577,17 @@ public:
         // Most of the time when either creating a new cache entry or replacing an old cache entry,
         // the 'works' value is based on the latest trial run. However, if the cache entry was
         // inactive and the latest trial required a higher works value, then we follow a special
-        // formula for computing an 'increasedWorks' value.
-        std::shared_ptr<Entry> newEntry = Entry::create(std::move(cachedPlan),
-                                                        queryHash,
-                                                        planCacheKey,
-                                                        callbacks->getPlanCacheCommandKeyHash(),
-                                                        now,
-                                                        isNewEntryActive,
-                                                        securityLevel,
-                                                        increasedWorks ? *increasedWorks : newWorks,
-                                                        callbacks->buildDebugInfo());
+        // formula for computing an 'increasedReadsOrWorks' value.
+        std::shared_ptr<Entry> newEntry =
+            Entry::create(std::move(cachedPlan),
+                          queryHash,
+                          planCacheKey,
+                          callbacks->getPlanCacheCommandKeyHash(),
+                          now,
+                          isNewEntryActive,
+                          securityLevel,
+                          increasedReadsOrWorks ? *increasedReadsOrWorks : newReadsOrWorks,
+                          callbacks->buildDebugInfo());
 
         this->put(key, std::move(newEntry), partitionLock);
         return Status::OK();
@@ -671,7 +749,7 @@ private:
     struct NewEntryState {
         bool shouldBeCreated = false;
         bool shouldBeActive = false;
-        boost::optional<size_t> increasedWorks = boost::none;
+        boost::optional<ReadsOrWorks> increasedReadsOrWorks = boost::none;
     };
 
     /**
@@ -679,50 +757,52 @@ private:
      * whether:
      * - We should create a new entry
      * - The new entry should be marked 'active'
-     * - The new entry should update 'works' to the new value returned as 'increasedWorks'.
+     * - The new entry should update 'works' to the new value returned as 'increasedReadsWorks'.
      */
     NewEntryState getNewEntryState(
         const KeyType& key,
         const Entry* oldEntry,
+        ReadsOrWorks newWorks,
         const CachedPlanType& newPlan,
-        size_t newWorks,
         double growthCoefficient,
         const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks) {
         NewEntryState res;
         if (!oldEntry) {
             if (callbacks) {
-                callbacks->onCreateInactiveCacheEntry(key, oldEntry, newWorks);
+                callbacks->onCreateInactiveCacheEntry(key, oldEntry, newWorks.rawValue());
             }
             res.shouldBeCreated = true;
             res.shouldBeActive = false;
             return res;
         }
 
-        if (!oldEntry->works) {
+        if (!oldEntry->readsOrWorks) {
             if (callbacks) {
-                callbacks->onUnexpectedPinnedCacheEntry(key, oldEntry, newPlan, newWorks);
+                callbacks->onUnexpectedPinnedCacheEntry(
+                    key, oldEntry, newPlan, newWorks.rawValue());
             }
             tasserted(6108302,
                       "Works value is not present in the old cache entry (is it a pinned entry?)");
         }
-        auto oldWorks = oldEntry->works.get();
+        const size_t newWorksRaw = newWorks.rawValue();
+        const size_t oldWorksRaw = oldEntry->readsOrWorks->rawValue();
 
-        if (oldEntry->isActive && newWorks <= oldWorks) {
+        if (oldEntry->isActive && newWorksRaw <= oldWorksRaw) {
             // The new plan did better than the currently stored active plan. This case may
             // occur if many MultiPlanners are run simultaneously.
             if (callbacks) {
-                callbacks->onReplaceActiveCacheEntry(key, oldEntry, newWorks);
+                callbacks->onReplaceActiveCacheEntry(key, oldEntry, newWorksRaw);
             }
             res.shouldBeCreated = true;
             res.shouldBeActive = true;
         } else if (oldEntry->isActive) {
             if (callbacks) {
-                callbacks->onNoopActiveCacheEntry(key, oldEntry, newWorks);
+                callbacks->onNoopActiveCacheEntry(key, oldEntry, newWorksRaw);
             }
             // There is already an active cache entry with a lower works value.
             // We do nothing.
             res.shouldBeCreated = false;
-        } else if (newWorks > oldWorks) {
+        } else if (newWorksRaw > oldWorksRaw) {
             // The cached plan performed worse than expected. Rather than immediately overwriting
             // the cache, lower the bar to what is considered good performance and keep the entry
             // inactive.
@@ -731,22 +811,23 @@ private:
             // value and 'internalQueryCacheWorksGrowthCoefficient' are low enough that
             // the old works * new works cast to size_t is the same as the previous value of
             // 'works'.
-            const double increasedWorks =
-                std::max(oldWorks + 1u, static_cast<size_t>(oldWorks * growthCoefficient));
+            const double increasedRawWorks =
+                std::max(oldWorksRaw + 1u, static_cast<size_t>(oldWorksRaw * growthCoefficient));
 
             if (callbacks) {
-                callbacks->onIncreasingWorkValue(key, oldEntry, increasedWorks);
+                callbacks->onIncreasingWorkValue(key, oldEntry, increasedRawWorks);
             }
 
             // Create a new inactive cache entry with 'increasedWorks'.
             res.shouldBeCreated = true;
-            res.increasedWorks.emplace(increasedWorks);
+            res.increasedReadsOrWorks.emplace(
+                oldEntry->readsOrWorks->createFrom(increasedRawWorks));
         } else {
             // This cached plan performed just as well or better than we expected, based on the
             // inactive entry's works. We use this as an indicator that it's safe to
             // cache (as an active entry) the plan this query used for the future.
             if (callbacks) {
-                callbacks->onPromoteCacheEntry(key, oldEntry, newWorks);
+                callbacks->onPromoteCacheEntry(key, oldEntry, newWorksRaw);
             }
             // We'll replace the old inactive entry with an active entry.
             res.shouldBeCreated = true;

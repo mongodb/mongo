@@ -55,8 +55,10 @@ export function assertCacheUsage(coll,
     }
     if (cacheEntryVersion === 2) {
         assert(entry.cachedPlan.stages.includes(cachedIndexName), entry);
+        assert.eq(entry.worksType, "reads");
     } else {
         assert(planHasIxScanStageForIndex(getCachedPlan(entry.cachedPlan), cachedIndexName), entry);
+        assert.eq(entry.worksType, "works");
     }
 }
 
