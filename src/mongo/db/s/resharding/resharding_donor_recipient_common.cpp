@@ -208,8 +208,14 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
                                  ReshardingDonorDocument>(opCtx, donorDoc);
 }
 
-bool isCurrentShardPrimary(OperationContext* opCtx, const CollectionMetadata& metadata) {
-    return metadata.getChunkManager()->dbPrimary() == ShardingState::get(opCtx)->shardId();
+bool isCurrentShardPrimary(OperationContext* opCtx, const NamespaceString& nss) {
+    // At this point of resharding execution, the coordinator is holding a DDL lock which means
+    // the DB primary is stable and we have gossiped-in the `configTime` which created that
+    // coordinator. Therefore the withRefresh call is guaranteed to see the most-up-to date DB
+    // primary.
+    auto dbInfo = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, nss.dbName()));
+    return dbInfo->getPrimary() == ShardingState::get(opCtx)->shardId();
 }
 
 /*
@@ -242,7 +248,7 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
 
     // This could be a shard not indicated as a recipient that's trying to refresh the temporary
     // collection. In this case, we don't want to create a recipient machine.
-    if (!isCurrentShardPrimary(opCtx, metadata) && !metadata.currentShardHasAnyChunks()) {
+    if (!isCurrentShardPrimary(opCtx, nss) && !metadata.currentShardHasAnyChunks()) {
         return;
     }
 
