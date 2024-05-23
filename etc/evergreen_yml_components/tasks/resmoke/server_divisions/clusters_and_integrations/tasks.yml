@@ -2021,21 +2021,6 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
-  - <<: *task_template
-    name: sharded_jscore_txns_sharded_collections_with_config_transitions
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "release_critical",
-        "incompatible_mac",
-        "sharding",
-        "jscore",
-        "txns",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
   - <<: *gen_task_template
     name: sharded_jscore_txns_sharded_collections_with_replica_set_endpoint_gen
     tags:
