@@ -209,7 +209,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
             if (!ovfl_key)
                 WT_RET(__rec_cell_build_leaf_key(session, r, NULL, 0, &ovfl_key));
         }
-        WT_RET(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
+        WT_RET(__wti_rec_split_crossing_bnd(session, r, key->len + val->len));
     }
 
     /* Copy the key/value pair onto the page. */
@@ -260,7 +260,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
         /* Boundary: split or write the page. */
         if (__wt_rec_need_split(r, key->len + val->len))
-            WT_RET(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
+            WT_RET(__wti_rec_split_crossing_bnd(session, r, key->len + val->len));
 
         /* Copy the key and value onto the page. */
         __wt_rec_image_copy(session, r, key);
@@ -274,11 +274,11 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 }
 
 /*
- * __wt_rec_row_int --
+ * __wti_rec_row_int --
  *     Reconcile a row-store internal page.
  */
 int
-__wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
+__wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
     WT_ADDR *addr;
     WT_BTREE *btree;
@@ -309,7 +309,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     ikey = NULL; /* -Wuninitialized */
     cell = NULL;
 
-    WT_RET(__wt_rec_split_init(session, r, page, 0, btree->maxintlpage_precomp, 0));
+    WT_RET(__wti_rec_split_init(session, r, page, 0, btree->maxintlpage_precomp, 0));
 
     /*
      * Ideally, we'd never store the 0th key on row-store internal pages because it's never used
@@ -350,7 +350,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
                 WT_ERR(__wt_ovfl_discard_add(session, page, kpack->cell));
         }
 
-        WT_ERR(__wt_rec_child_modify(session, r, ref, &cms));
+        WT_ERR(__wti_rec_child_modify(session, r, ref, &cms));
         addr = ref->addr;
         child = ref->page;
 
@@ -449,7 +449,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
         /* Boundary: split or write the page. */
         if (__wt_rec_need_split(r, key->len + val->len))
-            WT_ERR(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
+            WT_ERR(__wti_rec_split_crossing_bnd(session, r, key->len + val->len));
 
         /* Copy the key and value onto the page. */
         __wt_rec_image_copy(session, r, key);
@@ -464,7 +464,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_INTL_FOREACH_END;
 
     /* Write the remnant page. */
-    return (__wt_rec_split_finish(session, r));
+    return (__wti_rec_split_finish(session, r));
 
 err:
     WT_CHILD_RELEASE(session, cms.hazard, ref);
@@ -519,7 +519,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
     WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
 
     for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
-        WT_ERR(__wt_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
+        WT_ERR(__wti_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
         if ((upd = upd_select.upd) == NULL) {
             /*
              * In cases where a page has grown so large we are trying to force evict it (there is
@@ -533,7 +533,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
                 continue;
 
             WT_ERR(__wt_buf_set(session, r->cur, WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins)));
-            WT_ERR(__wt_rec_split_crossing_bnd(session, r, 0));
+            WT_ERR(__wti_rec_split_crossing_bnd(session, r, 0));
 
             /*
              * Turn off prefix and suffix compression until a full key is written into the new page.
@@ -587,7 +587,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
         if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone) {
             tmpkey->data = WT_INSERT_KEY(ins);
             tmpkey->size = WT_INSERT_KEY_SIZE(ins);
-            WT_ERR(__wt_rec_hs_clear_on_tombstone(
+            WT_ERR(__wti_rec_hs_clear_on_tombstone(
               session, r, WT_RECNO_OOB, tmpkey, upd->type == WT_UPDATE_TOMBSTONE ? false : true));
         }
 
@@ -611,7 +611,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
                     WT_ERR(__rec_cell_build_leaf_key(session, r, NULL, 0, &ovfl_key));
             }
 
-            WT_ERR(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
+            WT_ERR(__wti_rec_split_crossing_bnd(session, r, key->len + val->len));
         }
 
         /* Copy the key/value pair onto the page. */
@@ -660,11 +660,11 @@ err:
 }
 
 /*
- * __wt_rec_row_leaf --
+ * __wti_rec_row_leaf --
  *     Reconcile a row-store leaf page.
  */
 int
-__wt_rec_row_leaf(
+__wti_rec_row_leaf(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
 {
     static WT_UPDATE upd_tombstone = {.txnid = WT_TXN_NONE, .type = WT_UPDATE_TOMBSTONE};
@@ -704,7 +704,7 @@ __wt_rec_row_leaf(
     cbt = &r->update_modify_cbt;
     cbt->iface.session = (WT_SESSION *)session;
 
-    WT_RET(__wt_rec_split_init(session, r, page, 0, btree->maxleafpage_precomp, 0));
+    WT_RET(__wti_rec_split_init(session, r, page, 0, btree->maxleafpage_precomp, 0));
 
     /*
      * Write any K/V pairs inserted into the page before the first from-disk key on the page.
@@ -757,7 +757,7 @@ __wt_rec_row_leaf(
         __wt_row_leaf_value_cell(session, page, rip, vpack);
 
         /* Look for an update. */
-        WT_ERR(__wt_rec_upd_select(session, r, NULL, rip, vpack, &upd_select));
+        WT_ERR(__wti_rec_upd_select(session, r, NULL, rip, vpack, &upd_select));
         upd = upd_select.upd;
 
         /* Take the timestamp from the update or the cell. */
@@ -885,7 +885,7 @@ __wt_rec_row_leaf(
              */
             if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone) {
                 WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
-                WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, WT_RECNO_OOB, tmpkey,
+                WT_ERR(__wti_rec_hs_clear_on_tombstone(session, r, WT_RECNO_OOB, tmpkey,
                   upd->type == WT_UPDATE_TOMBSTONE ? false : true));
             }
 
@@ -979,7 +979,7 @@ slow:
                     WT_ERR(__rec_cell_build_leaf_key(session, r, NULL, 0, &ovfl_key));
             }
 
-            WT_ERR(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
+            WT_ERR(__wti_rec_split_crossing_bnd(session, r, key->len + val->len));
         }
 
         /* Copy the key/value pair onto the page. */
@@ -1004,7 +1004,7 @@ leaf_insert:
     }
 
     /* Write the remnant page. */
-    ret = __wt_rec_split_finish(session, r);
+    ret = __wti_rec_split_finish(session, r);
 
 err:
     __wt_scr_free(session, &lastkey);

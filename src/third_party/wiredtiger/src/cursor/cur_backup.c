@@ -234,7 +234,7 @@ __backup_free(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
     if (cb->incr_file != NULL)
         __wt_free(session, cb->incr_file);
 
-    return (__wt_curbackup_free_incr(session, cb));
+    return (__wti_curbackup_free_incr(session, cb));
 }
 
 /*
@@ -311,19 +311,19 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
   WT_CURSOR **cursorp)
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
-      __wt_cursor_get_value_notsup,                   /* get-value */
-      __wt_cursor_get_raw_key_value_notsup,           /* get-raw-key-value */
-      __wt_cursor_set_key_notsup,                     /* set-key */
-      __wt_cursor_set_value_notsup,                   /* set-value */
-      __wt_cursor_compare_notsup,                     /* compare */
-      __wt_cursor_equals_notsup,                      /* equals */
+      __wti_cursor_get_value_notsup,                  /* get-value */
+      __wti_cursor_get_raw_key_value_notsup,          /* get-raw-key-value */
+      __wti_cursor_set_key_notsup,                    /* set-key */
+      __wti_cursor_set_value_notsup,                  /* set-value */
+      __wti_cursor_compare_notsup,                    /* compare */
+      __wti_cursor_equals_notsup,                     /* equals */
       __curbackup_next,                               /* next */
       __wt_cursor_notsup,                             /* prev */
       __curbackup_reset,                              /* reset */
       __wt_cursor_notsup,                             /* search */
-      __wt_cursor_search_near_notsup,                 /* search-near */
+      __wti_cursor_search_near_notsup,                /* search-near */
       __wt_cursor_notsup,                             /* insert */
-      __wt_cursor_modify_notsup,                      /* modify */
+      __wti_cursor_modify_notsup,                     /* modify */
       __wt_cursor_notsup,                             /* update */
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
@@ -385,7 +385,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
     WT_ERR(ret);
     WT_ERR(cb->incr_file == NULL ?
         __wt_cursor_init(cursor, uri, NULL, cfg, cursorp) :
-        __wt_curbackup_open_incr(session, uri, other, cursor, cfg, cursorp));
+        __wti_curbackup_open_incr(session, uri, other, cursor, cfg, cursorp));
 
     WT_STAT_CONN_SET(session, backup_cursor_open, 1);
     if (0) {

@@ -112,18 +112,18 @@ err:
     if (ret == 0)
         return (0);
 
-    WT_TRET(__wt_win_directory_list_free(file_system, wt_session, entries, count));
+    WT_TRET(__wti_win_directory_list_free(file_system, wt_session, entries, count));
 
     WT_RET_MSG(
       session, ret, "%s: directory-list, prefix \"%s\"", directory, prefix == NULL ? "" : prefix);
 }
 
 /*
- * __wt_win_directory_list --
+ * __wti_win_directory_list --
  *     Get a list of files from a directory, MSVC version.
  */
 int
-__wt_win_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *directory,
+__wti_win_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
     return (
@@ -131,11 +131,11 @@ __wt_win_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, con
 }
 
 /*
- * __wt_win_directory_list_single --
+ * __wti_win_directory_list_single --
  *     Get a single file from a directory, MSVC version.
  */
 int
-__wt_win_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
+__wti_win_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
   const char *directory, const char *prefix, char ***dirlistp, uint32_t *countp)
 {
     return (
@@ -143,11 +143,11 @@ __wt_win_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_sessi
 }
 
 /*
- * __wt_win_directory_list_free --
- *     Free memory returned by __wt_win_directory_list, Windows version.
+ * __wti_win_directory_list_free --
+ *     Free memory returned by __wti_win_directory_list, Windows version.
  */
 int
-__wt_win_directory_list_free(
+__wti_win_directory_list_free(
   WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, char **dirlist, uint32_t count)
 {
     WT_SESSION_IMPL *session;

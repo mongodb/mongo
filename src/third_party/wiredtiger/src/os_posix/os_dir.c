@@ -79,18 +79,18 @@ err:
     if (ret == 0)
         return (0);
 
-    WT_TRET(__wt_posix_directory_list_free(file_system, wt_session, entries, count));
+    WT_TRET(__wti_posix_directory_list_free(file_system, wt_session, entries, count));
 
     WT_RET_MSG(
       session, ret, "%s: directory-list, prefix \"%s\"", directory, prefix == NULL ? "" : prefix);
 }
 
 /*
- * __wt_posix_directory_list --
+ * __wti_posix_directory_list --
  *     Get a list of files from a directory, POSIX version.
  */
 int
-__wt_posix_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
+__wti_posix_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
   const char *directory, const char *prefix, char ***dirlistp, uint32_t *countp)
 {
     return (
@@ -98,11 +98,11 @@ __wt_posix_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 }
 
 /*
- * __wt_posix_directory_list_single --
+ * __wti_posix_directory_list_single --
  *     Get one file from a directory, POSIX version.
  */
 int
-__wt_posix_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
+__wti_posix_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
   const char *directory, const char *prefix, char ***dirlistp, uint32_t *countp)
 {
     return (
@@ -110,11 +110,11 @@ __wt_posix_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_ses
 }
 
 /*
- * __wt_posix_directory_list_free --
- *     Free memory returned by __wt_posix_directory_list.
+ * __wti_posix_directory_list_free --
+ *     Free memory returned by __wti_posix_directory_list.
  */
 int
-__wt_posix_directory_list_free(
+__wti_posix_directory_list_free(
   WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, char **dirlist, uint32_t count)
 {
     WT_SESSION_IMPL *session;

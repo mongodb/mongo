@@ -2365,6 +2365,15 @@ struct __wt_connection {
      * @config{generation_drain_timeout_ms, the number of milliseconds to wait for a resource to
      * drain before timing out in diagnostic mode.  Default will wait for 4 minutes\, 0 will wait
      * forever., an integer greater than or equal to \c 0; default \c 240000.}
+     * @config{heuristic_controls = (, control the behavior of various optimizations.  This is
+     * primarily used as a mechanism for rolling out changes to internal heuristics while providing
+     * a mechanism for quickly reverting to prior behavior in the field., a set of related
+     * configuration options defined as follows.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+     * obsolete_check_aggressive, if true\, more aggressively reclaim obsolete updates from update
+     * chains in memory.  This can increase contention in concurrent applications with the benefit
+     * of improving cache effectiveness., a boolean flag; default \c true.}
+     * @config{ ),,}
      * @config{history_store = (, history store configuration options., a set of related
      * configuration options defined as follows.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the
@@ -3229,6 +3238,15 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;dhandle_buckets, configure the
  * number of hash buckets for hash arrays relating to data handles., an integer between \c 64 and \c
  * 65536; default \c 512.}
+ * @config{ ),,}
+ * @config{heuristic_controls = (, control the behavior of various optimizations.  This is primarily
+ * used as a mechanism for rolling out changes to internal heuristics while providing a mechanism
+ * for quickly reverting to prior behavior in the field., a set of related configuration options
+ * defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;obsolete_check_aggressive, if true\, more
+ * aggressively reclaim obsolete updates from update chains in memory.  This can increase contention
+ * in concurrent applications with the benefit of improving cache effectiveness., a boolean flag;
+ * default \c true.}
  * @config{ ),,}
  * @config{history_store = (, history store configuration options., a set of related configuration
  * options defined as follows.}

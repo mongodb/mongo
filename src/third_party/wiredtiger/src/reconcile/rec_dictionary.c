@@ -84,16 +84,16 @@ __rec_dictionary_skip_insert(WT_REC_DICTIONARY **head, WT_REC_DICTIONARY *e, uin
 }
 
 /*
- * __wt_rec_dictionary_init --
+ * __wti_rec_dictionary_init --
  *     Allocate and initialize the dictionary.
  */
 int
-__wt_rec_dictionary_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, u_int slots)
+__wti_rec_dictionary_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, u_int slots)
 {
     u_int depth, i;
 
     /* Free any previous dictionary. */
-    __wt_rec_dictionary_free(session, r);
+    __wti_rec_dictionary_free(session, r);
 
     r->dictionary_slots = slots;
     WT_RET(__wt_calloc(session, r->dictionary_slots, sizeof(WT_REC_DICTIONARY *), &r->dictionary));
@@ -107,11 +107,11 @@ __wt_rec_dictionary_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, u_int slots)
 }
 
 /*
- * __wt_rec_dictionary_free --
+ * __wti_rec_dictionary_free --
  *     Free the dictionary.
  */
 void
-__wt_rec_dictionary_free(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+__wti_rec_dictionary_free(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
     u_int i;
 
@@ -128,12 +128,12 @@ __wt_rec_dictionary_free(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 }
 
 /*
- * __wt_rec_dictionary_reset --
+ * __wti_rec_dictionary_reset --
  *     Reset the dictionary when reconciliation restarts and when crossing a page boundary (a
  *     potential split).
  */
 void
-__wt_rec_dictionary_reset(WT_RECONCILE *r)
+__wti_rec_dictionary_reset(WT_RECONCILE *r)
 {
     if (r->dictionary_slots) {
         r->dictionary_next = 0;

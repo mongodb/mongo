@@ -56,6 +56,7 @@ func_ok()
         -e '/int __posix_terminate$/d' \
         -e '/int __rec_destroy_session$/d' \
         -e '/int __rts_check_callback$/d' \
+        -e '/int __rts_thread_stop$/d' \
         -e '/int __time_aggregate_validate_parent$/d' \
         -e '/int __time_aggregate_validate_parent_stable$/d' \
         -e '/int __time_value_validate_parent$/d' \
@@ -74,15 +75,14 @@ func_ok()
         -e '/int __wt_count_birthmarks$/d' \
         -e '/int __wt_conn_prefetch_clear_tree$/d' \
         -e '/int __wt_curjoin_joined$/d' \
-        -e '/int __wt_cursor_noop$/d' \
+        -e '/int __wti_cursor_noop$/d' \
         -e '/int __wt_epoch$/d' \
         -e '/int __wt_errno$/d' \
         -e '/int __wt_get_vm_pagesize$/d' \
         -e '/int __wt_lex_compare_skip$/d' \
-        -e '/int __wt_lsm_manager_pop_entry$/d' \
+        -e '/int __wti_lsm_manager_pop_entry$/d' \
         -e '/int __wt_once$/d' \
-        -e '/int __wt_posix_directory_list_free$/d' \
-        -e '/int __wt_rts_thread_stop$/d' \
+        -e '/int __wti_posix_directory_list_free$/d' \
         -e '/int __wt_session_breakpoint$/d' \
         -e '/int __wt_set_return_func$/d' \
         -e '/int __wt_spin_init$/d' \
@@ -93,7 +93,7 @@ func_ok()
         -e '/int __wt_stat_session_desc/d' \
         -e '/int __wt_txn_read_upd_list$/d' \
         -e '/int __wt_txn_rollback_required$/d' \
-        -e '/int __wt_win_directory_list_free$/d' \
+        -e '/int __wti_win_directory_list_free$/d' \
         -e '/int __ut_ckpt_add_blkmod_entry$/d' \
         -e '/int __ut_ovfl_discard_verbose$/d' \
         -e '/int __ut_ovfl_discard_wrapup$/d' \

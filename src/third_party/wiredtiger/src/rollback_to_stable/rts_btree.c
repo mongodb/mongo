@@ -50,7 +50,7 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
          * of the rollback to stable page read, it instantiates the tombstones on the page.
          * The transaction id validation is ignored in all scenarios except recovery.
          */
-        txn_id_visible = __wt_rts_visibility_txn_visible_id(session, upd->txnid);
+        txn_id_visible = __wti_rts_visibility_txn_visible_id(session, upd->txnid);
         if (!txn_id_visible || rollback_timestamp < upd->durable_ts ||
           upd->prepare_state == WT_PREPARE_INPROGRESS) {
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
@@ -109,7 +109,7 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
              * that update from the history store as it has a globally visible tombstone. In that
              * case, it is enough to delete everything up until to the tombstone timestamp.
              */
-            WT_RET(__wt_rts_history_delete_hs(
+            WT_RET(__wti_rts_history_delete_hs(
               session, key, stable_upd == NULL ? tombstone->start_ts : stable_upd->start_ts));
 
             /*
@@ -371,7 +371,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
          * they are not obsolete at the time of reconciliation by an eviction thread and later they
          * become obsolete according to the checkpoint.
          */
-        if (__wt_rts_visibility_txn_visible_id(session, hs_tw->stop_txn) &&
+        if (__wti_rts_visibility_txn_visible_id(session, hs_tw->stop_txn) &&
           hs_tw->durable_stop_ts <= pinned_ts) {
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
               WT_RTS_VERB_TAG_HS_STOP_OBSOLETE
@@ -454,7 +454,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
          * Stop processing when we find a stable update according to the given timestamp and
          * transaction id.
          */
-        if (__wt_rts_visibility_txn_visible_id(session, hs_tw->start_txn) &&
+        if (__wti_rts_visibility_txn_visible_id(session, hs_tw->start_txn) &&
           hs_tw->durable_start_ts <= rollback_timestamp) {
             __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_2,
               WT_RTS_VERB_TAG_HS_UPDATE_VALID
@@ -525,7 +525,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
          * We have a tombstone on the original update chain and it is stable according to the
          * timestamp and txnid, we need to restore that as well.
          */
-        if (__wt_rts_visibility_txn_visible_id(session, hs_tw->stop_txn) &&
+        if (__wti_rts_visibility_txn_visible_id(session, hs_tw->stop_txn) &&
           hs_tw->durable_stop_ts <= rollback_timestamp) {
             /*
              * The restoring tombstone timestamp must be zero or less than previous update start
@@ -662,7 +662,7 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
         } else
             return (0);
     } else if (tw->durable_start_ts > rollback_timestamp ||
-      !__wt_rts_visibility_txn_visible_id(session, tw->start_txn) ||
+      !__wti_rts_visibility_txn_visible_id(session, tw->start_txn) ||
       (!WT_TIME_WINDOW_HAS_STOP(tw) && prepared)) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_ONDISK_ABORT_TW
@@ -671,7 +671,7 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
           "or tw_has_no_stop_and_is_prepared=%s",
           __wt_time_point_to_string(tw->start_ts, tw->durable_start_ts, tw->start_txn, time_string),
           tw->durable_start_ts > rollback_timestamp ? "true" : "false",
-          !__wt_rts_visibility_txn_visible_id(session, tw->start_txn) ? "true" : "false",
+          !__wti_rts_visibility_txn_visible_id(session, tw->start_txn) ? "true" : "false",
           !WT_TIME_WINDOW_HAS_STOP(tw) && prepared ? "true" : "false");
         if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
             return (__rts_btree_ondisk_fixup_key(
@@ -688,7 +688,7 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
         }
     } else if (WT_TIME_WINDOW_HAS_STOP(tw) &&
       (tw->durable_stop_ts > rollback_timestamp ||
-        !__wt_rts_visibility_txn_visible_id(session, tw->stop_txn) || prepared)) {
+        !__wti_rts_visibility_txn_visible_id(session, tw->stop_txn) || prepared)) {
         /*
          * For prepared transactions, it is possible that both the on-disk key start and stop time
          * windows can be the same. To abort these updates, check for any stable update from history
@@ -878,7 +878,7 @@ __rts_btree_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
                         }
                         /* If this key has a stable update, skip over it. */
                         if (recno + j == ins_recno &&
-                          __wt_rts_visibility_has_stable_update(ins->upd))
+                          __wti_rts_visibility_has_stable_update(ins->upd))
                             j++;
                     }
                 }
@@ -995,7 +995,7 @@ __rts_btree_abort_col_fix(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
             }
             /* If this key has a stable update, skip over it. */
             if (tw < numtws && page->pg_fix_tws[tw].recno_offset == ins_recno_offset &&
-              ins->upd != NULL && __wt_rts_visibility_has_stable_update(ins->upd))
+              ins->upd != NULL && __wti_rts_visibility_has_stable_update(ins->upd))
                 tw++;
         }
     }
@@ -1096,11 +1096,11 @@ err:
 }
 
 /*
- * __wt_rts_btree_abort_updates --
+ * __wti_rts_btree_abort_updates --
  *     Abort updates on this page newer than the timestamp.
  */
 int
-__wt_rts_btree_abort_updates(
+__wti_rts_btree_abort_updates(
   WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t rollback_timestamp)
 {
     WT_PAGE *page;
@@ -1115,7 +1115,7 @@ __wt_rts_btree_abort_updates(
      */
     page = ref->page;
     modified = __wt_page_is_modified(page);
-    if (!modified && !__wt_rts_visibility_page_needs_abort(session, ref, rollback_timestamp)) {
+    if (!modified && !__wti_rts_visibility_page_needs_abort(session, ref, rollback_timestamp)) {
         __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_3,
           WT_RTS_VERB_TAG_SKIP_UNMODIFIED "ref=%p: unmodified stable page of type=%s skipped",
           (void *)ref, __wt_page_type_str(page->type));

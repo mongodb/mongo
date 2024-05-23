@@ -562,7 +562,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __curindex_get_value,                           /* get-value */
-      __wt_cursor_get_raw_key_value_notsup,           /* get-raw-key-value */
+      __wti_cursor_get_raw_key_value_notsup,          /* get-raw-key-value */
       __wt_cursor_set_key,                            /* set-key */
       __curindex_set_value,                           /* set-value */
       __curindex_compare,                             /* compare */
@@ -573,7 +573,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __curindex_search,                              /* search */
       __curindex_search_near,                         /* search-near */
       __wt_cursor_notsup,                             /* insert */
-      __wt_cursor_modify_notsup,                      /* modify */
+      __wti_cursor_modify_notsup,                     /* modify */
       __wt_cursor_notsup,                             /* update */
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
@@ -659,7 +659,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
 
     if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
         WT_ERR(
-          __wt_json_column_init(cursor, uri, table->key_format, &idx->colconf, &table->colconf));
+          __wti_json_column_init(cursor, uri, table->key_format, &idx->colconf, &table->colconf));
 
     if (0) {
 err:

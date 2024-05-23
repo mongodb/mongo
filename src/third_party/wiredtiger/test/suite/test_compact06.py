@@ -27,12 +27,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import time
-import wiredtiger, wttest
+import wiredtiger
+from compact_util import compact_util
 from wiredtiger import stat
 
 # test_compact06.py
 # Test background compaction API usage.
-class test_compact06(wttest.WiredTigerTestCase):
+class test_compact06(compact_util):
     configuration_items = ['exclude=["table:a.wt"]', 'free_space_target=10MB', 'timeout=60']
 
     def get_bg_compaction_files_skipped(self):
@@ -40,28 +41,6 @@ class test_compact06(wttest.WiredTigerTestCase):
         skipped = stat_cursor[stat.conn.background_compact_skipped][2]
         stat_cursor.close()
         return skipped
-
-    def get_bg_compaction_running(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        compact_running = stat_cursor[stat.conn.background_compact_running][2]
-        stat_cursor.close()
-        return compact_running
-
-    def get_bg_compaction_success(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        skipped = stat_cursor[stat.conn.background_compact_success][2]
-        stat_cursor.close()
-        return skipped
-
-    def turn_off_bg_compact(self):
-        self.session.compact(None, 'background=false')
-        while self.get_bg_compaction_running():
-            time.sleep(1)
-
-    def turn_on_bg_compact(self, config=''):
-        self.session.compact(None, f'background=true,{config}')
-        while not self.get_bg_compaction_running():
-            time.sleep(1)
 
     def test_background_compact_api(self):
         # FIXME-WT-11399

@@ -30,12 +30,12 @@
 #   Test that compact reduces the file size.
 #
 
-import time, wiredtiger, wttest
-from wiredtiger import stat
+import time, wiredtiger
+from compact_util import compact_util
 from wtscenario import make_scenarios
 
 # Test basic compression
-class test_compact02(wttest.WiredTigerTestCase):
+class test_compact02(compact_util):
 
     types = [
         ('table', dict(uri='table:test_compact02')),
@@ -83,30 +83,6 @@ class test_compact02(wttest.WiredTigerTestCase):
 
     fullsize = nrecords // 2 * len(bigvalue) + nrecords // 2 * len(smallvalue)
 
-    # Return stats that track the progress of compaction.
-    def getCompactProgressStats(self):
-        cstat = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(all)')
-        statDict = {}
-        statDict["bytes_rewritten_expected"] = cstat[stat.dsrc.btree_compact_bytes_rewritten_expected][2]
-        statDict["pages_reviewed"] = cstat[stat.dsrc.btree_compact_pages_reviewed][2]
-        statDict["pages_skipped"] = cstat[stat.dsrc.btree_compact_pages_skipped][2]
-        statDict["pages_rewritten"] = cstat[stat.dsrc.btree_compact_pages_rewritten][2]
-        statDict["pages_rewritten_expected"] = cstat[stat.dsrc.btree_compact_pages_rewritten_expected][2]
-        cstat.close()
-        return statDict
-
-    # Return the size of the file
-    def getSize(self):
-        # To allow this to work on systems without ftruncate,
-        # get the portion of the file allocated, via 'statistics=(all)',
-        # not the physical file size, via 'statistics=(size)'.
-        cstat = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(all)')
-        sz = cstat[stat.dsrc.block_size][2]
-        cstat.close()
-        return sz
-
     # This test varies the cache size and so needs to set up its own connection.
     # Override the standard methods.
     def setUpConnectionOpen(self, dir):
@@ -146,7 +122,7 @@ class test_compact02(wttest.WiredTigerTestCase):
 
         # 2. Checkpoint and get stats on the table to confirm the size.
         self.session.checkpoint()
-        sz = self.getSize()
+        sz = self.get_size(self.uri)
         self.pr('After populate ' + str(sz // mb) + 'MB')
         if not self.runningHook('tiered'):
             self.assertGreater(sz, self.fullsize)
@@ -180,10 +156,10 @@ class test_compact02(wttest.WiredTigerTestCase):
             time.sleep(6)
 
         # 6. Get stats on compacted table.
-        sz = self.getSize()
+        sz = self.get_size(self.uri)
         self.pr('After compact ' + str(sz // mb) + 'MB')
 
-        statDict = self.getCompactProgressStats()
+        statDict = self.get_compact_progress_stats(self.uri)
         # After compact, the file size should be less than half the full size.
         if not self.runningHook('tiered') and not self.dryrun:
             self.assertLess(sz, self.fullsize // 2)

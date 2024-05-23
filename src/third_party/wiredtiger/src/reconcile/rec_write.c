@@ -251,16 +251,16 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     /* Reconcile the page. */
     switch (page->type) {
     case WT_PAGE_COL_FIX:
-        ret = __wt_rec_col_fix(session, r, ref, salvage);
+        ret = __wti_rec_col_fix(session, r, ref, salvage);
         break;
     case WT_PAGE_COL_INT:
-        WT_WITH_PAGE_INDEX(session, ret = __wt_rec_col_int(session, r, ref));
+        WT_WITH_PAGE_INDEX(session, ret = __wti_rec_col_int(session, r, ref));
         break;
     case WT_PAGE_COL_VAR:
-        ret = __wt_rec_col_var(session, r, ref, salvage);
+        ret = __wti_rec_col_var(session, r, ref, salvage);
         break;
     case WT_PAGE_ROW_INT:
-        WT_WITH_PAGE_INDEX(session, ret = __wt_rec_row_int(session, r, page));
+        WT_WITH_PAGE_INDEX(session, ret = __wti_rec_row_int(session, r, page));
         break;
     case WT_PAGE_ROW_LEAF:
         /*
@@ -268,7 +268,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
          * pointing into the internal page's memory. We want to prevent eviction of the internal
          * page for the duration.
          */
-        WT_WITH_PAGE_INDEX(session, ret = __wt_rec_row_leaf(session, r, ref, salvage));
+        WT_WITH_PAGE_INDEX(session, ret = __wti_rec_row_leaf(session, r, ref, salvage));
         break;
     default:
         ret = __wt_illegal_value(session, page->type);
@@ -695,8 +695,8 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
      */
     if (btree->dictionary != 0 && btree->dictionary > r->dictionary_slots)
         WT_ERR(
-          __wt_rec_dictionary_init(session, r, btree->dictionary < 100 ? 100 : btree->dictionary));
-    __wt_rec_dictionary_reset(r);
+          __wti_rec_dictionary_init(session, r, btree->dictionary < 100 ? 100 : btree->dictionary));
+    __wti_rec_dictionary_reset(r);
 
     /*
      * Prefix compression discards repeated prefix bytes from row-store leaf page keys.
@@ -829,7 +829,7 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
     __wt_free(session, r->supd);
     __wt_free(session, r->delete_hs_upd);
 
-    __wt_rec_dictionary_free(session, r);
+    __wti_rec_dictionary_free(session, r);
 
     __wt_buf_free(session, &r->k.buf);
     __wt_buf_free(session, &r->v.buf);
@@ -1063,11 +1063,11 @@ __rec_split_chunk_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *
 }
 
 /*
- * __wt_rec_split_init --
+ * __wti_rec_split_init --
  *     Initialization for the reconciliation split functions.
  */
 int
-__wt_rec_split_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page, uint64_t recno,
+__wti_rec_split_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page, uint64_t recno,
   uint64_t primary_size, uint32_t auxiliary_size)
 {
     /* FUTURE: primary_size should probably also be 32 bits. */
@@ -1347,11 +1347,11 @@ err:
 }
 
 /*
- * __wt_rec_split_grow --
+ * __wti_rec_split_grow --
  *     Grow the split buffer.
  */
 int
-__wt_rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t add_len)
+__wti_rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t add_len)
 {
     WT_BM *bm;
     WT_BTREE *btree;
@@ -1444,12 +1444,12 @@ __rec_split_fix_shrink(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 #define WT_PAGE_INTL_MINIMUM_ENTRIES 20
 
 /*
- * __wt_rec_split --
+ * __wti_rec_split --
  *     Handle the page reconciliation bookkeeping. (Did you know "bookkeeper" has 3 doubled letters
  *     in a row? Sweet-tooth does, too.)
  */
 int
-__wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
+__wti_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 {
     WT_BTREE *btree;
     WT_REC_CHUNK *tmp;
@@ -1485,7 +1485,7 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
         goto done;
 
     /* All page boundaries reset the dictionary. */
-    __wt_rec_dictionary_reset(r);
+    __wti_rec_dictionary_reset(r);
 
     /* Set the entries, timestamps and size for the just finished chunk. */
     r->cur_ptr->entries = r->entries;
@@ -1572,17 +1572,17 @@ done:
      * won't necessarily happen that way.
      */
     if (r->space_avail < next_len)
-        WT_RET(__wt_rec_split_grow(session, r, next_len));
+        WT_RET(__wti_rec_split_grow(session, r, next_len));
 
     return (0);
 }
 
 /*
- * __wt_rec_split_crossing_bnd --
+ * __wti_rec_split_crossing_bnd --
  *     Save the details for the minimum split size boundary or call for a split.
  */
 int
-__wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
+__wti_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 {
     /*
      * If crossing the minimum split size boundary, store the boundary details at the current
@@ -1606,17 +1606,17 @@ __wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t ne
         WT_TIME_AGGREGATE_COPY(&r->cur_ptr->ta_min, &r->cur_ptr->ta);
 
         WT_ASSERT_ALWAYS(
-          session, r->cur_ptr->min_offset == 0, "Trying to re-enter __wt_rec_split_crossing_bnd");
+          session, r->cur_ptr->min_offset == 0, "Trying to re-enter __wti_rec_split_crossing_bnd");
         r->cur_ptr->min_offset = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
 
         /* All page boundaries reset the dictionary. */
-        __wt_rec_dictionary_reset(r);
+        __wti_rec_dictionary_reset(r);
 
         return (0);
     }
 
     /* We are crossing a split boundary */
-    return (__wt_rec_split(session, r, next_len));
+    return (__wti_rec_split(session, r, next_len));
 }
 
 /*
@@ -1685,7 +1685,7 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WT_RECONCILE *r)
          */
         len_to_move = prev_ptr->image.size - prev_ptr->min_offset;
         if (r->space_avail < len_to_move)
-            WT_RET(__wt_rec_split_grow(session, r, len_to_move));
+            WT_RET(__wti_rec_split_grow(session, r, len_to_move));
         cur_dsk_start = WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem);
 
         /*
@@ -1716,11 +1716,11 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 }
 
 /*
- * __wt_rec_split_finish --
+ * __wti_rec_split_finish --
  *     Finish processing a page.
  */
 int
-__wt_rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+__wti_rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
     /*
      * We're done reconciling, write the final page. We may arrive here with no entries to write if
@@ -2096,7 +2096,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
     /* Initialize the page header(s). */
     __rec_split_write_header(session, r, chunk, multi, chunk->image.mem);
     if (r->page->type == WT_PAGE_COL_FIX)
-        __wt_rec_col_fix_write_auxheader(session, chunk->entries, chunk->aux_start_offset,
+        __wti_rec_col_fix_write_auxheader(session, chunk->entries, chunk->aux_start_offset,
           chunk->auxentries, chunk->image.mem, chunk->image.size);
     if (compressed_image != NULL)
         __rec_split_write_header(session, r, chunk, multi, compressed_image->mem);
@@ -2226,7 +2226,7 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 
     recno = btree->type == BTREE_ROW ? WT_RECNO_OOB : 1;
 
-    return (__wt_rec_split_init(session, r, cbulk->leaf, recno, btree->maxleafpage_precomp, 0));
+    return (__wti_rec_split_init(session, r, cbulk->leaf, recno, btree->maxleafpage_precomp, 0));
 }
 
 /*
@@ -2262,7 +2262,7 @@ __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
         break;
     }
 
-    WT_ERR(__wt_rec_split_finish(session, r));
+    WT_ERR(__wti_rec_split_finish(session, r));
     WT_ERR(__rec_write_wrapup(session, r, r->page));
     __rec_write_page_status(session, r);
 
@@ -2328,7 +2328,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
      */
     if (WT_PAGE_IS_INTERNAL(page) && mod->mod_root_split != NULL) {
         WT_RET(__rec_split_discard(session, mod->mod_root_split));
-        WT_RET(__wt_ovfl_track_wrapup(session, mod->mod_root_split));
+        WT_RET(__wti_ovfl_track_wrapup(session, mod->mod_root_split));
         __wt_page_out(session, &mod->mod_root_split);
     }
 
@@ -2438,7 +2438,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
      * some action to resolve the list of allocated/free/whatever blocks that are associated with
      * the checkpoint).
      */
-    WT_RET(__wt_ovfl_track_wrapup(session, page));
+    WT_RET(__wti_ovfl_track_wrapup(session, page));
 
     /*
      * This page may have previously been reconciled, and that information is now about to be
@@ -2651,7 +2651,7 @@ __rec_write_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         if (multi->addr.addr != NULL)
             WT_TRET(__wt_btree_block_free(session, multi->addr.addr, multi->addr.size));
 
-    WT_TRET(__wt_ovfl_track_wrapup_err(session, page));
+    WT_TRET(__wti_ovfl_track_wrapup_err(session, page));
 
     return (ret);
 }
@@ -2724,7 +2724,7 @@ __wt_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *k
      * See if this overflow record has already been written and reuse it if possible, otherwise
      * write a new overflow record.
      */
-    WT_RET(__wt_ovfl_reuse_search(session, page, &addr, &size, kv->buf.data, kv->buf.size));
+    WT_RET(__wti_ovfl_reuse_search(session, page, &addr, &size, kv->buf.data, kv->buf.size));
     if (addr == NULL) {
         /* Allocate a buffer big enough to write the overflow record. */
         size = kv->buf.size;
@@ -2751,7 +2751,7 @@ __wt_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *k
          * a record.
          */
         if (!r->is_bulk_load)
-            WT_ERR(__wt_ovfl_reuse_add(session, page, addr, size, kv->buf.data, kv->buf.size));
+            WT_ERR(__wti_ovfl_reuse_add(session, page, addr, size, kv->buf.data, kv->buf.size));
     }
 
     /* Set the callers K/V to reference the overflow record's address. */
@@ -2767,12 +2767,12 @@ err:
 }
 
 /*
- * __wt_rec_hs_clear_on_tombstone --
+ * __wti_rec_hs_clear_on_tombstone --
  *     When removing a key due to a tombstone with a durable timestamp of "none", also remove the
  *     history store contents associated with that key.
  */
 int
-__wt_rec_hs_clear_on_tombstone(
+__wti_rec_hs_clear_on_tombstone(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, uint64_t recno, WT_ITEM *rowkey, bool reinsert)
 {
     WT_BTREE *btree;

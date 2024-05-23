@@ -23,7 +23,7 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
           session->id);
 
     /* Switch to first-fit allocation. */
-    __wt_block_configure_first_fit(block, true);
+    __wti_block_configure_first_fit(block, true);
 
     /* Reset the compaction state information. */
     block->compact_bytes_reviewed = 0;
@@ -54,7 +54,7 @@ int
 __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
     /* Restore the original allocation plan. */
-    __wt_block_configure_first_fit(block, false);
+    __wti_block_configure_first_fit(block, false);
 
     /* Ensure this the same session that started compaction. */
     WT_ASSERT(session, block->compact_session_id == session->id);
@@ -588,8 +588,8 @@ __compact_page_skip(
      */
     if (!block->compact_estimated && block->compact_pages_reviewed >= WT_THOUSAND) {
         __block_compact_estimate_remaining_work(session, block);
-        /* If no potential work has been found, or we're in dry run mode, exit compaction. */
-        if (block->compact_pages_rewritten_expected == 0 || session->compact->dryrun)
+        /* If we're in dry run mode, exit compaction. */
+        if (session->compact->dryrun)
             ret = ECANCELED;
     }
 
@@ -652,9 +652,9 @@ __wt_block_compact_page_rewrite(
     WT_ERR(__wt_read(session, block->fh, offset, size, tmp->mem));
 
     /* Allocate a replacement block. */
-    WT_ERR(__wt_block_ext_prealloc(session, 5));
+    WT_ERR(__wti_block_ext_prealloc(session, 5));
     __wt_spin_lock(session, &block->live_lock);
-    ret = __wt_block_alloc(session, block, &new_offset, (wt_off_t)size);
+    ret = __wti_block_alloc(session, block, &new_offset, (wt_off_t)size);
     __wt_spin_unlock(session, &block->live_lock);
     WT_ERR(ret);
     discard_block = true;
@@ -664,7 +664,7 @@ __wt_block_compact_page_rewrite(
 
     /* Free the original block. */
     __wt_spin_lock(session, &block->live_lock);
-    ret = __wt_block_off_free(session, block, objectid, offset, (wt_off_t)size);
+    ret = __wti_block_off_free(session, block, objectid, offset, (wt_off_t)size);
     __wt_spin_unlock(session, &block->live_lock);
     WT_ERR(ret);
 
@@ -686,7 +686,7 @@ __wt_block_compact_page_rewrite(
 err:
     if (discard_block) {
         __wt_spin_lock(session, &block->live_lock);
-        WT_TRET(__wt_block_off_free(session, block, objectid, new_offset, (wt_off_t)size));
+        WT_TRET(__wti_block_off_free(session, block, objectid, new_offset, (wt_off_t)size));
         __wt_spin_unlock(session, &block->live_lock);
     }
     __wt_scr_free(session, &tmp);

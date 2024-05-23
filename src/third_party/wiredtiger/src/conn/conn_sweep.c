@@ -208,7 +208,7 @@ __sweep_remove_one(WT_SESSION_IMPL *session)
     if (!WT_DHANDLE_CAN_DISCARD(session->dhandle))
         WT_ERR(EBUSY);
 
-    ret = __wt_conn_dhandle_discard_single(session, false, true);
+    ret = __wti_conn_dhandle_discard_single(session, false, true);
 
     /*
      * If the handle was not successfully discarded, unlock it and don't retry the discard until it
@@ -430,11 +430,11 @@ err:
 }
 
 /*
- * __wt_sweep_config --
+ * __wti_sweep_config --
  *     Pull out sweep configuration settings
  */
 int
-__wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
+__wti_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -462,11 +462,11 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wt_sweep_create --
+ * __wti_sweep_create --
  *     Start the handle sweep thread.
  */
 int
-__wt_sweep_create(WT_SESSION_IMPL *session)
+__wti_sweep_create(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     uint32_t session_flags;
@@ -494,11 +494,11 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_sweep_destroy --
+ * __wti_sweep_destroy --
  *     Destroy the handle-sweep thread.
  */
 int
-__wt_sweep_destroy(WT_SESSION_IMPL *session)
+__wti_sweep_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;

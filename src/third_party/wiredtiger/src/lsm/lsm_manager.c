@@ -75,7 +75,7 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
             if (manager->lsm_workers % 2 == 0)
                 FLD_SET(worker_args->type, WT_LSM_WORK_MERGE);
         }
-        WT_RET(__wt_lsm_worker_start(session, worker_args));
+        WT_RET(__wti_lsm_worker_start(session, worker_args));
     }
 
     /*
@@ -111,7 +111,7 @@ __lsm_stop_workers(WT_SESSION_IMPL *session)
         worker_args = &manager->lsm_worker_cookies[manager->lsm_workers - 1];
         WT_ASSERT(session, worker_args->tid_set);
 
-        WT_RET(__wt_lsm_worker_stop(session, worker_args));
+        WT_RET(__wti_lsm_worker_stop(session, worker_args));
         worker_args->type = 0;
 
         /*
@@ -172,12 +172,12 @@ __wt_lsm_manager_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 }
 
 /*
- * __wt_lsm_manager_start --
+ * __wti_lsm_manager_start --
  *     Start the LSM management infrastructure. Our queues and locks were initialized when the
  *     connection was initialized.
  */
 int
-__wt_lsm_manager_start(WT_SESSION_IMPL *session)
+__wti_lsm_manager_start(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -237,11 +237,11 @@ err:
 }
 
 /*
- * __wt_lsm_manager_free_work_unit --
+ * __wti_lsm_manager_free_work_unit --
  *     Release an LSM tree work unit.
  */
 void
-__wt_lsm_manager_free_work_unit(WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT *entry)
+__wti_lsm_manager_free_work_unit(WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT *entry)
 {
     if (entry != NULL) {
         WT_ASSERT(session, entry->lsm_tree->queue_ref > 0);
@@ -281,7 +281,7 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
         }
 
         /* Clean up open LSM handles. */
-        ret = __wt_lsm_tree_close_all(session);
+        ret = __wti_lsm_tree_close_all(session);
 
         WT_TRET(__wt_thread_join(session, &manager->lsm_worker_cookies[0].tid));
 
@@ -289,17 +289,17 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
         while ((current = TAILQ_FIRST(&manager->switchqh)) != NULL) {
             TAILQ_REMOVE(&manager->switchqh, current, q);
             ++removed;
-            __wt_lsm_manager_free_work_unit(session, current);
+            __wti_lsm_manager_free_work_unit(session, current);
         }
         while ((current = TAILQ_FIRST(&manager->appqh)) != NULL) {
             TAILQ_REMOVE(&manager->appqh, current, q);
             ++removed;
-            __wt_lsm_manager_free_work_unit(session, current);
+            __wti_lsm_manager_free_work_unit(session, current);
         }
         while ((current = TAILQ_FIRST(&manager->managerqh)) != NULL) {
             TAILQ_REMOVE(&manager->managerqh, current, q);
             ++removed;
-            __wt_lsm_manager_free_work_unit(session, current);
+            __wti_lsm_manager_free_work_unit(session, current);
         }
 
         /* Close all LSM worker sessions. */
@@ -330,7 +330,7 @@ __lsm_manager_worker_shutdown(WT_SESSION_IMPL *session)
      */
     for (i = 1; i < manager->lsm_workers; i++) {
         WT_ASSERT(session, manager->lsm_worker_cookies[i].tid_set);
-        WT_TRET(__wt_lsm_worker_stop(session, &manager->lsm_worker_cookies[i]));
+        WT_TRET(__wti_lsm_worker_stop(session, &manager->lsm_worker_cookies[i]));
     }
     return (ret);
 }
@@ -391,16 +391,16 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
               (lsm_tree->merge_aggressiveness > WT_LSM_AGGRESSIVE_THRESHOLD &&
                 !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) ||
               idlems > fillms) {
-                WT_ERR(__wt_lsm_manager_push_entry(session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
-                WT_ERR(__wt_lsm_manager_push_entry(session, WT_LSM_WORK_DROP, 0, lsm_tree));
-                WT_ERR(__wt_lsm_manager_push_entry(session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
-                WT_ERR(__wt_lsm_manager_push_entry(session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
+                WT_ERR(__wti_lsm_manager_push_entry(session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
+                WT_ERR(__wti_lsm_manager_push_entry(session, WT_LSM_WORK_DROP, 0, lsm_tree));
+                WT_ERR(__wti_lsm_manager_push_entry(session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
+                WT_ERR(__wti_lsm_manager_push_entry(session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
                 __wt_verbose(session, WT_VERB_LSM_MANAGER,
                   "MGR %s: queue %" PRIu32 " mod %d nchunks %" PRIu32 " flags %#" PRIx32
                   " aggressive %" PRIu32 " idlems %" PRIu64 " fillms %" PRIu64,
                   lsm_tree->name, lsm_tree->queue_ref, lsm_tree->modified, lsm_tree->nchunks,
                   lsm_tree->flags, lsm_tree->merge_aggressiveness, idlems, fillms);
-                WT_ERR(__wt_lsm_manager_push_entry(session, WT_LSM_WORK_MERGE, 0, lsm_tree));
+                WT_ERR(__wti_lsm_manager_push_entry(session, WT_LSM_WORK_MERGE, 0, lsm_tree));
             }
         }
         __wt_readunlock(session, &conn->dhandle_lock);
@@ -449,12 +449,12 @@ err:
 }
 
 /*
- * __wt_lsm_manager_clear_tree --
+ * __wti_lsm_manager_clear_tree --
  *     Remove all entries for a tree from the LSM manager queues. This introduces an inefficiency if
  *     LSM trees are being opened and closed regularly.
  */
 void
-__wt_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wti_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
     WT_LSM_MANAGER *manager;
     WT_LSM_WORK_UNIT *current, *tmp;
@@ -471,7 +471,7 @@ __wt_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
             continue;
         ++removed;
         TAILQ_REMOVE(&manager->switchqh, current, q);
-        __wt_lsm_manager_free_work_unit(session, current);
+        __wti_lsm_manager_free_work_unit(session, current);
     }
     __wt_spin_unlock(session, &manager->switch_lock);
     /* Clear out the tree from the application queue */
@@ -482,7 +482,7 @@ __wt_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
             continue;
         ++removed;
         TAILQ_REMOVE(&manager->appqh, current, q);
-        __wt_lsm_manager_free_work_unit(session, current);
+        __wti_lsm_manager_free_work_unit(session, current);
     }
     __wt_spin_unlock(session, &manager->app_lock);
     /* Clear out the tree from the manager queue */
@@ -493,15 +493,15 @@ __wt_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
             continue;
         ++removed;
         TAILQ_REMOVE(&manager->managerqh, current, q);
-        __wt_lsm_manager_free_work_unit(session, current);
+        __wti_lsm_manager_free_work_unit(session, current);
     }
     __wt_spin_unlock(session, &manager->manager_lock);
     WT_STAT_CONN_INCRV(session, lsm_work_units_discarded, removed);
 }
 
 /*
- * We assume this is only called from __wt_lsm_manager_pop_entry and we have session, entry and type
- * available to use. If the queue is empty we may return from the macro.
+ * We assume this is only called from __wti_lsm_manager_pop_entry and we have session, entry and
+ * type available to use. If the queue is empty we may return from the macro.
  */
 #define LSM_POP_ENTRY(qh, qlock, qlen)            \
     do {                                          \
@@ -519,11 +519,11 @@ __wt_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
     } while (0)
 
 /*
- * __wt_lsm_manager_pop_entry --
+ * __wti_lsm_manager_pop_entry --
  *     Retrieve the head of the queue, if it matches the requested work unit type.
  */
 int
-__wt_lsm_manager_pop_entry(WT_SESSION_IMPL *session, uint32_t type, WT_LSM_WORK_UNIT **entryp)
+__wti_lsm_manager_pop_entry(WT_SESSION_IMPL *session, uint32_t type, WT_LSM_WORK_UNIT **entryp)
 {
     WT_LSM_MANAGER *manager;
     WT_LSM_WORK_UNIT *entry;
@@ -549,7 +549,7 @@ __wt_lsm_manager_pop_entry(WT_SESSION_IMPL *session, uint32_t type, WT_LSM_WORK_
 
 /*
  * Push a work unit onto the appropriate queue. This macro assumes we are called from
- * __wt_lsm_manager_push_entry and we have session and entry available for use.
+ * __wti_lsm_manager_push_entry and we have session and entry available for use.
  */
 #define LSM_PUSH_ENTRY(qh, qlock, qlen)    \
     do {                                   \
@@ -560,11 +560,11 @@ __wt_lsm_manager_pop_entry(WT_SESSION_IMPL *session, uint32_t type, WT_LSM_WORK_
     } while (0)
 
 /*
- * __wt_lsm_manager_push_entry --
+ * __wti_lsm_manager_push_entry --
  *     Add an entry to the end of the switch queue.
  */
 int
-__wt_lsm_manager_push_entry(
+__wti_lsm_manager_push_entry(
   WT_SESSION_IMPL *session, uint32_t type, uint32_t flags, WT_LSM_TREE *lsm_tree)
 {
     WT_LSM_MANAGER *manager;

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import time
-import wttest
+from compact_util import compact_util
 from wiredtiger import stat
 
 megabyte = 1024 * 1024
@@ -37,69 +37,19 @@ megabyte = 1024 * 1024
 #
 # It checks that background compaction only compacts a table when it is not part of the exclude
 # list.
-class test_compact09(wttest.WiredTigerTestCase):
+class test_compact09(compact_util):
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB,'
     conn_config = 'cache_size=100MB,statistics=(all),debug_mode=(background_compact)'
     uri_prefix = 'table:test_compact09'
 
     table_numkv = 100 * 1000
     n_tables = 2
-    value_size = 1024 # The value should be small enough so that we don't create overflow pages.
-
-    def delete_range(self, uri, num_keys):
-        c = self.session.open_cursor(uri, None)
-        for i in range(num_keys):
-            c.set_key(i)
-            c.remove()
-        c.close()
-
-    def get_bg_compaction_running(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        compact_running = stat_cursor[stat.conn.background_compact_running][2]
-        stat_cursor.close()
-        return compact_running
 
     def get_bg_compaction_files_excluded(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         files = stat_cursor[stat.conn.background_compact_exclude][2]
         stat_cursor.close()
         return files
-
-    def get_files_compacted(self):
-        files_compacted = 0
-        for i in range(self.n_tables):
-            uri = f'{self.uri_prefix}_{i}'
-            if self.get_pages_rewritten(uri) > 0:
-                files_compacted += 1
-        return files_compacted
-
-    def get_pages_rewritten(self, uri):
-        stat_cursor = self.session.open_cursor('statistics:' + uri, None, None)
-        pages_rewritten = stat_cursor[stat.dsrc.btree_compact_pages_rewritten][2]
-        stat_cursor.close()
-        return pages_rewritten
-
-    def populate(self, uri, num_keys, value_size):
-        c = self.session.open_cursor(uri, None)
-        for k in range(num_keys):
-            c[k] = ('%07d' % k) + '_' + 'abcd' * ((value_size // 4) - 2)
-        c.close()
-
-    def turn_off_bg_compact(self):
-        self.session.compact(None, 'background=false')
-        compact_running = self.get_bg_compaction_running()
-        while compact_running:
-            time.sleep(1)
-            compact_running = self.get_bg_compaction_running()
-        self.assertEqual(compact_running, 0)
-
-    def turn_on_bg_compact(self, config):
-        self.session.compact(None, config)
-        compact_running = self.get_bg_compaction_running()
-        while not compact_running:
-            time.sleep(1)
-            compact_running = self.get_bg_compaction_running()
-        self.assertEqual(compact_running, 1)
 
     # Test the exclude list functionality of the background compaction server.
     def test_compact09(self):
@@ -108,17 +58,18 @@ class test_compact09(wttest.WiredTigerTestCase):
             self.skipTest("this test does not yet work with tiered storage")
 
         # Create and populate tables.
+        uris = []
         for i in range(self.n_tables):
             uri = self.uri_prefix + f'_{i}'
+            uris.append(uri)
             self.session.create(uri, self.create_params)
-            self.populate(uri, self.table_numkv, self.value_size)
+            self.populate(uri, 0, self.table_numkv)
 
         # Write to disk.
         self.session.checkpoint()
 
-        # Delete the first 90%.
-        for i in range(self.n_tables):
-            uri = self.uri_prefix + f'_{i}'
+        # Delete the first 90% of each file.
+        for uri in uris:
             self.delete_range(uri, 90 * self.table_numkv // 100)
 
         # Write to disk.
@@ -132,7 +83,7 @@ class test_compact09(wttest.WiredTigerTestCase):
         # Background compaction should exclude all files.
         while self.get_bg_compaction_files_excluded() < self.n_tables:
             time.sleep(1)
-        assert self.get_files_compacted() == 0
+        assert self.get_files_compacted(uris) == 0
         num_files_excluded = self.get_bg_compaction_files_excluded()
         assert num_files_excluded == self.n_tables
 
@@ -151,9 +102,9 @@ class test_compact09(wttest.WiredTigerTestCase):
         assert self.get_bg_compaction_files_excluded() == num_files_excluded + 1
 
         # We should now start compacting the second table.
-        while self.get_files_compacted() == 0:
+        while self.get_files_compacted(uris) == 0:
             time.sleep(1)
-        assert self.get_files_compacted() == 1
+        assert self.get_files_compacted(uris) == 1
 
         # Make sure we have compacted the right table.
         uri = self.uri_prefix + '_0'

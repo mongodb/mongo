@@ -33,9 +33,10 @@ import wiredtiger, wttest
 class test_compact08(wttest.WiredTigerTestCase):
     uri = 'file:test_compact08'
 
-    def background_compaction(self):
+    def start_background_compaction(self):
         self.session.compact(None, 'background=true')
-    def foreground_compaction(self):
+
+    def start_foreground_compaction(self):
         self.session.compact(self.uri, None)
 
     def test_compact08(self):
@@ -48,20 +49,22 @@ class test_compact08(wttest.WiredTigerTestCase):
 
         # Foreground compaction.
         with self.expectedStdoutPattern('Compact does not work for in-memory databases'):
-           self.foreground_compaction()
+           self.start_foreground_compaction()
+
         # Background compaction.
         with self.expectedStdoutPattern('Background compact cannot be configured for in-memory or readonly databases'):
             self.assertRaisesException(wiredtiger.WiredTigerError,
-                lambda: self.background_compaction())
+                lambda: self.start_background_compaction())
 
         # Reopen in readonly mode.
         self.reopen_conn(config='in_memory=false,readonly=true')
 
         # Foreground compaction.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.foreground_compaction(),
+            lambda: self.start_foreground_compaction(),
             '/Operation not supported/')
+
         # Background compaction.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.background_compaction(),
+            lambda: self.start_foreground_compaction(),
             '/Operation not supported/')

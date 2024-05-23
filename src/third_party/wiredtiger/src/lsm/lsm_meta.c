@@ -89,12 +89,12 @@ __lsm_meta_read_v0(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, const char *
                     WT_RET(__wt_calloc_one(session, &chunk));
                     lsm_tree->chunk[nchunks++] = chunk;
                     chunk->id = (uint32_t)lv.val;
-                    WT_RET(__wt_lsm_tree_chunk_name(
+                    WT_RET(__wti_lsm_tree_chunk_name(
                       session, lsm_tree, chunk->id, chunk->generation, &chunk->uri));
                     F_SET(chunk, WT_LSM_CHUNK_ONDISK | WT_LSM_CHUNK_STABLE);
                 } else if (WT_CONFIG_LIT_MATCH("bloom", lk)) {
                     WT_RET(
-                      __wt_lsm_tree_bloom_name(session, lsm_tree, chunk->id, &chunk->bloom_uri));
+                      __wti_lsm_tree_bloom_name(session, lsm_tree, chunk->id, &chunk->bloom_uri));
                     F_SET(chunk, WT_LSM_CHUNK_BLOOM);
                     continue;
                 } else if (WT_CONFIG_LIT_MATCH("chunk_size", lk)) {
@@ -252,7 +252,7 @@ __lsm_meta_read_v1(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, const char *
             chunk->id = (uint32_t)lv.val;
             F_SET(chunk, WT_LSM_CHUNK_ONDISK | WT_LSM_CHUNK_STABLE);
         } else if (WT_CONFIG_LIT_MATCH("bloom", lk)) {
-            WT_ERR(__wt_lsm_tree_bloom_name(session, lsm_tree, chunk->id, &chunk->bloom_uri));
+            WT_ERR(__wti_lsm_tree_bloom_name(session, lsm_tree, chunk->id, &chunk->bloom_uri));
             F_SET(chunk, WT_LSM_CHUNK_BLOOM);
         } else if (WT_CONFIG_LIT_MATCH("chunk_size", lk)) {
             chunk->size = (uint64_t)lv.val;
@@ -263,7 +263,7 @@ __lsm_meta_read_v1(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, const char *
             /*
              * Id appears first, but we need both id and generation to create the name.
              */
-            WT_ERR(__wt_lsm_tree_chunk_name(
+            WT_ERR(__wti_lsm_tree_chunk_name(
               session, lsm_tree, chunk->id, chunk->generation, &chunk->uri));
         }
     }
@@ -364,11 +364,11 @@ err:
 }
 
 /*
- * __wt_lsm_meta_read --
+ * __wti_lsm_meta_read --
  *     Read the metadata for an LSM tree.
  */
 int
-__wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wti_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
@@ -408,11 +408,11 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 }
 
 /*
- * __wt_lsm_meta_write --
+ * __wti_lsm_meta_write --
  *     Write the metadata for an LSM tree.
  */
 int
-__wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, const char *newconfig)
+__wti_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, const char *newconfig)
 {
     WT_DECL_ITEM(buf);
     WT_DECL_RET;

@@ -26,14 +26,14 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, shutil, re, time, wttest
-from wiredtiger import stat
+import os, shutil, re
 from wtbackup import backup_base
+from compact_util import compact_util
 
 # test_compact11.py
 # Verify background compaction and incremental backup behaviour. The block modifications bits in an
 # incremental backup should never be cleared when background compact is working on tables.
-class test_compact11(backup_base):
+class test_compact11(backup_base, compact_util):
     backup_incr = "BACKUP_INCR"
     backup_full = "BACKUP_FULL"
     conn_config = 'cache_size=100MB,statistics=(all)'
@@ -42,42 +42,6 @@ class test_compact11(backup_base):
 
     num_tables = 5
     table_numkv = 100 * 1000
-    value_size = 1024 # The value should be small enough so that we don't create overflow pages.
-
-    def delete_range(self, uri, num_keys):
-        c = self.session.open_cursor(uri, None)
-        for i in range(num_keys):
-            c.set_key(i)
-            c.remove()
-        c.close()
-
-    def get_bg_compaction_running(self):
-        return self.get_stat(stat.conn.background_compact_running)
-
-    def get_bg_compaction_success(self):
-        return self.get_stat(stat.conn.background_compact_success)
-
-    def get_bytes_recovered(self):
-        return self.get_stat(stat.conn.background_compact_bytes_recovered)
-
-    def get_stat(self, stat, uri = None):
-        if not uri:
-            uri = ''
-        stat_cursor = self.session.open_cursor(f'statistics:{uri}', None, None)
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
-    def populate(self, uri, start_key, num_keys, value_size):
-        c = self.session.open_cursor(uri, None)
-        for k in range(start_key, num_keys):
-            c[k] = ('%07d' % k) + '_' + 'abcd' * ((value_size // 4) - 2)
-        c.close()
-
-    def turn_on_bg_compact(self, config = ''):
-        self.session.compact(None, f'background=true,{config}')
-        while not self.get_bg_compaction_running():
-            time.sleep(0.1)
 
     def compare_bitmap(self, orig, new):
         # Compare the bitmaps from the metadata. Once a bit is set, it should never
@@ -120,7 +84,7 @@ class test_compact11(backup_base):
 
         # Populate the first half of each table.
         for uri in uris:
-            self.populate(uri, 0, self.table_numkv // 2, self.value_size)
+            compact_util.populate(self, uri, 0, self.table_numkv // 2)
 
         # Write to disk.
         self.session.checkpoint()
@@ -134,7 +98,7 @@ class test_compact11(backup_base):
 
         # Insert the latter 50% in each table.
         for uri in uris:
-            self.populate(uri, self.table_numkv // 2, self.table_numkv, self.value_size)
+            compact_util.populate(self, uri, self.table_numkv // 2, self.table_numkv)
 
         # Write to disk.
         self.session.checkpoint()

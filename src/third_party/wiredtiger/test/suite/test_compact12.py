@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import time, wttest
+from compact_util import compact_util
 from wiredtiger import stat
 
 kilobyte = 1024
@@ -40,7 +41,7 @@ kilobyte = 1024
 # It checks that:
 #
 # - Compaction correctly rewrites pages in WT_REF_DELETED state but are still on disk.
-class test_compact12(wttest.WiredTigerTestCase):
+class test_compact12(compact_util):
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB,leaf_value_max=16MB'
     conn_config = 'cache_size=100MB,statistics=(all),verbose=[compact:4]'
     uri_prefix = 'table:test_compact12'
@@ -48,26 +49,11 @@ class test_compact12(wttest.WiredTigerTestCase):
     table_numkv = 10 * 1000
     value_size = kilobyte # The value should be small enough so that we don't create overflow pages.
 
-    def get_size(self, uri):
-        stat_cursor = self.session.open_cursor('statistics:' + uri, None, 'statistics=(all)')
-        size = stat_cursor[stat.dsrc.block_size][2]
-        stat_cursor.close()
-        return size
-
     def get_fast_truncated_pages(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
         stat_cursor.close()
         return pages
-
-    def truncate(self, uri, key1, key2):
-        lo_cursor = self.session.open_cursor(uri)
-        hi_cursor = self.session.open_cursor(uri)
-        lo_cursor.set_key(key1)
-        hi_cursor.set_key(key2)
-        self.session.truncate(None, lo_cursor, hi_cursor, None)
-        lo_cursor.close()
-        hi_cursor.close()
 
     def populate(self, uri, num_keys):
         c = self.session.open_cursor(uri, None)

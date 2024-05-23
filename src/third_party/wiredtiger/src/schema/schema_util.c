@@ -38,13 +38,13 @@ __schema_backup_check_int(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
- * __wt_schema_backup_check --
+ * __wti_schema_backup_check --
  *     Check if a backup cursor is open and give an error if the schema operation will conflict.
  *     This is called after the schema operations have taken the schema lock so no hot backup cursor
  *     can be created until this is done.
  */
 int
-__wt_schema_backup_check(WT_SESSION_IMPL *session, const char *name)
+__wti_schema_backup_check(WT_SESSION_IMPL *session, const char *name)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -72,11 +72,11 @@ __wt_schema_get_source(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
- * __wt_schema_internal_session --
+ * __wti_schema_internal_session --
  *     Create and return an internal schema session if necessary.
  */
 int
-__wt_schema_internal_session(WT_SESSION_IMPL *session, WT_SESSION_IMPL **int_sessionp)
+__wti_schema_internal_session(WT_SESSION_IMPL *session, WT_SESSION_IMPL **int_sessionp)
 {
     /*
      * Open an internal session if a transaction is running so that the schema operations are not
@@ -94,11 +94,11 @@ __wt_schema_internal_session(WT_SESSION_IMPL *session, WT_SESSION_IMPL **int_ses
 }
 
 /*
- * __wt_schema_session_release --
+ * __wti_schema_session_release --
  *     Release an internal schema session if needed.
  */
 int
-__wt_schema_session_release(WT_SESSION_IMPL *session, WT_SESSION_IMPL *int_session)
+__wti_schema_session_release(WT_SESSION_IMPL *session, WT_SESSION_IMPL *int_session)
 {
     if (session != int_session)
         WT_RET(__wt_session_close_internal(int_session));

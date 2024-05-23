@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
+from compact_util import compact_util
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet, ComplexDataSet
 from wiredtiger import stat
@@ -34,7 +35,7 @@ from wtscenario import make_scenarios
 
 # test_compact.py
 #    session level compact operation
-class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
+class test_compact(compact_util, suite_subprocess):
     name = 'test_compact'
 
     # We don't want to set the page size too small as compaction doesn't work on tables with many
@@ -60,17 +61,6 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
     # skew our compaction results).
     conn_config = 'cache_size=1GB,eviction_checkpoint_target=80,' +\
         'eviction_dirty_target=80,eviction_dirty_trigger=95,statistics=(all)'
-
-    # Return stats that track the progress of compaction.
-    def getCompactProgressStats(self, uri):
-        cstat = self.session.open_cursor(
-            'statistics:' + uri, None, 'statistics=(all)')
-        statDict = {}
-        statDict["pages_reviewed"] = cstat[stat.dsrc.btree_compact_pages_reviewed][2]
-        statDict["pages_skipped"] = cstat[stat.dsrc.btree_compact_pages_skipped][2]
-        statDict["pages_rewritten"] = cstat[stat.dsrc.btree_compact_pages_rewritten][2]
-        cstat.close()
-        return statDict
 
     # Test compaction.
     @wttest.skip_for_hook("timestamp", "removing timestamped items will not free space")
@@ -115,7 +105,7 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         # Verify compact progress stats. We can't do this with utility method as reopening the
         # connection would reset the stats.
         if self.utility == 0 and self.reopen == 0 and not self.runningHook('tiered'):
-            statDict = self.getCompactProgressStats(uri)
+            statDict = self.get_compact_progress_stats(uri)
             self.assertGreater(statDict["pages_reviewed"],0)
             self.assertGreater(statDict["pages_rewritten"],0)
             self.assertEqual(statDict["pages_rewritten"] + statDict["pages_skipped"],

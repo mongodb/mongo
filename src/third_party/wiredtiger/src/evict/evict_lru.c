@@ -190,13 +190,13 @@ __evict_list_clear_page_locked(WT_SESSION_IMPL *session, WT_REF *ref, bool exclu
 }
 
 /*
- * __wt_evict_list_clear_page --
+ * __wti_evict_list_clear_page --
  *     Check whether a page is present in the LRU eviction list. If the page is found in the list,
  *     remove it. This is called from the page eviction code to make sure there is no attempt to
  *     evict a child page multiple times.
  */
 void
-__wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref)
+__wti_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_CACHE *cache;
 
@@ -279,22 +279,22 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_evict_thread_chk --
+ * __evict_thread_chk --
  *     Check to decide if the eviction thread should continue running.
  */
-bool
-__wt_evict_thread_chk(WT_SESSION_IMPL *session)
+static bool
+__evict_thread_chk(WT_SESSION_IMPL *session)
 {
     return (F_ISSET(S2C(session), WT_CONN_EVICTION_RUN));
 }
 
 /*
- * __wt_evict_thread_run --
+ * __evict_thread_run --
  *     Entry function for an eviction thread. This is called repeatedly from the thread group code
  *     so it does not need to loop itself.
  */
-int
-__wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
+static int
+__evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
@@ -355,11 +355,11 @@ err:
 }
 
 /*
- * __wt_evict_thread_stop --
+ * __evict_thread_stop --
  *     Shutdown function for an eviction thread.
  */
-int
-__wt_evict_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
+static int
+__evict_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
@@ -541,8 +541,8 @@ __wt_evict_create(WT_SESSION_IMPL *session)
      */
     session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
     WT_RET(__wt_thread_group_create(session, &conn->evict_threads, "eviction-server",
-      conn->evict_threads_min, conn->evict_threads_max, session_flags, __wt_evict_thread_chk,
-      __wt_evict_thread_run, __wt_evict_thread_stop));
+      conn->evict_threads_min, conn->evict_threads_max, session_flags, __evict_thread_chk,
+      __evict_thread_run, __evict_thread_stop));
 
 /*
  * Ensure the cache stuck timer is initialized when starting eviction.
@@ -1777,6 +1777,45 @@ __evict_walk_target(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __evict_skip_dirty_candidate --
+ *     Check if eviction should skip the dirty page.
+ */
+static WT_INLINE bool
+__evict_skip_dirty_candidate(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_TXN *txn;
+
+    conn = S2C(session);
+    txn = session->txn;
+
+    /*
+     * If the global transaction state hasn't changed since the last time we tried eviction, it's
+     * unlikely we can make progress. This heuristic avoids repeated attempts to evict the same
+     * page.
+     */
+    if (!__wt_page_evict_retry(session, page)) {
+        WT_STAT_CONN_INCR(session, cache_eviction_server_skip_pages_retry);
+        return (true);
+    }
+
+    /*
+     * If we are under cache pressure, allow evicting pages with newly committed updates to free
+     * space. Otherwise, avoid doing that as it may thrash the cache.
+     */
+    if (F_ISSET(conn->cache, WT_CACHE_EVICT_DIRTY_HARD | WT_CACHE_EVICT_UPDATES_HARD) &&
+      F_ISSET(txn, WT_TXN_HAS_SNAPSHOT)) {
+        if (!__txn_visible_id(session, page->modify->update_txn))
+            return (true);
+    } else if (page->modify->update_txn >= conn->txn_global.last_running) {
+        WT_STAT_CONN_INCR(session, cache_eviction_server_skip_pages_last_running);
+        return (true);
+    }
+
+    return (false);
+}
+
+/*
  * __evict_walk_tree --
  *     Get a few page eviction candidates from a single underlying file.
  */
@@ -1790,6 +1829,7 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
     WT_EVICT_ENTRY *end, *evict, *start;
     WT_PAGE *last_parent, *page;
     WT_REF *ref;
+    WT_TXN *txn;
     uint64_t internal_pages_already_queued, internal_pages_queued, internal_pages_seen;
     uint64_t min_pages, pages_already_queued, pages_queued, pages_seen, refs_walked;
     uint32_t read_flags, remaining_slots, target_pages, walk_flags;
@@ -1802,6 +1842,7 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
     last_parent = NULL;
     restarts = 0;
     give_up = urgent_queued = false;
+    txn = session->txn;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &cache->evict_walk_lock);
 
@@ -1949,6 +1990,14 @@ rand_next:
      */
     ref = btree->evict_ref;
     btree->evict_ref = NULL;
+
+    /*
+     * Get the snapshot for the eviction server when we want to evict dirty content under cache
+     * pressure. This snapshot is used to check for the visibility of the last modified transaction
+     * id on the page.
+     */
+    if (F_ISSET(cache, WT_CACHE_EVICT_DIRTY_HARD | WT_CACHE_EVICT_UPDATES_HARD))
+        __wt_txn_bump_snapshot(session);
 
     /*
      * !!! Take care terminating this loop.
@@ -2126,24 +2175,8 @@ rand_next:
         if (__wt_cache_aggressive(session))
             goto fast;
 
-        /*
-         * If the global transaction state hasn't changed since the last time we tried eviction,
-         * it's unlikely we can make progress. This heuristic avoids repeated attempts to evict the
-         * same page.
-         */
-        if (!__wt_page_evict_retry(session, page)) {
-            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_pages_retry);
+        if (modified && __evict_skip_dirty_candidate(session, page))
             continue;
-        } else if (modified &&
-          page->modify->update_txn >= __wt_atomic_loadv64(&conn->txn_global.last_running)) {
-            /*
-             * FIXME-WT-11805: The assumption that the eviction will fail if most recent update on
-             * the page from the transaction that is greater than the last running transaction has
-             * changed because now eviction also has it's own snapshot for visibility check.
-             */
-            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_pages_last_running);
-            continue;
-        }
 
 fast:
         /* If the page can't be evicted, give up. */
@@ -2164,6 +2197,8 @@ fast:
         __wt_verbose(session, WT_VERB_EVICTSERVER, "walk select: %p, size %" WT_SIZET_FMT,
           (void *)page, page->memory_footprint);
     }
+    if (F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+        __wt_txn_release_snapshot(session);
     WT_RET_NOTFOUND_OK(ret);
 
     *slotp += (u_int)(evict - start);

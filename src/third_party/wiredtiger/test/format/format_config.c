@@ -1102,6 +1102,8 @@ config_in_memory_reset(void)
         config_off(NULL, "ops.salvage");
     if (!config_explicit(NULL, "ops.verify"))
         config_off(NULL, "ops.verify");
+    if (!config_explicit(NULL, "prefetch"))
+        config_off(NULL, "prefetch");
 }
 
 /*

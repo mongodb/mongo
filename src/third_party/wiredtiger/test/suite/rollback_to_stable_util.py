@@ -58,7 +58,7 @@ def verify_rts_logs():
     stderr = b'' if output.stderr is None else output.stderr
     return (output.returncode, stderr.strip().decode('utf-8'))
 
-# test_rollback_to_stable_base.py
+# rollback_to_stable_util.py
 # Shared base class used by rollback to stable tests.
 #
 # Note: this class now expects self.value_format to have been set for some of the

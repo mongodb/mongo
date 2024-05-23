@@ -34,11 +34,11 @@ __wt_addr_string(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size
 }
 
 /*
- * __wt_cell_type_string --
+ * __wti_cell_type_string --
  *     Return a string representing the cell type.
  */
 const char *
-__wt_cell_type_string(uint8_t type)
+__wti_cell_type_string(uint8_t type)
 {
     switch (type) {
     case WT_CELL_ADDR_DEL:

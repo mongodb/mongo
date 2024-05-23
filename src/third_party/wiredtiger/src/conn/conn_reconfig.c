@@ -35,11 +35,11 @@ __conn_compat_parse(
 }
 
 /*
- * __wt_conn_compat_config --
+ * __wti_conn_compat_config --
  *     Configure compatibility version.
  */
 int
-__wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
+__wti_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -196,11 +196,11 @@ err:
 }
 
 /*
- * __wt_conn_optrack_setup --
+ * __wti_conn_optrack_setup --
  *     Set up operation logging.
  */
 int
-__wt_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
+__wti_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -218,7 +218,7 @@ __wt_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconf
     WT_RET(__wt_config_gets(session, cfg, "operation_tracking.enabled", &cval));
     if (cval.val == 0) {
         if (F_ISSET(conn, WT_CONN_OPTRACK)) {
-            WT_RET(__wt_conn_optrack_teardown(session, reconfig));
+            WT_RET(__wti_conn_optrack_teardown(session, reconfig));
             F_CLR(conn, WT_CONN_OPTRACK);
         }
         return (0);
@@ -261,11 +261,11 @@ err:
 }
 
 /*
- * __wt_conn_optrack_teardown --
+ * __wti_conn_optrack_teardown --
  *     Clean up connection-wide resources used for operation logging.
  */
 int
-__wt_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig)
+__wti_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -288,11 +288,11 @@ __wt_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig)
 }
 
 /*
- * __wt_conn_statistics_config --
+ * __wti_conn_statistics_config --
  *     Set statistics configuration.
  */
 int
-__wt_conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
+__wti_conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONFIG_ITEM cval, sval;
     WT_CONNECTION_IMPL *conn;
@@ -364,11 +364,11 @@ __wt_conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wt_conn_reconfig --
+ * __wti_conn_reconfig --
  *     Reconfigure a connection (internal version).
  */
 int
-__wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
+__wti_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -403,25 +403,25 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
      * to avoid conflicts with WiredTiger's checkpoint thread, and rely on the documentation
      * specifying that no new operations can start until the upgrade / downgrade completes.
      */
-    WT_WITH_CHECKPOINT_LOCK(session, ret = __wt_conn_compat_config(session, cfg, true));
+    WT_WITH_CHECKPOINT_LOCK(session, ret = __wti_conn_compat_config(session, cfg, true));
     WT_ERR(ret);
     WT_ERR(__wt_blkcache_setup(session, cfg, true));
     WT_ERR(__wt_chunkcache_reconfig(session, cfg));
-    WT_ERR(__wt_conn_optrack_setup(session, cfg, true));
-    WT_ERR(__wt_conn_statistics_config(session, cfg));
-    WT_ERR(__wt_cache_config(session, cfg, true));
-    WT_ERR(__wt_capacity_server_create(session, cfg));
-    WT_ERR(__wt_checkpoint_server_create(session, cfg));
-    WT_ERR(__wt_debug_mode_config(session, cfg));
-    WT_ERR(__wt_extra_diagnostics_config(session, cfg));
+    WT_ERR(__wti_conn_optrack_setup(session, cfg, true));
+    WT_ERR(__wti_conn_statistics_config(session, cfg));
+    WT_ERR(__wti_cache_config(session, cfg, true));
+    WT_ERR(__wti_capacity_server_create(session, cfg));
+    WT_ERR(__wti_checkpoint_server_create(session, cfg));
+    WT_ERR(__wti_debug_mode_config(session, cfg));
+    WT_ERR(__wti_extra_diagnostics_config(session, cfg));
     WT_ERR(__wt_hs_config(session, cfg));
-    WT_ERR(__wt_logmgr_reconfig(session, cfg));
+    WT_ERR(__wti_logmgr_reconfig(session, cfg));
     WT_ERR(__wt_lsm_manager_reconfig(session, cfg));
-    WT_ERR(__wt_statlog_create(session, cfg));
+    WT_ERR(__wti_statlog_create(session, cfg));
     WT_ERR(__wt_tiered_conn_config(session, cfg, true));
-    WT_ERR(__wt_sweep_config(session, cfg));
-    WT_ERR(__wt_timing_stress_config(session, cfg));
-    WT_ERR(__wt_json_config(session, cfg, true));
+    WT_ERR(__wti_sweep_config(session, cfg));
+    WT_ERR(__wti_timing_stress_config(session, cfg));
+    WT_ERR(__wti_json_config(session, cfg, true));
     WT_ERR(__wt_verbose_config(session, cfg, true));
 
     /* Third, merge everything together, creating a new connection state. */

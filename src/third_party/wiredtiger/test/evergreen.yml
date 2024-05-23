@@ -173,13 +173,18 @@ functions:
       script: |
         set -o errexit
         set -o verbose
+        pushd wiredtiger
         mongo_repo=https://github.com/mongodb/mongo
-        branch=${branch_name}
+        # Find the equivalent mongodb branch that matches the same branch version to wiredtiger. In
+        # the case of patch builds, it is possible that the developer has a branch name that doesn't
+        # adhere to naming rules, therefore derive the base branch name from git.
+        branch=$(git branch --contains | grep -e "mongodb" -e "develop")
         if [[ $branch =~ "mongodb-" ]]; then
           mongo_branch=v$(echo $branch | cut -d'-' -f 2)
         else
           mongo_branch=master
         fi
+        popd
         git clone $mongo_repo -b $mongo_branch
   "import wiredtiger into mongo" :
     command: shell.exec
@@ -202,7 +207,6 @@ functions:
         virtualenv -p python3 venv
         source venv/bin/activate
         python3 -m pip install 'poetry==1.5.1'
-
         export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
         # FIXME-WT-12911 - There's a dependency ordering issue in the mongo poetry.lock file. Running poetry install twice resolves it.
         set +o errexit
@@ -336,16 +340,6 @@ functions:
           $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
           echo "Completed CMake"
         fi
-  "python config check":
-    command: shell.exec
-    type: setup
-    params:
-      working_dir: "wiredtiger/cmake_build"
-      shell: bash
-      script: |
-        set -o errexit
-        # Confirm that the Python binary matches the version of that configured by CMake.
-        ${python_binary|python3} ../test/evergreen/python_version_check.py -v -c ./CMakeCache.txt -s ${python_config_search_string}
   "make wiredtiger": &make_wiredtiger
     command: shell.exec
     params:
@@ -1458,9 +1452,7 @@ variables:
     tasks:
       - name: compile
       - name: make-check-test
-      # FIXME: WT-9575
-      # Using a special version of unit test for macOS to reduce the concurrency level.
-      - name: unit-test-macos
+      - name: unit-test
       - name: fops
       - name: memory-model-test-mac
         batchtime: 40320 # 28 days
@@ -2146,15 +2138,6 @@ tasks:
     - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "unit test"
-
-  - name: unit-test-macos
-    tags: ["python"]
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "python config check"
       - func: "unit test"
 
   - name: unit-test-zstd
@@ -4064,8 +4047,8 @@ tasks:
         params:
           exec_timeout_secs: 86400
           timeout_secs: 86400
-      - func: "fetch mongo repo"
       - func: "get project"
+      - func: "fetch mongo repo"
       - func: "get engflow creds"
       - func: "import wiredtiger into mongo"
       - func: "compile mongodb"

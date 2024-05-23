@@ -46,8 +46,9 @@ struct __wt_process {
 extern WT_PROCESS __wt_process;
 
 typedef enum __wt_background_compact_cleanup_stat_type {
-    BACKGROUND_CLEANUP_ALL_STAT,
-    BACKGROUND_CLEANUP_STALE_STAT
+    BACKGROUND_COMPACT_CLEANUP_EXIT,      /* Cleanup when the thread exits */
+    BACKGROUND_COMPACT_CLEANUP_OFF,       /* Cleanup when the thread is disabled */
+    BACKGROUND_COMPACT_CLEANUP_STALE_STAT /* Cleanup stale stats only */
 } WT_BACKGROUND_COMPACT_CLEANUP_STAT_TYPE;
 
 /*
@@ -746,6 +747,11 @@ struct __wt_connection_impl {
 #define WT_CONN_DEBUG_UPDATE_RESTORE_EVICT 0x800u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t debug_flags;
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_CONN_HEURISTIC_OBSOLETE_CHECK 0x1u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    uint16_t heuristic_controls;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_DIAGNOSTIC_ALL 0x001ull

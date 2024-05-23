@@ -21,13 +21,13 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
     allocsize = block->allocsize;
 
     /* Reset the description information in the first block. */
-    WT_RET(__wt_desc_write(session, block->fh, allocsize));
+    WT_RET(__wti_desc_write(session, block->fh, allocsize));
 
     /*
      * Salvage creates a new checkpoint when it's finished, set up for rolling an empty file
      * forward.
      */
-    WT_RET(__wt_block_ckpt_init(session, &block->live, "live"));
+    WT_RET(__wti_block_ckpt_init(session, &block->live, "live"));
 
     /*
      * Truncate the file to an allocation-size multiple of blocks (bytes trailing the last block
@@ -36,7 +36,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
     len = allocsize;
     if (block->size > allocsize)
         len = (block->size / allocsize) * allocsize;
-    WT_RET(__wt_block_truncate(session, block, len));
+    WT_RET(__wti_block_truncate(session, block, len));
 
     /*
      * The file's first allocation-sized block is description information, skip it when reading
@@ -48,7 +48,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
      * The only checkpoint extent we care about is the allocation list. Start with the entire file
      * on the allocation list, we'll "free" any blocks we don't want as we process the file.
      */
-    WT_RET(__wt_block_insert_ext(session, block, &block->live.alloc, allocsize, len - allocsize));
+    WT_RET(__wti_block_insert_ext(session, block, &block->live.alloc, allocsize, len - allocsize));
 
     /* Salvage performs a checkpoint but doesn't start or resolve it. */
     WT_ASSERT(session, block->ckpt_state == WT_CKPT_NONE);
@@ -73,11 +73,11 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
- * __wt_block_offset_invalid --
+ * __wti_block_offset_invalid --
  *     Return if the block offset is insane.
  */
 bool
-__wt_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size)
+__wti_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size)
 {
     if (size == 0) /* < minimum page size */
         return (true);
@@ -139,14 +139,14 @@ __wt_block_salvage_next(
          * checksum; if reading the block succeeds, return its address as a possible page,
          * otherwise, move past it.
          */
-        if (!__wt_block_offset_invalid(block, offset, size) &&
+        if (!__wti_block_offset_invalid(block, offset, size) &&
           __wt_block_read_off(session, block, tmp, objectid, offset, size, checksum) == 0)
             break;
 
         /* Free the allocation-size block. */
         __wt_verbose(session, WT_VERB_SALVAGE, "skipping %" PRIu32 "B at file offset %" PRIuMAX,
           allocsize, (uintmax_t)offset);
-        WT_ERR(__wt_block_off_free(session, block, objectid, offset, (wt_off_t)allocsize));
+        WT_ERR(__wti_block_off_free(session, block, objectid, offset, (wt_off_t)allocsize));
         block->slvg_off += allocsize;
     }
 
@@ -181,7 +181,7 @@ __wt_block_salvage_valid(
     if (valid)
         block->slvg_off = offset + size;
     else {
-        WT_RET(__wt_block_off_free(session, block, objectid, offset, (wt_off_t)block->allocsize));
+        WT_RET(__wti_block_off_free(session, block, objectid, offset, (wt_off_t)block->allocsize));
         block->slvg_off = offset + block->allocsize;
     }
 

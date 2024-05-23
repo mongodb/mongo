@@ -413,7 +413,7 @@ __time_value_validate_parent(
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
-    if (tw->start_txn > parent->newest_txn)
+    if (parent->newest_txn != WT_TXN_NONE && tw->start_txn > parent->newest_txn)
         WT_TIME_VALIDATE_RET(session,
           "value time window has a start transaction after its parent's newest transaction; "
           "time window %s, parent %s",
@@ -435,7 +435,7 @@ __time_value_validate_parent(
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
-    if (tw->stop_txn > parent->newest_stop_txn)
+    if (parent->newest_stop_txn != WT_TXN_NONE && tw->stop_txn > parent->newest_stop_txn)
         WT_TIME_VALIDATE_RET(session,
           "value time window has a stop transaction after its parent's newest stop transaction; "
           "time window %s, parent %s",

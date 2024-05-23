@@ -177,11 +177,11 @@ __capacity_server_start(WT_CONNECTION_IMPL *conn)
 }
 
 /*
- * __wt_capacity_server_create --
+ * __wti_capacity_server_create --
  *     Configure and start the capacity server.
  */
 int
-__wt_capacity_server_create(WT_SESSION_IMPL *session, const char *cfg[])
+__wti_capacity_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONNECTION_IMPL *conn;
 
@@ -196,7 +196,7 @@ __wt_capacity_server_create(WT_SESSION_IMPL *session, const char *cfg[])
      * we're updating, and it's not expected that reconfiguration will happen a lot.
      */
     if (conn->capacity_session != NULL)
-        WT_RET(__wt_capacity_server_destroy(session));
+        WT_RET(__wti_capacity_server_destroy(session));
     WT_RET(__capacity_config(session, cfg));
 
     /*
@@ -213,11 +213,11 @@ __wt_capacity_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wt_capacity_server_destroy --
+ * __wti_capacity_server_destroy --
  *     Destroy the capacity server thread.
  */
 int
-__wt_capacity_server_destroy(WT_SESSION_IMPL *session)
+__wti_capacity_server_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;

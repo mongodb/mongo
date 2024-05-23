@@ -9,9 +9,8 @@ variables:
   batchtime: 360 # 6 hours
   expansions: &ubuntu2004-perf-tests-expansions-template
     additional_env_vars: export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_BUILDDIR/test/utility/"
-    CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O3
-    HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
-    ENABLE_TCMALLOC: 0
+    ENABLE_TCMALLOC: 1
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Release
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     database: WTPerformanceDataDB
   tasks:

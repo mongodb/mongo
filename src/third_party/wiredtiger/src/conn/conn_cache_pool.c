@@ -38,11 +38,11 @@ static void __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
 static void __cache_pool_balance(WT_SESSION_IMPL *, bool);
 
 /*
- * __wt_cache_pool_config --
+ * __wti_cache_pool_config --
  *     Parse and setup the cache pool options.
  */
 int
-__wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
+__wti_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 {
     WT_CACHE_POOL *cp;
     WT_CONFIG_ITEM cval, cval_cache_size;
@@ -224,11 +224,60 @@ err:
 }
 
 /*
- * __wt_conn_cache_pool_open --
+ * __cache_pool_server --
+ *     Thread to manage cache pool among connections.
+ */
+static WT_THREAD_RET
+__cache_pool_server(void *arg)
+{
+    WT_CACHE *cache;
+    WT_CACHE_POOL *cp;
+    WT_SESSION_IMPL *session;
+    bool forward;
+
+    session = (WT_SESSION_IMPL *)arg;
+
+    cp = __wt_process.cache_pool;
+    cache = S2C(session)->cache;
+    forward = true;
+
+    while (F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
+      FLD_ISSET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_RUN)) {
+        if (cp->currently_used <= cp->size)
+            __wt_cond_wait(session, cp->cache_pool_cond, WT_MILLION, NULL);
+
+        /*
+         * Re-check pool run flag - since we want to avoid getting the lock on shutdown.
+         */
+        if (!F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
+          FLD_ISSET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_RUN))
+            break;
+
+        /* Try to become the managing thread */
+        if (__wt_atomic_cas8(&cp->pool_managed, 0, 1)) {
+            FLD_SET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_MANAGER);
+            __wt_verbose(session, WT_VERB_SHARED_CACHE, "%s", "Cache pool switched manager thread");
+        }
+
+        /*
+         * Continue even if there was an error. Details of errors are reported in the balance
+         * function.
+         */
+        if (FLD_ISSET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_MANAGER)) {
+            __cache_pool_balance(session, forward);
+            forward = !forward;
+        }
+    }
+
+    return (WT_THREAD_RET_VALUE);
+}
+
+/*
+ * __wti_conn_cache_pool_open --
  *     Add a connection to the cache pool.
  */
 int
-__wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
+__wti_conn_cache_pool_open(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CACHE_POOL *cp;
@@ -266,7 +315,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
      */
     F_SET(cp, WT_CACHE_POOL_ACTIVE);
     FLD_SET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_RUN);
-    WT_RET(__wt_thread_create(session, &cache->cp_tid, __wt_cache_pool_server, cache->cp_session));
+    WT_RET(__wt_thread_create(session, &cache->cp_tid, __cache_pool_server, cache->cp_session));
 
     /* Wake up the cache pool server to get our initial chunk. */
     __wt_cond_signal(session, cp->cache_pool_cond);
@@ -275,12 +324,12 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_conn_cache_pool_destroy --
+ * __wti_conn_cache_pool_destroy --
  *     Remove our resources from the shared cache pool. Remove the cache pool if we were the last
  *     connection.
  */
 int
-__wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
+__wti_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CACHE_POOL *cp;
@@ -678,53 +727,4 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
              */
         }
     }
-}
-
-/*
- * __wt_cache_pool_server --
- *     Thread to manage cache pool among connections.
- */
-WT_THREAD_RET
-__wt_cache_pool_server(void *arg)
-{
-    WT_CACHE *cache;
-    WT_CACHE_POOL *cp;
-    WT_SESSION_IMPL *session;
-    bool forward;
-
-    session = (WT_SESSION_IMPL *)arg;
-
-    cp = __wt_process.cache_pool;
-    cache = S2C(session)->cache;
-    forward = true;
-
-    while (F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
-      FLD_ISSET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_RUN)) {
-        if (cp->currently_used <= cp->size)
-            __wt_cond_wait(session, cp->cache_pool_cond, WT_MILLION, NULL);
-
-        /*
-         * Re-check pool run flag - since we want to avoid getting the lock on shutdown.
-         */
-        if (!F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
-          FLD_ISSET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_RUN))
-            break;
-
-        /* Try to become the managing thread */
-        if (__wt_atomic_cas8(&cp->pool_managed, 0, 1)) {
-            FLD_SET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_MANAGER);
-            __wt_verbose(session, WT_VERB_SHARED_CACHE, "%s", "Cache pool switched manager thread");
-        }
-
-        /*
-         * Continue even if there was an error. Details of errors are reported in the balance
-         * function.
-         */
-        if (FLD_ISSET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_MANAGER)) {
-            __cache_pool_balance(session, forward);
-            forward = !forward;
-        }
-    }
-
-    return (WT_THREAD_RET_VALUE);
 }

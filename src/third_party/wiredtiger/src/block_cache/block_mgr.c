@@ -12,11 +12,11 @@ static void __bm_method_set(WT_BM *, bool);
 static int __bm_sync_tiered_handles(WT_BM *, WT_SESSION_IMPL *);
 
 /*
- * __wt_bm_close_block --
+ * __wti_bm_close_block --
  *     Close a block handle.
  */
 int
-__wt_bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__wti_bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
     WT_CONNECTION_IMPL *conn;
     uint64_t bucket, hash;
@@ -129,7 +129,7 @@ __bm_sync_tiered_handles(WT_BM *bm, WT_SESSION_IMPL *session)
             }
         }
         if (found)
-            __wt_blkcache_get_read_handle(block);
+            __wti_blkcache_get_read_handle(block);
         __wt_readunlock(session, &bm->handle_array_lock);
 
         if (found) {
@@ -236,7 +236,7 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, s
          */
         if (!bm->is_multi_handle)
             WT_RET(
-              __wt_blkcache_map(session, bm->block, &bm->map, &bm->maplen, &bm->mapped_cookie));
+              __wti_blkcache_map(session, bm->block, &bm->map, &bm->maplen, &bm->mapped_cookie));
 
         /*
          * If this handle is for a checkpoint, that is, read-only, there isn't a lot you can do with
@@ -310,7 +310,7 @@ __bm_checkpoint_unload(WT_BM *bm, WT_SESSION_IMPL *session)
 
     /* Unmap any mapped segment. */
     if (bm->map != NULL)
-        WT_TRET(__wt_blkcache_unmap(session, bm->block, bm->map, bm->maplen, &bm->mapped_cookie));
+        WT_TRET(__wti_blkcache_unmap(session, bm->block, bm->map, bm->maplen, &bm->mapped_cookie));
 
     /* Unload the checkpoint. */
     WT_TRET(__wt_block_checkpoint_unload(session, bm->block, !bm->is_live));
@@ -332,7 +332,7 @@ __bm_close(WT_BM *bm, WT_SESSION_IMPL *session)
         return (0);
 
     if (!bm->is_multi_handle)
-        ret = __wt_bm_close_block(session, bm->block);
+        ret = __wti_bm_close_block(session, bm->block);
     else {
         /*
          * Higher-level code ensures that we can only have one call to close a block manager. So we
@@ -341,7 +341,7 @@ __bm_close(WT_BM *bm, WT_SESSION_IMPL *session)
          * We don't need to explicitly close the active handle; it is also in the handle array.
          */
         for (i = 0; i < bm->handle_array_next; ++i)
-            WT_TRET(__wt_bm_close_block(session, bm->handle_array[i]));
+            WT_TRET(__wti_bm_close_block(session, bm->handle_array[i]));
 
         __wt_rwlock_destroy(session, &bm->handle_array_lock);
         __wt_free(session, bm->handle_array);
@@ -488,7 +488,7 @@ __bm_free(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_
 
     /* Evict the freed block from the block cache */
     if (blkcache->type != WT_BLKCACHE_UNCONFIGURED)
-        __wt_blkcache_remove(session, addr, addr_size);
+        __wti_blkcache_remove(session, addr, addr_size);
 
     return (__wt_block_free(session, bm->block, addr, addr_size));
 }
@@ -774,7 +774,7 @@ __wt_blkcache_sweep_handles(WT_SESSION_IMPL *session, WT_BM *bm)
         if (block->read_count == 0 && __wt_block_eligible_for_sweep(bm, block)) {
             /* We cannot close the active handle. */
             WT_ASSERT(session, block != bm->block);
-            WT_TRET(__wt_bm_close_block(session, block));
+            WT_TRET(__wti_bm_close_block(session, block));
 
             /*
              * To fill the hole just created, shift the rest of the array down. Adjust the loop
@@ -987,7 +987,7 @@ __wt_blkcache_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[],
           session, &bm->handle_array_allocated, bm->handle_array_next + 1, &bm->handle_array));
 
         /* Open the active file, and save in array */
-        WT_ERR(__wt_blkcache_tiered_open(session, uri, 0, &bm->block));
+        WT_ERR(__wti_blkcache_tiered_open(session, uri, 0, &bm->block));
         bm->handle_array[bm->handle_array_next++] = bm->block;
     }
 

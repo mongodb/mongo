@@ -247,11 +247,11 @@ err:
 }
 
 /*
- * __wt_chunkcache_metadata_create --
+ * __wti_chunkcache_metadata_create --
  *     Start the server component of the chunk cache metadata subsystem.
  */
 int
-__wt_chunkcache_metadata_create(WT_SESSION_IMPL *session)
+__wti_chunkcache_metadata_create(WT_SESSION_IMPL *session)
 {
     WT_CHUNKCACHE *chunkcache;
     WT_CONNECTION_IMPL *conn;
@@ -296,7 +296,7 @@ __wt_chunkcache_metadata_create(WT_SESSION_IMPL *session)
     if (0) {
 err:
         FLD_CLR(conn->server_flags, WT_CONN_SERVER_CHUNKCACHE_METADATA);
-        WT_TRET(__wt_chunkcache_metadata_destroy(session));
+        WT_TRET(__wti_chunkcache_metadata_destroy(session));
     }
     __wt_free(session, metadata_config);
 
@@ -304,11 +304,11 @@ err:
 }
 
 /*
- * __wt_chunkcache_metadata_destroy --
+ * __wti_chunkcache_metadata_destroy --
  *     Destroy the chunk cache metadata server thread.
  */
 int
-__wt_chunkcache_metadata_destroy(WT_SESSION_IMPL *session)
+__wti_chunkcache_metadata_destroy(WT_SESSION_IMPL *session)
 {
     WT_CHUNKCACHE *chunkcache;
     WT_CHUNKCACHE_METADATA_WORK_UNIT *entry;

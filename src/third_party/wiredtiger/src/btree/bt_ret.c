@@ -76,11 +76,11 @@ __read_col_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, W
 }
 
 /*
- * __wt_read_row_time_window --
+ * __wti_read_row_time_window --
  *     Retrieve the time window from a row.
  */
 void
-__wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_TIME_WINDOW *tw)
+__wti_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_TIME_WINDOW *tw)
 {
     WT_CELL_UNPACK_KV unpack;
 
@@ -98,12 +98,11 @@ __wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
 }
 
 /*
- * __wt_col_fix_get_time_window --
+ * __col_fix_get_time_window --
  *     Look for a time window on a fixed-length column page.
  */
 static bool
-__wt_col_fix_get_time_window(
-  WT_SESSION_IMPL *session, WT_REF *ref, uint64_t recno, WT_TIME_WINDOW *tw)
+__col_fix_get_time_window(WT_SESSION_IMPL *session, WT_REF *ref, uint64_t recno, WT_TIME_WINDOW *tw)
 {
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
@@ -173,7 +172,7 @@ __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw)
     case WT_PAGE_ROW_LEAF:
         if (page->pg_row == NULL)
             return (false);
-        __wt_read_row_time_window(session, page, &page->pg_row[cbt->slot], tw);
+        __wti_read_row_time_window(session, page, &page->pg_row[cbt->slot], tw);
         break;
     case WT_PAGE_COL_VAR:
         if (page->pg_var == NULL)
@@ -181,7 +180,7 @@ __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw)
         __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw);
         break;
     case WT_PAGE_COL_FIX:
-        return (__wt_col_fix_get_time_window(session, cbt->ref, cbt->recno, tw));
+        return (__col_fix_get_time_window(session, cbt->ref, cbt->recno, tw));
     }
     return (true);
 }
@@ -257,7 +256,7 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
     case WT_PAGE_COL_FIX:
         /* Take the value from the original page. */
         if (tw != NULL) {
-            found = __wt_col_fix_get_time_window(session, ref, cbt->recno, tw);
+            found = __col_fix_get_time_window(session, ref, cbt->recno, tw);
             if (!found)
                 WT_TIME_WINDOW_INIT(tw);
         }

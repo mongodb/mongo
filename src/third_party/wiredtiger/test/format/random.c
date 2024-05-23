@@ -64,7 +64,8 @@ random_kv(void *arg)
 
     /* Open a session. */
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
+    wt_wrap_open_session(
+      conn, &sap, NULL, enable_session_prefetch() ? SESSION_PREFETCH_CFG_ON : NULL, &session);
 
     for (simple = false;;) {
         /* Alternate between simple random cursors and sample-size random cursors. */

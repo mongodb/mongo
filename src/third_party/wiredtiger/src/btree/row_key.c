@@ -381,14 +381,14 @@ __wt_row_ikey_alloc(
 }
 
 /*
- * __wt_row_ikey_incr --
+ * __wti_row_ikey_incr --
  *     Instantiate a key in a WT_IKEY structure and increment the page's memory footprint.
  */
 int
-__wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t cell_offset, const void *key,
+__wti_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t cell_offset, const void *key,
   size_t size, WT_REF *ref)
 {
-    WT_RET(__wt_row_ikey(session, cell_offset, key, size, ref));
+    WT_RET(__wti_row_ikey(session, cell_offset, key, size, ref));
 
     __wt_cache_page_inmem_incr(session, page, sizeof(WT_IKEY) + size);
 
@@ -396,11 +396,11 @@ __wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t cell_offset
 }
 
 /*
- * __wt_row_ikey --
+ * __wti_row_ikey --
  *     Instantiate a key in a WT_IKEY structure.
  */
 int
-__wt_row_ikey(
+__wti_row_ikey(
   WT_SESSION_IMPL *session, uint32_t cell_offset, const void *key, size_t size, WT_REF *ref)
 {
     WT_IKEY *ikey;

@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_execute_handle_operation --
+ * __wti_execute_handle_operation --
  *     Apply a function to a handle, getting exclusive access if requested.
  */
 int
-__wt_execute_handle_operation(WT_SESSION_IMPL *session, const char *uri,
+__wti_execute_handle_operation(WT_SESSION_IMPL *session, const char *uri,
   int (*file_func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[], uint32_t open_flags)
 {
     WT_DECL_RET;
@@ -36,11 +36,11 @@ __wt_execute_handle_operation(WT_SESSION_IMPL *session, const char *uri,
 }
 
 /*
- * __wt_schema_tiered_worker --
+ * __schema_tiered_worker --
  *     Run a schema worker operation on each tier of a tiered data source.
  */
-int
-__wt_schema_tiered_worker(WT_SESSION_IMPL *session, const char *uri,
+static int
+__schema_tiered_worker(WT_SESSION_IMPL *session, const char *uri,
   int (*file_func)(WT_SESSION_IMPL *, const char *[]),
   int (*name_func)(WT_SESSION_IMPL *, const char *, bool *), const char *cfg[], uint32_t open_flags)
 {
@@ -105,14 +105,14 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
     /* Get the btree handle(s) and call the underlying function. */
     if (WT_PREFIX_MATCH(uri, "file:")) {
         if (file_func != NULL)
-            WT_ERR(__wt_execute_handle_operation(session, uri, file_func, cfg, open_flags));
+            WT_ERR(__wti_execute_handle_operation(session, uri, file_func, cfg, open_flags));
     } else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
         WT_ERR(__wt_schema_get_colgroup(session, uri, false, NULL, &colgroup));
         WT_ERR(
           __wt_schema_worker(session, colgroup->source, file_func, name_func, cfg, open_flags));
     } else if (WT_PREFIX_MATCH(uri, "index:")) {
         idx = NULL;
-        WT_ERR(__wt_schema_get_index(session, uri, false, false, &idx));
+        WT_ERR(__wti_schema_get_index(session, uri, false, false, &idx));
         WT_ERR(__wt_schema_worker(session, idx->source, file_func, name_func, cfg, open_flags));
     } else if (WT_PREFIX_MATCH(uri, "lsm:")) {
         WT_ERR(__wt_lsm_tree_worker(session, uri, file_func, name_func, cfg, open_flags));
@@ -163,7 +163,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
                   __wt_schema_worker(session, idx->source, file_func, name_func, cfg, open_flags));
         }
     } else if (WT_PREFIX_MATCH(uri, "tiered:")) {
-        WT_ERR(__wt_schema_tiered_worker(session, uri, file_func, name_func, cfg, open_flags));
+        WT_ERR(__schema_tiered_worker(session, uri, file_func, name_func, cfg, open_flags));
     } else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL) {
         wt_session = (WT_SESSION *)session;
         if (file_func == __wt_salvage && dsrc->salvage != NULL)

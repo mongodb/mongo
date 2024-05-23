@@ -741,6 +741,17 @@ connection_runtime_config = [
             # !!! Must match WT_HS_FILE_MIN
             min='0')
         ]),
+    Config('heuristic_controls', '', r'''
+        control the behavior of various optimizations. This is primarily used as a mechanism for
+        rolling out changes to internal heuristics while providing a mechanism for quickly
+        reverting to prior behavior in the field''',
+        type='category', subconfig=[
+        Config('obsolete_check_aggressive', 'true', r'''
+               if true, more aggressively reclaim obsolete updates from update chains in memory.
+               This can increase contention in concurrent applications with the benefit of
+               improving cache effectiveness.''',
+               type='boolean'),
+        ]),
     Config('io_capacity', '', r'''
         control how many bytes per second are written and read. Exceeding the capacity results
         in throttling.''',

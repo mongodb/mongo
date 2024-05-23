@@ -143,7 +143,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
         if (creation || root_addr_size == 0)
             WT_ERR(__btree_tree_open_empty(session, creation));
         else {
-            WT_ERR(__wt_btree_tree_open(session, root_addr, root_addr_size));
+            WT_ERR(__wti_btree_tree_open(session, root_addr, root_addr_size));
 
             /* Warm the cache, if possible. */
             WT_WITH_PAGE_INDEX(session, ret = __btree_preload(session));
@@ -614,11 +614,11 @@ __wt_root_ref_init(WT_SESSION_IMPL *session, WT_REF *root_ref, WT_PAGE *root, bo
 }
 
 /*
- * __wt_btree_tree_open --
+ * __wti_btree_tree_open --
  *     Read in a tree from disk.
  */
 int
-__wt_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
+__wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
     WT_BM *bm;
     WT_BTREE *btree;
@@ -675,7 +675,7 @@ __wt_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_
      * Build the in-memory version of the page. Clear our local reference to the allocated copy of
      * the disk image on return, the in-memory object steals it.
      */
-    WT_ERR(__wt_page_inmem(session, NULL, dsk.data,
+    WT_ERR(__wti_page_inmem(session, NULL, dsk.data,
       WT_DATA_IN_ITEM(&dsk) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page, NULL));
     dsk.mem = NULL;
 
@@ -748,13 +748,13 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
         ref->addr = NULL;
         F_SET(ref, WT_REF_FLAG_LEAF);
         WT_REF_SET_STATE(ref, WT_REF_DELETED);
-        WT_ERR(__wt_row_ikey_incr(session, root, 0, "", 1, ref));
+        WT_ERR(__wti_row_ikey_incr(session, root, 0, "", 1, ref));
         break;
     }
 
     /* Bulk loads require a leaf page for reconciliation: create it now. */
     if (F_ISSET(btree, WT_BTREE_BULK)) {
-        WT_ERR(__wt_btree_new_leaf_page(session, ref));
+        WT_ERR(__wti_btree_new_leaf_page(session, ref));
         F_SET(ref, WT_REF_FLAG_LEAF);
         WT_REF_SET_STATE(ref, WT_REF_MEM);
         WT_ERR(__wt_page_modify_init(session, ref->page));
@@ -775,11 +775,11 @@ err:
 }
 
 /*
- * __wt_btree_new_leaf_page --
+ * __wti_btree_new_leaf_page --
  *     Create an empty leaf page.
  */
 int
-__wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_REF *ref)
+__wti_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_BTREE *btree;
 

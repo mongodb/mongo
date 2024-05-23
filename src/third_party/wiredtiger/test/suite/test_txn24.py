@@ -58,11 +58,6 @@ class test_txn24(wttest.WiredTigerTestCase):
                 eviction=(threads_max=4)'
 
     def test_snapshot_isolation_and_eviction(self):
-        if sys.platform.startswith('darwin'):
-            # FIXME-WT-9575
-            # Skip this test on MacOS/Darwin as it causes WT_ROLLBACKs to occur frequently, and they generate errors.
-            self.skipTest('Skipping test of snapshot isolation and eviction on Darwin (MacOS)')
-
         # Create and populate a table.
         uri = "table:test_txn24"
         table_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)

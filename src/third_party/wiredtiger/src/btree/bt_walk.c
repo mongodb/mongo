@@ -403,7 +403,7 @@ restart:
                 WT_ASSERT(session, ref != ref_orig);
 
                 if (__wt_session_prefetch_check(session, ref))
-                    WT_ERR(__wt_btree_prefetch(session, ref));
+                    WT_ERR(__wti_btree_prefetch(session, ref));
 
                 goto done;
             }
@@ -448,7 +448,7 @@ descend:
                  * If deleting a range, try to delete the page without instantiating it. (Note this
                  * test follows the check to skip the page entirely if it's already deleted.)
                  */
-                WT_ERR(__wt_delete_page(session, ref, &skip));
+                WT_ERR(__wti_delete_page(session, ref, &skip));
                 if (skip)
                     break;
                 empty_internal = false;
@@ -456,7 +456,7 @@ descend:
                 /*
                  * Try to skip deleted pages visible to us.
                  */
-                if (__wt_delete_page_skip(session, ref, LF_ISSET(WT_READ_VISIBLE_ALL)))
+                if (__wti_delete_page_skip(session, ref, LF_ISSET(WT_READ_VISIBLE_ALL)))
                     break;
             }
 
@@ -474,7 +474,7 @@ descend:
                 couple = NULL;
 
                 if (__wt_session_prefetch_check(session, ref))
-                    WT_ERR(__wt_btree_prefetch(session, ref));
+                    WT_ERR(__wti_btree_prefetch(session, ref));
 
                 /* Return leaf pages to our caller. */
                 if (F_ISSET(ref, WT_REF_FLAG_LEAF)) {
@@ -585,7 +585,8 @@ __tree_walk_skip_count_callback(
     /*
      * Skip deleted pages visible to us.
      */
-    if (WT_REF_GET_STATE(ref) == WT_REF_DELETED && __wt_delete_page_skip(session, ref, visible_all))
+    if (WT_REF_GET_STATE(ref) == WT_REF_DELETED &&
+      __wti_delete_page_skip(session, ref, visible_all))
         *skipp = true;
     else if (*skipleafcntp > 0 && F_ISSET(ref, WT_REF_FLAG_LEAF)) {
         --*skipleafcntp;
@@ -596,12 +597,12 @@ __tree_walk_skip_count_callback(
 }
 
 /*
- * __wt_tree_walk_skip --
+ * __wti_tree_walk_skip --
  *     Move to the next/previous page in the tree, skipping a certain number of leaf pages before
  *     returning.
  */
 int
-__wt_tree_walk_skip(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *skipleafcntp)
+__wti_tree_walk_skip(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *skipleafcntp)
 {
     /*
      * Optionally skip leaf pages, the second half. The tree-walk function didn't have an on-page

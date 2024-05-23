@@ -11,16 +11,16 @@
 static int __lsm_merge_span(WT_SESSION_IMPL *, WT_LSM_TREE *, u_int, u_int *, u_int *, uint64_t *);
 
 /*
- * __wt_lsm_merge_update_tree --
+ * __wti_lsm_merge_update_tree --
  *     Merge a set of chunks and populate a new one. Must be called with the LSM lock held.
  */
 int
-__wt_lsm_merge_update_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int start_chunk,
+__wti_lsm_merge_update_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int start_chunk,
   u_int nchunks, WT_LSM_CHUNK *chunk)
 {
     size_t chunks_after_merge;
 
-    WT_RET(__wt_lsm_tree_retire_chunks(session, lsm_tree, start_chunk, nchunks));
+    WT_RET(__wti_lsm_tree_retire_chunks(session, lsm_tree, start_chunk, nchunks));
 
     /* Update the current chunk list. */
     chunks_after_merge = lsm_tree->nchunks - (nchunks + start_chunk);
@@ -316,11 +316,11 @@ retry_find:
 }
 
 /*
- * __wt_lsm_merge --
+ * __wti_lsm_merge --
  *     Merge a set of chunks of an LSM tree.
  */
 int
-__wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
+__wti_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 {
     WT_BLOOM *bloom;
     WT_CURSOR *dest, *src;
@@ -349,7 +349,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
      * Use the lsm_tree lock to read the chunks (so no switches occur), but avoid holding it while
      * the merge is in progress: that may take a long time.
      */
-    __wt_lsm_tree_writelock(session, lsm_tree);
+    __wti_lsm_tree_writelock(session, lsm_tree);
     locked = true;
 
     WT_ERR(__lsm_merge_span(session, lsm_tree, id, &start_chunk, &end_chunk, &record_count));
@@ -362,7 +362,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
     for (generation = 0, i = 0; i < nchunks; i++)
         generation = WT_MAX(generation, lsm_tree->chunk[start_chunk + i]->generation + 1);
 
-    __wt_lsm_tree_writeunlock(session, lsm_tree);
+    __wti_lsm_tree_writeunlock(session, lsm_tree);
     locked = false;
 
     /* Allocate an ID for the merge. */
@@ -400,12 +400,12 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
      */
     WT_ERR(__wt_open_cursor(session, lsm_tree->name, NULL, NULL, &src));
     F_SET(src, WT_CURSTD_RAW);
-    WT_ERR(__wt_clsm_init_merge(src, start_chunk, start_id, nchunks));
+    WT_ERR(__wti_clsm_init_merge(src, start_chunk, start_id, nchunks));
 
-    WT_WITH_SCHEMA_LOCK(session, ret = __wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
+    WT_WITH_SCHEMA_LOCK(session, ret = __wti_lsm_tree_setup_chunk(session, lsm_tree, chunk));
     WT_ERR(ret);
     if (create_bloom) {
-        WT_ERR(__wt_lsm_tree_setup_bloom(session, lsm_tree, chunk));
+        WT_ERR(__wti_lsm_tree_setup_bloom(session, lsm_tree, chunk));
 
         WT_ERR(__wt_bloom_create(session, chunk->bloom_uri, lsm_tree->bloom_config, record_count,
           lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count, &bloom));
@@ -511,8 +511,8 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
     in_sync = false;
     WT_ERR_NOTFOUND_OK(ret, false);
 
-    WT_ERR(__wt_lsm_tree_set_chunk_size(session, lsm_tree, chunk));
-    __wt_lsm_tree_writelock(session, lsm_tree);
+    WT_ERR(__wti_lsm_tree_set_chunk_size(session, lsm_tree, chunk));
+    __wti_lsm_tree_writelock(session, lsm_tree);
     locked = true;
 
     /*
@@ -527,7 +527,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
      * It is safe to error out here - since the update can only fail prior to making updates to the
      * tree.
      */
-    WT_ERR(__wt_lsm_merge_update_tree(session, lsm_tree, start_chunk, nchunks, chunk));
+    WT_ERR(__wti_lsm_merge_update_tree(session, lsm_tree, start_chunk, nchunks, chunk));
 
     if (create_bloom)
         F_SET(chunk, WT_LSM_CHUNK_BLOOM);
@@ -542,20 +542,20 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
      * Any errors that happened after the tree was locked are fatal - we can't guarantee the state
      * of the tree.
      */
-    if ((ret = __wt_lsm_meta_write(session, lsm_tree, NULL)) != 0)
+    if ((ret = __wti_lsm_meta_write(session, lsm_tree, NULL)) != 0)
         WT_ERR_PANIC(session, ret, "Failed finalizing LSM merge");
 
     lsm_tree->dsk_gen++;
 
     /* Update the throttling while holding the tree lock. */
-    __wt_lsm_tree_throttle(session, lsm_tree, true);
+    __wti_lsm_tree_throttle(session, lsm_tree, true);
 
     /* Schedule a pass to discard old chunks */
-    WT_ERR(__wt_lsm_manager_push_entry(session, WT_LSM_WORK_DROP, 0, lsm_tree));
+    WT_ERR(__wti_lsm_manager_push_entry(session, WT_LSM_WORK_DROP, 0, lsm_tree));
 
 err:
     if (locked)
-        __wt_lsm_tree_writeunlock(session, lsm_tree);
+        __wti_lsm_tree_writeunlock(session, lsm_tree);
     if (in_sync)
         (void)__wt_atomic_sub32(&lsm_tree->merge_syncing, 1);
     if (src != NULL)

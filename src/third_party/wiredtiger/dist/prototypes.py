@@ -57,6 +57,9 @@ def fn_prototypes(fns, tests, name):
     for sig in extract_prototypes(name, r'\n[A-Za-z_].*\n__wt_[^{]*'):
         fns.append(sig)
 
+    for sig in extract_prototypes(name, r'\n[A-Za-z_].*\n__wti_[^{]*'):
+        fns.append(sig)
+
     for sig in extract_prototypes(name, r'\n[A-Za-z_].*\n__ut_[^{]*'):
         tests.append(sig)
 

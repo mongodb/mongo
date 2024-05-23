@@ -419,9 +419,9 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
          * The algorithm assumes the oldest update on the update chain in memory is either a full
          * update or a tombstone.
          *
-         * This is guaranteed by __wt_rec_upd_select appends the original onpage value at the end of
-         * the chain. It also assumes the onpage_upd selected cannot be a TOMBSTONE and the update
-         * newer than a TOMBSTONE must be a full update.
+         * This is guaranteed by __wti_rec_upd_select which appends the original onpage value at the
+         * end of the chain. It also assumes the onpage_upd selected cannot be a TOMBSTONE and the
+         * update newer than a TOMBSTONE must be a full update.
          *
          * The algorithm walks from the oldest update, or the most recently inserted into history
          * store update, to the newest update and builds full updates along the way. It sets the
@@ -511,8 +511,13 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
              * No need to continue if we found a first self contained value that is globally
              * visible.
              */
-            if (__wt_txn_upd_visible_all(session, upd) && WT_UPDATE_DATA_VALUE(upd))
+            if (__wt_txn_upd_visible_all(session, upd) && WT_UPDATE_DATA_VALUE(upd)) {
+                /* Free obsolete updates if exist. */
+                if (FLD_ISSET(S2C(session)->heuristic_controls, WT_CONN_HEURISTIC_OBSOLETE_CHECK) &&
+                  !F_ISSET(r, WT_REC_EVICT) && upd->next != NULL)
+                    __wt_free_obsolete_updates(session, r->page, upd);
                 break;
+            }
 
             /*
              * If we've reached a full update and it's in the history store we don't need to

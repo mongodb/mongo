@@ -78,11 +78,11 @@ err:
 }
 
 /*
- * __wt_log_system_prevlsn --
+ * __wti_log_system_prevlsn --
  *     Write a system log record for the previous LSN.
  */
 int
-__wt_log_system_prevlsn(WT_SESSION_IMPL *session, WT_FH *log_fh, WT_LSN *lsn)
+__wti_log_system_prevlsn(WT_SESSION_IMPL *session, WT_FH *log_fh, WT_LSN *lsn)
 {
     WT_DECL_ITEM(logrec_buf);
     WT_DECL_RET;
@@ -128,23 +128,23 @@ __wt_log_system_prevlsn(WT_SESSION_IMPL *session, WT_FH *log_fh, WT_LSN *lsn)
     WT_CLEAR(tmp);
     memset(&myslot, 0, sizeof(myslot));
     myslot.slot = &tmp;
-    __wt_log_slot_activate(session, &tmp);
+    __wti_log_slot_activate(session, &tmp);
     /*
      * Override the file handle to the one we're using.
      */
     tmp.slot_fh = log_fh;
-    WT_ERR(__wt_log_fill(session, &myslot, true, logrec_buf, NULL));
+    WT_ERR(__wti_log_fill(session, &myslot, true, logrec_buf, NULL));
 err:
     __wt_logrec_free(session, &logrec_buf);
     return (ret);
 }
 
 /*
- * __wt_log_recover_prevlsn --
+ * __wti_log_recover_prevlsn --
  *     Process a system log record for the previous LSN in recovery.
  */
 int
-__wt_log_recover_prevlsn(
+__wti_log_recover_prevlsn(
   WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, WT_LSN *lsnp)
 {
     WT_DECL_RET;

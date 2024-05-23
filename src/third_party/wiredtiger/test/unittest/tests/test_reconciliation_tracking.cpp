@@ -26,7 +26,7 @@ TEST_CASE("Reconciliation tracking: ovfl_track_init", "[reconciliation]")
 
     p.modify = &m;
 
-    REQUIRE(__wt_ovfl_track_init(session, &p) == 0);
+    REQUIRE(__ut_ovfl_track_init(session, &p) == 0);
     REQUIRE(m.ovfl_track != nullptr);
     __wt_free(session, m.ovfl_track);
 }
@@ -54,7 +54,7 @@ TEST_CASE("Reconciliation tracking: ovfl_discard_wrapup", "[reconciliation]")
     memset(&m, 0, sizeof(m));
     p.modify = &m;
 
-    REQUIRE(__wt_ovfl_track_init(session, &p) == 0);
+    REQUIRE(__ut_ovfl_track_init(session, &p) == 0);
 
     SECTION("handle empty overflow entry list")
     {

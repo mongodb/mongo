@@ -769,11 +769,11 @@ __assert_ckpt_matches(WT_SESSION_IMPL *session, WT_CKPT *ckpt_a, WT_CKPT *ckpt_b
 }
 
 /*
- * __assert_checkpoint_list_matches --
+ * __assert_ckptlist_matches --
  *     Assert that two given checkpoint lists match.
  */
 static void
-__assert_checkpoint_list_matches(WT_SESSION_IMPL *session, WT_CKPT *saved_list, WT_CKPT *new_list)
+__assert_ckptlist_matches(WT_SESSION_IMPL *session, WT_CKPT *saved_list, WT_CKPT *new_list)
 {
     WT_CKPT *ckpt_new, *ckpt_saved;
 
@@ -832,7 +832,7 @@ __wt_meta_ckptlist_get(
             WT_ERR(__wt_metadata_search(session, fname, &config));
             if ((ret = __wt_meta_ckptlist_get_from_config(
                    session, update, &ckptbase_comp, NULL, config)) == 0)
-                __assert_checkpoint_list_matches(session, *ckptbasep, ckptbase_comp);
+                __assert_ckptlist_matches(session, *ckptbasep, ckptbase_comp);
             __wt_meta_ckptlist_free(session, &ckptbase_comp);
             WT_ERR(ret);
         }
@@ -1025,12 +1025,12 @@ __ckpt_load(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v, WT_C
 }
 
 /*
- * __wt_metadata_update_connection --
+ * __wt_meta_update_connection --
  *     Update the connection's base write generation and most recent checkpoint time from the config
  *     string.
  */
 int
-__wt_metadata_update_connection(WT_SESSION_IMPL *session, const char *config)
+__wt_meta_update_connection(WT_SESSION_IMPL *session, const char *config)
 {
     WT_CKPT ckpt;
     WT_CONNECTION_IMPL *conn;
@@ -1050,11 +1050,11 @@ __wt_metadata_update_connection(WT_SESSION_IMPL *session, const char *config)
 }
 
 /*
- * __wt_metadata_load_prior_state --
+ * __wt_meta_load_prior_state --
  *     Initialize the connection's base write generation and most recent checkpoint time.
  */
 int
-__wt_metadata_load_prior_state(WT_SESSION_IMPL *session)
+__wt_meta_load_prior_state(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -1069,7 +1069,7 @@ __wt_metadata_load_prior_state(WT_SESSION_IMPL *session)
     /* Retrieve the metadata entry for the metadata file. */
     WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
     /* Update base write gen and most recent checkpoint time from the metadata. */
-    WT_ERR(__wt_metadata_update_connection(session, config));
+    WT_ERR(__wt_meta_update_connection(session, config));
 
 err:
     __wt_free(session, config);
@@ -1077,12 +1077,12 @@ err:
 }
 
 /*
- * __wt_metadata_correct_base_write_gen --
+ * __wt_meta_correct_base_write_gen --
  *     Update the connection's base write generation from all files in metadata at the end of the
  *     recovery checkpoint.
  */
 int
-__wt_metadata_correct_base_write_gen(WT_SESSION_IMPL *session)
+__wt_meta_correct_base_write_gen(WT_SESSION_IMPL *session)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -1099,7 +1099,7 @@ __wt_metadata_correct_base_write_gen(WT_SESSION_IMPL *session)
         WT_ERR(cursor->get_value(cursor, &config));
 
         /* Update base write gen and most recent checkpoint time. */
-        WT_ERR(__wt_metadata_update_connection(session, config));
+        WT_ERR(__wt_meta_update_connection(session, config));
     }
     WT_ERR_NOTFOUND_OK(ret, false);
 
@@ -1165,11 +1165,11 @@ __wt_meta_ckptlist_to_meta(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_ITEM 
 }
 
 /*
- * __wt_ckpt_blkmod_to_meta --
+ * __ckpt_blkmod_to_meta --
  *     Add in any modification block string needed, including an empty one.
  */
-int
-__wt_ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
+static int
+__ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
 {
     WT_BLOCK_MODS *blk;
     WT_ITEM bitstring;
@@ -1245,7 +1245,7 @@ __wt_meta_ckptlist_update_config(
     /* Add backup block modifications for any added checkpoint. */
     WT_CKPT_FOREACH (ckptbase, ckpt)
         if (F_ISSET(ckpt, WT_CKPT_ADD))
-            WT_ERR(__wt_ckpt_blkmod_to_meta(session, buf, ckpt));
+            WT_ERR(__ckpt_blkmod_to_meta(session, buf, ckpt));
 
     /* Replace the checkpoint entry. */
     cfg[0] = oldcfg;
@@ -1479,7 +1479,7 @@ __wt_meta_ckptlist_set(
     /* Add backup block modifications for any added checkpoint. */
     WT_CKPT_FOREACH (ckptbase, ckpt)
         if (F_ISSET(ckpt, WT_CKPT_ADD)) {
-            WT_ERR(__wt_ckpt_blkmod_to_meta(session, buf, ckpt));
+            WT_ERR(__ckpt_blkmod_to_meta(session, buf, ckpt));
 
             if (!F_ISSET(dhandle, WT_DHANDLE_IS_METADATA))
                 WT_ERR(__ckpt_check_backup_blocks(session, ckpt, fname));
@@ -1957,7 +1957,7 @@ err:
 }
 
 /*
- * __meta_retrieve_a_checkpoint_timestamp --
+ * __meta_retrieve_checkpoint_timestamp --
  *     Fetch a timestamp associated with the checkpoint from the metadata. If the checkpoint name
  *     passed is null, returns the timestamp from the most recent checkpoint. Also returns the
  *     checkpoint wall-clock time the timestamp came from (which is a time, but not a timestamp...)
@@ -1966,7 +1966,7 @@ err:
  *     confusing, but at this point not readily avoided.
  */
 static int
-__meta_retrieve_a_checkpoint_timestamp(WT_SESSION_IMPL *session, const char *ckpt_name,
+__meta_retrieve_checkpoint_timestamp(WT_SESSION_IMPL *session, const char *ckpt_name,
   const char *uri, const char *key, wt_timestamp_t *timestampp, uint64_t *ckpttime)
 {
     WT_DECL_ITEM(tmp);
@@ -1995,7 +1995,7 @@ int
 __wt_meta_read_checkpoint_timestamp(
   WT_SESSION_IMPL *session, const char *ckpt_name, wt_timestamp_t *timestampp, uint64_t *ckpttime)
 {
-    return (__meta_retrieve_a_checkpoint_timestamp(
+    return (__meta_retrieve_checkpoint_timestamp(
       session, ckpt_name, WT_SYSTEM_CKPT_URI, WT_SYSTEM_CKPT_TS, timestampp, ckpttime));
 }
 
@@ -2008,7 +2008,7 @@ int
 __wt_meta_read_checkpoint_oldest(
   WT_SESSION_IMPL *session, const char *ckpt_name, wt_timestamp_t *timestampp, uint64_t *ckpttime)
 {
-    return (__meta_retrieve_a_checkpoint_timestamp(
+    return (__meta_retrieve_checkpoint_timestamp(
       session, ckpt_name, WT_SYSTEM_OLDEST_URI, WT_SYSTEM_OLDEST_TS, timestampp, ckpttime));
 }
 
@@ -2061,7 +2061,7 @@ __wt_reset_blkmod(WT_SESSION_IMPL *session, const char *orig_config, WT_ITEM *bu
     WT_RET(__meta_blk_mods_load(session, orig_config, NULL, &ckpt, true));
 
     /* Take the checkpoint structure and generate the metadata string. */
-    ret = __wt_ckpt_blkmod_to_meta(session, buf, &ckpt);
+    ret = __ckpt_blkmod_to_meta(session, buf, &ckpt);
     __wt_meta_checkpoint_free(session, &ckpt);
     return (ret);
 }

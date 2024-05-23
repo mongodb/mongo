@@ -451,6 +451,7 @@ __curfile_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    uint64_t time_start, time_stop;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_UPDATE_API_CALL_BTREE(cursor, session, ret, modify);
@@ -461,7 +462,10 @@ __curfile_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
     if (nentries <= 0)
         WT_ERR_MSG(session, EINVAL, "Illegal modify vector with %d entries", nentries);
 
+    time_start = __wt_clock(session);
     WT_ERR(__wt_btcur_modify(cbt, entries, nentries));
+    time_stop = __wt_clock(session);
+    __wt_stat_usecs_hist_incr_opwrite(session, WT_CLOCKDIFF_US(time_stop, time_start));
 
     /*
      * Modify maintains a position, key and value. Unlike update, it's not always an internal value.
@@ -625,7 +629,7 @@ err:
          * If releasing the cursor fails in any way, it will be left in a state that allows it to be
          * normally closed.
          */
-        ret = __wt_cursor_cache_release(session, cursor, &released);
+        ret = __wti_cursor_cache_release(session, cursor, &released);
         if (released)
             goto done;
     }
@@ -637,7 +641,7 @@ err:
 
     /* Free the bulk-specific resources. */
     if (F_ISSET(cursor, WT_CURSTD_BULK))
-        WT_TRET(__wt_curbulk_close(session, (WT_CURSOR_BULK *)cursor));
+        WT_TRET(__wti_curbulk_close(session, (WT_CURSOR_BULK *)cursor));
 
     WT_TRET(__wt_btcur_close(cbt, false));
     /* The URI is owned by the btree handle. */
@@ -692,7 +696,7 @@ __curfile_cache(WT_CURSOR *cursor)
     cbt = (WT_CURSOR_BTREE *)cursor;
     session = CUR2S(cursor);
 
-    WT_TRET(__wt_cursor_cache(cursor, cbt->dhandle));
+    WT_TRET(__wti_cursor_cache(cursor, cbt->dhandle));
     WT_TRET(__wt_session_release_dhandle(session));
 
     API_RET_STAT(session, ret, cursor_cache);
@@ -732,7 +736,7 @@ __curfile_reopen_int(WT_CURSOR *cursor)
         F_SET(cursor, WT_CURSTD_DEAD);
         ret = WT_NOTFOUND;
     }
-    __wt_cursor_reopen(cursor, dhandle);
+    __wti_cursor_reopen(cursor, dhandle);
 
     /*
      * The btree handle may have been reopened since we last accessed it. Reset fields in the cursor
@@ -963,8 +967,8 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
       __curfile_remove,                               /* remove */
       __curfile_reserve,                              /* reserve */
       __wt_cursor_reconfigure,                        /* reconfigure */
-      __wt_cursor_largest_key,                        /* largest_key */
-      __wt_cursor_bound,                              /* bound */
+      __wti_cursor_largest_key,                       /* largest_key */
+      __wti_cursor_bound,                             /* bound */
       __curfile_cache,                                /* cache */
       __curfile_reopen,                               /* reopen */
       __wt_cursor_checkpoint_id,                      /* checkpoint ID */
@@ -1020,7 +1024,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
 
         /* Optionally skip the validation of each bulk-loaded key. */
         WT_ERR(__wt_config_gets_def(session, cfg, "skip_sort_check", 0, &cval));
-        WT_ERR(__wt_curbulk_init(session, cbulk, bitmap, cval.val == 0 ? 0 : 1));
+        WT_ERR(__wti_curbulk_init(session, cbulk, bitmap, cval.val == 0 ? 0 : 1));
     }
 
     /*

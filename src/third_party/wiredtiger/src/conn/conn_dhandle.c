@@ -865,11 +865,11 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, bool final)
 }
 
 /*
- * __wt_conn_dhandle_discard_single --
+ * __wti_conn_dhandle_discard_single --
  *     Close/discard a single data handle.
  */
 int
-__wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, bool final, bool mark_dead)
+__wti_conn_dhandle_discard_single(WT_SESSION_IMPL *session, bool final, bool mark_dead)
 {
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
@@ -914,11 +914,11 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, bool final, bool mark
 }
 
 /*
- * __wt_conn_dhandle_discard --
+ * __wti_conn_dhandle_discard --
  *     Close/discard all data handles.
  */
 int
-__wt_conn_dhandle_discard(WT_SESSION_IMPL *session)
+__wti_conn_dhandle_discard(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle, *dhandle_tmp;
@@ -944,7 +944,7 @@ restart:
             continue;
 
         WT_WITH_DHANDLE(session, dhandle,
-          WT_TRET(__wt_conn_dhandle_discard_single(session, true, F_ISSET(conn, WT_CONN_PANIC))));
+          WT_TRET(__wti_conn_dhandle_discard_single(session, true, F_ISSET(conn, WT_CONN_PANIC))));
         goto restart;
     }
 
@@ -970,7 +970,7 @@ restart:
     WT_TAILQ_SAFE_REMOVE_BEGIN(dhandle, &conn->dhqh, q, dhandle_tmp)
     {
         WT_WITH_DHANDLE(session, dhandle,
-          WT_TRET(__wt_conn_dhandle_discard_single(session, true, F_ISSET(conn, WT_CONN_PANIC))));
+          WT_TRET(__wti_conn_dhandle_discard_single(session, true, F_ISSET(conn, WT_CONN_PANIC))));
     }
     WT_TAILQ_SAFE_REMOVE_END
 
@@ -1024,11 +1024,11 @@ __wt_dhandle_update_write_gens(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_verbose_dump_handles --
+ * __wti_verbose_dump_handles --
  *     Dump information about all data handles.
  */
 int
-__wt_verbose_dump_handles(WT_SESSION_IMPL *session)
+__wti_verbose_dump_handles(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;

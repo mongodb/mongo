@@ -26,13 +26,14 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, shutil, time, wttest
+import os, time
+from compact_util import compact_util
 from wiredtiger import stat
 from wtbackup import backup_base
 
 # test_compact10.py
 # Verify compaction does not alter data by comparing full backups before/after compaction.
-class test_compact10(backup_base):
+class test_compact10(backup_base, compact_util):
 
     conn_config = 'cache_size=100MB,statistics=(all)'
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB'
@@ -40,41 +41,6 @@ class test_compact10(backup_base):
 
     num_tables = 5
     table_numkv = 100 * 1000
-    value_size = 1024 # The value should be small enough so that we don't create overflow pages.
-
-    def delete_range(self, uri, num_keys):
-        c = self.session.open_cursor(uri, None)
-        for i in range(num_keys):
-            c.set_key(i)
-            c.remove()
-        c.close()
-
-    def get_bg_compaction_running(self):
-        return self.get_stat(stat.conn.background_compact_running)
-
-    def get_bg_compaction_success(self):
-        return self.get_stat(stat.conn.background_compact_success)
-
-    def get_bytes_recovered(self):
-        return self.get_stat(stat.conn.background_compact_bytes_recovered)
-
-    def get_files_compacted(self, uris):
-        files_compacted = 0
-        for uri in uris:
-            if self.get_pages_rewritten(uri) > 0:
-                files_compacted += 1
-        return files_compacted
-
-    def get_pages_rewritten(self, uri):
-        return self.get_stat(stat.dsrc.btree_compact_pages_rewritten, uri)
-
-    def get_stat(self, stat, uri = None):
-        if not uri:
-            uri = ''
-        stat_cursor = self.session.open_cursor(f'statistics:{uri}', None, None)
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
 
     # This function generates the required data for the test by performing the following:
     # - Create N tables and populate them,
@@ -87,12 +53,12 @@ class test_compact10(backup_base):
             uri = self.uri_prefix + f'_{i}'
             uris.append(uri)
             self.session.create(uri, self.create_params)
-            self.populate(uri, self.table_numkv, self.value_size)
+            compact_util.populate(self, uri, 0, self.table_numkv)
 
         # Write to disk.
         self.session.checkpoint()
 
-        # Delete 50% of the file.
+        # Delete 50% of each file.
         for uri in uris:
             self.delete_range(uri, 50 * self.table_numkv // 100)
 
@@ -100,12 +66,6 @@ class test_compact10(backup_base):
         self.session.checkpoint()
 
         return uris
-
-    def populate(self, uri, num_keys, value_size):
-        c = self.session.open_cursor(uri, None)
-        for k in range(num_keys):
-            c[k] = ('%07d' % k) + '_' + 'abcd' * ((value_size // 4) - 2)
-        c.close()
 
     def turn_on_bg_compact(self, config = ''):
         self.session.compact(None, f'background=true,{config}')

@@ -45,7 +45,7 @@ __curstat_lsm_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cs
     }
 
     /* Hold the LSM lock so that we can safely walk through the chunks. */
-    __wt_lsm_tree_readlock(session, lsm_tree);
+    __wti_lsm_tree_readlock(session, lsm_tree);
     locked = true;
 
     /*
@@ -139,7 +139,7 @@ __curstat_lsm_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cs
 
 err:
     if (locked)
-        __wt_lsm_tree_readunlock(session, lsm_tree);
+        __wti_lsm_tree_readunlock(session, lsm_tree);
     __wt_lsm_tree_release(session, lsm_tree);
     __wt_scr_free(session, &uribuf);
 
