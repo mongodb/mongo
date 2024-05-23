@@ -6,6 +6,8 @@
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
+//   # Plan cache key is not guaranteed to be stable across versions.
+//   multiversion_incompatible,
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
 // ]
