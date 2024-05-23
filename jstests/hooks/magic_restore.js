@@ -26,6 +26,16 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
             .toArray();
 
     if (entriesAfterBackup.length > 0) {
+        // Need to check if the oplog has been truncated before attempting a PIT restore. If the
+        // oplog has been truncated and the entry at the checkpoint timestamp does not exist we
+        // cannot proceed with a PIT restore. We should throw an error so we don't get an obscure
+        // error which looks like data inconsistency later.
+        const checkpointOplogEntry = oplog.findOne({ns: {$regex: "magic_restore_metadata.*"}});
+        if (!checkpointOplogEntry) {
+            throw new Error(
+                "Oplog has been truncated while getting PIT restore oplog entries during Magic Restore.");
+        }
+
         // BSON arrays take up more space than raw objects do, but computing the size of a BSON
         // array is extremely expensive (O(N^2) time). As a compromise we will limit our size to be
         // 90% of the real BSON max which should allow us to stay under the threshold of max BSON
@@ -228,6 +238,12 @@ function performMagicRestore(sourceNode, dbPath, name, options) {
     rst.stopSet(null /*signal*/, true /*forRestart*/);
 
     jsTestLog("Magic Restore: Restarting with magic restore options.");
+
+    // Increase snapshot history window on the restore node so we don't get a SnapshotTooOld error
+    // when doing the consistency checker for long running tests.
+    const snapshotHistory = 3600;
+    options.setParameter = {minSnapshotHistoryWindowInSeconds: snapshotHistory};
+
     // performRestore returns a read timestamp for snapshot reads in consistency checks.
     const consistencyTs = performRestore(sourceNode, expectedConfig, dbPath, name, options);
 
@@ -235,7 +251,11 @@ function performMagicRestore(sourceNode, dbPath, name, options) {
         "Magic Restore: Starting restore cluster for data consistency check at snapshot timestamp " +
         tojson(consistencyTs) + ".");
 
-    rst.startSet({restart: true, dbpath: dbPath});
+    rst.startSet({
+        restart: true,
+        dbpath: dbPath,
+        setParameter: {minSnapshotHistoryWindowInSeconds: snapshotHistory}
+    });
 
     dataConsistencyCheck(sourceNode, rst.getPrimary(), consistencyTs);
 
