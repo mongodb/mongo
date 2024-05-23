@@ -339,7 +339,7 @@ void DropCollectionCoordinator::_commitDropCollection(
 
     // We need to send the drop to all the shards because both movePrimary and
     // moveChunk leave garbage behind for sharded collections.
-    auto participants = getAllShardsAndConfigServerIds(opCtx);
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     // Remove primary shard from participants
     participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
                        participants.end());
