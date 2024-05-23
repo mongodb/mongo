@@ -43,29 +43,68 @@
 namespace mongo {
 namespace repl {
 
-
-/*
-    RS_STARTUP    serving still starting up, or still trying to initiate the set
-    RS_PRIMARY    this server thinks it is primary
-    RS_SECONDARY  this server thinks it is a secondary
-    RS_RECOVERING recovering/resyncing; after recovery usually auto-transitions to secondary
-    RS_STARTUP2   loaded config, still determining who is primary
-
-    State -> integer mappings are reserved forever.  Do not change them or delete them, except
-    to update RS_MAX when introducing new states.
-*/
+/**
+ * Enumeration representing the state of a replica set member node. The State -> integer mappings
+ * are persisted and/or sent over the network, so their values are reserved forever. Do not change
+ * or delete them, except to update RS_MAX when introducing new states.
+ */
 struct MemberState {
     enum MS {
+        // Server is still starting-up or the replica set is still being initiated
         RS_STARTUP = 0,
+
+        // The node has won the latest election round and is running as primary, but is not
+        // necessarily writable. I.e., it might still be draining oplog.
         RS_PRIMARY = 1,
+
+        // The node is running as a secondary
         RS_SECONDARY = 2,
+
+        // The node is either re-syncing after having failed off the end of the oplog or it just
+        // finished an initial sync (or initial sync was not necessary). After that it usually
+        // auto-transitions to secondary.
         RS_RECOVERING = 3,
+
+        // This state doesn't exist since 3.0 and the value is here as a placeholder to avoid
+        // accidental reuse of the ordinal.
+        //
+        // Indicates that an unrecovable error was encountered during replication state transition
+        // and the repl subsystem is offline, but the server is still running. This has been
+        // replaced with fassert since SERVER-15089.
+        OBSOLETE_RS_FATAL = 4,
+
+        // The node has loaded the replica set config document and is determining whether initial
+        // sync is necessary. If initial sync is necessary it will be performed under the same
+        // state, after which the node will to into RS_RECOVERING.
         RS_STARTUP2 = 5,
-        RS_UNKNOWN = 6, /* remote node not yet reached */
+
+        // This value can only be returned for the remote node and never for the local member. Means
+        // that the remote node was reachable, but either the connection establishment failed (e.g.,
+        // for authentication reasons) or its state couldn't be retrieved due to error.
+        RS_UNKNOWN = 6,
+
+        // The node is running as an arbiter
         RS_ARBITER = 7,
-        RS_DOWN = 8, /* node not reachable for a report */
+
+        // This value can only be returned for the remote node and never for the local member. Means
+        // that the remote node was not reachable.
+        RS_DOWN = 8,
+
+        // The node is running rollback
         RS_ROLLBACK = 9,
-        RS_REMOVED = 10, /* node removed from replica set */
+
+        // This value can only be returned for the local node and never for any of the remote
+        // members. It means that this node does not consider itself to be part of the replica set,
+        // which could be for one of two reasons:
+        //  (1) The node was actually removed from the replica set, in which case node will not find
+        //  its index in the config
+        //  (2) The node was a part of a config server at some point in time in the past, but was
+        //  restarted without the --configsvr option. This is a legacy reason to avoid customers
+        //  inadvertently omitting that argument (and the skipShardingConfigurationChecks startup
+        //  parameter).
+        RS_REMOVED = 10,
+
+        // Counts the rest. Update if a new value is added.
         RS_MAX = 10
     } s;
 
@@ -102,14 +141,19 @@ struct MemberState {
     bool rollback() const {
         return s == RS_ROLLBACK;
     }
-    bool readable() const {
-        return s == RS_PRIMARY || s == RS_SECONDARY;
-    }
     bool removed() const {
         return s == RS_REMOVED;
     }
     bool arbiter() const {
         return s == RS_ARBITER;
+    }
+
+    /**
+     * The node is in a state where the data on disk is in a consistent state and any writes that
+     * are incoming are either from user writes (primary) or from oplog application (secondary).
+     */
+    bool readable() const {
+        return primary() || secondary();
     }
 
     std::string toString() const;
@@ -132,6 +176,8 @@ inline std::string MemberState::toString() const {
             return "SECONDARY";
         case RS_RECOVERING:
             return "RECOVERING";
+        case OBSOLETE_RS_FATAL:  // Unreachable
+            break;
         case RS_STARTUP2:
             return "STARTUP2";
         case RS_ARBITER:
@@ -145,7 +191,7 @@ inline std::string MemberState::toString() const {
         case RS_REMOVED:
             return "REMOVED";
     }
-    return "";
+    MONGO_UNREACHABLE;
 }
 
 /**
