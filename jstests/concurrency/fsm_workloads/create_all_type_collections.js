@@ -129,7 +129,7 @@ export const $config = (function() {
                 shardCollection: coll.getFullName(),
                 key: {time: 1},
                 unique: false,
-                timseries: {timeField: "time"}
+                timeseries: {timeField: "time"}
             });
             const errorCodes = [
                 // Concurrent creation on the same namespace.
