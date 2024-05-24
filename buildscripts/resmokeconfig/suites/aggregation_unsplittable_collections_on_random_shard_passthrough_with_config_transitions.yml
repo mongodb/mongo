@@ -1,3 +1,6 @@
+config_variables:
+  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
+
 test_kind: js_test
 
 selector:
@@ -119,6 +122,7 @@ executor:
         await import("jstests/libs/override_methods/implicitly_retry_on_config_transition_errors.js");
   hooks:
     - class: ContinuousConfigShardTransition
+      move_primary_comment: *movePrimaryComment
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
       shell_options:
@@ -147,4 +151,8 @@ executor:
             skipMoveCollectionThreshold: 0.5
           mode: alwaysOn
         balancerMigrationsThrottlingMs: 100
+        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
+          data:
+            comment: *movePrimaryComment
+          mode: alwaysOn
     enable_balancer: true
