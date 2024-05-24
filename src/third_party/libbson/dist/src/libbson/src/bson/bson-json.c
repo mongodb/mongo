@@ -21,10 +21,10 @@
 #include <math.h>
 
 #include "bson.h"
-#include "bson-config.h"
-#include "bson-json.h"
-#include "bson-json-private.h"
-#include "bson-iso8601-private.h"
+#include <bson/bson-config.h>
+#include <bson/bson-json.h>
+#include <bson/bson-json-private.h>
+#include <bson/bson-iso8601-private.h>
 
 #include "common-b64-private.h"
 #include "jsonsl/jsonsl.h"
@@ -394,8 +394,11 @@ bson_json_opts_new (bson_json_mode_t mode, int32_t max_len)
    bson_json_opts_t *opts;
 
    opts = (bson_json_opts_t *) bson_malloc (sizeof *opts);
-   opts->mode = mode;
-   opts->max_len = max_len;
+   *opts = (bson_json_opts_t){
+      .mode = mode,
+      .max_len = max_len,
+      .is_outermost_array = false,
+   };
 
    return opts;
 }
@@ -628,7 +631,13 @@ _bson_json_read_integer (bson_json_reader_t *reader, uint64_t val, int64_t sign)
          bson_append_int32 (
             STACK_BSON_CHILD, key, (int) len, (int) (val * sign));
       } else if (sign == -1) {
+#if defined(_WIN32) && !defined(__MINGW32__)
+         // Unary negation of unsigned integer is deliberate.
+#pragma warning(suppress : 4146)
          bson_append_int64 (STACK_BSON_CHILD, key, (int) len, (int64_t) -val);
+#else
+         bson_append_int64 (STACK_BSON_CHILD, key, (int) len, (int64_t) -val);
+#endif // defined(_WIN32) && !defined(__MINGW32__)
       } else {
          bson_append_int64 (STACK_BSON_CHILD, key, (int) len, (int64_t) val);
       }
@@ -735,33 +744,19 @@ _bson_json_parse_double (bson_json_reader_t *reader,
    *d = strtod (val, NULL);
 
 #ifdef _MSC_VER
+   const double pos_inf = INFINITY;
+   const double neg_inf = -pos_inf;
+
    /* Microsoft's strtod parses "NaN", "Infinity", "-Infinity" as 0 */
    if (*d == 0.0) {
       if (!_strnicmp (val, "nan", vlen)) {
-#ifdef NAN
          *d = NAN;
-#else
-         /* Visual Studio 2010 doesn't define NAN or INFINITY
-          * https://msdn.microsoft.com/en-us/library/w22adx1s(v=vs.100).aspx */
-         unsigned long nan[2] = {0xffffffff, 0x7fffffff};
-         *d = *(double *) nan;
-#endif
          return true;
       } else if (!_strnicmp (val, "infinity", vlen)) {
-#ifdef INFINITY
-         *d = INFINITY;
-#else
-         unsigned long inf[2] = {0x00000000, 0x7ff00000};
-         *d = *(double *) inf;
-#endif
+         *d = pos_inf;
          return true;
       } else if (!_strnicmp (val, "-infinity", vlen)) {
-#ifdef INFINITY
-         *d = -INFINITY;
-#else
-         unsigned long inf[2] = {0x00000000, 0xfff00000};
-         *d = *(double *) inf;
-#endif
+         *d = neg_inf;
          return true;
       }
    }
@@ -831,7 +826,7 @@ static bool
 _unhexlify_uuid (const char *uuid, uint8_t *out, size_t max)
 {
    unsigned int byte;
-   int x = 0;
+   size_t x = 0;
    int i = 0;
 
    BSON_ASSERT (strlen (uuid) == 32);
@@ -1129,9 +1124,9 @@ _bson_json_read_string (bson_json_reader_t *reader, /* IN */
       } break;
       case BSON_JSON_LF_DECIMAL128: {
          bson_decimal128_t decimal128;
-         bson_decimal128_from_string (val_w_null, &decimal128);
 
-         if (bson->read_state == BSON_JSON_IN_BSON_TYPE) {
+         if (bson_decimal128_from_string (val_w_null, &decimal128) &&
+             bson->read_state == BSON_JSON_IN_BSON_TYPE) {
             bson->bson_type_data.v_decimal128.value = decimal128;
          } else {
             goto BAD_PARSE;
@@ -1186,8 +1181,9 @@ _bson_json_read_start_map (bson_json_reader_t *reader) /* IN */
           * expected a legacy Binary format. now we see the second "{", so
           * backtrack and parse $type query operator. */
          bson->read_state = BSON_JSON_IN_START_MAP;
+         BSON_ASSERT (bson_in_range_unsigned (int, len));
          STACK_PUSH_DOC (bson_append_document_begin (
-            STACK_BSON_PARENT, key, len, STACK_BSON_CHILD));
+            STACK_BSON_PARENT, key, (int) len, STACK_BSON_CHILD));
          _bson_json_save_map_key (bson, (const uint8_t *) "$type", 5);
          break;
       case BSON_JSON_LF_CODE:
@@ -1301,7 +1297,7 @@ _bson_json_read_code_or_scope_key (bson_json_reader_bson_t *bson,
          /* save the key, e.g. {"key": {"$code": "return x", "$scope":{"x":1}}},
           * in case it is overwritten while parsing scope sub-object */
          _bson_json_buf_set (
-            &bson->code_data.key_buf, bson->key_buf.buf, bson->key_buf.len);
+            &bson->code_data.key_buf, bson->key, bson->key_buf.len);
       }
 
       if (is_scope) {
@@ -1405,7 +1401,7 @@ _bson_json_read_map_key (bson_json_reader_t *reader, /* IN */
       {
          /* start parsing "key": {"$dbPointer": {...}}, save "key" for later */
          _bson_json_buf_set (
-            &bson->dbpointer_key, bson->key_buf.buf, bson->key_buf.len);
+            &bson->dbpointer_key, bson->key, bson->key_buf.len);
 
          bson->bson_type = BSON_TYPE_DBPOINTER;
          bson->read_state = BSON_JSON_IN_BSON_TYPE_DBPOINTER_STARTMAP;
@@ -2233,8 +2229,11 @@ bson_json_reader_read (bson_json_reader_t *reader, /* IN */
 
          /* accumulate a key or string value */
          if (reader->json_text_pos != -1) {
-            if (reader->json_text_pos < reader->json->pos) {
-               accum = BSON_MIN (reader->json->pos - reader->json_text_pos, r);
+            if (bson_cmp_less_su (reader->json_text_pos, reader->json->pos)) {
+               BSON_ASSERT (
+                  bson_in_range_unsigned (ssize_t, reader->json->pos));
+               accum = BSON_MIN (
+                  (ssize_t) reader->json->pos - reader->json_text_pos, r);
                /* if this chunk stopped mid-token, buf_offset is how far into
                 * our current chunk the token begins. */
                buf_offset = AT_LEAST_0 (reader->json_text_pos - start_pos);
@@ -2336,6 +2335,14 @@ bson_json_reader_destroy (bson_json_reader_t *reader) /* IN */
    jsonsl_destroy (reader->json);
    bson_free (reader->tok_accumulator.buf);
    bson_free (reader);
+}
+
+
+void
+bson_json_opts_set_outermost_array (bson_json_opts_t *opts,
+                                    bool is_outermost_array)
+{
+   opts->is_outermost_array = is_outermost_array;
 }
 
 

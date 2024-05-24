@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_COMPAT_H
@@ -31,8 +31,8 @@
 #endif
 #endif
 
-#include "bson-config.h"
-#include "bson-macros.h"
+#include <bson/bson-config.h>
+#include <bson/bson-macros.h>
 
 
 #ifdef BSON_OS_WIN32
@@ -64,7 +64,7 @@
 #endif
 
 
-#include "bson-macros.h"
+#include <bson/bson-macros.h>
 
 
 #include <errno.h>
@@ -145,134 +145,6 @@ typedef SSIZE_T ssize_t;
  * all its bits to 1. */
 #define BSON_NUMERIC_LIMITS_MAX_UNSIGNED(T) ((T) (~((T) 0)))
 
-/* Define numeric limit constants if not already available for C90
- * compatibility. These can be removed once C99 is declared the minimum
- * supported C standard. */
-#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901L
-
-#ifndef SCHAR_MAX
-#define SCHAR_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (signed char)
-#endif
-
-#ifndef SHRT_MAX
-#define SHRT_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (short)
-#endif
-
-#ifndef INT_MAX
-#define INT_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (int)
-#endif
-
-#ifndef LONG_MAX
-#define LONG_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (long)
-#endif
-
-#ifndef LLONG_MAX
-#define LLONG_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (long long)
-#endif
-
-#ifndef UCHAR_MAX
-#define UCHAR_MAX BSON_NUMERIC_LIMITS_MAX_UNSIGNED (unsigned char)
-#endif
-
-#ifndef USHRT_MAX
-#define USHRT_MAX BSON_NUMERIC_LIMITS_MAX_UNSIGNED (unsigned short)
-#endif
-
-#ifndef UINT_MAX
-#define UINT_MAX BSON_NUMERIC_LIMITS_MAX_UNSIGNED (unsigned int)
-#endif
-
-#ifndef ULONG_MAX
-#define ULONG_MAX BSON_NUMERIC_LIMITS_MAX_UNSIGNED (unsigned long)
-#endif
-
-#ifndef ULLONG_MAX
-#define ULLONG_MAX BSON_NUMERIC_LIMITS_MAX_UNSIGNED (unsigned long long)
-#endif
-
-#ifndef INT8_MAX
-#define INT8_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (int8_t)
-#endif
-
-#ifndef INT16_MAX
-#define INT16_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (int16_t)
-#endif
-
-#ifndef INT32_MAX
-#define INT32_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (int32_t)
-#endif
-
-#ifndef INT64_MAX
-#define INT64_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (int64_t)
-#endif
-
-#ifndef UINT8_MAX
-#define UINT8_MAX BSON_NUMERIC_LIMITS_MAX_UNSIGNED (uint8_t)
-#endif
-
-#ifndef UINT16_MAX
-#define UINT16_MAX BSON_NUMERIC_LIMITS_MAX_UNSIGNED (uint16_t)
-#endif
-
-#ifndef UINT32_MAX
-#define UINT32_MAX BSON_NUMERIC_LIMITS_MAX_UNSIGNED (uint32_t)
-#endif
-
-#ifndef UINT64_MAX
-#define UINT64_MAX BSON_NUMERIC_LIMITS_MAX_UNSIGNED (uint64_t)
-#endif
-
-#ifndef SIZE_MAX
-#define SIZE_MAX BSON_NUMERIC_LIMITS_MAX_UNSIGNED (size_t)
-#endif
-
-#ifndef PTRDIFF_MAX
-#define PTRDIFF_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (ptrdiff_t)
-#endif
-
-#ifndef SCHAR_MIN
-#define SCHAR_MIN BSON_NUMERIC_LIMITS_MIN_SIGNED (signed char, SCHAR_MAX)
-#endif
-
-#ifndef SHRT_MIN
-#define SHRT_MIN BSON_NUMERIC_LIMITS_MIN_SIGNED (short, SHRT_MAX)
-#endif
-
-#ifndef INT_MIN
-#define INT_MIN BSON_NUMERIC_LIMITS_MIN_SIGNED (int, INT_MAX)
-#endif
-
-#ifndef LONG_MIN
-#define LONG_MIN BSON_NUMERIC_LIMITS_MIN_SIGNED (long, LONG_MAX)
-#endif
-
-#ifndef LLONG_MIN
-#define LLONG_MIN BSON_NUMERIC_LIMITS_MIN_SIGNED (long long, LLONG_MAX)
-#endif
-
-#ifndef INT8_MIN
-#define INT8_MIN BSON_NUMERIC_LIMITS_MIN_SIGNED (int8_t, INT8_MAX)
-#endif
-
-#ifndef INT16_MIN
-#define INT16_MIN BSON_NUMERIC_LIMITS_MIN_SIGNED (int16_t, INT16_MAX)
-#endif
-
-#ifndef INT32_MIN
-#define INT32_MIN BSON_NUMERIC_LIMITS_MIN_SIGNED (int32_t, INT32_MAX)
-#endif
-
-#ifndef INT64_MIN
-#define INT64_MIN BSON_NUMERIC_LIMITS_MIN_SIGNED (int64_t, INT64_MAX)
-#endif
-
-#ifndef PTRDIFF_MIN
-#define PTRDIFF_MIN BSON_NUMERIC_LIMITS_MIN_SIGNED (ptrdiff_t, PTRDIFF_MAX)
-#endif
-
-#endif /* !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901L */
-
-
 #ifndef SSIZE_MAX
 #define SSIZE_MAX BSON_NUMERIC_LIMITS_MAX_SIGNED (ssize_t)
 #endif
@@ -303,9 +175,9 @@ typedef signed char bool;
 #define bson_sync_synchronize() __sync_synchronize ()
 #elif defined(__i386__) || defined(__i486__) || defined(__i586__) || \
    defined(__i686__) || defined(__x86_64__)
-#define bson_sync_synchronize() asm volatile("mfence" ::: "memory")
+#define bson_sync_synchronize() asm volatile ("mfence" ::: "memory")
 #else
-#define bson_sync_synchronize() asm volatile("sync" ::: "memory")
+#define bson_sync_synchronize() asm volatile ("sync" ::: "memory")
 #endif
 #elif defined(_MSC_VER)
 #define bson_sync_synchronize() MemoryBarrier ()

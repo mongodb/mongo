@@ -20,9 +20,9 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include "bson-atomic.h"
-#include "bson-config.h"
-#include "bson-memory.h"
+#include <bson/bson-atomic.h>
+#include <bson/bson-config.h>
+#include <bson/bson-memory.h>
 
 
 // Ensure size of exported structs are stable.
@@ -33,14 +33,18 @@ BSON_STATIC_ASSERT2 (bson_mem_vtable_t,
 // For compatibility with C standards prior to C11.
 static void *
 _aligned_alloc_impl (size_t alignment, size_t num_bytes)
-#if __STDC_VERSION__ >= 201112L
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L && \
+   !defined(_WIN32) && !defined(__ANDROID__) && !defined(_AIX)
 {
    return aligned_alloc (alignment, num_bytes);
 }
 #elif defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L
 {
    void *mem = NULL;
-   (void) posix_memalign (&mem, alignment, num_bytes);
+
+   // Workaround for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66425.
+   BSON_MAYBE_UNUSED int ret = posix_memalign (&mem, alignment, num_bytes);
+
    return mem;
 }
 #else
@@ -148,7 +152,7 @@ bson_malloc0 (size_t num_bytes) /* IN */
 /*
  *--------------------------------------------------------------------------
  *
- * bson_aligned_malloc --
+ * bson_aligned_alloc --
  *
  *       Allocates @num_bytes of memory with an alignment of @alignment and
  *       returns a pointer to it.  If malloc failed to allocate the memory,

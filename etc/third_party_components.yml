@@ -252,8 +252,6 @@ components:
     release_monitoring_id: 10712
     local_directory_path: src/third_party/libbson
     team_owner: "Server Security"
-    upgrade_suppression: TODO SERVER-72019
-    vulnerability_suppression: TODO SERVER-72019
 
   mongo-cxx-driver:
     homepage_url: https://github.com/mongodb/mongo-cxx-driver

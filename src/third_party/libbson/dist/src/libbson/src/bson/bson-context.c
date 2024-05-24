@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "bson-compat.h"
+#include <bson/bson-compat.h>
 
 #include <limits.h>
 #include <stdarg.h>
@@ -22,11 +22,11 @@
 #include <string.h>
 #include <time.h>
 
-#include "bson-atomic.h"
-#include "bson-clock.h"
-#include "bson-context.h"
-#include "bson-context-private.h"
-#include "bson-memory.h"
+#include <bson/bson-atomic.h>
+#include <bson/bson-clock.h>
+#include <bson/bson-context.h>
+#include <bson/bson-context-private.h>
+#include <bson/bson-memory.h>
 #include "common-thread-private.h"
 
 
@@ -62,7 +62,9 @@ _bson_context_set_oid_seq32 (bson_context_t *context, /* IN */
                              bson_oid_t *oid)         /* OUT */
 {
    uint32_t seq = (uint32_t) bson_atomic_int32_fetch_add (
-      (int32_t *) &context->seq32, 1, bson_memory_order_seq_cst);
+      (DECL_ATOMIC_INTEGRAL_INT32 *) &context->seq32,
+      1,
+      bson_memory_order_seq_cst);
    seq = BSON_UINT32_TO_BE (seq);
    memcpy (&oid->bytes[BSON_OID_SEQ32_OFFSET],
            ((uint8_t *) &seq) + 1,

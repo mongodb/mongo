@@ -1,3 +1,212 @@
+libbson 1.26.2
+==============
+
+Fixes:
+
+  * Fix iteration in `bson_strfreev`.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Ezra Chung
+
+libbson 1.26.1
+==============
+
+Fixes:
+
+  * Use aligned alloc for `bson_array_builder_t`
+
+Thanks to everyone who contributed to the development of this release.
+
+  * 0x1 Louis
+
+libbson 1.26.0
+==============
+
+No changes since 1.25.4. Version incremented to match the libmongoc version.
+
+libbson 1.25.4
+==============
+
+Fixes:
+
+  * Restore support for Sphinx 1.7.6 for man page build.
+
+
+libbson 1.25.3
+==============
+
+No changes since 1.25.2. Version incremented to match the libmongoc version.
+
+libbson 1.25.2
+==============
+
+Fixes:
+
+  * Fix conversion warning with GCC 12.
+  * Include -pthread in pkg-config Libs.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Calvin Buckley
+  * Kevin Albertson
+  * Roland Hieber
+
+libbson 1.25.1
+==============
+
+Fixes:
+
+  * The `BUILD_VERSION` CMake option was restored.
+  * Fixes to some format strings in trace logs.
+  * Allow mongoc_buffer_t to be larger than INT_MAX.
+
+Thanks to everyone who contributed to the development of this release:
+
+  * Adrian Dole
+  * Kevin Albertson
+  * Roberto C. Sánchez
+
+libbson 1.25.0
+==============
+
+New Features:
+
+  * Add `bson_array_builder_t`.
+
+Platform Support:
+
+  * Support for macOS 10.14 is dropped.
+  * Support for Ubuntu 14.04 is dropped.
+  * Support for Debian 8.1 is dropped.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Kevin Albertson
+  * Colby Pike
+  * Adrian Dole
+  * Roberto C. Sánchez
+  * Ezra Chung
+  * Joshua Siegel
+
+
+libbson 1.24.4
+==============
+
+Fixes:
+  * Fix libmongoc build failure caused by missing install of `bson-dsl.h`.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Kevin Albertson
+  
+libbson 1.24.3
+==============
+
+Fixes:
+
+  * Fix parsing of `[ { $code: ... } ]` or `[{$dbPointer: ...}]`.
+  * Improve detection Fix use of `strerror_l`.
+  * Fix possible overflow parsing Decimal128 in extJSON with very large exponents.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Joshua Siegel
+  * Ezra Chung
+
+libbson 1.24.2
+==============
+
+No changes since 1.24.1. Version incremented to match the libmongoc version.
+
+libbson 1.24.1
+==============
+
+No changes since 1.24.0. Version incremented to match the libmongoc version.
+
+libbson 1.24.0
+==============
+
+New Features:
+
+  * Add extended JSON helpers for top-level BSON arrays `bson_array_as_canonical_extended_json` and `bson_array_as_relaxed_extended_json`.
+
+Language Standard Support:
+
+  * C89 support has been dropped. C99 is the default tested C standard.
+
+Platform Support:
+
+  * Support for macOS 10.14 will be dropped in an upcoming release.
+  * Support for Ubuntu 14.04 will be dropped in an upcoming release.
+  * Support for Debian 8.1 will be dropped in an upcoming release.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Ezra Chung
+  * Kevin Albertson
+  * Colby Pike
+  * Joshua Siegel
+  * Jeroen Ooms
+  * Jean-Marc Le Roux
+  * Kyle Kloberdanz
+  * bisht2050
+  * gopukrishnasIBM
+  * Charles Pritchard
+
+libbson 1.23.5
+==============
+
+No changes since 1.23.3. Version incremented to match the libmongoc version.
+
+
+libbson 1.23.4
+==============
+
+No changes since 1.23.3. Version incremented to match the libmongoc version.
+
+
+libbson 1.23.3
+==============
+
+Fix:
+
+  * Don't use `aligned_alloc()` on Windows
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Jeroen Ooms
+
+
+
+libbson 1.23.2
+==============
+
+No changes since 1.23.1. Version incremented to match the libmongoc version.
+
+-- Kevin Albertson
+
+
+libbson 1.22.2
+==============
+
+Bug fixes:
+
+- Fix link errors related to atomic operations on RISC-V
+- Fix compile-time errors due to type conflicts on some platforms.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Ezra Chung
+  * Roberto C. Sánchez
+
+
+libbson 1.23.1
+==============
+
+No changes since 1.23.0. Version incremented to match the libmongoc version.
+
+
 libbson 1.23.0
 ==============
 

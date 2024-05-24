@@ -14,17 +14,8 @@
  * limitations under the License.
  */
 
-
-#ifdef __APPLE__
-#include <mach/clock.h>
-#include <mach/mach.h>
-#include <mach/mach_time.h>
-#include <sys/time.h>
-#endif
-
-
-#include "bson-config.h"
-#include "bson-compat.h"
+#include <bson/bson-config.h>
+#include <bson/bson-compat.h>
 
 
 #if defined(BSON_HAVE_CLOCK_GETTIME)
@@ -32,8 +23,7 @@
 #include <sys/time.h>
 #endif
 
-#include "bson-clock.h"
-
+#include <bson/bson-clock.h>
 
 /*
  *--------------------------------------------------------------------------
@@ -125,19 +115,6 @@ bson_get_monotonic_time (void)
     * int64_t to avoid truncation. */
    clock_gettime (CLOCK_MONOTONIC, &ts);
    return (((int64_t) ts.tv_sec * 1000000) + (ts.tv_nsec / 1000));
-#elif defined(__APPLE__)
-   static mach_timebase_info_data_t info = {0};
-   static double ratio = 0.0;
-
-   if (!info.denom) {
-      /* the value from mach_absolute_time () * info.numer / info.denom
-       * is in nano seconds. So we have to divid by 1000.0 to get micro
-       * seconds*/
-      mach_timebase_info (&info);
-      ratio = (double) info.numer / (double) info.denom / 1000.0;
-   }
-
-   return mach_absolute_time () * ratio;
 #elif defined(_WIN32)
    /* Despite it's name, this is in milliseconds! */
    int64_t ticks = GetTickCount64 ();

@@ -53,14 +53,14 @@
  * specified in libbson.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_MD5_H
 #define BSON_MD5_H
 
 
-#include "bson-endian.h"
+#include <bson/bson-endian.h>
 
 
 BSON_BEGIN_DECLS

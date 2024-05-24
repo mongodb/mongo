@@ -919,7 +919,7 @@
                     }
                 }
             ],
-            "purl": "pkg:github/mongodb/mongo-c-driver@1.23.0",
+            "purl": "pkg:github/mongodb/mongo-c-driver@1.26.2",
             "properties": [
                 {
                     "name": "internal:team_responsible",

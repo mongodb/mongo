@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_DECIMAL128_H
@@ -23,9 +23,9 @@
 
 #include <string.h>
 
-#include "bson-macros.h"
-#include "bson-config.h"
-#include "bson-types.h"
+#include <bson/bson-macros.h>
+#include <bson/bson-config.h>
+#include <bson/bson-types.h>
 
 
 /**

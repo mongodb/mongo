@@ -39,7 +39,7 @@ a notice will be included in
 | [librdkafka]               | BSD-2-Clause                                                   | 2.0.2                                              |                      |                                 |
 | [libmongocrypt]            | Apache-2.0                                                     | 1.8.4                                              |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause                                                   | 6cdc775 + changes                                  |                      |                ✗                |
-| [mongo-c-driver]           | Apache-2.0                                                     | 1.23.0                                             |          ✗           |                ✗                |
+| [mongo-c-driver]           | Apache-2.0                                                     | 1.26.2                                             |          ✗           |                ✗                |
 | [mongo-cxx-driver]         | Apache-2.0                                                     | r3.7.1                                             |          ✗           |                ✗                |
 | [MozJS]                    | MPL-2.0                                                        | ESR 115.7                                          |                      |                ✗                |
 | [MurmurHash3]              | Public Domain                                                  | a6bd3ce + changes                                  |          ✗           |                ✗                |

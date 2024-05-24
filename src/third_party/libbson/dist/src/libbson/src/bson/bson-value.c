@@ -15,10 +15,10 @@
  */
 
 
-#include "bson-memory.h"
-#include "bson-string.h"
-#include "bson-value.h"
-#include "bson-oid.h"
+#include <bson/bson-memory.h>
+#include <bson/bson-string.h>
+#include <bson/bson-value.h>
+#include <bson/bson-oid.h>
 
 
 void
@@ -54,7 +54,8 @@ bson_value_copy (const bson_value_t *src, /* IN */
       dst->value.v_binary.data_len = src->value.v_binary.data_len;
       dst->value.v_binary.data = bson_malloc (src->value.v_binary.data_len);
       if (dst->value.v_binary.data_len) {
-         memcpy (dst->value.v_binary.data, src->value.v_binary.data,
+         memcpy (dst->value.v_binary.data,
+                 src->value.v_binary.data,
                  dst->value.v_binary.data_len);
       }
       break;

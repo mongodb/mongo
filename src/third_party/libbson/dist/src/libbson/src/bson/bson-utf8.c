@@ -17,9 +17,9 @@
 
 #include <string.h>
 
-#include "bson-memory.h"
-#include "bson-string.h"
-#include "bson-utf8.h"
+#include <bson/bson-memory.h>
+#include <bson/bson-string.h>
+#include <bson/bson-utf8.h>
 
 
 /*
@@ -118,8 +118,8 @@ bson_utf8_validate (const char *utf8, /* IN */
    bson_unichar_t c;
    uint8_t first_mask;
    uint8_t seq_length;
-   unsigned i;
-   unsigned j;
+   size_t i;
+   size_t j;
 
    BSON_ASSERT (utf8);
 

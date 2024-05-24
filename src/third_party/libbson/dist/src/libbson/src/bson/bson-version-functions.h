@@ -15,13 +15,13 @@
  */
 
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_VERSION_FUNCTIONS_H
 #define BSON_VERSION_FUNCTIONS_H
 
-#include "bson-types.h"
+#include <bson/bson-types.h>
 
 BSON_BEGIN_DECLS
 
