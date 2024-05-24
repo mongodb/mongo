@@ -758,30 +758,61 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-    def gen_setter(self, field):
+    def gen_setters(self, field):
         # type: (ast.Field) -> None
-        """Generate the C++ setter definition for a field."""
+        """Generate the C++ setter definitions for a field."""
         cpp_type_info = cpp_types.get_cpp_type(field)
-        param_type = cpp_type_info.get_getter_setter_type()
+        setter_type = cpp_type_info.get_getter_setter_type()
+        storage_type = cpp_type_info.get_storage_type()
         is_serial = _is_required_serializer_field(field)
         memfn = _get_field_member_setter_name(field)
+        validator = _get_field_member_validator_name(field) if field.validator is not None else ""
+
+        # Generate the setter for instances of the "getter/setter type", which may not be the same
+        # as the storage type.
         if field.chained_struct_field:
             body = "{}.{}(std::move(value));".format(
-                _get_field_member_name(field.chained_struct_field),
-                _get_field_member_setter_name(field),
+                _get_field_member_name(field.chained_struct_field), memfn
             )
         else:
-            body = cpp_type_info.get_setter_body(
-                _get_field_member_name(field),
-                _get_field_member_validator_name(field) if field.validator is not None else "",
-            )
+            body = cpp_type_info.get_setter_body(_get_field_member_name(field), validator)
         set_has = _gen_mark_present(field.cpp_name) if is_serial else ""
 
-        with self._block(f"void {memfn}({param_type} value) {{", "}"):
-            self._writer.write_line(f"{body}")
+        with self._block(f"void {memfn}({setter_type} value) {{", "}"):
+            self._writer.write_line(body)
             if set_has:
                 self._writer.write_line(set_has)
         self._writer.write_empty_line()
+
+        # If the storage type doesn't match the setter type and the field supports it, then
+        # generate the setter for instances of the storage type.
+        if storage_type != setter_type and cpp_type_info.has_storage_type_setter():
+            if field.chained_struct_field:
+                storage_setter_body = "{}.{}(std::move(value));".format(
+                    _get_field_member_name(field.chained_struct_field), memfn
+                )
+            else:
+                storage_setter_body = cpp_type_info.get_storage_type_setter_body(
+                    _get_field_member_name(field), validator
+                )
+
+            with self._block(f"void {memfn}({storage_type} value) {{", "}"):
+                self._writer.write_line(storage_setter_body)
+                if set_has:
+                    self._writer.write_line(set_has)
+            self._writer.write_empty_line()
+
+            # There may be types that are implicitly convertible to both the setter type and storage
+            # type (for instance, when dealing with string fields). This could make calls to the
+            # setter ambiguous. This template takes over when a type is implicitly convertible to
+            # the storage type, resolving the ambiguity. It just does the conversion and calls the
+            # storage type setter.
+            with self._block("template<typename T,", ">"):
+                self._writer.write_line(
+                    f"std::enable_if_t<std::is_convertible_v<T, {storage_type}>, int> = 0"
+                )
+            with self._block(f"void {memfn}(const T& value) {{", "}"):
+                self._writer.write_line(f"{memfn}({storage_type}{{value}});")
 
     def gen_constexpr_getters(self):
         # type: () -> None
@@ -1374,7 +1405,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                                 self.gen_description_comment(field.description)
                             self.gen_getter(struct, field)
                             if not struct.immutable or (field.type and field.type.internal_only):
-                                self.gen_setter(field)
+                                self.gen_setters(field)
 
                     # Generate getters for any constexpr/compile-time struct data
                     self.write_empty_line()

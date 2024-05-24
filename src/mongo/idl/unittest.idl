@@ -1101,6 +1101,47 @@ structs:
 
 ##################################################################################################
 #
+# Test setter overloads
+#
+##################################################################################################
+
+    StructWithOverloadedSetters:
+        description: A struct with fields that generate additional setter overloads.
+        strict: false
+        fields:
+            fieldString: string
+            fieldOptionalString:
+                type: string
+                optional: true
+            fieldStringWithValidator:
+                type: string
+                validator: { callback: "validateStartsWith<'x'>" }
+            fieldOptionalStringWithValidator:
+                type: string
+                optional: true
+                validator: { callback: "validateStartsWith<'x'>" }
+            fieldArrayString:
+                type: array<string>
+            fieldArrayStringWithValidator:
+                type: array<string>
+                validator: { callback: "validateAllCapsArray" }
+            fieldOptionalArrayString:
+                type: array<string>
+                optional: true
+            fieldOptionalArrayStringWithValidator:
+                type: array<string>
+                optional: true
+                validator: { callback: "validateAllCapsArray" }
+
+
+    StructWithInlineChainedOverloadedSetters:
+        description: A struct with an inline chained struct that generates setter overloads.
+        inline_chained_structs: true
+        chained_structs:
+            StructWithOverloadedSetters: StructWithOverloadedSetters
+
+##################################################################################################
+#
 # Test unsafe_dangerous_disable_extra_field_duplicate_checks ignores extra fields
 #
 ##################################################################################################
