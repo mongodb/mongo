@@ -70,6 +70,9 @@ filters:
     approvers:
       - 10gen/devprod-correctness
       - 10gen/devprod-build
+  - "sbom.json":
+    approvers:
+      - 10gen/server-security
   - "SConstruct":
     approvers:
       - 10gen/devprod-build
