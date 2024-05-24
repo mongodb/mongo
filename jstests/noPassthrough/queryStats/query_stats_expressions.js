@@ -22,7 +22,49 @@ for (let i = 0; i < numDocs / 2; ++i) {
     bulk.insert({foo: i, bar: i, applyDiscount: false, word: "ghjk"});
 }
 assert.commandWorked(bulk.execute());
-coll.createIndex({foo: 1})
+coll.createIndex({foo: 1});
+
+// Verifies that $getField with a syntax error fails to be parsed and does not make it to the query
+// stats store.
+(function testGetFieldWithSyntaxError() {
+    // If $getField's field argument is a constant, it should be a string. Otherwise, it should fail
+    // to be parsed. But if it isn't a string constant, this condition was not correctly checked and
+    // it made it to the query stats store and was causing an re-parsing error for $queryStats
+    // pipeline stage execution.
+    assert.throwsWithCode(
+        () => testDB.nocoll.aggregate([{$project: {a: {$getField: [[]]}}}]).toArray(), 5654602);
+    assert.throwsWithCode(
+        () => testDB.nocoll.aggregate([{$project: {a: {$getField: ["a"]}}}]).toArray(), 5654602);
+    assert.throwsWithCode(
+        () => testDB.nocoll.aggregate([{$project: {a: {$getField: [1, 2, 3]}}}]).toArray(),
+        5654602);
+    assert.throwsWithCode(
+        () => testDB.nocoll.aggregate([{$project: {a: {$getField: [{b: "c"}]}}}]).toArray(),
+        5654602);
+    assert.throwsWithCode(
+        () => testDB.nocoll
+                  .aggregate([{$project: {a: {$getField: {field: [[]], input: "$$CURRENT"}}}}])
+                  .toArray(),
+        5654602);
+    assert.throwsWithCode(
+        () => testDB.nocoll
+                  .aggregate([{$project: {a: {$getField: {field: ["a"], input: "$$CURRENT"}}}}])
+                  .toArray(),
+        5654602);
+    assert.throwsWithCode(
+        () => testDB.nocoll
+                  .aggregate([{$project: {a: {$getField: {field: [1, 2, 3], input: "$$CURRENT"}}}}])
+                  .toArray(),
+        5654602);
+    assert.throwsWithCode(
+        () =>
+            testDB.nocoll
+                .aggregate([{$project: {a: {$getField: {field: [{b: "c"}], input: "$$CURRENT"}}}}])
+                .toArray(),
+        5654602);
+    let queryStats = getQueryStats(testDB);
+    assert.eq(queryStats.length, 0, `Expected 0 elements but got ${tojson(queryStats)}`);
+})();
 
 // Tests that $meta is re-parsed correctly by ensuring the metaDataKeyword is not serialized as
 // string literal.

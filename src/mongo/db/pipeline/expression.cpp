@@ -8315,15 +8315,6 @@ intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const exp
             str::stream() << kExpressionName << " requires 'input' to be specified",
             inputExpr);
 
-    if (auto constFieldExpr = dynamic_cast<ExpressionConstant*>(fieldExpr.get()); constFieldExpr) {
-        uassert(5654602,
-                str::stream() << kExpressionName
-                              << " requires 'field' to evaluate to type String, "
-                                 "but got "
-                              << typeName(constFieldExpr->getValue().getType()),
-                constFieldExpr->getValue().getType() == BSONType::String);
-    }
-
     return make_intrusive<ExpressionGetField>(expCtx, fieldExpr, inputExpr);
 }
 
@@ -8353,6 +8344,22 @@ Value ExpressionGetField::evaluate(const Document& root, Variables* variables) c
 }
 
 intrusive_ptr<Expression> ExpressionGetField::optimize() {
+    _children[_kField] = _children[_kField]->optimize();
+    // Technically speaking, this check should be done at the parsing phase but we can't get an
+    // ExpressionConstant until we optimize the expression. So we check this here. If this
+    // expression is not optimized, this check is done at run-time (evaluate()).
+    if (auto constFieldExpr = dynamic_cast<ExpressionConstant*>(_children[_kField].get());
+        constFieldExpr) {
+        uassert(5654602,
+                str::stream() << kExpressionName
+                              << " requires 'field' to evaluate to type String, "
+                                 "but got "
+                              << typeName(constFieldExpr->getValue().getType()),
+                constFieldExpr->getValue().getType() == BSONType::String);
+    }
+
+    _children[_kInput] = _children[_kInput]->optimize();
+
     return intrusive_ptr<Expression>(this);
 }
 
@@ -8360,7 +8367,7 @@ Value ExpressionGetField::serialize(const SerializationOptions& options) const {
     Value fieldValue;
 
     if (auto fieldExprConst = dynamic_cast<ExpressionConstant*>(_children[_kField].get());
-        fieldExprConst) {
+        fieldExprConst && fieldExprConst->getValue().getType() == BSONType::String) {
         auto strPath = fieldExprConst->getValue().getString();
 
         Value maybeRedactedPath{options.serializeFieldPathFromString(strPath)};
