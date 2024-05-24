@@ -410,6 +410,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         def check_rcmaj_optime(client, node):
             """Return True if all nodes have caught up with the primary."""
             res = client.admin.command({"replSetGetStatus": 1})
+
+            if "readConcernMajorityOpTime" not in res["optimes"]:
+                # This can be null when the node is starting up.
+                return False
+
             read_concern_majority_optime = res["optimes"]["readConcernMajorityOpTime"]
 
             if (

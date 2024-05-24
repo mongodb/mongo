@@ -1,5 +1,6 @@
 """Test hook that periodically transitions the config server in/out of config shard mode."""
 
+import bson
 import time
 import threading
 import random
@@ -128,6 +129,8 @@ class _TransitionThread(threading.Thread):
                     continue
 
                 self._current_mode = self.DEDICATED
+
+                self._run_post_remove_shard_checks(self._fixture.configsvr, "config")
 
                 # Wait a random interval before transitioning back, unless the test already ended.
                 if not self.__lifecycle.poll_for_idle_request():
@@ -478,3 +481,74 @@ class _TransitionThread(threading.Thread):
             shard_info["_id"] for shard_info in res["shards"] if shard_info["_id"] != "config"
         ]
         return random.choice(possible_choices)
+
+    def _run_post_remove_shard_checks(self, removed_shard_fixture, removed_shard_name):
+        # Configsvr metadata checks:
+        ## Check that the removed shard no longer exists on config.shards.
+        assert (
+            self._client["config"]["shards"].count_documents({"_id": removed_shard_name}) == 0
+        ), f"Removed shard still exists on config.shards: {removed_shard_name}"
+
+        ## Check that no database has the removed shard as its primary shard.
+        databasesPointingToRemovedShard = [
+            doc for doc in self._client["config"]["databases"].find({"primary": removed_shard_name})
+        ]
+        assert not databasesPointingToRemovedShard, f"Found databases whose primary shard is a removed shard: {databasesPointingToRemovedShard}"
+
+        ## Check that no chunk has the removed shard as its owner.
+        chunksPointingToRemovedShard = [
+            doc for doc in self._client["config"]["chunks"].find({"shard": removed_shard_name})
+        ]
+        assert (
+            not chunksPointingToRemovedShard
+        ), f"Found chunks whose owner is a removed shard: {chunksPointingToRemovedShard}"
+
+        ## Check that all tag in config.tags refer to at least one existing shard.
+        tagsWithoutShardPipeline = [
+            {
+                "$lookup": {
+                    "from": "shards",
+                    "localField": "tag",
+                    "foreignField": "tags",
+                    "as": "shards",
+                }
+            },
+            {"$match": {"shards": []}},
+        ]
+        tagsWithoutShardPipelineResultCursor = self._client["config"]["tags"].aggregate(
+            tagsWithoutShardPipeline
+        )
+        tagsWithoutShardPipelineResult = [doc for doc in tagsWithoutShardPipelineResultCursor]
+        assert not tagsWithoutShardPipelineResult, f"Found tags in config.tags that are not owned by any shard: {tagsWithoutShardPipelineResult}"
+
+        # Check that there is no user data left on the removed shard. (Note: This can only be
+        # checked on transitionToDedicatedConfigServer)
+        removed_shard_primary_client = removed_shard_fixture.get_primary().mongo_client()
+        dbs = removed_shard_primary_client.list_database_names()
+        assert all(
+            databaseName in {"local", "admin", "config"} for databaseName in dbs
+        ), f"Expected to not have any user database on removed shard: {dbs}"
+
+        # Check the filtering metadata on removed shard. Expect that the shard knows that it does
+        # not own any chunk anymore. Check on all replica set nodes.
+        # First, await secondaries to replicate the last optime
+        removed_shard_fixture.await_last_op_committed(
+            removed_shard_fixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60
+        )
+        for removed_shard_node in [
+            removed_shard_fixture.get_primary()
+        ] + removed_shard_fixture.get_secondaries():
+            sharding_state_response = removed_shard_node.mongo_client().admin.command(
+                {"shardingState": 1}
+            )
+            for nss, metadata in sharding_state_response["versions"].items():
+                # placementVersion == Timestamp(0, 0) means that this shard owns no chunk for the
+                # collection.
+
+                # TODO (SERVER-90810): Re-enable this check for resharding temporary collections.
+                if "system.resharding" in nss:
+                    continue
+
+                assert (
+                    metadata["placementVersion"] == bson.Timestamp(0, 0)
+                ), f"Expected remove shard's filtering information to reflect that the shard does not own any chunk for collection {nss}, but found {metadata} on node {removed_shard_node.get_driver_connection_url()}"
