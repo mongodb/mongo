@@ -169,6 +169,43 @@ TEST(TypeCheckerTest, TypeCheckIf) {
     ASSERT(!TypeSignature::kNothingType.isSubset(sign));
 }
 
+TEST(TypeCheckerTest, TypeCheckIsString) {
+    // isString on an if() statement that would return a string in any case is always true.
+    auto tree = make<FunctionCall>("isString",
+                                   makeSeq(make<If>(make<BinaryOp>(Operations::FillEmpty,
+                                                                   make<Variable>("inputVar"),
+                                                                   Constant::boolean(true)),
+                                                    Constant::str("true"),
+                                                    Constant::str("false"))));
+    TypeChecker{}.typeCheck(tree);
+
+    ASSERT(tree.is<Constant>() && tree.cast<Constant>()->isValueBool() &&
+           tree.cast<Constant>()->getValueBool());
+
+    // Rewrite doesn't occur if one of the branches can throw an error.
+    auto tree1 = make<FunctionCall>(
+        "isString",
+        makeSeq(make<If>(
+            make<BinaryOp>(
+                Operations::FillEmpty, make<Variable>("inputVar"), Constant::boolean(true)),
+            Constant::str("true"),
+            make<FunctionCall>(
+                "fail", makeSeq(Constant::int32(7654301), Constant::str("unexpected value"))))));
+    TypeChecker{}.typeCheck(tree1);
+
+    ASSERT(tree1.is<FunctionCall>());
+
+    // Rewrite doesn't occur if there is a chance that the if() returns Nothing because of the
+    // test condition.
+    auto tree2 = make<FunctionCall>(
+        "isString",
+        makeSeq(
+            make<If>(make<Variable>("inputVar"), Constant::str("true"), Constant::str("false"))));
+    TypeChecker{}.typeCheck(tree2);
+
+    ASSERT(tree2.is<FunctionCall>());
+}
+
 TEST(TypeCheckerTest, FoldComparisonBetweenBools) {
     // A comparison between a boolean operation and a constant 'true' is just the boolean operation.
     auto tree1 =
