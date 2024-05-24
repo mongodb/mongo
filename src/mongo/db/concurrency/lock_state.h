@@ -340,7 +340,7 @@ private:
 
     // Per-locker locking statistics. Reported in the slow-query log message and through
     // db.currentOp. Complementary to the per-instance locking statistics.
-    SingleThreadedLockStats _stats;
+    AtomicLockStats _stats;
 
     // Delays release of exclusive/intent-exclusive locked resources until the write unit of
     // work completes. Value of 0 means we are not inside a write unit of work.
