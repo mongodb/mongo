@@ -27,8 +27,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "bson-reader.h"
-#include "bson-memory.h"
+#include <bson/bson-reader.h>
+#include <bson/bson-memory.h>
 
 
 typedef enum {

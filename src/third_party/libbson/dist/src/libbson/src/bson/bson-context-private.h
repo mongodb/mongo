@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_CONTEXT_PRIVATE_H
 #define BSON_CONTEXT_PRIVATE_H
 
 
-#include "bson-context.h"
+#include <bson/bson-context.h>
 #include "common-thread-private.h"
 
 

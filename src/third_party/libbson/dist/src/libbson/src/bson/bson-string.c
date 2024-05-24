@@ -18,11 +18,11 @@
 #include <limits.h>
 #include <stdarg.h>
 
-#include "bson-compat.h"
-#include "bson-config.h"
-#include "bson-string.h"
-#include "bson-memory.h"
-#include "bson-utf8.h"
+#include <bson/bson-compat.h>
+#include <bson/bson-config.h>
+#include <bson/bson-string.h>
+#include <bson/bson-memory.h>
+#include <bson/bson-utf8.h>
 
 #ifdef BSON_HAVE_STRINGS_H
 #include <strings.h>
@@ -77,7 +77,6 @@ bson_string_new (const char *str) /* IN */
    if (str) {
       memcpy (ret->str, str, ret->len);
    }
-   ret->str[ret->len] = '\0';
 
    ret->str[ret->len] = '\0';
 
@@ -90,7 +89,9 @@ bson_string_free (bson_string_t *string, /* IN */
 {
    char *ret = NULL;
 
-   BSON_ASSERT (string);
+   if (!string) {
+      return NULL;
+   }
 
    if (!free_segment) {
       ret = string->str;
@@ -472,11 +473,11 @@ bson_strndup (const char *str, /* IN */
 void
 bson_strfreev (char **str) /* IN */
 {
-   int i;
-
    if (str) {
-      for (i = 0; str[i]; i++)
-         bson_free (str[i]);
+      for (char **ptr = str; *ptr != NULL; ++ptr) {
+         bson_free (*ptr);
+      }
+
       bson_free (str);
    }
 }

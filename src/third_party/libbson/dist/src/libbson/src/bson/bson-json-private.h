@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 #ifndef BSON_JSON_PRIVATE_H
 #define BSON_JSON_PRIVATE_H
@@ -23,6 +23,7 @@
 struct _bson_json_opts_t {
    bson_json_mode_t mode;
    int32_t max_len;
+   bool is_outermost_array;
 };
 
 

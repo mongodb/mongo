@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_READER_H
 #define BSON_READER_H
 
 
-#include "bson-compat.h"
-#include "bson-oid.h"
-#include "bson-types.h"
+#include <bson/bson-compat.h>
+#include <bson/bson-oid.h>
+#include <bson/bson-types.h>
 
 
 BSON_BEGIN_DECLS

@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_PRIVATE_H
 #define BSON_PRIVATE_H
 
 
-#include "bson-macros.h"
-#include "bson-memory.h"
-#include "bson-types.h"
+#include <bson/bson-macros.h>
+#include <bson/bson-memory.h>
+#include <bson/bson-types.h>
 
 
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)

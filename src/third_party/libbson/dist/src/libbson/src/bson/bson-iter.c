@@ -15,10 +15,10 @@
  */
 
 
-#include "bson-iter.h"
-#include "bson-config.h"
-#include "bson-decimal128.h"
-#include "bson-types.h"
+#include <bson/bson-iter.h>
+#include <bson/bson-config.h>
+#include <bson/bson-decimal128.h>
+#include <bson/bson-types.h>
 
 #define ITER_TYPE(i) ((bson_type_t) * ((i)->raw + (i)->type))
 
@@ -110,8 +110,13 @@ bson_iter_init_from_data (bson_iter_t *iter,   /* OUT */
       return false;
    }
 
+   if (BSON_UNLIKELY (!bson_in_range_unsigned (uint32_t, length))) {
+      memset (iter, 0, sizeof *iter);
+      return false;
+   }
+
    iter->raw = (uint8_t *) data;
-   iter->len = length;
+   iter->len = (uint32_t) length;
    iter->off = 0;
    iter->type = 0;
    iter->key = 0;
