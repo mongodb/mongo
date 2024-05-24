@@ -290,7 +290,7 @@ std::vector<RemoteCursor> establishShardCursors(
                 str::stream() << "Expected same request for each shard when targeting every shard "
                                  "server, found different requests for shards: "
                               << cmdObj << " " << request.cmdObj,
-                cmdObj.binaryEqual(cmdObj));
+                cmdObj.binaryEqual(request.cmdObj));
         }
         return establishCursorsOnAllHosts(
             opCtx, std::move(executor), nss, shardIds, cmdObj, false, getDesiredRetryPolicy(opCtx));
