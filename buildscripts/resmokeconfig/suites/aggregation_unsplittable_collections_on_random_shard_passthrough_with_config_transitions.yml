@@ -90,8 +90,7 @@ selector:
     # TODO SERVER-90619 Investigate missing DISTINCT_SCAN in explain output in aggregation config transition suite.
     - jstests/aggregation/group_conversion_to_distinct_scan.js
 
-    # TODO (SERVER-90738): Re-enable collection_uuid_coll_stats_index_stats.js in
-    # aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions.
+    # This test expects a stable collection UUID, which isn't true with background moveCollections.
     - jstests/aggregation/collection_uuid_coll_stats_index_stats.js
 
   exclude_with_any_tags:
