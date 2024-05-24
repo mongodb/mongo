@@ -49,6 +49,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
@@ -156,6 +157,14 @@ public:
 
         shardingCatalogManager->appendShardDrainingStatus(
             opCtx, result, shardDrainingStatus, shardId);
+
+        if (shardDrainingStatus.status == RemoveShardProgress::COMPLETED) {
+            ShardingStatistics::get(opCtx)
+                .countTransitionToDedicatedConfigServerCompleted.addAndFetch(1);
+        } else if (shardDrainingStatus.status == RemoveShardProgress::STARTED) {
+            ShardingStatistics::get(opCtx)
+                .countTransitionToDedicatedConfigServerStarted.addAndFetch(1);
+        }
 
         return true;
     }
