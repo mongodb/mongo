@@ -991,6 +991,7 @@ tasks:
       ]
     commands:
       - func: "do setup"
+      - func: "get mongot version"
       - func: "run tests"
         vars:
           resmoke_jobs_max: 1
@@ -1006,6 +1007,7 @@ tasks:
       ]
     commands:
       - func: "do setup"
+      - func: "get mongot version"
       - func: "run tests"
         vars:
           resmoke_jobs_max: 1

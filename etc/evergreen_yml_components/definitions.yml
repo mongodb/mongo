@@ -393,6 +393,15 @@ functions:
       key: "${build_variant}_${project}"
       destination: "builder_num"
 
+  "get mongot version": &get_mongot_version
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "get mongot version"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/functions/get_mongot_version.sh"
+
   "run diskstats": &run_diskstats
     command: subprocess.exec
     display_name: "run diskstats"
