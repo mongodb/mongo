@@ -51,8 +51,7 @@ const isReshardingForTimeseriesEnabled =
         // Create sharded collection
         st.adminCommand({shardCollection: `${dbName}.sharded`, key: {x: 1}});
 
-        // TODO (SERVER-88852): Create the timeseries collection regardless of the feature flag
-        // status.
+        // TODO (SERVER-84744): Remove check for feature flag
         if (isReshardingForTimeseriesEnabled) {
             // Create timeseries collection
             assert.commandWorked(
@@ -81,7 +80,7 @@ function getDataShard(nss) {
 // Map: namespace -> shardId
 let initialPlacements = {};
 
-let trackableCollections = ['unsharded'];
+let trackableCollections = ['unsharded', 'sharded'];
 
 if (isReshardingForTimeseriesEnabled) {
     trackableCollections.push('system.buckets.timeseries');
