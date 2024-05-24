@@ -121,6 +121,8 @@ released binary artifacts.
 | concurrencytest |
 | discover        |
 | extras          |
+| iso8601         |
+| nlohmann/json   |
 | python-subunit  |
 | testscenarios   |
 | testtools       |

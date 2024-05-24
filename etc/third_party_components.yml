@@ -120,7 +120,7 @@ components:
     homepage_url: https://pypi.org/project/discover/
     open_hub_url: N/A
     release_monitoring_id: -1
-    local_directory_path: src/third_party/wiredtiger/test/3rdparty/discover-0.4.0
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/discover-0.4.0-locally-modified
     is_test_only: true
     team_owner: "Storage Engines"
 
@@ -321,6 +321,14 @@ components:
     team_owner: "Service Arch"
     upgrade_suppression: TODO SERVER-75761
 
+  pyiso8601:
+    homepage_url: https://github.com/micktwomey/pyiso8601
+    open_hub_url: https://openhub.net/p/pyiso8601
+    release_monitoring_id: 17228
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/iso8601-2.1.0
+    is_test_only: true
+    team_owner: "Storage Engines"
+
   testscenarios:
     homepage_url: https://launchpad.net/testscenarios
     open_hub_url: https://www.openhub.net/p/testscenarios
@@ -381,7 +389,7 @@ components:
     homepage_url: https://launchpad.net/subunit
     open_hub_url: N/A
     release_monitoring_id: 85461
-    local_directory_path: src/third_party/wiredtiger/test/3rdparty/python-subunit-0.0.16
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/python-subunit-1.4.4
     is_test_only: true
     team_owner: "Storage Engines"
 
@@ -404,7 +412,7 @@ components:
     homepage_url: https://launchpad.net/testtools
     open_hub_url: https://www.openhub.net/p/python-testtools
     release_monitoring_id: 4047
-    local_directory_path: src/third_party/wiredtiger/test/3rdparty/testtools-0.9.34
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/testtools-2.7.1
     is_test_only: true
     team_owner: "Storage Engines"
 

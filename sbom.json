@@ -1,10 +1,10 @@
 {
     "bomFormat": "CycloneDX",
     "specVersion": "1.5",
-    "serialNumber": "urn:uuid:6e50768b-f427-4b2f-b024-081b29d2d24f",
+    "serialNumber": "urn:uuid:35d8a8af-0b83-434f-92de-2ae7afcfa3c8",
     "version": 1,
     "metadata": {
-        "timestamp": "2024-05-09T21:13:30Z",
+        "timestamp": "2024-05-21T19:31:00Z",
         "authors": [
             {
                 "name": "MongoDB Inc."
@@ -346,7 +346,7 @@
             "evidence": {
                 "occurrences": [
                     {
-                        "location": "src/third_party/wiredtiger/test/3rdparty/discover-0.4.0"
+                        "location": "src/third_party/wiredtiger/test/3rdparty/discover-0.4.0-locally-modified"
                     }
                 ]
             },
@@ -1161,6 +1161,37 @@
         },
         {
             "supplier": {
+                "name": "Organization: pypi"
+            },
+            "name": "pyiso8601",
+            "version": "2.1.0",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ],
+            "purl": "pkg:pypi/iso8601@2.1.0",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Storage Engines"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "774b2491-ca76-470e-81c6-344af3a477b1",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/wiredtiger/test/3rdparty/iso8601-2.1.0"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
                 "name": "Organization: github"
             },
             "name": "RoaringBitmap/CRoaring",
@@ -1319,15 +1350,20 @@
                 "name": "Organization: github"
             },
             "name": "subunit",
-            "version": "0.0.16",
+            "version": "1.4.4",
             "licenses": [
+                {
+                    "license": {
+                        "id": "BSD-3-Clause"
+                    }
+                },
                 {
                     "license": {
                         "id": "Apache-2.0"
                     }
                 }
             ],
-            "purl": "pkg:github/testing-cabal/subunit@0.0.16",
+            "purl": "pkg:github/testing-cabal/subunit@1.4.4",
             "properties": [
                 {
                     "name": "internal:team_responsible",
@@ -1335,11 +1371,11 @@
                 }
             ],
             "type": "library",
-            "bom-ref": "2bb8894c-b723-4658-a0e2-c87cd837f659",
+            "bom-ref": "13db39c8-b15b-42d4-af5c-6221d7deab97",
             "evidence": {
                 "occurrences": [
                     {
-                        "location": "src/third_party/wiredtiger/test/3rdparty/python-subunit-0.0.16"
+                        "location": "src/third_party/wiredtiger/test/3rdparty/python-subunit-1.4.4"
                     }
                 ]
             },
@@ -1448,7 +1484,7 @@
                 "name": "Organization: github"
             },
             "name": "testtools",
-            "version": "0.9.34",
+            "version": "2.7.1",
             "licenses": [
                 {
                     "license": {
@@ -1456,7 +1492,7 @@
                     }
                 }
             ],
-            "purl": "pkg:github/testing-cabal/testtools@testtools-0.9.34",
+            "purl": "pkg:github/testing-cabal/testtools@2.7.1",
             "properties": [
                 {
                     "name": "internal:team_responsible",
@@ -1464,11 +1500,11 @@
                 }
             ],
             "type": "library",
-            "bom-ref": "c003d1c0-3828-4cee-8c92-dd75841cd720",
+            "bom-ref": "ac34fe8e-c549-4f64-a38f-948184c1dd52",
             "evidence": {
                 "occurrences": [
                     {
-                        "location": "src/third_party/wiredtiger/test/3rdparty/testtools-0.9.34"
+                        "location": "src/third_party/wiredtiger/test/3rdparty/testtools-2.7.1"
                     }
                 ]
             },
@@ -1607,20 +1643,22 @@
                 "f414e718-ed18-48a7-9077-61bcd8a096b2",
                 "41b1be32-40bb-4146-bc7c-bf007030fade",
                 "7e3b6aea-b1bd-4d0d-bac1-43422dee6a85",
+                "93ceff21-7764-48e7-8b95-e6363b8bdfb4",
                 "dbd5d755-0a6b-43d8-8718-1e67df4d0e73",
                 "975c38b7-7b90-428c-8c36-7eeac617e63b",
                 "ca413c3f-d9bc-44c0-b14b-b4e6cc5994cf",
                 "5f66f96c-5fb9-4434-b04c-b71ef625d128",
+                "774b2491-ca76-470e-81c6-344af3a477b1",
                 "3dda5e60-a20a-4203-82c8-fb39417666e9",
                 "c3ed2e40-6a4a-46b6-b421-65f8899ce320",
                 "144a085e-96cd-4061-acf6-262fd1b69abe",
                 "a6900036-9f89-42d0-bf45-3262a6edfa69",
                 "1d32730a-1e5b-475d-9923-f8e28d57152e",
-                "2bb8894c-b723-4658-a0e2-c87cd837f659",
+                "13db39c8-b15b-42d4-af5c-6221d7deab97",
                 "255fbc5e-3df9-4b0a-9974-a470d3240354",
                 "62226114-9f89-4fa3-95af-635beea6474e",
                 "f59e01b6-443b-41a5-be3c-41e0cc1d279f",
-                "c003d1c0-3828-4cee-8c92-dd75841cd720",
+                "ac34fe8e-c549-4f64-a38f-948184c1dd52",
                 "f10406eb-8a93-4695-91e9-cee00dc8237a",
                 "eb888ce9-e2b6-47f7-980e-b65e7d68e92a",
                 "bc384adb-9013-4a4f-a248-d1d0f240aec2"
