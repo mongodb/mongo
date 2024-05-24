@@ -80,6 +80,7 @@ struct AggCmdComponents : public SpecificKeyComponents {
         bool batchSize : 1 = false;
         bool bypassDocumentValidation : 1 = false;
         bool explain : 1 = false;
+        bool passthroughToShard : 1 = false;
     } _hasField;
 };
 

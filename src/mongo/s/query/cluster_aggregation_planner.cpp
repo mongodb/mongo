@@ -970,6 +970,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
     if (explain) {
         // If this was an explain, then we get back an explain result object rather than a cursor.
         result = response.swResponse.getValue().data;
+        collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
     } else {
         result = uassertStatusOK(storePossibleCursor(
             opCtx,
