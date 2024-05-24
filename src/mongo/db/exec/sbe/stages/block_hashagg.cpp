@@ -1145,7 +1145,9 @@ value::ValueBlock* BlockHashAggStage::makeMonoBlock(value::TypeTags tag, value::
     _monoBlocks.emplace_back();
     boost::optional<value::MonoBlock>& monoBlockOpt = _monoBlocks.back();
 
-    monoBlockOpt.emplace(_currentBlockSize, tag, val);
+    // MonoBlock wants ownership of the value.
+    auto [cpTag, cpVal] = value::copyValue(tag, val);
+    monoBlockOpt.emplace(_currentBlockSize, cpTag, cpVal);
 
     return &*monoBlockOpt;
 }

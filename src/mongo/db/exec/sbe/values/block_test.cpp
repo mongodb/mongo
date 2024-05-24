@@ -868,7 +868,6 @@ TEST_F(ValueBlockTest, MonoBlockMap) {
 
     {
         auto [strTag, strVal] = value::makeNewString("not a small string");
-        value::ValueGuard strGuard(strTag, strVal);
         auto block = std::make_unique<value::MonoBlock>(4, strTag, strVal);
 
         auto outBlock1 = block->map(testOp1);
@@ -1004,7 +1003,6 @@ TEST_F(ValueBlockTest, TestTokenize) {
 TEST_F(ValueBlockTest, MonoBlockTokenize) {
     {
         auto [strTag, strVal] = value::makeNewString("not a small string"_sd);
-        value::ValueGuard strGuard(strTag, strVal);
         auto block = std::make_unique<value::MonoBlock>(4, strTag, strVal);
 
         auto [outTokens, outIdxs] = block->tokenize();

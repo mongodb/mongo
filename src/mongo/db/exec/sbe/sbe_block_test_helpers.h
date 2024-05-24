@@ -83,7 +83,8 @@ static std::vector<std::pair<value::TypeTags, value::Value>> makeInt32s(
 }
 
 static CopyableValueBlock makeMonoBlock(std::pair<value::TypeTags, value::Value> tv, size_t ct) {
-    return CopyableValueBlock(std::make_unique<value::MonoBlock>(ct, tv.first, tv.second));
+    auto [tag, val] = value::copyValue(tv.first, tv.second);
+    return CopyableValueBlock(std::make_unique<value::MonoBlock>(ct, tag, val));
 }
 
 static CopyableValueBlock makeInt32sBlock(const std::vector<int32_t>& vals) {

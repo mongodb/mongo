@@ -2316,7 +2316,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockNewFil
             countTag == value::TypeTags::NumberInt32);
 
     // Take ownership of the value, we are transferring it to the block.
-    auto [leftOwned, leftTag, leftVal] = moveFromStack(0);
+    auto [leftTag, leftVal] = moveOwnedFromStack(0);
     auto blockOut =
         std::make_unique<value::MonoBlock>(value::bitcastTo<int32_t>(countVal), leftTag, leftVal);
     return {true,

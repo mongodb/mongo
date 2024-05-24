@@ -97,8 +97,9 @@ std::unique_ptr<ValueBlock> ValueBlock::mapMonotonicFastPath(const ColumnOp& op)
 
             auto [cmpTag, cmpVal] = value::compareValue(lbResTag, lbResVal, ubResTag, ubResVal);
             if (cmpTag == value::TypeTags::NumberInt32 && cmpVal == 0) {
-                // The MonoBlock constructor will create it's own copy of [lsResTag, lbResVal].
-                return std::make_unique<MonoBlock>(count(), lbResTag, lbResVal);
+                // The MonoBlock constructor assumes ownership of lbResVal
+                auto [resTag, resVal] = copyValue(lbResTag, lbResVal);
+                return std::make_unique<MonoBlock>(count(), resTag, resVal);
             }
         }
     }
@@ -140,6 +141,7 @@ std::unique_ptr<ValueBlock> buildBlockFromStorage(std::vector<value::TypeTags> t
 
         if (std::all_of(
                 vals.begin(), vals.end(), [&](value::Value value) { return value == vals[0]; })) {
+            // We know that the value is shallow since the tag is validHomogeneousType.
             return std::make_unique<MonoBlock>(vals.size(), tags[0], vals[0]);
         }
 
@@ -383,12 +385,11 @@ std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::fillEmpty(TypeTags fil
         return nullptr;
     } else if (fillTag == TypeTag) {
         // If _vals.size() is 0, then we know all values in the block (if there are any to begin
-        // with) must be Nothings.
+        // with) must be Nothings. We also know that fillTag must be shallow since HomogeneousBlocks
+        // can only store shallow types.
         if (_vals.size() == 0) {
             return std::make_unique<MonoBlock>(_presentBitset.size(), fillTag, fillVal);
         }
-        // We also know that fillTag must be shallow since HomogeneousBlocks can only store
-        // shallow types.
         size_t valsIndex = 0;
         std::vector<Value> vals(_presentBitset.size());
         for (size_t i = 0; i < _presentBitset.size(); ++i) {
@@ -435,7 +436,8 @@ std::unique_ptr<ValueBlock> MonoBlock::fillType(uint32_t typeMask,
                                                 TypeTags fillTag,
                                                 Value fillVal) {
     if (static_cast<bool>(getBSONTypeMask(_tag) & typeMask)) {
-        return std::make_unique<MonoBlock>(_count, fillTag, fillVal);
+        auto [tag, val] = copyValue(fillTag, fillVal);
+        return std::make_unique<MonoBlock>(_count, tag, val);
     }
     return nullptr;
 }
@@ -445,11 +447,11 @@ std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::fillType(uint32_t type
                                                                    TypeTags fillTag,
                                                                    Value fillVal) {
     if (static_cast<bool>(getBSONTypeMask(TypeTag) & typeMask)) {
+        // We know that fillTag must be shallow since HomogeneousBlocks can only store
+        // shallow types.
         if (*tryDense() || fillTag == value::TypeTags::Nothing) {
             return std::make_unique<MonoBlock>(count(), fillTag, fillVal);
         } else if (fillTag == TypeTag) {
-            // We also know that fillTag must be shallow since HomogeneousBlocks can only store
-            // shallow types.
             std::vector<Value> vals(_vals.size(), fillVal);
             return std::make_unique<HomogeneousBlock<T, TypeTag>>(std::move(vals), _presentBitset);
         } else {
