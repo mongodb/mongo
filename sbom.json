@@ -1001,6 +1001,37 @@
         },
         {
             "supplier": {
+                "name": "Organization: npmjs"
+            },
+            "name": "node",
+            "version": "22.1.0",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "ISC"
+                    }
+                }
+            ],
+            "purl": "pkg:npm/node@22.1.0",
+            "properties": [
+                {
+                    "name": "internal:team_responsible",
+                    "value": "Workload Scheduling"
+                }
+            ],
+            "type": "library",
+            "bom-ref": "93ceff21-7764-48e7-8b95-e6363b8bdfb4",
+            "evidence": {
+                "occurrences": [
+                    {
+                        "location": "src/third_party/node"
+                    }
+                ]
+            },
+            "scope": "excluded"
+        },
+        {
+            "supplier": {
                 "name": "Organization: pypi"
             },
             "name": "ocspbuilder",
