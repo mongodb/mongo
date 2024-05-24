@@ -655,6 +655,8 @@ last-continuous:
     ticket: SERVER-87961
   - test_file: jstests/core/timeseries/timeseries_lastpoint.js
     ticket: SERVER-87961
+  - test_file: jstests/core/index/index_count_scan.js
+    ticket: SERVER-90461
   suites: null
 last-lts:
   all:
