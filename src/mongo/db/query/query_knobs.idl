@@ -1664,6 +1664,15 @@ server_parameters:
     default: false
     redact: false
 
+  internalQueryEnableAggressiveSpillsInGroup:
+    description: "Enable spilling in $group every time there is a duplicate id to stress merge logic."
+    set_at: [ startup ]
+    cpp_varname: "internalQueryEnableAggressiveSpillsInGroup"
+    cpp_vartype: bool
+    default: false
+    test_only: true
+    redact: false
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'
