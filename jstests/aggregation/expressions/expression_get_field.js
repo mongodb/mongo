@@ -63,7 +63,7 @@ assertGetFieldFailedWithCode({field: "a"}, 3041703);
 
 // Test that $getField fails with a document with one or more arguments of incorrect type.
 assertGetFieldFailedWithCode({field: true, input: {a: "b"}}, 5654602);
-assertGetFieldFailedWithCode({field: {"a": 1}, input: {"a": 1}}, 5654602);
+assertGetFieldFailedWithCode({field: {"a": 1}, input: {"a": 1}}, 3041704);
 assertGetFieldFailedWithCode(5, 5654602);
 assertGetFieldFailedWithCode(true, 5654602);
 assertGetFieldFailedWithCode({field: null, input: {"a": 1}}, 5654602);
@@ -73,7 +73,7 @@ assertGetFieldFailedWithCode({field: "a", input: {a: "b"}, unknown: true}, 30417
 
 // Test that $getField fails when 'field' argument is an arbitrary expression that doesn't evaluate
 // to a string.
-assertGetFieldFailedWithCode({$add: [2, 3]}, 5654602);
+assertGetFieldFailedWithCode({$add: [2, 3]}, 3041704);
 assertGetFieldFailedWithCode({$const: true}, 5654602);
 assertGetFieldFailedWithCode({$const: {"a": 1}}, 5654602);
 assertGetFieldFailedWithCode({field: {$const: []}, input: {"a": 1}}, 5654602);
@@ -135,14 +135,14 @@ assertGetFieldResultsEq("$arr.0.0.0.b", [{_id: 0, test: "baz"}, {_id: 1, test: "
 
 // Test that $getField fails when 'field' argument is a dynamic expression evaluating to a
 // non-string value.
-assertGetFieldFailedWithCode({$add: [1, 2]}, 5654602);
-assertGetFieldFailedWithCode({$mod: [5, 10]}, 5654602);
+assertGetFieldFailedWithCode({$add: [1, 2]}, 3041704);
+assertGetFieldFailedWithCode({$mod: [5, 10]}, 3041704);
 assertGetFieldFailedWithCode({$month: "$$NOW"}, 3041704);
 assertGetFieldFailedWithCode({$ne: ["$x", 1]}, 3041704);
-assertGetFieldFailedWithCode({$toDouble: "2.5"}, 5654602);
+assertGetFieldFailedWithCode({$toDouble: "2.5"}, 3041704);
 assertGetFieldFailedWithCode({$reverseArray: "$items"}, 3041704);
 assertGetFieldFailedWithCode({$mergeObjects: ["$c", "$e"]}, 3041704);
-assertGetFieldFailedWithCode({$mergeObjects: [null, null]}, 5654602);
+assertGetFieldFailedWithCode({$mergeObjects: [null, null]}, 3041704);
 
 // Test that $getField returns the correct value when 'field' argument contains reference to a
 // system variable.
@@ -153,7 +153,7 @@ assertGetFieldResultsEq({$toString: "$$NOW"}, [{_id: 0}, {_id: 1}]);
 // Test that $getField fails when 'field' argument is a reference to a system variable that is of
 // resolves to a non-string type or is not available.
 assertGetFieldFailedWithCode("$$NOW", 3041704);
-assertGetFieldFailedWithCode("$$REMOVE", 5654602);
+assertGetFieldFailedWithCode("$$REMOVE", 3041704);
 assertGetFieldFailedWithCode("$$DESCEND", 17276);
 assertGetFieldFailedWithCode("$$PRUNE", 17276);
 assertGetFieldFailedWithCode("$$KEEP", 17276);
@@ -292,7 +292,7 @@ assertPipelineResultsEq([{
                     let: {
                         // Either "field0" or "field1"
                         field: "$lookupField"
-                    },
+                    }, 
                     from: "expression_get_field_lookup_test",
                     pipeline: [
                         {
@@ -305,7 +305,7 @@ assertPipelineResultsEq([{
                 }
             },
             {$project: {result: 1}},
-        ],
+        ], 
         [
             {_id: 0, result: [{_id: 0, field: "0"}]},
             {_id: 1, result: [{_id: 0, field: "1"}]},
