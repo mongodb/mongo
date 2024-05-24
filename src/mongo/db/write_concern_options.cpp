@@ -70,8 +70,13 @@ constexpr StringData kWElectionIdFieldName = "wElectionId"_sd;
 
 }  // namespace
 
-constexpr Milliseconds WriteConcernOptions::kNoTimeout;
-constexpr Milliseconds WriteConcernOptions::kNoWaiting;
+constexpr Milliseconds WriteConcernOptions::Timeout::kNoTimeoutVal;
+constexpr Milliseconds WriteConcernOptions::Timeout::kNoWaitingVal;
+
+constexpr WriteConcernOptions::Timeout WriteConcernOptions::kNoTimeout(
+    WriteConcernOptions::Timeout::kNoTimeoutVal);
+constexpr WriteConcernOptions::Timeout WriteConcernOptions::kNoWaiting(
+    WriteConcernOptions::Timeout::kNoWaitingVal);
 
 constexpr StringData WriteConcernOptions::kWriteConcernField;
 const char WriteConcernOptions::kMajority[] = "majority";
@@ -96,7 +101,7 @@ constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutUserCommand;
 WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout)
     : w{numNodes},
       syncMode{sync},
-      wTimeout(durationCount<Milliseconds>(timeout)),
+      wTimeout(timeout),
       usedDefaultConstructedWC{false},
       notExplicitWValue{false} {}
 
@@ -105,7 +110,21 @@ WriteConcernOptions::WriteConcernOptions(const std::string& mode,
                                          Milliseconds timeout)
     : w{mode},
       syncMode{sync},
-      wTimeout(durationCount<Milliseconds>(timeout)),
+      wTimeout(timeout),
+      usedDefaultConstructedWC{false},
+      notExplicitWValue{false} {}
+
+WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, Timeout timeout)
+    : w{numNodes},
+      syncMode{sync},
+      wTimeout(timeout),
+      usedDefaultConstructedWC{false},
+      notExplicitWValue{false} {}
+
+WriteConcernOptions::WriteConcernOptions(const std::string& mode, SyncMode sync, Timeout timeout)
+    : w{mode},
+      syncMode{sync},
+      wTimeout(timeout),
       usedDefaultConstructedWC{false},
       notExplicitWValue{false} {}
 
@@ -198,7 +217,7 @@ WriteConcernIdl WriteConcernOptions::toWriteConcernIdl() const {
         idl.setJ(false);
     }
 
-    idl.setWtimeout(wTimeout.count());
+    wTimeout.addToIDL(&idl);
     idl.setSource(_provenance.getSource());
 
     return idl;

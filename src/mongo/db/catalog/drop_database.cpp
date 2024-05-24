@@ -430,8 +430,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     // The user-supplied wTimeout should be used when waiting for majority write concern.
     const auto& userWriteConcern = opCtx->getWriteConcern();
     const auto wTimeout = !userWriteConcern.isImplicitDefaultWriteConcern()
-        ? Milliseconds{userWriteConcern.wTimeout}
-        : duration_cast<Milliseconds>(Minutes(10));
+        ? userWriteConcern.wTimeout
+        : WriteConcernOptions::Timeout(duration_cast<Milliseconds>(Minutes(10)));
 
     // This is used to wait for the collection drops to replicate to a majority of the replica
     // set. Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling

@@ -2365,8 +2365,10 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
         if (writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
             return Date_t::max();
         }
-        return clockSource->now() + clockSource->getPrecision() +
-            Milliseconds{writeConcern.wTimeout};
+        if (writeConcern.wTimeout == WriteConcernOptions::kNoWaiting) {
+            return clockSource->now();
+        }
+        return clockSource->now() + clockSource->getPrecision() + writeConcern.wTimeout.duration();
     }();
 
     const auto opCtxDeadline = opCtx->getDeadline();
