@@ -42,6 +42,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/signal_handlers_synchronous.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -127,16 +128,24 @@ CommonAsioSession::CommonAsioSession(
     std::shared_ptr<const SSLConnectionContext> transientSSLContext)
     : _socket(std::move(socket)), _tl(tl), _isIngressSession(isIngressSession) {
     auto sev = kDebugBuild ? logv2::LogSeverity::Info() : logv2::LogSeverity::Debug(3);
-    auto localEndpoint = getLocalEndpoint(_socket, "AsioSession get local endpoint", sev);
-    auto family = endpointToSockAddr(localEndpoint).getType();
-    if (family == AF_INET || family == AF_INET6) {
-        asioTransportLayerSessionPauseBeforeSetSocketOption.pauseWhileSet();
-        setSocketOption(_socket, NoDelayOption(true), "session no delay", sev);
-        setSocketOption(_socket, KeepAliveOption(true), "session keep alive", sev);
-        setSocketKeepAliveParams(_socket.native_handle(), sev);
-    }
+    try {
+        auto localEndpoint = getLocalEndpoint(_socket, "AsioSession get local endpoint", sev);
+        auto family = endpointToSockAddr(localEndpoint).getType();
+        if (family == AF_INET || family == AF_INET6) {
+            asioTransportLayerSessionPauseBeforeSetSocketOption.pauseWhileSet();
+            setSocketOption(_socket, NoDelayOption(true), "session no delay", sev);
+            setSocketOption(_socket, KeepAliveOption(true), "session keep alive", sev);
+            setSocketKeepAliveParams(_socket.native_handle(), sev);
+        }
 
-    _localAddr = endpointToSockAddr(localEndpoint);
+        _localAddr = endpointToSockAddr(localEndpoint);
+    } catch (...) {
+        LOGV2_DEBUG(307471,
+                    1,
+                    "Exception in CommonAsioSession constructor",
+                    "error"_attr = describeActiveException());
+        throw;
+    }
 
     if (endpoint == Endpoint()) {
         // Inbound connection, query socket for remote.
@@ -148,13 +157,29 @@ CommonAsioSession::CommonAsioSession(
         _remoteAddr = endpointToSockAddr(endpoint);
     }
 
-    _local = HostAndPort(_localAddr.toString(true));
-    if (tl->loadBalancerPort()) {
-        _isFromLoadBalancer = _local.port() == *tl->loadBalancerPort();
+    try {
+        _local = HostAndPort(_localAddr.toString(true));
+        if (tl->loadBalancerPort()) {
+            _isFromLoadBalancer = _local.port() == *tl->loadBalancerPort();
+        }
+    } catch (...) {
+        LOGV2_DEBUG(307472,
+                    1,
+                    "Exception in CommonAsioSession constructor",
+                    "error"_attr = describeActiveException());
+        throw;
     }
 
-    _remote = HostAndPort(_remoteAddr.toString(true));
-    _restrictionEnvironment = RestrictionEnvironment(_remoteAddr, _localAddr);
+    try {
+        _remote = HostAndPort(_remoteAddr.toString(true));
+        _restrictionEnvironment = RestrictionEnvironment(_remoteAddr, _localAddr);
+    } catch (...) {
+        LOGV2_DEBUG(307473,
+                    1,
+                    "Exception in CommonAsioSession constructor",
+                    "error"_attr = describeActiveException());
+        throw;
+    }
 #ifdef MONGO_CONFIG_SSL
     _sslContext = transientSSLContext ? transientSSLContext : tl->sslContext();
     if (transientSSLContext) {
