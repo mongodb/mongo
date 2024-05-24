@@ -211,8 +211,10 @@ returnedDoc = coll.findAndModify({
         nowFAMUpsert: {$exists: true},
         ctimeFAMUpsert: {$exists: true},
         $expr: {
-            $and:
-                [{$lt: ["$nowFAMUpsert", "$$NOW"]}, {$gt: ["$$CLUSTER_TIME", "$ctimeFAMUpsert"]}]
+            $and: [
+                {$lte: ["$nowFAMUpsert", {$max: [returnedDoc.nowFAMUpsert, "$$NOW"]}]},
+                {$gte: ["$$CLUSTER_TIME", "$ctimeFAMUpsert"]}
+            ]
         }
     },
     sort: {_id: 1},
