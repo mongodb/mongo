@@ -43,6 +43,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -73,34 +74,53 @@ OplogCapMaintainerThread* OplogCapMaintainerThread::get(ServiceContext* serviceC
     return &getMaintainerThread(serviceCtx);
 }
 
-bool OplogCapMaintainerThread::_deleteExcessDocuments() {
-    if (!getGlobalServiceContext()->getStorageEngine()) {
+bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
+    if (!opCtx->getServiceContext()->getStorageEngine()) {
         LOGV2_DEBUG(22240, 2, "OplogCapMaintainerThread: no global storage engine yet");
         return false;
     }
-
-    const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
 
     // Maintaining the Oplog cap is crucial to the stability of the server so that we don't let the
     // oplog grow unbounded. We mark the operation as having immediate priority to skip ticket
     // acquisition and flow control.
     ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
-        opCtx.get(), AdmissionContext::Priority::kExempt);
+        opCtx, AdmissionContext::Priority::kExempt);
 
     try {
         // A Global IX lock should be good enough to protect the oplog truncation from
-        // interruptions such as restartCatalog. Database lock or collection lock is not
+        // interruptions such as replication rollback. Database lock or collection lock is not
         // needed. This improves concurrency if oplog truncation takes long time.
-        Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
-        auto rs = LocalOplogInfo::get(opCtx.get())->getRecordStore();
-        if (!rs) {
-            LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
+        std::shared_ptr<CollectionTruncateMarkers> oplogTruncateMarkers;
+        {
+            Lock::GlobalLock globalLk(opCtx, MODE_IX);
+            auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+            if (!rs) {
+                LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
+                return false;
+            }
+
+            // Create another reference to the oplog truncate markers while holding a lock on
+            // the collection to prevent it from being destructed.
+            oplogTruncateMarkers = rs->getCollectionTruncateMarkers();
+            invariant(oplogTruncateMarkers);
+        }
+
+        if (!oplogTruncateMarkers->awaitHasExcessMarkersOrDead(opCtx)) {
+            // Oplog went away or we timed out waiting for oplog space to reclaim.
             return false;
         }
-        if (!rs->yieldAndAwaitOplogDeletionRequest(opCtx.get())) {
-            return false;  // Oplog went away.
+
+        {
+            // Oplog state could have changed while yielding. Reacquire global lock
+            // and refresh oplog state to ensure we have a valid pointer.
+            Lock::GlobalLock globalLk(opCtx, MODE_IX);
+            auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+            if (!rs) {
+                LOGV2_DEBUG(9064300, 2, "oplog collection does not exist");
+                return false;
+            }
+            rs->reclaimOplog(opCtx);
         }
-        rs->reclaimOplog(opCtx.get());
     } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& e) {
         LOGV2_DEBUG(5929700,
                     1,
@@ -109,6 +129,10 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
                     "error"_attr = e.toStatus());
     } catch (const DBException& ex) {
         if (!opCtx->checkForInterruptNoAssert().isOK()) {
+            LOGV2_DEBUG(9064301,
+                        1,
+                        "Oplog cap maintainer thread was interrupted, but can safely continue",
+                        "error"_attr = ex);
             return false;
         }
 
@@ -131,12 +155,28 @@ void OplogCapMaintainerThread::run() {
     }
 
     while (!globalInShutdownDeprecated()) {
+        auto opCtx = tc->makeOperationContext();
+
         if (MONGO_unlikely(hangOplogCapMaintainerThread.shouldFail())) {
             LOGV2(5095500, "Hanging the oplog cap maintainer thread due to fail point");
-            hangOplogCapMaintainerThread.pauseWhileSet();
+            try {
+                hangOplogCapMaintainerThread.pauseWhileSet(opCtx.get());
+            } catch (DBException& ex) {
+                auto interruptStatus = opCtx->checkForInterruptNoAssert();
+                if (!interruptStatus.isOK()) {
+                    LOGV2(9064302,
+                          "Stop hanging the oplog cap maintainer thread due to interrupted fail "
+                          "point wait",
+                          "ex"_attr = ex,
+                          "interruptStatus"_attr = interruptStatus,
+                          "shutdown"_attr = globalInShutdownDeprecated());
+                    continue;
+                }
+                throw;
+            }
         }
 
-        if (!_deleteExcessDocuments() && !globalInShutdownDeprecated()) {
+        if (!_deleteExcessDocuments(opCtx.get()) && !globalInShutdownDeprecated()) {
             sleepmillis(1000);  // Back off in case there were problems deleting.
         }
     }

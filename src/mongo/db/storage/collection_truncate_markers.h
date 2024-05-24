@@ -121,6 +121,8 @@ public:
           _currentBytes(leftoverRecordsBytes),
           _markers(std::move(markers)) {}
 
+    virtual ~CollectionTruncateMarkers() = default;
+
     boost::optional<Marker> peekOldestMarkerIfNeeded(OperationContext* opCtx) const;
 
     void popOldestMarker();
@@ -133,6 +135,19 @@ public:
                                                         const RecordId& highestInsertedRecordId,
                                                         Date_t wallTime,
                                                         int64_t countInserted);
+
+    /**
+     * Waits for expired markers. See _hasExcessMarkers().
+     * Returns true if expired markers are present.
+     * Otherwise, returns false. This could be due to reaching an implementation defined
+     * deadline for the wait, or if we are shutting down this CollectionTruncateMarkers
+     * instance.
+     * This operation may throw an exception if interrupted.
+     * Storage engines supporting oplog truncate markers must implement this function.
+     */
+    virtual bool awaitHasExcessMarkersOrDead(OperationContext* opCtx) {
+        MONGO_UNREACHABLE;
+    }
 
     // The method used for creating the initial set of markers.
     enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling };
