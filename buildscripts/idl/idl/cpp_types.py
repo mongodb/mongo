@@ -124,6 +124,12 @@ class CppTypeBase(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def has_storage_type_setter(self):
+        # type: () -> bool
+        """Return true if a setter with a parameter of the storage type should be generated."""
+        pass
+
+    @abstractmethod
     def get_getter_body(self, member_name):
         # type: (str) -> str
         """Get the body of the getter."""
@@ -135,6 +141,15 @@ class CppTypeBase(metaclass=ABCMeta):
         """Get the body of the setter."""
         pass
 
+    def get_storage_type_setter_body(self, member_name, validator_method_name):
+        # type: (str, str) -> str
+        """Get the body of the setter that takes a parameter of the storage type."""
+        return common.template_args(
+            "${optionally_call_validator} ${member_name} = std::move(value);",
+            member_name=member_name,
+            optionally_call_validator=_optionally_make_call(validator_method_name, "value"),
+        )
+
     @abstractmethod
     def get_transform_to_getter_type(self, expression):
         # type: (str) -> Optional[str]
@@ -144,7 +159,7 @@ class CppTypeBase(metaclass=ABCMeta):
     @abstractmethod
     def get_transform_to_storage_type(self, expression):
         # type: (str) -> Optional[str]
-        """Get the expression to transform the input expression into the setter type."""
+        """Get the expression to transform the input expression into the storage type."""
         pass
 
 
@@ -168,6 +183,10 @@ class _CppTypeBasic(CppTypeBase):
         return not is_primitive_type(self.get_type_name()) and not self._field.type.is_enum
 
     def is_view_type(self):
+        # type: () -> bool
+        return False
+
+    def has_storage_type_setter(self):
         # type: () -> bool
         return False
 
@@ -217,6 +236,10 @@ class _CppTypeView(CppTypeBase):
         return False
 
     def is_view_type(self):
+        # type: () -> bool
+        return True
+
+    def has_storage_type_setter(self):
         # type: () -> bool
         return True
 
@@ -271,6 +294,10 @@ class _CppTypeVector(CppTypeBase):
         # type: () -> bool
         return True
 
+    def has_storage_type_setter(self):
+        # type: () -> bool
+        return False
+
     def get_getter_body(self, member_name):
         # type: (str) -> str
         return common.template_args('return ConstDataRange(${member_name});',
@@ -324,6 +351,10 @@ class _CppTypeDelegating(CppTypeBase):
         # type: () -> bool
         return self._base.is_view_type()
 
+    def has_storage_type_setter(self):
+        # type: () -> bool
+        return self._base.has_storage_type_setter()
+
     def get_getter_body(self, member_name):
         # type: (str) -> str
         return self._base.get_getter_body(member_name)
@@ -331,6 +362,10 @@ class _CppTypeDelegating(CppTypeBase):
     def get_setter_body(self, member_name, validator_method_name):
         # type: (str, str) -> str
         return self._base.get_setter_body(member_name, validator_method_name)
+
+    def get_storage_type_setter_body(self, member_name, validator_method_name):
+        # type: (str, str) -> Optional[str]
+        return self._base.get_storage_type_setter_body(member_name, validator_method_name)
 
     def get_transform_to_getter_type(self, expression):
         # type: (str) -> Optional[str]
@@ -413,7 +448,7 @@ class _CppTypeOptional(_CppTypeDelegating):
 
     def get_getter_body(self, member_name):
         # type: (str) -> str
-        base_expression = common.template_args("${member_name}.get()", member_name=member_name)
+        base_expression = common.template_args("*${member_name}", member_name=member_name)
 
         convert = self._base.get_transform_to_getter_type(base_expression)
         if convert:
@@ -435,12 +470,11 @@ class _CppTypeOptional(_CppTypeDelegating):
                                         member_name=member_name)
         return common.template_args('return ${member_name};', member_name=member_name)
 
-    def get_setter_body(self, member_name, validator_method_name):
-        # type: (str, str) -> str
-        convert = self._base.get_transform_to_storage_type("value.get()")
+    def _get_setter_body(self, member_name, validator_method_name, convert):
+        # type: (str, str, str) -> str
         if convert or validator_method_name:
             if not convert:
-                convert = "value.get()"
+                convert = "*value"
             return common.template_args(
                 textwrap.dedent("""\
                             if (value.is_initialized()) {
@@ -453,6 +487,16 @@ class _CppTypeOptional(_CppTypeDelegating):
                             """), member_name=member_name, convert=convert,
                 optionally_call_validator=_optionally_make_call(validator_method_name, '_tmpValue'))
         return self._base.get_setter_body(member_name, validator_method_name)
+
+    def get_setter_body(self, member_name, validator_method_name):
+        # type: (str, str) -> str
+        convert = self._base.get_transform_to_storage_type("(*value)")
+        return self._get_setter_body(member_name, validator_method_name, convert)
+
+    def get_storage_type_setter_body(self, member_name, validator_method_name):
+        # type: (str, str) -> str
+        convert = "std::move(*value)"
+        return self._get_setter_body(member_name, validator_method_name, convert)
 
 
 def get_cpp_type_from_cpp_type_name(field, cpp_type_name, array):

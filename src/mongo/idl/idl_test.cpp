@@ -1569,6 +1569,441 @@ TEST(IDLFieldTests, TestOptionalFieldsWithNullAndUndefined) {
     TestWeakType<UndefinedLabeler>(BSONUndefined);
 }
 
+// Types used to test that (1) we can call the setter for any type that implicitly converts
+// to the storage type (for types with storage type setters) and (2) that the implicit
+// conversion to the storage type is used rather than the implicit conversion to the other
+// setter overload's type.
+struct ImplicitlyConvertsToString {
+    operator std::string() const {
+        return "ImplicitlyConvertsToString";
+    }
+    operator StringData() const {
+        ASSERT(false) << "Conversion to StringData should not be used.";
+        MONGO_UNREACHABLE;
+    }
+};
+
+struct ImplicitlyConvertsToOptionalString {
+    operator boost::optional<std::string>() const {
+        return boost::optional<std::string>{"ImplicitlyConvertsToOptionalString"};
+    }
+    operator boost::optional<StringData>() const {
+        ASSERT(false) << "Conversion to optional<StringData> should not be used.";
+        MONGO_UNREACHABLE;
+    }
+};
+
+struct ImplicitlyConvertsToVectorString {
+    operator std::vector<std::string>() const {
+        return {"ImplicitlyConvertsToVectorString"};
+    }
+    operator std::vector<StringData>() const {
+        ASSERT(false) << "Conversion to vector<StringData> should not be used.";
+        MONGO_UNREACHABLE;
+    }
+};
+
+struct ImplicitlyConvertsToOptionalVectorString {
+    operator boost::optional<std::vector<std::string>>() const {
+        return boost::optional<std::vector<std::string>>(
+            {"ImplicitlyConvertsToOptionalVectorString"});
+    }
+    operator boost::optional<std::vector<StringData>>() const {
+        ASSERT(false) << "Conversion to optional<vector<StringData>> should not be used.";
+        MONGO_UNREACHABLE;
+    }
+};
+
+template <typename T>
+T makeSetterOverloadTestStruct() {
+    IDLParserContext ctxt("root");
+    using StrArr = std::vector<std::string>;
+    auto testDoc = BSONObjBuilder{}
+                       .append("fieldString", "foo")
+                       .append("fieldOptionalString", "bar")
+                       .append("fieldStringWithValidator", "xfoo")
+                       .append("fieldOptionalStringWithValidator", "xbar")
+                       .append("fieldArrayString", StrArr{"foo", "bar"})
+                       .append("fieldArrayStringWithValidator", StrArr{"FOO", "BAR"})
+                       .append("fieldOptionalArrayString", StrArr{"baz", "qux"})
+                       .append("fieldOptionalArrayStringWithValidator", StrArr{"BAZ", "QUX"})
+                       .obj();
+    return T::parse(ctxt, testDoc);
+}
+
+template <typename T>
+void testSetterOverloadsForStringField() {
+    {
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_EQ(testStruct.getFieldString(), "foo");
+    }
+
+    {
+        // Set from const char*.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldString("bar");
+        ASSERT_EQ(testStruct.getFieldString(), "bar");
+    }
+
+    {
+        // Set from StringData.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldString("baz"_sd);
+        ASSERT_EQ(testStruct.getFieldString(), "baz");
+    }
+
+    {
+        // Set from string.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldString(std::string{"qux"});
+        ASSERT_EQ(testStruct.getFieldString(), "qux");
+    }
+
+    {
+        // Set from implicit conversion.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldString(ImplicitlyConvertsToString{});
+        ASSERT_EQ(testStruct.getFieldString(), "ImplicitlyConvertsToString");
+    }
+}
+
+TEST(SetterOverloadTest, StringField) {
+    testSetterOverloadsForStringField<StructWithOverloadedSetters>();
+}
+
+TEST(SetterOverloadTest, InlineChainedStringField) {
+    testSetterOverloadsForStringField<StructWithInlineChainedOverloadedSetters>();
+}
+
+template <typename T>
+void testSetterOverloadsForStringFieldWithValidator() {
+    {
+        // The validator requires the string to start with "x"
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_EQ(testStruct.getFieldStringWithValidator(), "xfoo");
+    }
+
+    {
+        // Set from various types with validation failure.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_THROWS(testStruct.setFieldStringWithValidator("one"), AssertionException);
+        ASSERT_THROWS(testStruct.setFieldStringWithValidator("one"_sd), AssertionException);
+        ASSERT_THROWS(testStruct.setFieldStringWithValidator(std::string{"one"}),
+                      AssertionException);
+        ASSERT_THROWS(testStruct.setFieldStringWithValidator(ImplicitlyConvertsToString{}),
+                      AssertionException);
+    }
+
+    {
+        // Set from const char*.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldStringWithValidator("xone");
+        ASSERT_EQ(testStruct.getFieldStringWithValidator(), "xone");
+    }
+
+    {
+        // Set from StringData.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldStringWithValidator("xtwo"_sd);
+        ASSERT_EQ(testStruct.getFieldStringWithValidator(), "xtwo");
+    }
+
+    {
+        // Set from string.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldStringWithValidator(std::string{"xthree"});
+        ASSERT_EQ(testStruct.getFieldStringWithValidator(), "xthree");
+    }
+}
+
+TEST(SetterOverloadTest, StringFieldWithValidator) {
+    testSetterOverloadsForStringFieldWithValidator<StructWithOverloadedSetters>();
+}
+
+TEST(SetterOverloadTest, InlineChainedStringFieldWithValidator) {
+    testSetterOverloadsForStringFieldWithValidator<StructWithInlineChainedOverloadedSetters>();
+}
+
+template <typename T>
+void testSetterOverloadsForOptionalStringField() {
+    {
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_EQ(testStruct.getFieldOptionalString().value(), "bar");
+    }
+
+    // Note: const char[] is not convertible to boost::optional<string>, so a C-style string literal
+    // like "one" will not work as an argument.
+
+    {
+        // Set from boost::none.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalString(boost::none);
+        ASSERT_EQ(testStruct.getFieldOptionalString(), boost::none);
+    }
+
+    {
+        // Set from implicit conversion.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalString(ImplicitlyConvertsToOptionalString{});
+        ASSERT_EQ(*testStruct.getFieldOptionalString(), "ImplicitlyConvertsToOptionalString");
+    }
+
+    {
+        // Set from StringData.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalString("two"_sd);
+        ASSERT_EQ(*testStruct.getFieldOptionalString(), "two");
+    }
+
+    {
+        // Set from string.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalString(std::string{"three"});
+        ASSERT_EQ(*testStruct.getFieldOptionalString(), "three");
+    }
+}
+
+TEST(SetterOverloadTest, OptionalStringField) {
+    testSetterOverloadsForOptionalStringField<StructWithOverloadedSetters>();
+}
+
+TEST(SetterOverloadTest, InlineChainedOptionalStringField) {
+    testSetterOverloadsForOptionalStringField<StructWithInlineChainedOverloadedSetters>();
+}
+
+template <typename T>
+void testSetterOverloadsForOptionalStringFieldWithValidator() {
+    // The validator requires the string to start with "x"
+    {
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_EQ(testStruct.getFieldOptionalStringWithValidator().value(), "xbar");
+    }
+
+    // Note: const char[] is not convertible to boost::optional<string>, so a C-style string literal
+    // like "one" will not work as an argument.
+
+    {
+        // Set from various types with validation failure.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_THROWS(testStruct.setFieldOptionalStringWithValidator(std::string{"one"}),
+                      AssertionException);
+        ASSERT_THROWS(testStruct.setFieldOptionalStringWithValidator("one"_sd), AssertionException);
+        ASSERT_THROWS(
+            testStruct.setFieldOptionalStringWithValidator(ImplicitlyConvertsToOptionalString{}),
+            AssertionException);
+    }
+
+    {
+        // Set from boost::none.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalStringWithValidator(boost::none);
+        ASSERT_EQ(testStruct.getFieldOptionalStringWithValidator(), boost::none);
+    }
+
+    {
+        // Set from StringData.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalStringWithValidator("xtwo"_sd);
+        ASSERT_EQ(*testStruct.getFieldOptionalStringWithValidator(), "xtwo");
+    }
+
+    {
+        // Set from string.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalStringWithValidator(std::string{"xthree"});
+        ASSERT_EQ(*testStruct.getFieldOptionalStringWithValidator(), "xthree");
+    }
+}
+
+TEST(SetterOverloadTest, OptionalStringFieldWithValidator) {
+    testSetterOverloadsForOptionalStringFieldWithValidator<StructWithOverloadedSetters>();
+}
+
+TEST(SetterOverloadTest, InlineChainedOptionalStringFieldWithValidator) {
+    testSetterOverloadsForOptionalStringFieldWithValidator<
+        StructWithInlineChainedOverloadedSetters>();
+}
+
+template <typename T>
+void testSetterOverloadsForArrayOfStringField() {
+    {
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_EQ(testStruct.getFieldArrayString(), (std::vector{"foo"_sd, "bar"_sd}));
+    }
+
+    {
+        // Set from implicit conversion.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldArrayString(ImplicitlyConvertsToVectorString{});
+        ASSERT_EQ(testStruct.getFieldArrayString(),
+                  std::vector{"ImplicitlyConvertsToVectorString"_sd});
+    }
+
+    {
+        // Set from vector<string>.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldArrayString(std::vector<std::string>{"one"});
+        ASSERT_EQ(testStruct.getFieldArrayString(), std::vector{"one"_sd});
+    }
+
+    {
+        // Set from vector<StringData>.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldArrayString(std::vector{"two"_sd});
+        ASSERT_EQ(testStruct.getFieldArrayString(), std::vector{"two"_sd});
+    }
+}
+
+TEST(SetterOverloadTest, ArrayofStringField) {
+    testSetterOverloadsForArrayOfStringField<StructWithOverloadedSetters>();
+}
+
+TEST(SetterOverloadTest, InlineChainedArrayOfStringField) {
+    testSetterOverloadsForArrayOfStringField<StructWithInlineChainedOverloadedSetters>();
+}
+
+template <typename T>
+void testSetterOverloadsForArrayOfStringFieldWithValidator() {
+    // The validator requires the elements to be all caps.
+    {
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_EQ(testStruct.getFieldArrayStringWithValidator(), (std::vector{"FOO"_sd, "BAR"_sd}));
+    }
+
+    {
+        // Set from various types with validation failure.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_THROWS(
+            testStruct.setFieldArrayStringWithValidator(ImplicitlyConvertsToVectorString{}),
+            AssertionException);
+        ASSERT_THROWS(testStruct.setFieldArrayStringWithValidator(std::vector<std::string>{"one"}),
+                      AssertionException);
+        ASSERT_THROWS(testStruct.setFieldArrayStringWithValidator(std::vector{"one"_sd}),
+                      AssertionException);
+    }
+
+    {
+        // Set from vector<string>.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldArrayStringWithValidator(std::vector<std::string>{"ONE"});
+        ASSERT_EQ(testStruct.getFieldArrayStringWithValidator(), std::vector{"ONE"_sd});
+    }
+
+    {
+        // Set from vector<StringData>.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldArrayStringWithValidator(std::vector{"TWO"_sd});
+        ASSERT_EQ(testStruct.getFieldArrayStringWithValidator(), std::vector{"TWO"_sd});
+    }
+}
+
+TEST(SetterOverloadTest, ArrayofStringFieldWithValidator) {
+    testSetterOverloadsForArrayOfStringFieldWithValidator<StructWithOverloadedSetters>();
+}
+
+TEST(SetterOverloadTest, InlineChainedArrayOfStringFieldWithValidator) {
+    testSetterOverloadsForArrayOfStringFieldWithValidator<
+        StructWithInlineChainedOverloadedSetters>();
+}
+
+template <typename T>
+void testSetterOverloadsForOptionalArrayOfStringField() {
+    {
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_EQ(testStruct.getFieldOptionalArrayString(), (std::vector{"baz"_sd, "qux"_sd}));
+    }
+
+    {
+        // Set from boost::none.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalArrayString(boost::none);
+        ASSERT_EQ(testStruct.getFieldOptionalArrayString(), boost::none);
+    }
+
+    {
+        // Set from implicit conversion.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalArrayString(ImplicitlyConvertsToOptionalVectorString{});
+        ASSERT_EQ(*testStruct.getFieldOptionalArrayString(),
+                  std::vector{"ImplicitlyConvertsToOptionalVectorString"_sd});
+    }
+
+    {
+        // Set from vector<string>.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalArrayString(std::vector<std::string>{"one"});
+        ASSERT_EQ(*testStruct.getFieldOptionalArrayString(), std::vector{"one"_sd});
+    }
+
+    {
+        // Set from vector<StringData>.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalArrayString(std::vector{"two"_sd});
+        ASSERT_EQ(*testStruct.getFieldOptionalArrayString(), std::vector{"two"_sd});
+    }
+}
+
+TEST(SetterOverloadTest, OptionalArrayOfStringField) {
+    testSetterOverloadsForOptionalArrayOfStringField<StructWithOverloadedSetters>();
+}
+
+TEST(SetterOverloadTest, InlineChainedOptionalArrayOfStringField) {
+    testSetterOverloadsForOptionalArrayOfStringField<StructWithInlineChainedOverloadedSetters>();
+}
+
+template <typename T>
+void testSetterOverloadsForOptionalArrayOfStringFieldWithValidator() {
+    // The validator requires the elements to be all caps.
+    {
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_EQ(testStruct.getFieldOptionalArrayStringWithValidator(),
+                  (std::vector{"BAZ"_sd, "QUX"_sd}));
+    }
+
+    {
+        // Set from various types with validation failure.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        ASSERT_THROWS(testStruct.setFieldOptionalArrayStringWithValidator(
+                          ImplicitlyConvertsToOptionalVectorString{}),
+                      AssertionException);
+        ASSERT_THROWS(
+            testStruct.setFieldOptionalArrayStringWithValidator(std::vector<std::string>{"one"}),
+            AssertionException);
+        ASSERT_THROWS(testStruct.setFieldOptionalArrayStringWithValidator(std::vector{"one"_sd}),
+                      AssertionException);
+    }
+
+    {
+        // Set from boost::none.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalArrayStringWithValidator(boost::none);
+        ASSERT_EQ(testStruct.getFieldOptionalArrayStringWithValidator(), boost::none);
+    }
+
+    {
+        // Set from vector<string>.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalArrayStringWithValidator(std::vector<std::string>{"ONE"});
+        ASSERT_EQ(*testStruct.getFieldOptionalArrayStringWithValidator(), std::vector{"ONE"_sd});
+    }
+
+    {
+        // Set from vector<StringData>.
+        auto testStruct = makeSetterOverloadTestStruct<T>();
+        testStruct.setFieldOptionalArrayStringWithValidator(std::vector{"TWO"_sd});
+        ASSERT_EQ(*testStruct.getFieldOptionalArrayStringWithValidator(), std::vector{"TWO"_sd});
+    }
+}
+
+TEST(SetterOverloadTest, OptionalArrayOfStringFieldWithValidator) {
+    testSetterOverloadsForOptionalArrayOfStringFieldWithValidator<StructWithOverloadedSetters>();
+}
+
+TEST(SetterOverloadTest, InlineChainedOptionalArrayOfStringFieldWithValidator) {
+    testSetterOverloadsForOptionalArrayOfStringFieldWithValidator<
+        StructWithInlineChainedOverloadedSetters>();
+}
+
 // Positive: Test a nested struct
 TEST(IDLNestedStruct, TestDuplicateTypes) {
     IDLParserContext ctxt("root");
