@@ -58,8 +58,8 @@ public:
         return _indexKeyPattern;
     }
 
-    void setStageName(std::string stageName) {
-        _stageName = std::move(stageName);
+    void setStageName(StringData stageName) {
+        _stageName = stageName.toString();
     }
 
     void incNumKeysExamined(size_t amount) {
@@ -70,12 +70,12 @@ public:
         _numDocumentsFetched += amount;
     }
 
-    void setIndexName(const std::string& indexName) {
-        _indexName = indexName;
+    void setIndexName(StringData indexName) {
+        _indexName = indexName.toString();
     }
 
-    void setIndexKeyPattern(const std::string& indexKeyPattern) {
-        _indexKeyPattern = indexKeyPattern;
+    void setIndexKeyPattern(StringData indexKeyPattern) {
+        _indexKeyPattern = indexKeyPattern.toString();
     }
 
     void populateSummaryStats(PlanSummaryStats* statsOut) const {

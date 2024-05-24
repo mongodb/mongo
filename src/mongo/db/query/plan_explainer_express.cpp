@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/query/plan_explainer_express.h"
-#include "mongo/db/keypattern.h"
 
 namespace mongo {
 std::string PlanExplainerExpress::getPlanSummary() const {

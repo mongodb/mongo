@@ -382,9 +382,9 @@ public:
         _collection = std::move(collection);
 
         _stats = stats;
-        _stats->setStageName("EXPRESS_IXSCAN");
-        _stats->setIndexName("_id_");
-        _stats->setIndexKeyPattern("{ _id: 1 }");
+        _stats->setStageName("EXPRESS_IXSCAN"_sd);
+        _stats->setIndexName("_id_"_sd);
+        _stats->setIndexKeyPattern("{ _id: 1 }"_sd);
     }
 
     template <class Continuation>
@@ -499,7 +499,7 @@ public:
     void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
         _collection = std::move(collection);
         _stats = stats;
-        _stats->setStageName("EXPRESS_CLUSTERED_IXSCAN");
+        _stats->setStageName("EXPRESS_CLUSTERED_IXSCAN"_sd);
     }
 
     template <class Continuation>
@@ -597,7 +597,7 @@ public:
         _collection = std::move(collection);
 
         _stats = stats;
-        _stats->setStageName("EXPRESS_IXSCAN");
+        _stats->setStageName("EXPRESS_IXSCAN"_sd);
         _stats->setIndexName(_indexName);
         _stats->setIndexKeyPattern(
             KeyPattern::toString(_indexCatalogEntry->descriptor()->keyPattern()));
