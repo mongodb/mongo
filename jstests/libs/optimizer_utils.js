@@ -99,6 +99,17 @@ export function extractLogicalCEFromNode(node) {
 }
 
 /**
+ * Parameter 'internalPipelineLengthLimit' depends on the platform and the build type.
+ */
+export function getExpectedPipelineLimit(database) {
+    const buildInfo = assert.commandWorked(database.adminCommand("buildInfo"));
+    const isDebug = buildInfo.debug;
+    const isS390X =
+        "buildEnvironment" in buildInfo ? buildInfo.buildEnvironment.distarch == "s390x" : false;
+    return isDebug ? 200 : (isS390X ? 700 : 1000);
+}
+
+/**
  * Get a very simplified version of a plan, which only includes nodeType and nesting structure.
  */
 export function getPlanSkeleton(node, options = {}) {
