@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo {
 
@@ -52,4 +53,6 @@ TcmallocReleaseRateT getMemoryReleaseRate();
 void setMemoryReleaseRate(TcmallocReleaseRateT val);
 
 Status onUpdateHeapProfilingSampleIntervalBytes(long long newValue);
+Status validateHeapProfilingSampleIntervalBytes(long long newValue,
+                                                const boost::optional<TenantId>& tenantId);
 }  // namespace mongo
