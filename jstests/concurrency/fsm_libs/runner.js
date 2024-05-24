@@ -217,25 +217,9 @@ export const runner = (function() {
                 myDB[collName].drop();
 
                 if (cluster.isSharded()) {
-                    // If the suite specifies shardCollection probability, only shard this
-                    // collection with that probability unless the workload expects it to be sharded
-                    // (i.e. specified a custom shard key).
-                    const shouldShard =
-                        (typeof context[workload].config.data.shardKey !== "undefined") ||
-                        (typeof TestData.shardCollectionProbability == "undefined") ||
-                        (Math.random() < TestData.shardCollectionProbability);
-                    print("Preparing test collection " + tojsononeline({
-                              dbName,
-                              collName,
-                              customShardKey: context[workload].config.data.shardKey,
-                              shardCollectionProbability: TestData.shardCollectionProbability,
-                              shouldShard,
-                          }));
-                    if (shouldShard) {
-                        var shardKey = context[workload].config.data.shardKey || {_id: "hashed"};
-                        // TODO: allow workload config data to specify split
-                        cluster.shardCollection(myDB[collName], shardKey, false);
-                    }
+                    var shardKey = context[workload].config.data.shardKey || {_id: 'hashed'};
+                    // TODO: allow workload config data to specify split
+                    cluster.shardCollection(myDB[collName], shardKey, false);
                 }
             }
 

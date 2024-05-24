@@ -111,8 +111,6 @@ last-continuous:
       ticket: SERVER-90485
     - test_file: jstests/core/index/index_count_scan.js
       ticket: SERVER-90461
-    - test_file: jstests/noPassthrough/move_primary_failpoint.js
-      ticket: SERVER-90465
   suites: null
 last-lts:
   all:
@@ -206,6 +204,4 @@ last-lts:
       ticket: SERVER-90485
     - test_file: jstests/core/index/index_count_scan.js
       ticket: SERVER-90461
-    - test_file: jstests/noPassthrough/move_primary_failpoint.js
-      ticket: SERVER-90465
   suites: null

@@ -1,9 +1,6 @@
 # Based on the concurrency_sharded_replication_with_balancer_and_config_transitions and
 # concurrency_sharded_kill_primary_with_balancer suite. This suite runs continuous config
 # transitions in the background.
-config_variables:
-  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
-
 test_kind: fsm_workload_test
 
 selector:
@@ -215,7 +212,6 @@ executor:
           useActionPermittedFile: true
           runningWithBalancer: true
           transitioningConfigShard: true
-          shardCollectionProbability: 0.5
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousStepdown
@@ -224,7 +220,6 @@ executor:
       use_action_permitted_file: true
       kill: true
     - class: ContinuousConfigShardTransition
-      move_primary_comment: *movePrimaryComment
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
@@ -281,10 +276,6 @@ executor:
           mode: alwaysOn
         balancerMigrationsThrottlingMs: 100
         featureFlagReshardingForTimeseries: true
-        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
-          data:
-            comment: *movePrimaryComment
-          mode: alwaysOn
     num_rs_nodes_per_shard: 3
     # Use 3 shards so there's always at least two for workloads with manual migrations, etc.
     num_shards: 3

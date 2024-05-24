@@ -1,8 +1,5 @@
 # Based on the concurrency_sharded_with_stepdowns_and_balancer suite. This suite
 # runs continuous config transitions in the background.
-config_variables:
-  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
-
 test_kind: fsm_workload_test
 
 selector:
@@ -201,7 +198,6 @@ executor:
           useActionPermittedFile: true
           runningWithBalancer: true
           transitioningConfigShard: true
-          shardCollectionProbability: 0.5
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
 
   hooks:
@@ -210,7 +206,6 @@ executor:
       shard_stepdown: true
       use_action_permitted_file: true
     - class: ContinuousConfigShardTransition
-      move_primary_comment: *movePrimaryComment
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
@@ -263,10 +258,6 @@ executor:
           mode: alwaysOn
         balancerMigrationsThrottlingMs: 100
         featureFlagReshardingForTimeseries: true
-        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
-          data:
-            comment: *movePrimaryComment
-          mode: alwaysOn
     num_rs_nodes_per_shard: 3
     num_shards: 3
     num_mongos: 2

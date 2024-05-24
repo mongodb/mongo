@@ -1,6 +1,3 @@
-config_variables:
-  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
-
 test_kind: js_test
 
 selector:
@@ -26,7 +23,6 @@ executor:
       objcheck: ""
   hooks:
     - class: ContinuousConfigShardTransition
-      move_primary_comment: *movePrimaryComment
     - class: RunQueryStats
       allow_feature_not_supported: true
     - class: FuzzerRestoreSettings
@@ -70,10 +66,6 @@ executor:
             skipMoveCollectionThreshold: 0.5
           mode: alwaysOn
         balancerMigrationsThrottlingMs: 100
-        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
-          data:
-            comment: *movePrimaryComment
-          mode: alwaysOn
       verbose: ""
     num_rs_nodes_per_shard: 1
     num_shards: 2
