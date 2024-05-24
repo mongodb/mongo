@@ -87,7 +87,18 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     // Allow the moveChunk to finish:
     commitFailpoint.off();
     jsTest.log("Make sure the recovery is executed");
-    assert.eq(st.s0.getDB(dbName).getCollection(collName).countDocuments({}), 1000);
+    assert.soon(function() {
+        try {
+            return (st.s0.getDB(dbName).getCollection(collName).countDocuments({}) == 1000);
+        } catch (e) {
+            if (e.code == ErrorCodes.Interrupted) {
+                // Expected as the request may have joined the filtering metadata refresh that
+                // the killOp above interrupted.
+                return false;
+            }
+            throw e;
+        }
+    });
 }
 
 testKillOpAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible",
