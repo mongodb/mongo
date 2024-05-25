@@ -1193,9 +1193,9 @@ private:
     static constexpr int kCount = 12;
 
     int expectedSpills() const {
-        // 'DocumentSourceGroup' has the knob called 'internalQueryEnableAggressiveSpillsInGroup'
-        // used to spill more aggressively when turned on.
-        return internalQueryEnableAggressiveSpillsInGroup ? kCount : 4;
+        // 'DocumentSourceGroup' has test-only behavior where it will spill more aggressively in
+        // debug builds.
+        return kDebugBuild ? kCount : 4;
     }
 
     std::deque<DocumentSource::GetNextResult> inputData() final {

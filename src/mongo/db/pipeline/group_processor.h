@@ -100,10 +100,9 @@ private:
     bool shouldSpillWithAttemptToSaveMemory();
 
     /**
-     * Returns true if the caller should spill to disk every time we have a duplicate id. Returns
-     * false otherwise.
+     * Returns true if the caller should spill to disk in debug mode. Returns false otherwise.
      */
-    bool shouldSpillOnEveryDuplicateId(bool isNewGroup);
+    bool shouldSpillForDebugBuild(bool isNewGroup);
 
     /**
      * Spills the GroupsMap to a new file and empties the map so that subsequent groups can be added
