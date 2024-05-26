@@ -773,12 +773,12 @@ __wt_cursor_reopen(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
 
     session = CUR2S(cursor);
     WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_CACHED));
+    WT_ASSERT(session, dhandle != NULL);
 
-    if (dhandle != NULL) {
-        session->dhandle = dhandle;
-        __wt_cursor_dhandle_incr_use(session);
-        WT_DHANDLE_RELEASE(dhandle);
-    }
+    session->dhandle = dhandle;
+    __wt_cursor_dhandle_incr_use(session);
+    WT_DHANDLE_RELEASE(dhandle);
+
     (void)__wt_atomic_add32(&S2C(session)->open_cursor_count, 1);
     WT_STAT_CONN_DECR_ATOMIC(session, cursor_cached_count);
     WT_STAT_DATA_INCR(session, cursor_open_count);
