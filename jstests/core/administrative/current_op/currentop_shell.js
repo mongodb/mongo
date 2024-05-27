@@ -3,6 +3,9 @@
  * command - ie. the result set isn't limited to 16MB and long operations aren't truncated.
  *
  * @tags: [
+ *   # The collection may be completely moved to another shard, which results in currentOp not
+ *   # returning the expected command.
+ *   assumes_balancer_off,
  *   # The test runs commands that are not allowed with security token: getLog.
  *   not_allowed_with_signed_security_token,
  *   uses_parallel_shell,
@@ -73,6 +76,7 @@ function startShellWithOp(comment) {
     // Confirm that the operation has started in the parallel shell.
     assert.soon(
         function() {
+            let shards = FixtureHelpers.numberOfShardsForCollection(coll);
             let aggRes =
                 db.getSiblingDB("admin")
                     .aggregate([
@@ -80,7 +84,7 @@ function startShellWithOp(comment) {
                         {$match: {ns: "test.currentOp_cursor", "command.comment": TestData.comment}}
                     ])
                     .toArray();
-            return aggRes.length >= 1;
+            return aggRes.length >= shards;
         },
         function() {
             return "Failed to find parallel shell operation in $currentOp output: " +
@@ -102,67 +106,47 @@ function testLogPattern(db, pattern) {
     });
 }
 
-// Test that the currentOp server command truncates long operations with a warning logged.
-const serverCommandTest = startShellWithOp("currentOp_server");
-res = db.adminCommand({
-    currentOp: true,
-    $and: [
-        {"ns": "test.currentOp_cursor"},
-        {"command.comment": "currentOp_server"},
-        // On the replica set endpoint, currentOp reports both router and shard operations. So
-        // filter out one of them.
-        TestData.testingReplicaSetEndpoint ? {role: "ClusterRole{router}"}
-                                           : {role: {$exists: false}}
-    ]
-});
-
-if (FixtureHelpers.numberOfShardsForCollection(coll) > 1) {
-    // Assert currentOp truncation behavior for each shard in the cluster.
-    assert(res.inprog.length >= 1, res);
-    res.inprog.forEach((result) => {
-        assert.eq(result.op, "getmore", res);
-        assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
+/**
+ * Tests the currentOp behaviour by first starting a parallel shell, where a long running command is
+ * being executed. After that a 'commandFn' is called, which is retrieving currentOps either through
+ * a dedicated command or a shell extension function.
+ */
+function testCurrentOp(comment, commandFn, shouldTruncate) {
+    const serverCommandTest = startShellWithOp(comment);
+    const res = commandFn({
+        $and: [
+            {"ns": "test.currentOp_cursor"},
+            {"command.comment": comment},
+            // On the replica set endpoint, currentOp reports both router and shard
+            // operations. So filter out one of them.
+            TestData.testingReplicaSetEndpoint ? {role: "ClusterRole{router}"}
+                                               : {role: {$exists: false}}
+        ]
     });
-} else {
-    // Assert currentOp truncation behavior for unsharded collections.
-    assert.eq(res.inprog.length, 1, res);
-    assert.eq(res.inprog[0].op, "command", res);
-    assert(res.inprog[0].command.hasOwnProperty("$truncated"), res);
-}
-assert(testLogPattern(db, /will be truncated/));
-
-res.inprog.forEach((op) => {
-    assert.commandWorked(db.killOp(op.opid));
-});
-
-serverCommandTest();
-
-// Test that the db.currentOp() shell helper does not truncate ops.
-const shellHelperTest = startShellWithOp("currentOp_shell");
-res = db.currentOp({
-    $and: [
-        {"ns": "test.currentOp_cursor"},
-        {"command.comment": "currentOp_shell"},
-        // On the replica set endpoint, currentOp reports both router and shard operations. So
-        // filter out one of them.
-        TestData.testingReplicaSetEndpoint ? {role: "ClusterRole{router}"}
-                                           : {role: {$exists: false}}
-    ]
-});
-
-if (FixtureHelpers.numberOfShardsForCollection(coll) > 1) {
-    assert(res.inprog.length >= 1, res);
+    assert.eq(res.inprog.length, FixtureHelpers.numberOfShardsForCollection(coll), res);
     res.inprog.forEach((result) => {
-        assert.eq(result.op, "getmore", res);
-        assert(!result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
+        if (result.op === 'command') {
+            assert.eq(shouldTruncate, result.command.hasOwnProperty("$truncated"), res);
+        } else {
+            assert.eq(result.op, 'getmore', res);
+            assert.eq(
+                shouldTruncate, result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
+        }
     });
-} else {
-    assert.eq(res.inprog.length, 1, res);
-    assert(!res.inprog[0].command.hasOwnProperty("$truncated"), res);
+
+    if (shouldTruncate) {
+        assert(testLogPattern(db, /will be truncated/));
+    }
+
+    res.inprog.forEach((op) => {
+        assert.commandWorked(db.killOp(op.opid));
+    });
+
+    serverCommandTest();
 }
 
-res.inprog.forEach((op) => {
-    assert.commandWorked(db.killOp(op.opid));
-});
+testCurrentOp("currentOp_server",
+              (args) => db.adminCommand({currentOp: true, ...args}),
+              true /* shouldTruncate */);
 
-shellHelperTest();
+testCurrentOp("currentOp_shell", (args) => db.currentOp(args), false /* shouldTruncate */);
