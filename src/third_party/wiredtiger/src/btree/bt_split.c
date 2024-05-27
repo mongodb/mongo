@@ -1191,9 +1191,9 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock, WT_PA
         /* Page locks live in the modify structure. */
         WT_RET(__wt_page_modify_init(session, parent));
 
-        if (trylock)
+        if (trylock) {
             WT_RET(WT_PAGE_TRYLOCK(session, parent));
-        else
+        } else
             WT_PAGE_LOCK(session, parent);
         if (parent == ref->home)
             break;

@@ -244,6 +244,8 @@ for f in "$@"; do
         -e '/WT_CURSOR_NEEDVALUE/d' \
         -e '/WT_PAGE_ALLOC_AND_SWAP(/d' \
         -e '/WT_ERR/d' \
+        -e '/WT_PAGE_TRYLOCK.*parent/d' \
+        -e '/WT_SPIN_INIT_TRACKED/d' \
         -e '/WT_SYSCALL.*ret/d' \
         -e '/WT_TRET/d' \
         -e '/__wt_buf_catfmt/d' \

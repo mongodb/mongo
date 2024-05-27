@@ -524,6 +524,9 @@ conn_stats = [
     ##########################################
     # Locking statistics
     ##########################################
+    LockStat('lock_btree_page_count', 'btree page lock acquisitions'),
+    LockStat('lock_btree_page_wait_application', 'btree page lock application thread wait time (usecs)'),
+    LockStat('lock_btree_page_wait_internal', 'btree page lock internal thread wait time (usecs)'),
     LockStat('lock_checkpoint_count', 'checkpoint lock acquisitions'),
     LockStat('lock_checkpoint_wait_application', 'checkpoint lock application thread wait time (usecs)'),
     LockStat('lock_checkpoint_wait_internal', 'checkpoint lock internal thread wait time (usecs)'),

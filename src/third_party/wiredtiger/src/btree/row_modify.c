@@ -21,7 +21,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_RET(__wt_calloc_one(session, &modify));
 
     /* Initialize the spinlock for the page. */
-    WT_ERR(__wt_spin_init(session, &modify->page_lock, "btree page"));
+    WT_SPIN_INIT_TRACKED(session, &modify->page_lock, btree_page);
 
     /*
      * Multiple threads of control may be searching and deciding to modify a page. If our modify
@@ -355,7 +355,6 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UP
     /* If we can't lock it, don't scan, that's okay. */
     if (WT_PAGE_TRYLOCK(session, page) != 0)
         return;
-
     /*
      * This function identifies obsolete updates, and truncates them from the rest of the chain;
      * because this routine is called from inside a serialization function, the caller has

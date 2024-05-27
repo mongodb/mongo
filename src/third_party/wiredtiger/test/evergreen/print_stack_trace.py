@@ -120,6 +120,16 @@ def main():
     parser.add_argument('-l', '--lib_path', help='library path')
     args = parser.parse_args()
 
+    # Add /data/mci to gdb's auto load safe paths. Otherwise gdb refuses to load our custom gdb scripts and raises a warning.
+    gdbinit_file = os.path.expanduser('~/.gdbinit')
+    if not os.path.exists(gdbinit_file):
+        # Touch the file if it doesn't exist
+        open(gdbinit_file, 'a').close()
+
+    with open(gdbinit_file, 'r+') as file:
+        if "add-auto-load-safe-path /data/mci/" not in file.read():
+            file.write("\nadd-auto-load-safe-path /data/mci/\n")
+
     # If the lib_path is not provided then search the current dir.
     lib_path = "." if args.lib_path is None else args.lib_path
 

@@ -33,6 +33,9 @@ checkpoints_total_failed
 checkpoints_total_succeed
 compress_read_ratio_hist_max
 compress_write_ratio_hist_max
+lock_btree_page_count
+lock_btree_page_wait_application
+lock_btree_page_wait_internal
 lock_checkpoint_count
 lock_checkpoint_wait_application
 lock_checkpoint_wait_internal

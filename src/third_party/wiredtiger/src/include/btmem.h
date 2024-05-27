@@ -449,8 +449,8 @@ struct __wt_page_modify {
     bool instantiated;        /* True if this is a newly instantiated page. */
     WT_UPDATE **inst_updates; /* Update list for instantiated page with unresolved truncate. */
 
-#define WT_PAGE_LOCK(s, p) __wt_spin_lock((s), &(p)->modify->page_lock)
-#define WT_PAGE_TRYLOCK(s, p) __wt_spin_trylock((s), &(p)->modify->page_lock)
+#define WT_PAGE_LOCK(s, p) __wt_spin_lock_track((s), &(p)->modify->page_lock)
+#define WT_PAGE_TRYLOCK(s, p) __wt_spin_trylock_track((s), &(p)->modify->page_lock)
 #define WT_PAGE_UNLOCK(s, p) __wt_spin_unlock((s), &(p)->modify->page_lock)
     WT_SPINLOCK page_lock; /* Page's spinlock */
 
