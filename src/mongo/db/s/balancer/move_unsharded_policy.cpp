@@ -55,30 +55,6 @@ int64_t getRandomIndex(const std::vector<T>& items) {
 }
 
 /**
- * Returns whether or not the cluster contains any sharded collections that are not located in the
- * config database.
- */
-bool clusterHasUserShardedCollections(OperationContext* opCtx) {
-    auto client = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-
-    std::vector<BSONObj> rawPipelineStages{
-        // Match only sharded collections whose database names are not config.
-        BSON("$match" << BSON(CollectionType::kUnsplittableFieldName
-                              << BSON("$ne" << true) << CollectionType::kNssFieldName
-                              << BSON("$regex"
-                                      << "^(?!config\\.).*"))),
-        // We only care if one exists, not what or how many there are.
-        BSON("$limit" << 1)};
-
-    AggregateCommandRequest aggRequest{NamespaceString::kConfigsvrCollectionsNamespace,
-                                       rawPipelineStages};
-    auto aggResult = client->runCatalogAggregation(
-        opCtx, aggRequest, {repl::ReadConcernLevel::kSnapshotReadConcern});
-
-    return !aggResult.empty();
-}
-
-/**
  *  Returns a list of collections that are present on the given shard for the given database.
  *
  *  These collections can be either sharded or unsharded.
@@ -426,14 +402,21 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
             return result;
         }
 
-
-        // Skip random moveCollections if there are sharded collections that could be balanced. Do
-        // this unconditionally if there are draining shards, or some of the time otherwise.
+        // Skip random moveCollections if at least one shard is draining, so we don't starve it of
+        // available shards to migrate data to.
         auto drainingShardIter = std::find_if(
             allShards.begin(), allShards.end(), [](const auto& stat) { return stat.isDraining; });
-        if ((drainingShardIter != allShards.end() ||
-             opCtx->getClient()->getPrng().nextCanonicalDouble() < 0.5) &&
-            clusterHasUserShardedCollections(opCtx)) {
+        if (drainingShardIter != allShards.end()) {
+            return result;
+        }
+
+        // Choosing to move a collection between shards removes them from the available shards,
+        // which prevents them from being chosen for a random chunk migration, so allow skipping a
+        // random moveCollection to avoid "starving" random chunk migrations with few shards. Note
+        // safeNumberDouble() defaults to 0 if the field is missing.
+        auto skipMoveCollectionThreshold =
+            sfp.getData()["skipMoveCollectionThreshold"].safeNumberDouble();
+        if (opCtx->getClient()->getPrng().nextCanonicalDouble() < skipMoveCollectionThreshold) {
             return result;
         }
 

@@ -125,23 +125,29 @@ TEST_F(MoveUnshardedPolicyTest, MigrateAnyCollectionFPOn) {
                                                 BSON("size" << 4));
 
     const std::vector<CollectionType> collections = [&] {
-        // Add three unsplittable (unsharded) collections
+        // Add a sharded and two unsplittable (unsharded) collections
         std::vector<CollectionType> collections;
         collections.emplace_back(setUpUnsplittableCollection(
             NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_unsplittable_1"),
             kShardId0));
         collections.emplace_back(setUpUnsplittableCollection(
-            NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_unsplittable_2"),
-            kShardId0));
-        collections.emplace_back(setUpUnsplittableCollection(
             NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_unsplittable_3"),
             kShardId0));
+        ChunkVersion defaultVersion({OID::gen(), Timestamp(42)}, {2, 0});
+        ChunkRange keyRange{kKeyPattern.globalMin(), kKeyPattern.globalMax()};
+        std::vector<ChunkType> chunks = {{UUID::gen(), keyRange, defaultVersion, kShardId0}};
+        collections.emplace_back(setupCollection(
+            NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_single_chunk_2"),
+            kKeyPattern,
+            chunks));
         return collections;
     }();
 
     std::set<NamespaceString> collectionsToCheck;
     for (auto& collection : collections) {
-        collectionsToCheck.insert(collection.getNss());
+        if (collection.getUnsplittable()) {
+            collectionsToCheck.insert(collection.getNss());
+        }
     }
 
     int attemptsLeft = collectionsToCheck.size() * 50;
