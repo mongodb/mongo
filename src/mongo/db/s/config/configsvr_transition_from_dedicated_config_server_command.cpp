@@ -47,7 +47,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
@@ -101,9 +100,6 @@ public:
                                                           opCtx->getWriteConcern());
 
             ShardingCatalogManager::get(opCtx)->addConfigShard(opCtx);
-
-            ShardingStatistics::get(opCtx)
-                .countTransitionFromDedicatedConfigServerCompleted.addAndFetch(1);
         }
 
     private:

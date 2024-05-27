@@ -138,16 +138,6 @@ struct ShardingStatistics {
     // role.
     AtomicWord<long long> unauthorizedDirectShardOperations{0};
 
-    // Total number of times the _configsvrTransitionToDedicatedConfigServer command has started.
-    AtomicWord<long long> countTransitionToDedicatedConfigServerStarted{0};
-
-    // Total number of times the _configsvrTransitionToDedicatedConfigServer command has completed.
-    AtomicWord<long long> countTransitionToDedicatedConfigServerCompleted{0};
-
-    // Total number of times the _configsvrTransitionFromDedicatedConfigServer command has
-    // completed.
-    AtomicWord<long long> countTransitionFromDedicatedConfigServerCompleted{0};
-
     /**
      * Obtains the per-process instance of the sharding statistics object.
      */

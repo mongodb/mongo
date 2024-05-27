@@ -93,12 +93,6 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
         builder->append("unauthorizedDirectShardOps",
                         unauthorizedDirectShardOperations.loadRelaxed());
     }
-    builder->append("countTransitionToDedicatedConfigServerStarted",
-                    countTransitionToDedicatedConfigServerStarted.loadRelaxed());
-    builder->append("countTransitionToDedicatedConfigServerCompleted",
-                    countTransitionToDedicatedConfigServerCompleted.loadRelaxed());
-    builder->append("countTransitionFromDedicatedConfigServerCompleted",
-                    countTransitionFromDedicatedConfigServerCompleted.loadRelaxed());
 }
 
 }  // namespace mongo

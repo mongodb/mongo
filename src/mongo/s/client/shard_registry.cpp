@@ -601,15 +601,6 @@ ShardRegistry::Cache::ValueHandle ShardRegistry::_getCachedData() const {
     return _cache->peekLatestCached(_kSingleton);
 }
 
-bool ShardRegistry::cachedClusterHasConfigShard() const {
-    auto data = _getCachedData();
-    if (!data) {
-        return false;
-    }
-
-    return data->findShard(ShardId::kConfigServerId) != nullptr;
-}
-
 std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort& host) const {
     // First check if this is a config shard lookup.
     {

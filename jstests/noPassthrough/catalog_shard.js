@@ -49,10 +49,6 @@ function getCatalogShardChunks(conn) {
     return conn.getCollection("config.chunks").find({shard: "config"}).toArray();
 }
 
-function getShardingStats(conn) {
-    return assert.commandWorked(conn.adminCommand({serverStatus: 1})).shardingStatistics;
-}
-
 const st = new ShardingTest({
     shards: 1,
     config: 3,
@@ -333,29 +329,9 @@ const newShardName =
     moveDatabaseAndUnshardedColls(st.s.getDB(unshardedDbName), configShardName);
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 0}, to: configShardName}));
 
-    // Sharding statistics before transitionToDedicatedConfigServer starts are correct.
-    let configPrimaryStats = getShardingStats(st.configRS.getPrimary());
-    assert.eq(configPrimaryStats.countTransitionToDedicatedConfigServerStarted, 0);
-    assert.eq(
-        configPrimaryStats.countTransitionToDedicatedConfigServerCompleted,
-        1);  // Transition command already completed once on this node. Completed > started because
-             // there was a failover in the test after starting the transition but before completing
-             // it. This is expected behavior for serverStatus counters which reset on failover.
-    assert.eq(configPrimaryStats.configServerInShardCache, true);
-    let mongosStats = getShardingStats(st.s0);
-    assert.eq(mongosStats.configServerInShardCache, true);
-
     let removeRes =
         assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("started", removeRes.state);
-
-    // Sharding statistics after transitionToDedicatedConfigServer starts are correct.
-    configPrimaryStats = getShardingStats(st.configRS.getPrimary());
-    assert.eq(configPrimaryStats.countTransitionToDedicatedConfigServerStarted, 1);
-    assert.eq(configPrimaryStats.countTransitionToDedicatedConfigServerCompleted, 1);
-    assert.eq(configPrimaryStats.configServerInShardCache, true);
-    mongosStats = getShardingStats(st.s0);
-    assert.eq(mongosStats.configServerInShardCache, true);
 
     moveDatabaseAndUnshardedColls(st.s.getDB(dbName), newShardName);
     moveDatabaseAndUnshardedColls(st.s.getDB(unshardedDbName), newShardName);
@@ -435,14 +411,6 @@ const newShardName =
     removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("completed", removeRes.state);
 
-    // Sharding statistics after transitionToDedicatedConfigServer completes are correct.
-    configPrimaryStats = getShardingStats(st.configRS.getPrimary());
-    assert.eq(configPrimaryStats.countTransitionToDedicatedConfigServerStarted, 1);
-    assert.eq(configPrimaryStats.countTransitionToDedicatedConfigServerCompleted, 2);
-    assert.eq(configPrimaryStats.configServerInShardCache, false);
-    mongosStats = getShardingStats(st.s0);
-    assert.eq(mongosStats.configServerInShardCache, false);
-
     // The transition has now removed the config server as a shard.
     assert.eq(null, st.s.getDB("config").shards.findOne({_id: "config"}));
 }
@@ -473,25 +441,10 @@ const newShardName =
     // correct indexes when receiving its first chunk after the transition.
     assert.commandWorked(st.s.getCollection(indexedNs).createIndex({newKey: 1}));
 
-    // Sharding statistics before transitionFromDedicatedConfigServer starts are correct.
-    let configPrimaryStats = getShardingStats(st.configRS.getPrimary());
-    assert.eq(configPrimaryStats.countTransitionFromDedicatedConfigServerCompleted,
-              1);  // Transition command already completed once on this node.
-    assert.eq(configPrimaryStats.configServerInShardCache, false);
-    let mongosStats = getShardingStats(st.s0);
-    assert.eq(mongosStats.configServerInShardCache, false);
-
     // Use write concern to verify the command support them. Any values weaker than the default
     // sharding metadata write concerns will be upgraded.
     assert.commandWorked(st.s.adminCommand(
         {transitionFromDedicatedConfigServer: 1, writeConcern: {wtimeout: 1000 * 60 * 60 * 24}}));
-
-    // Sharding statistics after transitionFromDedicatedConfigServer starts are correct.
-    configPrimaryStats = getShardingStats(st.configRS.getPrimary());
-    assert.eq(configPrimaryStats.countTransitionFromDedicatedConfigServerCompleted, 2);
-    assert.eq(configPrimaryStats.configServerInShardCache, true);
-    mongosStats = getShardingStats(st.s0);
-    assert.eq(mongosStats.configServerInShardCache, true);
 
     // Basic CRUD and sharded DDL work.
     basicCRUD(st.s);

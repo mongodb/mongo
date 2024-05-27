@@ -117,12 +117,6 @@ public:
 
         numHostsTargetedMetrics.appendSection(&result);
         catalogCache->report(&result);
-
-        if (grid->isInitialized()) {
-            auto configServerInShardCache = grid->shardRegistry()->cachedClusterHasConfigShard();
-            result.appendBool("configServerInShardCache", configServerInShardCache);
-        }
-
         return result.obj();
     }
 };
