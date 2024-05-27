@@ -441,11 +441,6 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
             return TypeSignature::kNumericType.include(
                 argSignature.intersect(TypeSignature::kNothingType));
         }
-
-        if (op.name() == "fail"s) {
-            // "fail" aborts the query and doesn't return any value
-            return TypeSignature{};
-        }
     } else if (arity == 1) {
         if (op.name() == "exists"s) {
             // If the argument is already guaranteed not to be a Nothing or if it is a constant, we
