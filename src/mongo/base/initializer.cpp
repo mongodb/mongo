@@ -59,6 +59,10 @@ bool mustRunSilently(const auto& args) {
     static constexpr std::array q{
         "--quiet"_sd,
         "--list"_sd,  // Avoid crosstalk with unit test names
+        "--version"_sd,
+        "--sysInfo"_sd,
+        "--help"_sd,
+        "-h"_sd,
     };
     return std::any_of(args.begin(), args.end(), [&](StringData a) {
         return std::any_of(q.begin(), q.end(), [&](StringData s) { return a.starts_with(s); });
