@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <chrono>
+
 #include "mongo/base/status.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/executor/network_interface.h"
@@ -68,7 +70,8 @@ public:
     Status sinkMessageCalled(Message message) {
         stdx::unique_lock lk{_mutex};
         _hasWaitingSinkMessage = true;
-        _cv.wait(lk, [&] { return !!_sinkMessageExpectation || _isCanceled; });
+        _readyRequestCV.notify_one();
+        _readyResponseCV.wait(lk, [&] { return !!_sinkMessageExpectation || _isCanceled; });
         if (_isCanceled) {
             // Consume the cancellation.
             _isCanceled = false;
@@ -85,13 +88,14 @@ public:
         stdx::lock_guard lk{_mutex};
         invariant(!_sinkMessageExpectation);
         _sinkMessageExpectation = std::move(handler);
-        _cv.notify_one();
+        _readyResponseCV.notify_one();
     }
 
     StatusWith<Message> sourceMessageCalled() {
         stdx::unique_lock lk{_mutex};
         _hasWaitingSourceMessage = true;
-        _cv.wait(lk, [&] { return !!_sourceMessageExpectation || _isCanceled; });
+        _readyRequestCV.notify_one();
+        _readyResponseCV.wait(lk, [&] { return !!_sourceMessageExpectation || _isCanceled; });
         if (_isCanceled) {
             // Consume the cancellation.
             _isCanceled = false;
@@ -108,18 +112,29 @@ public:
         stdx::lock_guard lk{_mutex};
         invariant(!_sourceMessageExpectation);
         _sourceMessageExpectation = std::move(handler);
-        _cv.notify_one();
+        _readyResponseCV.notify_one();
     }
 
     void cancelAsyncOpsCalled() {
         stdx::unique_lock lk{_mutex};
         _isCanceled = true;
-        _cv.notify_one();
+        _readyResponseCV.notify_one();
     }
 
     bool hasReadyRequests() {
         stdx::lock_guard lk{_mutex};
         return _hasWaitingSinkMessage || _hasWaitingSourceMessage;
+    }
+
+    bool tryWaitUntilReadyRequests() {
+        stdx::unique_lock lk{_mutex};
+        if (_hasWaitingSinkMessage || _hasWaitingSourceMessage) {
+            return true;
+        }
+
+        return _readyRequestCV.wait_for(lk, std::chrono::seconds(10), [&] {
+            return _hasWaitingSinkMessage || _hasWaitingSourceMessage;
+        });
     }
 
     std::shared_ptr<PinnedConnectionTaskExecutor> makePinnedConnTaskExecutor() {
@@ -129,7 +144,11 @@ public:
 private:
     std::shared_ptr<transport::Session> _session;
     mutable Mutex _mutex;
-    stdx::condition_variable _cv;
+    // We use two condition variables to handle the synchronous nature of this fixture:
+    // _readyRequestCV is notified when a request is received, whereas _readyResponseCV is notified
+    // when a response to a request (a request handler) is provided.
+    stdx::condition_variable _readyRequestCV;
+    stdx::condition_variable _readyResponseCV;
     boost::optional<SinkMessageCbT> _sinkMessageExpectation;
     boost::optional<SourceMessageCbT> _sourceMessageExpectation;
     bool _hasWaitingSinkMessage = false;

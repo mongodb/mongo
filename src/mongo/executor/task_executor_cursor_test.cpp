@@ -122,6 +122,17 @@ public:
     }
 
     /**
+     * Waits for up to 10 seconds for an expected ready request. If we wake up because there is a
+     * ready request, return true; otherwise, return false.
+     *
+     * The non-pinning test fixture schedules and receives requests synchronously, so no wait is
+     * necessary in its implementation.
+     */
+    bool tryWaitUntilReadyRequests() {
+        return Base::tryWaitUntilReadyRequests();
+    }
+
+    /**
      * Ensure we work for a single simple batch
      */
     void SingleBatchWorksTest() {

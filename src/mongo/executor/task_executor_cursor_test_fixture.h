@@ -173,6 +173,16 @@ public:
         return getNet()->hasReadyRequests();
     }
 
+    /**
+     * We provide this function to provide a uniform testing API for the pinning and non-pinning
+     * test fixtures. This function should be used when we are expecting to receive a ready
+     * request; unlike the pinning fixture though, this fixture receives requests synchronously, so
+     * no wait is necessary.
+     */
+    bool tryWaitUntilReadyRequests() {
+        return hasReadyRequests();
+    }
+
     void blackHoleNextOutgoingRequest() {
         NetworkInterfaceMock::InNetworkGuard guard(getNet());
         getNet()->blackHole(getNet()->getFrontOfUnscheduledQueue());
@@ -252,6 +262,10 @@ public:
 
     bool hasReadyRequests() {
         return PinnedConnectionTaskExecutorTest::hasReadyRequests();
+    }
+
+    bool tryWaitUntilReadyRequests() {
+        return PinnedConnectionTaskExecutorTest::tryWaitUntilReadyRequests();
     }
 
     void blackHoleNextOutgoingRequest() {

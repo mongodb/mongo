@@ -48,6 +48,7 @@ public:
     // Specifies the factor by which the batchSize sent from mongod to mongot increases per batch.
     // TODO SERVER-88412: Convert this into an atomic, configurable cluster parameter.
     static constexpr double kInternalSearchBatchSizeGrowthFactor = 2.0;
+    static constexpr int kAlwaysPrefetchAfterNBatches = 3;
 
     MongotTaskExecutorCursorGetMoreStrategy(
         std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
@@ -69,7 +70,12 @@ public:
                                  const NamespaceString& nss,
                                  long long prevBatchNumReceived) final;
 
-    bool shouldPrefetch() const final;
+    /**
+     * For the mongot cursor, we want to prefetch the next batch if we know we'll need another batch
+     * (see _mustNeedAnotherBatch()), or if the maxDocsNeededBounds for this query is Unknown and
+     * we've already received 3 batches.
+     */
+    bool shouldPrefetch(long long totalNumReceived, long long numBatchesReceived) const final;
 
     long long getCurrentBatchSize() const {
         tassert(8953003,
@@ -83,6 +89,12 @@ public:
     }
 
 private:
+    /**
+     * Returns true if we will definitely need to request another batch from mongot in order to
+     * fulfill this query (assuming the cursor is not closed / still has results to return).
+     */
+    bool _mustNeedAnotherBatch(long long totalNumReceived) const;
+
     /**
      * If batchSize tuning is not enabled, we'll see the initial batchSize for any getMore requests.
      * Otherwise, we'll apply tuning strategies to optimize batchSize of each batch requested.

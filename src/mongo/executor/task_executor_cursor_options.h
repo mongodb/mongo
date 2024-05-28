@@ -61,8 +61,12 @@ public:
     /**
      * If true, we'll fetch the next batch as soon as the current one is received. If false, we'll
      * fetch the next batch when the current batch is exhausted and 'getNext()' is invoked.
+     *
+     * totalNumReceived and numBatchesReceived may or may not be used, based on implementation, to
+     * determine if prefetch is enabled.
      */
-    virtual bool shouldPrefetch() const = 0;
+    virtual bool shouldPrefetch(long long totalNumReceived, long long numBatchesReceived) const = 0;
+
     virtual ~TaskExecutorCursorGetMoreStrategy() {}
 };
 
@@ -85,7 +89,7 @@ public:
                                  const NamespaceString& nss,
                                  long long prevBatchNumReceived) final;
 
-    bool shouldPrefetch() const final {
+    bool shouldPrefetch(long long totalNumReceived, long long numBatchesReceived) const final {
         return _preFetchNextBatch;
     }
 

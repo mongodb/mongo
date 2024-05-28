@@ -129,6 +129,10 @@ public:
         return Base::hasReadyRequests();
     }
 
+    bool tryWaitUntilReadyRequests() {
+        return Base::tryWaitUntilReadyRequests();
+    }
+
     /**
      * Tests that the TaskExecutorCursor with mongot options applies the calcDocsNeededFn to add
      * docsRequested option on getMore requests.
@@ -571,6 +575,103 @@ public:
         });
     }
 
+    void PrefetchAllGetMoresTest() {
+        CursorId cursorId = 1;
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 BSON("search"
+                                      << "foo"),
+                                 opCtx.get());
+        // Use NeedAll bounds to trigger pre-fetching for all batches.
+        auto tec = makeMongotCursor(rcr,
+                                    /*calcDocsNeededFn*/ nullptr,
+                                    /*startingBatchSize*/ 5,
+                                    /*minDocsNeededBounds*/ docs_needed_bounds::NeedAll(),
+                                    /*maxDocsNeededBounds*/ docs_needed_bounds::NeedAll());
+        // Assert the initial request is received.
+        ASSERT_TRUE(tryWaitUntilReadyRequests());
+        scheduleSuccessfulCursorResponse("firstBatch", 1, 5, cursorId, /*expectedPrefetch*/ true);
+
+        // Populate the cursor to process the initial batch, which should dispatch the pre-fetched
+        // request for the first getMore, even before any getNexts.
+        tec->populateCursor(opCtx.get());
+        // Assert the pre-fetched GetMore was recevied.
+        ASSERT_TRUE(tryWaitUntilReadyRequests());
+        // Mock the response for the first getMore.
+        scheduleSuccessfulCursorResponse("nextBatch", 6, 10, cursorId, /*expectedPrefetch*/ true);
+
+        // Exhaust the first batch, then request the first result of the first getMore, prompting
+        // another pre-fetched batch.
+        for (int docNum = 1; docNum <= 6; docNum++) {
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
+        }
+        // Assert another pre-fetched GetMore was recevied.
+        ASSERT_TRUE(tryWaitUntilReadyRequests());
+        // Mock the response for the second getMore, which returns a closed cursor.
+        scheduleSuccessfulCursorResponse(
+            "nextBatch", 11, 15, /*cursorId*/ 0, /*expectedPrefetch*/ true);
+
+        // Exhaust the second batch, then request the first result of the second getMore, to ensure
+        // no requests are sent since the cursor was closed.
+        for (int docNum = 7; docNum <= 11; docNum++) {
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
+        }
+
+        // Assert that the TaskExecutorCursor has not pre-fetched a GetMore since the cursor was
+        // exhausted.
+        ASSERT_FALSE(hasReadyRequests());
+    }
+
+    void DefaultStartPrefetchAfterThreeBatchesTest() {
+        // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
+        // throughout the test.
+        unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+            CursorId cursorId = 1;
+            RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                     DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                     BSON("search"
+                                          << "foo"),
+                                     opCtx.get());
+            // Use the default mongot cursor behavior, which should only start pre-fetching after
+            // the third batch is received.
+            auto tec = makeMongotCursor(rcr);
+            // Mock and exhaust the response for the first batch.
+            scheduleSuccessfulCursorResponse(
+                "firstBatch", 1, 101, cursorId, /*expectedPrefetch*/ false);
+            for (int docNum = 1; docNum <= 101; docNum++) {
+                ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
+            }
+            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
+            ASSERT_FALSE(hasReadyRequests());
+
+            // Schedule and exhaust the second batch.
+            auto responseSchedulerThread = monitor.spawn([&] {
+                scheduleSuccessfulCursorResponse(
+                    "nextBatch", 102, 303, cursorId, /*expectedPrefetch*/ false);
+            });
+            for (int docNum = 102; docNum <= 303; docNum++) {
+                ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
+            }
+            responseSchedulerThread.join();
+
+            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
+            ASSERT_FALSE(hasReadyRequests());
+
+            // Schedule the third batch, and request just the first document from that batch. Upon
+            // receipt of the third batch, a request to pre-fetch the fourth batch should be sent.
+            responseSchedulerThread = monitor.spawn([&] {
+                scheduleSuccessfulCursorResponse(
+                    "nextBatch", 304, 707, cursorId, /*expectedPrefetch*/ false);
+            });
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 304);
+            // Assert the pre-fetched GetMore was recevied.
+            ASSERT_TRUE(tryWaitUntilReadyRequests());
+            // Black hole the pre-fetched fourth batch since it won't be necessary.
+            blackHoleNextOutgoingRequest();
+            responseSchedulerThread.join();
+        });
+    }
+
     ServiceContext::UniqueServiceContext serviceCtx = ServiceContext::make();
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
@@ -627,6 +728,22 @@ TEST_F(PinnedConnMongotCursorTestFixture, BatchSizeGrowthPausesThenResumesTest) 
 
 TEST_F(NonPinningMongotCursorTestFixture, BatchSizeGrowthPausesThenResumesTest) {
     BatchSizeGrowthPausesThenResumesTest();
+}
+
+TEST_F(PinnedConnMongotCursorTestFixture, PrefetchAllGetMoresTest) {
+    PrefetchAllGetMoresTest();
+}
+
+TEST_F(NonPinningMongotCursorTestFixture, PrefetchAllGetMoresTest) {
+    PrefetchAllGetMoresTest();
+}
+
+TEST_F(PinnedConnMongotCursorTestFixture, DefaultStartPrefetchAfterThreeBatchesTest) {
+    DefaultStartPrefetchAfterThreeBatchesTest();
+}
+
+TEST_F(NonPinningMongotCursorTestFixture, DefaultStartPrefetchAfterThreeBatchesTest) {
+    DefaultStartPrefetchAfterThreeBatchesTest();
 }
 }  // namespace
 }  // namespace executor

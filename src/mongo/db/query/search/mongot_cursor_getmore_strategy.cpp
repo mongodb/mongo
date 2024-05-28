@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 namespace executor {
@@ -95,7 +96,19 @@ long long MongotTaskExecutorCursorGetMoreStrategy::_getNextBatchSize(
     return *_currentBatchSize;
 }
 
-bool MongotTaskExecutorCursorGetMoreStrategy::shouldPrefetch() const {
+bool MongotTaskExecutorCursorGetMoreStrategy::_mustNeedAnotherBatch(
+    long long totalNumReceived) const {
+    return visit(
+        OverloadedVisitor{
+            [totalNumReceived](long long minBounds) { return (totalNumReceived < minBounds); },
+            [](docs_needed_bounds::NeedAll minBounds) { return true; },
+            [](docs_needed_bounds::Unknown minBounds) { return false; },
+        },
+        _minDocsNeededBounds);
+}
+
+bool MongotTaskExecutorCursorGetMoreStrategy::shouldPrefetch(long long totalNumReceived,
+                                                             long long numBatchesReceived) const {
     // If we aren't sending batchSize to mongot, then we prefetch the next batch, unless we have a
     // discrete maximum bounds used to set docsRequested. When docsRequested is set, we
     // optimistically assume that we will only need a single batch and attempt to avoid doing
@@ -106,8 +119,11 @@ bool MongotTaskExecutorCursorGetMoreStrategy::shouldPrefetch() const {
         return !std::holds_alternative<long long>(_maxDocsNeededBounds);
     }
 
-    // TODO SERVER-86739 Enable pre-fetching for queries that use batchSize tuning.
-    return false;
+    if (_mustNeedAnotherBatch(totalNumReceived)) {
+        return true;
+    }
+    return std::holds_alternative<docs_needed_bounds::Unknown>(_maxDocsNeededBounds) &&
+        numBatchesReceived >= kAlwaysPrefetchAfterNBatches;
 }
 
 }  // namespace executor

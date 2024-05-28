@@ -195,6 +195,90 @@ DEATH_TEST_F(MongotCursorHelpersTest,
     MongotTaskExecutorCursorGetMoreStrategy(calcDocsNeededFn, /*initialBatchSize*/ 10);
 }
 
+TEST_F(MongotCursorHelpersTest, DefaultStrategyPrefetchAfterThreeBatches) {
+    MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
+        MongotTaskExecutorCursorGetMoreStrategy();
+    ASSERT_FALSE(
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 1));
+    ASSERT_FALSE(
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 4));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 5));
+}
+
+TEST_F(MongotCursorHelpersTest, DiscreteMinBoundsUnknownMaxBoundsPrefetch) {
+    // With discrete min bounds, prefetch if num received is less than minBounds. With unknown max
+    // bounds, still prefetch always after third batch.
+    MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
+        MongotTaskExecutorCursorGetMoreStrategy(
+            /*calcDocsNeededFn*/ nullptr,
+            /*startingBatchSize*/ 101,
+            /*minDocsNeededBounds*/ 50,
+            /*maxDocsNeededBounds*/ docs_needed_bounds::Unknown());
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 30, /*numBatchesReceived*/ 1));
+    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 1));
+    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 70, /*numBatchesReceived*/ 1));
+
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 30, /*numBatchesReceived*/ 2));
+    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 2));
+    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 70, /*numBatchesReceived*/ 2));
+
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 30, /*numBatchesReceived*/ 3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 70, /*numBatchesReceived*/ 3));
+}
+
+TEST_F(MongotCursorHelpersTest, DiscreteMinBoundsDiscreteMaxBoundsPrefetch) {
+    // With discrete min bounds and max bounds, only prefetch if num received is less than
+    // minBounds.
+    MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
+        MongotTaskExecutorCursorGetMoreStrategy(
+            /*calcDocsNeededFn*/ nullptr,
+            /*startingBatchSize*/ 101,
+            /*minDocsNeededBounds*/ 50,
+            /*maxDocsNeededBounds*/ 150);
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 40, /*numBatchesReceived*/ 1));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 49, /*numBatchesReceived*/ 1));
+    ASSERT_FALSE(
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 100, /*numBatchesReceived*/ 1));
+    ASSERT_FALSE(
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 150, /*numBatchesReceived*/ 1));
+
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 40, /*numBatchesReceived*/ 2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 49, /*numBatchesReceived*/ 2));
+    ASSERT_FALSE(
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 100, /*numBatchesReceived*/ 2));
+    ASSERT_FALSE(
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 150, /*numBatchesReceived*/ 2));
+
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 40, /*numBatchesReceived*/ 3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 49, /*numBatchesReceived*/ 3));
+    ASSERT_FALSE(
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 100, /*numBatchesReceived*/ 3));
+    ASSERT_FALSE(
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 150, /*numBatchesReceived*/ 3));
+}
+
+TEST_F(MongotCursorHelpersTest, AlwaysPrefetchNeedAllBounds) {
+    MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
+        MongotTaskExecutorCursorGetMoreStrategy(
+            /*calcDocsNeededFn*/ nullptr,
+            /*startingBatchSize*/ 101,
+            /*minDocsNeededBounds*/ docs_needed_bounds::NeedAll(),
+            /*maxDocsNeededBounds*/ docs_needed_bounds::NeedAll());
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 0, /*numBatchesReceived*/ 1));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 1));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 1));
+
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 0, /*numBatchesReceived*/ 2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 2));
+
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 0, /*numBatchesReceived*/ 3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 3));
+}
 }  // namespace
 }  // namespace executor
 }  // namespace mongo

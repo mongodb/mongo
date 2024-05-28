@@ -268,6 +268,7 @@ private:
     std::vector<BSONObj> _batch;
     decltype(_batch)::iterator _batchIter;
     long long _batchNum = 0;
+    long long _totalNumDocsReceived = 0;
 
     // Cursors built from the responses returned alongside the results for this cursor.
     std::vector<std::unique_ptr<TaskExecutorCursor>> _additionalCursors;

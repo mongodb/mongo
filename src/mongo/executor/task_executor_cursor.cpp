@@ -264,10 +264,12 @@ void TaskExecutorCursor::_processResponse(OperationContext* opCtx, CursorRespons
     _cursorId = response.getCursorId();
     _batch = response.releaseBatch();
     _batchIter = _batch.begin();
+    _totalNumDocsReceived += _batch.size();
 
     // If the previous response contained a cursorId and pre-fetching is enabled, schedule the
     // getMore.
-    if ((_cursorId != kClosedCursorId) && _options.getMoreStrategy->shouldPrefetch()) {
+    if ((_cursorId != kClosedCursorId) &&
+        _options.getMoreStrategy->shouldPrefetch(_totalNumDocsReceived, _batchNum)) {
         _scheduleGetMore(opCtx);
     }
 }
@@ -285,7 +287,7 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     // If we don't have an in-flight request, schedule one. This will occur when the
     // getMoreStrategy's 'shouldPrefetch()' is false.
     if (!_cmdState) {
-        invariant(!_options.getMoreStrategy->shouldPrefetch());
+        invariant(!_options.getMoreStrategy->shouldPrefetch(_totalNumDocsReceived, _batchNum));
         _scheduleGetMore(opCtx);
     }
 
