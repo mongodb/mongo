@@ -47,6 +47,7 @@ buildvariants:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       antithesis_build_type: aubsan
       compile_variant: *enterprise-ubuntu2204-64-aubsan-libvoidstar
+      separate_debug: off
       compile_flags: >-
         --allocator=system
         --sanitize=address,undefined
@@ -79,6 +80,7 @@ buildvariants:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       antithesis_build_type: tsan
       compile_variant: *enterprise-ubuntu2204-64-tsan-libvoidstar
+      separate_debug: off
       compile_flags: >-
         --allocator=system
         --sanitize=thread
