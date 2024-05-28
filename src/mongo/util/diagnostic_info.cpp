@@ -59,143 +59,139 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 
+using namespace fmt::literals;
+
 namespace mongo {
 
 namespace {
-using namespace fmt::literals;
-
 MONGO_FAIL_POINT_DEFINE(currentOpSpawnsThreadWaitingForLatch);
 
 constexpr auto kBlockedOpMutexName = "BlockedOpForTestLatch"_sd;
 constexpr auto kBlockedOpInterruptibleName = "BlockedOpForTestInterruptible"_sd;
 
-struct LatchState {
-    void start(Service* service) {
-        mutex.lock();
-        thread = stdx::thread([this, service]() {
-            ThreadClient tc("DiagnosticCaptureTestLatch", service);
-
-            // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
-
-            LOGV2(23123, "Entered currentOpSpawnsThreadWaitingForLatch thread");
-
-            stdx::lock_guard testLock(mutex);
-
-            LOGV2(23124, "Joining currentOpSpawnsThreadWaitingForLatch thread");
-        });
-    }
-
-    void stop() {
-        mutex.unlock();
-    }
-
-    boost::optional<Promise<void>> readyReached;
-    stdx::thread thread;
-
-    Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(3), kBlockedOpMutexName);
-};
-
-struct InterruptibleState {
-    void start(Service* service) {
-        thread = stdx::thread([this, service]() mutable {
-            ThreadClient tc("DiagnosticCaptureTestInterruptible", service);
-
-            // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
-
-            auto opCtx = tc->makeOperationContext();
-
-            LOGV2(23125, "Entered currentOpSpawnsThreadWaitingForLatch thread for interruptibles");
-            stdx::unique_lock lk(mutex);
-            opCtx->waitForConditionOrInterrupt(cv, lk, [&] { return isDone; });
-            isDone = false;
-
-            LOGV2(23126, "Joining currentOpSpawnsThreadWaitingForLatch thread for interruptibles");
-        });
-    }
-
-    void stop() {
-        stdx::lock_guard lk(mutex);
-        isDone = true;
-        cv.notify_one();
-    }
-
-    boost::optional<Promise<void>> readyReached;
-    stdx::thread thread;
-
-    stdx::condition_variable cv;
-    Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), kBlockedOpInterruptibleName);
-    bool isDone = false;
-};
-
 class BlockedOp {
 public:
     void start(Service* service);
     void join();
-    void setIsContended();
-    void setIsWaiting();
+    void setIsContended(bool value);
+    void setIsWaiting(bool value);
 
 private:
+    stdx::condition_variable _cv;
     stdx::mutex _m;  // NOLINT
+
+    struct LatchState {
+        bool isContended = false;
+        boost::optional<stdx::thread> thread{boost::none};
+
+        Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(3), kBlockedOpMutexName);
+    };
     LatchState _latchState;
+
+    struct InterruptibleState {
+        bool isWaiting = false;
+        boost::optional<stdx::thread> thread{boost::none};
+
+        stdx::condition_variable cv;
+        Mutex mutex =
+            MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), kBlockedOpInterruptibleName);
+        bool isDone = false;
+    };
     InterruptibleState _interruptibleState;
-};
+} gBlockedOp;
 
-BlockedOp gBlockedOp;
-
-// Starts a blocked operation. Makes two threads - one that contends for a lock held throughout the
-// blocked operation, and one that waits for a condition throughout the blocked operation.
+// This function causes us to make an additional thread with a self-contended lock so that
+// $currentOp can observe its DiagnosticInfo. Note that we track each thread that called us so that
+// we can join the thread when they are gone.
 void BlockedOp::start(Service* service) {
-    stdx::lock_guard lk(_m);
+    stdx::unique_lock<stdx::mutex> lk(_m);
 
-    invariant(!_latchState.readyReached);
-    invariant(!_interruptibleState.readyReached);
+    invariant(!_latchState.thread);
+    invariant(!_interruptibleState.thread);
 
-    auto latchStateReady = makePromiseFuture<void>();
-    auto interruptibleStateReady = makePromiseFuture<void>();
-    _latchState.readyReached = std::move(latchStateReady.promise);
-    _interruptibleState.readyReached = std::move(interruptibleStateReady.promise);
+    _latchState.mutex.lock();
+    _latchState.thread = stdx::thread([this, service]() mutable {
+        ThreadClient tc("DiagnosticCaptureTestLatch", service);
 
-    _latchState.start(service);
-    _interruptibleState.start(service);
+        // TODO(SERVER-74659): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationUnkillableByStepdown(lk);
+        }
 
-    latchStateReady.future.get();
-    interruptibleStateReady.future.get();
+        LOGV2(23123, "Entered currentOpSpawnsThreadWaitingForLatch thread");
 
+        stdx::lock_guard testLock(_latchState.mutex);
+
+        LOGV2(23124, "Joining currentOpSpawnsThreadWaitingForLatch thread");
+    });
+
+    _interruptibleState.thread = stdx::thread([this, service]() mutable {
+        ThreadClient tc("DiagnosticCaptureTestInterruptible", service);
+
+        // TODO(SERVER-74659): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationUnkillableByStepdown(lk);
+        }
+
+        auto opCtx = tc->makeOperationContext();
+
+        LOGV2(23125, "Entered currentOpSpawnsThreadWaitingForLatch thread for interruptibles");
+        stdx::unique_lock lk(_interruptibleState.mutex);
+        opCtx->waitForConditionOrInterrupt(
+            _interruptibleState.cv, lk, [&] { return _interruptibleState.isDone; });
+        _interruptibleState.isDone = false;
+
+        LOGV2(23126, "Joining currentOpSpawnsThreadWaitingForLatch thread for interruptibles");
+    });
+
+
+    _cv.wait(lk, [this] { return _latchState.isContended && _interruptibleState.isWaiting; });
     LOGV2(23127, "Started threads for currentOpSpawnsThreadWaitingForLatch");
 }
 
-// Unblocks threads started in BlockedOp::start(), joins them, and returns the BlockedOp to its
-// initial state.
+// This function unlocks testMutex and joins if there are no more callers of BlockedOp::start()
+// remaining
 void BlockedOp::join() {
-    stdx::unique_lock lk(_m);
-    _latchState.stop();
-    _interruptibleState.stop();
-    auto latchThread = std::exchange(_latchState.thread, {});
-    auto interruptibleThread = std::exchange(_interruptibleState.thread, {});
-    lk.unlock();
+    decltype(_latchState.thread) latchThread;
+    decltype(_interruptibleState.thread) interruptibleThread;
+    {
+        stdx::lock_guard<stdx::mutex> lk(_m);
 
-    latchThread.join();
-    interruptibleThread.join();
+        invariant(_latchState.thread);
+        invariant(_interruptibleState.thread);
+
+        _latchState.mutex.unlock();
+        _latchState.isContended = false;
+
+        {
+            stdx::lock_guard lk(_interruptibleState.mutex);
+            _interruptibleState.isDone = true;
+            _interruptibleState.cv.notify_one();
+        }
+        _interruptibleState.isWaiting = false;
+
+        std::swap(_latchState.thread, latchThread);
+        std::swap(_interruptibleState.thread, interruptibleThread);
+    }
+
+    latchThread->join();
+    interruptibleThread->join();
 }
 
-void BlockedOp::setIsContended() {
-    LOGV2(23128, "Setting isContended");
-    if (auto promise = std::move(_latchState.readyReached))
-        promise->emplaceValue();
+void BlockedOp::setIsContended(bool value) {
+    LOGV2(23128, "Setting isContended", "value"_attr = (value ? "true" : "false"));
+    stdx::lock_guard lk(_m);
+    _latchState.isContended = value;
+    _cv.notify_one();
 }
 
-void BlockedOp::setIsWaiting() {
-    LOGV2(23129, "Setting isWaiting");
-    if (auto promise = std::move(_interruptibleState.readyReached))
-        promise->emplaceValue();
+void BlockedOp::setIsWaiting(bool value) {
+    LOGV2(23129, "Setting isWaiting", "value"_attr = (value ? "true" : "false"));
+    stdx::lock_guard lk(_m);
+    _interruptibleState.isWaiting = value;
+    _cv.notify_one();
 }
 
 struct DiagnosticInfoHandle {
@@ -204,8 +200,8 @@ struct DiagnosticInfoHandle {
 };
 const auto getDiagnosticInfoHandle = Client::declareDecoration<DiagnosticInfoHandle>();
 
-MONGO_INITIALIZER_GENERAL(DiagnosticInfo, (), ("FinalizeDiagnosticListeners"))
-(InitializerContext*) {
+MONGO_INITIALIZER_GENERAL(DiagnosticInfo, (/* NO PREREQS */), ("FinalizeDiagnosticListeners"))
+(InitializerContext* context) {
     class DiagnosticListener : public latch_detail::DiagnosticListener {
         void onContendedLock(const Identity& id) override {
             if (auto client = Client::getCurrent()) {
@@ -213,7 +209,7 @@ MONGO_INITIALIZER_GENERAL(DiagnosticInfo, (), ("FinalizeDiagnosticListeners"))
 
                 if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
                     (id.name() == kBlockedOpMutexName)) {
-                    gBlockedOp.setIsContended();
+                    gBlockedOp.setIsContended(true);
                 }
             }
         }
@@ -251,7 +247,7 @@ MONGO_INITIALIZER(InterruptibleWaitListener)(InitializerContext* context) {
 
                 if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
                     (name == kBlockedOpInterruptibleName)) {
-                    gBlockedOp.setIsWaiting();
+                    gBlockedOp.setIsWaiting(true);
                 }
             }
         }
