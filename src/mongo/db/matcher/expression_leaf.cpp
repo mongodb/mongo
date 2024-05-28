@@ -70,10 +70,10 @@ ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     clonable_ptr<ErrorAnnotation> annotation,
     const CollatorInterface* collator)
     : LeafMatchExpression(type, path, leafArrBehavior, nonLeafArrBehavior, std::move(annotation)),
-      _backingBSON(BSON((path ? *path : "") << rhs)),
+      _backingBSONIsSet(false),
       _collator(collator) {
-    setData(_backingBSON.firstElement());
-    invariant(_rhs.type() != BSONType::EOO);
+    setData(path, std::move(rhs));
+    invariant(!_rhs.eoo());
 }
 
 // Instantiate above constructor for 'Value&&' and 'const BSONElement&' types.

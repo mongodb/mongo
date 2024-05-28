@@ -241,7 +241,7 @@ public:
      */
     static void translateEquality(const PathMatchExpression* matchExpr,
                                   const BSONElement& data,
-                                  const BSONObj* holder,
+                                  boost::optional<BSONObj> holder,
                                   const IndexEntry& index,
                                   bool isHashed,
                                   OrderedIntervalList* oil,

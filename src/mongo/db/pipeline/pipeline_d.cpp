@@ -1587,13 +1587,19 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     const BSONObj queryObj = pipeline->getInitialQuery();
     boost::intrusive_ptr<DocumentSourceMatch> leadingMatch;
     bool isTextQuery = false;
+    const bool isChangeStream =
+        pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
     // If a $match query is pulled into the cursor, the $match is redundant, and can be
     // removed from the pipeline.
+    // We avoid performing further optimizations on change stream MatchExpressions to avoid
+    // causing lifetime issues to the BSONObj included in the relevant MatchExpressions.
     if (!queryObj.isEmpty()) {
         auto firstStage = sources.front();
         if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(firstStage.get())) {
-            leadingMatch = boost::intrusive_ptr<DocumentSourceMatch>(matchStage);
-            isTextQuery = matchStage->isTextQuery();
+            if (!isChangeStream) {
+                leadingMatch = boost::intrusive_ptr<DocumentSourceMatch>(matchStage);
+                isTextQuery = matchStage->isTextQuery();
+            }
             sources.pop_front();
         } else {
             // A $geoNear stage, the only other stage that can produce an initial query, is also
@@ -1642,8 +1648,6 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
         }
     }
 
-    const bool isChangeStream =
-        pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
     if (isChangeStream) {
         invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);
         plannerOpts |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |

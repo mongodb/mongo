@@ -843,8 +843,8 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateExclusi
         params.maxRecord = RecordIdBound(record_id_helpers::keyForDate(maxDate));
 
         // Exclude all but the record with _id 'middleDate' from the scan.
-        StatusWithMatchExpression swMatch = MatchExpressionParser::parse(
-            BSON("_id" << BSON("$gt" << minDate << "$lt" << maxDate)), _expCtx.get());
+        BSONObj bsonObj = BSON("_id" << BSON("$gt" << minDate << "$lt" << maxDate));
+        StatusWithMatchExpression swMatch = MatchExpressionParser::parse(bsonObj, _expCtx.get());
 
         ASSERT_OK(swMatch.getStatus());
         auto filter = std::move(swMatch.getValue());
@@ -1037,7 +1037,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
     params.maxRecord = RecordIdBound(recordIds[endOffset]);
 
     // Provide RecordId bounds with exclusive filters.
-    StatusWithMatchExpression swMatch = MatchExpressionParser::parse(
+    auto bsonObj =
         fromjson(fmt::sprintf("{_id: {$gt: ObjectId('%s'), $lt: ObjectId('%s')}}",
                               record_id_helpers::toBSONAs(params.minRecord->recordId(), "")
                                   .firstElement()
@@ -1046,8 +1046,8 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
                               record_id_helpers::toBSONAs(params.maxRecord->recordId(), "")
                                   .firstElement()
                                   .OID()
-                                  .toString())),
-        _expCtx.get());
+                                  .toString()));
+    StatusWithMatchExpression swMatch = MatchExpressionParser::parse(bsonObj, _expCtx.get());
     ASSERT_OK(swMatch.getStatus());
     auto filter = std::move(swMatch.getValue());
 
@@ -1104,7 +1104,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
     params.maxRecord = RecordIdBound(recordIds[startOffset]);
 
     // Provide RecordId bounds with exclusive filters.
-    StatusWithMatchExpression swMatch = MatchExpressionParser::parse(
+    auto bsonObj =
         fromjson(fmt::sprintf("{_id: {$gt: ObjectId('%s'), $lt: ObjectId('%s')}}",
                               record_id_helpers::toBSONAs(params.minRecord->recordId(), "")
                                   .firstElement()
@@ -1113,8 +1113,8 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
                               record_id_helpers::toBSONAs(params.maxRecord->recordId(), "")
                                   .firstElement()
                                   .OID()
-                                  .toString())),
-        _expCtx.get());
+                                  .toString()));
+    StatusWithMatchExpression swMatch = MatchExpressionParser::parse(bsonObj, _expCtx.get());
     ASSERT_OK(swMatch.getStatus());
     auto filter = std::move(swMatch.getValue());
 
@@ -1341,11 +1341,10 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundsOv
         expectedResults.erase(expectedResults.begin());
         expectedResults.pop_back();
 
-
         // Filtering includes the min and max records. However the ScanBoundInclusion should enforce
         // the bounds are not included in the results.
-        StatusWithMatchExpression swMatch = MatchExpressionParser::parse(
-            BSON("_id" << BSON("$gte" << 0 << "$lte" << 4)), _expCtx.get());
+        auto bsonObj = BSON("_id" << BSON("$gte" << 0 << "$lte" << 4));
+        StatusWithMatchExpression swMatch = MatchExpressionParser::parse(bsonObj, _expCtx.get());
 
         ASSERT_OK(swMatch.getStatus());
         auto filter = std::move(swMatch.getValue());

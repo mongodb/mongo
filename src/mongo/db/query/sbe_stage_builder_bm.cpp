@@ -142,9 +142,10 @@ void BM_Simple(benchmark::State& state) {
     // Create QuerySolution
     auto child = fixture.makeIndexScanNode("x1", "index1", -INFINITY, kIndexUpperBound);
     auto root = std::make_unique<FetchNode>(std::move(child));
+
+    auto bsonObj = fixture.buildFilter(state.range(0), false);
     root->filter = std::move(
-        MatchExpressionParser::parse(fixture.buildFilter(state.range(0), false),
-                                     make_intrusive<ExpressionContextForTest>(opCtx, kNss))
+        MatchExpressionParser::parse(bsonObj, make_intrusive<ExpressionContextForTest>(opCtx, kNss))
             .getValue());
     auto solution = std::make_unique<QuerySolution>();
     solution->setRoot(std::move(root));
