@@ -235,6 +235,26 @@ TEST(DocumentGetFieldNonCaching, CachedTopLevelFields) {
     }
 }
 
+TEST(DocumentGetFieldNonCaching, ModifiedTopLevelFields) {
+    // Update "val1" and "val2.val2" to be scalar and in document cache.
+    MutableDocument mutDocument(fromBson(BSON("val1" << BSON("val1" << BSONObj()))));
+    mutDocument.setField("val1", Value(true));
+    MutableDocument mutSubDocument(fromBson(BSON("val2" << BSON("val2" << BSONObj()))));
+    mutSubDocument.setField("val2", Value(true));
+    mutDocument.addField("val2", mutSubDocument.freezeToValue());
+    Document document = mutDocument.freeze();
+
+    // Attempt to access the top-level and nested fields that reside in the cache with the non
+    // caching accessor.
+    {
+        ASSERT_EQ(document.getNestedScalarFieldNonCaching("val1")->getBool(), true);
+        ASSERT_EQ(document.getNestedScalarFieldNonCaching("val1.val1")->getType(), EOO);
+
+        ASSERT_EQ(document.getNestedScalarFieldNonCaching("val2.val2")->getBool(), true);
+        ASSERT_EQ(document.getNestedScalarFieldNonCaching("val2.val2.val2")->getType(), EOO);
+    }
+}
+
 TEST(DocumentGetFieldNonCaching, NonArrayDottedPaths) {
     BSONObj bson = BSON("address" << BSON("zip" << 123 << "street"
                                                 << "foo"));

@@ -697,6 +697,9 @@ boost::optional<Value> Document::getNestedScalarFieldNonCachingHelper(const Fiel
                 return val.getDocument().getNestedScalarFieldNonCachingHelper(dottedField,
                                                                               level + 1);
             }
+
+            // Returns missing when reading the sub-field of a scalar.
+            return Value();
         }
     }
 
