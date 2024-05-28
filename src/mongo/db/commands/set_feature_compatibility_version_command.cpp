@@ -686,17 +686,6 @@ private:
                     opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
         }
 
-        // We also wait for Create Collection coordinators to drain if downgrading and the flag for
-        // validateAndDefaultValuesForShardedTimeseries gets disabled since it involves a durable
-        // DDL document change.
-        if (isDowngrading &&
-            gFeatureFlagValidateAndDefaultValuesForShardedTimeseries
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
-        }
-
         // TODO SERVER-87119 remove the following scope once v8.0 branches out
         if (isDowngrading &&
             feature_flags::gConvertToCappedCoordinator.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
@@ -1794,18 +1783,6 @@ private:
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kCreateCollectionPre80Compatible);
-        }
-
-        // We perform a drain of create coordinators so that we don't end up with a confusing
-        // ConflictingOperationInProgress error. For more details see SERVER-83114.
-        //
-        // This can be removed once 8.0 becomes last LTS.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-            gFeatureFlagValidateAndDefaultValuesForShardedTimeseries.isEnabledOnVersion(
-                requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
         }
 
         // TODO SERVER-77915: Remove once v8.0 branches out.

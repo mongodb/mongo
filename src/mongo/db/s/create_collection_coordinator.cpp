@@ -1329,14 +1329,7 @@ void commit(OperationContext* opCtx,
 
     if (translatedRequestParams->getTimeseries()) {
         TypeCollectionTimeseriesFields timeseriesFields;
-        auto tsOptions = [&] {
-            // TODO SERVER-85251: We can replace all of this with:
-            //    return *translatedRequestParams->getTimeseries();
-            // Once the next LTS is made.
-            TimeseriesOptions timeseriesOptions = *(translatedRequestParams->getTimeseries());
-            (void)timeseries::validateAndSetBucketingParameters(timeseriesOptions);
-            return timeseriesOptions;
-        }();
+        auto tsOptions = *translatedRequestParams->getTimeseries();
         timeseriesFields.setTimeseriesOptions(std::move(tsOptions));
         coll.setTimeseriesFields(std::move(timeseriesFields));
     }
