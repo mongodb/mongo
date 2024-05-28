@@ -338,7 +338,9 @@ buildvariants:
         --ssl
         -j$(grep -c ^processor /proc/cpuinfo)
         --use-diagnostic-latches=on
-      test_flags: --excludeWithAnyTags=corrupts_data
+      test_flags: >-
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --excludeWithAnyTags=corrupts_data
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under {A,UB}SAN build.
       hang_analyzer_dump_core: false
       scons_cache_scope: shared
@@ -401,6 +403,7 @@ buildvariants:
       multiversion_platform: rhel80
       multiversion_edition: enterprise
       test_flags: >-
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
         --excludeWithAnyTags=tsan_incompatible
     tasks:
       - name: search_end_to_end_sharded_cluster
@@ -474,7 +477,7 @@ buildvariants:
     expansions:
       <<: *aubsan-lite-required-expansions
       test_flags: >-
-        --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+        --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine, internalQueryEnableAggressiveSpillsInGroup: true}"
         --excludeWithAnyTags=requires_increased_memlock_limits,featureFlagSbeFull,incompatible_aubsan
     tasks:
       - name: .aggregation !.sbe_only
