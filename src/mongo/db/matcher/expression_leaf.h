@@ -216,9 +216,7 @@ public:
     void setBackingBSON(const BSONObj& obj) {
         invariant(obj.isOwned());
         _backingBSON = obj;
-
-        // TODO: SERVER-87277 remove this after removing _backingBSON creation
-        _rhs = _backingBSON.firstElement();
+        _backingBSONIsSet = true;
     }
 
     const CollatorInterface* getCollator() const {
@@ -233,9 +231,8 @@ public:
         return _inputParamId;
     }
 
-    const BSONObj& getOwnedBackingBSON() const {
-        tassert(8870300, "Expected backing BSON to be owned", _backingBSON.isOwned());
-        return _backingBSON;
+    boost::optional<BSONObj> getOwnedBackingBSON() const {
+        return (_backingBSONIsSet ? boost::make_optional(_backingBSON) : boost::none);
     }
 
 protected:
@@ -247,7 +244,14 @@ protected:
     }
 
     // BSON which holds the data referenced by _rhs.
+    // For performance, the _backingBSON in ComparisonMatchExpressionBase is optionally populated.
+    // The creator of the MatchExpression ensures the lifetime of the relevant BSONObj against which
+    // the comparison is performed. _rhs points into that relevant _backingBSON.
+    // The specific cases when _backingBSON is populated (non-exhaustive list):
+    // -- initialization using Value
+    // -- $in simplification to Equality where the original BSONObj is destroyed.
     BSONObj _backingBSON;
+    bool _backingBSONIsSet;
     BSONElement _rhs;
 
     // Collator used to compare elements. By default, simple binary comparison will be used.
@@ -258,6 +262,15 @@ private:
         return [](std::unique_ptr<MatchExpression> expression) {
             return expression;
         };
+    }
+
+    void setData(boost::optional<StringData>& path, BSONElement elem) {
+        _rhs = elem;
+    }
+
+    void setData(boost::optional<StringData>& path, Value elem) {
+        setBackingBSON(BSON((path ? *path : "") << elem));
+        setData(_backingBSON.firstElement());
     }
 
     boost::optional<InputParamId> _inputParamId;
@@ -327,6 +340,9 @@ public:
     std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<EqualityMatchExpression>(path(), getData(), _errorAnnotation);
+        if (_backingBSONIsSet) {
+            e->setBackingBSON(_backingBSON);
+        }
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -368,6 +384,9 @@ public:
     std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<LTEMatchExpression>(path(), _rhs, _errorAnnotation);
+        if (_backingBSONIsSet) {
+            e->setBackingBSON(_backingBSON);
+        }
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -409,6 +428,9 @@ public:
     std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<LTMatchExpression>(path(), _rhs, _errorAnnotation);
+        if (_backingBSONIsSet) {
+            e->setBackingBSON(_backingBSON);
+        }
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -455,6 +477,9 @@ public:
     std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<GTMatchExpression>(path(), _rhs, _errorAnnotation);
+        if (_backingBSONIsSet) {
+            e->setBackingBSON(_backingBSON);
+        }
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -500,6 +525,9 @@ public:
     std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<GTEMatchExpression>(path(), _rhs, _errorAnnotation);
+        if (_backingBSONIsSet) {
+            e->setBackingBSON(_backingBSON);
+        }
         if (getTag()) {
             e->setTag(getTag()->clone());
         }

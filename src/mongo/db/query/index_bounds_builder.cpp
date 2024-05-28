@@ -665,13 +665,11 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // is from one element.
 
         // Passing a "holder" for the BOSNElement (node->getData()) here allows us to skip
-        // creating a new BSON to wrap the element in translateEquality().
-        // TODO SERVER-87277: After SERVER-87277, there might not be owned backing BSON on the match
-        // expression. Passing unowned BSON as the "holder" here is acceptable, as long as the BSON
-        // lives for as long as the query plan.
+        // creating a new BSON to wrap the element in translateEquality(). Passing unowned BSON as
+        // the "holder" here is acceptable, as long as the BSON lives for as long as the query plan.
         translateEquality(node,
                           node->getData(),
-                          &node->getOwnedBackingBSON(),
+                          node->getOwnedBackingBSON(),
                           index,
                           isHashed,
                           oilOut,
@@ -1125,8 +1123,13 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             // First, we generate the bounds the same way that we would do for an individual
             // equality. This will set tightness to the value it should be if this equality is being
             // considered in isolation.
-            IndexBoundsBuilder::translateEquality(
-                ime, equality, &ime->getOwnedBSONStorage(), index, isHashed, oilOut, &tightness);
+            IndexBoundsBuilder::translateEquality(ime,
+                                                  equality,
+                                                  boost::make_optional(ime->getOwnedBSONStorage()),
+                                                  index,
+                                                  isHashed,
+                                                  oilOut,
+                                                  &tightness);
 
             if (entireNullIntervalMatchesPredicate && BSONType::jstNULL == equality.type()) {
                 // We may have a covered null query. In this case, we update null interval
@@ -1404,7 +1407,7 @@ void IndexBoundsBuilder::translateRegex(const RegexMatchExpression* rme,
 // static
 void IndexBoundsBuilder::translateEquality(const PathMatchExpression* matchExpr,
                                            const BSONElement& data,
-                                           const BSONObj* holder,
+                                           boost::optional<BSONObj> holder,
                                            const IndexEntry& index,
                                            bool isHashed,
                                            OrderedIntervalList* oil,
@@ -1417,7 +1420,7 @@ void IndexBoundsBuilder::translateEquality(const PathMatchExpression* matchExpr,
     if (BSONType::Array != data.type()) {
         // Reuse the BSON from the parse tree if possible to avoid allocating a BSONObj.
         // A hashed index or collation means we have to create a copy to construct the bounds.
-        if (!isHashed && index.collator == nullptr && holder != nullptr) {
+        if (!isHashed && index.collator == nullptr && holder.has_value()) {
             oil->intervals.emplace_back(*holder, data, true, data, true);
             *tightnessOut = IndexBoundsBuilder::EXACT;
             return;
@@ -1460,7 +1463,7 @@ void IndexBoundsBuilder::translateEquality(const PathMatchExpression* matchExpr,
 
     // Case 3.
     // Reuse the BSON from the parse tree if possible to avoid allocating a BSONObj.
-    if (!index.collator && holder) {
+    if (!index.collator && holder.has_value()) {
         oil->intervals.emplace_back(*holder, data, true, data, true);
     } else {
         oil->intervals.push_back(makePointInterval(objFromElement(data, index.collator)));
@@ -1475,7 +1478,7 @@ void IndexBoundsBuilder::translateEquality(const PathMatchExpression* matchExpr,
         // Case 1.
         // Reuse the BSON from the parse tree if possible to avoid allocating a BSONObj.
         BSONElement firstEl = data.Obj().firstElement();
-        if (!index.collator && holder) {
+        if (!index.collator && holder.has_value()) {
             oil->intervals.emplace_back(*holder, firstEl, true, firstEl, true);
         } else {
             oil->intervals.push_back(makePointInterval(objFromElement(firstEl, index.collator)));
