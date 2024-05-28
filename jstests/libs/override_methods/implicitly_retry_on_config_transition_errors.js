@@ -26,7 +26,10 @@ const kRetryableErrors = [
     // lower in testing than in production, dropCollection is scheduled almost immediately.
     // Similarly, the collection rename step in resharding (moveCollection) can cause a query to
     // get killed.
-    {code: ErrorCodes.QueryPlanKilled}
+    {code: ErrorCodes.QueryPlanKilled},
+    // TODO SERVER-90609: Stop ignoring this error. Currently an index build may fail because a
+    // concurrent movePrimary triggered by the transition hook drops the collection.
+    {code: ErrorCodes.IndexBuildAborted},
 ];
 
 // Commands known not to work with transitions so tests can fail immediately with a clear error.

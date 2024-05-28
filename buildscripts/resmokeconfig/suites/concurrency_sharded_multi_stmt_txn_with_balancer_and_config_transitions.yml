@@ -119,6 +119,10 @@ selector:
     # TODO SERVER-80690: Remove when tracked time series collections can be moved.
     - jstests/concurrency/fsm_workloads/timeseries_deletes_and_inserts.js
 
+    # TODO SERVER-90609: Enable these tests.
+    - jstests/concurrency/fsm_workloads/create_index_background_unique.js
+    - jstests/concurrency/fsm_workloads/create_index_background_unique_capped.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
