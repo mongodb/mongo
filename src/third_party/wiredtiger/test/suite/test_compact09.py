@@ -75,35 +75,39 @@ class test_compact09(compact_util):
         # Write to disk.
         self.session.checkpoint()
 
-        # Enable background compaction and exclude the two tables.
+        # Enable background compaction and exclude the two tables. Use run once to be able to
+        # track the stats easily.
         exclude_list = f'["{self.uri_prefix}_0.wt", "{self.uri_prefix}_1.wt"]'
-        config = f'background=true,free_space_target=1MB,exclude={exclude_list}'
-        self.turn_on_bg_compact(config)
+        config = f'background=true,free_space_target=1MB,exclude={exclude_list},run_once=true'
+        # Don't use the helper function as the server may go to sleep before we have the time to
+        # check it is actually running.
+        self.session.compact(None, config)
 
         # Background compaction should exclude all files.
         while self.get_bg_compaction_files_excluded() < self.n_tables:
-            time.sleep(1)
+            time.sleep(0.1)
         assert self.get_files_compacted(uris) == 0
         num_files_excluded = self.get_bg_compaction_files_excluded()
         assert num_files_excluded == self.n_tables
 
-        # Stop the background compaction server.
-        self.turn_off_bg_compact()
+        # Make sure the background server is stopped by now.
+        while self.get_bg_compaction_running():
+            time.sleep(0.1)
 
         # Enable background compaction and exclude only one table.
         exclude_list = f'["{self.uri_prefix}_0.wt"]'
-        config = f'background=true,free_space_target=1MB,exclude={exclude_list}'
-        self.turn_on_bg_compact(config)
+        config = f'background=true,free_space_target=1MB,exclude={exclude_list},run_once=true'
+        self.session.compact(None, config)
 
         # Background compaction should exclude only one file now. Since the stats are cumulative, we
         # need to take into account the previous check.
         while self.get_bg_compaction_files_excluded() < num_files_excluded + 1:
-            time.sleep(1)
+            time.sleep(0.1)
         assert self.get_bg_compaction_files_excluded() == num_files_excluded + 1
 
         # We should now start compacting the second table.
         while self.get_files_compacted(uris) == 0:
-            time.sleep(1)
+            time.sleep(0.1)
         assert self.get_files_compacted(uris) == 1
 
         # Make sure we have compacted the right table.
@@ -111,9 +115,6 @@ class test_compact09(compact_util):
         self.assertEqual(self.get_pages_rewritten(uri), 0)
         uri = self.uri_prefix + '_1'
         self.assertGreater(self.get_pages_rewritten(uri), 0)
-
-        # Stop the background compaction server.
-        self.turn_off_bg_compact()
 
         # Background compaction may have been inspecting a table when disabled, which is considered
         # as an interruption, ignore that message.

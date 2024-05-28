@@ -257,6 +257,7 @@ extern const char __WT_CONFIG_CHOICE_ordered[];
 extern const char __WT_CONFIG_CHOICE_out_of_order[];
 extern const char __WT_CONFIG_CHOICE_overflow[];
 extern const char __WT_CONFIG_CHOICE_pinned[];
+extern const char __WT_CONFIG_CHOICE_prefetch_delay[];
 extern const char __WT_CONFIG_CHOICE_prefix_compare[];
 extern const char __WT_CONFIG_CHOICE_prepare[];
 extern const char __WT_CONFIG_CHOICE_prepare_checkpoint_delay[];

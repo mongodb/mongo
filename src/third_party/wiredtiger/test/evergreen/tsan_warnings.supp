@@ -12,6 +12,7 @@ race:src/support/stat.c
 
 # FIXME-WT-12734 this function copies an 8 byte struct which needs further investigation.
 race:__log_wrlsn_server
+race:__wt_log_force_sync
 
 # FIXME-WT-12611 CONNECTION_API_CALL contains a data race that touches the session array, but the number of macro
 # calls makes diagnosing this very hard. For now suppress the surrounding function and handle this in a separate ticket.

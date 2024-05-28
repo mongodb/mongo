@@ -359,6 +359,9 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
 
   {"stress.hs_sweep", "stress history store sweep", C_BOOL, 2, 0, 0, V_GLOBAL_STRESS_HS_SWEEP},
 
+  {"stress.prefetch_delay", "stress prefetch delay", C_BOOL, 2, 0, 0,
+    V_GLOBAL_STRESS_PREFETCH_DELAY},
+
   {"stress.prepare_resolution_1", "stress prepare resolution (#1)", C_BOOL, 2, 0, 0,
     V_GLOBAL_STRESS_PREPARE_RESOLUTION_1},
 

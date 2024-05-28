@@ -162,8 +162,8 @@ __compact_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     WT_ADDR_COPY copy;
     WT_BM *bm;
     WT_DECL_RET;
+    WT_REF_STATE previous_state;
     size_t addr_size;
-    uint8_t previous_state;
 
     *skipp = true; /* Default skip. */
 

@@ -30,7 +30,7 @@ static WT_INLINE void
 __spin_init_internal(WT_SPINLOCK *t, const char *name)
 {
     t->name = name;
-    t->session_id = WT_SESSION_ID_INVALID;
+    __wt_atomic_store32(&t->session_id, WT_SESSION_ID_INVALID);
     t->stat_count_off = t->stat_app_usecs_off = t->stat_int_usecs_off = -1;
     t->stat_session_usecs_off = -1;
     t->initialized = 1;
@@ -176,7 +176,7 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
     ret = pthread_mutex_trylock(&t->lock);
     if (ret == 0)
-        t->session_id = WT_SPIN_SESSION_ID_SAFE(session);
+        __wt_atomic_store32(&t->session_id, WT_SPIN_SESSION_ID_SAFE(session));
     return (ret);
 }
 
@@ -191,7 +191,7 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
     if ((ret = pthread_mutex_lock(&t->lock)) != 0)
         WT_IGNORE_RET(__wt_panic(session, ret, "pthread_mutex_lock: %s", t->name));
-    t->session_id = WT_SPIN_SESSION_ID_SAFE(session);
+    __wt_atomic_store32(&t->session_id, WT_SPIN_SESSION_ID_SAFE(session));
 }
 #endif
 

@@ -1914,7 +1914,7 @@ __wti_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
     if (freep != NULL)
         *freep = true;
     release_buffered = WT_LOG_SLOT_RELEASED_BUFFERED(__wt_atomic_loadiv64(&slot->slot_state));
-    release_bytes = release_buffered + slot->slot_unbuffered;
+    release_bytes = release_buffered + __wt_atomic_loadi64(&slot->slot_unbuffered);
 
     /*
      * Checkpoints can be configured based on amount of log written. Add in this log record to the

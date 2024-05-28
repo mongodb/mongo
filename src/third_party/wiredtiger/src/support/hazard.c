@@ -73,7 +73,7 @@ __wt_hazard_set_func(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 )
 {
     WT_HAZARD *hp;
-    uint8_t current_state;
+    WT_REF_STATE current_state;
 
     *busyp = false;
 

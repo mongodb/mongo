@@ -193,7 +193,7 @@ static int
 __sync_obsolete_cleanup_one(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_DECL_RET;
-    uint8_t new_state, previous_state, ref_state;
+    WT_REF_STATE new_state, previous_state, ref_state;
     bool busy, ref_deleted;
 
     busy = ref_deleted = false;

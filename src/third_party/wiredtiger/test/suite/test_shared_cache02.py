@@ -143,7 +143,7 @@ class test_shared_cache02(wttest.WiredTigerTestCase):
 
     # Test reconfigure that switches to using a shared cache
     # previous reserve size isn't taken into account
-    def test_shared_cache_reconfig03(self):
+    def test_shared_cache_reconfig04(self):
         nops = 1000
         self.openConnections(['WT_TEST1', 'WT_TEST2'], pool_opts = ',')
 
@@ -162,7 +162,7 @@ class test_shared_cache02(wttest.WiredTigerTestCase):
         self.closeConnections()
 
     # Test reconfigure with absolute value for eviction config fails
-    def test_shared_cache_reconfig04(self):
+    def test_shared_cache_reconfig05(self):
         nops = 1000
         self.openConnections(['WT_TEST1', 'WT_TEST2'],
             pool_opts = ',shared_cache=(name=pool,size=50M,reserve=20M),')

@@ -191,7 +191,7 @@ union __wt_lsn {
 struct __wt_logslot {
     WT_CACHE_LINE_PAD_BEGIN
     wt_shared volatile int64_t slot_state; /* Slot state */
-    int64_t slot_unbuffered;               /* Unbuffered data in this slot */
+    wt_shared int64_t slot_unbuffered;     /* Unbuffered data in this slot */
     wt_shared int slot_error;              /* Error value */
     wt_shared wt_off_t slot_start_offset;  /* Starting file offset */
     wt_shared wt_off_t slot_last_offset;   /* Last record offset */

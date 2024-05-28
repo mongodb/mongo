@@ -44,6 +44,9 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         __wt_cond_wait(session, conn->prefetch_threads.wait_cond, 10 * WT_THOUSAND, NULL);
 
     while (!TAILQ_EMPTY(&conn->pfqh)) {
+        /* Encourage races. */
+        __wt_timing_stress(session, WT_TIMING_STRESS_PREFETCH_DELAY, NULL);
+
         __wt_spin_lock(session, &conn->prefetch_lock);
         pe = TAILQ_FIRST(&conn->pfqh);
 

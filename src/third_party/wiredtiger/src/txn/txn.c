@@ -1714,6 +1714,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
+    WT_REF_STATE previous_state;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_OP *op;
@@ -1722,7 +1723,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_DIAGNOSTIC
     uint32_t prepare_count;
 #endif
-    uint8_t previous_state;
     u_int i;
     bool cannot_fail, locked, prepare, readonly, update_durable_ts;
 

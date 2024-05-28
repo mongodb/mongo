@@ -107,7 +107,7 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
     WT_ADDR_COPY addr;
     WT_DECL_RET;
-    uint8_t previous_state;
+    WT_REF_STATE previous_state;
 
     *skipp = false;
 
@@ -224,9 +224,9 @@ err:
 int
 __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+    WT_REF_STATE current_state;
     WT_UPDATE **updp;
     uint64_t sleep_usecs, yield_count;
-    uint8_t current_state;
     bool locked;
 
     /* Lock the reference. We cannot access ref->page_del except when locked. */

@@ -521,7 +521,7 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
      * Save the current eviction walk setting: checkpoint can interfere with eviction and we don't
      * want to unfairly penalize (or promote) eviction in trees due to checkpoints.
      */
-    btree->evict_walk_saved = btree->evict_walk_period;
+    btree->evict_walk_saved = __wt_atomic_load32(&btree->evict_walk_period);
 
     session->ckpt_handle[session->ckpt_handle_next++] = session->dhandle;
     return (0);
@@ -2508,7 +2508,7 @@ __checkpoint_presync(WT_SESSION_IMPL *session, const char *cfg[])
 
     btree = S2BT(session);
     WT_ASSERT(session, btree->checkpoint_gen == __wt_gen(session, WT_GEN_CHECKPOINT));
-    btree->evict_walk_period = btree->evict_walk_saved;
+    __wt_atomic_store32(&btree->evict_walk_period, btree->evict_walk_saved);
     return (0);
 }
 
@@ -2556,7 +2556,7 @@ __checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
      * In case this tree was being skipped by the eviction server during the checkpoint, restore the
      * previous state.
      */
-    btree->evict_walk_period = btree->evict_walk_saved;
+    __wt_atomic_store32(&btree->evict_walk_period, btree->evict_walk_saved);
 
     /*
      * Wake the eviction server, in case application threads have stalled while the eviction server

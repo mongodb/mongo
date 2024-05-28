@@ -1668,7 +1668,7 @@ tasks:
       - func: "make check directory"
         vars:
           directory: examples/c
-          extra_args: -E "(ex_all|ex_backup|ex_backup_block|ex_file_system)" -j ${num_jobs}
+          extra_args: -E "(ex_all|ex_backup|ex_backup_block)" -j ${num_jobs}
 
   - name: examples-c-production-disable-shared-test
     tags: ["pull_request"]
@@ -2538,11 +2538,9 @@ tasks:
   # End of Python unit test tasks
 
   - name: s-all
-    tags: ["pull_request"]
-    depends_on:
-    - name: compile
+    tags: ["lint"]
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/dist"
@@ -2814,7 +2812,7 @@ tasks:
       - func: "verify wt datafiles"
 
   - name: clang-analyzer
-    tags: ["pull_request"]
+    tags: ["lint"]
     commands:
       - func: "get project"
       - command: shell.exec
@@ -5365,6 +5363,7 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
     - name: ".pull_request !.pull_request_compilers"
+    - name: ".lint"
     - name: ".unit_test_long"
       distros: ubuntu2004-large
     - name: compile
@@ -5490,7 +5489,6 @@ buildvariants:
     extra_args: -LE "cppsuite|long_running"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
   tasks:
-    - name: clang-analyzer
     - name: compile
     - name: compile-production-disable-shared
     - name: compile-production-disable-static
@@ -5517,7 +5515,6 @@ buildvariants:
     ENABLE_TCMALLOC: 0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
-    - name: clang-analyzer
     - name: compile
     - name: compile-production-disable-shared
     - name: compile-production-disable-static

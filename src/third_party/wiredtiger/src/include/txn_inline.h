@@ -322,8 +322,8 @@ static WT_INLINE void
 __wt_txn_op_delete_apply_prepare_state(WT_SESSION_IMPL *session, WT_REF *ref, bool commit)
 {
     WT_PAGE_DELETED *page_del;
+    WT_REF_STATE previous_state;
     WT_UPDATE **updp;
-    uint8_t previous_state;
 
     /* Lock the ref to ensure we don't race with page instantiation. */
     WT_REF_LOCK(session, ref, &previous_state);
@@ -387,9 +387,9 @@ __txn_op_delete_commit_apply_page_del_timestamp(WT_SESSION_IMPL *session, WT_REF
 static WT_INLINE void
 __wt_txn_op_delete_commit_apply_timestamps(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+    WT_REF_STATE previous_state;
     WT_TXN *txn;
     WT_UPDATE **updp;
-    uint8_t previous_state;
 
     txn = session->txn;
 

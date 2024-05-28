@@ -294,7 +294,7 @@ struct __wt_reconcile {
     bool cache_write_hs;      /* Used the history store table */
     bool cache_write_restore; /* Used update/restoration */
 
-    uint8_t tested_ref_state; /* Debugging information */
+    WT_REF_STATE tested_ref_state; /* Debugging information */
 
     /*
      * XXX In the case of a modified update, we may need a copy of the current value as a set of

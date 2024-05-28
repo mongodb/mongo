@@ -51,7 +51,7 @@ __wt_ref_is_root(WT_REF *ref)
  *     Set a ref's state. Accessed from the WT_REF_SET_STATE macro.
  */
 static WT_INLINE void
-__ref_set_state(WT_REF *ref, uint8_t state)
+__ref_set_state(WT_REF *ref, WT_REF_STATE state)
 {
     WT_RELEASE_WRITE_WITH_BARRIER(ref->__state, state);
 }
@@ -67,7 +67,7 @@ __ref_set_state(WT_REF *ref, uint8_t state)
  */
 static WT_INLINE void
 __ref_track_state(
-  WT_SESSION_IMPL *session, WT_REF *ref, uint8_t new_state, const char *func, int line)
+  WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE new_state, const char *func, int line)
 {
     ref->hist[ref->histoff].session = session;
     ref->hist[ref->histoff].name = session->name;
@@ -89,7 +89,7 @@ __ref_track_state(
  * __ref_get_state --
  *     Get a ref's state variable safely.
  */
-static WT_INLINE uint8_t
+static WT_INLINE WT_REF_STATE
 __ref_get_state(WT_REF *ref)
 {
     return (__wt_atomic_loadv8(&ref->__state));
@@ -102,8 +102,8 @@ __ref_get_state(WT_REF *ref)
  *     Try to do a compare and swap, if successful update the ref history in diagnostic mode.
  */
 static WT_INLINE bool
-__ref_cas_state(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t old_state, uint8_t new_state,
-  const char *func, int line)
+__ref_cas_state(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE old_state,
+  WT_REF_STATE new_state, const char *func, int line)
 {
     bool cas_result;
 
@@ -134,9 +134,9 @@ __ref_cas_state(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t old_state, uint8_
  *     Spin until successfully locking the ref. Return the previous state to the caller.
  */
 static WT_INLINE void
-__ref_lock(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t *previous_statep)
+__ref_lock(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE *previous_statep)
 {
-    uint8_t previous_state;
+    WT_REF_STATE previous_state;
     for (;; __wt_yield()) {
         previous_state = WT_REF_GET_STATE(ref);
         if (previous_state != WT_REF_LOCKED &&

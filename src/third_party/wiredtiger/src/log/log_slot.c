@@ -42,8 +42,8 @@ __log_slot_dump(WT_SESSION_IMPL *session)
         __wt_errx(session, "    Offset: start: %" PRIuMAX " last:%" PRIuMAX,
           (uintmax_t)__wt_atomic_loadi64(&slot->slot_start_offset),
           (uintmax_t)__wt_atomic_loadi64(&slot->slot_last_offset));
-        __wt_errx(session, "    Unbuffered: %" PRId64 " error: %" PRId32, slot->slot_unbuffered,
-          __wt_atomic_loadi32(&slot->slot_error));
+        __wt_errx(session, "    Unbuffered: %" PRId64 " error: %" PRId32,
+          __wt_atomic_loadi64(&slot->slot_unbuffered), __wt_atomic_loadi32(&slot->slot_error));
     }
     __wt_errx(session, "Earliest slot: %d", earliest);
 }
@@ -69,7 +69,7 @@ __wti_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
      * set for closing the file handle on a log file switch.  The flags
      * are reset when the slot is freed.  See log_slot_free.
      */
-    slot->slot_unbuffered = 0;
+    __wt_atomic_storei64(&slot->slot_unbuffered, 0);
     WT_ASSIGN_LSN(&slot->slot_start_lsn, &log->alloc_lsn);
     WT_ASSIGN_LSN(&slot->slot_end_lsn, &slot->slot_start_lsn);
     __wt_atomic_storei64(&slot->slot_start_offset, __wt_lsn_offset(&log->alloc_lsn));
@@ -153,7 +153,7 @@ retry:
     time_start = __wt_clock(session);
 
     if (WT_LOG_SLOT_UNBUFFERED_ISSET(old_state)) {
-        while (slot->slot_unbuffered == 0) {
+        while (__wt_atomic_loadi64(&slot->slot_unbuffered) == 0) {
             WT_STAT_CONN_INCR(session, log_slot_close_unbuf);
             __wt_yield();
             if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_SLOW_OPERATION)) {
@@ -165,7 +165,7 @@ retry:
                           "SLOT_CLOSE: Slot %" PRIu32 " Timeout unbuffered, state 0x%" PRIx64
                           " unbuffered %" PRId64,
                           (uint32_t)(slot - &log->slot_pool[0]), (uint64_t)slot->slot_state,
-                          slot->slot_unbuffered);
+                          __wt_atomic_loadi64(&slot->slot_unbuffered));
                         __log_slot_dump(session);
                         __wt_abort(session);
                     }
@@ -175,7 +175,8 @@ retry:
         }
     }
 
-    end_offset = WT_LOG_SLOT_JOINED_BUFFERED(old_state) + slot->slot_unbuffered;
+    end_offset =
+      WT_LOG_SLOT_JOINED_BUFFERED(old_state) + __wt_atomic_loadi64(&slot->slot_unbuffered);
     __wt_atomic_add32(&slot->slot_end_lsn.l.offset, (uint32_t)end_offset);
     WT_STAT_CONN_INCRV(session, log_slot_consolidated, end_offset);
     /*
@@ -629,9 +630,9 @@ __wti_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, W
     if (LF_ISSET(WT_LOG_FSYNC))
         F_SET_ATOMIC_16(slot, WT_SLOT_SYNC);
     if (F_ISSET(myslot, WT_MYSLOT_UNBUFFERED)) {
-        WT_ASSERT(session, slot->slot_unbuffered == 0);
+        WT_ASSERT(session, __wt_atomic_loadi64(&slot->slot_unbuffered) == 0);
         WT_STAT_CONN_INCR(session, log_slot_unbuffered);
-        slot->slot_unbuffered = (int64_t)mysize;
+        __wt_atomic_storei64(&slot->slot_unbuffered, (int64_t)mysize);
     }
     myslot->slot = slot;
     myslot->offset = join_offset;
