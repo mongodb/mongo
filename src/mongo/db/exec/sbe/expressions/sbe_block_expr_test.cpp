@@ -393,7 +393,6 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
 
     {
         auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
-        value::ValueGuard blockInputGuard(blockTag, blockVal);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
@@ -490,7 +489,6 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
 
     {
         auto [blockTag, blockVal] = value::makeNewString("GMT"_sd);
-        value::ValueGuard blockInputGuard(blockTag, blockVal);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
@@ -515,7 +513,6 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
 
     {
         auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
-        value::ValueGuard blockInputGuard(blockTag, blockVal);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
@@ -590,7 +587,6 @@ TEST_F(SBEBlockExpressionTest, BlockExistsMonoHomogeneousTest) {
 
     {
         auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
-        value::ValueGuard blockInputGuard(blockTag, blockVal);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
@@ -790,7 +786,6 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
 
     {
         auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
-        value::ValueGuard blockInputGuard(blockTag, blockVal);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         auto [fillTag, fillVal] = makeInt32(0);
@@ -946,8 +941,6 @@ TEST_F(SBEBlockExpressionTest, BlockFillTypeMonoHomogeneousTest) {
 
     {
         auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
-        value::ValueGuard blockInputGuard(blockTag, blockVal);
-
         value::MonoBlock monoBlock(2, blockTag, blockVal);
         auto extracted = monoBlock.extract();
 
