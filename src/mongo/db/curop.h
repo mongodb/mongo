@@ -1094,7 +1094,10 @@ public:
     void setGenericCursor_inlock(GenericCursor gc);
 
     boost::optional<SingleThreadedLockStats> getLockStatsBase() const {
-        return _lockStatsBase;
+        if (!_lockerStatsBase) {
+            return boost::none;
+        }
+        return _lockerStatsBase->lockStats;
     }
 
     void setTickSource_forTest(TickSource* tickSource) {
@@ -1120,6 +1123,34 @@ private:
     class CurOpStack;
 
     /**
+     * A set of additive locker stats that CurOp tracks during it's lifecycle.
+     */
+    struct AdditiveLockerStats {
+        void append(const AdditiveLockerStats& other);
+        void subtract(const AdditiveLockerStats& other);
+
+        /**
+         * Snapshot of locker lock stats.
+         */
+        SingleThreadedLockStats lockStats;
+
+        /**
+         * Total time spent waiting on locks.
+         */
+        Microseconds cumulativeLockWaitTime{0};
+
+        /**
+         * Total time spent queued for tickets.
+         */
+        Microseconds timeQueuedForTickets{0};
+
+        /**
+         * Total time spent queued for flow control tickets.
+         */
+        Microseconds timeQueuedForFlowControl{0};
+    };
+
+    /**
      * Gets the OperationContext associated with this CurOp.
      * This must only be called after the CurOp has been pushed to an OperationContext's CurOpStack.
      */
@@ -1128,6 +1159,11 @@ private:
     TickSource::Tick startTime();
     Microseconds computeElapsedTimeTotal(TickSource::Tick startTime,
                                          TickSource::Tick endTime) const;
+
+    /**
+     * Collects and returns additive lockers stats
+     */
+    static AdditiveLockerStats getAdditiveLockerStats(const Locker* locker);
 
     /**
      * Returns the time operation spends blocked waiting for locks and tickets. Also returns the
@@ -1203,25 +1239,14 @@ private:
     std::string _planSummary;
 
     // The lock stats being reported on the locker that accrued outside of this operation. This
-    // includes the snapshot of lock stats taken when this CurOp instance is pushed to a CurOpStack
+    // includes:
+    // * the snapshot of lock stats taken when this CurOp instance is pushed to a CurOpStack
     // or the snapshot of lock stats taken when transaction resources are unstashed to this
-    // operation context.
-    boost::optional<SingleThreadedLockStats> _lockStatsBase;
-
-    // The snapshot of lock stats taken when transaction resources are stashed. This captures the
-    // locker activity that happened on this operation before the locker is released back to
-    // transaction resources.
-    boost::optional<SingleThreadedLockStats> _lockStatsOnceStashed;
-
-    // The ticket wait times being reported on the locker that accrued outside of this operation.
-    // This includes ticket wait times already accrued when the CurOp instance is pushed to a
-    // CurOpStack or ticket wait times on locker when transaction resources are unstashed to this
-    // operation context.
-    Microseconds _ticketWaitBase{0};
-
-    // The ticket wait times that accrued during this operation captured before the locker is
-    // released back to transaction resources and stashed.
-    Microseconds _ticketWaitWhenStashed{0};
+    // operation context (as positive)
+    // * the snapshot of lock stats taken when transactions resources are stashed (as negative).
+    //   This captures the locker activity that happened on this operation before the locker is
+    //   released back to transaction resources.
+    boost::optional<AdditiveLockerStats> _lockerStatsBase;
 
     SharedUserAcquisitionStats _userAcquisitionStats{std::make_shared<UserAcquisitionStats>()};
 
