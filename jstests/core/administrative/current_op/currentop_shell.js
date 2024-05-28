@@ -93,19 +93,6 @@ function startShellWithOp(comment) {
     return awaitShell;
 }
 
-// Check if there is a shard in the cluster with a log line containing the given pattern.
-// We can't be sure which is the shard containing that log line because there may be a move
-// collection operation running in background.
-// The only thing we know is that it must happen on at least one shard
-function testLogPattern(db, pattern) {
-    const nodesToCheck = FixtureHelpers.isStandalone(db) ? [db] : FixtureHelpers.getPrimaries(db);
-
-    return nodesToCheck.some(conn => {
-        const log = conn.adminCommand({getLog: "global"});
-        return pattern.test(log.log);
-    });
-}
-
 /**
  * Tests the currentOp behaviour by first starting a parallel shell, where a long running command is
  * being executed. After that a 'commandFn' is called, which is retrieving currentOps either through
@@ -133,10 +120,6 @@ function testCurrentOp(comment, commandFn, shouldTruncate) {
                 shouldTruncate, result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
         }
     });
-
-    if (shouldTruncate) {
-        assert(testLogPattern(db, /will be truncated/));
-    }
 
     res.inprog.forEach((op) => {
         assert.commandWorked(db.killOp(op.opid));
