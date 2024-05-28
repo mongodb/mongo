@@ -88,7 +88,13 @@ def _combine_errors(fixes_filename: str, files_to_parse: List[str]) -> int:
         with open(item) as input_yml:
             fixes = yaml.safe_load(input_yml)
         for fix in fixes["Diagnostics"]:
-            fix_msg = fix["DiagnosticMessage"]
+            fix_msg = None
+            if "Notes" in fix:
+                fix_msg = fix["Notes"][0]
+                if len(fix["Notes"]) > 1:
+                    print(f'Warning: this script may be missing values in [{fix["Notes"]}]')
+            else:
+                fix_msg = fix["DiagnosticMessage"]
             fix_data = (
                 all_fixes.setdefault(fix["DiagnosticName"], {})
                 .setdefault(fix_msg.get("FilePath", "FilePath Not Found"), {})
@@ -140,75 +146,7 @@ def __dedup_errors(clang_tidy_errors_threads: List[str]) -> str:
     return os.linesep.join(unique_single_error_flatten)
 
 
-def main():
-    """Execute Main entry point."""
-
-    parser = argparse.ArgumentParser(description="Run multithreaded clang-tidy")
-
-    parser.add_argument(
-        "-t",
-        "--threads",
-        type=int,
-        default=multiprocessing.cpu_count(),
-        help="Run with a specific number of threads",
-    )
-    parser.add_argument(
-        "-d",
-        "--output-dir",
-        type=str,
-        default="clang_tidy_fixes",
-        help="Directory to write all clang-tidy output to",
-    )
-    parser.add_argument(
-        "-o",
-        "--fixes-file",
-        type=str,
-        default="clang_tidy_fixes.json",
-        help="Report json file to write combined fixes to",
-    )
-    parser.add_argument(
-        "-c",
-        "--compile-commands",
-        type=str,
-        default="compile_commands.json",
-        help="compile_commands.json file to use to find the files to tidy",
-    )
-    parser.add_argument(
-        "--split-jobs",
-        type=int,
-        default=0,
-        help="The total number of splits if splitting the jobs across multiple tasks. 0 means don't split.",
-    )
-    parser.add_argument(
-        "--split",
-        type=int,
-        default=1,
-        help="The interval to run out of the total number of --split-jobs. Must be a value between 1 and --split-jobs value.",
-    )
-    parser.add_argument(
-        "-q", "--show-stdout", type=bool, default=True, help="Log errors to console"
-    )
-    parser.add_argument(
-        "-l", "--log-file", type=str, default="clang_tidy", help="clang tidy log from evergreen"
-    )
-    parser.add_argument(
-        "--disable-reporting",
-        action="store_true",
-        default=False,
-        help="Disable generating the report file for evergreen perf.send",
-    )
-    parser.add_argument(
-        "-m",
-        "--check-module",
-        type=str,
-        default=CHECKS_SO,
-        help="Path to load the custom mongo checks module.",
-    )
-    # TODO: Is there someway to get this without hardcoding this much
-    parser.add_argument("-y", "--clang-tidy-toolchain", type=str, default="v4")
-    parser.add_argument("-f", "--clang-tidy-cfg", type=str, default=".clang-tidy")
-    args = parser.parse_args()
-
+def _run_tidy(args):
     clang_tidy_binary = f"/opt/mongodbtoolchain/{args.clang_tidy_toolchain}/bin/clang-tidy"
 
     if os.path.exists(args.check_module):
@@ -327,17 +265,109 @@ def main():
                 f" The number of jobs completed is {tasks_completed}/{total_jobs}. Duration {pretty_time_duration}"
             )
 
+    return clang_tidy_errors_futures, files_to_parse
+
+
+def main():
+    """Execute Main entry point."""
+
+    parser = argparse.ArgumentParser(description="Run multithreaded clang-tidy")
+
+    parser.add_argument(
+        "-t",
+        "--threads",
+        type=int,
+        default=multiprocessing.cpu_count(),
+        help="Run with a specific number of threads",
+    )
+    parser.add_argument(
+        "-d",
+        "--output-dir",
+        type=str,
+        default="clang_tidy_fixes",
+        help="Directory to write all clang-tidy output to",
+    )
+    parser.add_argument(
+        "-o",
+        "--fixes-file",
+        type=str,
+        default="clang_tidy_fixes.json",
+        help="Report json file to write combined fixes to",
+    )
+    parser.add_argument(
+        "-c",
+        "--compile-commands",
+        type=str,
+        default="compile_commands.json",
+        help="compile_commands.json file to use to find the files to tidy",
+    )
+    parser.add_argument(
+        "--split-jobs",
+        type=int,
+        default=0,
+        help="The total number of splits if splitting the jobs across multiple tasks. 0 means don't split.",
+    )
+    parser.add_argument(
+        "--split",
+        type=int,
+        default=1,
+        help="The interval to run out of the total number of --split-jobs. Must be a value between 1 and --split-jobs value.",
+    )
+    parser.add_argument(
+        "-q", "--show-stdout", type=bool, default=True, help="Log errors to console"
+    )
+    parser.add_argument(
+        "-l", "--log-file", type=str, default="clang_tidy", help="clang tidy log from evergreen"
+    )
+    parser.add_argument(
+        "--only-process-fixes",
+        action="store_true",
+        help="Skip tidy and process the fixes directory to generate a fixes file. Use in conjunction with -d.",
+    )
+    parser.add_argument(
+        "--disable-reporting",
+        action="store_true",
+        default=False,
+        help="Disable generating the report file for evergreen perf.send",
+    )
+    parser.add_argument(
+        "-m",
+        "--check-module",
+        type=str,
+        default=CHECKS_SO,
+        help="Path to load the custom mongo checks module.",
+    )
+    # TODO: Is there someway to get this without hardcoding this much
+    parser.add_argument("-y", "--clang-tidy-toolchain", type=str, default="v4")
+    parser.add_argument("-f", "--clang-tidy-cfg", type=str, default=".clang-tidy")
+    args = parser.parse_args()
+
+    if args.only_process_fixes:
+        if not os.path.isdir(args.output_dir):
+            print(f"Error: {args.output_dir} is not a valid directory.")
+            sys.exit(3)
+        find_cmd = ["find", args.output_dir, "-type", "f", "-name", "*.yml"]
+        find_output = subprocess.Popen(find_cmd, stdout=subprocess.PIPE)
+        files_to_parse = []
+        for line in iter(find_output.stdout.readline, ""):
+            if not line:
+                break
+            files_to_parse.append(str(line.rstrip().decode("utf-8")))
+    else:
+        clang_tidy_errors_futures, files_to_parse = _run_tidy(args)
+
     failed_files = _combine_errors(Path(args.output_dir, args.fixes_file), files_to_parse)
 
-    # Zip up all the files for upload
-    subprocess.run(["tar", "-czvf", args.output_dir + ".tgz", args.output_dir], check=False)
+    if not args.only_process_fixes:
+        # Zip up all the files for upload
+        subprocess.run(["tar", "-czvf", args.output_dir + ".tgz", args.output_dir], check=False)
 
-    # create report and dump to report.json
-    if not args.disable_reporting:
-        error_file_contents = __dedup_errors(clang_tidy_errors_futures)
-        report = make_report(args.log_file, error_file_contents, 1 if failed_files > 0 else 0)
-        try_combine_reports(report)
-        put_report(report)
+        # Create report and dump to report.json
+        if not args.disable_reporting:
+            error_file_contents = __dedup_errors(clang_tidy_errors_futures)
+            report = make_report(args.log_file, error_file_contents, 1 if failed_files > 0 else 0)
+            try_combine_reports(report)
+            put_report(report)
 
     return failed_files
 
