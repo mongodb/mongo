@@ -259,7 +259,7 @@ class FindWhereSleepController {
         // Offset the slowDocId by at least the getMore batch size so that when testing getMore,
         // we quickly return enough documents to serve the first batch without timing out.
         slowDocId += Math.max(...batchSizesForGetMore);
-        const sleepTimeMS = Math.round(1.1 * ampleTimeMS);
+        const sleepTimeMS = Math.round(1.5 * ampleTimeMS);
         whereExpressions[this.shard] = `if (this._id == ${slowDocId}) {sleep(${sleepTimeMS})};`;
     }
 
