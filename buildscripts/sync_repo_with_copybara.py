@@ -342,11 +342,6 @@ def main():
     else:
         run_command("git clone https://github.com/10gen/copybara.git")
 
-    # Pin to a specific commit
-    # This commit is arbitrary and could be updated however, once updated we should confirm it works
-    # rather than just letting copybara roll under our feet
-    run_command("git reset --hard e346cf9d3dcc49dedbf7209060099290a114031e")
-
     # Navigate to the Copybara directory and build the Copybara Docker image
     run_command("cd copybara && docker build --rm -t copybara .")
 
