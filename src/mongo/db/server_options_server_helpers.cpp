@@ -77,8 +77,6 @@
 using std::endl;
 using std::string;
 
-namespace moe = ::mongo::optionenvironment;
-
 namespace mongo {
 
 namespace {

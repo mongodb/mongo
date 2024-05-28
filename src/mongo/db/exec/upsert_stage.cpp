@@ -80,8 +80,6 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpsertPerformsInsert);
 
-namespace mb = mutablebson;
-
 namespace {
 
 const char idFieldName[] = "_id";

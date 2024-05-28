@@ -92,8 +92,6 @@
 
 namespace mongo {
 
-namespace mb = mutablebson;
-
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeThrowWouldChangeOwningShard);

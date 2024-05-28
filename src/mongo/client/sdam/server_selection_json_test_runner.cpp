@@ -101,7 +101,6 @@
  */
 
 namespace fs = boost::filesystem;
-namespace moe = mongo::optionenvironment;
 using namespace mongo::sdam;
 
 namespace mongo::sdam {

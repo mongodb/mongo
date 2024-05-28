@@ -47,7 +47,6 @@
 
 namespace mongo {
 
-namespace moe = mongo::optionenvironment;
 using std::string;
 
 SSLParams sslGlobalParams;

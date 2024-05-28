@@ -185,8 +185,6 @@ using std::ostringstream;
 using std::string;
 using std::vector;
 
-namespace dps = ::mongo::dotted_path_support;
-
 using ChangeStreamRequirement = StageConstraints::ChangeStreamRequirement;
 using HostTypeRequirement = StageConstraints::HostTypeRequirement;
 using PositionRequirement = StageConstraints::PositionRequirement;

@@ -102,7 +102,6 @@ namespace {
 using namespace mongo;
 
 namespace wcp = ::mongo::wildcard_planning;
-namespace dps = ::mongo::dotted_path_support;
 
 /**
  * Casts 'node' to a FetchNode* if it is a FetchNode, otherwise returns null.

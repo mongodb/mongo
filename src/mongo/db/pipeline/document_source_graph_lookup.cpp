@@ -131,8 +131,6 @@ NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
 
 using boost::intrusive_ptr;
 
-namespace dps = ::mongo::dotted_path_support;
-
 std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
     uassert(ErrorCodes::FailedToParse,

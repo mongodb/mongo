@@ -59,8 +59,6 @@ namespace mongo {
 namespace executor {
 namespace connection_pool_test_details {
 
-namespace m = unittest::match;
-
 class ConnectionPoolTest : public unittest::Test {
 public:
     constexpr static Milliseconds kNoTimeout = Milliseconds{-1};

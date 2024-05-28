@@ -48,8 +48,6 @@
 
 namespace mongo::unittest {
 
-namespace fs = ::boost::filesystem;
-
 using namespace fmt::literals;
 
 void GoldenTestContext::printTestHeader(HeaderFormat format) {

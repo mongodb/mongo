@@ -68,7 +68,6 @@
 
 
 namespace {
-namespace stdx = mongo::stdx;
 namespace mus = mongo::unittest::stringify;
 
 bool containsPattern(const std::string& pattern, const std::string& value) {
