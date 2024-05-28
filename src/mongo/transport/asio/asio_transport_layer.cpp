@@ -65,6 +65,7 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/strong_weak_finish_line.h"
 
 #ifdef MONGO_CONFIG_SSL
@@ -1482,15 +1483,23 @@ AsioTransportLayer::_createSSLContext(std::shared_ptr<SSLManagerInterface>& mana
 
 StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
 AsioTransportLayer::createTransientSSLContext(const TransientSSLParams& transientSSLParams) {
-    auto coordinator = SSLManagerCoordinator::get();
-    if (!coordinator) {
-        return Status(ErrorCodes::InvalidSSLConfiguration,
-                      "SSLManagerCoordinator is not initialized");
-    }
-    auto manager = coordinator->createTransientSSLManager(transientSSLParams);
-    invariant(manager);
+    try {
+        auto coordinator = SSLManagerCoordinator::get();
+        if (!coordinator) {
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          "SSLManagerCoordinator is not initialized");
+        }
+        auto manager = coordinator->createTransientSSLManager(transientSSLParams);
+        invariant(manager);
 
-    return _createSSLContext(manager, sslMode(), true /* asyncOCSPStaple */);
+        return _createSSLContext(manager, sslMode(), true /* asyncOCSPStaple */);
+    } catch (...) {
+        LOGV2_DEBUG(307470,
+                    1,
+                    "Exception in createTransientSSLContext",
+                    "error"_attr = describeActiveException());
+        throw;
+    }
 }
 
 #endif
