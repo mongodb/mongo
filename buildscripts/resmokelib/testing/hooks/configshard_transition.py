@@ -13,6 +13,9 @@ from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interfa
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.retry import retryable_codes as retryable_network_errs
+from buildscripts.resmokelib.testing.retry import (
+    retryable_code_names as retryable_network_err_names,
+)
 
 
 class ContinuousConfigShardTransition(interface.Hook):
@@ -605,9 +608,12 @@ class _TransitionThread(threading.Thread):
                 # transition, addShard will fail because it will not be able to connect. The error
                 # code return is not retryable (it is OperationFailed), so we check the specific
                 # error message as well.
-                if err.code in [self._OPERATION_FAILED] and "Connection refused" in str(err):
+                if err.code in [self._OPERATION_FAILED] and (
+                    "Connection refused" in str(err)
+                    or any(err_name in str(err) for err_name in retryable_network_err_names)
+                ):
                     self.logger.info(
-                        "Connection refused when transitioning from dedicated config "
+                        "Network error adding shard when transitioning from dedicated config "
                         "server, will retry. err: " + str(err)
                     )
                     time.sleep(1)
