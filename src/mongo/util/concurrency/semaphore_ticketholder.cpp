@@ -86,27 +86,20 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
     };
 
     while (true) {
-        auto oldAvailable = _tickets.load();
-
         if (boost::optional<Ticket> maybeTicket = _tryAcquireImpl(admCtx); maybeTicket) {
             return std::move(*maybeTicket);
         }
 
-        if (oldAvailable != _tickets.loadRelaxed()) {
-            continue;
-        }
-
         Date_t deadline = nextDeadline();
-        auto canAcquire = _tickets.waitUntil(oldAvailable, deadline);
+        _waiterCount.fetchAndAdd(1);
+        _tickets.waitUntil(0, deadline);
+        _waiterCount.fetchAndSubtract(1);
+
         if (interruptible) {
             opCtx->checkForInterrupt();
         }
 
-        if (canAcquire) {
-            if (boost::optional<Ticket> maybeTicket = _tryAcquireImpl(admCtx)) {
-                return std::move(*maybeTicket);
-            }
-        } else if (deadline == until) {
+        if (deadline == until) {
             // We hit the end of our deadline, so return nothing.
             return boost::none;
         }
@@ -114,7 +107,11 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
 }
 
 void SemaphoreTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
-    if (_tickets.fetchAndAdd(1) >= 0) {
+    // Notifying a futex costs a syscall. Since queued waiters guarantee that the `_waiterCount` is
+    // non-zero while they are waiting, we can avoid the needless cost if there are tickets and no
+    // queued waiters.
+    int32_t availableBeforeIncrementing = _tickets.fetchAndAdd(1);
+    if (availableBeforeIncrementing >= 0 && _waiterCount.load() > 0) {
         _tickets.notifyOne();
     }
 }
