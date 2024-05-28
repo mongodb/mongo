@@ -342,6 +342,11 @@ def main():
     else:
         run_command("git clone https://github.com/10gen/copybara.git")
 
+    # Pin to a specific commit
+    # This commit is arbitrary and could be updated however, once updated we should confirm it works
+    # rather than just letting copybara roll under our feet
+    run_command("git reset --hard e346cf9d3dcc49dedbf7209060099290a114031e")
+
     # Navigate to the Copybara directory and build the Copybara Docker image
     run_command("cd copybara && docker build --rm -t copybara .")
 
@@ -358,7 +363,7 @@ def main():
     create_mongodb_bot_gitconfig()
 
     current_dir = os.getcwd()
-    config_file = f"{current_dir}/copybara.sky"
+    config_file = f"{current_dir}/copy.bara.sky"
     git_destination_url_with_token = (
         f"https://x-access-token:{access_token_copybara_syncer}@github.com/mongodb/mongo.git"
     )

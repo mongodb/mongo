@@ -21,7 +21,7 @@ OWNERS.yml @IamXander
 .pylintrc @10gen/devprod-build @10gen/devprod-correctness
 .style.yapf @10gen/devprod-build @10gen/devprod-correctness
 BUILD.bazel @10gen/devprod-build
-copybara.sky @IamXander
+copy.bara.sky @IamXander
 copybara.staging.sky @10gen/devprod-correctness
 jsconfig.json @10gen/devprod-correctness
 package.json @10gen/devprod-correctness

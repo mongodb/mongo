@@ -47,7 +47,7 @@ filters:
   - "BUILD.bazel":
     approvers:
       - 10gen/devprod-build
-  - "copybara.sky":
+  - "copy.bara.sky":
     approvers:
       - IamXander
   - "copybara.staging.sky":
