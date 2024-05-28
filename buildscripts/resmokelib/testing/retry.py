@@ -21,6 +21,23 @@ retryable_codes = [
     262,  # ExceededTimeLimit
 ]
 
+# The names for the error codes above.
+retryable_code_names = [
+    "InterruptedAtShutdown",
+    "ShutdownInProgress",
+    "LegacyNotPrimary",
+    "NotWritablePrimary",
+    "NotPrimaryNoSecondaryOk",
+    "InterruptedDueToReplStateChange",
+    "NotPrimaryOrSecondary",
+    "PrimarySteppedDown",
+    "HostNotFound",
+    "HostUnreachable",
+    "NetworkTimeout",
+    "SocketException",
+    "ExceededTimeLimit",
+]
+
 
 def is_retryable_error(exc, retryable_error_codes):
     if isinstance(exc, ConnectionFailure):
