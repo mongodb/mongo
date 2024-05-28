@@ -629,6 +629,15 @@ functions:
             await import("jstests/hooks/run_validate_collections.actual.js");
           EOF
           fi
+  download buildscripts:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          mkdir -p mongodb/buildscripts
+          cp -a buildscripts/* mongodb/buildscripts
   package binary:
     - command: shell.exec
       params:
@@ -705,6 +714,7 @@ tasks:
       - func: "generate server params list"
       - func: "download mongodb"
       - func: "download jstests"
+      - func: "download buildscripts"
       - func: "package binary"
       - func: "upload binary"
 
