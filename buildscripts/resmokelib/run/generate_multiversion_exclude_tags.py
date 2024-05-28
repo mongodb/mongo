@@ -11,7 +11,7 @@ from github import GithubIntegration
 import subprocess
 
 import requests
-from retry import retry
+from requests.adapters import HTTPAdapter, Retry
 
 from buildscripts.resmokelib.testing import tags as _tags
 from buildscripts.resmokelib.config import MultiversionOptions
@@ -97,7 +97,6 @@ def get_git_file_content_locally(commit_hash: str) -> str:
         )
 
 
-@retry(tries=15, delay=60)
 def get_git_file_content_ci(commit_hash: str, expansions_file: str) -> str:
     """Retrieve the content of a file from a specific commit in a Git repository in a CI environment."""
 
@@ -110,7 +109,13 @@ def get_git_file_content_ci(commit_hash: str, expansions_file: str) -> str:
         expansions["installation_id_10gen_mongo"],
     )
 
-    response = requests.get(
+    session = requests.Session()
+    retry = Retry(total=5, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+
+    response = session.get(
         f"{BACKPORTS_REQUIRED_BASE_URL}/{commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}",
         headers={
             "Authorization": f"token {access_token_10gen_mongo}",
