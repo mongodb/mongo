@@ -50,8 +50,6 @@ public:
                                    ResizePolicy resizePolicy = ResizePolicy::kGradual);
 
     int32_t available() const final;
-
-
     int64_t queued() const final {
         auto removed = _semaphoreStats.totalRemovedQueue.loadRelaxed();
         auto added = _semaphoreStats.totalAddedQueue.loadRelaxed();
@@ -67,6 +65,7 @@ private:
                                                     bool interruptible) final;
 
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) final;
+
     void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept final;
 
     bool _resizeImpl(WithLock lock,
@@ -83,6 +82,7 @@ private:
 
     ResizePolicy _resizePolicy;
     BasicWaitableAtomic<int32_t> _tickets;
+    Atomic<int32_t> _waiterCount{0};
     QueueStats _semaphoreStats;
 };
 
