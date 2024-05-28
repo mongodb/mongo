@@ -96,6 +96,9 @@ public:
      * someBaton.cancelSession(S1); someBaton.cancelSession(S2);
      * The continuation for `S1` may run before or after that of `S2`. Continuations for
      * timers behave similarly with respect to cancellation.
+     *
+     * Sessions and timers that are still active when the baton detaches will be cancelled in the
+     * context of the detachment and their continuations will run inline with detachment.
      */
     bool cancelSession(Session& session) noexcept override;
 
@@ -141,12 +144,14 @@ private:
      *
      * Otherwise, take exclusive access and run the job on the current thread.
      *
-     * Note that `_safeExecute()` will throw if the baton has been detached.
+     * Note that `_safeExecute()` will throw (and `_safeExecuteNoThrow` will invariant) if the baton
+     * has been detached.
      *
      * Also note that the job may not run inline, and may get scheduled to run by the baton, so it
      * should never throw.
      */
     void _safeExecute(stdx::unique_lock<Mutex> lk, Job job);
+    void _safeExecuteNoThrow(stdx::unique_lock<Mutex> lk, Job job) noexcept;
 
     /**
      * Blocks polling on the registered sessions until one of the following happens:

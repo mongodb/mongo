@@ -367,7 +367,7 @@ bool AsioNetworkingBaton::cancelSession(Session& session) noexcept {
     it->second.canceled = true;
 
     // The session is active. Remove it and fulfill the promise out-of-line.
-    _safeExecute(std::move(lk), [this, id](stdx::unique_lock<Mutex> lk) {
+    _safeExecuteNoThrow(std::move(lk), [this, id](stdx::unique_lock<Mutex> lk) {
         auto iter = _sessions.find(id);
         // The session may have been removed already elsewhere, and it may have even been added
         // back to the baton. So we may find it's absent or no longer canceled.
@@ -415,7 +415,7 @@ bool AsioNetworkingBaton::_cancelTimer(size_t id) noexcept {
     timer.canceled = true;
 
     // The timer is active. Remove it and fulfill the promise out-of-line.
-    _safeExecute(std::move(lk), [this, id](stdx::unique_lock<Mutex> lk) {
+    _safeExecuteNoThrow(std::move(lk), [this, id](stdx::unique_lock<Mutex> lk) {
         auto iter = _timersById.find(id);
         // The timer may have already been canceled and removed elsewhere.
         if (iter == _timersById.end())
@@ -449,6 +449,13 @@ void AsioNetworkingBaton::_safeExecute(stdx::unique_lock<Mutex> lk, AsioNetworki
     } else {
         job(std::move(lk));
     }
+}
+
+void AsioNetworkingBaton::_safeExecuteNoThrow(stdx::unique_lock<Mutex> lk,
+                                              AsioNetworkingBaton::Job job) noexcept try {
+    _safeExecute(std::move(lk), std::move(job));
+} catch (...) {
+    invariant(exceptionToStatus());
 }
 
 std::pair<std::list<Promise<void>>, std::list<Promise<void>>> AsioNetworkingBaton::_poll(
@@ -650,17 +657,12 @@ void AsioNetworkingBaton::detachImpl() noexcept {
                      _timers.empty() && _pendingTimers.empty()))
         return;
 
-    using std::swap;
-    decltype(_scheduled) scheduled;
-    swap(_scheduled, scheduled);
-    decltype(_sessions) sessions;
-    swap(_sessions, sessions);
-    decltype(_pendingSessions) pendingSessions;
-    swap(_pendingSessions, pendingSessions);
-    decltype(_timers) timers;
-    swap(_timers, timers);
-    decltype(_pendingTimers) pendingTimers;
-    swap(_pendingTimers, pendingTimers);
+    auto scheduled = std::exchange(_scheduled, {});
+    auto sessions = std::exchange(_sessions, {});
+    auto pendingSessions = std::exchange(_pendingSessions, {});
+    auto timers = std::exchange(_timers, {});
+    auto pendingTimers = std::exchange(_pendingTimers, {});
+    auto timersById = std::exchange(_timersById, {});
 
     lk.unlock();
 
