@@ -1,9 +1,5 @@
-# Based on the concurrency_sharded_multi_stmt_txn_with_balancer and
-# concurrency_sharded_replication_with_balancer_and_transitions suites. This suite runs continuous
-# background config transitions and wraps test state functions in multi document transactions.
-config_variables:
-  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
-
+# Based on the concurrency_sharded_replication_with_balancer_and_config_transitions suite. This
+# suite adds and removes shards continuously in the background.
 test_kind: fsm_workload_test
 
 selector:
@@ -67,6 +63,14 @@ selector:
     # infrastructure. See SERVER-77039 for full details.
     - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
+    # TODO SERVER-89555: Timeseries collections hit movePrimaryInProgress errors and the temporary
+    # retry logic for this hook leads to breaking a test assertion.
+    - jstests/concurrency/fsm_workloads/timeseries_mirrored_writes.js
+
+    # TODO SERVER-89840: Inconsistent UUIDs for config.system.sessions across config shard and
+    # removed/re-added shard.
+    - jstests/concurrency/fsm_workloads/add_remove_shards_killop.js
+
     # TODO SERVER-89841: Performs many sharding DDL operations and can time out taking the DDL lock
     # on slower variants.
     - jstests/concurrency/fsm_workloads/agg_lookup.js
@@ -77,47 +81,18 @@ selector:
     - jstests/concurrency/fsm_workloads/map_reduce_replace.js
     - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
     - jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js
+    - jstests/concurrency/fsm_workloads/random_DDL_operations.js
+    - jstests/concurrency/fsm_workloads/rename_sharded_collection.js
     - jstests/concurrency/fsm_workloads/rename_capped_collection_chain.js
     - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js
     - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
     - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_droptarget.js
     - jstests/concurrency/fsm_workloads/timeseries_agg_out.js
 
-    ##
-    # Denylists from concurrency_sharded_multi_stmt_txn_with_balancer
-    ##
-
-    # Expects reads to die with a particular error, but other errors are possible if the read is part
-    # of a transaction (e.g. ErrorCodes.LockTimeout).
-    - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
-    - jstests/concurrency/fsm_workloads/drop_index_during_lookup.js
-
-    # Relies on having one thread observe writes from the other threads, which won't become visible
-    # once a transaction in the thread is started because it'll keep reading from the same snapshot.
-    - jstests/concurrency/fsm_workloads/create_index_background.js
-    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
-
-    # Use updates that do not contain the shard key, so they are rejected before any commands are
-    # sent to participant shards, but these workloads do not fail, so the auto retry transaction logic
-    # attempts to commit, which fails because no participants have been contacted.
-    - jstests/concurrency/fsm_workloads/update_rename.js
-    - jstests/concurrency/fsm_workloads/update_rename_noindex.js
-
-    ##
-    # Denylists from this suite.
-    ##
-
-    # Time series collections can be tracked by the config server, but cannot be moved by
-    # moveCollection yet, and this test creates an unsplittable time series collection that if
-    # placed on the config shard, can't be moved off it, timing out the transition hook.
-    #
-    # TODO SERVER-80690: Remove when tracked time series collections can be moved.
-    - jstests/concurrency/fsm_workloads/timeseries_deletes_and_inserts.js
-
-    # TODO SERVER-90609: Enable these tests.
-    - jstests/concurrency/fsm_workloads/create_index_background_unique.js
-    - jstests/concurrency/fsm_workloads/create_index_background_unique_capped.js
+    # This test expects to catch QueryPlanKilled errors, but the config transition runCommand
+    # override retries on QueryPlanKilled errors to retain test coverage for transient errors
+    # caused by config transitions.
+    - jstests/concurrency/fsm_workloads/kill_rooted_or.js
 
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
@@ -127,28 +102,17 @@ selector:
     - requires_profiling
     - assumes_unsharded_collection
 
-    # Snapshot reads in transactions are banned on capped collections.
-    - requires_capped
-    - does_not_support_causal_consistency
-    # Sharing cursors between state functions will fail in this suite because it will attempt to use
-    # the same cursor in multiple transactions.
-    - state_functions_share_cursor
-    # These start a transaction in one state function and use it in other state functions. This suite
-    # would instead execute each state function as its own transaction.
-    - state_functions_share_transaction
-    # Tests which expect commands to fail and catch the error can cause transactions to abort and
-    # retry indefinitely.
-    - catches_command_failures
-    - does_not_support_transactions
-
     # The following tags are excluded specifically for this suite.
     - config_shard_incompatible
     - assumes_stable_shard_list
 
+    # This suites execute random moveCollections in the background that cause open cursors on the
+    # collection to be killed.
+    - requires_getmore
+
 executor:
   archive:
     hooks:
-      - CheckReplDBHashInBackground
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
@@ -159,19 +123,16 @@ executor:
         await import("jstests/libs/override_methods/implicitly_retry_on_config_transition_errors.js");
       global_vars:
         TestData:
-          runInsideTransaction: true
-          runningWithSessions: true
-          traceExceptions: false
           runningWithBalancer: true
           transitioningConfigShard: true
-          shardCollectionProbability: 0.5
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousAddRemoveShard
-      transition_configsvr: true
-      move_primary_comment: *movePrimaryComment
+      transition_configsvr: false
+      add_remove_random_shards: true
     - class: CheckShardFilteringMetadata
-    - class: CheckReplDBHashInBackground
+    # Suites that shutdown nodes are not compatible with the CheckReplDBHashInBackground hook, so
+    # this suite does not include that hook
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
       shell_options:
@@ -184,7 +145,6 @@ executor:
     - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
-    config_shard: "any"
     mongos_options:
       set_parameters:
         enableTestCommands: 1
@@ -209,10 +169,6 @@ executor:
           mode: alwaysOn
         balancerMigrationsThrottlingMs: 100
         featureFlagReshardingForTimeseries: true
-        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
-          data:
-            comment: *movePrimaryComment
-          mode: alwaysOn
     num_rs_nodes_per_shard: 3
     # Use 3 shards so there's always at least two for workloads with manual migrations, etc.
     num_shards: 3

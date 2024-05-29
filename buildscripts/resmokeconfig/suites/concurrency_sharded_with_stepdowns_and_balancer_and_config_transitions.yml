@@ -201,7 +201,8 @@ executor:
       config_stepdown: true
       shard_stepdown: true
       use_action_permitted_file: true
-    - class: ContinuousConfigShardTransition
+    - class: ContinuousAddRemoveShard
+      transition_configsvr: true
       move_primary_comment: *movePrimaryComment
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash

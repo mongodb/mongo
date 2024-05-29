@@ -106,8 +106,9 @@ executor:
         TestData:
           transitioningConfigShard: true
   hooks:
-    - class: ContinuousConfigShardTransition
+    - class: ContinuousAddRemoveShard
       random_balancer_on: false
+      transition_configsvr: true
       move_primary_comment: *movePrimaryComment
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

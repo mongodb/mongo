@@ -162,7 +162,8 @@ executor:
           shardCollectionProbability: 0.5
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
-    - class: ContinuousConfigShardTransition
+    - class: ContinuousAddRemoveShard
+      transition_configsvr: true
       move_primary_comment: *movePrimaryComment
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHashInBackground

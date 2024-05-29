@@ -335,6 +335,19 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 return False
             raise err
 
+    def get_shard_object(self, conn_string):
+        """Return the shard object that matches the shard referenced in conn_string."""
+        hosts = conn_string.split("/")[1].split(",")
+        ports = []
+        for host in hosts:
+            ports += [host.split(":")[1]]
+
+        for shard in self.shards:
+            shard_info = shard.get_node_info()
+            for node in shard_info:
+                if str(node.port) in ports:
+                    return shard
+
     def _do_teardown(self, mode=None):
         """Shut down the sharded cluster."""
         self.logger.info("Stopping all members of the sharded cluster...")

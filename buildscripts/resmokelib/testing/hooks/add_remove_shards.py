@@ -1,4 +1,6 @@
-"""Test hook that periodically transitions the config server in/out of config shard mode."""
+"""Test hook that periodically adds and removes a shard. That shard may be the config server, in
+which case it is transitioned in/out of config shard mode.
+"""
 
 import bson
 import time
@@ -18,10 +20,10 @@ from buildscripts.resmokelib.testing.retry import (
 )
 
 
-class ContinuousConfigShardTransition(interface.Hook):
+class ContinuousAddRemoveShard(interface.Hook):
     DESCRIPTION = (
-        "Continuous config shard transition (transitions in/out of config shard mode at regular"
-        " intervals)"
+        "Continuously adds and removes shards at regular intervals. If running with configsvr "
+        + "transitions, will transition in/out of config shard mode."
     )
 
     IS_BACKGROUND = True
@@ -34,15 +36,17 @@ class ContinuousConfigShardTransition(interface.Hook):
         fixture,
         auth_options=None,
         random_balancer_on=True,
+        transition_configsvr=False,
+        add_remove_random_shards=False,
         move_primary_comment=None,
     ):
-        interface.Hook.__init__(
-            self, hook_logger, fixture, ContinuousConfigShardTransition.DESCRIPTION
-        )
+        interface.Hook.__init__(self, hook_logger, fixture, ContinuousAddRemoveShard.DESCRIPTION)
         self._fixture = fixture
-        self._transition_thread = None
+        self._add_remove_thread = None
         self._auth_options = auth_options
         self._random_balancer_on = random_balancer_on
+        self._transition_configsvr = transition_configsvr
+        self._add_remove_random_shards = add_remove_random_shards
         self._move_primary_comment = move_primary_comment
 
     def before_suite(self, test_report):
@@ -50,41 +54,49 @@ class ContinuousConfigShardTransition(interface.Hook):
         lifecycle = lifecycle_interface.FlagBasedThreadLifecycle()
 
         if not isinstance(self._fixture, shardedcluster.ShardedClusterFixture):
-            msg = "Can only transition config shard mode for sharded cluster fixtures."
+            msg = "Can only add and remove shards for sharded cluster fixtures."
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 
-        self._transition_thread = _TransitionThread(
+        if not self._transition_configsvr and not self._add_remove_random_shards:
+            msg = "Continuous add and remove shard hook must run with either or both of "
+            "transition_configsvr: true or add_remove_random_shards: true."
+            self.logger.error(msg)
+            raise errors.ServerFailure(msg)
+
+        self._add_remove_thread = _AddRemoveShardThread(
             self.logger,
             lifecycle,
             self._fixture,
             self._auth_options,
             self._random_balancer_on,
+            self._transition_configsvr,
+            self._add_remove_random_shards,
             self._move_primary_comment,
         )
-        self.logger.info("Starting the transition thread.")
-        self._transition_thread.start()
+        self.logger.info("Starting the add/remove shard thread.")
+        self._add_remove_thread.start()
 
     def after_suite(self, test_report, teardown_flag=None):
         """After suite."""
-        self.logger.info("Stopping the transition thread.")
-        self._transition_thread.stop()
-        self.logger.info("Transition thread stopped.")
+        self.logger.info("Stopping the add/remove shard thread.")
+        self._add_remove_thread.stop()
+        self.logger.info("Add/remove shard thread stopped.")
 
     def before_test(self, test, test_report):
         """Before test."""
-        self.logger.info("Resuming the transition thread.")
-        self._transition_thread.pause()
-        self._transition_thread.resume()
+        self.logger.info("Resuming the add/remove shard thread.")
+        self._add_remove_thread.pause()
+        self._add_remove_thread.resume()
 
     def after_test(self, test, test_report):
         """After test."""
-        self.logger.info("Pausing the transition thread.")
-        self._transition_thread.pause()
-        self.logger.info("Paused the transition thread.")
+        self.logger.info("Pausing the add/remove shard thread.")
+        self._add_remove_thread.pause()
+        self.logger.info("Paused the add/remove shard thread.")
 
 
-class _TransitionThread(threading.Thread):
+class _AddRemoveShardThread(threading.Thread):
     CONFIG_SHARD = "config shard mode"
     DEDICATED = "dedicated config server mode"
     # The possible number of seconds to wait before initiating a transition.
@@ -116,18 +128,23 @@ class _TransitionThread(threading.Thread):
         fixture,
         auth_options,
         random_balancer_on,
+        transition_configsvr,
+        add_remove_random_shards,
         move_primary_comment,
     ):
-        threading.Thread.__init__(self, name="TransitionThread")
+        threading.Thread.__init__(self, name="AddRemoveShardThread")
         self.logger = logger
         self.__lifecycle = stepdown_lifecycle
         self._fixture = fixture
         self._auth_options = auth_options
         self._random_balancer_on = random_balancer_on
+        self._transition_configsvr = transition_configsvr
+        self._add_remove_random_shards = add_remove_random_shards
         self._move_primary_comment = move_primary_comment
         self._client = fixture_interface.build_client(self._fixture, self._auth_options)
-        self._current_mode = self._current_fixture_mode()
+        self._current_config_mode = self._current_fixture_mode()
         self._should_wait_for_balancer_round = False
+        self._shard_name_suffix = 0
 
         # Event set when the thread has been stopped using the 'stop()' method.
         self._is_stopped_evt = threading.Event()
@@ -144,6 +161,19 @@ class _TransitionThread(threading.Thread):
 
         return self.DEDICATED
 
+    def _pick_shard_to_add_remove(self):
+        if not self._add_remove_random_shards:
+            return "config", None
+
+        # If running with both config transitions and random shard add/removals, pick any shard
+        # including the config shard. Otherwise, pick any shard that is not the config shard.
+        shard_to_remove_and_add = (
+            self._get_other_shard_info(None)
+            if self._transition_configsvr and self._current_config_mode is self.CONFIG_SHARD
+            else self._get_other_shard_info("config")
+        )
+        return shard_to_remove_and_add["_id"], shard_to_remove_and_add["host"]
+
     def run(self):
         try:
             while True:
@@ -155,36 +185,62 @@ class _TransitionThread(threading.Thread):
 
                 self._is_idle_evt.clear()
 
+                # Pick the shard to add/remove this round
+                shard_id, shard_host = self._pick_shard_to_add_remove()
+
                 wait_secs = random.choice(self.TRANSITION_INTERVALS)
-                self.logger.info(f"Waiting {wait_secs} seconds before transition to dedicated.")
+                msg = (
+                    "transition to dedicated."
+                    if shard_id == "config"
+                    else "removing shard " + shard_id + "."
+                )
+                self.logger.info(f"Waiting {wait_secs} seconds before " + msg)
                 self.__lifecycle.wait_for_action_interval(wait_secs)
 
-                succeeded = self._transition_to_dedicated()
+                succeeded = self._transition_to_dedicated_or_remove_shard(shard_id)
                 if not succeeded:
                     # The transition failed with a retryable error, so loop around and try again.
                     continue
 
-                self._current_mode = self.DEDICATED
+                shard_obj = None
+                removed_shard_fixture = None
+                if shard_id == "config":
+                    self._current_config_mode = self.DEDICATED
+                    removed_shard_fixture = self._fixture.configsvr
+                else:
+                    self.logger.info("Decomissioning removed shard " + shard_id + ".")
+                    shard_obj = self._fixture.get_shard_object(shard_host)
+                    removed_shard_fixture = shard_obj
+                    self._decomission_removed_shard(shard_obj)
 
-                self._run_post_remove_shard_checks(self._fixture.configsvr, "config")
+                self._run_post_remove_shard_checks(removed_shard_fixture, shard_id)
 
                 # Wait a random interval before transitioning back, unless the test already ended.
                 if not self.__lifecycle.poll_for_idle_request():
                     wait_secs = random.choice(self.TRANSITION_INTERVALS)
-                    self.logger.info(
-                        f"Waiting {wait_secs} seconds before transition to config shard."
+                    msg = (
+                        "transition to config shard."
+                        if shard_id == "config"
+                        else "adding shard " + shard_id + "."
                     )
+                    self.logger.info(f"Waiting {wait_secs} seconds before " + msg)
                     self.__lifecycle.wait_for_action_interval(wait_secs)
 
-                # Always end in config shard mode so the shard list at test startup is the
-                # same at the end.
-                self._transition_to_config_shard()
-                self._current_mode = self.CONFIG_SHARD
+                # Always end with with same shard list at the test end as at startup.
+
+                # If we decomissioned the shard, restart it before adding it back.
+                if shard_id != "config":
+                    self.logger.info("Restarting decomissioned shard " + shard_id + ".")
+                    shard_obj.setup()
+
+                self._transition_to_config_shard_or_add_shard(shard_id, shard_host)
+                if shard_id == "config":
+                    self._current_config_mode = self.CONFIG_SHARD
 
         except Exception:  # pylint: disable=W0703
             # Proactively log the exception when it happens so it will be
             # flushed immediately.
-            self.logger.exception("Transition Thread threw exception")
+            self.logger.exception("Add/Remove Shard Thread threw exception")
             # The event should be signaled whenever the thread is not performing stepdowns.
             self._is_idle_evt.set()
 
@@ -211,7 +267,7 @@ class _TransitionThread(threading.Thread):
 
     def _check_thread(self):
         if not self.is_alive():
-            msg = "The transition thread is not running."
+            msg = "The add/remove shard thread is not running."
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 
@@ -258,7 +314,7 @@ class _TransitionThread(threading.Thread):
             return True
 
         if code == self._CONFLICTING_OPERATION_IN_PROGRESS:
-            # Tests with interruptions may interrupt the transition thread while running
+            # Tests with interruptions may interrupt the add/remove shard thread while running
             # movePrimary, leading the thread to retry and hit ConflictingOperationInProgress.
             return True
 
@@ -299,7 +355,68 @@ class _TransitionThread(threading.Thread):
 
         return False
 
-    def _get_tracked_collections_on_config(self):
+    def _decomission_removed_shard(self, shard_obj):
+        start_time = time.time()
+
+        while True:
+            if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
+                self.logger.error("Timed out waiting for removed shard to finish data clean up")
+                raise errors.ServerFailure(msg)
+
+            direct_shard_conn = pymongo.MongoClient(shard_obj.get_driver_connection_url())
+
+            # Wait until any DDL, resharding, transactions, and migration ops are cleaned up.
+            # TODO SERVER-90782 Change these to be assertions, rather than waiting for the collections
+            # to be empty
+            if len(list(direct_shard_conn.config.system.sharding_ddl_coordinators.find())) != 0:
+                self.logger.info(
+                    "Waiting for config.system.sharding_ddl_coordinators to be empty before decomissioning."
+                )
+                time.sleep(1)
+                continue
+
+            if len(list(direct_shard_conn.config.localReshardingOperations.recipient.find())) != 0:
+                self.logger.info(
+                    "Waiting for config.localReshardingOperations.recipient to be empty before decomissioning."
+                )
+                time.sleep(1)
+                continue
+
+            if len(list(direct_shard_conn.config.transaction_coordinators.find())) != 0:
+                self.logger.info(
+                    "Waiting for config.transaction_coordinators to be empty before decomissioning."
+                )
+                time.sleep(1)
+                continue
+
+            if len(list(direct_shard_conn.config.rangeDeletions.find())) != 0:
+                self.logger.info(
+                    "Waiting for config.rangeDeletions to be empty before decomissioning."
+                )
+                time.sleep(1)
+                continue
+
+            all_dbs = direct_shard_conn.admin.command({"listDatabases": 1})
+            for db in all_dbs["databases"]:
+                if db["name"] not in ["admin", "config", "local"] and db["empty"] is False:
+                    db_name = db["name"]
+                    all_collections = direct_shard_conn.db_name.command({"listCollections": 1})
+                    for coll in all_collections:
+                        if len(list(direct_shard_conn.db_name.coll.find())) != 0:
+                            msg = "Found non-empty collection after removing shard: " + coll
+                            self.logger.error(msg)
+                            raise errors.ServerFailure(msg)
+
+            break
+
+        teardown_handler = fixture_interface.FixtureTeardownHandler(self.logger)
+        teardown_handler.teardown(shard_obj, "shard")
+        if not teardown_handler.was_successful():
+            msg = "Error when decomissioning shard."
+            self.logger.error(msg)
+            raise errors.ServerFailure(teardown_handler.get_error_message())
+
+    def _get_tracked_collections_on_shard(self, shard_id):
         return list(
             self._client.config.collections.aggregate(
                 [
@@ -308,27 +425,27 @@ class _TransitionThread(threading.Thread):
                             "from": "chunks",
                             "localField": "uuid",
                             "foreignField": "uuid",
-                            "as": "chunksOnConfig",
+                            "as": "chunksOnRemovedShard",
                             "pipeline": [
-                                {"$match": {"shard": "config"}},
+                                {"$match": {"shard": shard_id}},
                                 # History can be very large because we randomize migrations, so
                                 # exclude it to reduce log spam.
                                 {"$project": {"history": 0}},
                             ],
                         }
                     },
-                    {"$match": {"chunksOnConfig": {"$ne": []}}},
+                    {"$match": {"chunksOnRemovedShard": {"$ne": []}}},
                 ]
             )
         )
 
-    def _get_untracked_collections_on_config(self):
+    def _get_untracked_collections_on_shard(self, source):
         untracked_collections = []
         databases = list(
             self._client.config.databases.aggregate(
                 [
                     {
-                        "$match": {"primary": "config"},
+                        "$match": {"primary": source},
                     }
                 ]
             )
@@ -342,10 +459,10 @@ class _TransitionThread(threading.Thread):
                     untracked_collections.append(collection)
         return untracked_collections
 
-    def _move_collection_all_from_config(self, collections):
+    def _move_all_collections_from_shard(self, collections, source):
         for collection in collections:
             namespace = collection["_id"]
-            destination = self._get_non_config_shard_id()
+            destination = self._get_other_shard_id(source)
             self.logger.info("Running moveCollection for " + namespace + " to " + destination)
             try:
                 self._client.admin.command({"moveCollection": namespace, "toShard": destination})
@@ -362,9 +479,9 @@ class _TransitionThread(threading.Thread):
                     )
                     return
 
-    def _move_primary_all_from_config(self, databases):
+    def _move_all_primaries_from_shard(self, databases, source):
         for database in databases:
-            destination = self._get_non_config_shard_id()
+            destination = self._get_other_shard_id(source)
             try:
                 self.logger.info("Running movePrimary for " + database + " to " + destination)
                 cmd_obj = {"movePrimary": database, "to": destination}
@@ -378,8 +495,8 @@ class _TransitionThread(threading.Thread):
                     "Ignoring error when moving the database '" + database + "': " + str(err)
                 )
 
-    def _drain_config_for_ongoing_transition(self, num_rounds, transition_result):
-        tracked_colls = self._get_tracked_collections_on_config()
+    def _drain_shard_for_ongoing_transition(self, num_rounds, transition_result, source):
+        tracked_colls = self._get_tracked_collections_on_shard(source)
         sharded_colls = []
         tracked_unsharded_colls = []
         for coll in tracked_colls:
@@ -387,22 +504,28 @@ class _TransitionThread(threading.Thread):
                 tracked_unsharded_colls.append(coll)
             else:
                 sharded_colls.append(coll)
-        untracked_unsharded_colls = self._get_untracked_collections_on_config()
+        untracked_unsharded_colls = self._get_untracked_collections_on_shard(source)
 
         if num_rounds % 10 == 0:
-            self.logger.info("Draining the config shard: " + str({"num_rounds": num_rounds}))
+            self.logger.info("Draining shard " + source + ": " + str({"num_rounds": num_rounds}))
             self.logger.info(
-                "Sharded collections on config server: "
+                "Sharded collections on "
+                + source
+                + ": "
                 + str({"count": len(sharded_colls), "collections": sharded_colls})
             )
             self.logger.info(
-                "Tracked unsharded collections on config server: "
+                "Tracked unsharded collections on "
+                + source
+                + ": "
                 + str(
                     {"count": len(tracked_unsharded_colls), "collections": tracked_unsharded_colls}
                 )
             )
             self.logger.info(
-                "Untracked unsharded collections on config server: "
+                "Untracked unsharded collections on "
+                + source
+                + ": "
                 + str(
                     {
                         "count": len(untracked_unsharded_colls),
@@ -411,7 +534,9 @@ class _TransitionThread(threading.Thread):
                 )
             )
             self.logger.info(
-                "Databases on config server: "
+                "Databases on "
+                + source
+                + ": "
                 + str(
                     {
                         "count": len(transition_result["dbsToMove"]),
@@ -426,19 +551,19 @@ class _TransitionThread(threading.Thread):
         # still move collections half of the time.
         should_move = not self._random_balancer_on or random.random() < 0.5
         if should_move:
-            self._move_collection_all_from_config(
-                tracked_unsharded_colls + untracked_unsharded_colls
+            self._move_all_collections_from_shard(
+                tracked_unsharded_colls + untracked_unsharded_colls, source
             )
-        self._move_primary_all_from_config(transition_result["dbsToMove"])
+        self._move_all_primaries_from_shard(transition_result["dbsToMove"], source)
 
-    def _get_balancer_status_on_shard_not_found(self, prev_round_interrupted):
+    def _get_balancer_status_on_shard_not_found(self, prev_round_interrupted, msg):
         try:
             latest_status = self._client.admin.command({"balancerStatus": 1})
         except pymongo.errors.OperationFailure as balancerStatusErr:
             if balancerStatusErr.code in set(retryable_network_errs):
                 self.logger.info(
                     "Network error when running balancerStatus after "
-                    "receiving ShardNotFound error on transition to dedicated, will "
+                    "receiving ShardNotFound error on " + msg + ", will "
                     "retry. err: " + str(balancerStatusErr)
                 )
                 prev_round_interrupted = False
@@ -450,19 +575,25 @@ class _TransitionThread(threading.Thread):
             prev_round_interrupted = True
             self.logger.info(
                 "Ignoring 'Interrupted' error when running balancerStatus "
-                "after receiving ShardNotFound error on transition to dedicated."
+                "after receiving ShardNotFound error on " + msg
             )
             return None, prev_round_interrupted
 
         return latest_status, prev_round_interrupted
 
-    def _transition_to_dedicated(self):
-        self.logger.info("Starting transition from " + self._current_mode)
+    def _transition_to_dedicated_or_remove_shard(self, shard_id):
+        if shard_id == "config":
+            self.logger.info("Starting transition from " + self._current_config_mode)
+        else:
+            self.logger.info("Starting removal of " + shard_id)
+
         res = None
         start_time = time.time()
         last_balancer_status = None
         prev_round_interrupted = False
         num_draining_rounds = -1
+
+        msg = "transition to dedicated" if shard_id == "config" else "removing shard"
 
         while True:
             try:
@@ -472,15 +603,15 @@ class _TransitionThread(threading.Thread):
                 if self._should_wait_for_balancer_round:
                     # TODO SERVER-90291: Remove.
                     #
-                    # Wait for one balancer round after starting to drain if the config server owned no
-                    # chunks to avoid a race where the migration of the first chunk to the config server
+                    # Wait for one balancer round after starting to drain if the shard owned no
+                    # chunks to avoid a race where the migration of the first chunk to the shard
                     # can leave the collection orphaned on it after it's been removed as a shard.
                     latest_status = self._client.admin.command({"balancerStatus": 1})
 
                     if last_balancer_status["term"] != latest_status["term"]:
                         self.logger.info(
                             "Detected change in repl set term while waiting for a balancer round "
-                            "before transitioning to dedicated CSRS. last term: %d, new term: %d",
+                            "before " + msg + ". last term: %d, new term: %d",
                             last_balancer_status["term"],
                             latest_status["term"],
                         )
@@ -493,43 +624,40 @@ class _TransitionThread(threading.Thread):
                         >= latest_status["numBalancerRounds"]
                     ):
                         self.logger.info(
-                            "Waiting for a balancer round before transition to dedicated. "
-                            "Last round: %d, latest round: %d",
+                            "Waiting for a balancer round before "
+                            + msg
+                            + ". Last round: %d, latest round: %d",
                             last_balancer_status["numBalancerRounds"],
                             latest_status["numBalancerRounds"],
                         )
                         time.sleep(1)
                         continue
 
-                    self.logger.info(
-                        "Done waiting for a balancer round before transition to dedicated"
-                    )
+                    self.logger.info("Done waiting for a balancer round before " + msg)
                     self._should_wait_for_balancer_round = False
 
-                res = self._client.admin.command({"transitionToDedicatedConfigServer": 1})
+                if shard_id == "config":
+                    res = self._client.admin.command({"transitionToDedicatedConfigServer": 1})
+                else:
+                    res = self._client.admin.command({"removeShard": shard_id})
 
                 if res["state"] == "completed":
                     self.logger.info(
-                        "Completed transition to %s in %0d ms",
-                        self.DEDICATED,
-                        (time.time() - start_time) * 1000,
+                        "Completed " + msg + " in %0d ms", (time.time() - start_time) * 1000
                     )
                     return True
                 elif res["state"] == "started":
-                    if self._client.config.chunks.count_documents({"shard": "config"}) == 0:
+                    if self._client.config.chunks.count_documents({"shard": shard_id}) == 0:
                         self._should_wait_for_balancer_round = True
                 elif res["state"] == "ongoing":
                     num_draining_rounds += 1
-                    self._drain_config_for_ongoing_transition(num_draining_rounds, res)
+                    self._drain_shard_for_ongoing_transition(num_draining_rounds, res, shard_id)
 
                 prev_round_interrupted = False
                 time.sleep(1)
 
                 if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
-                    msg = (
-                        "Could not transition to dedicated config server. with last response: "
-                        + str(res)
-                    )
+                    msg = "Could not " + msg + " with last response: " + str(res)
                     self.logger.error(msg)
                     raise errors.ServerFailure(msg)
             except pymongo.errors.OperationFailure as err:
@@ -544,21 +672,19 @@ class _TransitionThread(threading.Thread):
                 # network error, we should retry.
                 if err.code in set(retryable_network_errs):
                     self.logger.info(
-                        "Network error when transitioning to dedicated config server, "
-                        "will retry. err: " + str(err)
+                        "Network error during " + msg + ", will retry. err: " + str(err)
                     )
                     time.sleep(1)
                     prev_round_interrupted = False
                     continue
 
-                # If there was a failover when finishing the transition to a dedicated CSRS or if
-                # the transitionToDedicated request was interrupted when finishing the transition,
-                # it's possible that this thread didn't learn that the transition finished. When the
-                # the transition to dedicated is retried, it will fail because the shard "config"
-                # will no longer exist.
+                # If there was a failover when finishing the transition to a dedicated CSRS/shard removal or if
+                # the transitionToDedicated/removeShard request was interrupted when finishing the transition,
+                # it's possible that this thread didn't learn that the removal finished. When the
+                # the transition to dedicated is retried, it will fail because the shard will no longer exist.
                 if err.code in [self._SHARD_NOT_FOUND]:
                     latest_status, prev_round_interrupted = (
-                        self._get_balancer_status_on_shard_not_found(prev_round_interrupted)
+                        self._get_balancer_status_on_shard_not_found(prev_round_interrupted, msg)
                     )
                     if latest_status is None:
                         # The balancerStatus request was interrupted, so we retry the transition
@@ -575,9 +701,12 @@ class _TransitionThread(threading.Thread):
                         or prev_round_interrupted
                     ):
                         self.logger.info(
-                            "Did not find entry for 'config' in config.shards after detecting a "
+                            "Did not find entry for "
+                            + shard_id
+                            + " in config.shards after detecting a "
                             "change in repl set term or after transition was interrutped. Assuming "
-                            "transition to dedicated finished on previous transition request."
+                            + msg
+                            + " finished on previous transition request."
                         )
                         return True
 
@@ -585,36 +714,49 @@ class _TransitionThread(threading.Thread):
                     raise err
 
                 prev_round_interrupted = True
-                self.logger.info("Ignoring error transitioning to dedicated: " + str(err))
+                self.logger.info("Ignoring error when " + msg + " : " + str(err))
 
-    def _transition_to_config_shard(self):
-        self.logger.info("Starting transition from " + self._current_mode)
+    def _transition_to_config_shard_or_add_shard(self, shard_id, shard_host):
+        if shard_id == "config":
+            self.logger.info("Starting transition from " + self._current_config_mode)
+        else:
+            self.logger.info("Starting to add shard " + shard_id)
+
+        msg = "transitioning from dedicated" if shard_id == "config" else "adding shard"
+
         while True:
             try:
-                self._client.admin.command({"transitionFromDedicatedConfigServer": 1})
+                if shard_id == "config":
+                    self._client.admin.command({"transitionFromDedicatedConfigServer": 1})
+                else:
+                    original_shard_id = (
+                        shard_id if self._shard_name_suffix == 0 else shard_id.split("_")[0]
+                    )
+                    shard_name = original_shard_id + "_" + str(self._shard_name_suffix)
+                    self.logger.info("Adding shard with new shardId: " + shard_name)
+                    self._client.admin.command({"addShard": shard_host, "name": shard_name})
+                    self._shard_name_suffix = self._shard_name_suffix + 1
                 return
             except pymongo.errors.OperationFailure as err:
                 # Some suites run with forced failovers, if transitioning fails with a retryable
                 # network error, we should retry.
                 if err.code in set(retryable_network_errs):
                     self.logger.info(
-                        "Network error when transitioning from dedicated config "
-                        "server, will retry. err: " + str(err)
+                        "Network error when " + msg + " server, will retry. err: " + str(err)
                     )
                     time.sleep(1)
                     continue
 
-                # If one of the nodes in the config server is killed just before attempting to
-                # transition, addShard will fail because it will not be able to connect. The error
-                # code return is not retryable (it is OperationFailed), so we check the specific
+                # If one of the nodes in the shard is killed just before the attempt to
+                # transition/addShard, addShard will fail because it will not be able to connect. The
+                # error code returned is not retryable (it is OperationFailed), so we check the specific
                 # error message as well.
                 if err.code in [self._OPERATION_FAILED] and (
                     "Connection refused" in str(err)
                     or any(err_name in str(err) for err_name in retryable_network_err_names)
                 ):
                     self.logger.info(
-                        "Network error adding shard when transitioning from dedicated config "
-                        "server, will retry. err: " + str(err)
+                        "Connection refused when " + msg + ", will retry. err: " + str(err)
                     )
                     time.sleep(1)
                     continue
@@ -622,20 +764,28 @@ class _TransitionThread(threading.Thread):
                 # Some workloads kill sessions which may interrupt the transition.
                 if not self._is_expected_transition_error_code(err.code):
                     raise err
-                self.logger.info("Ignoring error transitioning to config shard: " + str(err))
+                self.logger.info("Ignoring error " + msg + " : " + str(err))
 
-    def _get_non_config_shard_id(self):
+    def _get_other_shard_info(self, shard_id):
         res = self._client.admin.command({"listShards": 1})
 
         if len(res["shards"]) < 2:
-            msg = "Did not find a non-config shard"
+            msg = "Did not find a shard different from " + shard_id
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 
-        possible_choices = [
-            shard_info["_id"] for shard_info in res["shards"] if shard_info["_id"] != "config"
-        ]
+        possible_choices = []
+        if shard_id is not None:
+            possible_choices = [
+                shard_info for shard_info in res["shards"] if shard_info["_id"] != shard_id
+            ]
+        else:
+            possible_choices = [shard_info for shard_info in res["shards"]]
+
         return random.choice(possible_choices)
+
+    def _get_other_shard_id(self, shard_id):
+        return self._get_other_shard_info(shard_id)["_id"]
 
     def _run_post_remove_shard_checks(self, removed_shard_fixture, removed_shard_name):
         # Configsvr metadata checks:
@@ -675,6 +825,9 @@ class _TransitionThread(threading.Thread):
         )
         tagsWithoutShardPipelineResult = [doc for doc in tagsWithoutShardPipelineResultCursor]
         assert not tagsWithoutShardPipelineResult, f"Found tags in config.tags that are not owned by any shard: {tagsWithoutShardPipelineResult}"
+
+        if removed_shard_name != "config":
+            return
 
         # Check that there is no user data left on the removed shard. (Note: This can only be
         # checked on transitionToDedicatedConfigServer)
