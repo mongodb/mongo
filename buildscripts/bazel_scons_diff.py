@@ -91,7 +91,6 @@ def get_bazel_args(compiler_type: str, extra_args: list[str]) -> list[str]:
             "ICECC=",
             "CCACHE=",
             "--ninja=disabled",
-            "BAZEL_BUILD_ENABLED=1",
             "$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp",
         ],
         env={**os.environ.copy(), **bazel_env_settings},
@@ -274,7 +273,6 @@ def scons_commands(
             "ICECC=",
             "CCACHE=",
             "--ninja=disabled",
-            "BAZEL_BUILD_ENABLED=0",
             "$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp",
         ],
         env={**os.environ.copy(), **bazel_env_settings},
@@ -297,7 +295,6 @@ def scons_commands(
             "ICECC=",
             "CCACHE=",
             "--ninja=disabled",
-            "BAZEL_BUILD_ENABLED=0",
             "--dry-run",
             *scons_targets,
         ],
@@ -391,6 +388,17 @@ def main():
 
     args = parser.parse_args()
 
+    # Needed for git stash on Windows
+    git_env = {
+        **os.environ.copy(),
+        **{
+            "GIT_COMMITTER_NAME": "Evergreen",
+            "GIT_COMMITTER_EMAIL": "evergreen@mongodb.com",
+            "GIT_AUTHOR_NAME": "Evergreen",
+            "GIT_AUTHOR_EMAIL": "evergreen@mongodb.com",
+        },
+    }
+
     # Switch to repository root directory.
     os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -416,6 +424,9 @@ def main():
         target_type_map[scons_to_bazel_target(scons_target)] = target_type
 
     extra_args = args.extra_args.strip().split(" ") if args.extra_args != "" else []
+
+    # Replace the single quotes in the build command that would usually be removed by Bash
+    extra_args = [extra_arg.replace("'", "") for extra_arg in extra_args]
     bazel_args = get_bazel_args(args.compiler_type, extra_args)
     link_static = "--//bazel/config:linkstatic=True" in bazel_args
 
@@ -444,6 +455,15 @@ def main():
     linker_output_paths = bazel_linker_commands(
         bazel_bin, bazel_targets, target_type_map, bazel_args, link_static
     )
+
+    # With thin targets, the build system only allows one definition of each target between both SCons and Bazel.
+    # Since we want to get a diff after removing the target from SCons and adding it to Bazel, we can rely on git
+    # to revert the change to add the BUILD.bazel definitions when we want to execute the SCons version of the build.
+    current_branch = subprocess.check_output(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"], env=git_env, text=True
+    ).strip()
+    subprocess.run(["git", "commit", "-m", "tmp"], env=git_env)
+    subprocess.run(["git", "checkout", "HEAD~1"], env=git_env, check=True)
     scons_commands(
         scons_targets, args.compiler_type, compile_output_paths, linker_output_paths, extra_args
     )
@@ -465,6 +485,8 @@ def main():
                     print(line)
                 print("\n\n\n")
                 output_file.write("\n```\n\n\n")
+    subprocess.run(["git", "checkout", current_branch], env=git_env, check=True)
+    subprocess.run(["git", "reset", "HEAD~1"], env=git_env, check=True)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,13 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "environment_buffer",
+    srcs = [
+        "environment_buffer.cpp",
+    ],
+    hdrs = [
+        "environment_buffer.h",
+    ],
+)
