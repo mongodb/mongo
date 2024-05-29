@@ -388,21 +388,28 @@ __background_compact_list_cleanup(
     WT_BACKGROUND_COMPACT_STAT *compact_stat, *temp_compact_stat;
     WT_CONNECTION_IMPL *conn;
     uint64_t cur_time, i;
+    bool cleanup_stat;
 
+    cleanup_stat = false;
     conn = S2C(session);
     cur_time = __wt_clock(session);
 
-    for (i = 0; i < conn->hash_size; i++)
+    if (cleanup_type == BACKGROUND_COMPACT_CLEANUP_EXIT ||
+      cleanup_type == BACKGROUND_COMPACT_CLEANUP_OFF)
+        cleanup_stat = true;
+
+    for (i = 0; i < conn->hash_size; i++) {
         TAILQ_FOREACH_SAFE(
           compact_stat, &conn->background_compact.stat_hash[i], hashq, temp_compact_stat)
         {
-            if (cleanup_type == BACKGROUND_CLEANUP_ALL_STAT ||
+            if (cleanup_stat ||
               WT_CLOCKDIFF_SEC(cur_time, compact_stat->prev_compact_time) >
                 conn->background_compact.max_file_idle_time)
                 __background_compact_list_remove(session, compact_stat, i);
         }
+    }
 
-    if (cleanup_type == BACKGROUND_CLEANUP_ALL_STAT)
+    if (cleanup_type == BACKGROUND_COMPACT_CLEANUP_EXIT)
         __wt_free(session, conn->background_compact.stat_hash);
 }
 
@@ -521,7 +528,7 @@ __background_compact_server(void *arg)
                 full_iteration = false;
                 WT_ERR(__wt_buf_set(session, uri, WT_BACKGROUND_COMPACT_URI_PREFIX,
                   strlen(WT_BACKGROUND_COMPACT_URI_PREFIX) + 1));
-                __background_compact_list_cleanup(session, BACKGROUND_CLEANUP_STALE_STAT);
+                __background_compact_list_cleanup(session, BACKGROUND_COMPACT_CLEANUP_STALE_STAT);
             }
 
             /* Check periodically in case the signal was missed. */
@@ -544,6 +551,10 @@ __background_compact_server(void *arg)
             if (running && conn->background_compact.run_once)
                 WT_ERR(__wt_buf_set(session, uri, WT_BACKGROUND_COMPACT_URI_PREFIX,
                   strlen(WT_BACKGROUND_COMPACT_URI_PREFIX) + 1));
+
+            /* If disabled, clean up the stats. */
+            if (!running)
+                __background_compact_list_cleanup(session, BACKGROUND_COMPACT_CLEANUP_OFF);
 
             conn->background_compact.signalled = false;
             WT_STAT_CONN_SET(session, background_compact_running, running);
@@ -622,7 +633,7 @@ __background_compact_server(void *arg)
 
 err:
     __background_compact_exclude_list_clear(session, true);
-    __background_compact_list_cleanup(session, BACKGROUND_CLEANUP_ALL_STAT);
+    __background_compact_list_cleanup(session, BACKGROUND_COMPACT_CLEANUP_EXIT);
 
     __wt_free(session, conn->background_compact.config);
     __wt_scr_free(session, &config);

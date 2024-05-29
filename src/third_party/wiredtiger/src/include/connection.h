@@ -46,8 +46,9 @@ struct __wt_process {
 extern WT_PROCESS __wt_process;
 
 typedef enum __wt_background_compact_cleanup_stat_type {
-    BACKGROUND_CLEANUP_ALL_STAT,
-    BACKGROUND_CLEANUP_STALE_STAT
+    BACKGROUND_COMPACT_CLEANUP_EXIT,      /* Cleanup when the thread exits */
+    BACKGROUND_COMPACT_CLEANUP_OFF,       /* Cleanup when the thread is disabled */
+    BACKGROUND_COMPACT_CLEANUP_STALE_STAT /* Cleanup stale stats only */
 } WT_BACKGROUND_COMPACT_CLEANUP_STAT_TYPE;
 
 /*
