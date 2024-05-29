@@ -214,7 +214,7 @@ tasks:
       - func: "run benchmark tests"
         vars:
           suite: benchmarks_first_half
-          exec_timeout_secs: 21600 # 6 hour timeout.
+          exec_timeout_secs: 28800 # 8 hour timeout.
           resmoke_jobs_max: 1
 
   - <<: *benchmark_template
@@ -226,7 +226,7 @@ tasks:
       - func: "run benchmark tests"
         vars:
           suite: benchmarks_second_half
-          exec_timeout_secs: 21600 # 6 hour timeout.
+          exec_timeout_secs: 28800 # 8 hour timeout.
           resmoke_jobs_max: 1
 
   - <<: *benchmark_template
@@ -242,7 +242,7 @@ tasks:
       - func: "run benchmark tests"
         vars:
           suite: benchmarks_sep
-          exec_timeout_secs: 21600 # 6 hour timeout.
+          exec_timeout_secs: 28800 # 8 hour timeout.
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
