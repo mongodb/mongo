@@ -46,6 +46,6 @@ namespace mongo {
  */
 StatusWith<int64_t> compactCollection(OperationContext* opCtx,
                                       const CompactOptions& options,
-                                      const NamespaceString& collectionNss);
+                                      const CollectionPtr& collection);
 
 }  // namespace mongo
