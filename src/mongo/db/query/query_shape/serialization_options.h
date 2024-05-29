@@ -239,6 +239,9 @@ struct SerializationOptions {
     // be used to clone the DocumentSource instance. When 'serializeForCloning' is true, all other
     // options in this struct should be set to their default values.
     bool serializeForCloning{false};
+
+    // If set to true, serializes each stage and expression as needed for query analysis.
+    bool serializeForQueryAnalysis = false;
 };
 
 }  // namespace mongo

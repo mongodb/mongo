@@ -274,10 +274,14 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     // We append an additional BSONObj to '_resolvedPipeline' as a placeholder for the $match stage
     // we'll eventually construct from the input document.
     _resolvedPipeline.reserve(_resolvedPipeline.size() + 1);
+
+    // Initialize the introspection pipeline before we insert the $match. This is okay because we do
+    // not use the introspection pipeline during/after query execution, which is when the $match is
+    // necessary.
+    initializeResolvedIntrospectionPipeline();
+
     _resolvedPipeline.push_back(BSON("$match" << BSONObj()));
     _fieldMatchPipelineIdx = _resolvedPipeline.size() - 1;
-
-    initializeResolvedIntrospectionPipeline();
 }
 
 std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
@@ -310,8 +314,9 @@ DocumentSourceLookUp::DocumentSourceLookUp(
         // the local/foreignField $match. It must next after $documents if present.
         auto sourceStages = extractSourceStage(pipeline);
         _resolvedPipeline.insert(_resolvedPipeline.end(), sourceStages.begin(), sourceStages.end());
-        _resolvedPipeline.push_back(BSON("$match" << BSONObj()));
-        _fieldMatchPipelineIdx = _resolvedPipeline.size() - 1;
+        // Save the correct position of the $match, but wait to insert it until we have finished
+        // constructing the pipeline and created the introspection pipeline below.
+        _fieldMatchPipelineIdx = _resolvedPipeline.size();
         // Add the user pipeline to '_resolvedPipeline' after any potential view prefix and $match
         _resolvedPipeline.insert(
             _resolvedPipeline.end(), pipeline.begin() + sourceStages.size(), pipeline.end());
@@ -336,7 +341,20 @@ DocumentSourceLookUp::DocumentSourceLookUp(
             _variablesParseState.defineVariable(varName));
     }
 
+    // Initialize the introspection pipeline before we insert the $match (if applicable). This is
+    // okay because we only use the introspection pipeline for reference while doing query analysis
+    // and analyzing involved dependencies/variables/collections/constraints. We do not use the
+    // introspection pipeline during/after query execution, which is when the $match is necessary.
+    // It wouldn't hurt anything to include the $match in this pipeline, but we also use the
+    // introspection pipeline in serialization, so it would be a bit odd to include an extra empty
+    // $match.
     initializeResolvedIntrospectionPipeline();
+
+    // Finally, insert the $match placeholder if we need it.
+    if (_fieldMatchPipelineIdx) {
+        _resolvedPipeline.insert(_resolvedPipeline.begin() + *_fieldMatchPipelineIdx,
+                                 BSON("$match" << BSONObj()));
+    }
 }
 
 DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
@@ -1163,12 +1181,21 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
     // Add a pipeline field if only-pipeline syntax was used (to ensure the output is valid $lookup
     // syntax) or if a $match was absorbed.
     auto serializedPipeline = [&]() -> std::vector<BSONObj> {
-        auto pipeline = _userPipeline.get_value_or(std::vector<BSONObj>());
+        if (!_userPipeline) {
+            return std::vector<BSONObj>{};
+        }
         if (opts.transformIdentifiers ||
             opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-            return Pipeline::parse(pipeline, _fromExpCtx)->serializeToBson(opts);
+            return Pipeline::parse(*_userPipeline, _fromExpCtx)->serializeToBson(opts);
         }
-        return pipeline;
+        if (opts.serializeForQueryAnalysis) {
+            // If we are in query analysis, encrypted fields will have been marked in the
+            // introspection pipeline, so we need to serialize that here.
+            // TODO SERVER-81802 always serialize the resolved pipeline for non-query-shapification
+            // cases.
+            return _resolvedIntrospectionPipeline->serializeToBson(opts);
+        }
+        return *_userPipeline;
     }();
     if (_additionalFilter) {
         auto serializedFilter = [&]() -> BSONObj {
