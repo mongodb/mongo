@@ -126,15 +126,23 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
 
     _remotesLeft--;
 
-    // If we've been interrupted, the response queue should be filled with interrupted answers, go
-    // ahead and return one of those
-    if (!_interruptStatus.isOK()) {
-        if (_failedUnyield) {
-            AsyncRequestsSender::Response response{.swResponse = _interruptStatus};
-            return response;
+    auto popResponseAfterInterrupt = [&] {
+        invariant(!_interruptStatus.isOK());
+        // If we have been interrupted, the response queue should be populated with responses
+        // already, go ahead and return one of those.
+        auto response = _responseQueue.pop();
+        if (_failedUnyield && response.swResponse != _interruptStatus) {
+            // If the interrupt was caused by an unyield error, every subsequent response must
+            // also have that unyield error.
+            AsyncRequestsSender::Response failedResponse{.shardId = response.shardId,
+                                                         .swResponse = _interruptStatus};
+            return failedResponse;
         }
+        return response;
+    };
 
-        return _responseQueue.pop();
+    if (!_interruptStatus.isOK()) {
+        return popResponseAfterInterrupt();
     }
 
     // Try to pop a value from the queue
@@ -191,12 +199,7 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
     // shutdown the scoped task executor
     _subExecutor->shutdown();
 
-    if (_failedUnyield) {
-        AsyncRequestsSender::Response response{.swResponse = _interruptStatus};
-        return response;
-    }
-
-    return _responseQueue.pop();
+    return popResponseAfterInterrupt();
 }
 
 void AsyncRequestsSender::stopRetrying() noexcept {

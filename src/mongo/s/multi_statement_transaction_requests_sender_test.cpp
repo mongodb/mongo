@@ -64,8 +64,9 @@ namespace mongo {
 namespace {
 
 const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("test.bar");
-const ShardId kTestRemoteShardId = ShardId("FakeShard1");
+const ShardId kTestRemoteShardId1 = ShardId("FakeShard1");
 const HostAndPort kTestRemoteHostAndPort = HostAndPort("FakeShard1Host", 12345);
+const ShardId kTestRemoteShardId2 = ShardId("FakeShard2");
 
 class RouterMultiStatementTransactionRequestsSenderTest
     : public virtual service_context_test::RouterRoleOverride,
@@ -80,7 +81,7 @@ public:
 
         std::vector<ShardType> shards;
         ShardType shardType;
-        shardType.setName(kTestRemoteShardId.toString());
+        shardType.setName(kTestRemoteShardId1.toString());
         shardType.setHost(kTestRemoteHostAndPort.toString());
         shards.push_back(shardType);
 
@@ -124,7 +125,7 @@ protected:
 TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsNotAppendedIfNoTxnRouter) {
     auto cmdName = "find";
     std::vector<AsyncRequestsSender::Request> requests{
-        {kTestRemoteShardId, BSON(cmdName << "bar")}};
+        {kTestRemoteShardId1, BSON(cmdName << "bar")}};
 
     auto msars =
         MultiStatementTransactionRequestsSender(operationContext(),
@@ -162,7 +163,7 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedI
     TransactionRouter::get(operationContext()).setDefaultAtClusterTime(operationContext());
 
     auto cmdName = "find";
-    std::vector<AsyncRequestsSender::Request> requests{{kTestRemoteShardId,
+    std::vector<AsyncRequestsSender::Request> requests{{kTestRemoteShardId1,
                                                         BSON("find"
                                                              << "bar")}};
 
@@ -214,7 +215,7 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedI
                             TransactionRouter::TransactionActions::kStartOrContinue);
 
     auto cmdName = "find";
-    std::vector<AsyncRequestsSender::Request> requests{{kTestRemoteShardId,
+    std::vector<AsyncRequestsSender::Request> requests{{kTestRemoteShardId1,
                                                         BSON("find"
                                                              << "bar")}};
 
@@ -264,11 +265,17 @@ public:
                 request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
 
-            ShardType shardType;
-            shardType.setName(kTestRemoteShardId.toString());
-            shardType.setHost(kTestRemoteHostAndPort.toString());
-            return CursorResponse(
-                       NamespaceString::kConfigsvrShardsNamespace, 0LL, {shardType.toBSON()})
+            ShardType shardType1;
+            shardType1.setName(kTestRemoteShardId1.toString());
+            shardType1.setHost(kTestRemoteHostAndPort.toString());
+
+            ShardType shardType2;
+            shardType2.setName(kTestRemoteShardId1.toString());
+            shardType2.setHost(kTestRemoteHostAndPort.toString());
+
+            return CursorResponse(NamespaceString::kConfigsvrShardsNamespace,
+                                  0LL,
+                                  {shardType1.toBSON(), shardType2.toBSON()})
                 .toBSON(CursorResponse::ResponseType::InitialResponse);
         });
 
@@ -309,12 +316,13 @@ TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest,
 
     // Schedule remote requests
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.emplace_back(kTestRemoteShardId,
+    requests.emplace_back(kTestRemoteShardId1,
                           BSON("find"
                                << "bar"));
-    requests.emplace_back(kTestRemoteShardId,
+    requests.emplace_back(kTestRemoteShardId2,
                           BSON("find"
                                << "bar"));
+    std::set<ShardId> pendingShardIds{kTestRemoteShardId1, kTestRemoteShardId2};
 
     auto msars = MultiStatementTransactionRequestsSender(
         operationContext(),
@@ -332,6 +340,8 @@ TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest,
     auto future = launchAsync([&]() {
         auto response = msars.next();
         auto status = response.swResponse.getStatus();
+        ASSERT(response.shardId.isValid());
+        pendingShardIds.erase(response.shardId);
         assertFailedToUnyieldError(status, ErrorCodes::LockTimeout);
     });
 
@@ -354,11 +364,14 @@ TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest,
         while (!msars.done()) {
             auto response = msars.next();
             auto status = response.swResponse.getStatus();
+            ASSERT(response.shardId.isValid());
+            pendingShardIds.erase(response.shardId);
             assertFailedToUnyieldError(status, ErrorCodes::LockTimeout);
         }
     });
 
     future.default_timed_get();
+    ASSERT(pendingShardIds.empty());
 
     SessionCatalog::get(operationContext()->getServiceContext())->reset_forTest();
 }
