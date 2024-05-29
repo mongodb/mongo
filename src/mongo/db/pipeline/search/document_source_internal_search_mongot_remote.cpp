@@ -74,14 +74,12 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
     const SerializationOptions& opts) const {
     // Though mongos can generate explain output, it should never make a remote call to the mongot.
     if (!opts.verbosity || pExpCtx->inMongos) {
-        if (_spec.getMetadataMergeProtocolVersion().has_value()) {
-            // TODO SERVER-90941 The IDL should be able to handle this serialization once we
-            // populate the query_shape field.
+        if (_metadataMergeProtocolVersion) {
             MutableDocument spec;
             spec.addField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName,
-                          opts.serializeLiteral(_spec.getMongotQuery()));
+                          opts.serializeLiteral(_searchQuery));
             spec.addField(InternalSearchMongotRemoteSpec::kMetadataMergeProtocolVersionFieldName,
-                          opts.serializeLiteral(*_spec.getMetadataMergeProtocolVersion()));
+                          opts.serializeLiteral(_metadataMergeProtocolVersion.get()));
             // In a non-sharded scenario we don't need to pass the limit around as the limit stage
             // will do equivalent work. In a sharded scenario we want the limit to get to the
             // shards, so we serialize it. We serialize it in this block as all sharded search
@@ -89,48 +87,46 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
             // This is the limit that we copied, and does not replace the real limit stage later in
             // the pipeline.
             spec.addField(InternalSearchMongotRemoteSpec::kLimitFieldName,
-                          opts.serializeLiteral((long long)_spec.getLimit().get_value_or(0)));
-            if (_spec.getSortSpec().has_value()) {
+                          opts.serializeLiteral((long long)_limit));
+            if (_sortSpec.has_value()) {
                 spec.addField(InternalSearchMongotRemoteSpec::kSortSpecFieldName,
-                              opts.serializeLiteral(*_spec.getSortSpec()));
+                              opts.serializeLiteral(*_sortSpec));
             }
             spec.addField(InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
-                          opts.serializeLiteral(_spec.getRequiresSearchMetaCursor()));
+                          opts.serializeLiteral(_queryReferencesSearchMeta));
             return spec.freezeToValue();
         } else {
             // mongod/mongos don't know how to read a search query, so we can't redact the correct
             // field paths and literals. Treat the entire query as a literal. We don't know what
             // operators were used in the search query, so generate an entirely redacted document.
-            return opts.serializeLiteral(_spec.getMongotQuery());
+            return opts.serializeLiteral(_searchQuery);
         }
     }
-
     // Explain with queryPlanner verbosity does not execute the query, so the _explainResponse
     // may not be populated. In that case, we fetch the response here instead.
     BSONObj explainInfo = _explainResponse.isEmpty()
-        ? mongot_cursor::getSearchExplainResponse(
-              pExpCtx.get(), _spec.getMongotQuery(), _taskExecutor.get())
+        ? mongot_cursor::getSearchExplainResponse(pExpCtx.get(), _searchQuery, _taskExecutor.get())
         : _explainResponse;
     MutableDocument mDoc;
     mDoc.addField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName,
-                  opts.serializeLiteral(_spec.getMongotQuery()));
+                  opts.serializeLiteral(_searchQuery));
     // We should not need to redact when explaining, but treat it as a literal just in case.
     mDoc.addField("explain", opts.serializeLiteral(explainInfo));
     // Limit is relevant for explain.
-    if (_spec.getLimit().has_value() && *_spec.getLimit() != 0) {
+    if (_limit != 0) {
         mDoc.addField(InternalSearchMongotRemoteSpec::kLimitFieldName,
-                      opts.serializeLiteral((long long)*_spec.getLimit()));
+                      opts.serializeLiteral((long long)_limit));
     }
-    if (_spec.getSortSpec().has_value()) {
+    if (_sortSpec.has_value()) {
         mDoc.addField(InternalSearchMongotRemoteSpec::kSortSpecFieldName,
-                      opts.serializeLiteral(*_spec.getSortSpec()));
+                      opts.serializeLiteral(*_sortSpec));
     }
-    if (_spec.getMongotDocsRequested().has_value()) {
+    if (_mongotDocsRequested.has_value()) {
         mDoc.addField(InternalSearchMongotRemoteSpec::kMongotDocsRequestedFieldName,
-                      opts.serializeLiteral((long long)*_spec.getMongotDocsRequested()));
+                      opts.serializeLiteral(*_mongotDocsRequested));
     }
     mDoc.addField(InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
-                  opts.serializeLiteral(_spec.getRequiresSearchMetaCursor()));
+                  opts.serializeLiteral(_queryReferencesSearchMeta));
     return mDoc.freezeToValue();
 }
 
@@ -141,8 +137,8 @@ Value DocumentSourceInternalSearchMongotRemote::serialize(const SerializationOpt
         return Value(Document{{getSourceName(), innerSpecVal}});
     }
     MutableDocument innerSpec{innerSpecVal.getDocument()};
-    if ((!opts.verbosity || pExpCtx->inMongos) &&
-        _spec.getMetadataMergeProtocolVersion().has_value() && _mergingPipeline) {
+    if ((!opts.verbosity || pExpCtx->inMongos) && _metadataMergeProtocolVersion &&
+        _mergingPipeline) {
         innerSpec[InternalSearchMongotRemoteSpec::kMergingPipelineFieldName] =
             Value(_mergingPipeline->serialize(opts));
     }
@@ -150,20 +146,19 @@ Value DocumentSourceInternalSearchMongotRemote::serialize(const SerializationOpt
 }
 
 boost::optional<long long> DocumentSourceInternalSearchMongotRemote::calcDocsNeeded() {
-    if (!_spec.getMongotDocsRequested().has_value()) {
+    if (!_mongotDocsRequested.has_value()) {
         return boost::none;
     }
     if (isStoredSource()) {
         // In the stored source case, the return value will start at _mongotDocsRequested and
         // will decrease by one for each document returned by this stage.
-        return _spec.getMongotDocsRequested().get() - _docsReturned;
+        return _mongotDocsRequested.get() - _docsReturned;
     } else {
         // The return value will start at _mongotDocsRequested and will decrease by one
         // for each document that gets returned by the $idLookup stage. If a document gets
         // filtered out, docsReturnedByIdLookup will not change and so docsNeeded will stay the
         // same.
-        return _spec.getMongotDocsRequested().get() -
-            pExpCtx->sharedSearchState.getDocsReturnedByIdLookup();
+        return _mongotDocsRequested.get() - pExpCtx->sharedSearchState.getDocsReturnedByIdLookup();
     }
 }
 
@@ -185,8 +180,7 @@ bool DocumentSourceInternalSearchMongotRemote::shouldReturnEOF() {
         uasserted(7942401, "Fail because failClassicSearch is enabled");
     }
 
-    if (_spec.getLimit().has_value() && *_spec.getLimit() != 0 &&
-        _docsReturned >= *_spec.getLimit()) {
+    if (_limit != 0 && _docsReturned >= _limit) {
         return true;
     }
 
@@ -199,7 +193,7 @@ bool DocumentSourceInternalSearchMongotRemote::shouldReturnEOF() {
 
     if (pExpCtx->explain) {
         _explainResponse = mongot_cursor::getSearchExplainResponse(
-            pExpCtx.get(), _spec.getMongotQuery(), _taskExecutor.get());
+            pExpCtx.get(), _searchQuery, _taskExecutor.get());
         return true;
     }
     return false;
@@ -268,7 +262,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextA
 
         // If we have a sortSpec, then we use that to set sortKey. Otherwise, use the 'searchScore'
         // if the document has one.
-        if (_spec.getSortSpec().has_value()) {
+        if (_sortSpec.has_value()) {
             tassert(7320402,
                     "_sortKeyGen must be initialized if _sortSpec is present",
                     _sortKeyGen.has_value());
@@ -287,17 +281,16 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextA
 
 std::unique_ptr<executor::TaskExecutorCursor>
 DocumentSourceInternalSearchMongotRemote::establishCursor() {
-    auto cursors =
-        mongot_cursor::establishCursorsForSearchStage(pExpCtx,
-                                                      _spec.getMongotQuery(),
-                                                      _taskExecutor,
-                                                      getMongotDocsRequested(),
-                                                      _minDocsNeededBounds,
-                                                      _maxDocsNeededBounds,
-                                                      boost::none,
-                                                      nullptr,
-                                                      _spec.getMetadataMergeProtocolVersion(),
-                                                      getPaginationFlag());
+    auto cursors = mongot_cursor::establishCursorsForSearchStage(pExpCtx,
+                                                                 _searchQuery,
+                                                                 _taskExecutor,
+                                                                 _mongotDocsRequested,
+                                                                 _minDocsNeededBounds,
+                                                                 _maxDocsNeededBounds,
+                                                                 boost::none,
+                                                                 nullptr,
+                                                                 _metadataMergeProtocolVersion,
+                                                                 _requiresSearchSequenceToken);
     // Should be called only in unsharded scenario, therefore only expect a results cursor and no
     // metadata cursor.
     tassert(5253301, "Expected exactly one cursor from mongot", cursors.size() == 1);

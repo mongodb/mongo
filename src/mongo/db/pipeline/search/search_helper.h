@@ -39,9 +39,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor_cursor.h"
@@ -56,12 +56,10 @@ using RemoteExplainVector = std::vector<BSONObj>;
 extern FailPoint searchReturnEofImmediately;
 namespace search_helpers {
 /**
- * Consult mongot to get planning information for sharded search queries, used to configure the
- * metadataMergeProtocolVersion, metaPipeline, and sortSpec fields in the existing mongot remote
- * spec.
+ * Consult mongot to get planning information for sharded search queries.
  */
-void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                       InternalSearchMongotRemoteSpec* remoteSpec);
+InternalSearchMongotRemoteSpec planShardedSearch(
+    const boost::intrusive_ptr<ExpressionContext>& pExpCtx, const BSONObj& searchRequest);
 
 /**
  * Helper function that determines whether the document source references the $$SEARCH_META
@@ -203,10 +201,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> createInitialSearchPipeline(
 
     // Send a planShardedSearch command to mongot to get the relevant planning information,
     // including the metadata merging pipeline and the optional merge sort spec.
-    InternalSearchMongotRemoteSpec remoteSpec(specObj.getOwned());
-    planShardedSearch(expCtx, &remoteSpec);
+    auto params = planShardedSearch(expCtx, specObj);
 
-    return {make_intrusive<TargetSearchDocumentSource>(std::move(remoteSpec), expCtx, executor)};
+    return {make_intrusive<TargetSearchDocumentSource>(std::move(params), expCtx, executor)};
 }
 }  // namespace search_helpers
 }  // namespace mongo

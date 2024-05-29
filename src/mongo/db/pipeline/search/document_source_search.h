@@ -32,8 +32,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
 #include "mongo/db/pipeline/search/search_helper.h"
-#include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/executor/task_executor_cursor.h"
 
@@ -68,9 +68,19 @@ public:
      */
     static bool canMovePastDuringSplit(const DocumentSource& ds);
 
-    DocumentSourceSearch(const boost::intrusive_ptr<ExpressionContext> expCtx,
-                         InternalSearchMongotRemoteSpec spec)
-        : DocumentSource(kStageName, expCtx), _spec(std::move(spec)) {}
+    DocumentSourceSearch() = default;
+    DocumentSourceSearch(BSONObj query,
+                         const boost::intrusive_ptr<ExpressionContext> expCtx,
+                         boost::optional<InternalSearchMongotRemoteSpec> spec,
+                         boost::optional<long long> limit,
+                         bool requireSearchSequenceToken = false,
+                         bool pipelineNeedsSearchMeta = true)
+        : DocumentSource(kStageName, expCtx),
+          _searchQuery(query.getOwned()),
+          _spec(spec),
+          _queryReferencesSearchMeta(pipelineNeedsSearchMeta),
+          _limit(limit),
+          _requiresSearchSequenceToken(requireSearchSequenceToken) {}
 
     const char* getSourceName() const override;
     StageConstraints constraints(Pipeline::SplitState pipeState) const override;
@@ -78,37 +88,37 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
     auto isStoredSource() const {
-        auto storedSourceElem = _spec.getMongotQuery()[mongot_cursor::kReturnStoredSourceArg];
-        return !storedSourceElem.eoo() && storedSourceElem.Bool();
+        return _searchQuery.hasField(mongot_cursor::kReturnStoredSourceArg)
+            ? _searchQuery[mongot_cursor::kReturnStoredSourceArg].Bool()
+            : false;
     }
 
     std::list<boost::intrusive_ptr<DocumentSource>> desugar();
 
     BSONObj getSearchQuery() const {
-        return _spec.getMongotQuery().getOwned();
+        return _searchQuery.getOwned();
     }
 
     boost::optional<long long> getLimit() const {
-        return _spec.getLimit().has_value() ? boost::make_optional<long long>(*_spec.getLimit())
-                                            : boost::none;
+        return _limit;
     }
 
     bool getSearchPaginationFlag() {
-        return _spec.getRequiresSearchSequenceToken().get_value_or(false);
+        return _requiresSearchSequenceToken;
     }
 
     boost::optional<int> getIntermediateResultsProtocolVersion() const {
         // If it turns out that this stage is not running on a sharded collection, we don't want
         // to send the protocol version to mongot. If the protocol version is sent, mongot will
         // generate unmerged metadata documents that we won't be set up to merge.
-        if (!pExpCtx->needsMerge) {
+        if (!pExpCtx->needsMerge || !_spec) {
             return boost::none;
         }
-        return _spec.getMetadataMergeProtocolVersion();
+        return _spec->getMetadataMergeProtocolVersion();
     }
 
     boost::optional<BSONObj> getSortSpec() const {
-        return _spec.getSortSpec();
+        return _spec ? _spec->getSortSpec() : boost::none;
     }
 
     size_t getRemoteCursorId() {
@@ -152,8 +162,41 @@ private:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) override;
 
-    // Holds all the planning information for the command's eventual mongot request.
-    InternalSearchMongotRemoteSpec _spec;
+    // The original stage specification that was the value for the "$search" field of the owning
+    // object.
+    BSONObj _searchQuery;
+
+    /**
+     * Valid in a sharded environment and holding information returned from planShardedSearch call,
+     * including metadataMergeProtocolVersion, sortSpec, and mergingPipeline.
+     *
+     * TODO SERVER-87077 This _spec should not be optional. It should be constructed on construction
+     * of the document source, which can enable us to remove fields like _queryReferencesSearchMeta,
+     * _limit, and _requiresSearchSequenceToken that will just live in the _spec instead.
+     */
+    boost::optional<InternalSearchMongotRemoteSpec> _spec;
+
+    /**
+     * Flag indicating whether or not the total user pipeline references the $$SEARCH_META variable.
+     * If true on mongos, we will insert a $setVariableFromSubPipeline stage into the merging
+     * pipeline to provide it. If true on mongod, we will create a second plan executor and cursor
+     * to handle the metadata pipeline (see generateMetadataPipelineAndAttachCursorsForSearch).
+     */
+    bool _queryReferencesSearchMeta = true;
+
+    /**
+     * This will populate the docsRequested field of the cursorOptions document sent as part of the
+     * command to mongot in the case where the query has an extractable limit that can guide the
+     * number of documents that mongot returns to mongod.
+     */
+    boost::optional<long long> _limit;
+
+    /***
+     * Flag indicating if the stage following the search query references $searchSequenceToken. This
+     * will be passed to mongot_cursor
+     *
+     */
+    bool _requiresSearchSequenceToken = false;
 
     // An unique id of search stage in the pipeline, currently it is hard coded to 0 because we can
     // only have one search stage and sub-pipelines are not in the same PlanExecutor.

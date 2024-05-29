@@ -82,7 +82,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
 /**
  * Run the given search query against mongot and build one cursor object for each
  * cursor returned from mongot.
- * TODO SERVER-90943 This function should accept a InternalSearchMongotRemoteSpec rather than
+ * TODO SERVER-87077 This function should accept a InternalSearchMongotRemoteSpec rather than
  * require the fields passed individually.
  * TODO SERVER-86733 Bounds should not be optional once batchSize tuning is enabled for SBE.
  */
