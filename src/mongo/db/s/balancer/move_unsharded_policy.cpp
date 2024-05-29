@@ -251,7 +251,8 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 status.isA<ErrorCategory::WriteConcernError>() ||
                 status.isA<ErrorCategory::NeedRetargettingError>() ||
                 status.isA<ErrorCategory::NotPrimaryError>();
-            if (isErrorInAcceptableCategory) {
+            // ReshardingImrpovements flag is not enabled (refer to SERVER-90675)
+            if (isErrorInAcceptableCategory || status.code() == 90675) {
                 return true;
             }
 
