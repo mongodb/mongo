@@ -62,7 +62,7 @@ hs_cursor(void *arg)
      * Open a session.
      */
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, NULL, &session);
+    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
 
     memset(&hs_key, 0, sizeof(hs_key));
     memset(&hs_value, 0, sizeof(hs_value));

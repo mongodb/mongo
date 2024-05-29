@@ -173,7 +173,7 @@ timestamp(void *arg)
 
     /* Locks need session */
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, NULL, &session);
+    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
 
     /*
      * Update the oldest and stable timestamps at least once every 15 seconds. For predictable

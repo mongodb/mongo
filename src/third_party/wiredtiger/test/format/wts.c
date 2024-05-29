@@ -581,7 +581,7 @@ create_object(TABLE *table, void *arg)
      * Create the underlying store.
      */
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, NULL, &session);
+    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
     testutil_checkfmt(session->create(session, table->uri, config), "%s", table->uri);
     wt_wrap_close_session(session);
 }
@@ -773,7 +773,7 @@ wts_stats(void)
     testutil_assert(fprintf(fp, "====== Connection statistics:\n") >= 0);
 
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, NULL, &session);
+    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
     stats_data_print(session, "statistics:", fp);
 
     args.fp = fp;

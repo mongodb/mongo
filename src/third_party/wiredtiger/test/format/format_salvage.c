@@ -141,7 +141,7 @@ wts_salvage(TABLE *table, void *arg)
     /* Salvage, then verify. */
     wts_open(g.home, &conn, true);
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, table->track_prefix, &session);
+    wt_wrap_open_session(conn, &sap, table->track_prefix, NULL, &session);
     testutil_check(session->salvage(session, table->uri, "force=true"));
     table_verify(table, conn);
     wts_close(&conn);
@@ -150,7 +150,7 @@ wts_salvage(TABLE *table, void *arg)
     corrupt(table);
     wts_open(g.home, &conn, false);
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, table->track_prefix, &session);
+    wt_wrap_open_session(conn, &sap, table->track_prefix, NULL, &session);
     testutil_check(session->salvage(session, table->uri, "force=true"));
     table_verify(table, conn);
     wts_close(&conn);

@@ -512,7 +512,7 @@ backup(void *arg)
 
     /* Open a session. */
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, NULL, &session);
+    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
 
     __wt_seconds(NULL, &g.backup_id);
     active_files_init(&active[0]);
