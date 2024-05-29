@@ -113,6 +113,7 @@ void ensureOplogCollectionsDropped(OperationContext* opCtx,
 void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
                                                 const CommonReshardingMetadata& metadata);
 
+bool isCollectionCapped(OperationContext* opCtx, const NamespaceString& nss);
 /**
  * Removes all entries matching the given reshardingUUID from the recipient resume data table.
  */

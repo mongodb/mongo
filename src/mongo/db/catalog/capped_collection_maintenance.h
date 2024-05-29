@@ -36,7 +36,8 @@
 namespace mongo {
 namespace collection_internal {
 
-bool insertsAreDueToOplogApplication(OperationContext* opCtx, const CollectionPtr& collection);
+bool shouldDeferCappedDeletesToOplogApplication(OperationContext* opCtx,
+                                                const CollectionPtr& collection);
 
 /**
  * If the collection is capped and the current data size or number of records exceeds cappedMaxSize

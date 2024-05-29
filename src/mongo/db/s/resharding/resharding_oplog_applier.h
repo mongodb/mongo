@@ -101,7 +101,8 @@ public:
                            std::vector<NamespaceString> allStashNss,
                            size_t myStashIdx,
                            ChunkManager sourceChunkMgr,
-                           std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator);
+                           std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
+                           bool isCapped = false);
 
     /**
      * Schedules work to repeatedly apply batches of oplog entries from a donor shard.

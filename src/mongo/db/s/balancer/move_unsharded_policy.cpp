@@ -264,7 +264,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::CommandNotSupported:
                 case ErrorCodes::DuplicateKey:
                 case ErrorCodes::FailedToSatisfyReadPreference:
-                // TODO SERVER-89826 Investigate IllegalOperation error
+                // TODO SERVER-90851 Investigate IllegalOperation error
                 case ErrorCodes::IllegalOperation:
                 case ErrorCodes::LockBusy:
                 case ErrorCodes::NamespaceNotFound:

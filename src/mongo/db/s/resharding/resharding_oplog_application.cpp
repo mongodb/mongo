@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 
+#include "mongo/db/catalog_raii.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <memory>
@@ -107,6 +108,22 @@ void runWithTransaction(OperationContext* opCtx,
     resharding::data_copy::runWithTransactionFromOpCtx(asr.opCtx(), nss, sii, std::move(func));
 }
 
+CollectionAcquisition acquireCollectionAndAssertExists(OperationContext* opCtx,
+                                                       const NamespaceString& collNss) {
+    auto acquiredColl =
+        acquireCollection(opCtx,
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx, collNss, AcquisitionPrerequisites::kWrite, getDeadline(opCtx)),
+                          MODE_IX);
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Failed to apply op during resharding due to missing collection "
+                          << collNss.toStringForErrorMsg(),
+            acquiredColl.exists());
+
+    return acquiredColl;
+}
+
 }  // namespace
 
 ReshardingOplogApplicationRules::ReshardingOplogApplicationRules(
@@ -115,14 +132,16 @@ ReshardingOplogApplicationRules::ReshardingOplogApplicationRules(
     size_t myStashIdx,
     ShardId donorShardId,
     ChunkManager sourceChunkMgr,
-    ReshardingOplogApplierMetrics* applierMetrics)
+    ReshardingOplogApplierMetrics* applierMetrics,
+    bool isCapped)
     : _outputNss(std::move(outputNss)),
       _allStashNss(std::move(allStashNss)),
       _myStashIdx(myStashIdx),
       _myStashNss(_allStashNss.at(_myStashIdx)),
       _donorShardId(std::move(donorShardId)),
       _sourceChunkMgr(std::move(sourceChunkMgr)),
-      _applierMetrics(applierMetrics) {}
+      _applierMetrics(applierMetrics),
+      _isCapped(isCapped) {}
 
 Status ReshardingOplogApplicationRules::applyOperation(
     OperationContext* opCtx,
@@ -430,21 +449,30 @@ void ReshardingOplogApplicationRules::_applyDelete(
 
     BSONObj idQuery = idField.wrap();
     const NamespaceString outputNss = op.getNss();
+
+    /*
+     * Capped collections are unsplittable collections which exist on a single shard, so stash
+     * collections are redundant for them since they can't have duplicate _id values.
+     * TODO (SERVER-90821): Use this for all unsplittable collections.
+     */
+    if (_isCapped) {
+        WriteUnitOfWork wuow(opCtx);
+        const auto outputCappedColl = acquireCollectionAndAssertExists(opCtx, _outputNss);
+
+        // Delete from the output collection
+        auto nDeleted = deleteObjects(opCtx, outputCappedColl, idQuery, true /* justOne */);
+        invariant(nDeleted != 0);
+        invariant(shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
+        wuow.commit();
+
+        return;
+    }
+
     {
         // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
         // apply rule #1 and delete the doc from the stash collection.
         WriteUnitOfWork wuow(opCtx);
-
-        const auto stashColl = acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(
-                opCtx, _myStashNss, AcquisitionPrerequisites::kWrite, getDeadline(opCtx)),
-            MODE_IX);
-
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << _myStashNss.toStringForErrorMsg(),
-                stashColl.exists());
+        const auto stashColl = acquireCollectionAndAssertExists(opCtx, _myStashNss);
 
         auto stashCollDoc = _queryStashCollById(opCtx, stashColl.getCollectionPtr(), idQuery);
         if (!stashCollDoc.isEmpty()) {
@@ -465,19 +493,7 @@ void ReshardingOplogApplicationRules::_applyDelete(
     // single replica set transaction that is executed if we apply rule #4, so we therefore must run
     // 'findByIdAndNoopUpdate' as a part of the single replica set transaction.
     runWithTransaction(opCtx, _outputNss, sii, [this, idQuery](OperationContext* opCtx) {
-        const auto outputColl = acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx,
-                                                    _outputNss,
-                                                    AcquisitionPrerequisites::OperationType::kWrite,
-                                                    getDeadline(opCtx)),
-            MODE_IX);
-
-
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << _outputNss.toStringForErrorMsg(),
-                outputColl.exists());
+        const auto outputColl = acquireCollectionAndAssertExists(opCtx, _outputNss);
 
         // Query the output collection for a doc with _id == [op _id].
         BSONObj outputCollDoc;
@@ -499,16 +515,16 @@ void ReshardingOplogApplicationRules::_applyDelete(
         // A doc with _id == [op _id] exists and is owned by '_donorShardId'. Apply rule #4 and
         // atomically:
         // 1. Delete the doc from '_outputNss'
-        // 2. Choose a document with _id == [op _id] arbitrarily from among all resharding conflict
-        // stash collections to delete from that resharding conflict stash collection
+        // 2. Choose a document with _id == [op _id] arbitrarily from among all resharding
+        // conflict stash collections to delete from that resharding conflict stash collection
         // 3. Insert the doc just deleted into the output collection
 
         // Delete from the output collection
         auto nDeleted = deleteObjects(opCtx, outputColl, idQuery, true /* justOne */);
         invariant(nDeleted != 0);
 
-        // Attempt to delete a doc from one of the stash collections. Once we've matched a doc in
-        // one collection, we'll break.
+        // Attempt to delete a doc from one of the stash collections. Once we've matched a doc
+        // in one collection, we'll break.
         BSONObj doc;
         size_t i = 0;
         for (const auto& coll : _allStashNss) {

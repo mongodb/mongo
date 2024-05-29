@@ -214,6 +214,16 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
         renameCollection(opCtx, metadata.getTempReshardingNss(), metadata.getSourceNss(), options));
 }
 
+bool isCollectionCapped(OperationContext* opCtx, const NamespaceString& nss) {
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+
+    AutoGetCollection coll(opCtx, nss, MODE_IS);
+    uassert(
+        ErrorCodes::NamespaceNotFound, "Temporary resharding collection doesn't exist."_sd, coll);
+    return coll.getCollection()->isCapped();
+}
+
 void deleteRecipientResumeData(OperationContext* opCtx, const UUID& reshardingUUID) {
     writeConflictRetry(
         opCtx,

@@ -111,7 +111,8 @@ const auto cappedCollectionState =
 }  // namespace
 
 
-bool insertsAreDueToOplogApplication(OperationContext* opCtx, const CollectionPtr& collection) {
+bool shouldDeferCappedDeletesToOplogApplication(OperationContext* opCtx,
+                                                const CollectionPtr& collection) {
     // Secondaries only delete from capped collections via oplog application when there are explicit
     // delete oplog entries.
     if (!opCtx->isEnforcingConstraints()) {
@@ -136,7 +137,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
     if (!collection->isCappedAndNeedsDelete(opCtx))
         return;
 
-    if (insertsAreDueToOplogApplication(opCtx, collection)) {
+    if (shouldDeferCappedDeletesToOplogApplication(opCtx, collection)) {
         // The primary has already executed the following logic and generated the necessary delete
         // oplogs. We will apply them later.
         return;

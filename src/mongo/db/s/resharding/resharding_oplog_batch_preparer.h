@@ -53,7 +53,8 @@ private:
     using OplogEntry = repl::OplogEntry;
 
 public:
-    ReshardingOplogBatchPreparer(std::unique_ptr<CollatorInterface> defaultCollator);
+    ReshardingOplogBatchPreparer(std::unique_ptr<CollatorInterface> defaultCollator,
+                                 bool isCapped = false);
 
     using OplogBatchToPrepare = std::vector<OplogEntry>;
     using OplogBatchToApply = std::vector<const OplogEntry*>;
@@ -107,6 +108,7 @@ private:
                                  WriterVectors& writerVectors) const;
 
     const std::unique_ptr<CollatorInterface> _defaultCollator;
+    const bool _isCapped;
 };
 
 }  // namespace mongo
