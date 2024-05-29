@@ -135,6 +135,16 @@ assert.gte((new Date()) - now, 2000);
 jsTestLog(
     'Repeat the test, this time tailing the oplog rather than a user-created capped collection.');
 if (FixtureHelpers.isReplSet(db)) {
+    // Create a collection, and add some documents. These operations should be reflected on the
+    // oplog. The find command we issue to the oplog will filter on this ns. This avoids getMore
+    // returning a non-empty batch when it hits maxTimeMs because any other test running in parallel
+    // can append to the oplog.
+    const findCollName = 'findColl' + jsTestName();
+    const findColl = db[findCollName];
+    for (let i = 0; i < 10; i++) {
+        findColl.insert({a: 1});
+    }
+
     const localDB = db.getSiblingDB("local");
     const oplogColl = localDB.oplog.rs;
 
@@ -145,8 +155,9 @@ if (FixtureHelpers.isReplSet(db)) {
         batchSize: 2,
         awaitData: true,
         tailable: true,
-        filter: {ns: {$ne: "config.system.sessions"}}
+        filter: {"ns": findColl.getFullName()}
     });
+
     assert.commandWorked(cmdRes);
     jsTestLog('Oplog tailing result: ' + tojson(cmdRes));
     if (cmdRes.cursor.id > NumberLong(0)) {

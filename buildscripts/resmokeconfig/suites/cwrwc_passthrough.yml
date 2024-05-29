@@ -7,7 +7,10 @@ test_kind: js_test
 selector:
   roots:
     - jstests/core/**/*.js
-
+  exclude_files:
+    # This test attempts to read from the "local.oplog.rs" collection, which may be missing entries
+    # if a write was performed on the primary of the replica set instead.
+    - jstests/core/query/awaitdata_getmore_cmd.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
 
