@@ -8,6 +8,9 @@
  *   requires_fastcount,
  *   # TODO SERVER-30466
  *   does_not_support_causal_consistency,
+ *   # Sanitizers slow down the server and can break reasonable timeouts set on queries. This test
+ *   # is for shell helpers, so the sanitizers are unnecessary anyway.
+ *   incompatible_aubsan,
  * ]
  */
 
