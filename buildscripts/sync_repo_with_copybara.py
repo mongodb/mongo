@@ -343,7 +343,7 @@ def main():
     create_mongodb_bot_gitconfig()
 
     current_dir = os.getcwd()
-    config_file = f"{current_dir}/copybara.sky"
+    config_file = f"{current_dir}/copy.bara.sky"
     git_destination_url_with_token = f"https://x-access-token:{access_token_copybara_syncer}@github.com/mongodb/mongo.git"
 
     # create destination branch if not exists

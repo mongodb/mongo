@@ -50,7 +50,7 @@ filters:
   - "BUILD.bazel":
     approvers:
       - devprod-build
-  - "copybara.sky":
+  - "copy.bara.sky":
     approvers:
       - IamXander
   - "copybara.staging.sky":
