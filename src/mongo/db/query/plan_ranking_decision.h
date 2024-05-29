@@ -154,6 +154,7 @@ struct PlanRankingDecision {
     }
 
     // Execution stats details for each candidate plan.
+    // TODO SERVER-88047: We can make this a non-variant once we delete SBE runtime planning.
     std::variant<StatsDetails, SBEStatsDetails> stats;
 
     // The "goodness" score corresponding to 'stats'.

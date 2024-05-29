@@ -1858,7 +1858,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     std::unique_ptr<QuerySolution>&& solution,
     const std::map<NamespaceString, CollectionInfo>& secondaryCollInfos) {
     if (query.cqPipeline().empty()) {
-        return nullptr;
+        return std::move(solution);
     }
 
     std::unique_ptr<QuerySolutionNode> solnForAgg = std::make_unique<SentinelNode>();

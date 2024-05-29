@@ -194,44 +194,13 @@ std::unique_ptr<PlannerInterface> replan(PlannerDataForSBE plannerData,
     return std::make_unique<MultiPlanner>(
         std::move(plannerData), std::move(solutions), shouldCache, std::move(replanReason));
 }
-}  // namespace
 
-std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
-    PlannerDataForSBE plannerData, std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder) {
-    AllIndicesRequiredChecker indexExistenceChecker{plannerData.collections};
-    const auto& decisionReads = cachedPlanHolder->decisionReads();
-    auto sbePlan = std::move(cachedPlanHolder->cachedPlan->root);
-    auto planStageData = std::move(cachedPlanHolder->cachedPlan->planStageData);
-    planStageData.debugInfo = cachedPlanHolder->debugInfo;
-
-    LOGV2_DEBUG(
-        8523404, 5, "Recovering SBE plan from the cache", "decisionReads"_attr = decisionReads);
-
-    const auto& foreignHashJoinCollections = planStageData.staticData->foreignHashJoinCollections;
-    if (!plannerData.cq->cqPipeline().empty() && !foreignHashJoinCollections.empty()) {
-        // We'd like to check if there is any foreign collection in the hash_lookup stage
-        // that is no longer eligible for using a hash_lookup plan. In this case we
-        // invalidate the cache and immediately replan without ever running a trial period.
-        const auto& secondaryCollectionsInfo = plannerData.plannerParams->secondaryCollectionsInfo;
-
-        for (const auto& foreignCollection : foreignHashJoinCollections) {
-            const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
-            tassert(8832902,
-                    "Foreign collection must be present in the collections info",
-                    collectionInfo != secondaryCollectionsInfo.end());
-            tassert(8832901, "Foreign collection must exist", collectionInfo->second.exists);
-
-            if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
-                return replan(std::move(plannerData),
-                              indexExistenceChecker,
-                              str::stream() << "Foreign collection "
-                                            << foreignCollection.toStringForErrorMsg()
-                                            << " is not eligible for hash join anymore",
-                              /* shouldCache */ true);
-            }
-        }
-    }
-
+std::unique_ptr<PlannerInterface> attemptToUsePlan(
+    PlannerDataForSBE plannerData,
+    boost::optional<size_t> decisionReads,
+    std::unique_ptr<sbe::PlanStage> sbePlan,
+    stage_builder::PlanStageData planStageData,
+    const AllIndicesRequiredChecker& indexExistenceChecker) {
     const bool isPinnedCacheEntry = !decisionReads.has_value();
     if (isPinnedCacheEntry) {
         auto sbePlanAndData = std::make_pair(std::move(sbePlan), std::move(planStageData));
@@ -246,7 +215,6 @@ std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
                                                         std::move(planStageData),
                                                         maxReadsBeforeReplan);
 
-    tassert(8523801, "'debugInfo' should be initialized", candidate.data.stageData.debugInfo);
     auto explainer = plan_explainer_factory::make(candidate.root.get(),
                                                   &candidate.data.stageData,
                                                   candidate.solution.get(),
@@ -310,5 +278,99 @@ std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
     // candidate to the executor. All results generated during the trial are stored with the
     // candidate so that the executor will be able to reuse them.
     return std::make_unique<ValidCandidatePlanner>(std::move(plannerData), std::move(candidate));
+}
+}  // namespace
+
+PlannerGeneratorFromClassicCacheEntry::PlannerGeneratorFromClassicCacheEntry(
+    PlannerDataForSBE plannerDataArg,
+    const QuerySolution& solution,
+    boost::optional<size_t> decisionReads)
+    : _plannerData(std::move(plannerDataArg)),
+      _solution(std::move(solution)),
+      _decisionReads(decisionReads) {
+    LOGV2_DEBUG(8523445,
+                5,
+                "Building SBE plan from the classic plan cache",
+                "decisionReads"_attr = decisionReads);
+
+    // After retrieving a classic cache entry, we have a QSN tree for the winning plan. Now we
+    // lower it to SBE.
+    std::tie(_sbePlan, _planStageData) =
+        stage_builder::buildSlotBasedExecutableTree(_plannerData.opCtx,
+                                                    _plannerData.collections,
+                                                    *_plannerData.cq,
+                                                    _solution,
+                                                    _plannerData.sbeYieldPolicy.get());
+}
+
+std::unique_ptr<PlannerInterface> PlannerGeneratorFromClassicCacheEntry::makePlanner() {
+    // Note that planStageData.debugInfo is not set here. This will be set when an explainer is
+    // created.
+    AllIndicesRequiredChecker indexExistenceChecker{_plannerData.collections};
+    return attemptToUsePlan(std::move(_plannerData),
+                            _decisionReads,
+                            std::move(_sbePlan),
+                            std::move(*_planStageData),
+                            indexExistenceChecker);
+}
+
+std::unique_ptr<PlannerInterface> PlannerGeneratorFromSbeCacheEntry::makePlanner() {
+    AllIndicesRequiredChecker indexExistenceChecker{_plannerData.collections};
+    const boost::optional<size_t> decisionReads = _cachedPlanHolder->decisionReads();
+    auto sbePlan = std::move(_cachedPlanHolder->cachedPlan->root);
+    auto planStageData = std::move(_cachedPlanHolder->cachedPlan->planStageData);
+    planStageData.debugInfo = _cachedPlanHolder->debugInfo;
+
+    LOGV2_DEBUG(8523404,
+                5,
+                "Recovering SBE plan from the SBE plan cache",
+                "decisionReads"_attr = decisionReads);
+
+    const auto& foreignHashJoinCollections = planStageData.staticData->foreignHashJoinCollections;
+    if (!_plannerData.cq->cqPipeline().empty() && !foreignHashJoinCollections.empty()) {
+        // We'd like to check if there is any foreign collection in the hash_lookup stage
+        // that is no longer eligible for using a hash_lookup plan. In this case we
+        // invalidate the cache and immediately replan without ever running a trial period.
+        const auto& secondaryCollectionsInfo = _plannerData.plannerParams->secondaryCollectionsInfo;
+
+        for (const auto& foreignCollection : foreignHashJoinCollections) {
+            const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
+            tassert(8832902,
+                    "Foreign collection must be present in the collections info",
+                    collectionInfo != secondaryCollectionsInfo.end());
+            tassert(8832901, "Foreign collection must exist", collectionInfo->second.exists);
+
+            if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
+                return replan(std::move(_plannerData),
+                              indexExistenceChecker,
+                              str::stream() << "Foreign collection "
+                                            << foreignCollection.toStringForErrorMsg()
+                                            << " is not eligible for hash join anymore",
+                              /* shouldCache */ true);
+            }
+        }
+    }
+
+    return attemptToUsePlan(std::move(_plannerData),
+                            decisionReads,
+                            std::move(sbePlan),
+                            std::move(planStageData),
+                            indexExistenceChecker);
+}
+
+std::unique_ptr<PlannerInterface> makePlannerForSbeCacheEntry(
+    PlannerDataForSBE plannerData, std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder) {
+    PlannerGeneratorFromSbeCacheEntry generator(std::move(plannerData),
+                                                std::move(cachedPlanHolder));
+    return generator.makePlanner();
+}
+
+std::unique_ptr<PlannerInterface> makePlannerForClassicCacheEntry(
+    PlannerDataForSBE plannerData,
+    const QuerySolution& solution,
+    boost::optional<size_t> decisionReads) {
+    PlannerGeneratorFromClassicCacheEntry generator(
+        std::move(plannerData), solution, decisionReads);
+    return generator.makePlanner();
 }
 }  // namespace mongo::classic_runtime_planner_for_sbe

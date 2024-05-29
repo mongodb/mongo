@@ -123,9 +123,39 @@ bool MultiPlanner::_shouldUseEofOptimization() const {
 }
 
 void MultiPlanner::_buildSbePlanAndMaybeCache(
-    const CanonicalQuery& cq,
+    const CanonicalQuery& queryToCache,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
     std::vector<plan_ranker::CandidatePlan>& candidates) {
+    invariant(queryToCache.isSbeCompatible());
+    // Note: 'queryToCache' is _not_ necessarily the same as the canonical query available in cq().
+    // This is because subplanning will plan (and cache) each branch of the top-level OR in a query
+    // separately, and invoke this callback with each branch as if it were an independent top-level
+    // query.
+
+    boost::optional<NumReads> numReads;
+    if (_shouldWriteToPlanCache) {
+        // Compute 'numReads'.
+        auto stats = _multiPlanStage->getStats();
+        auto winnerIdx = ranking->candidateOrder[0];
+        auto summary = collectExecutionStatsSummary(stats.get(), winnerIdx);
+        tassert(8523807,
+                "Expected StatsDetails in classic runtime planner ranking decision.",
+                std::holds_alternative<plan_ranker::StatsDetails>(ranking->stats));
+        numReads = NumReads{summary.totalKeysExamined + summary.totalDocsExamined};
+    }
+
+    // If classic plan cache is enabled, write to it. We need to do this before we extend the QSN
+    // tree with the agg pipeline, since the agg portion does not get cached in classic.
+    if (_shouldWriteToPlanCache && !useSbePlanCache()) {
+        plan_cache_util::updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
+            opCtx(),
+            collections().getMainCollection(),
+            queryToCache,
+            *numReads,
+            std::move(ranking),
+            candidates);
+    }
+
     // Pointer to the query solution which should be used to construct the SBE plan cache entry.
     const QuerySolution* solnToCache = _multiPlanStage->bestSolution();
 
@@ -137,20 +167,10 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
         solnToCache = _winningSolution.get();
     }
 
-    auto stats = _multiPlanStage->getStats();
-    auto winnerIdx = ranking->candidateOrder[0];
-    auto summary = collectExecutionStatsSummary(stats.get(), winnerIdx);
-    tassert(8523807,
-            "Expected StatsDetails in classic runtime planner ranking decision.",
-            std::holds_alternative<plan_ranker::StatsDetails>(ranking->stats));
-    auto& rankerDetails = std::get<plan_ranker::StatsDetails>(ranking->stats);
-    rankerDetails.candidatePlanStats[0]->common.works =
-        summary.totalKeysExamined + summary.totalDocsExamined;
-
     _sbePlanAndData = prepareSbePlanAndData(*solnToCache, std::move(_replanReason));
-    if (_shouldWriteToPlanCache) {
-        plan_cache_util::updateSbePlanCacheFromClassicCandidates(
-            opCtx(), collections(), cq, *ranking, candidates, *_sbePlanAndData, solnToCache);
+    if (_shouldWriteToPlanCache && useSbePlanCache()) {
+        plan_cache_util::updateSbePlanCacheWithNumReads(
+            opCtx(), collections(), queryToCache, *numReads, *_sbePlanAndData, solnToCache);
     }
 }
 

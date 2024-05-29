@@ -401,6 +401,13 @@ public:
         }
     }
 
+    /**
+     * Indicates whether this query was created specifically for the sub planner.
+     */
+    bool forSubPlanner() const {
+        return _forSubPlanner;
+    }
+
 private:
     void initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                 std::unique_ptr<ParsedFindCommand> parsedFind,
@@ -484,6 +491,8 @@ private:
     bool _isUncacheableSbe = false;
 
     bool _isSearchQuery = false;
+
+    bool _forSubPlanner = false;
 };
 
 }  // namespace mongo

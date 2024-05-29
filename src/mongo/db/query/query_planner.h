@@ -104,6 +104,11 @@ public:
         std::map<IndexEntry::Identifier, size_t> indexMap;
     };
 
+    /**
+     * Given a CanonicalQuery and a QSN tree, creates QSN nodes for each pipeline stage in 'query'
+     * and grafts them on top of the existing QSN tree. If 'query' has an empty pipeline, this
+     * function is a noop.
+     */
     static std::unique_ptr<QuerySolution> extendWithAggPipeline(
         CanonicalQuery& query,
         std::unique_ptr<QuerySolution>&& solution,

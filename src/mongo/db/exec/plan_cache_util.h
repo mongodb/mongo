@@ -67,6 +67,32 @@ plan_cache_debug_info::DebugInfo buildDebugInfo(
 plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution);
 
 /**
+ * Updates the classic plan cache from candidates generated using classic planning, but with the
+ * intent of executing the query in SBE. If the query is not a type that can be cached, does
+ * nothing. It is the caller's responsibility to compute a 'numReads' value to be stored in the
+ * cache entry indicating the expected number of reads the SBE plan requires.
+ */
+void updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const CanonicalQuery& query,
+    NumReads numReads,
+    std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
+    std::vector<plan_ranker::CandidatePlan>& candidates);
+
+/**
+ * Updates the classic plan cache from candidates generated using classic planning, with the intent
+ * of executing it in classic. If the query is not a type that can be cached, does nothing. This
+ * uses the 'works' value provided in 'ranking' as the works value to store in the cache.
+ */
+void updateClassicPlanCacheFromClassicCandidatesForClassicExecution(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const CanonicalQuery& query,
+    std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
+    std::vector<plan_ranker::CandidatePlan>& candidates);
+
+/**
  * Caches the best candidate execution plan for 'query' in SBE plan cache, chosen from the given
  * 'candidates' from SBE based on the 'ranking' decision, if the 'query' is of a type that can be
  * cached. Otherwise, does nothing.
@@ -87,12 +113,11 @@ void updateSbePlanCacheFromSbeCandidates(OperationContext* opCtx,
  *    * Never cached.
  *    * Cached, except in certain special cases.
  */
-void updateSbePlanCacheFromClassicCandidates(
+void updateSbePlanCacheWithNumReads(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     const CanonicalQuery& query,
-    const plan_ranker::PlanRankingDecision& ranking,
-    const std::vector<plan_ranker::CandidatePlan>& candidates,
+    NumReads nReads,
     const std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>& sbePlanAndData,
     const QuerySolution* winningSolution);
 

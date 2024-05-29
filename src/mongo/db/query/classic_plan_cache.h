@@ -207,6 +207,7 @@ struct VirtualScanCacheData {
                          bool hasRecordId,
                          const BSONObj& keyPattern)
         : docs(docs), hasRecordId(hasRecordId), indexKeyPattern(keyPattern){};
+    VirtualScanCacheData(const VirtualScanCacheData& other) = default;
 
     std::vector<BSONArray> docs;
     bool hasRecordId;

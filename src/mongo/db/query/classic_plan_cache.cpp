@@ -112,6 +112,9 @@ std::unique_ptr<SolutionCacheData> SolutionCacheData::clone() const {
         // 'tree' could be NULL if the cached solution is a collection scan.
         other->tree = this->tree->clone();
     }
+    if (this->virtualScanData) {
+        other->virtualScanData = std::make_unique<VirtualScanCacheData>(*this->virtualScanData);
+    }
     other->solnType = this->solnType;
     other->wholeIXSolnDir = this->wholeIXSolnDir;
     other->indexFilterApplied = this->indexFilterApplied;
