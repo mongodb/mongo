@@ -8,8 +8,6 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   requires_fcv_71,
- *   featureFlagAggOutTimeseries,
  *   # TODO(mbroadst): Some bug here, appears to be double-prefixing
  *   not_allowed_with_signed_security_token,
  *   # TODO SERVER-88275: aggregation using internally a $mergeCursor stage can fail with

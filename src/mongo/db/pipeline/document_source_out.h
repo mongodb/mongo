@@ -153,6 +153,17 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
+    /**
+     * Used to track the $out state for the destructor. $out should clean up different namespaces
+     * depending on when the stage was interrupted or failed.
+     */
+    enum class OutCleanUpProgress {
+        kTmpCollExists,
+        kRenameComplete,
+        kViewCreatedIfNeeded,
+        kComplete
+    };
+
     DocumentSourceOut(NamespaceString outputNs,
                       boost::optional<TimeseriesOptions> timeseries,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
@@ -205,6 +216,20 @@ private:
 
     NamespaceString makeBucketNsIfTimeseries(const NamespaceString& ns);
 
+    /**
+     * Runs a renameCollection from the temporary namespace to the user requested namespace. Returns
+     * nothing, but if the function returns, we assume the rename has succeeded and the temporary
+     * namespace no longer exists.
+     */
+    void renameTemporaryCollection();
+
+    /**
+     * Runs a createCollection command to create the view backing the time-series buckets
+     * collection. This should only be called if $out is writing to a time-series collection. If the
+     * function returns, we assume the view is created.
+     */
+    void createTimeseriesView();
+
     // Stash the writeConcern of the original command as the operation context may change by the
     // time we start to flush writes. This is because certain aggregations (e.g. $exchange)
     // establish cursors with batchSize 0 then run subsequent getMore's which use a new operation
@@ -224,9 +249,8 @@ private:
     // writing to a time-series collection or not.
     boost::optional<TimeseriesOptions> _timeseries;
 
-    // Set to true if the stage has not initialized or the view was successfully created.
-    // Used by the destructor to determine if the "real" buckets collection should be destroyed.
-    bool _timeseriesStateConsistent = true;
+    // Tracks the current state of the temporary collection, and is used for cleanup.
+    OutCleanUpProgress _tmpCleanUpState = OutCleanUpProgress::kComplete;
 };
 
 }  // namespace mongo
