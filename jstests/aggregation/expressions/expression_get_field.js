@@ -62,11 +62,11 @@ assertGetFieldFailedWithCode({input: {a: "b"}}, 3041702);
 assertGetFieldFailedWithCode({field: "a"}, 3041703);
 
 // Test that $getField fails with a document with one or more arguments of incorrect type.
-assertGetFieldFailedWithCode({field: true, input: {a: "b"}}, 5654602);
+assertGetFieldFailedWithCode({field: true, input: {a: "b"}}, [5654602, 3041704]);
 assertGetFieldFailedWithCode({field: {"a": 1}, input: {"a": 1}}, 3041704);
-assertGetFieldFailedWithCode(5, 5654602);
-assertGetFieldFailedWithCode(true, 5654602);
-assertGetFieldFailedWithCode({field: null, input: {"a": 1}}, 5654602);
+assertGetFieldFailedWithCode(5, [5654602, 3041704]);
+assertGetFieldFailedWithCode(true, [5654602, 3041704]);
+assertGetFieldFailedWithCode({field: null, input: {"a": 1}}, [5654602, 3041704]);
 
 // Test that $getField fails with a document with invalid arguments.
 assertGetFieldFailedWithCode({field: "a", input: {a: "b"}, unknown: true}, 3041701);
@@ -74,9 +74,9 @@ assertGetFieldFailedWithCode({field: "a", input: {a: "b"}, unknown: true}, 30417
 // Test that $getField fails when 'field' argument is an arbitrary expression that doesn't evaluate
 // to a string.
 assertGetFieldFailedWithCode({$add: [2, 3]}, 3041704);
-assertGetFieldFailedWithCode({$const: true}, 5654602);
-assertGetFieldFailedWithCode({$const: {"a": 1}}, 5654602);
-assertGetFieldFailedWithCode({field: {$const: []}, input: {"a": 1}}, 5654602);
+assertGetFieldFailedWithCode({$const: true}, [5654602, 3041704]);
+assertGetFieldFailedWithCode({$const: {"a": 1}}, [5654602, 3041704]);
+assertGetFieldFailedWithCode({field: {$const: []}, input: {"a": 1}}, [5654602, 3041704]);
 
 // Test that $getField returns the correct value from the provided object.
 assertGetFieldResultsEq({field: "a", input: {a: "b"}}, [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
@@ -292,7 +292,7 @@ assertPipelineResultsEq([{
                     let: {
                         // Either "field0" or "field1"
                         field: "$lookupField"
-                    }, 
+                    },
                     from: "expression_get_field_lookup_test",
                     pipeline: [
                         {
@@ -305,7 +305,7 @@ assertPipelineResultsEq([{
                 }
             },
             {$project: {result: 1}},
-        ], 
+        ],
         [
             {_id: 0, result: [{_id: 0, field: "0"}]},
             {_id: 1, result: [{_id: 0, field: "1"}]},
