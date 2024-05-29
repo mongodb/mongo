@@ -574,7 +574,6 @@ env.Library(
         "exchange_spec.idl",
         "resume_token.idl",
         "resume_token.cpp",
-        "search/document_source_internal_search_mongot_remote.idl",
         "search/plan_sharded_search.idl",
         "storage_stats_spec.idl",
     ],

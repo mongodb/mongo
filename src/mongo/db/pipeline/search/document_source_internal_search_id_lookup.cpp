@@ -31,7 +31,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
+#include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 
 namespace mongo {
 

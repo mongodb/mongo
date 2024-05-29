@@ -34,10 +34,10 @@
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
-#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
+#include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/util/net/hostandport.h"
@@ -69,44 +69,19 @@ public:
         return constraints;
     }
 
-    DocumentSourceInternalSearchMongotRemote(
-        InternalSearchMongotRemoteSpec spec,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        std::shared_ptr<executor::TaskExecutor> taskExecutor,
-        boost::optional<long long> mongotDocsRequested = boost::none,
-        bool requiresSearchSequenceToken = false)
+    DocumentSourceInternalSearchMongotRemote(InternalSearchMongotRemoteSpec spec,
+                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             std::shared_ptr<executor::TaskExecutor> taskExecutor)
         : DocumentSource(kStageName, expCtx),
-          _mergingPipeline(spec.getMergingPipeline()
+          _mergingPipeline(spec.getMergingPipeline().has_value()
                                ? mongo::Pipeline::parse(*spec.getMergingPipeline(), expCtx)
                                : nullptr),
-          _searchQuery(spec.getMongotQuery().getOwned()),
-          _taskExecutor(taskExecutor),
-          _metadataMergeProtocolVersion(spec.getMetadataMergeProtocolVersion()),
-          _limit(spec.getLimit().value_or(0)),
-          _queryReferencesSearchMeta(spec.getRequiresSearchMetaCursor().value_or(true)),
-          _mongotDocsRequested(mongotDocsRequested),
-          _requiresSearchSequenceToken(requiresSearchSequenceToken) {
-        if (spec.getSortSpec().has_value()) {
-            _sortSpec = spec.getSortSpec()->getOwned();
-            _sortKeyGen.emplace(SortPattern{*_sortSpec, pExpCtx}, pExpCtx->getCollator());
+          _spec(std::move(spec)),
+          _taskExecutor(taskExecutor) {
+        if (_spec.getSortSpec().has_value()) {
+            _sortKeyGen.emplace(SortPattern{*_spec.getSortSpec(), pExpCtx}, pExpCtx->getCollator());
         }
     }
-
-    /**
-     * Shorthand constructor from a mongot query only (e.g. no merging pipeline, limit, etc).
-     */
-    DocumentSourceInternalSearchMongotRemote(
-        BSONObj searchQuery,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        std::shared_ptr<executor::TaskExecutor> taskExecutor,
-        boost::optional<long long> mongotDocsRequested = boost::none,
-        bool requiresSearchSequenceToken = false)
-        : DocumentSource(kStageName, expCtx),
-          _mergingPipeline(nullptr),
-          _searchQuery(searchQuery.getOwned()),
-          _taskExecutor(taskExecutor),
-          _mongotDocsRequested(mongotDocsRequested),
-          _requiresSearchSequenceToken(requiresSearchSequenceToken) {}
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         return getSearchDefaultConstraints();
@@ -124,26 +99,14 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
-        if (_metadataMergeProtocolVersion) {
-            InternalSearchMongotRemoteSpec remoteSpec{_searchQuery, *_metadataMergeProtocolVersion};
-            remoteSpec.setMergingPipeline(_mergingPipeline
-                                              ? boost::optional<std::vector<mongo::BSONObj>>(
-                                                    _mergingPipeline->serializeToBson())
-                                              : boost::none);
-            if (_sortSpec.has_value()) {
-                remoteSpec.setSortSpec(_sortSpec->getOwned());
-            }
-            remoteSpec.setRequiresSearchMetaCursor(_queryReferencesSearchMeta);
-            return make_intrusive<DocumentSourceInternalSearchMongotRemote>(
-                std::move(remoteSpec), expCtx, _taskExecutor, _mongotDocsRequested);
-        } else {
-            return make_intrusive<DocumentSourceInternalSearchMongotRemote>(
-                _searchQuery, expCtx, _taskExecutor, _mongotDocsRequested);
-        }
+        auto spec = InternalSearchMongotRemoteSpec::parseOwned(IDLParserContext(kStageName),
+                                                               _spec.toBSON());
+        return make_intrusive<DocumentSourceInternalSearchMongotRemote>(
+            std::move(spec), expCtx, _taskExecutor);
     }
 
     BSONObj getSearchQuery() const {
-        return _searchQuery.getOwned();
+        return _spec.getMongotQuery().getOwned();
     }
 
     auto getTaskExecutor() const {
@@ -156,11 +119,13 @@ public:
     }
 
     boost::optional<long long> getMongotDocsRequested() const {
-        return _mongotDocsRequested;
+        return _spec.getMongotDocsRequested().has_value()
+            ? boost::make_optional<long long>(*_spec.getMongotDocsRequested())
+            : boost::none;
     }
 
     bool getPaginationFlag() const {
-        return _requiresSearchSequenceToken;
+        return _spec.getRequiresSearchSequenceToken().get_value_or(false);
     }
     /**
      * Calculate the number of documents needed to satisfy a user-defined limit. This information
@@ -197,17 +162,17 @@ public:
         if (!pExpCtx->needsMerge) {
             return boost::none;
         }
-        return _metadataMergeProtocolVersion;
+        return _spec.getMetadataMergeProtocolVersion();
     }
 
     bool queryReferencesSearchMeta() {
-        return _queryReferencesSearchMeta;
+        return _spec.getRequiresSearchMetaCursor();
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
     auto isStoredSource() const {
-        const auto storedSourceElem = _searchQuery[mongot_cursor::kReturnStoredSourceArg];
+        auto storedSourceElem = _spec.getMongotQuery()[mongot_cursor::kReturnStoredSourceArg];
         return !storedSourceElem.eoo() && storedSourceElem.Bool();
     }
 
@@ -264,7 +229,7 @@ private:
                                                  std::set<Variables::Id>{Variables::kSearchMetaId});
     }
 
-    const BSONObj _searchQuery;
+    InternalSearchMongotRemoteSpec _spec;
 
     // If this is an explain of a $search at execution-level verbosity, then the explain
     // results are held here. Otherwise, this is an empty object.
@@ -283,44 +248,12 @@ private:
     // exhausted.
     boost::optional<CursorId> _cursorId{boost::none};
 
-    /**
-     * Protocol version if it must be communicated via the search request.
-     * If we are in a sharded environment but on a non-sharded collection we may have a protocol
-     * version even though it should not be sent to mongot.
-     */
-    boost::optional<int> _metadataMergeProtocolVersion;
-
-    long long _limit = 0;
     long long _docsReturned = 0;
-
-    /**
-     * Sort specification for the current query. Used to populate the $sortKey on mongod after
-     * documents are returned from mongot.
-     * boost::none if plan sharded search did not specify a sort.
-     */
-    boost::optional<BSONObj> _sortSpec;
 
     /**
      * Sort key generator used to populate $sortKey. Has a value iff '_sortSpec' has a value.
      */
     boost::optional<SortKeyGenerator> _sortKeyGen;
-
-    /**
-     * Flag indicating whether or not the total user pipeline references the $$SEARCH_META variable.
-     * In sharded search, mongos will set this value send it to mongod; mongod should not try to
-     * recompute this value since it may incorrectly think it doesn't need metadata if only the
-     * merging pipeline (and not the shard's pipeline) references $$SEARCH_META.
-     */
-    bool _queryReferencesSearchMeta = true;
-
-    /**
-     * This will populate the docsRequested field of the cursorOptions document sent as part of the
-     * command to mongot in the case where the query has an extractable limit that can guide the
-     * number of documents that mongot returns to mongod.
-     */
-    boost::optional<long long> _mongotDocsRequested;
-
-    bool _requiresSearchSequenceToken = false;
 
     boost::optional<DocsNeededBounds> _minDocsNeededBounds;
     boost::optional<DocsNeededBounds> _maxDocsNeededBounds;

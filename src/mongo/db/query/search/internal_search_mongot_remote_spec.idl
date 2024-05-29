@@ -45,12 +45,13 @@ structs:
         type: object
       metadataMergeProtocolVersion:
         description: The mongot protocol version.
-        optional: false
+        optional: true
         type: int
       mergingPipeline:
         description: An optional pipeline to apply to the collection being unioned.
         optional: true
         type: array<object>
+      # TODO SERVER-74941 We may be able to remove limit alongside docsRequested.
       limit:
         description: A limit copied from the merging part of the pipeline.
         optional: true
@@ -68,6 +69,8 @@ structs:
         optional: true
         type: long
       requiresSearchMetaCursor:
-        description: "If false, we will ignore the metadata cursor returned from mongot and not establish a search metadata pipeline."
-        optional: true
+        description: >-
+          Flag indicating whether or not the total user pipeline references the $$SEARCH_META variable. If false, we will
+          ignore the metadata cursor returned from mongot and not establish a search metadata pipeline.
+        default: true
         type: bool
