@@ -22,12 +22,18 @@
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
+function getNonConfigShards() {
+    const shards = db.getSiblingDB('config').shards.find({_id: {$ne: "config"}}).toArray();
+    return shards.map(doc => doc._id);
+}
+
+const nonConfigShards = getNonConfigShards();
+
 if (FixtureHelpers.isMongos(db)) {
-    const shards = db.getSiblingDB('config').shards.find().toArray();
-    const shardName0 = shards.map(doc => doc._id)[0];
     const dbName = db.getName();
     db.getSiblingDB(dbName).dropDatabase();
-    assert.commandWorked(db.adminCommand({enableSharding: dbName, primaryShard: shardName0}));
+    assert.commandWorked(
+        db.adminCommand({enableSharding: dbName, primaryShard: nonConfigShards[0]}));
 }
 
 // Create unindexed collection
@@ -46,17 +52,13 @@ assert.commandWorked(collIndexed.createIndex({'t': 1}));
 jsTestLog(collIndexed.getIndexes());
 jsTestLog(bucketsIndexed.getIndexes());
 
-function numShards() {
-    return db.getSiblingDB('config').shards.count();
-}
 for (const collection of [buckets, bucketsIndexed]) {
-    if (FixtureHelpers.isSharded(collection) && numShards() >= 2) {
+    if (FixtureHelpers.isSharded(collection) && nonConfigShards.length >= 2) {
         // Split and move data to create an interesting scenario: we have some data on each shard,
         // but all the extended-range data is on a non-primary shard. This means view resolution is
         // unaware of the extended-range data, because that happens on the primary shard.
 
-        const shards = db.getSiblingDB('config').shards.find().toArray();
-        const [shardName0, shardName1] = shards.map(doc => doc._id);
+        const [shardName0, shardName1] = nonConfigShards;
 
         const collName = collection.getFullName();
         // Our example data has documents between 2000-2003, and these dates are non-wrapping.
@@ -133,7 +135,7 @@ function checkAgainstReferenceBoundedSortUnexpected(
     const options = hint ? {hint: hint} : {};
 
     const plan = collection.explain().aggregate(pipeline, options);
-    if (FixtureHelpers.isSharded(buckets) && numShards() >= 2) {
+    if (FixtureHelpers.isSharded(buckets) && nonConfigShards.length >= 2) {
         // With a sharded collection, some shards might not have any extended-range data,
         // so they might still use $_internalBoundedSort. But we know at least one
         // shard has extended-range data, so we know at least one shard has to
