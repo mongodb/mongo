@@ -459,7 +459,16 @@ void ReshardingOplogApplicationRules::_applyDelete(
         WriteUnitOfWork wuow(opCtx);
         const auto outputCappedColl = acquireCollectionAndAssertExists(opCtx, _outputNss);
 
+        BSONObj outputCollDoc;
+        auto foundDoc = Helpers::findByIdAndNoopUpdate(
+            opCtx, outputCappedColl.getCollectionPtr(), idQuery, outputCollDoc);
+
+        if (!foundDoc) {
+            return;
+        }
+
         // Delete from the output collection
+        invariant(!outputCollDoc.isEmpty());
         auto nDeleted = deleteObjects(opCtx, outputCappedColl, idQuery, true /* justOne */);
         invariant(nDeleted != 0);
         invariant(shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
