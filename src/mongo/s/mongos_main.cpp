@@ -410,6 +410,8 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             mongosTopCoord->enterQuiesceModeAndWait(opCtx, quiesceTime);
         }
 
+        UserCacheInvalidator::stop(serviceContext);
+
         // Inform the TransportLayers to stop accepting new connections.
         if (auto tlm = serviceContext->getTransportLayerManager()) {
             TimeElapsedBuilderScopedTimer scopedTimer(

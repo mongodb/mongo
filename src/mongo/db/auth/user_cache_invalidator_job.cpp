@@ -203,6 +203,15 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
     getUserCacheInvalidator(serviceCtx)->_job->start();
 }
 
+void UserCacheInvalidator::stop(ServiceContext* serviceCtx) {
+    const auto& invalidator = getUserCacheInvalidator(serviceCtx);
+    if (invalidator == nullptr) {
+        return;
+    }
+
+    invalidator->_job->stop();
+}
+
 void UserCacheInvalidator::run() try {
     auto opCtx = cc().makeOperationContext();
     ScopedSetRouterService guard(opCtx.get());
