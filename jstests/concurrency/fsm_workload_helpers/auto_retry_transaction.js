@@ -55,11 +55,8 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
             return true;
         }
 
-        // Currently operations on unsplittable collections can fail if a movePrimary is in
-        // progress, which happens in the config shard transition suite.
-        //
-        // TODO SERVER-89555: Remove when operations on tracked unsharded collections don't hit
-        // MovePrimaryInProgress errors.
+        // DDL operations on unsharded or unsplittable collections in a transaction can fail if a
+        // movePrimary is in progress, which may happen in the config shard transition suite.
         if (TestData.transitioningConfigShard &&
             includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
             print("-=-=-=- Retrying transaction after move primary error: " + tojsononeline(e));

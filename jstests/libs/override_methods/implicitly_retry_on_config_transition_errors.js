@@ -12,9 +12,9 @@ const kInterval = 200;
 const kNoRetry = true;
 const kRetry = false;
 
-// TODO SERVER-89555: Remove ErrorCodes.MovePrimaryInProgress when operations on tracked unsharded
-// collections don't hit MovePrimaryInProgress errors.
 const kRetryableErrors = [
+    // Not all collections can be moved with moveCollection, and must be moved with movePrimary,
+    // e.g. FLE state collections, so operations against them may fail with MovePrimaryInProgress.
     {code: ErrorCodes.MovePrimaryInProgress},
     {code: ErrorCodes.ReshardCollectionInProgress},
     {
@@ -103,9 +103,8 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
                 return kRetry;
             }
 
-            // TODO SERVER-89555: Remove once we never retry on MovePrimaryInProgress. Several
-            // workloads use bulk inserts to load data and can fail with duplicate key errors on
-            // retry if the first attempt failed part way through because of a movePrimary.
+            // Some workloads use bulk inserts to load data and can fail with duplicate key errors
+            // on retry if the first attempt failed part way through because of a movePrimary.
             if (cmdName === "insert" && attempt > 1 && res.hasOwnProperty("writeErrors")) {
                 const hasOnlyDuplicateKeyErrors = res.writeErrors.every((err) => {
                     return err.code === ErrorCodes.DuplicateKey;
