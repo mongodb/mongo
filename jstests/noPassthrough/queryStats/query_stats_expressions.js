@@ -69,4 +69,61 @@ coll.createIndex({foo: 1})
               queryStats[0].key.queryShape.filter);
 }
 
+function makeAggCmd(pipeline, collName = coll.getName()) {
+    return {aggregate: collName, pipeline: pipeline, cursor: {}};
+}
+
+// Tests that $queryStats stage does not return any entries for pipelines with $getField with
+// non-string 'field' argument. These all fail at run-time and so no query stats are collected for
+// them.
+{
+    resetQueryStatsStore(conn, "1MB");
+    assert.commandFailedWithCode(
+        testDB.runCommand(makeAggCmd([{$project: {a: {$getField: {$add: [1, 2]}}}}])), 3041704);
+    assert.commandFailedWithCode(
+        testDB.runCommand(makeAggCmd([{$project: {a: {$getField: ["a", "b"]}}}])), 3041704);
+    assert.commandFailedWithCode(
+        testDB.runCommand(makeAggCmd([{$project: {a: {$getField: null}}}])), 3041704);
+    assert.commandFailedWithCode(
+        testDB.runCommand(makeAggCmd(
+            [{$project: {a: {$getField: {field: {$add: [1, 2]}, input: "$$CURRENT"}}}}])),
+        3041704);
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            makeAggCmd([{$project: {a: {$getField: {field: ["a", "b"], input: "$$CURRENT"}}}}])),
+        3041704);
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            makeAggCmd([{$project: {a: {$getField: {field: null, input: "$$CURRENT"}}}}])),
+        3041704);
+    let queryStats = getQueryStats(conn);
+    assert.eq(queryStats.length, 0, `Expected no entries but got ${tojson(queryStats)}`);
+}
+
+// Tests that $queryStats stage does not fail with a re-parse error for a pipeline with $getField
+// with non-string 'field' argument. These all have syntax errors for $getField's field argument
+// but they do not fail because there's no collection named "nocoll" and so they make it to the
+// query stats store. $queryStats should be able to retrive them without any re-parse error.
+{
+    resetQueryStatsStore(conn, "1MB");
+
+    // query shape #1
+    testDB.runCommand(makeAggCmd([{$project: {a: {$getField: {$add: [1, 2]}}}}], "nocoll"));
+    testDB.runCommand(makeAggCmd(
+        [{$project: {a: {$getField: {field: {$add: [1, 2]}, input: "$$CURRENT"}}}}], "nocoll"));
+
+    // query shape #2
+    testDB.runCommand(makeAggCmd([{$project: {a: {$getField: ["a", "b"]}}}], "nocoll"));
+    testDB.runCommand(makeAggCmd(
+        [{$project: {a: {$getField: {field: ["a", "b"], input: "$$CURRENT"}}}}], "nocoll"));
+
+    // query shape #3
+    testDB.runCommand(makeAggCmd([{$project: {a: {$getField: null}}}], "nocoll"));
+    testDB.runCommand(
+        makeAggCmd([{$project: {a: {$getField: {field: null, input: "$$CURRENT"}}}}], "nocoll"));
+
+    let queryStats = getQueryStats(conn);
+    assert.eq(queryStats.length, 3, `Expected 3 entries but got ${tojson(queryStats)}`);
+}
+
 MongoRunner.stopMongod(conn);
