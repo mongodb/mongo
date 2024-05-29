@@ -321,6 +321,9 @@ buildvariants:
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
           - rhel80-medium
+      # TODO(SERVER-90936): Remove this once streams_kafka* tests can work with the "default" tag.
+      - name: streams_kafka
+      - name: streams_kafka_gwproxy
 
   # This build variant is used to test suites that use sharded cluster fixture with embedded router mode.
   # Also supports ProgramRunner/ShardingTest driven suites that look for an embedded router flag in TestData.
