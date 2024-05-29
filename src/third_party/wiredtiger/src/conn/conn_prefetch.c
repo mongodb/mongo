@@ -221,13 +221,6 @@ __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
       "Pre-fetch needs to save a valid dhandle when clearing the queue for a btree");
 
     __wt_spin_lock(session, &conn->prefetch_lock);
-    /*
-     * We guarantee that no dhandle enters the prefetch busy state while we wait. This is because we
-     * hold the lock while draining, and the lock is required when taking from the queue.
-     */
-    if (dhandle != NULL)
-        while (((WT_BTREE *)dhandle->handle)->prefetch_busy > 0)
-            __wt_yield();
 
     /* Empty the queue of the relevant pages, or all of them if specified. */
     TAILQ_FOREACH_SAFE(pe, &conn->pfqh, q, pe_tmp)
@@ -249,6 +242,16 @@ __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
      * may not note that the tree is closed for prefetch.
      */
     __wt_spin_unlock(session, &conn->prefetch_lock);
+
+    /*
+     * If we are only clearing refs from a certain tree, wait for any other concurrent pre-fetch
+     * activity to drain to prevent any invalid ref uses.
+     */
+    if (!all) {
+        while (((WT_BTREE *)dhandle->handle)->prefetch_busy > 0)
+            __wt_yield();
+    }
+
     return (0);
 }
 
