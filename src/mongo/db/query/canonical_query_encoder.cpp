@@ -754,8 +754,12 @@ class MatchExpressionSbePlanCacheKeySerializationVisitor final
 public:
     explicit MatchExpressionSbePlanCacheKeySerializationVisitor(OperationContext* opCtx,
                                                                 BufBuilder* builder,
-                                                                bool encodeParameterTypes)
-        : _opCtx(opCtx), _builder(builder), _encodeParameterTypes(encodeParameterTypes) {
+                                                                bool encodeParameterTypes,
+                                                                bool hasSort)
+        : _opCtx(opCtx),
+          _builder(builder),
+          _encodeParameterTypes(encodeParameterTypes),
+          _hasSort(hasSort) {
         invariant(_opCtx);
     }
 
@@ -801,11 +805,11 @@ public:
 
         // Encode the number of unique $in values as part of the plan cache key. If the query is
         // optimized by exploding for sort, the number of unique elements in $in determines how many
-        // merge branches we get in the query plan.
-        if (expr->getInputParamId()) {
+        // merge branches we get in the query plan. If there is no sort, this is not necessary.
+        if (expr->getInputParamId() && _hasSort) {
             size_t maxScansToExplode =
                 QueryKnobConfiguration::decoration(_opCtx).getMaxScansToExplodeForOp();
-            // Assume that $in have n elements.
+            // Assume that $in has n elements.
             // If n is less than or equal to maxScansToExplode, then it is possible that explode for
             // sort optimization will be used, so we need to add n to plan cache key.
             // If n is greater than maxScansToExplode, then we can't explode it for sort. So we can
@@ -1109,6 +1113,12 @@ private:
     BufBuilder* const _builder;
     // Whether to encode the type of query parameter into the cache key.
     bool _encodeParameterTypes{false};
+    // Whether there is a sort absorbed by the Canonical query. Note: '_hasSort' is true only when
+    // there is a sort that can be used for explode for sort optimization. For a $match stage,
+    // '_hasSort' should be false since $match does not perform index selection. In cases where a
+    // $sort is not absorbed by the canonical query '_hasSort' should be false since we only perform
+    // explode for sort using the sort in canonical query.
+    bool _hasSort;
 };
 
 /**
@@ -1122,8 +1132,9 @@ class MatchExpressionSbePlanCacheKeySerializationWalker {
 public:
     explicit MatchExpressionSbePlanCacheKeySerializationWalker(OperationContext* opCtx,
                                                                BufBuilder* builder,
-                                                               bool encodeParameterTypes)
-        : _builder{builder}, _visitor{opCtx, _builder, encodeParameterTypes} {
+                                                               bool encodeParameterTypes,
+                                                               bool hasSort)
+        : _builder{builder}, _visitor{opCtx, _builder, encodeParameterTypes, hasSort} {
         invariant(_builder);
     }
 
@@ -1163,8 +1174,10 @@ private:
 void encodeKeyForAutoParameterizedMatchSBE(OperationContext* opCtx,
                                            MatchExpression* matchExpr,
                                            BufBuilder* builder,
-                                           bool encodeParameterTypes) {
-    MatchExpressionSbePlanCacheKeySerializationWalker walker{opCtx, builder, encodeParameterTypes};
+                                           bool encodeParameterTypes,
+                                           bool hasSort) {
+    MatchExpressionSbePlanCacheKeySerializationWalker walker{
+        opCtx, builder, encodeParameterTypes, hasSort};
     tree_walker::walk<true, MatchExpression>(matchExpr, &walker);
 }
 
@@ -1190,7 +1203,13 @@ void encodePipeline(const ExpressionContext* expCtx,
             const bool encodeParameterTypes = optimizer == Optimizer::kBonsai;
             // Match expressions are parameterized so need to be encoded differently.
             encodeKeyForAutoParameterizedMatchSBE(
-                expCtx->opCtx, matchStage->getMatchExpression(), bufBuilder, encodeParameterTypes);
+                expCtx->opCtx,
+                matchStage->getMatchExpression(),
+                bufBuilder,
+                encodeParameterTypes,
+                // We do not use explode for sort optimization for a $match stage, since it is not
+                // a part of index selection.
+                false /*hasSort*/);
         } else if (!search_helpers::encodeSearchForSbeCache(expCtx, documentSource, bufBuilder)) {
             encodeKeyForPipelineStage(documentSource, serializedArray, bufBuilder);
         }
@@ -1255,8 +1274,11 @@ std::string encodeSBE(const CanonicalQuery& cq, const Optimizer optimizer) {
     // Only encode parameter types in the MatchExpression if this key is being generated by
     // Bonsai.
     const bool encodeParameterTypes = optimizer == Optimizer::kBonsai;
-    encodeKeyForAutoParameterizedMatchSBE(
-        cq.getOpCtx(), cq.getPrimaryMatchExpression(), &bufBuilder, encodeParameterTypes);
+    encodeKeyForAutoParameterizedMatchSBE(cq.getOpCtx(),
+                                          cq.getPrimaryMatchExpression(),
+                                          &bufBuilder,
+                                          encodeParameterTypes,
+                                          !sort.isEmpty());
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
     bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
     bufBuilder.appendChar(kEncodeSectionDelimiter);

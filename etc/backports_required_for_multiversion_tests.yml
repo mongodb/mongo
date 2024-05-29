@@ -615,6 +615,8 @@ last-continuous:
     ticket: SERVER-87961
   - test_file: jstests/core/timeseries/timeseries_lastpoint.js
     ticket: SERVER-87961
+  - test_file: jstests/core/query/in_expression_plan_cache.js
+    ticket: SERVER-83712
   suites: null
 last-lts:
   all:
@@ -1284,4 +1286,6 @@ last-lts:
     ticket: SERVER-87961
   - test_file: jstests/core/timeseries/timeseries_lastpoint.js
     ticket: SERVER-87961
+  - test_file: jstests/core/query/in_expression_plan_cache.js
+    ticket: SERVER-83712
   suites: null
