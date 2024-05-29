@@ -107,6 +107,7 @@ selector:
   # that can be aborted by the fcv upgrade downgrade suite.
   - jstests/core/command_let_variables_expressions.js
   - jstests/core/index/hashed/hashed_index_with_arrays.js
+  - jstests/core/write/update/update_with_pipeline.js
 
   # Expected failure due to interfering collMod commands acquiring a lock that the test does not expect.
   - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
