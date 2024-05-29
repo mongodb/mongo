@@ -661,9 +661,8 @@ buildvariants:
       - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
-      # TODO: Enable in SERVER-66572.
-      # - name: tpch_10_normalized
-      # - name: tpch_10_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
       - name: tsbs_load
@@ -721,9 +720,8 @@ buildvariants:
       - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
-      # TODO: Enable in SERVER-66572.
-      # - name: tpch_10_normalized
-      # - name: tpch_10_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
       - name: tsbs_load
@@ -785,9 +783,8 @@ buildvariants:
       - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
-      # TODO: Enable in SERVER-66572.
-      # - name: tpch_10_normalized
-      # - name: tpch_10_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
       - name: tsbs_load
@@ -1604,9 +1601,8 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
-      # TODO: Enable in SERVER-66572.
-      # - name: tpch_10_normalized
-      # - name: tpch_10_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
         cron: *high-value-workload-cron
@@ -1696,9 +1692,8 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
-      # TODO: Enable in SERVER-66572.
-      # - name: tpch_10_normalized
-      # - name: tpch_10_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
         cron: *high-value-workload-cron
