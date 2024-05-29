@@ -337,6 +337,18 @@ configure_chunkcache(char **p, size_t max)
 }
 
 /*
+ * configure_prefetch --
+ *     Configure prefetch settings for opening a connection. When enabled, this allows sessions to
+ *     use the prefetch feature.
+ */
+static void
+configure_prefetch(char **p, size_t max)
+{
+    if (GV(PREFETCH))
+        CONFIG_APPEND(*p, ",prefetch=(available=true,default=false)");
+}
+
+/*
  * create_database --
  *     Create a WiredTiger database.
  */
@@ -442,6 +454,9 @@ create_database(const char *home, WT_CONNECTION **connp)
 
     /* Optional chunk cache. */
     configure_chunkcache(&p, max);
+
+    /* Optional prefetch. */
+    configure_prefetch(&p, max);
 
 #define EXTENSION_PATH(path) (access((path), R_OK) == 0 ? (path) : "")
 
@@ -650,6 +665,9 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
 
     /* Optional debug mode. */
     configure_debug_mode(&p, max);
+
+    /* Optional prefetch. */
+    configure_prefetch(&p, max);
 
     /* If in-memory, there's only a single, shared WT_CONNECTION handle. */
     if (GV(RUNS_IN_MEMORY) != 0)

@@ -168,6 +168,7 @@ create_configs()
     echo "leak_memory=1" >> $file_name              # Faster runs
     echo "logging=1" >> $file_name                  # Test log compatibility
     echo "logging_compression=snappy" >> $file_name # We only built with snappy, force the choice
+    echo "prefetch=0" >> $file_name                 # WT-12978 - Not supported by older releases
     echo "rows=1000000" >> $file_name
     echo "salvage=0" >> $file_name                  # Faster runs
     echo "stress.checkpoint=0" >> $file_name        # Faster runs
