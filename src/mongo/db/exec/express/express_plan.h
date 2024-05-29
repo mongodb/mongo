@@ -442,9 +442,13 @@ public:
     }
 
     void restoreResources(OperationContext* opCtx, const CollectionPtr* collection) {
+        // Note that this can be called with collection pointing to
+        // nullptr in cases where executor has a CollectionAcquisition instead
+        // of a CollectionPtr, so handle it carefully.
         restoreInvalidatedCollection(_collection, collection);
+        const auto& coll = unwrapCollection(_collection);
         _indexCatalogEntry =
-            IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, *collection->get());
+            IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, accessCollection(coll));
     }
 
     template <class Callable>
@@ -693,9 +697,13 @@ public:
     }
 
     void restoreResources(OperationContext* opCtx, const CollectionPtr* collection) {
+        // Note that this can be called with collection pointing to
+        // nullptr in cases where executor has a CollectionAcquisition instead
+        // of a CollectionPtr, so handle it carefully.
         restoreInvalidatedCollection(_collection, collection);
+        const auto& coll = unwrapCollection(_collection);
         _indexCatalogEntry = LookupViaUserIndex::getIndexCatalogEntryForUserIndex(
-            opCtx, *collection->get(), _indexIdent, _indexName);
+            opCtx, accessCollection(coll), _indexIdent, _indexName);
     }
 
     template <class Callable>
