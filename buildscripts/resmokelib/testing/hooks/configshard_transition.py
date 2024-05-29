@@ -701,7 +701,7 @@ class _TransitionThread(threading.Thread):
                 # collection.
 
                 # TODO (SERVER-90810): Re-enable this check for resharding temporary collections.
-                if "system.resharding" in nss:
+                if "system.resharding" in nss or "system.buckets.resharding" in nss:
                     continue
 
                 assert (
