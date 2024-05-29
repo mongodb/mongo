@@ -58,6 +58,10 @@ struct CounterOps {
         counter = value;
     }
 
+    static void set(int64_t& counter, const AtomicWord<long long>& value) {
+        counter = value.load();
+    }
+
     static void set(AtomicWord<long long>& counter, int64_t value) {
         counter.store(value);
     }
@@ -84,6 +88,13 @@ struct CounterOps {
  */
 template <typename CounterType>
 struct LockStatCounters {
+    template <typename OtherType>
+    void set(const LockStatCounters<OtherType>& other) {
+        CounterOps::set(numAcquisitions, other.numAcquisitions);
+        CounterOps::set(numWaits, other.numWaits);
+        CounterOps::set(combinedWaitTimeMicros, other.combinedWaitTimeMicros);
+    }
+
     template <typename OtherType>
     void append(const LockStatCounters<OtherType>& other) {
         CounterOps::add(numAcquisitions, other.numAcquisitions);
@@ -124,6 +135,22 @@ public:
     // Declare the type for the lock counters bundle
     typedef LockStatCounters<CounterType> LockStatCountersType;
 
+    LockStats() = default;
+    LockStats(const LockStats<CounterType>& other) = default;
+
+    template <typename OtherType>
+    explicit LockStats(const LockStats<OtherType>& other) {
+        set(other);
+    }
+
+    LockStats<CounterType>& operator=(const LockStats<CounterType>& other) = default;
+
+    template <typename OtherType>
+    LockStats<CounterType>& operator=(const LockStats<OtherType>& other) {
+        set(other);
+        return *this;
+    }
+
     void recordAcquisition(ResourceId resId, LockMode mode) {
         CounterOps::add(get(resId, mode).numAcquisitions, 1);
     }
@@ -146,6 +173,35 @@ public:
         }
 
         return _stats[resId.getType()].modeStats[mode];
+    }
+
+    template <typename OtherType>
+    void set(const LockStats<OtherType>& other) {
+        typedef LockStatCounters<OtherType> OtherLockStatCountersType;
+
+        // Set global lock stats.
+        for (uint8_t i = 0; i < static_cast<uint8_t>(ResourceGlobalId::kNumIds); ++i) {
+            for (uint8_t mode = 0; mode < LockModesCount; ++mode) {
+                _resourceGlobalStats[i].modeStats[mode].set(
+                    other._resourceGlobalStats[i].modeStats[mode]);
+            }
+        }
+
+        // Set all non-global, non-oplog lock stats.
+        for (int i = 0; i < ResourceTypesCount; i++) {
+            for (int mode = 0; mode < LockModesCount; mode++) {
+                const OtherLockStatCountersType& otherStats = other._stats[i].modeStats[mode];
+                LockStatCountersType& thisStats = _stats[i].modeStats[mode];
+                thisStats.set(otherStats);
+            }
+        }
+
+        // Set the oplog stats
+        for (int mode = 0; mode < LockModesCount; mode++) {
+            const OtherLockStatCountersType& otherStats = other._oplogStats.modeStats[mode];
+            LockStatCountersType& thisStats = _oplogStats.modeStats[mode];
+            thisStats.set(otherStats);
+        }
     }
 
     template <typename OtherType>

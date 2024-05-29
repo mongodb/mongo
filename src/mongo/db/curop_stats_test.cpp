@@ -298,5 +298,51 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisWithBlockedTimeAtStart) {
                             .count(),
                         1);
 }
+
+TEST_F(CurOpStatsTest, MultipleUnstashingAndStashingTransaction) {
+    // Initialize two operation contexts.
+    auto serviceContext = getGlobalServiceContext();
+    auto client1 = serviceContext->getService()->makeClient("client1");
+    auto opCtx1 = client1->makeOperationContext();
+    auto curop1 = CurOp::get(*opCtx1);
+    auto lockerOp1 = shard_role_details::getLocker(opCtx1.get());
+
+    auto tickSourceMock = std::make_unique<TickSourceMock<Microseconds>>();
+    // The tick source is initialized to a non-zero value as CurOp equates a value of 0 with a
+    // not-started timer.
+    tickSourceMock->advance(Milliseconds{123});
+    curop1->setTickSource_forTest(tickSourceMock.get());
+
+    // Advance execution time.
+    curop1->ensureStarted();
+    tickSourceMock->advance(Milliseconds{1000});
+    lockerOp1->addTicketQueueTime(Milliseconds{20});
+
+    // Advance counters while stashed
+    curop1->updateStatsOnTransactionStash();
+    tickSourceMock->advance(Milliseconds{1000});
+    lockerOp1->addTicketQueueTime(Milliseconds{30});
+    curop1->updateStatsOnTransactionUnstash();
+
+    // Advance counters while not stashed
+    tickSourceMock->advance(Milliseconds{1000});
+    lockerOp1->addTicketQueueTime(Milliseconds{40});
+
+    // Advance counters while stashed
+    curop1->updateStatsOnTransactionStash();
+    tickSourceMock->advance(Milliseconds{1000});
+    lockerOp1->addTicketQueueTime(Milliseconds{50});
+    curop1->updateStatsOnTransactionUnstash();
+
+    // Advance counters while not stashed
+    tickSourceMock->advance(Milliseconds{1000});
+    lockerOp1->addTicketQueueTime(Milliseconds{60});
+    curop1->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+
+    // Verify that 120ms are excluded from 5000 execution time.
+    // Out of 200ms of locker queue time, only 120ms happened while the locker was not stashed.
+    ASSERT_EQ(curop1->debug().workingTimeMillis, Milliseconds(4880));
+}
+
 }  // namespace
 }  // namespace mongo

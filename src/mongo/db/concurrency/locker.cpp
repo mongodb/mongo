@@ -458,7 +458,6 @@ void Locker::getLockerInfo(
     // Zero-out the contents
     lockerInfo->locks.clear();
     lockerInfo->waitingResource = ResourceId();
-    lockerInfo->stats.reset();
 
     _lock.lock();
     LockRequestsMap::ConstIterator it = _requests.begin();
@@ -475,14 +474,15 @@ void Locker::getLockerInfo(
     std::sort(lockerInfo->locks.begin(), lockerInfo->locks.end());
 
     lockerInfo->waitingResource = getWaitingResource();
-    lockerInfo->stats.append(_stats);
+    lockerInfo->stats.set(_stats);
 
     // alreadyCountedStats is a snapshot of lock stats taken when the sub-operation starts. Only
     // sub-operations have alreadyCountedStats.
-    if (alreadyCountedStats)
+    if (alreadyCountedStats) {
         // Adjust the lock stats by subtracting the alreadyCountedStats. No mutex is needed because
         // alreadyCountedStats is immutable.
         lockerInfo->stats.subtract(*alreadyCountedStats);
+    }
 }
 
 Locker::LockerInfo Locker::getLockerInfo(

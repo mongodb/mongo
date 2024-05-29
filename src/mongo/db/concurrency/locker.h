@@ -100,6 +100,15 @@ public:
     void setDebugInfo(std::string info);
 
     /**
+     * Returns the cumulative lock stats accrued so far. The returned stats are not a snapshot
+     * but a reference to AtomicLockStats, meaning that they can change at any time after they are
+     * returned.
+     */
+    const AtomicLockStats& stats() const {
+        return _stats;
+    }
+
+    /**
      * State for reporting the number of active and queued reader and writer clients.
      */
     enum ClientState { kInactive, kActiveReader, kActiveWriter, kQueuedReader, kQueuedWriter };
