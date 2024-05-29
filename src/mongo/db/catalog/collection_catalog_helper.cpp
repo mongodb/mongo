@@ -84,6 +84,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
                              CollectionCatalog::CollectionInfoFn predicate) {
 
     auto catalogForIteration = CollectionCatalog::get(opCtx);
+    size_t collectionCount = 0;
     for (auto&& coll : catalogForIteration->range(dbName)) {
         auto uuid = coll->uuid();
         if (predicate && !catalogForIteration->checkIfCollectionSatisfiable(uuid, predicate)) {
@@ -117,7 +118,14 @@ void forEachCollectionFromDb(OperationContext* opCtx,
         if (!callback(collection.get()))
             break;
 
+        // This was a rough heuristic that was found that 400 collections would take 100
+        // milliseconds with calling checkForInterrupt() (with freeStorage: 1).
+        // We made the checkForInterrupt() occur after 200 collections to be conservative.
+        if (!(collectionCount % 200)) {
+            opCtx->checkForInterrupt();
+        }
         hangBeforeGettingNextCollection.pauseWhileSet();
+        collectionCount += 1;
     }
 }
 
