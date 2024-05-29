@@ -164,67 +164,67 @@
 
   <Type Name="mongo::BSONElement">
     <!-- double: { name, value } -->
-    <DisplayString Condition="*(char*)data==1">{{ {data+1,s8}, {*(double*)((char*)data+strlen(data+1)+2)} }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==1">{{ {_data+1,s8}, {*(double*)((char*)_data+strlen(_data+1)+2)} }}</DisplayString>
 
     <!-- string -->
-    <DisplayString Condition="*(char*)data==2 ">{{ {data+1,s8}, {(char*)data+strlen(data+1)+6,[*(int32_t*)((char*)data+strlen(data+1)+2)-1]s8} }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==2 ">{{ {_data+1,s8}, {(char*)_data+strlen(_data+1)+6,[*(int32_t*)((char*)_data+strlen(_data+1)+2)-1]s8} }}</DisplayString>
 
     <!-- embedded document or array -->
-    <DisplayString Condition="*(char*)data==3 || *(char*)data==4">{{ {data+1,s8}, objsize={*(int32_t*)((char*)data+strlen(data+1)+2)} }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==3 || *(char*)_data==4">{{ {_data+1,s8}, objsize={*(int32_t*)((char*)_data+strlen(_data+1)+2)} }}</DisplayString>
 
     <!-- binary, treat uuid separately -->
-    <DisplayString Condition="*(char*)data==5 &amp;&amp; *(char*)((char*)data+strlen((char*)data+1)+6)!=4">{{ {data+1,s8}, binary }}</DisplayString>
-    <DisplayString Condition="*(char*)data==5 &amp;&amp; *(char*)((char*)data+strlen((char*)data+1)+6)==4">{{ {data+1,s8}, uuid }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==5 &amp;&amp; *(char*)((char*)_data+strlen((char*)_data+1)+6)!=4">{{ {_data+1,s8}, binary }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==5 &amp;&amp; *(char*)((char*)_data+strlen((char*)_data+1)+6)==4">{{ {_data+1,s8}, uuid }}</DisplayString>
 
     <!-- undefined -->
-    <DisplayString Condition="*(char*)data==6">{{ {data+1,s8}, undefined }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==6">{{ {_data+1,s8}, undefined }}</DisplayString>
 
     <!-- ObjectId -->
-    <DisplayString Condition="*(char*)data==7">{{ {data+1,s8}, oid }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==7">{{ {_data+1,s8}, oid }}</DisplayString>
 
     <!-- bool -->
-    <DisplayString Condition="*(char*)data==8">{{ {data+1,s8}, {*(bool*)((char*)data+strlen((char*)data+1)+2)} }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==8">{{ {_data+1,s8}, {*(bool*)((char*)_data+strlen((char*)_data+1)+2)} }}</DisplayString>
 
     <!-- Date_t -->
-    <DisplayString Condition="*(char*)data==9">{{ {data+1,s8}, {*(mongo::Date_t*)((char*)data+strlen((char*)data+1)+2)} }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==9">{{ {_data+1,s8}, {*(mongo::Date_t*)((char*)_data+strlen((char*)_data+1)+2)} }}</DisplayString>
 
     <!-- null -->
-    <DisplayString Condition="*(char*)data==10">{{ {data+1,s8}, null }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==10">{{ {_data+1,s8}, null }}</DisplayString>
 
     <!-- regex -->
-    <DisplayString Condition="*(char*)data==11">{{ {data+1,s8}, regex }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==11">{{ {_data+1,s8}, regex }}</DisplayString>
 
     <!-- DBRef -->
-    <DisplayString Condition="*(char*)data==12 ">{{ {data+1,s8}, DBRef }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==12 ">{{ {_data+1,s8}, DBRef }}</DisplayString>
 
     <!-- Code -->
-    <DisplayString Condition="*(char*)data==13 ">{{ {data+1,s8}, code }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==13 ">{{ {_data+1,s8}, code }}</DisplayString>
 
     <!-- Symbol -->
-    <DisplayString Condition="*(char*)data==14 ">{{ {data+1,s8}, symbol }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==14 ">{{ {_data+1,s8}, symbol }}</DisplayString>
 
     <!-- code with scope -->
-    <DisplayString Condition="*(char*)data==15">{{ {data+1,s8}, codeWScope }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==15">{{ {_data+1,s8}, codeWScope }}</DisplayString>
 
     <!-- int32 -->
-    <DisplayString Condition="*(char*)data==16">{{ {data+1,s8}, {*(int32_t*)((char*)data+strlen((char*)data+1)+2)} }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==16">{{ {_data+1,s8}, {*(int32_t*)((char*)_data+strlen((char*)_data+1)+2)} }}</DisplayString>
 
     <!-- Timestamp -->
-    <DisplayString Condition="*(char*)data==17">{{ {data+1,s8}, {*(mongo::Timestamp*)((char*)data+strlen((char*)data+1)+2)} }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==17">{{ {_data+1,s8}, {*(mongo::Timestamp*)((char*)_data+strlen((char*)_data+1)+2)} }}</DisplayString>
 
     <!-- int64 -->
-    <DisplayString Condition="*(char*)data==18">{{ {data+1,s8}, {*(int64_t*)((char*)data+strlen((char*)data+1)+2)} }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==18">{{ {_data+1,s8}, {*(int64_t*)((char*)_data+strlen((char*)_data+1)+2)} }}</DisplayString>
 
     <!-- Decimal128 -->
-    <DisplayString Condition="*(char*)data==19">{{ {data+1,s8}, {*(mongo::Decimal128*)((char*)data+strlen((char*)data+1)+2)} }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==19">{{ {_data+1,s8}, {*(mongo::Decimal128*)((char*)_data+strlen((char*)_data+1)+2)} }}</DisplayString>
 
     <!-- MinKey/MaxKey -->
-    <DisplayString Condition="*(char*)data==-1">{{ {data+1,s8}, MinKey }}</DisplayString>
-    <DisplayString Condition="*(char*)data==0x7f">{{ {data+1,s8}, MaxKey }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==-1">{{ {_data+1,s8}, MinKey }}</DisplayString>
+    <DisplayString Condition="*(char*)_data==0x7f">{{ {_data+1,s8}, MaxKey }}</DisplayString>
 
     <Expand>
-        <Item Name="name">(const char*)data+1,s8</Item>
-        <Item Name="value">(const mongo::BSONElementData*)data,na</Item>
+      <Item Name="name">(const char*)_data+1,s8</Item>
+      <Item Name="value">(const mongo::BSONElementData*)_data,na</Item>
     </Expand>
   </Type>
 
@@ -423,8 +423,8 @@
   <Type Name="mongo::ShardVersion">
     <DisplayString>{{chunkVersion = {_chunkVersion} indexVersion = {_indexVersion}}}</DisplayString>
     <Expand>
-        <Item Name="ChunkVersion">_chunkVersion</Item>
-        <Item Name="IndexVersion">_indexVersion</Item>
+      <Item Name="ChunkVersion">_chunkVersion</Item>
+      <Item Name="IndexVersion">_indexVersion</Item>
     </Expand>
   </Type>
 
@@ -436,10 +436,10 @@
 
   <Type Name="mongo::DatabaseVersionBase">
     <DisplayString>{{uuid = UUID({_uuid}) timestamp = Timestamp({_timestamp.secs}, {_timestamp.i}) lastMod = {_lastMod}}}</DisplayString>
-      <Expand>
-          <Item Name="UUID">_uuid</Item>
-          <Item Name="Timestamp">_timestamp</Item>
-          <Item Name="LastMod">_lastMod</Item>
-      </Expand>
+    <Expand>
+      <Item Name="UUID">_uuid</Item>
+      <Item Name="Timestamp">_timestamp</Item>
+      <Item Name="LastMod">_lastMod</Item>
+    </Expand>
   </Type>
 </AutoVisualizer>
