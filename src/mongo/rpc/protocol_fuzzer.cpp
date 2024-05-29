@@ -94,7 +94,6 @@ void doFuzzing(ConstDataRangeCursor fuzzedData) try {
         case dbKillCursors:
         case dbDelete:
         case dbUpdate:
-        case dbBulkWrite:
             break;
         default:
             invariant(!isSupportedRequestNetworkOp(msg.operation()));
