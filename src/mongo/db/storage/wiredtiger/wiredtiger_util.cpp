@@ -952,7 +952,8 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
     WT_SESSION* session;
 
     if (gFeatureFlagPrefetch.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !sessionCache->isEphemeral()) {
         invariantWTOK(conn->open_session(conn, &eventHandler, "prefetch=(enabled=true)", &session),
                       nullptr);
     } else {

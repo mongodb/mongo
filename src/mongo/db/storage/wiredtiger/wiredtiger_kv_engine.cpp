@@ -490,7 +490,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     }
 
     if (gFeatureFlagPrefetch.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !_ephemeral) {
         ss << "prefetch=(available=true,default=false),";
     }
 
