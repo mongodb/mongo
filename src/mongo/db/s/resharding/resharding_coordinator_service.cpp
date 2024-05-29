@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 
+#include "mongo/s/resharding/common_types_gen.h"
 #include <absl/container/node_hash_map.h>
 #include <algorithm>
 #include <boost/cstdint.hpp>
@@ -2174,9 +2175,17 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                    // attempting to move to the same shard.
                    std::set<ShardId> shardIdsSet;
                    cm->getAllShardIds(&shardIdsSet);
-                   const auto currentShard =
+                   const auto toShard =
                        _coordinatorDoc.getShardDistribution().get().front().getShard();
-                   return shardIdsSet.find(currentShard) != shardIdsSet.end();
+                   return shardIdsSet.find(toShard) != shardIdsSet.end();
+               } else if (_metadata.getProvenance() &&
+                          _metadata.getProvenance().get() == ProvenanceEnum::kUnshardCollection) {
+                   std::set<ShardId> shardIdsSet;
+                   cm->getAllShardIds(&shardIdsSet);
+                   const auto toShard =
+                       _coordinatorDoc.getShardDistribution().get().front().getShard();
+                   return !cm->isSharded() && cm->hasRoutingTable() &&
+                       shardIdsSet.find(toShard) != shardIdsSet.end();
                }
 
                const auto currentShardKey = cm->getShardKeyPattern().getKeyPattern();

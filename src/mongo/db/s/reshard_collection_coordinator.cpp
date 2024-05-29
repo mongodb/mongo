@@ -190,6 +190,16 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                         str::stream()
                             << "MoveCollection can only be called on an unsharded collection.",
                         !cmOld.isSharded() && cmOld.hasRoutingTable());
+            } else if (provenance && provenance.get() == ProvenanceEnum::kUnshardCollection) {
+                // If the collection is already unsharded, check if the toShard matches.
+                if (!cmOld.isSharded() && cmOld.hasRoutingTable()) {
+                    std::set<ShardId> currentShards;
+                    cmOld.getAllShardIds(&currentShards);
+                    const auto toShard = _doc.getShardDistribution().get().front().getShard();
+                    uassert(ErrorCodes::NamespaceNotSharded,
+                            "unshardCollection can only be called on a sharded collection.",
+                            currentShards.find(toShard) != currentShards.end());
+                }
             } else {
                 uassert(ErrorCodes::NamespaceNotSharded,
                         "Collection has to be a sharded collection.",

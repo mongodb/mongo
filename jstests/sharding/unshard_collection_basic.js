@@ -34,14 +34,6 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: 
 let coll = mongos.getDB(dbName)[collName];
 assert.commandWorked(coll.insert({oldKey: 50}));
 
-// Fail if unsplittable tracked collection.
-const unsplittableCollName = "foo_unsplittable"
-const unsplittableCollNs = dbName + '.' + unsplittableCollName;
-assert.commandWorked(
-    st.s.getDB(dbName).runCommand({createUnsplittableCollection: unsplittableCollName}));
-assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: unsplittableCollNs}),
-                             ErrorCodes.NamespaceNotSharded);
-
 // Fail if unsharded collection.
 const unshardedCollName = "foo_unsharded"
 const unshardedCollNS = dbName + '.' + unshardedCollName;
@@ -77,8 +69,16 @@ assert.eq(0, st.rs0.getPrimary().getCollection(ns).countDocuments({}));
 let unshardedChunk = configDb.chunks.find({uuid: unshardedColl.uuid}).toArray();
 assert.eq(1, unshardedChunk.length);
 
-// Fail since collection is unsharded now
-assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns}),
+const collInfo = mongos.getDB(dbName).getCollectionInfos({name: coll.getName()})[0];
+const prevCollUUID = collInfo.info.uuid;
+
+// Unshard collection should no-op with the same toShard option.
+assert.commandWorked(mongos.adminCommand({unshardCollection: ns, toShard: shard1}));
+assert.eq(mongos.getDB(dbName).getCollectionInfos({name: coll.getName()})[0].info.uuid,
+          prevCollUUID);
+
+// Unshard collection should fail with the different toShard option.
+assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns, toShard: shard0}),
                              ErrorCodes.NamespaceNotSharded);
 
 const newCollName = "foo1"
