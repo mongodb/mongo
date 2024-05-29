@@ -472,7 +472,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
 void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
     dassert(shard_role_details::getLocker(opCtx)->isLocked());
     if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
-        LOGV2_FOR_RECOVERY(4615632, kCatalogLogLevel.toInt(), "loadCatalog:");
+        LOGV2_FOR_RECOVERY(4615632, kCatalogLogLevel.toInt(), "closeCatalog:");
         _dumpCatalog(opCtx);
     }
 
