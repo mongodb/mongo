@@ -8,13 +8,15 @@
  * @tags: [resource_intensive]
  */
 
+function isSlow(mongoInstance) {
+    const buildInfo = assert.commandWorked(mongoInstance.adminCommand({"buildInfo": 1}));
+    const isCodeCoverageEnabled = buildInfo.buildEnvironment.ccflags.includes('-ftest-coverage');
+    const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
+    return isCodeCoverageEnabled || isSanitizerEnabled;
+}
+
 var st = new ShardingTest({shards: 2, mongos: 1});
-
-const buildInfo = assert.commandWorked(st.s0.adminCommand({"buildInfo": 1}));
-
-const isCodeCoverageEnabled = buildInfo.buildEnvironment.ccflags.includes('-ftest-coverage');
-const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
-const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
+const slowTestVariant = isSlow(st.s0) || isSlow(st.shard0) || isSlow(st.shard1);
 
 var dbname = "test";
 var coll = "foo";
