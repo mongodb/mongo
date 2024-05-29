@@ -155,6 +155,10 @@ parse(const char *str)
         return create_table(
           parse_uint64(args[0]), args[1].c_str(), args[2].c_str(), args[3].c_str());
     }
+    if (name == "evict") {
+        CHECK_NUM_ARGS(2);
+        return evict(parse_uint64(args[0]), data_value(parse_uint64(args[1])));
+    }
     if (name == "insert") {
         CHECK_NUM_ARGS(4);
         return insert(parse_uint64(args[0]), parse_uint64(args[1]),

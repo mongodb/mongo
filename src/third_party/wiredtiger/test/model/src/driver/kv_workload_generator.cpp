@@ -60,6 +60,8 @@ kv_workload_generator_spec::kv_workload_generator_spec()
 
     checkpoint = 0.02;
     crash = 0.002;
+    /* FIXME-WT-12972 Enable the eviction operator when it is safe to do so. Set to 0.1. */
+    evict = 0.0;
     restart = 0.002;
     rollback_to_stable = 0.005;
     set_oldest_timestamp = 0.1;
@@ -501,6 +503,15 @@ kv_workload_generator::run()
                 *p << operation::crash();
                 _sequences.push_back(p);
             }
+            probability_case(_spec.evict)
+            {
+                kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
+                  _sequences.size(), kv_workload_sequence_type::evict);
+                table_context_ptr table = choose_table(std::move(kv_workload_sequence_ptr()));
+                data_value key = generate_key(table, op_category::evict);
+                *p << operation::evict(table->id(), key);
+                _sequences.push_back(p);
+            }
             probability_case(_spec.restart)
             {
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
@@ -672,6 +683,10 @@ kv_workload_generator::generate_key(table_context_ptr table, op_category op)
     switch (op) {
     case op_category::none:
         p_existing = 0;
+        break;
+
+    case op_category::evict:
+        p_existing = 1.0;
         break;
 
     case op_category::remove:

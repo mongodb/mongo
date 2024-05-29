@@ -194,6 +194,7 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
 
         UPDATE_SPEC(checkpoint, float);
         UPDATE_SPEC(crash, float);
+        UPDATE_SPEC(evict, float);
         UPDATE_SPEC(restart, float);
         UPDATE_SPEC(rollback_to_stable, float);
         UPDATE_SPEC(set_oldest_timestamp, float);

@@ -157,9 +157,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
               !WT_IS_HS(S2BT(session)->dhandle) ||
                 (*upd_entry == NULL ||
                   ((*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
-                    (((*upd_entry)->txnid == WT_TXN_NONE && (*upd_entry)->start_ts == WT_TS_NONE) ||
-                      __wt_txn_visible_all(
-                        session, (*upd_entry)->txnid, (*upd_entry)->durable_ts)))) ||
+                    (*upd_entry)->txnid == WT_TXN_NONE && (*upd_entry)->start_ts == WT_TS_NONE)) ||
                 (upd_arg->type == WT_UPDATE_TOMBSTONE && upd_arg->start_ts == WT_TS_NONE &&
                   upd_arg->next == NULL) ||
                 (upd_arg->type == WT_UPDATE_TOMBSTONE && upd_arg->next != NULL &&
@@ -339,11 +337,13 @@ err:
  *     Check for obsolete updates and force evict the page if the update list is too long.
  */
 void
-__wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+__wt_update_obsolete_check(
+  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd, bool update_accounting)
 {
     WT_PAGE *page;
     WT_TXN_GLOBAL *txn_global;
     WT_UPDATE *first, *next;
+    size_t size;
     u_int count;
 
     next = NULL;
@@ -351,7 +351,6 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UP
     txn_global = &S2C(session)->txn_global;
 
     WT_ASSERT(session, page->modify != NULL);
-
     /* If we can't lock it, don't scan, that's okay. */
     if (WT_PAGE_TRYLOCK(session, page) != 0)
         return;
@@ -398,8 +397,24 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UP
      * subsequent to it, other threads of control will terminate their walk in this element. Save a
      * reference to the list we will discard, and terminate the list.
      */
-    if (first != NULL && (next = first->next) != NULL)
-        __wt_free_obsolete_updates(session, page, first);
+    if (first != NULL && (next = first->next) != NULL) {
+        /*
+         * No need to use a compare and swap because we have obtained a lock at the start of the
+         * function.
+         */
+        first->next = NULL;
+
+        /*
+         * Decrement the dirty byte count while holding the page lock, else we can race with
+         * checkpoints cleaning a page.
+         */
+        if (update_accounting) {
+            for (size = 0, upd = next; upd != NULL; upd = upd->next)
+                size += WT_UPDATE_MEMSIZE(upd);
+            if (size != 0)
+                __wt_cache_page_inmem_decr(session, page, size);
+        }
+    }
 
     /*
      * Force evict a page when there are more than WT_THOUSAND updates to a single item. Increasing
@@ -412,13 +427,18 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UP
         __wt_page_evict_soon(session, cbt->ref);
     }
 
-    if (next == NULL) {
+    if (next != NULL)
+        __wt_free_update_list(session, &next);
+    else {
         /*
          * If the list is long, don't retry checks on this page until the transaction state has
          * moved forwards.
          */
-        if (count > 20)
+        if (count > 20) {
             page->modify->obsolete_check_txn = __wt_atomic_loadv64(&txn_global->last_running);
+            if (txn_global->has_pinned_timestamp)
+                page->modify->obsolete_check_timestamp = txn_global->pinned_timestamp;
+        }
     }
 
     WT_PAGE_UNLOCK(session, page);

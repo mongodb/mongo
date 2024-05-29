@@ -111,9 +111,9 @@ struct __wt_reconcile {
 
     /*
      * When we do not find any update to be written for the whole page, we would like to mark
-     * eviction failed in the case of update-restore. There is no progress made by eviction in such
-     * a case, the page size stays the same and considering it a success could force the page
-     * through eviction repeatedly.
+     * eviction failed in the case of update-restore unless all the updates for a key are found
+     * aborted. There is no progress made by eviction in such a case, the page size stays the same
+     * and considering it a success could force the page through eviction repeatedly.
      */
     bool update_used;
 
@@ -291,8 +291,9 @@ struct __wt_reconcile {
 
     WT_SALVAGE_COOKIE *salvage; /* If it's a salvage operation */
 
-    bool cache_write_hs;      /* Used the history store table */
-    bool cache_write_restore; /* Used update/restoration */
+    bool cache_write_hs;                /* Used the history store table */
+    bool cache_write_restore_invisible; /* Used update/restoration because of invisible update */
+    bool cache_upd_chain_all_aborted;   /* All updates in the chain are aborted */
 
     WT_REF_STATE tested_ref_state; /* Debugging information */
 

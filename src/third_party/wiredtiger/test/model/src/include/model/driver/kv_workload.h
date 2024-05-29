@@ -347,6 +347,52 @@ operator<<(std::ostream &out, const create_table &op)
 }
 
 /*
+ * evict --
+ *     A representation of this workload operation.
+ */
+struct evict : public without_txn_id {
+    table_id_t table_id;
+    data_value key;
+
+    /*
+     * evict::evict --
+     *     Create the operation.
+     */
+    inline evict(table_id_t table_id, const data_value &key) : table_id(table_id), key(key) {}
+
+    /*
+     * evict::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const evict &other) const noexcept
+    {
+        return table_id == other.table_id && key == other.key;
+    }
+
+    /*
+     * evict::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const evict &other) const noexcept
+    {
+        return !(*this == other);
+    }
+};
+
+/*
+ * operator<< --
+ *     Human-readable output.
+ */
+inline std::ostream &
+operator<<(std::ostream &out, const evict &op)
+{
+    out << "evict(" << op.table_id << ", " << op.key << ")";
+    return out;
+}
+
+/*
  * insert --
  *     A representation of this workload operation.
  */
@@ -828,7 +874,7 @@ operator<<(std::ostream &out, const truncate &op)
  *     Any workload operation.
  */
 using any = std::variant<begin_transaction, checkpoint, commit_transaction, crash, create_table,
-  insert, prepare_transaction, remove, restart, rollback_to_stable, rollback_transaction,
+  evict, insert, prepare_transaction, remove, restart, rollback_to_stable, rollback_transaction,
   set_commit_timestamp, set_oldest_timestamp, set_stable_timestamp, truncate>;
 
 /*

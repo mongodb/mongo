@@ -362,6 +362,18 @@ kv_workload_runner_wt::do_operation(const operation::create_table &op)
  *     Execute the given workload operation in WiredTiger.
  */
 int
+kv_workload_runner_wt::do_operation(const operation::evict &op)
+{
+    std::shared_lock lock(_connection_lock);
+    wt_evict(_connection, table_uri(op.table_id), op.key);
+    return 0;
+}
+
+/*
+ * kv_workload_runner_wt::do_operation --
+ *     Execute the given workload operation in WiredTiger.
+ */
+int
 kv_workload_runner_wt::do_operation(const operation::insert &op)
 {
     std::shared_lock lock(_connection_lock);

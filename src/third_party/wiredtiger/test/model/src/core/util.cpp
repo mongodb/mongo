@@ -374,6 +374,39 @@ parse_uint64(const char *str, const char **end)
 }
 
 /*
+ * wt_evict --
+ *     Evict a WiredTiger page with the given key.
+ */
+void
+wt_evict(WT_CONNECTION *conn, const char *uri, const data_value &key)
+{
+    WT_SESSION *session;
+    int ret = conn->open_session(conn, nullptr, nullptr, &session);
+    if (ret != 0)
+        throw wiredtiger_exception("Cannot open a session: ", ret);
+    wiredtiger_session_guard session_guard(session);
+
+    ret = session->begin_transaction(session, "ignore_prepare=true");
+    if (ret != 0)
+        throw wiredtiger_exception("Transaction begin failed: ", ret);
+
+    WT_CURSOR *cursor;
+    ret = session->open_cursor(session, uri, nullptr, "debug=(release_evict)", &cursor);
+    if (ret != 0)
+        throw wiredtiger_exception("Cannot open a cursor: ", ret);
+    wiredtiger_cursor_guard cursor_guard(cursor);
+
+    set_wt_cursor_key(cursor, key);
+    ret = cursor->search_near(cursor, nullptr);
+    if (ret != 0 && ret != WT_NOTFOUND)
+        throw wiredtiger_exception("Search failed: ", ret);
+
+    ret = cursor->reset(cursor);
+    if (ret != 0)
+        throw wiredtiger_exception("Cursor reset failed: ", ret);
+}
+
+/*
  * wt_list_tables --
  *     Get the list of WiredTiger tables.
  */

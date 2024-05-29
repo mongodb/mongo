@@ -78,6 +78,7 @@ struct kv_workload_generator_spec {
     /* Probabilities of special operations. */
     float checkpoint;
     float crash;
+    float evict;
     float restart;
     float rollback_to_stable;
     float set_oldest_timestamp;
@@ -115,6 +116,7 @@ protected:
      */
     enum class op_category {
         none,
+        evict,
         remove,
         update,
     };
