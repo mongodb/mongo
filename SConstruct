@@ -4766,6 +4766,17 @@ def doConfigure(myenv):
         # If possible with the current linker, mark relocations as read-only.
         myenv.AddToLINKFLAGSIfSupported("-Wl,-z,relro")
 
+        if linker_ld != "gold" and not env.TargetOSIs("darwin", "macOS"):
+            myenv.AppendUnique(
+                CCFLAGS=["-ffunction-sections"],
+                LINKFLAGS=[
+                    "-Wl,--symbol-ordering-file=symbols.orderfile",
+                    "-Wl,--no-warn-symbol-ordering",
+                ],
+            )
+        else:
+            print("WARNING: lld linker is required to sort symbols")
+
         # As far as we know these flags only apply on posix-y systems,
         # and not on Darwin.
         if env.TargetOSIs("posix") and not env.TargetOSIs("darwin"):
