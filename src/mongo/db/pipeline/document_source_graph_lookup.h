@@ -174,6 +174,12 @@ public:
         return DepsTracker::State::SEE_NEXT;
     };
 
+    size_t getFrontierUsageBytes_forTest() const {
+        return _frontierUsageBytes;
+    }
+
+    void frontierInsertWithMemoryTracking_forTest(Value value);
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {
         expression::addVariableRefs(_startWith.get(), refs);
         if (_additionalFilter) {
@@ -286,6 +292,11 @@ private:
      * Returns whether '_visited' was updated, and thus, whether the search should recurse.
      */
     bool addToVisitedAndFrontier(Document result, long long depth);
+
+    /**
+     * Insert into 'frontier' and update '_frontierUsageBytes.'
+     */
+    inline void frontierInsertWithMemoryTracking(Value value);
 
     /**
      * Returns true if we are not in a transaction.

@@ -305,7 +305,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
 
         ValueFlatUnorderedSet queried = pExpCtx->getValueComparator().makeFlatUnorderedValueSet();
         _frontier.swap(queried);
-        _frontierUsageBytes = 0;
+        // _frontier is a flat set that has 'capacity'-many slots, each sizeof(Value) bytes.
+        _frontierUsageBytes = sizeof(Value) * _frontier.capacity();
 
         // Process cached values, populating '_frontier' for the next iteration of search.
         while (!cached.empty()) {
@@ -394,7 +395,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
              (!_maxDepth || depth <= *_maxDepth));
 
     _frontier.clear();
-    _frontierUsageBytes = 0;
+    _frontierUsageBytes = sizeof(Value) * _frontier.capacity();
 }
 
 bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(Document result, long long depth) {
@@ -418,8 +419,7 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(Document result, long lo
     // '_frontier'.
     document_path_support::visitAllValuesAtPath(
         result, _connectFromField, [this](const Value& nextFrontierValue) {
-            _frontier.insert(nextFrontierValue);
-            _frontierUsageBytes += nextFrontierValue.getApproximateSize();
+            frontierInsertWithMemoryTracking(nextFrontierValue);
         });
 
     // Add the object to our '_visited' list and update the size of '_visited' appropriately.
@@ -430,6 +430,19 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(Document result, long lo
 
     // We inserted into _visited, so return true.
     return true;
+}
+
+inline void DocumentSourceGraphLookUp::frontierInsertWithMemoryTracking(Value value) {
+    auto prevCapacity = _frontier.capacity();
+    _frontier.insert(value);
+    // Track allocations internal to 'value.'
+    _frontierUsageBytes += value.getApproximateSize() - sizeof(Value);
+    // Track increased capacity in slot array, if any.
+    _frontierUsageBytes += sizeof(Value) * (_frontier.capacity() - prevCapacity);
+}
+
+void DocumentSourceGraphLookUp::frontierInsertWithMemoryTracking_forTest(Value value) {
+    frontierInsertWithMemoryTracking(value);
 }
 
 void DocumentSourceGraphLookUp::addToCache(const Document& result,
@@ -458,8 +471,8 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(
 
             // If the cached value increased in size while in the cache, we don't want to underflow
             // '_frontierUsageBytes'.
-            invariant(valueSize <= _frontierUsageBytes);
-            _frontierUsageBytes -= valueSize;
+            invariant((valueSize - sizeof(Value)) <= _frontierUsageBytes);
+            _frontierUsageBytes -= (valueSize - sizeof(Value));
         } else {
             ++it;
         }
@@ -523,12 +536,10 @@ void DocumentSourceGraphLookUp::performSearch() {
     // If _startWith evaluates to an array, treat each value as a separate starting point.
     if (startingValue.isArray()) {
         for (const auto& value : startingValue.getArray()) {
-            _frontier.insert(value);
-            _frontierUsageBytes += value.getApproximateSize();
+            frontierInsertWithMemoryTracking(value);
         }
     } else {
-        _frontier.insert(startingValue);
-        _frontierUsageBytes += startingValue.getApproximateSize();
+        frontierInsertWithMemoryTracking(startingValue);
     }
 
     try {
