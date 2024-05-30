@@ -100,8 +100,8 @@ bool shouldUpdateTxnTable(const repl::OplogEntry& op) {
 using WriterVectors = ReshardingOplogBatchPreparer::WriterVectors;
 
 ReshardingOplogBatchPreparer::ReshardingOplogBatchPreparer(
-    std::unique_ptr<CollatorInterface> defaultCollator)
-    : _defaultCollator(std::move(defaultCollator)) {}
+    std::unique_ptr<CollatorInterface> defaultCollator, bool isCapped)
+    : _defaultCollator(std::move(defaultCollator)), _isCapped(isCapped) {}
 
 void ReshardingOplogBatchPreparer::throwIfUnsupportedCommandOp(const OplogEntry& op) {
     invariant(op.isCommand());
@@ -288,8 +288,12 @@ void ReshardingOplogBatchPreparer::_appendCrudOpToWriterVector(const OplogEntry*
                                                                WriterVectors& writerVectors) const {
     BSONElementComparator elementHasher{BSONElementComparator::FieldNamesMode::kIgnore,
                                         _defaultCollator.get()};
-    const auto idHash = elementHasher.hash(op->getIdElement());
-    _appendOpToWriterVector(absl::HashOf(idHash), op, writerVectors);
+    if (_isCapped) {
+        _appendOpToWriterVector(absl::HashOf(op->getNss()), op, writerVectors);
+    } else {
+        const auto idHash = elementHasher.hash(op->getIdElement());
+        _appendOpToWriterVector(absl::HashOf(idHash), op, writerVectors);
+    }
 }
 
 void ReshardingOplogBatchPreparer::_appendSessionOpToWriterVector(

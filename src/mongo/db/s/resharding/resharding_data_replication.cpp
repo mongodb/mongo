@@ -248,7 +248,8 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
             // in progress_applier. Otherwise, it starts at minFetchTimestamp, which corresponds to
             // {clusterTime: minFetchTimestamp, ts: minFetchTimestamp} as a resume token value.
             std::make_unique<ReshardingDonorOplogIterator>(
-                oplogBufferNss, std::move(idToResumeFrom), oplogFetchers[i].get())));
+                oplogBufferNss, std::move(idToResumeFrom), oplogFetchers[i].get()),
+            resharding::data_copy::isCollectionCapped(opCtx, metadata.getTempReshardingNss())));
     }
 
     return oplogAppliers;

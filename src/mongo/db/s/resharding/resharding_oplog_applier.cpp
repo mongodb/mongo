@@ -87,16 +87,19 @@ ReshardingOplogApplier::ReshardingOplogApplier(
     std::vector<NamespaceString> allStashNss,
     size_t myStashIdx,
     ChunkManager sourceChunkMgr,
-    std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator)
+    std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
+    bool isCapped)
     : _env(std::move(env)),
       _sourceId(std::move(sourceId)),
-      _batchPreparer{CollatorInterface::cloneCollator(sourceChunkMgr.getDefaultCollator())},
+      _batchPreparer{CollatorInterface::cloneCollator(sourceChunkMgr.getDefaultCollator()),
+                     isCapped},
       _crudApplication{std::move(outputNss),
                        std::move(allStashNss),
                        myStashIdx,
                        _sourceId.getShardId(),
                        std::move(sourceChunkMgr),
-                       _env->applierMetrics()},
+                       _env->applierMetrics(),
+                       isCapped},
       _sessionApplication{std::move(oplogBufferNss)},
       _batchApplier{_crudApplication, _sessionApplication},
       _oplogIter(std::move(oplogIterator)) {}

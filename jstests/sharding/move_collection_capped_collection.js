@@ -1,21 +1,62 @@
-const dbName = 'test';
+/**
+ * Tests for capped collection functionality of the move collection feature.
+ *
+ * @tags: [
+ *  requires_fcv_80,
+ *  featureFlagMoveCollection,
+ *  assumes_balancer_off,
+ *  requires_capped
+ * ]
+ */
+
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
+
+const dbName = 'db';
 const collName = 'foo';
+const ns = dbName + '.' + collName;
 
-const st = new ShardingTest({mongos: 1, shards: 2});
-const db = st.s.getDB(dbName);
-const coll = db[collName]
+const reshardingTest = new ReshardingTest();
+reshardingTest.setup();
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+const donorShardNames = reshardingTest.donorShardNames;
+const sourceCollection = reshardingTest.createUnshardedCollection(
+    {ns: ns, primaryShardName: donorShardNames[0], collOptions: {capped: true, size: 4096}});
 
-// Create a capped collection.
-assert.commandWorked(db.createCollection(collName, {capped: true, size: 1000}));
+// Insert more than one document to it. This tests that capped collections can clone multiple docs.
+const numDocs = 30;
+for (let i = 0; i < numDocs; ++i) {
+    assert.commandWorked(sourceCollection.insert({x: i}));
+}
 
-// Insert more than one document to it.
-assert.commandWorked(coll.insertMany([{x: 0}, {x: 1}]));
+const preReshardingOrder = sourceCollection.find({}).toArray();
+assert.commandWorked(sourceCollection.insert({x: 31}));
 
-// Move the collection.
-assert.commandWorked(
-    st.s.adminCommand({moveCollection: coll.getFullName(), toShard: st.shard1.shardName}));
+const recipientShardNames = reshardingTest.recipientShardNames;
+reshardingTest.withMoveCollectionInBackground(
+    {
+        toShard: recipientShardNames[0],
+    },
+    () => {
+        reshardingTest.awaitCloneTimestampChosen();
+        // Test delete oplog application rules.
+        assert.commandWorked(sourceCollection.remove({x: 31}, {justOne: true}));
+    });
 
-st.stop();
+const st = reshardingTest._st;
+let collEntry = st.s.getDB('config').getCollection('collections').findOne({_id: ns});
+assert.eq(collEntry._id, ns);
+assert.eq(collEntry.unsplittable, true);
+assert.eq(collEntry.key, {_id: 1});
+assert.eq(st.s.getDB(dbName).getCollection(collName).isCapped(), true);
+assert.eq(st.s.getDB(dbName).getCollection(collName).countDocuments({}), numDocs);
+assert.eq(st.rs0.getPrimary().getDB(dbName).getCollection(collName).countDocuments({}), 0);
+assert.eq(st.rs1.getPrimary().getDB(dbName).getCollection(collName).countDocuments({}), numDocs);
+
+// Order matches after resharding.
+const postReshardingOrder = st.s.getDB(dbName).getCollection(collName).find({}).toArray();
+assert.eq(preReshardingOrder.length, postReshardingOrder.length);
+for (let i = 0; i < preReshardingOrder.length; i++) {
+    assert.eq(preReshardingOrder[i], postReshardingOrder[i]);
+}
+
+reshardingTest.teardown();
