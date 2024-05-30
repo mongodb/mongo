@@ -372,6 +372,11 @@ public:
     Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                               ReplSetHeartbeatResponse* response) override;
 
+    /**
+     * Set the value for getWriteConcernMajorityShouldJournal()
+     */
+    void setWriteConcernMajorityShouldJournal(bool shouldJournal);
+
     bool getWriteConcernMajorityShouldJournal() override;
 
     long long getTerm() const override;
@@ -546,6 +551,8 @@ private:
 
     Seconds _secondaryDelaySecs = Seconds(0);
     OplogSyncState _oplogSyncState = OplogSyncState::Running;
+
+    bool _writeConcernMajorityShouldJournal = true;
 };
 
 }  // namespace repl

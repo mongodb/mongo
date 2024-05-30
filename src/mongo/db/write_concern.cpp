@@ -183,6 +183,20 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
         }
     }
 
+    if (writeConcern.syncMode == WriteConcernOptions::SyncMode::NONE && writeConcern.isMajority() &&
+        !opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
+        auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (replCoord && replCoord->getSettings().isReplSet() &&
+            replCoord->getWriteConcernMajorityShouldJournal()) {
+            LOGV2_DEBUG(8668500,
+                        1,
+                        "Overriding write concern majority j:false to j:true",
+                        "writeConcern"_attr = writeConcern);
+            writeConcern.majorityJFalseOverridden = true;
+            writeConcern.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
+        }
+    }
+
     Status wcStatus = validateWriteConcern(opCtx, writeConcern);
     if (!wcStatus.isOK()) {
         return wcStatus;

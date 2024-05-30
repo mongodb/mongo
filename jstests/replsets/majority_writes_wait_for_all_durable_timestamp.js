@@ -2,6 +2,11 @@
  * This tests that writes with majority write concern will wait for at least the all durable
  * timestamp to reach the timestamp of the write. This guarantees that once a write is majority
  * committed, reading at the all durable timestamp will read that write.
+ *
+ * We must disable the test on ephemeral storage engines, because we can't prevent durable from
+ * advancing. The means the write succeeds even with journaling and checkpointing turned off.
+ *
+ * @tags: [requires_persistence]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
@@ -11,7 +16,15 @@ function assertWriteConcernTimeout(result) {
     assert(result.getWriteConcernError().errInfo.wtimeout, tojson(result));
 }
 
-const rst = new ReplSetTest({name: "writes_wait_for_all_durable", nodes: 1});
+const rst = new ReplSetTest({
+    name: "writes_wait_for_all_durable",
+    nodes: 1,
+    nodeOptions: {
+        // Disable background checkpoints: a zero value disables checkpointing.  This way only
+        // journaling can advance the durable timestamp.
+        syncdelay: 0
+    }
+});
 rst.startSet();
 rst.initiate();
 
@@ -27,27 +40,16 @@ TestData.collName = collName;
 testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "majority"}}));
 
-const failPoint = configureFailPoint(
-    testDB, "hangAfterCollectionInserts", {collectionNS: testColl.getFullName(), first_id: "b"});
-
-jsTestLog(
-    "Insert a document to hang before the insert completes to hold back the all durable timestamp.");
-const joinHungWrite = startParallelShell(() => {
-    assert.commandWorked(db.getSiblingDB(TestData.dbName)[TestData.collName].insert({_id: "b"}));
-}, primary.port);
-jsTestLog("Checking that the log contains fail point enabled.");
-failPoint.wait();
+// Turn off the journal flusher so we don't get durability.
+const journalFlusherFP = configureFailPoint(primary, "pauseJournalFlusherBeforeFlush");
+journalFlusherFP.wait();
 
 try {
     jsTest.log("Do a write with majority write concern that should time out.");
-    // Note: we must use {j: false} otherwise the command can hang where writeConcern waits for no
-    // oplog holes, which currently does not obey wtimeout (SERVER-46191), before persistence on
-    // single voter replica set primaries.
     assertWriteConcernTimeout(
-        testColl.insert({_id: 0}, {writeConcern: {w: "majority", j: false, wtimeout: 2 * 1000}}));
+        testColl.insert({_id: 0}, {writeConcern: {w: "majority", wtimeout: 2 * 1000}}));
 } finally {
-    failPoint.off();
+    journalFlusherFP.off();
 }
 
-joinHungWrite();
 rst.stopSet();

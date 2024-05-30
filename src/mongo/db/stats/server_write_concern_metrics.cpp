@@ -157,6 +157,9 @@ void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::recordWrite
             implicitDefaultWC.recordWriteConcern(writeConcernOptions, numOps);
             notExplicitWCount += numOps;
         } else {
+            if (writeConcernOptions.majorityJFalseOverridden) {
+                majorityJFalseOverriddenCount += numOps;
+            }
             explicitWC.recordWriteConcern(writeConcernOptions, numOps);
         }
     }
@@ -183,6 +186,9 @@ void ServerWriteConcernMetrics::WriteConcernCounters::toBSON(BSONObjBuilder* bui
 void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::toBSON(
     BSONObjBuilder* builder) const {
     explicitWC.toBSON(builder);
+
+    builder->append("majorityJFalseOverridden",
+                    static_cast<long long>(majorityJFalseOverriddenCount));
 
     builder->append("none", static_cast<long long>(notExplicitWCount));
     BSONObjBuilder noneBuilder(builder->subobjStart("noneInfo"));

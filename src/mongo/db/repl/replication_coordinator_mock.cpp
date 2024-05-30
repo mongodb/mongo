@@ -720,8 +720,12 @@ Status ReplicationCoordinatorMock::processHeartbeatV1(const ReplSetHeartbeatArgs
     return Status::OK();
 }
 
+void ReplicationCoordinatorMock::setWriteConcernMajorityShouldJournal(bool shouldJournal) {
+    _writeConcernMajorityShouldJournal = shouldJournal;
+}
+
 bool ReplicationCoordinatorMock::getWriteConcernMajorityShouldJournal() {
-    return true;
+    return _writeConcernMajorityShouldJournal;
 }
 
 long long ReplicationCoordinatorMock::getTerm() const {

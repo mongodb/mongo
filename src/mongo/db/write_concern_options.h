@@ -252,6 +252,11 @@ public:
     //      - Internal commands set empty WC ({writeConcern: {}}).
     bool notExplicitWValue{true};
 
+    // Used only for tracking opWriteConcernCounters metric.
+    // True if the "w" value of the write concern used is "majority" and the "j" value is true,
+    // but "j" was originally false.
+    bool majorityJFalseOverridden{false};
+
     CheckCondition checkCondition{CheckCondition::OpTime};
 
 private:

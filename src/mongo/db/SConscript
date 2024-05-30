@@ -2914,6 +2914,7 @@ if wiredtiger:
             "vector_clock_test.cpp",
             "vector_clock_test_fixture.cpp",
             "wire_version_test.cpp",
+            "write_concern_test.cpp",
             "write_concern_options_test.cpp",
         ],
         LIBDEPS=[

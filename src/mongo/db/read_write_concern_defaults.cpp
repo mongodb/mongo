@@ -110,7 +110,8 @@ void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const ReadConcern& rc) 
             !rc.getProvenance().hasSource());
 }
 
-void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const WriteConcern& wc) {
+void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const WriteConcern& wc,
+                                                         bool writeConcernMajorityShouldJournal) {
     uassert(ErrorCodes::BadValue,
             "Unacknowledged write concern is not suitable for the default write concern",
             !wc.isUnacknowledged());
@@ -118,6 +119,15 @@ void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const WriteConcern& wc)
             str::stream() << "'" << ReadWriteConcernProvenance::kSourceFieldName
                           << "' must be unset in default write concern",
             !wc.getProvenance().hasSource());
+    if (writeConcernMajorityShouldJournal && wc.syncMode == WriteConcern::SyncMode::NONE &&
+        wc.isMajority()) {
+        LOGV2_WARNING(
+            8668501,
+            "Default write concern mode is majority but non-journaled, but the configuration has "
+            "'writeConcernMajorityJournalDefault' enabled.  The write concern journal setting will "
+            "be ignored; writes with default write concern will be journaled.",
+            "writeConcern"_attr = wc);
+    }
 }
 
 RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
@@ -142,7 +152,8 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
         rwc.setDefaultReadConcern(rc);
     }
     if (wc && !wc->usedDefaultConstructedWC) {
-        checkSuitabilityAsDefault(*wc);
+        auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+        checkSuitabilityAsDefault(*wc, replCoord->getWriteConcernMajorityShouldJournal());
         rwc.setDefaultWriteConcern(wc);
     }
 
