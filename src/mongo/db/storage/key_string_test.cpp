@@ -836,6 +836,21 @@ TEST_F(KeyStringBuilderTest, InvalidInfinityDecimalV0) {
         31231);
 }
 
+TEST_F(KeyStringBuilderTest, CannotEncodeDecimalInV0) {
+    // Try encode a Decimal by passing it as a part of BSON
+    ASSERT_THROWS_CODE(mongo::key_string::Builder(mongo::key_string::Version::V0,
+                                                  BSON("d" << Decimal128::kPi),
+                                                  ALL_ASCENDING),
+                       AssertionException,
+                       ErrorCodes::UnsupportedFormat);
+
+    // Try encode a Decimal directly
+    mongo::key_string::Builder builder{mongo::key_string::Version::V0};
+    ASSERT_THROWS_CODE(builder.appendNumberDecimal(Decimal128::kPi),
+                       AssertionException,
+                       ErrorCodes::UnsupportedFormat);
+}
+
 TEST_F(KeyStringBuilderTest, ReasonableSize) {
     // Tests that key_string::Builders do not use an excessive amount of memory for small key
     // generation. These upper bounds were the calculated sizes of each type at the time this
