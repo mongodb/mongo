@@ -132,7 +132,6 @@ public:
      * Should not be used once execution has begun.
      */
     std::vector<boost::intrusive_ptr<Expression>>& getMutableIdExpressions() {
-        tassert(7020503, "Can't mutate _id fields after initialization", !_executionStarted);
         return _idExpressions;
     }
 
@@ -148,8 +147,6 @@ public:
      * Should not be used once execution has begun.
      */
     std::vector<AccumulationStatement>& getMutableAccumulationStatements() {
-        tassert(
-            7020504, "Can't mutate accumulated fields after initialization", !_executionStarted);
         return _accumulatedFields;
     }
 
