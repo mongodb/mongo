@@ -12,11 +12,19 @@ assert.commandWorked(
 var t = db.capped_truncate;
 
 // It is an error to remove a non-positive number of documents.
-assert.commandFailed(db.runCommand({captrunc: "capped_truncate", n: -1}),
-                     "captrunc didn't return an error when attempting to remove a negative " +
-                         "number of documents");
-assert.commandFailed(db.runCommand({captrunc: "capped_truncate", n: 0}),
-                     "captrunc didn't return an error when attempting to remove 0 documents");
+assert.commandFailedWithCode(
+    db.runCommand({captrunc: "capped_truncate", n: -1}),
+    ErrorCodes.BadValue,
+    "captrunc didn't return an error when attempting to remove a negative " +
+        "number of documents");
+assert.commandFailedWithCode(
+    db.runCommand({captrunc: "capped_truncate", n: 0}),
+    ErrorCodes.BadValue,
+    "captrunc didn't return an error when attempting to remove 0 documents");
+assert.commandFailedWithCode(
+    db.runCommand({captrunc: "capped_truncate", n: NaN}),
+    ErrorCodes.BadValue,
+    "captrunc didn't return an error when attempting to remove NaN documents");
 
 for (var j = 1; j <= 10; j++) {
     assert.commandWorked(t.insert({x: j}));

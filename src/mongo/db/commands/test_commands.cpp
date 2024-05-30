@@ -193,7 +193,7 @@ public:
                           << "collection name " << fullNs.toStringForErrorMsg() << " is not valid");
         }
 
-        int n = cmdObj.getIntField("n");
+        int n = cmdObj["n"].safeNumberInt();
         bool inc = cmdObj.getBoolField("inc");  // inclusive range?
 
         if (n <= 0) {
