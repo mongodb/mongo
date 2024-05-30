@@ -53,6 +53,7 @@ PyYAML = "5.3.1"
 types-PyYAML = "~6.0.12.10"
 requests = "^2.26.0"
 typing-extensions = "^4.7.1"
+typer = "^0.12.3"
 
 [tool.poetry.group.export.dependencies]
 pipx = "1.4.3"
