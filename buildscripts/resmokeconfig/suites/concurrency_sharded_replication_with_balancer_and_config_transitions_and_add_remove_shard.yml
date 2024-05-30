@@ -67,10 +67,6 @@ selector:
     # retry logic for this hook leads to breaking a test assertion.
     - jstests/concurrency/fsm_workloads/timeseries_mirrored_writes.js
 
-    # TODO SERVER-89840: Inconsistent UUIDs for config.system.sessions across config shard and
-    # removed/re-added shard.
-    - jstests/concurrency/fsm_workloads/add_remove_shards_killop.js
-
     # TODO SERVER-89841: Performs many sharding DDL operations and can time out taking the DDL lock
     # on slower variants.
     - jstests/concurrency/fsm_workloads/agg_lookup.js
