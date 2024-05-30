@@ -1402,9 +1402,6 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
 
     auto released = [&] {
         if (auto released = _readyIndexes.release(entry->descriptor())) {
-            if (entry->descriptor()->isIdIndex()) {
-                _cachedIdIndex = nullptr;
-            }
             return released;
         }
         if (auto released = _buildingIndexes.release(entry->descriptor())) {
@@ -1487,16 +1484,11 @@ bool IndexCatalogImpl::haveIdIndex(OperationContext* opCtx) const {
 }
 
 const IndexDescriptor* IndexCatalogImpl::findIdIndex(OperationContext* opCtx) const {
-    if (_cachedIdIndex)
-        return _cachedIdIndex;
-
     auto ii = getIndexIterator(opCtx, InclusionPolicy::kReady);
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();
-        if (desc->isIdIndex()) {
-            _cachedIdIndex = desc;
+        if (desc->isIdIndex())
             return desc;
-        }
     }
     return nullptr;
 }
@@ -1642,9 +1634,6 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
     const std::string indexName = oldDesc->indexName();
     invariant(collection->isIndexReady(indexName));
-
-    // The _id index should not be modified by a collMod.
-    tassert(9037800, "Should not be refreshing the _id index", !oldDesc->isIdIndex());
 
     // Delete the IndexCatalogEntry that owns this descriptor. After deletion, 'oldDesc' is invalid
     // and should not be dereferenced. Also, invalidate the index from the
