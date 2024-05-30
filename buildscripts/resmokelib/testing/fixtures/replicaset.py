@@ -417,10 +417,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
             read_concern_majority_optime = res["optimes"]["readConcernMajorityOpTime"]
 
-            if (
-                read_concern_majority_optime["t"] == primary_optime["t"]
-                and read_concern_majority_optime["ts"] >= primary_optime["ts"]
-            ):
+            if compare_optime(read_concern_majority_optime, primary_optime) >= 0:
                 up_to_date_nodes.add(node.port)
 
             return len(up_to_date_nodes) == len(self.nodes)
