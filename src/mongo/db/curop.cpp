@@ -622,8 +622,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 
     // Obtain the total execution time of this operation.
     done();
-    _debug.additiveMetrics.executionTime =
-        duration_cast<Microseconds>(elapsedTimeExcludingPauses());
+    _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
     const auto executionTimeMillis =
         durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime);
 

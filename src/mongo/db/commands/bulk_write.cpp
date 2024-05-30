@@ -444,7 +444,7 @@ private:
 void finishCurOp(OperationContext* opCtx, CurOp* curOp, LogicalOp logicalOp) {
     try {
         curOp->done();
-        auto executionTimeMicros = duration_cast<Microseconds>(curOp->elapsedTimeExcludingPauses());
+        auto executionTimeMicros = curOp->elapsedTimeExcludingPauses();
         curOp->debug().additiveMetrics.executionTime = executionTimeMicros;
 
         recordCurOpMetrics(opCtx);
