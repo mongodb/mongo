@@ -83,6 +83,7 @@ public:
      */
     static CollectionTruncateMarkers::InitialSetOfMarkers createInitialMarkersFromSamples(
         OperationContext* opCtx,
+        const UUID& preImagesCollectionUUID,
         const UUID& nsUUID,
         const std::vector<CollectionTruncateMarkers::RecordIdAndWallTime>& samples,
         int64_t estimatedRecordsPerMarker,
