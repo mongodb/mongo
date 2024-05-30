@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <absl/container/inlined_vector.h>
 #include <boost/optional.hpp>
 #include <vector>
 
@@ -288,13 +287,7 @@ public:
     }
 
 private:
-    static constexpr auto kCanonicalTypeMinValue = BSONType::MinKey;
-    static constexpr auto kCanonicalTypeMaxValue = BSONType::MaxKey;
-    static constexpr std::size_t kCanonicalTypeCardinality =
-        kCanonicalTypeMaxValue - kCanonicalTypeMinValue + 1;
     struct CloneCtorTag {};
-    using SmallBSONElementVector = absl::InlinedVector<BSONElement, 1>;
-    using CanonicalTypeMask = std::bitset<kCanonicalTypeCardinality>;
 
     InListData(CloneCtorTag, const InListData& other);
 
@@ -359,12 +352,6 @@ private:
 
     void sortAndDedupElementsImpl();
 
-    /**
-     * Returns a normalized canonical type of BSON type 'type'. The max returned value is expected
-     * to be less than 256.
-     */
-    static std::size_t getNormalizedCanonicalType(BSONType type);
-
     // If '_arr' is defined and '_arr->isOwned()' is false, this helper function will call
     // makeOwned() on '_arr' and then it will fixup the BSONElements in '_originalElements'
     // and '_sortedElements'. Otherwise, this helper does nothing and returns.
@@ -426,18 +413,11 @@ private:
     boost::optional<BSONObj> _oldBackingArr;
 
     // If '_elementsInitialized' is true, then this field will contain the all elements (with regex
-    // type values filtered out). There are the following states of operation: (1) if '_arr' is set,
-    // the elements refer to elements of BSON array '_arr'; (2) otherwise, the elements either refer
-    // to elements of BSON array '_oldBackingArr' (which is owned), or elements of external to the
-    // class unowned BSON arrays.
+    // type values filtered out).
     std::vector<BSONElement> _originalElements;
 
     // A lazily initialized vector of BSONElements. When '_sortedElements' has been initialized,
     // it will contain a sorted and deduped copy of the elements from '_originalElements'.
     boost::optional<LazilyInitialized<std::vector<BSONElement>>> _sortedElements;
-
-    // A vector of BSONElements of the first observed elements of each distinct canonical type in
-    // '_originalElements'.
-    SmallBSONElementVector _firstOfEachTypeElements;
 };
 }  // namespace mongo
