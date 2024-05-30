@@ -4,7 +4,7 @@
  * Stresses $queryStats being toggled on and off during execution.
  *
  * @tags: [
- *  featureFlagQueryStats,
+ *  requires_fcv_70,
  *  # Cannot read query stats entries from a different node than issued the query.
  *  does_not_support_causal_consistency,
  *  # setParameter is not persistent.

@@ -142,12 +142,9 @@ private:
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
 
 /**
- * Indicates whether or not query stats is enabled via the feature flags. If
- * requiresFullQueryStatsFeatureFlag is true, it will only return true if featureFlagQueryStats is
- * enabled. Otherwise, it will return true if either featureFlagQueryStats or
- * featureFlagQueryStatsFindCommand is enabled.
+ * Indicates whether or not query stats is enabled via the feature flag.
  */
-bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag);
+bool isQueryStatsFeatureEnabled();
 
 /**
  * Registers a request for query stats collection. The function may decide not to collect anything,
@@ -181,15 +178,10 @@ bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag);
  *   deferred construction callback to ensure that this feature does not impact performance if
  *   collecting stats is not needed due to the feature being disabled or the request being rate
  *   limited.
- * - Since we currently have 2 feature flags (one for full query stats, and one for
- *   find-command-only query stats), we use the requiresFullQueryStatsFeatureFlag parameter to
- * denote which requests should only be registered when the full feature flag is enabled. TODO
- * SERVER-79494 Remove requiresFullQueryStatsFeatureFlag parameter.
  */
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      std::function<std::unique_ptr<Key>(void)> makeKey,
-                     bool requiresFullQueryStatsFeatureFlag = true,
                      bool willNeverExhaust = false);
 
 /**

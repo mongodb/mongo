@@ -110,7 +110,7 @@ void assertConfigurationAllowed() {
             "Cannot configure queryStats store. The feature flag is not enabled. Please restart "
             "and specify the feature flag, or upgrade the feature compatibility version to one "
             "where it is enabled by default.",
-            isQueryStatsFeatureEnabled(/* requiresFullQueryStatsFeatureFlag = */ false));
+            isQueryStatsFeatureEnabled());
 }
 
 class QueryStatsOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
@@ -168,13 +168,12 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
 /**
  * Top-level checks for whether queryStats collection is enabled. If this returns false, we must go
  * no further.
- * TODO SERVER-79494 Remove requiresFullQueryStatsFeatureFlag parameter.
  */
-bool isQueryStatsEnabled(const ServiceContext* serviceCtx, bool requiresFullQueryStatsFeatureFlag) {
+bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
     // During initialization, FCV may not yet be setup but queries could be run. We can't
     // check whether queryStats should be enabled without FCV, so default to not recording
     // those queries.
-    return isQueryStatsFeatureEnabled(requiresFullQueryStatsFeatureFlag) &&
+    return isQueryStatsFeatureEnabled() &&
         QueryStatsStoreManager::get(serviceCtx)->getMaxSize() > 0;
 }
 
@@ -222,25 +221,21 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
 
 }  // namespace
 
-bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag) {
+bool isQueryStatsFeatureEnabled() {
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     return fcvSnapshot.isVersionInitialized() &&
-        (feature_flags::gFeatureFlagQueryStats.isEnabled(fcvSnapshot) ||
-         (!requiresFullQueryStatsFeatureFlag &&
-          feature_flags::gFeatureFlagQueryStatsFindCommand.isEnabled(fcvSnapshot)));
+        (feature_flags::gFeatureFlagQueryStats.isEnabled(fcvSnapshot));
 }
 
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      std::function<std::unique_ptr<Key>(void)> makeKey,
-                     bool requiresFullQueryStatsFeatureFlag,
                      bool willNeverExhaust) {
-    if (!isQueryStatsEnabled(opCtx->getServiceContext(), requiresFullQueryStatsFeatureFlag)) {
+    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         LOGV2_DEBUG(8473000,
                     5,
                     "not collecting query stats for this request since it is disabled",
-                    "featureEnabled"_attr =
-                        isQueryStatsFeatureEnabled(requiresFullQueryStatsFeatureFlag));
+                    "featureEnabled"_attr = isQueryStatsFeatureEnabled());
         return;
     }
 
@@ -307,8 +302,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
     uassert(6579000,
             "Query stats is not enabled without the feature flag on and a cache size greater than "
             "0 bytes",
-            isQueryStatsEnabled(opCtx->getServiceContext(),
-                                /*requiresFullQueryStatsFeatureFlag*/ false));
+            isQueryStatsEnabled(opCtx->getServiceContext()));
     return QueryStatsStoreManager::get(opCtx->getServiceContext())->getQueryStatsStore();
 }
 
@@ -331,8 +325,7 @@ void writeQueryStats(OperationContext* opCtx,
     // (e.g., by FCV downgrade or setting the store size to 0). Rather than calling
     // getQueryStatsStore (which would trigger a uassert if queryStats is disabled), we return and
     // log a message if query stats is disabled, and otherwise grab the query stats store directly.
-    if (!isQueryStatsEnabled(opCtx->getServiceContext(),
-                             /*requiresFullQueryStatsFeatureFlag*/ false)) {
+    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         LOGV2_DEBUG(8456700,
                     2,
                     "Query stats was enabled when the command started but is now disabled. "

@@ -1,6 +1,6 @@
 /**
  * Test that the queryStats HMAC key is not leaked during profiling.
- * @tags: [featureFlagQueryStatsFindCommand]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

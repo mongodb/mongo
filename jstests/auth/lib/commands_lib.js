@@ -6519,9 +6519,6 @@ export const authCommandsLib = {
           testname: "testQueryStatsReadPrivilege",
           command: {aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}},
           skipSharded: false,
-          skipTest: (conn) => {
-              return !TestData.setParameters.featureFlagQueryStats && !TestData.setParameters.featureFlagQueryStatsFindCommand;
-          },
           testcases: [{runOnDb: adminDbName, roles: roles_monitoring}]
         },
         {
@@ -6529,9 +6526,6 @@ export const authCommandsLib = {
           testname: "testQueryStatsReadTransformedPrivilege",
           command: {aggregate: 1, pipeline: [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacKey: BinData(8, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=")}}}], cursor: {}},
           skipSharded: false,
-          skipTest: (conn) => {
-              return !TestData.setParameters.featureFlagQueryStats && !TestData.setParameters.featureFlagQueryStatsFindCommand;
-          },
           testcases: [{runOnDb: adminDbName, roles: roles_monitoring}]
         },
         {

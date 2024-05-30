@@ -19,8 +19,6 @@ include:
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 - filename: etc/evergreen_yml_components/variants/classic_engine.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
-- filename: etc/evergreen_yml_components/variants/query_stats.yml
-### Uncomment when using this file for a LTS or Rapid release branch. ###
 # TODO: (SERVER-86211) Re-enable config shard evergreen variant.
 # - filename: etc/evergreen_yml_components/variants/config_shard.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
@@ -278,6 +276,10 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: .query_fuzzer
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
+  - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:

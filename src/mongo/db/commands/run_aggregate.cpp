@@ -842,7 +842,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                                                              origNss,
                                                              collectionType);
             },
-            /*requiresFullQueryStatsFeatureFlag*/ true,
             hasChangeStream);
     }
 

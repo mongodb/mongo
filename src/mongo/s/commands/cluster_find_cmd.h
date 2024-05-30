@@ -215,15 +215,11 @@ public:
             auto& parsedFind = parsedFindResult.second;
 
             if (!_didDoFLERewrite) {
-                query_stats::registerRequest(
-                    opCtx,
-                    expCtx->ns,
-                    [&]() {
-                        // This callback is either never invoked or invoked immediately within
-                        // registerRequest, so use-after-move of parsedFind isn't an issue.
-                        return std::make_unique<query_stats::FindKey>(expCtx, *parsedFind);
-                    },
-                    /*requiresFullQueryStatsFeatureFlag*/ false);
+                query_stats::registerRequest(opCtx, expCtx->ns, [&]() {
+                    // This callback is either never invoked or invoked immediately within
+                    // registerRequest, so use-after-move of parsedFind isn't an issue.
+                    return std::make_unique<query_stats::FindKey>(expCtx, *parsedFind);
+                });
             }
             auto cq = uassertStatusOK(CanonicalQuery::canonicalize(expCtx, std::move(parsedFind)));
 

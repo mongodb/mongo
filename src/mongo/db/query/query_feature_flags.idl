@@ -84,7 +84,8 @@ feature_flags:
     featureFlagQueryStats:
       description: "Feature flag for enabling full queryStats collection."
       cpp_varname: gFeatureFlagQueryStats
-      default: false
+      default: true
+      version: 7.0
 
     featureFlagBitwiseAggOperators:
       description: "Feature flag for enabling support for bitwise operators in the aggregation language."
@@ -115,11 +116,6 @@ feature_flags:
       cpp_varname: gFeatureFlagApproxPercentiles
       default: true
       version: 7.0
-
-    featureFlagQueryStatsFindCommand:
-      description: "Feature flag for enabling queryStats collection for the find command."
-      cpp_varname: gFeatureFlagQueryStatsFindCommand
-      default: false
 
     featureFlagSearchBatchSizeLimit:
       description: "Feature flag to enable the search batchsize and limit optimization."

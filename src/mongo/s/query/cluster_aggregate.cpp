@@ -331,7 +331,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                 return std::make_unique<query_stats::AggKey>(
                     request, *pipeline, expCtx, involvedNamespaces, executionNss);
             },
-            /*requiresFullQueryStatsFeatureFlag*/ true,
             hasChangeStream);
     }
     return pipeline;

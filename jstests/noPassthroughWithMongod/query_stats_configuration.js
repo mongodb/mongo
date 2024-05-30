@@ -7,8 +7,7 @@
 
 load("jstests/libs/feature_flag_util.js");
 
-if (FeatureFlagUtil.isEnabled(db, "QueryStats") ||
-    FeatureFlagUtil.isEnabled(db, "QueryStatsFindCommand")) {
+if (FeatureFlagUtil.isEnabled(db, "QueryStats")) {
     function testQueryStatsSetting(paramName, paramValue) {
         // The feature flag is enabled - make sure the queryStats store can be configured.
         const original = assert.commandWorked(db.adminCommand({getParameter: 1, [paramName]: 1}));

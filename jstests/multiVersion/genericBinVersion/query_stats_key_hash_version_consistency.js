@@ -1,6 +1,6 @@
 /**
  * Tests that query stats key hashes are consistent across versions.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 'use strict';

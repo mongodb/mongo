@@ -44,17 +44,6 @@ function runTest(conn) {
 let conn = MongoRunner.runMongod({
     setParameter: {
         internalQueryStatsRateLimit: -1,
-        featureFlagQueryStats: true,
-    }
-});
-runTest(conn);
-MongoRunner.stopMongod(conn);
-
-// TODO SERVER-79494 remove second run with find-command-only feature flag
-conn = MongoRunner.runMongod({
-    setParameter: {
-        internalQueryStatsRateLimit: -1,
-        featureFlagQueryStatsFindCommand: true,
     }
 });
 runTest(conn);
@@ -68,23 +57,6 @@ let st = new ShardingTest({
     mongosOptions: {
         setParameter: {
             internalQueryStatsRateLimit: -1,
-            featureFlagQueryStats: true,
-        }
-    },
-});
-runTest(st.s);
-st.stop();
-
-// TODO SERVER-79494 remove second run with find-command-only feature flag
-st = new ShardingTest({
-    mongos: 1,
-    shards: 1,
-    config: 1,
-    rs: {nodes: 1},
-    mongosOptions: {
-        setParameter: {
-            internalQueryStatsRateLimit: -1,
-            featureFlagQueryStatsFindCommand: true,
         }
     },
 });

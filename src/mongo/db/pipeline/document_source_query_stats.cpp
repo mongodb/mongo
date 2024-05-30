@@ -41,11 +41,11 @@ namespace {
 CounterMetric queryStatsHmacApplicationErrors("queryStats.numHmacApplicationErrors");
 }
 
-// TODO SERVER-79494 Use REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG
-REGISTER_DOCUMENT_SOURCE(queryStats,
-                         DocumentSourceQueryStats::LiteParsed::parse,
-                         DocumentSourceQueryStats::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
+                                           DocumentSourceQueryStats::LiteParsed::parse,
+                                           DocumentSourceQueryStats::createFromBson,
+                                           AllowedWithApiStrict::kNeverInVersion1,
+                                           feature_flags::gFeatureFlagQueryStats);
 
 namespace {
 
@@ -102,13 +102,6 @@ BSONObj DocumentSourceQueryStats::computeQueryStatsKey(std::shared_ptr<const Key
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
-    // TODO SERVER-79494 Remove this manual feature flag check once we're registering doc source
-    // with REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            "$queryStats is not allowed in the current configuration. You may need to enable the "
-            "correponding feature flag",
-            query_stats::isQueryStatsFeatureEnabled(/*requiresFullQueryStatsFeatureFlag*/ false));
-
     return parseSpec(spec, [&](TransformAlgorithmEnum algorithm, std::string hmacKey) {
         return std::make_unique<DocumentSourceQueryStats::LiteParsed>(
             spec.fieldName(), algorithm, hmacKey);
@@ -117,13 +110,6 @@ std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    // TODO SERVER-79494 Remove this manual feature flag check once we're registering doc source
-    // with REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            "$queryStats is not allowed in the current configuration. You may need to enable the "
-            "correponding feature flag",
-            query_stats::isQueryStatsFeatureEnabled(/*requiresFullQueryStatsFeatureFlag*/ false));
-
     const NamespaceString& nss = pExpCtx->ns;
 
     uassert(ErrorCodes::InvalidNamespace,
