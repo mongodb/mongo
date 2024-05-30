@@ -1469,6 +1469,34 @@ TEST(InMatchExpression, ChangingCollationAfterAddingEqualitiesPreservesEqualitie
     ASSERT(in.contains(obj2.firstElement()));
 }
 
+// Serializes expression 'expression' into the query shape format.
+BSONObj serializeToQueryShape(const MatchExpression& expression) {
+    BSONObjBuilder objBuilder;
+    expression.serialize(&objBuilder,
+                         SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    return objBuilder.obj();
+}
+
+TEST(InMatchExpression, SerializeToQueryShapeEmptyList) {
+    InMatchExpression matchExpression("a"_sd);
+    ASSERT_BSONOBJ_EQ(serializeToQueryShape(matchExpression), fromjson("{ a: { $in: [] } }"));
+}
+
+TEST(InMatchExpression, SerializeToQueryShapeMultipleElementsList) {
+    BSONObj operand = BSON_ARRAY(1 << "r" << true);
+    InMatchExpression matchExpression("a"_sd);
+    ASSERT_OK(matchExpression.setEqualities({operand[0], operand[1], operand[2]}));
+    ASSERT_BSONOBJ_EQ(serializeToQueryShape(matchExpression),
+                      fromjson("{ a: { $in: [ 2, \"or more types\" ] } }"));
+}
+
+TEST(InMatchExpression, SerializeToQueryShapeSingleElementList) {
+    BSONObj operand = BSON_ARRAY(5);
+    InMatchExpression matchExpression("a"_sd);
+    ASSERT_OK(matchExpression.setEqualities({operand.firstElement()}));
+    ASSERT_BSONOBJ_EQ(serializeToQueryShape(matchExpression), fromjson("{ a: { $in: [1] } }"));
+}
+
 std::vector<uint32_t> bsonArrayToBitPositions(const BSONArray& ba) {
     std::vector<uint32_t> bitPositions;
 
