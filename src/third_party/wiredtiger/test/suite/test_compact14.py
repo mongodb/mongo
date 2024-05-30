@@ -30,31 +30,22 @@ import time
 from wiredtiger import stat
 from compact_util import compact_util
 
-megabyte = 1024 * 1024
-
-# test_compact13.py
-# This test checks that background compaction resets statistics after being disabled.
-class test_compact13(compact_util):
+# test_compact14.py
+# This test checks that background compaction skips small files.
+class test_compact14(compact_util):
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB,'
     conn_config = 'cache_size=100MB,statistics=(all)'
-    uri_prefix = 'table:test_compact13'
 
-    table_numkv = 100 * 1000
-    n_tables = 2
+    table_numkv = 1
 
-    # Test background compaction stats are reset when after being disabled.
-    def test_compact13(self):
-        # FIXME-WT-11399
+    def test_compact14(self):
         if self.runningHook('tiered'):
             self.skipTest("this test does not yet work with tiered storage")
 
-        # Create and populate tables.
-        uris = []
-        for i in range(self.n_tables):
-            uri = f'{self.uri_prefix}_{i}'
-            uris.append(uri)
-            self.session.create(uri, self.create_params)
-            self.populate(uri, 0, self.table_numkv)
+        # Create an table and populate small amount of data.
+        uri = "table:test_compact14"
+        self.session.create(uri, self.create_params)
+        self.populate(uri, 0, self.table_numkv)
 
         # Write to disk.
         self.session.checkpoint()
@@ -63,22 +54,5 @@ class test_compact13(compact_util):
         bg_compact_config = 'background=true,free_space_target=1MB'
         self.turn_on_bg_compact(bg_compact_config)
 
-        # Nothing should be compacted.
-        while self.get_bg_compaction_files_skipped() < self.n_tables + 1:
-            time.sleep(0.1)
-
-        self.turn_off_bg_compact()
-
-        # Delete the first 90%.
-        for i in range(self.n_tables):
-            uri = self.uri_prefix + f'_{i}'
-            self.delete_range(uri, 90 * self.table_numkv // 100)
-
-        # Write to disk.
-        self.session.checkpoint()
-
-        # Now the files can be compacted.
-        self.turn_on_bg_compact(bg_compact_config)
-
-        while self.get_files_compacted(uris) < 2:
+        while self.get_bg_compaction_files_skipped() == 0:
             time.sleep(0.1)

@@ -157,7 +157,9 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
               !WT_IS_HS(S2BT(session)->dhandle) ||
                 (*upd_entry == NULL ||
                   ((*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
-                    (*upd_entry)->txnid == WT_TXN_NONE && (*upd_entry)->start_ts == WT_TS_NONE)) ||
+                    (((*upd_entry)->txnid == WT_TXN_NONE && (*upd_entry)->start_ts == WT_TS_NONE) ||
+                      ((*upd_entry)->txnid == WT_TXN_ABORTED &&
+                        (*upd_entry)->next->txnid == WT_TXN_ABORTED)))) ||
                 (upd_arg->type == WT_UPDATE_TOMBSTONE && upd_arg->start_ts == WT_TS_NONE &&
                   upd_arg->next == NULL) ||
                 (upd_arg->type == WT_UPDATE_TOMBSTONE && upd_arg->next != NULL &&

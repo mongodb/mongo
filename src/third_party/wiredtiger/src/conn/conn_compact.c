@@ -231,38 +231,67 @@ __background_compact_get_stat(WT_SESSION_IMPL *session, const char *uri, int64_t
 }
 
 /*
- * __background_compact_should_run --
+ * __background_compact_should_skip --
  *     Check whether we should proceed with calling compaction on the given file.
  */
-static bool
-__background_compact_should_run(WT_SESSION_IMPL *session, const char *uri, int64_t id)
+static int
+__background_compact_should_skip(WT_SESSION_IMPL *session, const char *uri, int64_t id, bool *skipp)
 {
     WT_BACKGROUND_COMPACT_STAT *compact_stat;
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    wt_off_t file_size;
     uint64_t cur_time;
+    const char *filename;
 
     conn = S2C(session);
 
     /* Check if the file is excluded. */
     if (__background_compact_exclude(session, uri)) {
         WT_STAT_CONN_INCR(session, background_compact_exclude);
-        return (false);
+        *skipp = true;
+        return (0);
+    }
+
+    /* Fast path to check the file size, ignore small files. */
+    filename = uri;
+    WT_PREFIX_SKIP(filename, "file:");
+    ret = __wt_block_manager_named_size(session, filename, &file_size);
+
+    /* It is possible that the file no longer exists. */
+    if (ret == ENOENT) {
+        *skipp = true;
+        return (0);
+    }
+
+    WT_RET(ret);
+
+    if (file_size <= WT_MEGABYTE) {
+        WT_STAT_CONN_INCR(session, background_compact_skipped);
+        *skipp = true;
+        return (0);
     }
 
     /* If we haven't seen this file before we should try and compact it. */
     compact_stat = __background_compact_get_stat(session, uri, id);
-    if (compact_stat == NULL)
-        return (true);
+    if (compact_stat == NULL) {
+        *skipp = false;
+        return (0);
+    }
 
     /* If we are running once, force compaction on the file. */
-    if (conn->background_compact.run_once)
-        return (true);
+    if (conn->background_compact.run_once) {
+        *skipp = false;
+        return (0);
+    }
 
     /* Proceed with compaction when the file has not been compacted for some time. */
     cur_time = __wt_clock(session);
     if (WT_CLOCKDIFF_SEC(cur_time, compact_stat->prev_compact_time) >=
-      conn->background_compact.max_file_skip_time)
-        return (true);
+      conn->background_compact.max_file_skip_time) {
+        *skipp = false;
+        return (0);
+    }
 
     /*
      * If the last compaction pass was unsuccessful or less successful than the average, skip it for
@@ -273,10 +302,12 @@ __background_compact_should_run(WT_SESSION_IMPL *session, const char *uri, int64
         compact_stat->skip_count++;
         conn->background_compact.files_skipped++;
         WT_STAT_CONN_INCR(session, background_compact_skipped);
-        return (false);
+        *skipp = true;
+        return (0);
     }
 
-    return (true);
+    *skipp = false;
+    return (0);
 }
 
 /*
@@ -425,6 +456,7 @@ __background_compact_find_next_uri(WT_SESSION_IMPL *session, WT_ITEM *uri, WT_IT
     WT_DECL_RET;
     int exact;
     const char *key, *value;
+    bool skip;
 
     cursor = NULL;
     exact = 0;
@@ -463,7 +495,8 @@ __background_compact_find_next_uri(WT_SESSION_IMPL *session, WT_ITEM *uri, WT_IT
              */
             WT_ERR(cursor->get_value(cursor, &value));
             WT_ERR(__wt_config_getones(session, value, "id", &id));
-            if (__background_compact_should_run(session, key, id.val))
+            WT_ERR(__background_compact_should_skip(session, key, id.val, &skip));
+            if (!skip)
                 break;
         }
     } while ((ret = cursor->next(cursor)) == 0);

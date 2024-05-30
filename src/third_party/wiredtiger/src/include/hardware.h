@@ -84,9 +84,6 @@
  * being read as a volatile and achieve volatile semantics. For other compilers we'll fall back on
  * inserting an acquire barrier after the read (our pre-existing implementation) which prevents
  * invented and fused loads for this variable in the code following the expression.
- *
- * FIXME-WT-11718 - Once Windows build machines that support C11 _Generics are available this macro
- * will be updated to use _Generic on all platforms.
  */
 #if defined(__GNUC__) || defined(__clang__)
 #define WT_READ_ONCE(v, val) (v) = __wt_atomic_load_generic((volatile __typeof__(val) *)&(val))
@@ -101,9 +98,6 @@
  * compiled output.
  *
  * See the read once macro description for more details.
- *
- * FIXME-WT-11718 - Once Windows build machines that support C11 _Generics are available this macro
- * will be updated to use _Generic on all platforms.
  */
 #if defined(__GNUC__) || defined(__clang__)
 #define WT_WRITE_ONCE(v, val) __wt_atomic_store_generic((volatile __typeof__(v) *)&(v), (val))

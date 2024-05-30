@@ -58,7 +58,7 @@ buildvariants:
   - ubuntu2004-test
   expansions:
     ENABLE_TCMALLOC: 0
-    doc_update_branches: develop,mongodb-7.0,mongodb-6.0,mongodb-5.0,mongodb-4.4,mongodb-4.2
+    doc_update_branches: develop,mongodb-8.0,mongodb-7.0,mongodb-6.0,mongodb-5.0,mongodb-4.4,mongodb-4.2
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: doc-update
