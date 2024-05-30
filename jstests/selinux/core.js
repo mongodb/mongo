@@ -1,17 +1,19 @@
 
+import {getPython3Binary} from "jstests/libs/python.js";
 import {SelinuxBaseTest} from "jstests/selinux/lib/selinux_base_test.js";
 
 export class TestDefinition extends SelinuxBaseTest {
     async run() {
-        // On RHEL7 there is no python3, but check_has_tag.py will also work with python2
-        const python = (0 == runNonMongoProgram("which", "python3")) ? "python3" : "python2";
+        const python = getPython3Binary();
 
         const dirs = ["jstests/core", "jstests/core_standalone"];
+
+        const TestData = {isHintsToQuerySettingsSuite: false};
 
         for (let dir of dirs) {
             jsTest.log("Running tests in " + dir);
 
-            const all_tests = ls(dir).filter(d => !d.endsWith("/")).sort();
+            const all_tests = ls(dir).filter(d => d.endsWith(".js")).sort();
             assert(all_tests);
             assert(all_tests.length);
 
@@ -42,9 +44,11 @@ export class TestDefinition extends SelinuxBaseTest {
                     throw ("Failure occurred while checking tags of test: " + t);
                 }
 
+                TestData.testName = t.substring(t.lastIndexOf('/') + 1, t.length - ".js".length);
+
                 jsTest.log("Running test: " + t);
                 try {
-                    let evalString = "import(" + tojson(t) + ")";
+                    let evalString = `TestData = ${tojson(TestData)}; load(${tojson(t)});`;
                     let handle = startParallelShell(evalString, db.getMongo().port);
                     let rc = handle();
                     assert.eq(rc, 0);
