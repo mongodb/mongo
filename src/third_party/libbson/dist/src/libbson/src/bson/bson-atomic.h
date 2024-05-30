@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_ATOMIC_H
 #define BSON_ATOMIC_H
 
 
-#include "bson-config.h"
-#include "bson-compat.h"
-#include "bson-macros.h"
+#include <bson/bson-config.h>
+#include <bson/bson-compat.h>
+#include <bson/bson-macros.h>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -47,7 +47,8 @@ enum bson_memory_order {
 #define MSVC_MEMORDER_SUFFIX(X)
 #endif
 
-#if defined(USE_LEGACY_GCC_ATOMICS) || (!defined(__clang__) && __GNUC__ == 4)
+#if defined(USE_LEGACY_GCC_ATOMICS) || \
+   (!defined(__clang__) && __GNUC__ == 4) || defined(__xlC__)
 #define BSON_USE_LEGACY_GCC_ATOMICS
 #else
 #undef BSON_USE_LEGACY_GCC_ATOMICS
@@ -61,6 +62,7 @@ enum bson_memory_order {
 #ifdef BSON_USE_LEGACY_GCC_ATOMICS
 #undef BSON_IF_GNU_LIKE
 #define BSON_IF_GNU_LIKE(...)
+#define BSON_IF_MSVC(...)
 #define BSON_IF_GNU_LEGACY_ATOMICS(...) __VA_ARGS__
 #else
 #define BSON_IF_GNU_LEGACY_ATOMICS(...)
@@ -377,6 +379,10 @@ DECL_ATOMIC_STDINT (int32, )
 #if !defined(BSON_EMULATE_INT)
 DECL_ATOMIC_INTEGRAL (int, int, )
 #endif
+#endif
+
+#ifndef DECL_ATOMIC_INTEGRAL_INT32
+#define DECL_ATOMIC_INTEGRAL_INT32 int32_t
 #endif
 
 BSON_EXPORT (int64_t)

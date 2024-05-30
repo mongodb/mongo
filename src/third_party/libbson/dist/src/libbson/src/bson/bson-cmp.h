@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_CMP_H
 #define BSON_CMP_H
 
 
-#include "bson-compat.h" /* ssize_t */
-#include "bson-macros.h" /* BSON_CONCAT */
+#include <bson/bson-compat.h> /* ssize_t */
+#include <bson/bson-macros.h> /* BSON_CONCAT */
 
 #include <limits.h>
 #include <stdbool.h>

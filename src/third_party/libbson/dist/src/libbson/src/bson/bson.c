@@ -16,11 +16,11 @@
 
 
 #include "bson.h"
-#include "bson-config.h"
-#include "bson-private.h"
-#include "bson-json-private.h"
-#include "bson-string.h"
-#include "bson-iso8601-private.h"
+#include <bson/bson-config.h>
+#include <bson/bson-private.h>
+#include <bson/bson-json-private.h>
+#include <bson/bson-string.h>
+#include <bson/bson-iso8601-private.h>
 
 #include "common-b64-private.h"
 
@@ -85,7 +85,8 @@ static char *
 _bson_as_json_visit_all (const bson_t *bson,
                          size_t *length,
                          bson_json_mode_t mode,
-                         int32_t max_len);
+                         int32_t max_len,
+                         bool is_outermost_array);
 
 /*
  * Globals.
@@ -2184,7 +2185,7 @@ bson_copy_to (const bson_t *src, bson_t *dst)
    if ((src->flags & BSON_FLAG_INLINE)) {
 #ifdef BSON_MEMCHECK
       dst->len = src->len;
-      dst->canary = malloc (1);
+      dst->canary = bson_malloc (1);
       memcpy (dst->padding, src->padding, sizeof dst->padding);
 #else
       memcpy (dst, src, sizeof *dst);
@@ -2294,7 +2295,6 @@ bson_copy_to_excluding_noinit (const bson_t *src,
    bson_copy_to_excluding_noinit_va (src, dst, first_exclude, args);
    va_end (args);
 }
-
 
 void
 bson_destroy (bson_t *bson)
@@ -2993,12 +2993,13 @@ _bson_as_json_visit_after (const bson_iter_t *iter, const char *key, void *data)
       return false;
    }
 
-   if (state->str->len >= state->max_len) {
+   if (bson_cmp_greater_equal_us (state->str->len, state->max_len)) {
       state->max_len_reached = true;
 
-      if (state->str->len > state->max_len) {
+      if (bson_cmp_greater_us (state->str->len, state->max_len)) {
+         BSON_ASSERT (bson_in_range_signed (uint32_t, state->max_len));
          /* Truncate string to maximum length */
-         bson_string_truncate (state->str, state->max_len);
+         bson_string_truncate (state->str, (uint32_t) state->max_len);
       }
 
       return true;
@@ -3106,10 +3107,12 @@ _bson_as_json_visit_codewscope (const bson_iter_t *iter,
 
    /* Encode scope with the same mode */
    if (state->max_len != BSON_MAX_LEN_UNLIMITED) {
-      max_scope_len = BSON_MAX (0, state->max_len - state->str->len);
+      BSON_ASSERT (bson_in_range_unsigned (int32_t, state->str->len));
+      max_scope_len = BSON_MAX (0, state->max_len - (int32_t) state->str->len);
    }
 
-   scope = _bson_as_json_visit_all (v_scope, NULL, state->mode, max_scope_len);
+   scope = _bson_as_json_visit_all (
+      v_scope, NULL, state->mode, max_scope_len, false);
 
    if (!scope) {
       return true;
@@ -3165,7 +3168,9 @@ _bson_as_json_visit_document (const bson_iter_t *iter,
       child_state.mode = state->mode;
       child_state.max_len = BSON_MAX_LEN_UNLIMITED;
       if (state->max_len != BSON_MAX_LEN_UNLIMITED) {
-         child_state.max_len = BSON_MAX (0, state->max_len - state->str->len);
+         BSON_ASSERT (bson_in_range_unsigned (int32_t, state->str->len));
+         child_state.max_len =
+            BSON_MAX (0, state->max_len - (int32_t) state->str->len);
       }
 
       child_state.max_len_reached = child_state.max_len == 0;
@@ -3216,7 +3221,9 @@ _bson_as_json_visit_array (const bson_iter_t *iter,
       child_state.mode = state->mode;
       child_state.max_len = BSON_MAX_LEN_UNLIMITED;
       if (state->max_len != BSON_MAX_LEN_UNLIMITED) {
-         child_state.max_len = BSON_MAX (0, state->max_len - state->str->len);
+         BSON_ASSERT (bson_in_range_unsigned (int32_t, state->str->len));
+         child_state.max_len =
+            BSON_MAX (0, state->max_len - (int32_t) state->str->len);
       }
 
       child_state.max_len_reached = child_state.max_len == 0;
@@ -3247,7 +3254,8 @@ static char *
 _bson_as_json_visit_all (const bson_t *bson,
                          size_t *length,
                          bson_json_mode_t mode,
-                         int32_t max_len)
+                         int32_t max_len,
+                         bool is_outermost_array)
 {
    bson_json_state_t state;
    bson_iter_t iter;
@@ -3265,7 +3273,7 @@ _bson_as_json_visit_all (const bson_t *bson,
          *length = 3;
       }
 
-      return bson_strdup ("{ }");
+      return bson_strdup (is_outermost_array ? "[ ]" : "{ }");
    }
 
    if (!bson_iter_init (&iter, bson)) {
@@ -3273,8 +3281,8 @@ _bson_as_json_visit_all (const bson_t *bson,
    }
 
    state.count = 0;
-   state.keys = true;
-   state.str = bson_string_new ("{ ");
+   state.keys = !is_outermost_array;
+   state.str = bson_string_new (is_outermost_array ? "[ " : "{ ");
    state.depth = 0;
    state.err_offset = &err_offset;
    state.mode = mode;
@@ -3298,7 +3306,7 @@ _bson_as_json_visit_all (const bson_t *bson,
     */
    remaining = state.max_len - state.str->len;
    if (state.max_len == BSON_MAX_LEN_UNLIMITED || remaining > 1) {
-      bson_string_append (state.str, " }");
+      bson_string_append (state.str, is_outermost_array ? " ]" : " }");
    } else if (remaining == 1) {
       bson_string_append (state.str, " ");
    }
@@ -3316,15 +3324,16 @@ bson_as_json_with_opts (const bson_t *bson,
                         size_t *length,
                         const bson_json_opts_t *opts)
 {
-   return _bson_as_json_visit_all (bson, length, opts->mode, opts->max_len);
+   return _bson_as_json_visit_all (
+      bson, length, opts->mode, opts->max_len, opts->is_outermost_array);
 }
 
 
 char *
 bson_as_canonical_extended_json (const bson_t *bson, size_t *length)
 {
-   const bson_json_opts_t opts = {BSON_JSON_MODE_CANONICAL,
-                                  BSON_MAX_LEN_UNLIMITED};
+   const bson_json_opts_t opts = {
+      BSON_JSON_MODE_CANONICAL, BSON_MAX_LEN_UNLIMITED, false};
    return bson_as_json_with_opts (bson, length, &opts);
 }
 
@@ -3332,8 +3341,8 @@ bson_as_canonical_extended_json (const bson_t *bson, size_t *length)
 char *
 bson_as_json (const bson_t *bson, size_t *length)
 {
-   const bson_json_opts_t opts = {BSON_JSON_MODE_LEGACY,
-                                  BSON_MAX_LEN_UNLIMITED};
+   const bson_json_opts_t opts = {
+      BSON_JSON_MODE_LEGACY, BSON_MAX_LEN_UNLIMITED, false};
    return bson_as_json_with_opts (bson, length, &opts);
 }
 
@@ -3341,8 +3350,8 @@ bson_as_json (const bson_t *bson, size_t *length)
 char *
 bson_as_relaxed_extended_json (const bson_t *bson, size_t *length)
 {
-   const bson_json_opts_t opts = {BSON_JSON_MODE_RELAXED,
-                                  BSON_MAX_LEN_UNLIMITED};
+   const bson_json_opts_t opts = {
+      BSON_JSON_MODE_RELAXED, BSON_MAX_LEN_UNLIMITED, false};
    return bson_as_json_with_opts (bson, length, &opts);
 }
 
@@ -3350,57 +3359,27 @@ bson_as_relaxed_extended_json (const bson_t *bson, size_t *length)
 char *
 bson_array_as_json (const bson_t *bson, size_t *length)
 {
-   bson_json_state_t state;
-   bson_iter_t iter;
-   ssize_t err_offset = -1;
+   const bson_json_opts_t opts = {
+      BSON_JSON_MODE_LEGACY, BSON_MAX_LEN_UNLIMITED, true};
+   return bson_as_json_with_opts (bson, length, &opts);
+}
 
-   BSON_ASSERT (bson);
 
-   if (length) {
-      *length = 0;
-   }
+char *
+bson_array_as_relaxed_extended_json (const bson_t *bson, size_t *length)
+{
+   const bson_json_opts_t opts = {
+      BSON_JSON_MODE_RELAXED, BSON_MAX_LEN_UNLIMITED, true};
+   return bson_as_json_with_opts (bson, length, &opts);
+}
 
-   if (bson_empty0 (bson)) {
-      if (length) {
-         *length = 3;
-      }
 
-      return bson_strdup ("[ ]");
-   }
-
-   if (!bson_iter_init (&iter, bson)) {
-      return NULL;
-   }
-
-   state.count = 0;
-   state.keys = false;
-   state.str = bson_string_new ("[ ");
-   state.depth = 0;
-   state.err_offset = &err_offset;
-   state.mode = BSON_JSON_MODE_LEGACY;
-   state.max_len = BSON_MAX_LEN_UNLIMITED;
-   state.max_len_reached = false;
-
-   if ((bson_iter_visit_all (&iter, &bson_as_json_visitors, &state) ||
-        err_offset != -1) &&
-       !state.max_len_reached) {
-      /*
-       * We were prematurely exited due to corruption or failed visitor.
-       */
-      bson_string_free (state.str, true);
-      if (length) {
-         *length = 0;
-      }
-      return NULL;
-   }
-
-   bson_string_append (state.str, " ]");
-
-   if (length) {
-      *length = state.str->len;
-   }
-
-   return bson_string_free (state.str, false);
+char *
+bson_array_as_canonical_extended_json (const bson_t *bson, size_t *length)
+{
+   const bson_json_opts_t opts = {
+      BSON_JSON_MODE_CANONICAL, BSON_MAX_LEN_UNLIMITED, true};
+   return bson_as_json_with_opts (bson, length, &opts);
 }
 
 
@@ -3668,4 +3647,346 @@ bson_concat (bson_t *dst, const bson_t *src)
    }
 
    return true;
+}
+
+struct _bson_array_builder_t {
+   uint32_t index;
+   bson_t bson;
+};
+
+bson_array_builder_t *
+bson_array_builder_new (void)
+{
+   bson_array_builder_t *bab = BSON_ALIGNED_ALLOC0 (bson_array_builder_t);
+   bson_init (&bab->bson);
+   return bab;
+}
+
+// `bson_array_builder_append_impl` generates the next key index, calls
+// `append_fn`, and may update the tracked next index.
+#define bson_array_builder_append_impl(append_fn, ...)                        \
+   if (1) {                                                                   \
+      BSON_ASSERT_PARAM (bab);                                                \
+      const char *key;                                                        \
+      char buf[16];                                                           \
+      size_t key_length =                                                     \
+         bson_uint32_to_string (bab->index, &key, buf, sizeof buf);           \
+      /* Expect enough room in `buf` for key string. UINT32_MAX is 10 digits. \
+       * With the NULL terminator, 11 is expected maximum number of           \
+       * characters.  */                                                      \
+      BSON_ASSERT (key_length < sizeof buf);                                  \
+      bool ok = append_fn (&bab->bson, key, (int) key_length, __VA_ARGS__);   \
+      if (ok) {                                                               \
+         bab->index += 1;                                                     \
+      }                                                                       \
+      return ok;                                                              \
+   } else                                                                     \
+      (void) 0
+
+#define bson_array_builder_append_impl_noargs(append_fn)                      \
+   if (1) {                                                                   \
+      BSON_ASSERT_PARAM (bab);                                                \
+      const char *key;                                                        \
+      char buf[16];                                                           \
+      size_t key_length =                                                     \
+         bson_uint32_to_string (bab->index, &key, buf, sizeof buf);           \
+      /* Expect enough room in `buf` for key string. UINT32_MAX is 10 digits. \
+       * With the NULL terminator, 11 is expected maximum number of           \
+       * characters.  */                                                      \
+      BSON_ASSERT (key_length < sizeof buf);                                  \
+      bool ok = append_fn (&bab->bson, key, (int) key_length);                \
+      if (ok) {                                                               \
+         bab->index += 1;                                                     \
+      }                                                                       \
+      return ok;                                                              \
+   } else                                                                     \
+      (void) 0
+
+bool
+bson_array_builder_append_value (bson_array_builder_t *bab,
+                                 const bson_value_t *value)
+{
+   bson_array_builder_append_impl (bson_append_value, value);
+}
+
+bool
+bson_array_builder_append_array (bson_array_builder_t *bab, const bson_t *array)
+{
+   bson_array_builder_append_impl (bson_append_array, array);
+}
+
+
+bool
+bson_array_builder_append_binary (bson_array_builder_t *bab,
+                                  bson_subtype_t subtype,
+                                  const uint8_t *binary,
+                                  uint32_t length)
+{
+   bson_array_builder_append_impl (bson_append_binary, subtype, binary, length);
+}
+
+
+bool
+bson_array_builder_append_bool (bson_array_builder_t *bab, bool value)
+{
+   bson_array_builder_append_impl (bson_append_bool, value);
+}
+
+
+bool
+bson_array_builder_append_code (bson_array_builder_t *bab,
+                                const char *javascript)
+{
+   bson_array_builder_append_impl (bson_append_code, javascript);
+}
+
+
+bool
+bson_array_builder_append_code_with_scope (bson_array_builder_t *bab,
+                                           const char *javascript,
+                                           const bson_t *scope)
+{
+   bson_array_builder_append_impl (
+      bson_append_code_with_scope, javascript, scope);
+}
+
+
+bool
+bson_array_builder_append_dbpointer (bson_array_builder_t *bab,
+                                     const char *collection,
+                                     const bson_oid_t *oid)
+{
+   bson_array_builder_append_impl (bson_append_dbpointer, collection, oid);
+}
+
+
+bool
+bson_array_builder_append_double (bson_array_builder_t *bab, double value)
+{
+   bson_array_builder_append_impl (bson_append_double, value);
+}
+
+
+bool
+bson_array_builder_append_document (bson_array_builder_t *bab,
+                                    const bson_t *value)
+{
+   bson_array_builder_append_impl (bson_append_document, value);
+}
+
+
+bool
+bson_array_builder_append_document_begin (bson_array_builder_t *bab,
+                                          bson_t *child)
+{
+   bson_array_builder_append_impl (bson_append_document_begin, child);
+}
+
+
+bool
+bson_array_builder_append_document_end (bson_array_builder_t *bab,
+                                        bson_t *child)
+{
+   return bson_append_document_end (&bab->bson, child);
+}
+
+
+bool
+bson_array_builder_append_int32 (bson_array_builder_t *bab, int32_t value)
+{
+   bson_array_builder_append_impl (bson_append_int32, value);
+}
+
+
+bool
+bson_array_builder_append_int64 (bson_array_builder_t *bab, int64_t value)
+{
+   bson_array_builder_append_impl (bson_append_int64, value);
+}
+
+
+bool
+bson_array_builder_append_decimal128 (bson_array_builder_t *bab,
+                                      const bson_decimal128_t *value)
+{
+   bson_array_builder_append_impl (bson_append_decimal128, value);
+}
+
+
+bool
+bson_array_builder_append_iter (bson_array_builder_t *bab,
+                                const bson_iter_t *iter)
+{
+   bson_array_builder_append_impl (bson_append_iter, iter);
+}
+
+
+bool
+bson_array_builder_append_minkey (bson_array_builder_t *bab)
+{
+   bson_array_builder_append_impl_noargs (bson_append_minkey);
+}
+
+
+bool
+bson_array_builder_append_maxkey (bson_array_builder_t *bab)
+{
+   bson_array_builder_append_impl_noargs (bson_append_maxkey);
+}
+
+
+bool
+bson_array_builder_append_null (bson_array_builder_t *bab)
+{
+   bson_array_builder_append_impl_noargs (bson_append_null);
+}
+
+
+bool
+bson_array_builder_append_oid (bson_array_builder_t *bab, const bson_oid_t *oid)
+{
+   bson_array_builder_append_impl (bson_append_oid, oid);
+}
+
+
+bool
+bson_array_builder_append_regex (bson_array_builder_t *bab,
+                                 const char *regex,
+                                 const char *options)
+{
+   bson_array_builder_append_impl (bson_append_regex, regex, options);
+}
+
+
+bool
+bson_array_builder_append_regex_w_len (bson_array_builder_t *bab,
+                                       const char *regex,
+                                       int regex_length,
+                                       const char *options)
+{
+   bson_array_builder_append_impl (
+      bson_append_regex_w_len, regex, regex_length, options);
+}
+
+
+bool
+bson_array_builder_append_utf8 (bson_array_builder_t *bab,
+                                const char *value,
+                                int length)
+{
+   bson_array_builder_append_impl (bson_append_utf8, value, length);
+}
+
+
+bool
+bson_array_builder_append_symbol (bson_array_builder_t *bab,
+                                  const char *value,
+                                  int length)
+{
+   bson_array_builder_append_impl (bson_append_symbol, value, length);
+}
+
+
+bool
+bson_array_builder_append_time_t (bson_array_builder_t *bab, time_t value)
+{
+   bson_array_builder_append_impl (bson_append_time_t, value);
+}
+
+
+bool
+bson_array_builder_append_timeval (bson_array_builder_t *bab,
+                                   struct timeval *value)
+{
+   bson_array_builder_append_impl (bson_append_timeval, value);
+}
+
+
+bool
+bson_array_builder_append_date_time (bson_array_builder_t *bab, int64_t value)
+{
+   bson_array_builder_append_impl (bson_append_date_time, value);
+}
+
+
+bool
+bson_array_builder_append_now_utc (bson_array_builder_t *bab)
+{
+   bson_array_builder_append_impl_noargs (bson_append_now_utc);
+}
+
+
+bool
+bson_array_builder_append_timestamp (bson_array_builder_t *bab,
+                                     uint32_t timestamp,
+                                     uint32_t increment)
+{
+   bson_array_builder_append_impl (bson_append_timestamp, timestamp, increment);
+}
+
+
+bool
+bson_array_builder_append_undefined (bson_array_builder_t *bab)
+{
+   bson_array_builder_append_impl_noargs (bson_append_undefined);
+}
+
+
+bool
+bson_array_builder_append_array_builder_begin (bson_array_builder_t *bab,
+                                               bson_array_builder_t **child)
+{
+   bson_array_builder_append_impl (bson_append_array_builder_begin, child);
+}
+
+bool
+bson_array_builder_append_array_builder_end (bson_array_builder_t *bab,
+                                             bson_array_builder_t *child)
+{
+   return bson_append_array_builder_end (&bab->bson, child);
+}
+
+
+bool
+bson_array_builder_build (bson_array_builder_t *bab, bson_t *out)
+{
+   BSON_ASSERT_PARAM (bab);
+   BSON_ASSERT_PARAM (out);
+   if (!bson_steal (out, &bab->bson)) {
+      return false;
+   }
+   bson_init (&bab->bson);
+   bab->index = 0;
+   return true;
+}
+
+void
+bson_array_builder_destroy (bson_array_builder_t *bab)
+{
+   if (!bab) {
+      return;
+   }
+   bson_destroy (&bab->bson);
+   bson_free (bab);
+}
+
+bool
+bson_append_array_builder_begin (bson_t *bson,
+                                 const char *key,
+                                 int key_length,
+                                 bson_array_builder_t **child)
+{
+   BSON_ASSERT_PARAM (bson);
+   BSON_ASSERT_PARAM (key);
+   BSON_ASSERT_PARAM (child);
+   *child = bson_array_builder_new ();
+   return bson_append_array_begin (bson, key, key_length, &(*child)->bson);
+}
+
+bool
+bson_append_array_builder_end (bson_t *bson, bson_array_builder_t *child)
+{
+   bool ok = bson_append_array_end (bson, &child->bson);
+   bson_array_builder_destroy (child);
+   return ok;
 }

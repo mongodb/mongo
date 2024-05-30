@@ -19,7 +19,8 @@
 #error "Only <mongoc/mongoc.h> or <bson/bson.h> can be included directly."
 #endif
 
-#define COMMON_NAME_1(a, b) a##_##b
+#define COMMON_NAME_1(a, b) COMMON_NAME_2 (a, b)
+#define COMMON_NAME_2(a, b) a##_##b
 
 #if defined(MCOMMON_NAME_PREFIX) && !defined(__INTELLISENSE__)
 #define COMMON_NAME(Name) COMMON_NAME_1 (MCOMMON_NAME_PREFIX, Name)

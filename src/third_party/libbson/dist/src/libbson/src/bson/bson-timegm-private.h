@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_TIMEGM_PRIVATE_H
 #define BSON_TIMEGM_PRIVATE_H
 
 
-#include "bson-compat.h"
-#include "bson-macros.h"
+#include <bson/bson-compat.h>
+#include <bson/bson-macros.h>
 
 
 BSON_BEGIN_DECLS

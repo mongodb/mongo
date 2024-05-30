@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "bson-prelude.h"
+#include <bson/bson-prelude.h>
 
 
 #ifndef BSON_JSON_H
@@ -61,7 +61,9 @@ BSON_EXPORT (bson_json_opts_t *)
 bson_json_opts_new (bson_json_mode_t mode, int32_t max_len);
 BSON_EXPORT (void)
 bson_json_opts_destroy (bson_json_opts_t *opts);
-
+BSON_EXPORT (void)
+bson_json_opts_set_outermost_array (bson_json_opts_t *opts,
+                                    bool is_outermost_array);
 
 typedef ssize_t (*bson_json_reader_cb) (void *handle,
                                         uint8_t *buf,
