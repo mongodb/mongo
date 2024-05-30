@@ -80,8 +80,11 @@ constexpr uint64_t safe_integer_unsigned() {
 
 // This is working around https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81676,
 // fixed in gcc-10
+// MongoDB Edit: Only enable for GCC.
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#endif
 template <typename In, typename Out>
 bool IsInBounds(In aIn) {
   constexpr bool inSigned = std::is_signed_v<In>;
@@ -166,7 +169,10 @@ bool IsInBounds(In aIn) {
   }
   return true;
 }
+// MongoDB Edit: Only enable for GCC.
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
+#endif
 
 }  // namespace detail
 
