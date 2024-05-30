@@ -176,7 +176,7 @@ void validate(const BSONObj& cmdObj,
     // uninitialized FCV, and creating/parsing/validating this command invocation happens before
     // any check that the node is a primary.
     uassert(
-        ErrorCodes::InvalidOptions,
+        90675,
         "$_requestResumeToken is not supported without Resharding Improvements",
         !requestResumeTokenElem ||
             resharding::gFeatureFlagReshardingImprovements.isEnabledUseLastLTSFCVWhenUninitialized(
