@@ -2620,46 +2620,38 @@ TEST(PipelineOptimizationTest, MatchOnArrayFieldCanSplitAcrossRenameWithMapAndPr
 }
 
 TEST(PipelineOptimizationTest,
-     MatchElemMatchValueOnArrayFieldCanSplitAcrossRenameWithSimpleProject) {
-    // The $project simply renames 'a' to 'b', and the $match with $elemMatch on
-    // the value can be swapped with $project.
-    std::string inputPipe =
-        "[{$project: {b: '$a', _id: false}},{$match: {b: {$elemMatch: {$eq: 1}}}}]";
-    std::string outputPipe =
-        "[{$match: {a: {$elemMatch: {$eq: 1}}}},{$project: {b: '$a', _id: false}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe);
-}
-
-TEST(PipelineOptimizationTest,
-     MatchElemMatchValueOnArrayFieldCanNotSplitAcrossRenameWithMapAndAddFields) {
-    // The $addFields simply maps an array of objects to one containing their inner 'elementField'
-    // scalar values . The $match stage on the reshaped array should not be swapped with $project to
-    // preserve the original $elemMatch semantics.
-    std::string pipeline = R"(
+     MatchElemMatchValueOnArrayFieldCanSplitAcrossRenameWithMapAndProject) {
+    // The $project simply renames 'a.b' & 'a.c' to 'd.e' & 'd.f' and the $match with $elemMatch on
+    // the leaf value can be swapped with $project.
+    std::string inputPipe = R"(
 [
     {
-        $addFields: {
-            "reshapedArray": {
-                $map: {input: '$arrayField', as: 'iter', in : "$$iter.elementField"}
-            },
-            _id: { "$const": false }
+        $project: {
+            d: {
+                $map: {input: '$a', as: 'iter', in : {e: '$$iter.b', f: '$$iter.c'}}
+            }
         }
     },
-    {$match: {"reshapedArray": {$elemMatch: {$eq: 1}}}}
+    {$match: {"d.e": {$elemMatch: {$eq: 1}}, "d.f": {$elemMatch: {$eq: 1}}}}
 ]
         )";
-    assertPipelineOptimizesAndSerializesTo(pipeline, pipeline);
-}
+    std::string outputPipe = R"(
+[
+    {
+        $match: {$and: [{"a.b": {$elemMatch: {$eq: 1}}}, {"a.c": {$elemMatch: {$eq: 1}}}]}
+    },
+    {
+        $project: {
+            _id: true,
+            d: {
+                $map: {input: '$a', as: 'iter', in : {e: '$$iter.b', f: '$$iter.c'}}
+            }
+        }
+    }
+]
+        )";
 
-TEST(PipelineOptimizationTest,
-     MatchElemMatchValueOnArrayFieldCanNotSplitAcrossRenameWithDottedProject) {
-    // The $project stage maps a dotted field path to a simple non-dotted one which is then matched
-    // upon. Expect no swap to be happen as it might affect the result of the query due to
-    // $elemMatch.
-    std::string pipeline =
-        "[{$project: {reshaped: '$document.array.element.deeply.nested.field', _id: false}},"
-        "{$match: {reshaped: {$elemMatch: {$eq: 1}}}}]";
-    assertPipelineOptimizesAndSerializesTo(pipeline, pipeline);
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe);
 }
 
 // TODO SERVER-74298 The $match can be swapped with $project after renaming.

@@ -152,25 +152,27 @@ public:
         invariant(_elementPath);
 
         size_t renamesFound = 0u;
-        FieldRef rewrittenPathRef;
-        for (const auto& [src, dst] : renameList) {
-            if (src == path()) {
-                rewrittenPathRef.parse(dst);
+        std::string rewrittenPath;
+        for (const auto& rename : renameList) {
+            if (rename.first == path()) {
+                rewrittenPath = rename.second;
+
                 ++renamesFound;
             }
 
-            FieldRef prefixToRename(src);
-            const auto& currFieldPathRef = _elementPath->fieldRef();
-            if (prefixToRename.isPrefixOf(currFieldPathRef)) {
-                // Perform a partial prefix rewrite. 'src' is a prefix for the current field path
-                // and we should substitute it with 'dst'.
-                rewrittenPathRef.parse(dst);
-                for (size_t it = prefixToRename.numParts(); it < currFieldPathRef.numParts();
-                     it++) {
-                    rewrittenPathRef.appendPart(currFieldPathRef.getPart(it));
-                }
+            FieldRef prefixToRename(rename.first);
+            const auto& pathFieldRef = _elementPath->fieldRef();
+            if (prefixToRename.isPrefixOf(pathFieldRef)) {
+                // Get the 'pathTail' by chopping off the 'prefixToRename' path components from the
+                // beginning of the 'pathFieldRef' path.
+                auto pathTail = pathFieldRef.dottedSubstring(prefixToRename.numParts(),
+                                                             pathFieldRef.numParts());
+                // Replace the chopped off components with the component names resulting from the
+                // rename.
+                rewrittenPath = str::stream() << rename.second << "." << pathTail.toString();
+
                 ++renamesFound;
-            } else if (currFieldPathRef.isPrefixOf(prefixToRename)) {
+            } else if (pathFieldRef.isPrefixOf(prefixToRename)) {
                 // TODO SERVER-74298 Implement renaming by each path component instead of returning
                 // the pair of 'false' and boost::none. We can traverse subexpressions with the
                 // remaining path suffix of 'prefixToRename' to see if we can rename each path
@@ -183,33 +185,11 @@ public:
         }
 
         // There should never be multiple applicable renames.
-        tassert(9086900,
-                str::stream() << "expected at most one applicable rename, but found "
-                              << renamesFound << " for path " << path(),
-                renamesFound <= 1u);
+        invariant(renamesFound <= 1u);
         if (renamesFound == 1u) {
-            if (auto type = matchType();
-                type == MatchType::ELEM_MATCH_VALUE || type == MatchType::ELEM_MATCH_OBJECT) {
-                // Inhibit renaming '$elemMatch' to field paths containing multiple components.
-                // Doing so might alter the semantincs of the original expression by replacing
-                // array re-shaping operations with non-compatible implicit array traversals.
-                //
-                // Consider expr = {flattened: {$elemMatch: {$eq: true}}} and renames =
-                // {{"flattened", "outer.inner"}} where the underlying document is {outer: [{inner:
-                // true}]}:
-                // - The original non-optimised expression would succeed matching {$eq: true} over
-                // each element of the reshaped 'outer.inner' array: [{flattened: [true]}].
-                // - The renamed expression would be incorrect due to implicit array traversal. The
-                // {$elemMatch: {$eq: true}} predicate would be applied to each element of
-                // 'outer.inner', and then subsequently return false because 'true' has a non-array
-                // type.
-                if (rewrittenPathRef.numParts() > 1) {
-                    return {false, boost::none};
-                }
-            }
             // There is an applicable rename. Modify the path of this expression to use the new
             // name.
-            return {true, rewrittenPathRef.dottedField().toString()};
+            return {true, rewrittenPath};
         }
 
         return {true, boost::none};

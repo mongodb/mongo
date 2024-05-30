@@ -8,14 +8,6 @@
  */
 import {getAggPlanStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
-/**
- * Utillity for inhibiting aggregate stage pushdowns to find-land queries. It doesn't prohibit other
- * pipeline optimisation techniques such as stage reordering & renames from being applied.
- */
-function withForbiddenPushdowns(pipeline) {
-    return [{$_internalInhibitOptimization: {}}, ...pipeline];
-}
-
 let coll = db.match_swapping_renamed_fields;
 coll.drop();
 
@@ -201,106 +193,11 @@ assert.neq(null, ixscan, tojson(explain));
 assert.eq({"a.b.c": 1}, ixscan.keyPattern, tojson(ixscan));
 
 // Test multiple renames. Designed to reproduce SERVER-32690.
-pipeline = [{$project: {x: "$x", y: "$x"}}, {$match: {y: 1, w: 1}}];
+pipeline =
+    [{$_internalInhibitOptimization: {}}, {$project: {x: "$x", y: "$x"}}, {$match: {y: 1, w: 1}}];
 assert.eq([], coll.aggregate(pipeline).toArray());
-explain = coll.explain().aggregate(withForbiddenPushdowns(pipeline));
+explain = coll.explain().aggregate(pipeline);
 // We expect that the $match stage has been split into two, since one predicate has an
 // applicable rename that allows swapping, while the other does not.
 let matchStages = getAggPlanStages(explain, "$match");
 assert.eq(2, matchStages.length);
-
-// Test that we correctly match using the '$elemMatch' expression on renamed subfields. Designed to
-// reproduce HELP-59485.
-coll.drop()
-const bulk = coll.initializeUnorderedBulkOp();
-bulk.insert({
-    _id: 0,
-    otherField: "same-string",
-    outer: undefined,
-});
-bulk.insert({
-    _id: 1,
-    otherField: "same-string",
-    outer: [{inner: true}],
-});
-bulk.insert({
-    _id: 2,
-    otherField: "same-string",
-    outer: [[], [[{inner: true}]]],
-});
-bulk.insert({
-    _id: 3,
-    otherField: "same-string",
-    outer: [[], [[]], [[[{inner: true}]]]],
-});
-bulk.insert({
-    _id: 4,
-    otherField: "same-string",
-    outer: [{inner: [true]}],
-});
-assert.commandWorked(bulk.execute());
-
-function runElemMatchTest({pipeline, expectedDocumentIds}) {
-    const extractDocumentId = ({_id}) => _id;
-    const actualIds = coll.aggregate(pipeline).toArray().map(extractDocumentId);
-    assert.eq(actualIds, expectedDocumentIds);
-    // Expect the '$match' expression to be split into two parts, since the 'otherField' rename is
-    // still a valid rewrite.
-    const explain = coll.explain().aggregate(withForbiddenPushdowns(pipeline));
-    const matchStages = getAggPlanStages(explain, "$match");
-    assert.eq(2, matchStages.length);
-}
-
-runElemMatchTest({
-    pipeline: [
-        {
-            $addFields: {
-                flattened: {
-                    $map: {input: '$outer', as: "iter", in : "$$iter.inner"},
-                },
-                renamedOtherField: "$otherField"
-            },
-        },
-        {
-            $match: {flattened: {$elemMatch: {$eq: true}}, renamedOtherField: "same-string"},
-        }
-    ],
-    expectedDocumentIds: [1]
-})
-
-// Repeat the previous test case, but this time with a $project stage targeting a deeply nested
-// transform.
-runElemMatchTest({
-    pipeline: [
-        {
-            $project: {
-                a: {
-                    b: {
-                        c: {
-                            $map: {input: '$outer', as: "iter", in : "$$iter.inner"},
-                        }
-                    }
-                },
-                renamedOtherField: "$otherField"
-            }
-        },
-        {
-            $match: {"a.b.c": {$elemMatch: {$eq: true}}, renamedOtherField: "same-string"},
-        }
-    ],
-    expectedDocumentIds: [1],
-})
-
-// Similarly, ensure that we match on the correct documents when using $elemMatch expressions on
-// simple dot-syntax renamed fields.
-runElemMatchTest({
-    pipeline: [
-        {
-            $project: {flattened: "$outer.inner", renamedOtherField: "$otherField"},
-        },
-        {
-            $match: {flattened: {$elemMatch: {$eq: true}}, renamedOtherField: "same-string"},
-        }
-    ],
-    expectedDocumentIds: [1]
-})
