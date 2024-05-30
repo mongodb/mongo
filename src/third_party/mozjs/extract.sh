@@ -29,11 +29,10 @@ CFLAGS="$CFLAGS -D__STDC_FORMAT_MACROS" \
     --disable-tests \
     --disable-new-pass-manager
 
-
 # we have to run make to generate a byte code version of the self hosted js and
 # a switch table
 echo "Run make"
-make
+make -j$(grep -c ^processor /proc/cpuinfo)
 
 cd ../../../..
 
