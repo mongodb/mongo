@@ -535,9 +535,17 @@ export class MagicRestoreUtils {
      * inserts a no-op oplog entry with a higher term, the stable checkpoint timestamp should be
      * equal to the timestamp of that entry.
      */
-    assertStableCheckpointIsCorrectAfterRestore(restoreNode) {
+    assertStableCheckpointIsCorrectAfterRestore(restoreNode, lastOplogEntryTs = undefined) {
         let lastStableCheckpointTs =
             this.isPit ? this.pointInTimeTimestamp : this.checkpointTimestamp;
+
+        // For a PIT restore on a sharded cluster, the lastStableCheckpointTs of a given shard might
+        // be behind the global pointInTimeTimestamp. This allows the caller to specify
+        // lastOplogEntryTs instead.
+        if (lastOplogEntryTs != undefined) {
+            lastStableCheckpointTs = lastOplogEntryTs;
+        }
+
         if (this.insertHigherTermOplogEntry) {
             const oplog = restoreNode.getDB("local").getCollection('oplog.rs');
             const incrementTermEntry =
