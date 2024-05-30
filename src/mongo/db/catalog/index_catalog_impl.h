@@ -371,10 +371,5 @@ private:
     IndexCatalogEntryContainer _readyIndexes;
     IndexCatalogEntryContainer _buildingIndexes;
     IndexCatalogEntryContainer _frozenIndexes;
-
-    // Pointer to the ready _id index, if it exists. Set by the first call to findIdIndex(). Should
-    // be kept in sync with _readyIndexes; if the _id index is removed from _readyIndexes, this
-    // entry should be nullptr.
-    mutable const IndexDescriptor* _cachedIdIndex{nullptr};
 };
 }  // namespace mongo
