@@ -153,6 +153,8 @@ CanonicalQuery::CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& ba
         std::move(findCommand),
         ProjectionPolicies::findProjectionPolicies()));
 
+    _forSubPlanner = true;
+
     // Note: we do not optimize the MatchExpression representing the branch of the top-level $or
     // that we are currently examining. This is because repeated invocations of
     // MatchExpression::optimize() may change the order of predicates in the MatchExpression, due to

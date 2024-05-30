@@ -61,13 +61,18 @@ import {
     ClusteredCollectionUtil
 } from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {
+    checkSbeFullFeatureFlagEnabled,
+    checkSbeRestrictedOrFullyEnabled
+} from "jstests/libs/sbe_util.js";
 
 // Flag indicating if index filter commands are running through the query settings interface.
 var isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
 
 const coll = db.jstests_index_filter_commands;
 coll.drop();
+
+const sbePlanCacheEnabled = checkSbeFullFeatureFlagEnabled(db);
 
 // Setup the data so that plans will not tie given the indices and query
 // below. Tying plans will not be cached, and we need cached shapes in
@@ -413,11 +418,13 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     let results = coll.aggregate(pipeline).toArray();
 
     // Check details of the cached plan.
-    assert.eq(1, results.length, results);
-    planAfterSetFilter = planCacheEntryForPipeline(pipeline);
-    assert.neq(null, planAfterSetFilter, coll.getPlanCache().list());
-    // Check 'indexFilterSet' field in plan details - no index filters should be applied.
-    assert.eq(false, planAfterSetFilter.indexFilterSet, planAfterSetFilter);
+    if (sbePlanCacheEnabled) {
+        assert.eq(1, results.length, results);
+        planAfterSetFilter = planCacheEntryForPipeline(pipeline);
+        assert.neq(null, planAfterSetFilter, coll.getPlanCache().list());
+        // Check 'indexFilterSet' field in plan details - no index filters should be applied.
+        assert.eq(false, planAfterSetFilter.indexFilterSet, planAfterSetFilter);
+    }
 
     // Ensure that despite an index filter being set on the foreign collection, we're still using
     // heuristics to select an INLJ plan. This can be proved by showing that the index being used is
@@ -459,12 +466,14 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         // Re-run the pipeline.
         results = coll.aggregate(pipeline).toArray();
 
-        // Check details of the cached plan.
-        assert.eq(1, results.length, results);
-        planAfterSetFilter = planCacheEntryForPipeline(pipeline);
-        assert.neq(null, planAfterSetFilter, coll.getPlanCache().list());
-        // Check 'indexFilterSet' field in plan details - an index filter should be applied.
-        assert.eq(true, planAfterSetFilter.indexFilterSet, planAfterSetFilter);
+        // Check details of the cached plan, when SBE plan cache is enabled.
+        if (sbePlanCacheEnabled) {
+            assert.eq(1, results.length, results);
+            planAfterSetFilter = planCacheEntryForPipeline(pipeline);
+            assert.neq(null, planAfterSetFilter, coll.getPlanCache().list());
+            // Check 'indexFilterSet' field in plan details - an index filter should be applied.
+            assert.eq(true, planAfterSetFilter.indexFilterSet, planAfterSetFilter);
+        }
 
         // Check that the inner side was still using the heursitics to select an INLJ plan, and the
         // outer side honoured the index filter.
@@ -496,17 +505,19 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         assert.eq(1, filters[0].indexes.length, filters);
         assert.eq(indexA1C1, filters[0].indexes[0], filters);
 
-        let planCacheEntry = planCacheEntryForPipeline(pipeline);
-        assert.neq(null, planCacheEntry, coll.getPlanCache().list());
-        assert.eq(true, planCacheEntry.indexFilterSet, planCacheEntry);
+        if (sbePlanCacheEnabled) {
+            let planCacheEntry = planCacheEntryForPipeline(pipeline);
+            assert.neq(null, planCacheEntry, coll.getPlanCache().list());
+            assert.eq(true, planCacheEntry.indexFilterSet, planCacheEntry);
 
-        // Clear the index filter on the main collection and ensure that the plan is no longer in
-        // the cache.
-        assert.commandWorked(coll.runCommand("planCacheClearFilters", {query: queryA1}));
-        filters = getFilters(coll);
-        assert.eq(0, filters.length, filters);
+            // Clear the index filter on the main collection and ensure that the plan is no longer
+            // in the cache.
+            assert.commandWorked(coll.runCommand("planCacheClearFilters", {query: queryA1}));
+            filters = getFilters(coll);
+            assert.eq(0, filters.length, filters);
 
-        planCacheEntry = planCacheEntryForPipeline(pipeline);
-        assert.eq(null, planCacheEntry, coll.getPlanCache().list());
+            planCacheEntry = planCacheEntryForPipeline(pipeline);
+            assert.eq(null, planCacheEntry, coll.getPlanCache().list());
+        }
     }
 }

@@ -1308,10 +1308,39 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
         cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
     keyBuilder << (apiStrict ? "t" : "f");
 
-    // Encode whether the query is marked SBE compatible or not. This ensures that we won't re-use
-    // a cache entry that was planned using SBE (specifically when SBE uses the classic plan cache)
-    // with a cache entry that was created from the standard classic path.
-    keyBuilder << (cq.isSbeCompatible() ? "t" : "f");
+
+    // Encode a flag with three possible values:
+    // 1 ('c'): The cache entry is intended to use the classic code path completely. In this case
+    //            the entry stores 'works.'
+    // 2 ('s'): The cache entry was planned with the classic runtime planners, and we intend
+    //            to run it in SBE. In this case the entry stores 'reads.'
+    // 3 ('o'): The cache entry is used for sub-planning using the classic SubPlanner
+    //            and we intend to run it in SBE. In this case the entry stores 'works' but
+    //            since replanning doesn't happen for queries generated from subplanning,
+    //            the value has no meaning. TODO SERVER-90957: Update these entries to store a
+    //            placeholder instead.
+    //
+    // The third case is treated specially because the classic sub-planner stores and reads
+    // cache entries that cannot be executed with SBE. We use this extra flag to avoid the
+    // possibility of the sub planner writing a cache entry for a branch of $or which is then used
+    // by an independent query that doesn't subplan.
+    //
+    // For example, if the user runs an SBE-compatible query {$or: [{a:1,b:1}, {c:1,d:1}]} and a
+    // cache entry is written for each branch, we do NOT want thos cache entries to be re-used for
+    // a query {a:1,b:1} since the second query would expect the cache entry to store a "reads"
+    // value that can be used with SBE's cache recovery path.
+    //
+    // By incorporating 'forSubplanner' we eliminate this possibility.
+
+    if (cq.isSbeCompatible()) {
+        if (cq.forSubPlanner()) {
+            keyBuilder << "o";  // Case 3: 'o' for "OR."
+        } else {
+            keyBuilder << "s";  // Case 2: 's' for "SBE."
+        }
+    } else {
+        keyBuilder << "c";  // Case 1: 'c' for "classic."
+    }
 
     return keyBuilder.str();
 }

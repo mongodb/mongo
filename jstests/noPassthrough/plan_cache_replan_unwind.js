@@ -6,7 +6,10 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {assertCacheUsage, setUpActiveCacheEntry} from "jstests/libs/plan_cache_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {
+    checkSbeFullFeatureFlagEnabled,
+    checkSbeFullyEnabled,
+} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -14,6 +17,7 @@ const coll = db.plan_cache_replan_unwind;
 coll.drop();
 
 const sbeEnabled = checkSbeFullyEnabled(db);
+const sbePlanCacheEnabled = checkSbeFullFeatureFlagEnabled(db);
 // TODO SERVER-83887: Delete this block when "featureFlagClassicRuntimePlanningForSbe" is
 // deleted.
 if (sbeEnabled && !FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
@@ -58,20 +62,24 @@ function testFn(
     // Now run the other pipeline, which has the same query shape but is faster with a different
     // index. It should trigger re-planning of the query.
     assert.eq(bExpectedResultCount, coll.aggregate(bIndexPipeline).itcount());
-    assertCacheUsage(coll,
-                     bIndexPipeline,
-                     true /*multiPlanning*/,
-                     cacheEntryVersion,
-                     true /*cacheEntryIsActive*/,
-                     "b_1" /*cachedIndexName*/);
+    assertCacheUsage({
+        queryColl: coll,
+        pipeline: bIndexPipeline,
+        fromMultiPlanning: true,
+        cacheEntryVersion,
+        cacheEntryIsActive: true,
+        cachedIndexName: "b_1"
+    });
 
     assert.eq(bExpectedResultCount, coll.aggregate(bIndexPipeline).itcount());
-    assertCacheUsage(coll,
-                     bIndexPipeline,
-                     false /*multiPlanning*/,
-                     cacheEntryVersion,
-                     true /*cacheEntryIsActive*/,
-                     "b_1" /*cachedIndexName*/);
+    assertCacheUsage({
+        queryColl: coll,
+        pipeline: bIndexPipeline,
+        fromMultiPlanning: false,
+        cacheEntryVersion,
+        cacheEntryIsActive: true,
+        cachedIndexName: "b_1"
+    });
 
     coll.getPlanCache().clear();
 }
@@ -83,7 +91,7 @@ const aIndexPredicate = [{$match: {a: {$gte: 1097, $lt: 1100}, b: {$gte: 1, $lt:
 // should still replan, as $unwind should not affect replanning.
 const bIndexPredicate = [{$match: {a: {$gte: 1, $lt: 1100}, b: {$gte: 1029, $lt: 1032}}}];
 
-const expectedCacheEntryVersion = sbeEnabled ? 2 : 1;
+const expectedCacheEntryVersion = sbePlanCacheEnabled ? 2 : 1;
 
 // We add another stage, so $unwind is pushed down.
 const unwindSum = [{$unwind: "$arr"}, {$addFields: {sum: {$add: ["$a", "$b", "$arr"]}}}];
@@ -114,19 +122,21 @@ if (sbeEnabled) {
 
     setUpActiveCacheEntry(coll,
                           aIndexPredicate.concat(lookupUnwind),
-                          2 /*cacheEntryVersion*/,
+                          expectedCacheEntryVersion /*cacheEntryVersion*/,
                           "a_1" /*cachedIndexName*/,
                           getAssertCount(numExpectedResults));
     assert.eq(numExpectedResults, coll.aggregate(bIndexPredicate.concat(lookupUnwind)).itcount());
     // Assert that replanning did not get triggered (a plan using the {a: 1} index is still in the
     // cache) due to the amount of data that had to get stashed during the trial period growing too
     // large
-    assertCacheUsage(coll,
-                     bIndexPredicate.concat(lookupUnwind),
-                     false /*multiPlanning*/,
-                     2 /*cacheEntryVersion*/,
-                     true /*cacheEntryIsActive*/,
-                     "a_1" /*cachedIndexName*/);
+    assertCacheUsage({
+        queryColl: coll,
+        pipeline: bIndexPredicate.concat(lookupUnwind),
+        fromMultiPlanning: false,
+        cacheEntryVersion: expectedCacheEntryVersion,
+        cacheEntryIsActive: true,
+        cachedIndexName: "a_1"
+    });
 
     coll.getPlanCache().clear();
 }

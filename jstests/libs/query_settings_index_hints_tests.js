@@ -11,8 +11,11 @@ import {
     isIdhackOrExpress,
     planHasStage,
 } from "jstests/libs/analyze_plan.js";
-import {getCollectionName, getExplainCommand} from "jstests/libs/cmd_object_utils.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
+import {
+    checkSbeFullFeatureFlagEnabled,
+    checkSbeRestrictedOrFullyEnabled
+} from "jstests/libs/sbe_util.js";
 
 /**
  * Class containing common test functions used in query_settings_index_application_* tests.
@@ -58,8 +61,12 @@ export class QuerySettingsIndexHintsTests {
             networkErrorAndTxnOverrideConfig.retryOnNetworkErrors;
         const shouldCheckPlanCache =
             // Single solution plans are not cached in classic, therefore do not perform plan cache
-            // checks for classic.
-            getEngine(explain) === "sbe" &&
+            // checks for when the classic cache is used. Note that the classic cache is used
+            // by default for SBE, except when featureFlagSbeFull is on.
+            // TODO SERVER-90880: We can relax this check when we cache single-solution plans in the
+            // classic cache with SBE.
+            // TODO SERVER-13341: Relax this check to include the case where classic is being used.
+            (getEngine(explain) === "sbe" && checkSbeFullFeatureFlagEnabled(db)) &&
             // Express or IDHACK optimized queries are not cached.
             !isIdhackQuery &&
             // Min/max queries are not cached.
