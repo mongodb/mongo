@@ -63,6 +63,7 @@ env.CppUnitTest(
         "expression_type_test.cpp",
         "expression_with_placeholder_test.cpp",
         "implicit_validator_test.cpp",
+        "in_list_data_test.cpp",
         "match_expression_hasher_test.cpp",
         "matcher_type_set_test.cpp",
         "path_accepting_keyword_test.cpp",
