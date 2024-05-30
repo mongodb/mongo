@@ -275,9 +275,11 @@ export class MagicRestoreUtils {
     }
 
     /**
-     * Takes a checkpoint and opens the backup cursor on the source.
+     * Takes a checkpoint and opens the backup cursor on the source. backupCursorOpts is an optional
+     * parameter which will be passed to the openBackupCursor call if provided. This function
+     * returns the backup cursor metadata object.
      */
-    takeCheckpointAndOpenBackup() {
+    takeCheckpointAndOpenBackup(backupCursorOpts = {}) {
         // Take the initial checkpoint.
         assert.commandWorked(this.backupSource.adminCommand({fsync: 1}));
 
@@ -286,13 +288,14 @@ export class MagicRestoreUtils {
         mkdir(this.backupDbPath + "/journal");
 
         // Open a backup cursor on the checkpoint.
-        this.backupCursor = openBackupCursor(this.backupSource.getDB("admin"));
+        this.backupCursor = openBackupCursor(this.backupSource.getDB("admin"), backupCursorOpts);
         // Print the backup metadata document.
         assert(this.backupCursor.hasNext());
         const {metadata} = this.backupCursor.next();
         jsTestLog("Backup cursor metadata document: " + tojson(metadata));
         this.backupId = metadata.backupId;
         this.checkpointTimestamp = metadata.checkpointTimestamp;
+        return metadata;
     }
 
     /**
