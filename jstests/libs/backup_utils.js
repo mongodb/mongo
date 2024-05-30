@@ -602,4 +602,20 @@ export class MagicRestoreUtils {
     getCollUuid(node, dbName, collName) {
         return node.getDB(dbName).getCollectionInfos({name: collName})[0].info.uuid;
     }
+
+    /**
+     * Checks the log file specified at 'logpath', and ensures that it contains logs with the
+     * 'RESTORE' component. The function also ensures the first and last log lines are as expected.
+     */
+    checkRestoreSpecificLogs(logpath) {
+        // When splitting the logs on new lines, the last element will be an empty string, so we
+        // should filter it out.
+        let logs = cat(logpath)
+                       .split("\n")
+                       .filter(line => line.trim() !== "")
+                       .map(line => JSON.parse(line))
+                       .filter(json => json.c === 'RESTORE');
+        assert.eq(logs[0].msg, "Beginning magic restore");
+        assert.eq(logs[logs.length - 1].msg, "Finished magic restore");
+    }
 }

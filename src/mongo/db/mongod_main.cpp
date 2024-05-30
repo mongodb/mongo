@@ -1200,7 +1200,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         TimeElapsedBuilderScopedTimer scopedTimer(
             serviceContext->getFastClockSource(), "Magic restore", &startupTimeElapsedBuilder);
         if (getMagicRestoreMain() == nullptr) {
-            LOGV2_FATAL_NOTRACE(7180701, "--magicRestore cannot be used with a community build");
+            LOGV2_ERROR(7180701, "--magicRestore cannot be used with a community build");
+            exitCleanly(ExitCode::badOptions);
         }
         return getMagicRestoreMain()(serviceContext);
     }

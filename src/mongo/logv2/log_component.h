@@ -81,6 +81,7 @@ namespace mongo::logv2 {
     X(kStorageRecovery,        , "recovery"              , "RECOVERY", kStorage) \
     X(kJournal,                , "journal"               , "JOURNAL" , kStorage) \
     X(kWiredTiger,             , "wt"                    , "WT"      , kStorage) \
+    X(kMagicRestore,           , "magicRestore"          , "RESTORE" , kStorage) \
     X(kWiredTigerBackup,       , "wtBackup"              , "WTBACKUP", kWiredTiger) \
     X(kWiredTigerCheckpoint,   , "wtCheckpoint"          , "WTCHKPT" , kWiredTiger) \
     X(kWiredTigerCompact,      , "wtCompact"             , "WTCMPCT" , kWiredTiger) \
