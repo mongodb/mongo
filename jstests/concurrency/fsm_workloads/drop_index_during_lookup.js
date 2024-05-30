@@ -21,8 +21,9 @@ export const $config = (function() {
                 assert.docEq({_id: 0, a: 0, out: [{_id: 0, b: 0}]}, result[0]);
             } catch (e) {
                 // We expect any errors of query getting killed due to selected index for join is
-                // dropped.
-                assert.contains(e.code, interruptedQueryErrors);
+                // dropped. We also accept StaleConfig error that may be raised due to the slowness
+                // of MoveChunk in certain suites in debug build.
+                assert.contains(e.code, interruptedQueryErrors.concat(ErrorCodes.StaleConfig));
             }
         },
 
