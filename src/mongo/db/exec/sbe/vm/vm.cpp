@@ -197,6 +197,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isMinKey
     0,  // isMaxKey
     0,  // isTimestamp
+    0,  // isKeyString
     0,  // typeMatchImm
 
     0,  // function is special, the stack offset is encoded in the instruction itself
@@ -899,6 +900,10 @@ void CodeFragment::appendIsMaxKey(Instruction::Parameter input) {
 
 void CodeFragment::appendIsTimestamp(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::isTimestamp, input);
+}
+
+void CodeFragment::appendIsKeyString(Instruction::Parameter input) {
+    appendSimpleInstruction(Instruction::isKeyString, input);
 }
 
 void CodeFragment::appendTraverseP() {
@@ -11492,6 +11497,10 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::isTimestamp: {
                 runTagCheck(pcPointer, value::TypeTags::Timestamp);
+                break;
+            }
+            case Instruction::isKeyString: {
+                runTagCheck(pcPointer, value::TypeTags::keyString);
                 break;
             }
             case Instruction::typeMatchImm: {

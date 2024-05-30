@@ -190,6 +190,7 @@ struct Instruction {
         isMinKey,
         isMaxKey,
         isTimestamp,
+        isKeyString,
         typeMatchImm,
 
         function,
@@ -423,6 +424,8 @@ struct Instruction {
                 return "isMaxKey";
             case isTimestamp:
                 return "isTimestamp";
+            case isKeyString:
+                return "isKeyString";
             case typeMatchImm:
                 return "typeMatchImm";
             case function:
@@ -1172,6 +1175,7 @@ public:
     void appendIsMinKey(Instruction::Parameter input);
     void appendIsMaxKey(Instruction::Parameter input);
     void appendIsTimestamp(Instruction::Parameter input);
+    void appendIsKeyString(Instruction::Parameter input);
     void appendTypeMatch(Instruction::Parameter input, uint32_t mask);
     void appendFunction(Builtin f, ArityType arity);
     void appendLabelJump(LabelId labelId);

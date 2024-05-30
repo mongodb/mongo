@@ -849,8 +849,6 @@ QsnAnalysis SlotBasedStageBuilder::analyze(const QuerySolutionNode* node) {
             return QsnAnalysis{getAnalysis(node->children[0]).allowedFieldSet};
         }
         case STAGE_OR:
-        case STAGE_AND_HASH:
-        case STAGE_AND_SORTED:
         case STAGE_SORT_MERGE: {
             // Union the FieldSets produced by all this node's children and return it.
             auto allowedFields = getAnalysis(node->children[0]).allowedFieldSet;
@@ -1097,10 +1095,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    // If the slots necessary for performing an index consistency check were not requested in
-    // 'reqs', then set 'doIndexConsistencyCheck' to false to avoid generating unnecessary logic.
-    bool doIndexConsistencyCheck =
-        reqs.has(kSnapshotId) && reqs.has(kIndexIdent) && reqs.has(kIndexKey);
+    // Create a new PlanStageReqs object to pass the relevant reqs to the "generateIndexScan"
+    // function.
+    PlanStageReqs indexScanReqs;
+    indexScanReqs.set(PlanStageSlots::kRecordId)
+        .setIf(PlanStageSlots::kSnapshotId, reqs.has(PlanStageSlots::kSnapshotId))
+        .setIf(PlanStageSlots::kIndexIdent, reqs.has(PlanStageSlots::kIndexIdent))
+        .setIf(PlanStageSlots::kIndexKey, reqs.has(PlanStageSlots::kIndexKey))
+        .setIf(PlanStageSlots::kIndexKeyPattern, reqs.has(PlanStageSlots::kIndexKeyPattern))
+        .setIf(PlanStageSlots::kPrefetchedResult, reqs.has(PlanStageSlots::kPrefetchedResult));
 
     const auto generateIndexScanFunc =
         ixn->iets.empty() ? generateIndexScan : generateIndexScanWithDynamicBounds;
@@ -1110,8 +1113,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                             fieldBitset,
                                                             sortKeyBitset,
                                                             _yieldPolicy,
-                                                            doIndexConsistencyCheck,
-                                                            reqs.has(kIndexKeyPattern));
+                                                            indexScanReqs);
 
     auto stage = std::move(scanStage);
     auto outputs = std::move(scanOutputs);
@@ -1166,6 +1168,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     tassert(5295803, "buildCountScan() does not support kIndexKey", !reqs.has(kIndexKey));
     tassert(
         5295804, "buildCountScan() does not support kIndexKeyPattern", !reqs.has(kIndexKeyPattern));
+    tassert(9081802,
+            "buildCountScan() does not support kPrefetchedResult",
+            !reqs.has(kPrefetchedResult));
     tassert(5295805, "buildCountScan() does not support kSortKey", !reqs.hasSortKeys());
 
     auto csn = static_cast<const CountScanNode*>(root);
@@ -1542,6 +1547,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             return false;
         });
 
+    // Check if this FETCH stage has any descendants that are FETCHs or COLLSCANs.
+    boost::optional<UnfetchedIxscans> unfetchedIxns = getUnfetchedIxscans(root);
+    const bool mayHaveFetchOrCollScanDescendants =
+        !unfetchedIxns || unfetchedIxns->hasFetchesOrCollScans;
+
     auto forwardingReqs = reqs.copyForChild()
                               .clearResult()
                               .clear(kRecordId)
@@ -1556,6 +1566,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                          .set(kIndexKey)
                          .set(kIndexKeyPattern);
 
+    if (mayHaveFetchOrCollScanDescendants) {
+        childReqs.set(kPrefetchedResult);
+    }
+
     auto [stage, outputs] = build(child, childReqs);
 
     uassert(4822880, "RecordId slot is not defined", outputs.has(kRecordId));
@@ -1565,6 +1579,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     uassert(7566701, "Index ident slot is not defined", outputs.has(kIndexIdent));
     uassert(5290711, "Index key slot is not defined", outputs.has(kIndexKey));
     uassert(5113713, "Index key pattern slot is not defined", outputs.has(kIndexKeyPattern));
+    uassert(9081801,
+            "Prefetched result slot is not defined",
+            !mayHaveFetchOrCollScanDescendants || outputs.has(kPrefetchedResult));
 
     sortKeys = std::move(additionalSortKeys);
 
@@ -1581,25 +1598,32 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    auto resultSlot = SbSlot{_slotIdGenerator.generate()};
-    auto ridSlot = _slotIdGenerator.generate();
-    auto fieldSlots = _slotIdGenerator.generateMultiple(fields.size());
-
     auto relevantSlots = getSlotsToForward(_state, forwardingReqs, outputs);
 
-    stage = makeLoopJoinForFetch(std::move(stage),
-                                 resultSlot,
-                                 ridSlot,
-                                 fields,
-                                 fieldSlots,
-                                 outputs.get(kRecordId),
-                                 outputs.get(kSnapshotId),
-                                 outputs.get(kIndexIdent),
-                                 outputs.get(kIndexKey),
-                                 outputs.get(kIndexKeyPattern),
-                                 getCurrentCollection(reqs),
-                                 root->nodeId(),
-                                 std::move(relevantSlots));
+    auto recordIdSlot = outputs.get(kRecordId);
+    auto snapshotIdSlot = outputs.get(kSnapshotId);
+    auto indexIndexSlot = outputs.get(kIndexIdent);
+    auto indexKeySlot = outputs.get(kIndexKey);
+    auto indexKeyPatternSlot = outputs.get(kIndexKeyPattern);
+    auto prefetchedResultSlot = mayHaveFetchOrCollScanDescendants
+        ? boost::make_optional(outputs.get(kPrefetchedResult))
+        : boost::none;
+
+    auto [outStage, resultSlot, ridSlot, fieldSlots] =
+        makeLoopJoinForFetch(std::move(stage),
+                             fields,
+                             recordIdSlot,
+                             snapshotIdSlot,
+                             indexIndexSlot,
+                             indexKeySlot,
+                             indexKeyPatternSlot,
+                             prefetchedResultSlot,
+                             getCurrentCollection(reqs),
+                             _state,
+                             root->nodeId(),
+                             std::move(relevantSlots));
+
+    stage = std::move(outStage);
 
     outputs.setResultObj(resultSlot);
 
@@ -1629,14 +1653,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto sortKeysSet = StringSet{sortKeys.begin(), sortKeys.end()};
     auto fieldsAndSortKeys = appendVectorUnique(std::move(fields), std::move(sortKeys));
 
-    auto [outStage, outSlots] = projectFieldsToSlots(std::move(stage),
-                                                     fieldsAndSortKeys,
-                                                     resultSlot,
-                                                     root->nodeId(),
-                                                     &_slotIdGenerator,
-                                                     _state,
-                                                     &outputs);
-    stage = std::move(outStage);
+    auto [projectStage, outSlots] = projectFieldsToSlots(std::move(stage),
+                                                         fieldsAndSortKeys,
+                                                         resultSlot,
+                                                         root->nodeId(),
+                                                         &_slotIdGenerator,
+                                                         _state,
+                                                         &outputs);
+    stage = std::move(projectStage);
 
     auto collatorSlot = _state.getCollatorSlot();
 
@@ -2521,72 +2545,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 }  // buildReplaceRoot
 
 namespace {
-std::pair<std::vector<const QuerySolutionNode*>, bool> getUnfetchedIxscans(
-    const QuerySolutionNode* root) {
-    using DfsItem = std::pair<const QuerySolutionNode*, size_t>;
-
-    absl::InlinedVector<DfsItem, 64> dfs;
-    std::vector<const QuerySolutionNode*> results;
-    bool hasFetchesOrScans = false;
-
-    for (auto&& child : root->children) {
-        dfs.emplace_back(DfsItem(child.get(), 0));
-    }
-
-    while (!dfs.empty()) {
-        auto& dfsBack = dfs.back();
-        auto node = dfsBack.first;
-        auto childIdx = dfsBack.second;
-        bool popDfs = true;
-
-        auto visitNextChild = [&] {
-            if (childIdx < node->children.size()) {
-                popDfs = false;
-                dfsBack.second++;
-                dfs.emplace_back(DfsItem(node->children[childIdx].get(), 0));
-                return true;
-            }
-            return false;
-        };
-
-        switch (node->getType()) {
-            case STAGE_IXSCAN: {
-                results.push_back(node);
-                break;
-            }
-            case STAGE_LIMIT:
-            case STAGE_SKIP:
-            case STAGE_MATCH:
-            case STAGE_SHARDING_FILTER:
-            case STAGE_SORT_SIMPLE:
-            case STAGE_SORT_DEFAULT:
-            case STAGE_OR:
-            case STAGE_AND_HASH:
-            case STAGE_AND_SORTED:
-            case STAGE_SORT_MERGE: {
-                visitNextChild();
-                break;
-            }
-            case STAGE_COLLSCAN:
-            case STAGE_VIRTUAL_SCAN:
-            case STAGE_COLUMN_SCAN:
-            case STAGE_FETCH: {
-                hasFetchesOrScans = true;
-                break;
-            }
-            default: {
-                return {{}, false};
-            }
-        }
-
-        if (popDfs) {
-            dfs.pop_back();
-        }
-    }
-
-    return {std::move(results), hasFetchesOrScans};
-}
-
 template <typename SetT>
 bool prefixIsInSet(StringData str, const SetT& s) {
     for (;;) {
@@ -2768,8 +2726,8 @@ bool canUseCoveredProjection(const QuerySolutionNode* root,
         return false;
     }
 
-    auto [ixNodes, hasFetchesOrScans] = getUnfetchedIxscans(root);
-    if (ixNodes.empty() || hasFetchesOrScans) {
+    boost::optional<UnfetchedIxscans> unfetchedIxns = getUnfetchedIxscans(root);
+    if (!unfetchedIxns || unfetchedIxns->ixscans.empty() || unfetchedIxns->hasFetchesOrCollScans) {
         return false;
     }
 
@@ -2790,17 +2748,9 @@ bool canUseCoveredProjection(const QuerySolutionNode* root,
         addPrefixesToSet(path, projPathPrefixSet);
     }
 
-    if (projPathsHaveCommonPrefix && hasFetchesOrScans) {
-        // If two of more paths needed by root's parent have a common prefix and the 'root' subtree
-        // contains one or more FETCHs, then it's not possible to statically determine the subfield
-        // order for all the top-level fields needed by root's parent. In this case, we cannot use
-        // the "covered projection" optimization because we can't meet condition #4 from above.
-        return false;
-    }
-
     std::vector<StringData> patternWithTopLevelSorted;
 
-    for (auto& ixNode : ixNodes) {
+    for (auto& ixNode : unfetchedIxns->ixscans) {
         auto ixn = static_cast<const IndexScanNode*>(ixNode);
 
         StringDataSet patternPartSet;
@@ -3172,7 +3122,7 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
         // that 'reqResultInfo' is always false when 'isCoveredProjection' is true.)
         planType.emplace(BuildProjectionPlan::kUseCoveredProjection);
 
-        auto ixNode = getUnfetchedIxscans(root).first[0];
+        auto ixNode = getUnfetchedIxscans(root)->ixscans[0];
         auto ixn = static_cast<const IndexScanNode*>(ixNode);
 
         auto fields = getTopLevelFields(paths);
@@ -3466,7 +3416,7 @@ SlotBasedStageBuilder::buildProjectionImpl(const QuerySolutionNode* root,
                 "Expected 'updatedPathsExprMap' to be empty",
                 plan->updatedPathsExprMap.empty());
 
-        auto ixNode = getUnfetchedIxscans(root).first[0];
+        auto ixNode = getUnfetchedIxscans(root)->ixscans[0];
         auto ixn = static_cast<const IndexScanNode*>(ixNode);
 
         // When doing a covered projection, we need to re-order 'paths' so that it matches the order
@@ -3918,6 +3868,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildAndHash(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    // Note: This implementation is incomplete and doesn't support all the possible cases that
+    // the query planner could potentially generate. This implementation is only enabled when
+    // 'internalQueryForceIntersectionPlans' is set to true.
+
     auto andHashNode = static_cast<const AndHashNode*>(root);
 
     tassert(6023412, "buildAndHash() does not support kSortKey", !reqs.hasSortKeys());
@@ -3942,6 +3896,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto innerIndexIdentSlot = innerOutputs.getIfExists(kIndexIdent);
     auto innerIndexKeySlot = innerOutputs.getIfExists(kIndexKey);
     auto innerIndexKeyPatternSlot = innerOutputs.getIfExists(kIndexKeyPattern);
+    auto innerPrefetchedResultSlot = innerOutputs.getIfExists(kPrefetchedResult);
 
     auto innerCondSlots = sbe::makeSV(innerIdSlot);
     auto innerProjectSlots = sbe::makeSV(innerResultSlot);
@@ -3975,6 +3930,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto slot = *innerIndexKeyPatternSlot;
         innerProjectSlots.push_back(slot.slotId);
         outputs.set(kIndexKeyPattern, slot);
+    }
+    if (reqs.has(kPrefetchedResult) && innerPrefetchedResultSlot) {
+        auto slot = *innerPrefetchedResultSlot;
+        innerProjectSlots.push_back(slot.slotId);
+        outputs.set(kPrefetchedResult, slot);
     }
 
     auto stage = sbe::makeS<sbe::HashJoinStage>(std::move(outerStage),
@@ -4015,6 +3975,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildAndSorted(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    // Note: This implementation is incomplete and doesn't support all the possible cases that
+    // the query planner could potentially generate. This implementation is only enabled when
+    // 'internalQueryForceIntersectionPlans' is set to true.
+
     tassert(6023413, "buildAndSorted() does not support kSortKey", !reqs.hasSortKeys());
 
     auto andSortedNode = static_cast<const AndSortedNode*>(root);
@@ -4032,7 +3996,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                               .clear(kSnapshotId)
                               .clear(kIndexIdent)
                               .clear(kIndexKey)
-                              .clear(kIndexKeyPattern);
+                              .clear(kIndexKeyPattern)
+                              .clear(kPrefetchedResult);
     auto [outerStage, outerOutputs] = build(outerChild, outerChildReqs);
 
     auto outerIdSlot = outerOutputs.get(kRecordId).slotId;
@@ -4076,6 +4041,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto innerIndexKeyPatternSlot = innerOutputs.get(kIndexKeyPattern);
         innerProjectSlots.push_back(innerIndexKeyPatternSlot.slotId);
         outputs.set(kIndexKeyPattern, innerIndexKeyPatternSlot);
+    }
+    if (reqs.has(kPrefetchedResult)) {
+        auto innerPrefetchedResultSlot = innerOutputs.get(kPrefetchedResult);
+        innerProjectSlots.push_back(innerPrefetchedResultSlot.slotId);
+        outputs.set(kPrefetchedResult, innerPrefetchedResultSlot);
     }
 
     std::vector<sbe::value::SortDirection> sortDirs(outerKeySlots.size(),
@@ -5474,14 +5444,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     bool isStoredSource = sn->searchQuery.getBoolField(mongot_cursor::kReturnStoredSourceArg);
 
     auto topLevelFields = getTopLevelFields(reqs.getFields());
-    auto topLevelFieldSlots = _slotIdGenerator.generateMultiple(topLevelFields.size());
 
     PlanStageSlots outputs;
-
-    for (size_t i = 0; i < topLevelFields.size(); ++i) {
-        outputs.set(std::make_pair(PlanStageSlots::kField, topLevelFields[i]),
-                    topLevelFieldSlots[i]);
-    }
 
     // Search cursor stage output slots
     auto searchResultSlot = isStoredSource && reqs.hasResult()
@@ -5495,26 +5459,35 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     _data->metadataSlots.sortKeySlot = _slotIdGenerator.generate();
 
     auto collatorSlot = _state.getCollatorSlot();
+
     if (isStoredSource) {
         if (searchResultSlot) {
             outputs.setResultObj(searchResultSlot.value());
         }
 
-        return {sbe::SearchCursorStage::createForStoredSource(expCtx->ns,
-                                                              expCtx->uuid,
-                                                              searchResultSlot,
-                                                              metadataNames,
-                                                              metadataSlots,
-                                                              topLevelFields,
-                                                              topLevelFieldSlots,
-                                                              sn->remoteCursorId,
-                                                              sortSpecSlot,
-                                                              limitSlot,
-                                                              _data->metadataSlots.sortKeySlot,
-                                                              collatorSlot,
-                                                              _yieldPolicy,
-                                                              sn->nodeId()),
-                std::move(outputs)};
+        auto topLevelFieldSlots = _slotIdGenerator.generateMultiple(topLevelFields.size());
+
+        auto stage = sbe::SearchCursorStage::createForStoredSource(expCtx->ns,
+                                                                   expCtx->uuid,
+                                                                   searchResultSlot,
+                                                                   metadataNames,
+                                                                   metadataSlots,
+                                                                   topLevelFields,
+                                                                   topLevelFieldSlots,
+                                                                   sn->remoteCursorId,
+                                                                   sortSpecSlot,
+                                                                   limitSlot,
+                                                                   _data->metadataSlots.sortKeySlot,
+                                                                   collatorSlot,
+                                                                   _yieldPolicy,
+                                                                   sn->nodeId());
+
+        for (size_t i = 0; i < topLevelFields.size(); ++i) {
+            outputs.set(std::make_pair(PlanStageSlots::kField, topLevelFields[i]),
+                        topLevelFieldSlots[i]);
+        }
+
+        return {std::move(stage), std::move(outputs)};
     }
 
     auto idSlot = _slotIdGenerator.generate();
@@ -5574,26 +5547,29 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                         true /* forward */,
                                         false /* lowPriority */);
 
-    // Slot stores the resulting document.
-    auto outputDocSlot = _slotIdGenerator.generate();
-    outputs.setResultObj(outputDocSlot);
-    // Slot stores rid if it it found, in our case same as seekRecordIdSlot.
-    auto ridSlot = _slotIdGenerator.generate();
-
     // Join the idx scan stage with fetch stage.
-    auto fetchStage = makeLoopJoinForFetch(std::move(idxScanStage),
-                                           outputDocSlot,
-                                           ridSlot,
-                                           topLevelFields,
-                                           topLevelFieldSlots,
-                                           idxOutputs.get(kRecordId),
-                                           idxOutputs.get(kSnapshotId),
-                                           idxOutputs.get(kIndexIdent),
-                                           idxOutputs.get(kIndexKey),
-                                           idxOutputs.get(kIndexKeyPattern),
-                                           collection,
-                                           sn->nodeId(),
-                                           sbe::makeSV() /* slotsToForward */);
+    auto [outStage, outputDocSlot, _, topLevelFieldSlots] =
+        makeLoopJoinForFetch(std::move(idxScanStage),
+                             topLevelFields,
+                             idxOutputs.get(kRecordId),
+                             idxOutputs.get(kSnapshotId),
+                             idxOutputs.get(kIndexIdent),
+                             idxOutputs.get(kIndexKey),
+                             idxOutputs.get(kIndexKeyPattern),
+                             boost::none /* prefetchedResultSlot */,
+                             collection,
+                             _state,
+                             sn->nodeId(),
+                             sbe::makeSV() /* slotsToForward */);
+    auto fetchStage = std::move(outStage);
+
+    // Slot stores the resulting document.
+    outputs.setResultObj(outputDocSlot);
+
+    for (size_t i = 0; i < topLevelFields.size(); ++i) {
+        outputs.set(std::make_pair(PlanStageSlots::kField, topLevelFields[i]),
+                    topLevelFieldSlots[i]);
+    }
 
     // Join the search_cursor+project stage with idx_scan+fetch stage.
     auto outerProjVec = metadataSlots;
@@ -5712,7 +5688,7 @@ const CollectionPtr& SlotBasedStageBuilder::getCurrentCollection(const PlanStage
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
 // could not be constructed.
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::build(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    const QuerySolutionNode* root, const PlanStageReqs& reqsIn) {
     // Define the 'builderCallback' typedef.
     typedef std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> (
         SlotBasedStageBuilder::*builderCallback)(const QuerySolutionNode*, const PlanStageReqs&);
@@ -5769,16 +5745,38 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         case STAGE_LIMIT:
         case STAGE_SKIP:
             if (_cq.getFindCommandRequest().getTailable() &&
-                !reqs.getIsBuildingUnionForTailableCollScan()) {
-                auto childReqs = reqs;
-                childReqs.setIsBuildingUnionForTailableCollScan(true);
-                return makeUnionForTailableCollScan(root, childReqs);
+                !reqsIn.getIsBuildingUnionForTailableCollScan()) {
+                auto reqs = reqsIn;
+                reqs.setIsBuildingUnionForTailableCollScan(true);
+                return makeUnionForTailableCollScan(root, reqs);
             }
             [[fallthrough]];
         default:
             break;
     }
 
+    // If 'root->fetched()' is true and 'reqsIn' has a kPrefetchedResult req, then we drop the
+    // kPrefetchedResult req (as well as the kIndexKey, kIndexKeyPattern, kIndexIdent, and
+    // kSnapshotId reqs) and we add a result object req.
+    //
+    // After we call build() on 'root' we will fix up the PlanStageSlots object returned by build().
+    bool moveResultToPrefetchedResultSlot = false;
+    boost::optional<PlanStageReqs> localReqs;
+
+    if (reqsIn.has(kPrefetchedResult) && root->fetched()) {
+        localReqs.emplace(reqsIn);
+        localReqs->clear(kPrefetchedResult)
+            .clear(kIndexKey)
+            .clear(kIndexKeyPattern)
+            .clear(kIndexIdent)
+            .clear(kSnapshotId);
+        localReqs->setResultObj();
+        moveResultToPrefetchedResultSlot = true;
+    }
+
+    const PlanStageReqs& reqs = localReqs ? *localReqs : reqsIn;
+
+    // Build the child.
     auto [stage, slots] = (this->*(kStageBuilders.at(stageType)))(root, reqs);
     auto outputs = std::move(slots);
 
@@ -5833,6 +5831,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
+    // If 'moveResultToPrefetchedResultSlot' is true, then we need to fix up 'outputs'.
+    if (moveResultToPrefetchedResultSlot) {
+        auto nothingSlot = SbSlot{_state.getNothingSlot()};
+
+        // Set kIndexKey to point to the slot holding the result object and set kIndexKey,
+        // kIndexKeyPattern, kIndexIdent, and kSnapshotId to point to the Nothing slot.
+        outputs.set(kPrefetchedResult, outputs.getResultObj());
+        outputs.set(kIndexKey, nothingSlot);
+        outputs.set(kIndexKeyPattern, nothingSlot);
+        outputs.set(kIndexIdent, nothingSlot);
+        outputs.set(kSnapshotId, nothingSlot);
+    }
+
     if (reqResultInfo) {
         // If 'outputs' has a materialized result and 'reqs' was expecting ResultInfo,
         // then convert the materialized result into a ResultInfo.
@@ -5860,7 +5871,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             stageType != STAGE_PROJECTION_SIMPLE && stageType != STAGE_PROJECTION_COVERED &&
             stageType != STAGE_PROJECTION_DEFAULT;
 
-        outputs.clearNonRequiredSlots(reqs, saveResultObj);
+        outputs.clearNonRequiredSlots(reqsIn, saveResultObj);
     }
 
     return {std::move(stage), std::move(outputs)};

@@ -1572,8 +1572,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
             // Push down compatible stages to SBE land and fill out secondary collections
             // planner parameters.
             finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
+
             plannerParams->fillOutSecondaryCollectionsPlannerParams(
                 opCtx, *canonicalQuery, collections);
+
+            plannerParams->setTargetSbeStageBuilder(opCtx, *canonicalQuery, collections);
 
             const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
             const bool useSbePlanCache = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);

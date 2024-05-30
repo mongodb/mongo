@@ -490,6 +490,13 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
                             const PlanStageSlots& outputs,
                             SbExpr sortSpecExpr = {});
 
+struct UnfetchedIxscans {
+    std::vector<const QuerySolutionNode*> ixscans;
+    bool hasFetchesOrCollScans;
+};
+
+boost::optional<UnfetchedIxscans> getUnfetchedIxscans(const QuerySolutionNode* root);
+
 /**
  * Retrieves the accumulation op name from 'accStmt' and returns it.
  */
@@ -563,19 +570,19 @@ std::unique_ptr<sbe::EExpression> makeLocalBind(sbe::value::FrameIdGenerator* fr
     return sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(innerExpr));
 }
 
-std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
-                                                     SbSlot resultSlot,
-                                                     SbSlot recordIdSlot,
-                                                     std::vector<std::string> fields,
-                                                     sbe::value::SlotVector fieldSlots,
-                                                     SbSlot seekRecordIdSlot,
-                                                     SbSlot snapshotIdSlot,
-                                                     SbSlot indexIdentSlot,
-                                                     SbSlot indexKeySlot,
-                                                     SbSlot indexKeyPatternSlot,
-                                                     const CollectionPtr& collToFetch,
-                                                     PlanNodeId planNodeId,
-                                                     sbe::value::SlotVector slotsToForward);
+std::tuple<std::unique_ptr<sbe::PlanStage>, SbSlot, SbSlot, sbe::value::SlotVector>
+makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
+                     std::vector<std::string> fields,
+                     SbSlot seekRecordIdSlot,
+                     SbSlot snapshotIdSlot,
+                     SbSlot indexIdentSlot,
+                     SbSlot indexKeySlot,
+                     SbSlot indexKeyPatternSlot,
+                     boost::optional<SbSlot> prefetchedResultSlot,
+                     const CollectionPtr& collToFetch,
+                     StageBuilderState& state,
+                     PlanNodeId planNodeId,
+                     sbe::value::SlotVector slotsToForward);
 
 /**
  * Given an index key pattern, and a subset of the fields of the index key pattern that are depended

@@ -1725,6 +1725,18 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         }
         andResult = std::move(ixscanNodes[0]);
     } else {
+        if ((params.mainCollectionInfo.options & QueryPlannerParams::TARGET_SBE_STAGE_BUILDER) &&
+            !internalQueryForceIntersectionPlans.load()) {
+            // When targeting the SBE Stage Builder, we don't allow sort-based intersection or
+            // hash-based intersection when 'internalQueryForceIntersectionPlans' is false because
+            // SBE's implementation of STAGE_AND_HASH and STAGE_AND_SORTED is not complete.
+            LOGV2_DEBUG(9081800,
+                        5,
+                        "Can't build index intersection solution: AND_SORTED and AND_HASH are not "
+                        "possible due to TARGET_SBE_STAGE_BUILDER option being set");
+            return nullptr;
+        }
+
         // $** indexes are prohibited from participating in either AND_SORTED or AND_HASH.
         const bool wildcardIndexInvolvedInIntersection =
             std::any_of(ixscanNodes.begin(), ixscanNodes.end(), [](const auto& ixScan) {

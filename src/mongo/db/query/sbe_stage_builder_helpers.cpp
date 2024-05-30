@@ -696,19 +696,19 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
     return true;
 }
 
-std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
-                                                     SbSlot resultSlot,
-                                                     SbSlot recordIdSlot,
-                                                     std::vector<std::string> fields,
-                                                     sbe::value::SlotVector fieldSlots,
-                                                     SbSlot seekRecordIdSlot,
-                                                     SbSlot snapshotIdSlot,
-                                                     SbSlot indexIdentSlot,
-                                                     SbSlot indexKeySlot,
-                                                     SbSlot indexKeyPatternSlot,
-                                                     const CollectionPtr& collToFetch,
-                                                     PlanNodeId planNodeId,
-                                                     sbe::value::SlotVector slotsToForward) {
+std::tuple<std::unique_ptr<sbe::PlanStage>, SbSlot, SbSlot, sbe::value::SlotVector>
+makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
+                     std::vector<std::string> fields,
+                     SbSlot seekRecordIdSlot,
+                     SbSlot snapshotIdSlot,
+                     SbSlot indexIdentSlot,
+                     SbSlot indexKeySlot,
+                     SbSlot indexKeyPatternSlot,
+                     boost::optional<SbSlot> prefetchedResultSlot,
+                     const CollectionPtr& collToFetch,
+                     StageBuilderState& state,
+                     PlanNodeId planNodeId,
+                     sbe::value::SlotVector slotsToForward) {
     // It is assumed that we are generating a fetch loop join over the main collection. If we are
     // generating a fetch over a secondary collection, it is the responsibility of a parent node
     // in the QSN tree to indicate which collection we are fetching over.
@@ -716,39 +716,134 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
 
     sbe::ScanCallbacks callbacks(indexKeyCorruptionCheckCallback, indexKeyConsistencyCheckCallback);
 
-    // Scan the collection in the range [seekRecordIdSlot, Inf).
-    auto scanStage = sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
-                                                resultSlot.slotId,
-                                                recordIdSlot.slotId,
-                                                snapshotIdSlot.slotId,
-                                                indexIdentSlot.slotId,
-                                                indexKeySlot.slotId,
-                                                indexKeyPatternSlot.slotId,
-                                                boost::none /* oplogTsSlot */,
-                                                std::move(fields),
-                                                std::move(fieldSlots),
-                                                seekRecordIdSlot.slotId,
-                                                boost::none /* minRecordIdSlot */,
-                                                boost::none /* maxRecordIdSlot */,
-                                                true /* forward */,
-                                                nullptr /* yieldPolicy */,
-                                                planNodeId,
-                                                std::move(callbacks));
+    // Allocate a new result slot and a new record ID slot.
+    SbSlot resultSlot = state.slotId();
+    SbSlot recordIdSlot = state.slotId();
 
-    // Get the recordIdSlot from the outer side (e.g., IXSCAN) and feed it to the inner side,
-    // limiting the result set to 1 row.
-    return sbe::makeS<sbe::LoopJoinStage>(
-        std::move(inputStage),
-        sbe::makeS<sbe::LimitSkipStage>(
-            std::move(scanStage), makeInt64Constant(1), nullptr, planNodeId),
-        std::move(slotsToForward),
-        sbe::makeSV(seekRecordIdSlot.slotId,
-                    snapshotIdSlot.slotId,
-                    indexIdentSlot.slotId,
-                    indexKeySlot.slotId,
-                    indexKeyPatternSlot.slotId),
-        nullptr /* predicate */,
+    // Allocate a new slot for each field in 'fields'.
+    sbe::value::SlotVector fieldSlots;
+    for (size_t i = 0; i < fields.size(); ++i) {
+        fieldSlots.push_back(state.slotId());
+    }
+
+    // Create a limit-1/scan subtree to perform the seek.
+    auto seekStage = sbe::makeS<sbe::LimitSkipStage>(
+        sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
+                                   resultSlot.getId(),
+                                   recordIdSlot.getId(),
+                                   snapshotIdSlot.getId(),
+                                   indexIdentSlot.getId(),
+                                   indexKeySlot.getId(),
+                                   indexKeyPatternSlot.getId(),
+                                   boost::none /* oplogTsSlot */,
+                                   fields,
+                                   fieldSlots,
+                                   seekRecordIdSlot.getId(),
+                                   boost::none /* minRecordIdSlot */,
+                                   boost::none /* maxRecordIdSlot */,
+                                   true /* forward */,
+                                   nullptr /* yieldPolicy */,
+                                   planNodeId,
+                                   std::move(callbacks)),
+        makeInt64Constant(1),
+        nullptr,
         planNodeId);
+
+    if (prefetchedResultSlot) {
+        // Prepare to create a BranchStage, with one branch performing retrieving the result object
+        // by performing a seek, and with the other branch getting the result object by moving it
+        // from the kPrefetchedResult slot. The resulting subtree will look something like this:
+        //
+        //   branch {!exists(prefetchedResultSlot)} [resultSlot, recordIdSlot]
+        //     [thenResultSlot, thenRecordIdSlot]
+        //       limit 1
+        //       seek seekRecordId thenResultSlot thenRecordIdSlot snapshotIdSlot indexIdentSlot
+        //              indexKeySlot indexKeyPatternSlot none none [] @collUuid true false
+        //     [elseResultSlot, elseRecordIdSlot]
+        //       project [elseResultSlot = prefetchedResultSlot, elseRecordIdSlot = seekRecordId]
+        //       limit 1
+        //       coscan
+
+        // Move 'resultSlot', 'recordIdSlot', and 'fieldSlots' to new variables
+        // 'thenResultSlot', 'thenRecordIdSlot', and 'thenFieldSlots', respectively.
+        SbSlot thenResultSlot = resultSlot;
+        SbSlot thenRecordIdSlot = recordIdSlot;
+        sbe::value::SlotVector thenFieldSlots = std::move(fieldSlots);
+        fieldSlots = sbe::value::SlotVector{};
+
+        // Move 'seekStage' into 'thenStage'. We will re-initialize 'seekStage' later.
+        auto thenStage = std::move(seekStage);
+        seekStage = {};
+
+        // Set 'resultSlot' and 'recordIdSlot' to point to newly allocated slots. Also,
+        // clear 'fieldSlots' and then fill it with newly allocated slots for each field.
+        resultSlot = state.slotId();
+        recordIdSlot = state.slotId();
+
+        for (size_t i = 0; i < fields.size(); ++i) {
+            fieldSlots.push_back(state.slotId());
+        }
+
+        // Allocate new slots for the result and record ID produced by the else branch.
+        SbSlot elseResultSlot = state.slotId();
+        SbSlot elseRecordIdSlot = state.slotId();
+
+        // Create a project/limit-1/coscan subtree for the else branch.
+        auto elseStage = sbe::makeProjectStage(makeLimitCoScanTree(planNodeId, 1),
+                                               planNodeId,
+                                               elseResultSlot.getId(),
+                                               makeVariable(*prefetchedResultSlot),
+                                               elseRecordIdSlot.getId(),
+                                               makeVariable(seekRecordIdSlot));
+
+        // Project the fields to slots for the else branch.
+        auto [outStage, elseFieldSlots] = projectFieldsToSlots(
+            std::move(elseStage), fields, elseResultSlot, planNodeId, state.slotIdGenerator, state);
+        elseStage = std::move(outStage);
+
+        auto conditionExpr = makeNot(makeFunction("exists", makeVariable(*prefetchedResultSlot)));
+
+        auto outputSlots = sbe::makeSV(resultSlot.getId(), recordIdSlot.getId());
+        outputSlots.insert(outputSlots.end(), fieldSlots.begin(), fieldSlots.end());
+
+        auto thenOutputSlots = sbe::makeSV(thenResultSlot.getId(), thenRecordIdSlot.getId());
+        thenOutputSlots.insert(thenOutputSlots.end(), thenFieldSlots.begin(), thenFieldSlots.end());
+
+        auto elseOutputSlots = sbe::makeSV(elseResultSlot.getId(), elseRecordIdSlot.getId());
+        for (size_t i = 0; i < elseFieldSlots.size(); ++i) {
+            elseOutputSlots.push_back(elseFieldSlots[i].getId());
+        }
+
+        // Create a BranchStage that combines 'thenStage' and 'elseStage' and store it in
+        // 'seekStage'.
+        seekStage = sbe::makeS<sbe::BranchStage>(std::move(thenStage),
+                                                 std::move(elseStage),
+                                                 std::move(conditionExpr),
+                                                 std::move(thenOutputSlots),
+                                                 std::move(elseOutputSlots),
+                                                 std::move(outputSlots),
+                                                 planNodeId);
+    }
+
+    auto correlatedSlots = sbe::makeSV(seekRecordIdSlot.getId(),
+                                       snapshotIdSlot.getId(),
+                                       indexIdentSlot.getId(),
+                                       indexKeySlot.getId(),
+                                       indexKeyPatternSlot.getId());
+
+    if (prefetchedResultSlot) {
+        correlatedSlots.push_back(prefetchedResultSlot->getId());
+    }
+
+    // Create a LoopJoinStage that combines 'inputStage' and 'seekStage'.
+    auto loopJoinStage = sbe::makeS<sbe::LoopJoinStage>(std::move(inputStage),
+                                                        std::move(seekStage),
+                                                        std::move(slotsToForward),
+                                                        std::move(correlatedSlots),
+                                                        nullptr /* predicate */,
+                                                        planNodeId);
+
+    return {std::move(loopJoinStage), resultSlot, recordIdSlot, std::move(fieldSlots)};
 }
 
 namespace {
@@ -1030,6 +1125,69 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
     return sortKeysExprs;
 }
 
+boost::optional<UnfetchedIxscans> getUnfetchedIxscans(const QuerySolutionNode* root) {
+    using DfsItem = std::pair<const QuerySolutionNode*, size_t>;
+
+    absl::InlinedVector<DfsItem, 64> dfs;
+    std::vector<const QuerySolutionNode*> ixscans;
+    bool hasFetchesOrCollScans = false;
+
+    for (auto&& child : root->children) {
+        dfs.emplace_back(DfsItem(child.get(), 0));
+    }
+
+    while (!dfs.empty()) {
+        auto& dfsBack = dfs.back();
+        auto node = dfsBack.first;
+        auto childIdx = dfsBack.second;
+        bool popDfs = true;
+
+        auto visitNextChild = [&] {
+            if (childIdx < node->children.size()) {
+                popDfs = false;
+                dfsBack.second++;
+                dfs.emplace_back(DfsItem(node->children[childIdx].get(), 0));
+                return true;
+            }
+            return false;
+        };
+
+        switch (node->getType()) {
+            case STAGE_IXSCAN: {
+                ixscans.push_back(node);
+                break;
+            }
+            case STAGE_LIMIT:
+            case STAGE_SKIP:
+            case STAGE_MATCH:
+            case STAGE_SHARDING_FILTER:
+            case STAGE_SORT_SIMPLE:
+            case STAGE_SORT_DEFAULT:
+            case STAGE_OR:
+            case STAGE_SORT_MERGE: {
+                visitNextChild();
+                break;
+            }
+            case STAGE_COLLSCAN:
+            case STAGE_VIRTUAL_SCAN:
+            case STAGE_COLUMN_SCAN:
+            case STAGE_FETCH: {
+                hasFetchesOrCollScans = true;
+                break;
+            }
+            default: {
+                return boost::none;
+            }
+        }
+
+        if (popDfs) {
+            dfs.pop_back();
+        }
+    }
+
+    return {UnfetchedIxscans{std::move(ixscans), hasFetchesOrCollScans}};
+}
+
 bool isAccumulatorN(StringData name) {
     return name == AccumulatorTop::getName() || name == AccumulatorBottom::getName() ||
         name == AccumulatorTopN::getName() || name == AccumulatorBottomN::getName() ||
@@ -1273,7 +1431,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
         sbe::SlotExprPairVector projects;
         for (size_t i = 0; i < fields.size(); ++i) {
             auto name = std::make_pair(PlanStageSlots::kField, StringData(fields[i]));
-            auto fieldSlot = slots->getIfExists(name);
+            auto fieldSlot = slots ? slots->getIfExists(name) : boost::none;
             if (fieldSlot) {
                 outputSlots.emplace_back(*fieldSlot);
             } else {

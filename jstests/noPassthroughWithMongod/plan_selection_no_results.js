@@ -4,7 +4,7 @@
  * The plan which is able to most cheaply determine that there are no results should be selected as
  * the winner.
  */
-import {getPlanStage} from "jstests/libs/analyze_plan.js";
+import {getEngine, getPlanStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.plan_selection_no_results;
 coll.drop();
@@ -35,6 +35,12 @@ const explain = coll.find(predicate).explain();
 const ixScan = getPlanStage(explain, "IXSCAN");
 assert.eq(ixScan.keyPattern, {y: 1}, explain);
 
-// Check that there's two rejected plans (one IX intersect plan and one plan which scans the
-// {x: 1} index).
-assert.eq(explain.queryPlanner.rejectedPlans.length, 2, explain);
+const engineUsed = getEngine(explain);
+if (engineUsed === "sbe") {
+    // Check that there's one rejected plan (which scans the '{x: 1}' index).
+    assert.eq(explain.queryPlanner.rejectedPlans.length, 1, explain);
+} else {
+    // Check that there's two rejected plans (one IX intersect plan, and one plan which scans
+    // the '{x: 1}' index).
+    assert.eq(explain.queryPlanner.rejectedPlans.length, 2, explain);
+}

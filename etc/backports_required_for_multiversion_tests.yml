@@ -113,6 +113,8 @@ last-continuous:
       ticket: SERVER-90461
     - test_file: jstests/noPassthrough/move_primary_failpoint.js
       ticket: SERVER-90465
+    - test_file: jstests/core/timeseries/timeseries_ixscan_clusteredidxscan_union.js
+      ticket: SERVER-90818
   suites: null
 last-lts:
   all:
@@ -208,4 +210,6 @@ last-lts:
       ticket: SERVER-90461
     - test_file: jstests/noPassthrough/move_primary_failpoint.js
       ticket: SERVER-90465
+    - test_file: jstests/core/timeseries/timeseries_ixscan_clusteredidxscan_union.js
+      ticket: SERVER-90818
   suites: null

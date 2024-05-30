@@ -190,6 +190,7 @@ public:
     static constexpr UnownedSlotName kIndexIdent = {kMeta, "indexIdent"_sd};
     static constexpr UnownedSlotName kIndexKey = {kMeta, "indexKey"_sd};
     static constexpr UnownedSlotName kIndexKeyPattern = {kMeta, "indexKeyPattern"_sd};
+    static constexpr UnownedSlotName kPrefetchedResult = {kMeta, "prefetchedResult"_sd};
     static constexpr UnownedSlotName kMetadataSearchScore = {kMeta, "metadataSearchScore"_sd};
     static constexpr UnownedSlotName kMetadataSearchHighlights = {kMeta,
                                                                   "metadataSearchHighlights"_sd};
@@ -909,6 +910,7 @@ public:
     static constexpr auto kIndexIdent = PlanStageSlots::kIndexIdent;
     static constexpr auto kIndexKey = PlanStageSlots::kIndexKey;
     static constexpr auto kIndexKeyPattern = PlanStageSlots::kIndexKeyPattern;
+    static constexpr auto kPrefetchedResult = PlanStageSlots::kPrefetchedResult;
     static constexpr auto kMetadataSearchScore = PlanStageSlots::kMetadataSearchScore;
     static constexpr auto kMetadataSearchHighlights = PlanStageSlots::kMetadataSearchHighlights;
     static constexpr auto kMetadataSearchDetails = PlanStageSlots::kMetadataSearchDetails;
