@@ -1320,9 +1320,9 @@ TEST(SplitMatchExpression, ShouldMoveElemMatchObjectOnRenamedPathForDottedPathAc
     auto matchPredicateRenameAndExpected = {
         // Assumes that this match expression follows {$project: {a: "$x"}}} which is a simple
         // rename.
-        std::make_tuple(fromjson(R"({"a.b": {$elemMatch: {c: 3}}})"),
+        std::make_tuple(fromjson(R"({"a": {$elemMatch: {c: 3}}})"),
                         std::make_pair("a"s, "x"s),
-                        fromjson(R"({"x.b": {$elemMatch: {c: {$eq: 3}}}})")),
+                        fromjson(R"({"x": {$elemMatch: {c: {$eq: 3}}}})")),
         // Assumes that this match expression follows {$project: {a: {b: {"$x"}}}} which is a simple
         // rename.
         std::make_tuple(fromjson(R"({"a.b": {$elemMatch: {c: 3}}})"),
@@ -1367,7 +1367,7 @@ TEST(SplitMatchExpression, ShouldMoveElemMatchValueAcrossRename) {
     ASSERT_FALSE(residualExpr.get());
 }
 
-TEST(SplitMatchExpression, ShouldMoveElemMatchValueForDottedPathAcrossRename) {
+TEST(SplitMatchExpression, ShouldNotMoveElemMatchValueForDottedPathAcrossRename) {
     BSONObj matchPredicate = fromjson(R"({"a.b": {$elemMatch: {$eq: 3}}})");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
@@ -1377,10 +1377,10 @@ TEST(SplitMatchExpression, ShouldMoveElemMatchValueForDottedPathAcrossRename) {
     auto [splitOutExpr, residualExpr] =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
-    ASSERT_TRUE(splitOutExpr.get());
-    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson(R"({"c.b": {$elemMatch: {$eq: 3}}})"));
+    ASSERT_TRUE(residualExpr.get());
+    ASSERT_BSONOBJ_EQ(residualExpr->serialize(), fromjson(R"({"a.b": {$elemMatch: {$eq: 3}}})"));
 
-    ASSERT_FALSE(residualExpr.get());
+    ASSERT_FALSE(splitOutExpr.get());
 }
 
 TEST(SplitMatchExpression, ShouldMoveTypeAcrossRename) {
