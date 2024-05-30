@@ -165,7 +165,7 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
         void yield(OperationContext*) override {}
 
         void unyield(OperationContext*) override {
-            if (_count++) {
+            if (_count++ == 1) {
                 uasserted(ErrorCodes::BadValue, "Simulated error");
             }
         }
@@ -184,6 +184,7 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
     requests.emplace_back(kTestShardIds[2],
                           BSON("find"
                                << "bar"));
+    std::set<ShardId> pendingShardIds{kTestShardIds[0], kTestShardIds[1], kTestShardIds[2]};
 
     auto ars = AsyncRequestsSender(operationContext(),
                                    executor(),
@@ -201,16 +202,24 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
         // Unyield doesn't throw the first time.
         auto response = ars.next();
         ASSERT(response.swResponse.getStatus().isOK());
-        ASSERT_EQ(response.shardId, kTestShardIds[0]);
+        ASSERT(response.shardId.isValid());
+        pendingShardIds.erase(response.shardId);
 
         firstResponseProcessed.countDownAndWait();
 
-        // Unyield throws here. Even if the next response was already ready the response will fail.
-        // The returned error will have an empty shardId to represent a local failure rather than a
-        // remote failure.
+        // Unyield throws this time. Even if the next response was already ready and successful,
+        // the returned response should have the unyield error.
         response = ars.next();
         ASSERT_EQ(response.swResponse.getStatus(), ErrorCodes::BadValue);
-        ASSERT_EQ(response.shardId, ShardId{});
+        ASSERT(response.shardId.isValid());
+        pendingShardIds.erase(response.shardId);
+
+        // Unyield doesn't throw this time but this next() call should not even try to yield and
+        // unyield and the returned response should have the unyield error.
+        response = ars.next();
+        ASSERT_EQ(response.swResponse.getStatus(), ErrorCodes::BadValue);
+        ASSERT(response.shardId.isValid());
+        pendingShardIds.erase(response.shardId);
     });
 
     onCommand([&](const auto& request) {
@@ -228,6 +237,7 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
     });
 
     future.default_timed_get();
+    ASSERT(pendingShardIds.empty());
 }
 
 TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingDoesNotSkipUnyield) {
