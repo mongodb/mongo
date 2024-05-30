@@ -10278,7 +10278,7 @@ buildvariants:
     multiversion_platform: rhel71
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits,requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits,requires_latch_analyzer,ppc64le_incompatible
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -10327,7 +10327,7 @@ buildvariants:
     multiversion_platform: rhel81
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
-    test_flags: --excludeWithAnyTags=requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer,ppc64le_incompatible
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
