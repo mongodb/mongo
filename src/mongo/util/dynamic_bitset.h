@@ -47,17 +47,18 @@ T maskbit(size_t bitIndex) {
 
 /**
  * Bitset class implementation, which can dynamically grow and shrink. t has the capability to
- * inline up to (8 * sizeof(T) * NumberOfBlocks) bits When the number of elements exceeds the
+ * inline up to (8 * sizeof(T) * nBlocks) bits When the number of elements exceeds the
  * threshold, the data is then stored in the heap. The size of the bitset is always a factor of 8 *
  * sizeof(T).
  */
-template <typename T, size_t NumberOfBlocks>
-requires std::is_integral_v<T> &&(NumberOfBlocks > static_cast<size_t>(0)) class DynamicBitset {
+template <typename T, size_t nBlocks, typename Storage = InlinedStorage<T, nBlocks>>
+class DynamicBitset {
 public:
-    using Storage = InlinedStorage<T, NumberOfBlocks>;
     using BlockType = T;
+    static_assert(std::is_integral_v<BlockType>);
+    static_assert(nBlocks > 0);
 
-    static constexpr size_t kNpos = static_cast<size_t>(-1);
+    static constexpr size_t npos = static_cast<size_t>(-1);
 
     // Useful for bit operations constants.
     static constexpr BlockType kZero = 0;       // All bits unset: 0b00000000
@@ -71,21 +72,13 @@ public:
         BitReference(BlockType& block, size_t bitIndex) noexcept
             : _block(block), _bitIndex(bitIndex) {}
 
-        BitReference& operator=(bool bitValue) noexcept {
-            if (bitValue) {
-                _block |= maskbit();
-            } else {
-                _block &= ~maskbit();
-            }
+        BitReference& operator=(bool bit) noexcept {
+            _set(bit);
             return *this;
         }
 
         BitReference& operator=(const BitReference& bit) noexcept {
-            if (bit) {
-                _block |= maskbit();
-            } else {
-                _block &= ~maskbit();
-            }
+            _set(bit);
             return *this;
         }
 
@@ -93,14 +86,14 @@ public:
          * Return negated value of this bit.
          */
         bool operator~() const noexcept {
-            return (_block & maskbit()) == 0;
+            return !*this;
         }
 
         /**
          * Return value of this bit.
          */
         operator bool() const noexcept {
-            return (_block & maskbit()) != 0;
+            return _block & maskbit();
         }
 
         /**
@@ -112,8 +105,16 @@ public:
         }
 
     private:
-        inline BlockType maskbit() const noexcept {
+        BlockType maskbit() const noexcept {
             return bitset_utils::maskbit<BlockType>(_bitIndex);
+        }
+
+        void _set(bool b) noexcept {
+            if (b) {
+                _block |= maskbit();
+            } else {
+                _block &= ~maskbit();
+            }
         }
 
         BlockType& _block;
@@ -122,11 +123,11 @@ public:
 
     /**
      * Allocates a bitset of default size. The bitset of default size occupies all available inlined
-     * storage and never allocates. The default size is equal to NumberOfBlocks * sizeof(BlockType)
+     * storage and never allocates. The default size is equal to nBlocks * sizeof(BlockType)
      * * CHAR_BIT. E.g., DynamicBitset<uint8_t, 1> has default size 8 bits, DynamicBitset<uint64_t,
      * 2> - 128 bits.
      */
-    DynamicBitset() : _storage(NumberOfBlocks) {}
+    DynamicBitset() : _storage(nBlocks) {}
 
     /**
      * Create a bitset of size >= 'minSize'. The actual size will be ceil(minSize/sizeof(block)).
@@ -152,11 +153,9 @@ public:
      * Return true if at least one bit of this bitset is set.
      */
     MONGO_COMPILER_ALWAYS_INLINE bool any() const {
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            if (_storage[i] != kZero) {
+        for (auto&& e : _storage)
+            if (e)
                 return true;
-            }
-        }
         return false;
     }
 
@@ -173,9 +172,7 @@ public:
      */
     MONGO_COMPILER_ALWAYS_INLINE DynamicBitset& operator&=(const DynamicBitset& other) {
         assertSize(other);
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            _storage[i] &= other._storage[i];
-        }
+        _forEach([](auto& e, const auto& o) { e &= o; }, other);
         return *this;
     }
 
@@ -185,9 +182,7 @@ public:
      */
     MONGO_COMPILER_ALWAYS_INLINE DynamicBitset& operator|=(const DynamicBitset& other) {
         assertSize(other);
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            _storage[i] |= other._storage[i];
-        }
+        _forEach([](auto& a, const auto& b) { a |= b; }, other);
         return *this;
     }
 
@@ -197,9 +192,7 @@ public:
      */
     MONGO_COMPILER_ALWAYS_INLINE DynamicBitset& operator^=(const DynamicBitset& other) {
         assertSize(other);
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            _storage[i] ^= other._storage[i];
-        }
+        _forEach([](auto& a, const auto& b) { a ^= b; }, other);
         return *this;
     }
 
@@ -209,19 +202,15 @@ public:
      */
     MONGO_COMPILER_ALWAYS_INLINE DynamicBitset& operator-=(const DynamicBitset& other) {
         assertSize(other);
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            _storage[i] &= ~other._storage[i];
-        }
+        _forEach([](auto& a, const auto& b) { a &= ~b; }, other);
         return *this;
     }
 
     /**
-     * Flip all bits of this subset.
+     * Flip all bits of this bitset.
      */
     MONGO_COMPILER_ALWAYS_INLINE void flip() {
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            _storage[i] = ~_storage[i];
-        }
+        _forEach([](auto& e) { e = ~e; });
     }
 
     /**
@@ -253,9 +242,7 @@ public:
      * Set all bits of this bitset.
      */
     MONGO_COMPILER_ALWAYS_INLINE void set() {
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            _storage[i] = kOnes;
-        }
+        std::fill(_storage.begin(), _storage.end(), kOnes);
     }
 
     /**
@@ -274,9 +261,7 @@ public:
      */
     MONGO_COMPILER_ALWAYS_INLINE size_t count() const {
         size_t count = 0;
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            count += std::popcount(_storage[i]);
-        }
+        _forEach([&](auto&& e) { count += std::popcount(e); });
         return count;
     }
 
@@ -284,20 +269,14 @@ public:
      * Return true if this bitset is a subset of subset 'other'.
      */
     MONGO_COMPILER_ALWAYS_INLINE bool isSubsetOf(const DynamicBitset& other) const {
-        return allOf([](BlockType thisBlock,
-                        BlockType otherBlock) { return thisBlock == (thisBlock & otherBlock); },
-                     _storage,
-                     other._storage);
+        return allOf([](auto a, auto b) { return a == (a & b); }, *this, other);
     }
 
     /**
      * Return true if this bitset has common set bits with 'other'.
      */
     MONGO_COMPILER_ALWAYS_INLINE bool intersects(const DynamicBitset& other) const {
-        return anyOf(
-            [](BlockType thisBlock, BlockType otherBlock) { return thisBlock & otherBlock; },
-            _storage,
-            other._storage);
+        return anyOf([](auto a, auto b) { return a & b; }, *this, other);
     }
 
     /**
@@ -306,36 +285,31 @@ public:
      */
     MONGO_COMPILER_ALWAYS_INLINE bool isEqualToMasked(const DynamicBitset& other,
                                                       const DynamicBitset& mask) const {
-        return allOf([](BlockType thisBlock,
-                        BlockType otherBlock,
-                        BlockType maskBlock) { return thisBlock == (otherBlock & maskBlock); },
-                     _storage,
-                     other._storage,
-                     mask._storage);
+        return allOf([](auto a, auto b, auto m) { return a == (b & m); }, *this, other, mask);
     }
 
     /**
-     * Return the index of first set bit, if nothing found return 'kNpos'.
+     * Return the index of first set bit, if nothing found return 'npos'.
      */
     size_t findFirst() const {
         for (size_t i = 0; i < _storage.size(); ++i) {
             const auto block = _storage[i];
             if (block != kZero) {
-                return i * Storage::kBlockSize + std::countr_zero(block);
+                return i * kBitsPerBlock + std::countr_zero(block);
             }
         }
 
-        return kNpos;
+        return npos;
     }
 
     /**
      * Return the index of the first set bit starting AFTER position 'previous', if nothing found
-     * return 'kNpos'.
+     * return 'npos'.
      */
     size_t findNext(size_t previous) const {
         const size_t size = this->size();
         if (++previous >= size) {
-            return kNpos;
+            return npos;
         }
 
         // Step 1. Checking the starting block.
@@ -350,11 +324,11 @@ public:
         for (size_t i = startBlockIndex + 1; i < _storage.size(); ++i) {
             const auto block = _storage[i];
             if (block != kZero) {
-                return i * Storage::kBlockSize + std::countr_zero(block);
+                return i * kBitsPerBlock + std::countr_zero(block);
             }
         }
 
-        return kNpos;
+        return npos;
     }
 
     /**
@@ -378,46 +352,94 @@ public:
      * Return the number of the bits in this subset.
      */
     MONGO_COMPILER_ALWAYS_INLINE size_t size() const {
-        return _storage.size() * Storage::kBlockSize;
+        return _storage.size() * kBitsPerBlock;
     }
 
     /**
      * Iterates over integer blocks of the bitsets and returns true if the predicate returns true
      * for at least one set of corresponing blocks.
      */
-    template <class Predicate, typename... Bitset>
-    friend bool anyOf(Predicate predicate, const DynamicBitset& s, const Bitset&... ss) {
-        return anyOf(predicate, s._storage, ss._storage...);
+    friend bool anyOf(auto predicate, const DynamicBitset& s, const auto&... ss) {
+        return [&](auto... ssIters) {
+            for (auto& sElem : s._storage)
+                if (predicate(sElem, *ssIters++...))
+                    return true;
+            return false;
+        }(ss._storage.begin()...);
     }
 
     /**
      * Iterates over integer blocks of the bitsets and returns true if the predicate returns true
      * for all sets of corresponing blocks.
      */
-    template <class Predicate, typename... Bitset>
-    friend bool allOf(Predicate predicate, const DynamicBitset& s, const Bitset&... ss) {
-        return allOf(predicate, s._storage, ss._storage...);
+    friend bool allOf(auto predicate, const DynamicBitset& s, const auto&... ss) {
+        return [&](auto... ssIters) {
+            for (auto& sElem : s._storage)
+                if (!predicate(sElem, *ssIters++...))
+                    return false;
+            return true;
+        }(ss._storage.begin()...);
     }
-
-    template <typename BT, size_t NB>
-    friend bool operator==(const DynamicBitset<BT, NB>& lhs, const DynamicBitset<BT, NB>& rhs);
-
-    template <typename BT, size_t NB>
-    friend bool operator<(const DynamicBitset<BT, NB>& lhs, const DynamicBitset<BT, NB>& rhs);
 
     template <typename H>
     friend H AbslHashValue(H h, const DynamicBitset& bitset) {
         return H::combine(std::move(h), bitset._storage);
     }
 
+    bool operator==(const DynamicBitset& rhs) const = default;
+    auto operator<=>(const DynamicBitset& rhs) const = default;
+
+    /** and */
+    friend DynamicBitset operator&(DynamicBitset lhs, const DynamicBitset& rhs) {
+        return lhs &= rhs;
+    }
+
+    /** or */
+    friend DynamicBitset operator|(DynamicBitset lhs, const DynamicBitset& rhs) {
+        return lhs |= rhs;
+    }
+
+    /** xor */
+    friend DynamicBitset operator^(DynamicBitset lhs, const DynamicBitset& rhs) {
+        return lhs ^= rhs;
+    }
+
+    /** Set difference. */
+    friend DynamicBitset operator-(DynamicBitset lhs, const DynamicBitset& rhs) {
+        return lhs -= rhs;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const DynamicBitset& bitset) {
+        for (size_t i = bitset.size(); i > 0; --i) {
+            os << (bitset[i - 1] ? '1' : '0');
+        }
+        return os;
+    }
+
 private:
+    static constexpr size_t kBitsPerBlock = sizeof(BlockType) * CHAR_BIT;
+
+    static void _forEachImpl(auto&& self, auto&& f, auto&&... others) {
+        return [&](auto... iters) {
+            for (auto&& e : self._storage)
+                f(e, *iters++...);
+        }(others._storage.begin()...);
+    }
+    void _forEach(auto&& f, auto&&... others) const {
+        _forEachImpl(*this, f, others...);
+    }
+    void _forEach(auto&& f, auto&&... others) {
+        _forEachImpl(*this, f, others...);
+    }
+
+
     MONGO_COMPILER_ALWAYS_INLINE static size_t getRequiredNumberOfBlocks(
         size_t sizeInBits) noexcept {
-        return (sizeInBits + Storage::kBlockSize - 1) / Storage::kBlockSize;
+        return (sizeInBits + kBitsPerBlock - 1) / kBitsPerBlock;
     }
 
     MONGO_COMPILER_ALWAYS_INLINE static size_t getBlockIndex(size_t index) noexcept {
-        return index / Storage::kBlockSize;
+        return index / kBitsPerBlock;
     }
 
     MONGO_COMPILER_ALWAYS_INLINE static BlockType maskbit(size_t bitIndex) noexcept {
@@ -428,7 +450,7 @@ private:
      * Returns bit inside inside its block.
      */
     MONGO_COMPILER_ALWAYS_INLINE static size_t getBitIndex(size_t index) noexcept {
-        return index % Storage::kBlockSize;
+        return index % kBitsPerBlock;
     }
 
     MONGO_COMPILER_ALWAYS_INLINE void assertSize(const DynamicBitset& other) const {
@@ -447,76 +469,4 @@ private:
     Storage _storage;
 };
 
-/**
- * Return true if the given bitset are equal. The bitsets must be of the same size.
- */
-template <typename T, size_t NumberOfBlocks>
-bool operator==(const DynamicBitset<T, NumberOfBlocks>& lhs,
-                const DynamicBitset<T, NumberOfBlocks>& rhs) {
-    return lhs._storage == rhs._storage;
-}
-
-/*
- * Return true if 'lhs' bitset is lexicographically less than 'rhs', and false otherwise.
- */
-template <typename T, size_t NumberOfBlocks>
-bool operator<(const DynamicBitset<T, NumberOfBlocks>& lhs,
-               const DynamicBitset<T, NumberOfBlocks>& rhs) {
-    return lhs._storage < rhs._storage;
-}
-
-/**
- * Return a new bitset which is a result of AND operator of the given bitsets. The bitsets must be
- * of the same size.
- */
-template <typename T, size_t NumberOfBlocks>
-DynamicBitset<T, NumberOfBlocks> operator&(const DynamicBitset<T, NumberOfBlocks>& lhs,
-                                           const DynamicBitset<T, NumberOfBlocks>& rhs) {
-    DynamicBitset<T, NumberOfBlocks> result{lhs};
-    result &= rhs;
-    return result;
-}
-
-/**
- * Return a new bitset which is a result of OR operator of the given bitsets. The bitsets must be of
- * the same size.
- */
-template <typename T, size_t NumberOfBlocks>
-DynamicBitset<T, NumberOfBlocks> operator|(const DynamicBitset<T, NumberOfBlocks>& lhs,
-                                           const DynamicBitset<T, NumberOfBlocks>& rhs) {
-    DynamicBitset<T, NumberOfBlocks> result{lhs};
-    result |= rhs;
-    return result;
-}
-
-/**
- * Return a new bitset which is a result of XOR operator of the given bitsets. The bitsets must be
- * of the same size.
- */
-template <typename T, size_t NumberOfBlocks>
-DynamicBitset<T, NumberOfBlocks> operator^(const DynamicBitset<T, NumberOfBlocks>& lhs,
-                                           const DynamicBitset<T, NumberOfBlocks>& rhs) {
-    DynamicBitset<T, NumberOfBlocks> result{lhs};
-    result ^= rhs;
-    return result;
-}
-
-/**
- * Return a set difference of the given bitsets. The bitsets must be of the same size.
- */
-template <typename T, size_t NumberOfBlocks>
-DynamicBitset<T, NumberOfBlocks> operator-(const DynamicBitset<T, NumberOfBlocks>& lhs,
-                                           const DynamicBitset<T, NumberOfBlocks>& rhs) {
-    DynamicBitset<T, NumberOfBlocks> result{lhs};
-    result -= rhs;
-    return result;
-}
-
-template <typename T, size_t NumberOfBlocks>
-std::ostream& operator<<(std::ostream& os, const DynamicBitset<T, NumberOfBlocks>& bitset) {
-    for (size_t i = bitset.size(); i > 0; --i) {
-        os << (bitset[i - 1] ? '1' : '0');
-    }
-    return os;
-}
 }  // namespace mongo
