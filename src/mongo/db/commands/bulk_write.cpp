@@ -497,7 +497,7 @@ void setCurOpInfoAndEnsureStarted(OperationContext* opCtx,
     curOp->setNS_inlock(nsEntry.getIsTimeseriesNamespace()
                             ? nsEntry.getNs().getTimeseriesViewNamespace()
                             : nsEntry.getNs());
-    curOp->setNetworkOp_inlock(NetworkOp::dbBulkWrite);
+    curOp->setNetworkOp_inlock(NetworkOp::dbMsg);
     curOp->setLogicalOp_inlock(LogicalOp::opBulkWrite);
     curOp->setOpDescription_inlock(opDescription);
     curOp->ensureStarted();
