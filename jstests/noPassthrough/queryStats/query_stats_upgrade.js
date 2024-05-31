@@ -1,8 +1,8 @@
 /**
- * Test that query stats doesn't work on a lower FCV version but works after an FCV upgrade.
+ * Test that query stats works both before and after an FCV upgrade.
  * @tags: [
- *   # Query Stats is new in 7.1.
- *   requires_fcv_71,
+ *   # Query Stats should not skip FCV gating before 8.0.
+ *   requires_fcv_80,
  *   # Re-uses FCV state in the dbpath.
  *   requires_persistence
  *  ]
@@ -23,15 +23,15 @@ function testLower(restart = false) {
         adminDB = conn.getDB("admin");
     }
 
-    assert.commandFailedWithCode(
-        testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
-        [6579000, ErrorCodes.QueryFeatureNotAllowed]);
+    // We should be able to run a query stats pipeline even though the FCV is not upgraded.
+    assert.commandWorked(
+        testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}));
 
     // Upgrade FCV.
     assert.commandWorked(adminDB.runCommand(
         {setFeatureCompatibilityVersion: binVersionToFCV("latest"), confirm: true}));
 
-    // We should be able to run a query stats pipeline now that the FCV is correct.
+    // We should still be able to run a query stats pipeline on the upgraded FCV.
     assert.commandWorked(
         testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
     );
