@@ -206,14 +206,17 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         // Get the final key in the range, and see if it's the same as the first key.
         BSONObj maxKeyInChunk;
         {
-            auto exec = InternalPlanner::shardKeyIndexScan(opCtx,
-                                                           &collection.getCollection(),
-                                                           *shardKeyIdx,
-                                                           maxKey,
-                                                           minKey,
-                                                           BoundInclusion::kIncludeEndKeyOnly,
-                                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                           InternalPlanner::BACKWARD);
+            // Use INTERRUPT_ONLY since it just fetches the last key. Using YIELD_AUTO could
+            // invalidate `exec` in the outer scope below.
+            auto exec =
+                InternalPlanner::shardKeyIndexScan(opCtx,
+                                                   &collection.getCollection(),
+                                                   *shardKeyIdx,
+                                                   maxKey,
+                                                   minKey,
+                                                   BoundInclusion::kIncludeEndKeyOnly,
+                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                   InternalPlanner::BACKWARD);
 
             PlanExecutor::ExecState state = exec->getNext(&maxKeyInChunk, nullptr);
             uassert(
@@ -316,6 +319,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                   "splitVector doing another cycle because of force",
                   "keyCount"_attr = keyCount);
 
+            // Since the previous `exec` plan is finished, we are not violating the requirement
+            // that only one yieldable plan is active.
             exec = InternalPlanner::shardKeyIndexScan(opCtx,
                                                       &collection.getCollection(),
                                                       *shardKeyIdx,
