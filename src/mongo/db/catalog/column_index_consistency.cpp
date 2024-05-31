@@ -77,18 +77,17 @@ int64_t ColumnIndexConsistency::traverseIndex(OperationContext* opCtx,
             stdx::unique_lock<Client> lk(*opCtx->getClient());
             _progress.get(lk)->hit();
         }
-        ++numIndexEntries;
-
-        if (numIndexEntries % kInterruptIntervalNumRecords == 0) {
-            // Periodically checks for interrupts and yields.
-            opCtx->checkForInterrupt();
-            _validateState->yieldCursors(opCtx);
-        }
 
         if (_firstPhase) {
             addIndexEntry(cell.get());
         } else {
             _updateSuspectList(cell.get(), results);
+        }
+
+        if (++numIndexEntries % kInterruptIntervalNumRecords == 0) {
+            // Periodically checks for interrupts and yields.
+            opCtx->checkForInterrupt();
+            _validateState->yieldCursors(opCtx);
         }
     }
 
