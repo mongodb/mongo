@@ -33,6 +33,7 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
@@ -128,6 +129,12 @@ DatabaseType ShardingCatalogManager::createDatabase(
         uassert(ErrorCodes::BadValue,
                 str::stream() << "invalid shard name: " << *optPrimaryShard,
                 optPrimaryShard->isValid());
+        // (Ignore FCV check): gFeatureFlagTransitionToCatalogShard was enabled in a previous
+        // version and then disabled again, so it does not properly participate in the FCV protocol.
+        uassert(ErrorCodes::ShardNotFound,
+                "Unable to use config as primary shard",
+                gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe() ||
+                    *optPrimaryShard != ShardId::kConfigServerId);
     }
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto resolvedPrimaryShard = optPrimaryShard

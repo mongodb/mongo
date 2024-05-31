@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/s/active_migrations_registry.h"
@@ -116,6 +117,13 @@ public:
                    BSONObjBuilder& result) override {
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+
+        // (Ignore FCV check): gFeatureFlagTransitionToCatalogShard was enabled in a previous
+        // version and then disabled again, so it does not properly participate in the FCV protocol.
+        uassert(ErrorCodes::ShardNotFound,
+                "Config is unable to receive chunks",
+                gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe() ||
+                    ShardingState::get(opCtx)->shardId() != ShardId::kConfigServerId);
 
         auto nss = NamespaceString(parseNs({boost::none, dbname}, cmdObj));
 
