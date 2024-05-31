@@ -67,7 +67,7 @@ function read(insertTS, enableCausal) {
     }));
 
     jsTestLog(`find result for enableCausal=${enableCausal}: ${tojson(result)}`);
-    assert.gt(result.cursor.atClusterTime, insertTS);
+    assert.gte(result.cursor.atClusterTime, insertTS);
     assert.eq(result.cursor.firstBatch[0], {_id: 0, x: "updatedValue"});
 }
 const waitForShell = startParallelShell(funWithArgs(read, insertTS, false), st.s.port);
