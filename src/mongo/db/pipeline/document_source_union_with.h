@@ -102,7 +102,11 @@ public:
     DocumentSourceUnionWith(const DocumentSourceUnionWith& original,
                             const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
         : DocumentSource(kStageName, newExpCtx),
-          _pipeline(original._pipeline->clone()),
+          _pipeline(original._pipeline->clone(
+              newExpCtx ? newExpCtx->copyForSubPipeline(
+                              newExpCtx->getResolvedNamespace(original._userNss).ns,
+                              newExpCtx->getResolvedNamespace(original._userNss).uuid)
+                        : nullptr)),
           _userNss(original._userNss),
           _userPipeline(original._userPipeline) {
         _pipeline->getContext()->inUnionWith = true;

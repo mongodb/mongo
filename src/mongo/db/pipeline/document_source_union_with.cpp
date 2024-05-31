@@ -92,7 +92,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     opts.validator = validatorCallback;
 
     return Pipeline::makePipelineFromViewDefinition(
-        expCtx->copyForSubPipeline(expCtx->ns, resolvedNs.uuid),
+        expCtx->copyForSubPipeline(resolvedNs.ns, resolvedNs.uuid),
         resolvedNs,
         std::move(currentPipeline),
         opts);
