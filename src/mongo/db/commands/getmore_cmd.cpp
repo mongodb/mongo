@@ -459,7 +459,7 @@ public:
                 // Don't check document size here before appending, since we always want to make
                 // progress.
                 nextBatch->append(obj);
-                docUnitsReturned->observeOneDoc(objSize);
+                docUnitsReturned->observeOne(objSize);
                 *numResults = 1;
 
                 // As soon as we get a result, this operation no longer waits.

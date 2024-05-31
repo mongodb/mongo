@@ -408,7 +408,7 @@ bool getFirstBatch(OperationContext* opCtx,
         // If this executor produces a postBatchResumeToken, add it to the cursor response.
         responseBuilder.setPostBatchResumeToken(exec.getPostBatchResumeToken());
         responseBuilder.append(nextDoc);
-        docUnitsReturned.observeOneDoc(nextDoc.objsize());
+        docUnitsReturned.observeOne(nextDoc.objsize());
     }
 
     if (doRegisterCursor) {

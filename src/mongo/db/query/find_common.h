@@ -155,7 +155,7 @@ public:
             }
 
             _builder->append(obj);
-            _docUnitsReturned->observeOneDoc(objSize);
+            _docUnitsReturned->observeOne(objSize);
 
             // If this executor produces a postBatchResumeToken, store it. We will set the
             // latest valid 'pbrt' on the batch at the end of batched execution.
