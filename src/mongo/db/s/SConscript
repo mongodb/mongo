@@ -158,7 +158,6 @@ env.Library(
         "resharding/resharding_oplog_session_application.cpp",
         "resharding/resharding_recipient_service.cpp",
         "resharding/resharding_recipient_service_external_state.cpp",
-        "resharding/resharding_server_parameters.idl",
         "resharding/resharding_txn_cloner.cpp",
         "resharding/resharding_txn_cloner_progress.idl",
         "resharding/resharding_util.cpp",
@@ -207,6 +206,7 @@ env.Library(
         "$BUILD_DIR/mongo/s/query/cluster_aggregate",
         "$BUILD_DIR/mongo/s/sharding_api",
         "forwardable_operation_metadata",
+        "resharding_server_parameters_idl",
         "sharding_catalog_manager",
         "transaction_coordinator",
     ],
@@ -404,6 +404,7 @@ env.Library(
         "$BUILD_DIR/mongo/util/log_and_backoff",
         "$BUILD_DIR/mongo/util/pcre_wrapper",
         "forwardable_operation_metadata",
+        "resharding_server_parameters_idl",
         "sharding_logging",
         "user_writes_recoverable_critical_section",
     ],
@@ -728,6 +729,12 @@ env.Library(
         "$BUILD_DIR/mongo/db/op_observer/operation_logger_impl",
         "$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl",
     ],
+)
+
+env.Library(
+    target="resharding_server_parameters_idl",
+    source=["resharding/resharding_server_parameters.idl"],
+    LIBDEPS_PRIVATE=["$BUILD_DIR/mongo/db/server_base"],
 )
 
 env.CppUnitTest(

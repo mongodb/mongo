@@ -81,6 +81,9 @@ TEST_F(MoveUnshardedPolicyTest, MigrateUnsplittableCollection) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagTrackUnshardedCollectionsUponCreation", true);
 
+    RAIIServerParameterControllerForTest serverParamController{
+        "reshardingMinimumOperationDurationMillis", 5000};
+
     setupShards({kShard0, kShard1});
     setupDatabase(kDbName, kShardId0);
 
@@ -112,6 +115,9 @@ TEST_F(MoveUnshardedPolicyTest, MigrateAnyCollectionFPOn) {
 
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagTrackUnshardedCollectionsUponCreation", true);
+
+    RAIIServerParameterControllerForTest serverParamController{
+        "reshardingMinimumOperationDurationMillis", 5000};
 
     setupShards({kShard0, kShard1});
     setupDatabase(kDbName, kShardId0);
@@ -168,6 +174,38 @@ TEST_F(MoveUnshardedPolicyTest, MigrateAnyCollectionFPOn) {
     ASSERT(attemptsLeft > 0);
 }
 
+TEST_F(MoveUnshardedPolicyTest, DontMigrateAnyCollectionIfReshardingMinimumDurationIsTooLarge) {
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTrackUnshardedCollectionsUponCreation", true);
+
+    RAIIServerParameterControllerForTest serverParamController{
+        "reshardingMinimumOperationDurationMillis", 5001};
+
+    setupShards({kShard0, kShard1});
+    setupDatabase(kDbName, kShardId0);
+
+    // Enable failpoint to return random collections
+    FailPointEnableBlock fp("balancerShouldReturnRandomMigrations");
+
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
+
+    // Set up 1 unsplittable collections
+    constexpr int numCollections = 1;
+    std::vector<CollectionType> collections;
+    for (auto i = 0; i < numCollections; ++i) {
+        collections.emplace_back(setUpUnsplittableCollection(
+            NamespaceString::createNamespaceString_forTest(kDbName, "TestColl" + std::to_string(i)),
+            kShardId0));
+    }
+
+    auto availableShards = getAllShardIds(operationContext());
+    const auto& migrateInfoVector = _unshardedPolicy.selectCollectionsToMove(
+        operationContext(), getShardStats(operationContext()), &availableShards);
+    ASSERT_EQ(0, migrateInfoVector.size());
+}
 
 }  // namespace
 }  // namespace mongo
