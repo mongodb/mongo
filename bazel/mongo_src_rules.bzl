@@ -1137,8 +1137,7 @@ def mongo_cc_library(
         target_compatible_with = [],
         skip_global_deps = [],
         non_transitive_dyn_linkopts = [],
-        defines = [],
-        additional_linker_inputs = []):
+        defines = []):
     """Wrapper around cc_library.
 
     Args:
@@ -1164,7 +1163,6 @@ def mongo_cc_library(
         See https://jira.mongodb.org/browse/SERVER-89047 for motivation.
       defines: macro definitions added to the compile line when building any source in this target, as well as the compile
         line of targets that depend on this.
-      additional_linker_inputs: Any additional files that you may want to pass to the linker, for example, linker scripts.
     """
 
     if linkstatic == True:
@@ -1233,7 +1231,6 @@ def mongo_cc_library(
             "//bazel/config:shared_archive_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
         }) + target_compatible_with,
-        additional_linker_inputs = additional_linker_inputs,
     )
 
     native.cc_library(
@@ -1257,7 +1254,6 @@ def mongo_cc_library(
             "//conditions:default": ["pie"],
         }),
         target_compatible_with = target_compatible_with,
-        additional_linker_inputs = additional_linker_inputs,
     )
 
     # Creates a shared library version of our target only if //bazel/config:linkstatic_disabled is true.
@@ -1274,7 +1270,6 @@ def mongo_cc_library(
             "//conditions:default": ["@platforms//:incompatible"],
         }) + target_compatible_with,
         dynamic_deps = deps,
-        additional_linker_inputs = additional_linker_inputs,
     )
 
     extract_debuginfo(
@@ -1307,8 +1302,7 @@ def mongo_cc_binary(
         linkstatic = False,
         local_defines = [],
         target_compatible_with = [],
-        defines = [],
-        additional_linker_inputs = []):
+        defines = []):
     """Wrapper around cc_binary.
 
     Args:
@@ -1328,7 +1322,6 @@ def mongo_cc_binary(
       local_defines: macro definitions passed to all source and header files.
       defines: macro definitions added to the compile line when building any source in this target, as well as the compile
         line of targets that depend on this.
-      additional_linker_inputs: Any additional files that you may want to pass to the linker, for example, linker scripts.
     """
 
     if linkstatic == True:
@@ -1374,7 +1367,6 @@ def mongo_cc_binary(
             "//conditions:default": [],
         }),
         target_compatible_with = target_compatible_with,
-        additional_linker_inputs = additional_linker_inputs,
     )
 
     extract_debuginfo_binary(
