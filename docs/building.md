@@ -26,15 +26,21 @@ To build MongoDB, you will need:
 MongoDB supports the following architectures: arm64, ppc64le, s390x,
 and x86-64. More detailed platform instructions can be found below.
 
-## MongoDB Tools
+## Quick (re)Start
 
-The MongoDB command line tools (`mongodump`, `mongorestore`,
-`mongoimport`, `mongoexport`, etc) have been rewritten in
-[Go](http://golang.org/) and are no longer included in this
-repository.
-
-The source for the tools is now available at
-[mongodb/mongo-tools](https://github.com/mongodb/mongo-tools).
+### Linux Workstation
+```bash
+git clean -fdx # USE WITH CAUTION! Delete every untracked file including .gitignored files (this is basically everything)
+# Close and reopen your terminal to clear out any problems from your old environment
+python3 --version # Should be >=3.10. If it is not, follow [online instructions](https://www.python.org/downloads/) to install python.
+python3 -m venv python3-venv --prompt mongo # Create a virtual environment. "python3-venv" is non standard but it is kept since it is assumed elsewhere in our code.
+source python3-venv/bin/activate # You should see a (mongo) appear in your terminal
+which python3 # This should point to the python in python3-venv
+python3 -m pip install 'poetry==1.5.1' # It is also non standard to install poetry into its own virtual environment. However, the idea is to make even fewer unpinned dependencies.
+PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring python3 -m poetry install --no-root --sync # install all required python dependencies to build and test.
+python3 buildscripts/scons.py --build-profile=opt
+ninja -f opt.ninja -j 200 install-devcore
+```
 
 ## Python Prerequisites
 
