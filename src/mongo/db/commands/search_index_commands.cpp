@@ -331,6 +331,9 @@ MONGO_REGISTER_COMMAND(CmdUpdateSearchIndexCommand).forShard().forRouter();
  * }
  *
  */
+
+// We don't want to log the deprecation warning for every call, instead log rarely.
+Rarely listSearchIndexesCall;
 class CmdListSearchIndexesCommand final : public TypedCommand<CmdListSearchIndexesCommand> {
 public:
     using Request = ListSearchIndexesCommand;
@@ -364,6 +367,11 @@ public:
         }
 
         ListSearchIndexesReply typedRun(OperationContext* opCtx) {
+            if (listSearchIndexesCall.tick()) {
+                LOGV2_WARNING(9090900,
+                              "Use of the listSearchIndexes command is deprecated. Instead use the "
+                              "'$listSearchIndexes' aggregation stage.");
+            }
             throwIfNotRunningWithRemoteSearchIndexManagement();
 
             const auto& cmd = request();
