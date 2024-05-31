@@ -34,7 +34,7 @@ class MongotHook(interface.Hook):
                 "The Mongot hook requires a ReplicaSetFixture or ShardedClusterFixture"
             )
 
-    def clear_mongot_data_dir(self):
+    def clear_mongot_data_files(self):
         # Remove each MongoTFixture's associated config journal.
         for mongot in self.fixture._all_mongots():
             self.logger.info("Deleting mongot data dir: %s", mongot.data_dir)
@@ -45,11 +45,13 @@ class MongotHook(interface.Hook):
                 pass
 
     def after_suite(self, test_report, teardown_flag=None):
-        """After suite.
-
-        Tests create config journals in this data directory. As this removes not just the contents of
-        the directory, but the directory itself, Mongot Hook should delete data dir only after suite and not after test
-        or else subsequent tests fail."""
+        """After suite."""
         self.logger.info("Begin deleting mongot data files after suite finished")
-        self.clear_mongot_data_dir()
+        self.clear_mongot_data_files()
         self.logger.info("Finished deleting mongot data files after suite finished")
+
+    def after_test(self, test, test_report):
+        """After test."""
+        self.logger.info("Begin deleting mongot data files after individual test finished")
+        self.clear_mongot_data_files()
+        self.logger.info("Finished deleting mongot data files after individual test finished")

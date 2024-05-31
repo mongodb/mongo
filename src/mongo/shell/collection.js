@@ -645,73 +645,58 @@ DBCollection.prototype.createIndexes = function(keys, options, commitQuorum) {
         {createIndexes: this.getName(), indexes: indexSpecs, commitQuorum: commitQuorum});
 };
 
-DBCollection.prototype._runCreateSearchIndexesOnPrimary = function(
+DBCollection.prototype._runCreateSearchIndexOnPrimary = function(
     keys, blockOnIndexQueryable, shardConn) {
     let primaryDB =
         shardConn != undefined ? shardConn.getDB("admin").getSiblingDB(this._db._name) : this._db;
     let response = assert.commandWorked(
-        primaryDB.runCommand({createSearchIndexes: this.getName(), indexes: keys}));
+        primaryDB.runCommand({createSearchIndexes: this.getName(), indexes: [keys]}));
 
     if (!blockOnIndexQueryable) {
+        return;
+    }
+
+    let name = response["indexesCreated"][0]["name"];
+    let collname = this.getName();
+    let searchIndexArray = primaryDB[collname].aggregate([{$listSearchIndexes: {name}}]).toArray();
+    assert.eq(searchIndexArray.length, 1, searchIndexArray);
+    let queryable = searchIndexArray[0]["queryable"];
+
+    if (queryable) {
         return response;
     }
-
-    let collname = this.getName();
-    let indexesCreated = response["indexesCreated"];
-    for (let i = 0; i < indexesCreated.length; i++) {
-        let name = indexesCreated[i]["name"];
-
-        // This should return a single index as the query specifies an id.
-        let searchIndexArray =
-            primaryDB[collname].aggregate([{$listSearchIndexes: {name}}]).toArray();
-        assert.eq(searchIndexArray.length, 1, searchIndexArray);
-
-        // Do not exit until search index is queryable.
-        let queryable = searchIndexArray[0]["queryable"];
-        if (queryable) {
-            return response;
-        }
-        // This default times out in 90 seconds.
-        assert.soon(() => primaryDB[collname]
-                              .aggregate([{$listSearchIndexes: {name}}])
-                              .toArray()[0]["queryable"]);
-    }
-
+    // This default times out in 90 seconds.
+    assert.soon(() => primaryDB[collname]
+                          .aggregate([{$listSearchIndexes: {name}}])
+                          .toArray()[0]["queryable"]);
     return response;
 };
 
-DBCollection.prototype.createSearchIndexes = function(keys, blockUntilSearchIndexQueryableBool) {
+// TODO SERVER-87541 add createSearchIndexes command.
+DBCollection.prototype.createSearchIndex = function(keys, blockUntilSearchIndexQueryable) {
     if (arguments.length > 2) {
-        throw new Error("createSearchIndexes accepts up to 2 arguments");
-    }
-
-    if (keys.constructor !== Array) {
-        throw new Error("createSearchIndexes only accepts an array of indexes");
+        throw new Error("createSearchIndex accepts up to 2 arguments");
     }
 
     let blockOnIndexQueryable = true;
     if (arguments.length == 2) {
-        // The second arg may only be the "blockUntilSearchIndexesQueryable" flag.
-        if (typeof (blockUntilSearchIndexQueryableBool) != 'object' ||
-            Object.keys(blockUntilSearchIndexQueryableBool).length != 1 ||
-            !blockUntilSearchIndexQueryableBool.hasOwnProperty('blockUntilSearchIndexQueryable')) {
+        // The second arg may only be the "blockUntilSearchIndexQueryable" flag.
+        if (typeof (blockUntilSearchIndexQueryable) != 'object' ||
+            Object.keys(blockUntilSearchIndexQueryable).length != 1 ||
+            !blockUntilSearchIndexQueryable.hasOwnProperty('blockUntilSearchIndexQueryable')) {
             throw new Error(
-                "createSearchIndexes only accepts index definition object and blockUntilSearchIndexQueryable object")
+                "createSearchIndex only accepts index definition object and blockUntilSearchIndexQueryable object")
         }
 
-        blockOnIndexQueryable =
-            blockUntilSearchIndexQueryableBool["blockUntilSearchIndexQueryable"];
+        blockOnIndexQueryable = blockUntilSearchIndexQueryable["blockUntilSearchIndexQueryable"];
         if (typeof blockOnIndexQueryable != "boolean") {
             throw new Error("'blockUntilSearchIndexQueryable' argument must be a boolean")
         }
     }
 
-    for (let i = 0; i < keys.length; i++) {
-        if (!keys[i].hasOwnProperty('definition')) {
-            throw new Error("Each index passed to createSearchIndexes must have a definition");
-        }
+    if (!keys.hasOwnProperty('definition')) {
+        throw new Error("createSearchIndex must have a definition");
     }
-
     // All search queries ($search, $vectorSearch, PlanShardedSearch) require a search index.
     // Regardless of what a collection contains, a search query will return no results if there is
     // no search index. Furthermore, in sharded clusters, mongos handles search index management
@@ -736,30 +721,12 @@ DBCollection.prototype.createSearchIndexes = function(keys, blockUntilSearchInde
             let host = shardDoc.host;
             // This connects to primary of each shard.
             let sconn = new Mongo(host);
-            response = this._runCreateSearchIndexesOnPrimary(keys, blockOnIndexQueryable, sconn)
+            response = this._runCreateSearchIndexOnPrimary(keys, blockOnIndexQueryable, sconn)
         }
-    }
-
-    let response = assert.commandWorked(
-        this._db.runCommand({createSearchIndexes: this.getName(), indexes: keys}));
-
-    if (!blockOnIndexQueryable) {
         return response;
     }
 
-    return this._runCreateSearchIndexesOnPrimary(keys, blockOnIndexQueryable);
-};
-
-DBCollection.prototype.createSearchIndex = function(keys, blockUntilSearchIndexQueryableBool) {
-    if (arguments.length > 2) {
-        throw new Error("createSearchIndex accepts up to 2 arguments");
-    }
-    if (arguments.length == 2) {
-        return this.createSearchIndexes([keys], blockUntilSearchIndexQueryableBool);
-    } else {
-        // blockUntilSearchIndexQueryableBool is defaulted to true
-        return this.createSearchIndexes([keys]);
-    }
+    return this._runCreateSearchIndexOnPrimary(keys, blockOnIndexQueryable);
 };
 
 DBCollection.prototype.reIndex = function() {

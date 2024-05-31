@@ -1,6 +1,5 @@
 // This test ensures correct error handling for the createSearchIndex shell command
 const coll = db[jsTestName()];
-
 coll.drop();
 
 let error = assert.throws(
@@ -13,7 +12,7 @@ error =
     assert.throws(() => coll.createSearchIndex(
                       {name: "foo-block", definition: {"mappings": {"dynamic": true}}}, {arg2: 1}));
 expectedMessage =
-    "Error: createSearchIndexes only accepts index definition object and blockUntilSearchIndexQueryable object";
+    "Error: createSearchIndex only accepts index definition object and blockUntilSearchIndexQueryable object";
 assert.eq(error, expectedMessage);
 
 error = assert.throws(
@@ -24,5 +23,5 @@ expectedMessage = "Error: createSearchIndex accepts up to 2 arguments";
 assert.eq(error, expectedMessage);
 
 error = assert.throws(() => coll.createSearchIndex({name: "foo-block"}));
-expectedMessage = "Error: Each index passed to createSearchIndexes must have a definition";
+expectedMessage = "Error: createSearchIndex must have a definition";
 assert.eq(error, expectedMessage);
