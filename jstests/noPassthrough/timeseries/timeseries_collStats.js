@@ -52,7 +52,6 @@ const clearCollection = function() {
     expectedStats.numBucketsClosedDueToCount = 0;
     expectedStats.numBucketsClosedDueToSize = 0;
     expectedStats.numBucketsClosedDueToTimeForward = 0;
-    expectedStats.numBucketsClosedDueToTimeBackward = 0;
     expectedStats.numBucketsClosedDueToMemoryThreshold = 0;
     expectedStats.numBucketsArchivedDueToMemoryThreshold = 0;
     expectedStats.numBucketsArchivedDueToTimeBackward = 0;

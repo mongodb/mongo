@@ -75,7 +75,6 @@ const runTest = function(ordered) {
     assert.eq(0, stats.timeseries["numBucketsClosedDueToSchemaChange"]);
     assert.eq(0, stats.timeseries["numBucketsClosedDueToSize"]);
     assert.eq(0, stats.timeseries["numBucketsClosedDueToTimeForward"]);
-    assert.eq(0, stats.timeseries["numBucketsClosedDueToTimeBackward"]);
     assert.eq(0, stats.timeseries["numBucketsClosedDueToMemoryThreshold"]);
     assert.eq(0, stats.timeseries["numCommits"]);
     assert.eq(0, stats.timeseries["numMeasurementsGroupCommitted"]);
@@ -123,7 +122,6 @@ const runTest = function(ordered) {
     assert.eq(0, stats.timeseries["numBucketsClosedDueToSchemaChange"]);
     assert.eq(0, stats.timeseries["numBucketsClosedDueToSize"]);
     assert.eq(0, stats.timeseries["numBucketsClosedDueToTimeForward"]);
-    assert.eq(0, stats.timeseries["numBucketsClosedDueToTimeBackward"]);
     assert.eq(0, stats.timeseries["numBucketsClosedDueToMemoryThreshold"]);
     assert.eq(3, stats.timeseries["numCommits"]);
     assert.eq(0, stats.timeseries["numMeasurementsGroupCommitted"]);
@@ -155,7 +153,6 @@ const runTest = function(ordered) {
     assert.eq(0, stats.timeseries["numBucketsClosedDueToSchemaChange"]);
     assert.eq(0, stats.timeseries["numBucketsClosedDueToSize"]);
     assert.eq(0, stats.timeseries["numBucketsClosedDueToTimeForward"]);
-    assert.eq(0, stats.timeseries["numBucketsClosedDueToTimeBackward"]);
     assert.eq(0, stats.timeseries["numBucketsClosedDueToMemoryThreshold"]);
     assert.eq(6, stats.timeseries["numCommits"]);
     assert.eq(0, stats.timeseries["numMeasurementsGroupCommitted"]);

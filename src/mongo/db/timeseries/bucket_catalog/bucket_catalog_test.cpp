@@ -77,7 +77,6 @@ constexpr StringData kNumBucketsReopened = "numBucketsReopened"_sd;
 constexpr StringData kNumArchivedDueToMemoryThreshold = "numBucketsArchivedDueToMemoryThreshold"_sd;
 constexpr StringData kNumClosedDueToReopening = "numBucketsClosedDueToReopening"_sd;
 constexpr StringData kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"_sd;
-constexpr StringData kNumClosedDueToTimeBackward = "numBucketsClosedDueToTimeBackward"_sd;
 constexpr StringData kNumClosedDueToMemoryThreshold = "numBucketsClosedDueToMemoryThreshold"_sd;
 
 class BucketCatalogTest : public CatalogTestFixture {

@@ -75,11 +75,6 @@ void ExecutionStatsController::incNumBucketsClosedDueToTimeForward(long long inc
     _globalStats->numBucketsClosedDueToTimeForward.fetchAndAddRelaxed(increment);
 }
 
-void ExecutionStatsController::incNumBucketsClosedDueToTimeBackward(long long increment) {
-    _collectionStats->numBucketsClosedDueToTimeBackward.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsClosedDueToTimeBackward.fetchAndAddRelaxed(increment);
-}
-
 void ExecutionStatsController::incNumBucketsClosedDueToMemoryThreshold(long long increment) {
     _collectionStats->numBucketsClosedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
     _globalStats->numBucketsClosedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
@@ -211,8 +206,6 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     builder.appendNumber("numBucketsClosedDueToSize", stats.numBucketsClosedDueToSize.load());
     builder.appendNumber("numBucketsClosedDueToTimeForward",
                          stats.numBucketsClosedDueToTimeForward.load());
-    builder.appendNumber("numBucketsClosedDueToTimeBackward",
-                         stats.numBucketsClosedDueToTimeBackward.load());
     builder.appendNumber("numBucketsClosedDueToMemoryThreshold",
                          stats.numBucketsClosedDueToMemoryThreshold.load());
 
@@ -272,7 +265,6 @@ void addCollectionExecutionStats(ExecutionStatsController& stats, const Executio
     stats.incNumBucketsClosedDueToCachePressure(
         collStats.numBucketsClosedDueToCachePressure.load());
     stats.incNumBucketsClosedDueToTimeForward(collStats.numBucketsClosedDueToTimeForward.load());
-    stats.incNumBucketsClosedDueToTimeBackward(collStats.numBucketsClosedDueToTimeBackward.load());
     stats.incNumBucketsClosedDueToMemoryThreshold(
         collStats.numBucketsClosedDueToMemoryThreshold.load());
     stats.incNumBucketsClosedDueToReopening(collStats.numBucketsClosedDueToReopening.load());
