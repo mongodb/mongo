@@ -1079,6 +1079,29 @@ tasks:
           args:
             - "src/evergreen/lint_yaml.sh"
 
+  - name: monitor_build_status
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "configure evergreen api credentials"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/monitor_build_status/cli.py"
+          env:
+            JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
+            JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
+            JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
+            JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
+
   - name: monitor_mongo_fork_10gen
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
