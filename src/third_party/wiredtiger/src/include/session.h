@@ -124,8 +124,8 @@ struct __wt_session_impl {
      */
     /* Session handle reference list */
     TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
-    uint64_t last_sweep;        /* Last sweep for dead handles */
-    struct timespec last_epoch; /* Last epoch time returned */
+    wt_shared uint64_t last_sweep; /* Last sweep for dead handles */
+    struct timespec last_epoch;    /* Last epoch time returned */
 
     WT_CURSOR_LIST cursors;          /* Cursors closed with the session */
     u_int ncursors;                  /* Count of active file cursors. */

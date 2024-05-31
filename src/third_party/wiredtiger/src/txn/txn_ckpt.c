@@ -1156,8 +1156,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     logging = FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED);
 
     /* Reset the statistics tracked per checkpoint. */
-    cache->evict_max_page_size = 0;
-    cache->evict_max_ms = 0;
+    __wt_atomic_store64(&cache->evict_max_page_size, 0);
+    __wt_atomic_store64(&cache->evict_max_ms, 0);
     cache->reentry_hs_eviction_ms = 0;
     conn->rec_maximum_hs_wrapup_milliseconds = 0;
     conn->rec_maximum_image_build_milliseconds = 0;
@@ -1852,7 +1852,8 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
          * been created before the backup started. Fail if trying to delete any other named
          * checkpoint.
          */
-        if (conn->hot_backup_start != 0 && ckpt->sec <= conn->hot_backup_start) {
+        if (__wt_atomic_load64(&conn->hot_backup_start) != 0 &&
+          ckpt->sec <= __wt_atomic_load64(&conn->hot_backup_start)) {
             if (is_wt_ckpt) {
                 F_CLR(ckpt, WT_CKPT_DELETE);
                 continue;
@@ -1901,8 +1902,9 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
             if (!F_ISSET(ckpt, WT_CKPT_DELETE))
                 continue;
             WT_ASSERT(session,
-              !WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT) || conn->hot_backup_start == 0 ||
-                ckpt->sec > conn->hot_backup_start);
+              !WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT) ||
+                __wt_atomic_load64(&conn->hot_backup_start) == 0 ||
+                ckpt->sec > __wt_atomic_load64(&conn->hot_backup_start));
             /*
              * We can't delete checkpoints referenced by a cursor. WiredTiger checkpoints are
              * uniquely named and it's OK to have multiple in the system: clear the delete flag for

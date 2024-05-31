@@ -642,7 +642,7 @@ __log_file_server(void *arg)
                  * file system may not support truncate: both are OK, it's just more work during
                  * cursor traversal.
                  */
-                if (conn->hot_backup_start == 0 && conn->log_cursors == 0) {
+                if (__wt_atomic_load64(&conn->hot_backup_start) == 0 && conn->log_cursors == 0) {
                     WT_WITH_HOTBACKUP_READ_LOCK(session,
                       ret = __wt_ftruncate(session, close_fh, __wt_lsn_offset(&close_end_lsn)),
                       NULL);

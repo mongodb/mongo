@@ -231,7 +231,7 @@ __wt_session_compact_check_interrupted(WT_SESSION_IMPL *session)
     if (session == conn->background_compact.session) {
         background_compaction = true;
         __wt_spin_lock(session, &conn->background_compact.lock);
-        if (!conn->background_compact.running)
+        if (!__wt_atomic_loadbool(&conn->background_compact.running))
             ret = WT_ERROR;
         __wt_spin_unlock(session, &conn->background_compact.lock);
     } else if (session->event_handler->handle_general != NULL) {

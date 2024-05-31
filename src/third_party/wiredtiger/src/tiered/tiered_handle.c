@@ -91,7 +91,7 @@ __tiered_dhandle_setup(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t i, 
 
     WT_RET(__wt_session_get_dhandle(session, name, NULL, NULL, 0));
     if (i == WT_TIERED_INDEX_INVALID) {
-        type = session->dhandle->type;
+        type = __wt_atomic_load_enum(&session->dhandle->type);
         if (type == WT_DHANDLE_TYPE_BTREE)
             id = WT_TIERED_INDEX_LOCAL;
         else if (type == WT_DHANDLE_TYPE_TIERED)
@@ -111,7 +111,7 @@ __tiered_dhandle_setup(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t i, 
     tier->tier = session->dhandle;
 
     /* The Btree needs to use the bucket storage to do file system operations. */
-    if (session->dhandle->type == WT_DHANDLE_TYPE_BTREE)
+    if (__wt_atomic_load_enum(&session->dhandle->type) == WT_DHANDLE_TYPE_BTREE)
         ((WT_BTREE *)session->dhandle->handle)->bstorage = tiered->bstorage;
 err:
     WT_RET(__wt_session_release_dhandle(session));
@@ -689,10 +689,10 @@ __wt_tiered_name(
 
     name = dhandle->name;
     /* Skip the prefix depending on what we're given. */
-    if (dhandle->type == WT_DHANDLE_TYPE_TIERED)
+    if (__wt_atomic_load_enum(&dhandle->type) == WT_DHANDLE_TYPE_TIERED)
         WT_PREFIX_SKIP_REQUIRED(session, name, "tiered:");
     else {
-        WT_ASSERT(session, dhandle->type == WT_DHANDLE_TYPE_TIERED_TREE);
+        WT_ASSERT(session, __wt_atomic_load_enum(&dhandle->type) == WT_DHANDLE_TYPE_TIERED_TREE);
         WT_ASSERT(session, !LF_ISSET(WT_TIERED_NAME_SHARED));
         WT_PREFIX_SKIP_REQUIRED(session, name, "tier:");
     }

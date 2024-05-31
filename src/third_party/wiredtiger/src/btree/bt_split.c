@@ -1251,7 +1251,7 @@ __split_internal_should_split(WT_SESSION_IMPL *session, WT_REF *ref)
      * Deepen the tree if the page's memory footprint is larger than the maximum size for a page in
      * memory (presumably putting eviction pressure on the cache).
      */
-    if (page->memory_footprint > btree->maxmempage)
+    if (__wt_atomic_loadsize(&page->memory_footprint) > btree->maxmempage)
         return (true);
 
     /*

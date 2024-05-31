@@ -942,6 +942,9 @@ __cursor_reuse_or_init(WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *
     WT_CONFIG_ITEM cval;
     WT_CURSOR *cdump, *owner;
 
+    cdump = NULL;
+    owner = ownerp ? *ownerp : NULL;
+
     if (cfg != NULL) {
         /*
          * WT_CURSTD_APPEND is only relevant to column stores.
@@ -961,7 +964,38 @@ __cursor_reuse_or_init(WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *
 
         /* WT_CURSTD_DEBUG_RESET_EVICT */
         WT_RET(__cursor_config_debug(cursor, cfg));
+
+        /*
+         * If an index cursor is opened with the dump configuration option, then this function is
+         * called on the index files, with the dump config string, and with the index cursor as an
+         * owner. We don't want to create a dump cursor in that case, because we'll create the dump
+         * cursor on the index cursor itself.
+         */
+        WT_RET(__wt_config_gets_def(session, cfg, "dump", 0, &cval));
+        if (cval.len != 0 && owner == NULL) {
+            uint64_t dump_flag;
+            if (WT_CONFIG_LIT_MATCH("json", cval))
+                dump_flag = WT_CURSTD_DUMP_JSON;
+            else if (WT_CONFIG_LIT_MATCH("print", cval))
+                dump_flag = WT_CURSTD_DUMP_PRINT;
+            else if (WT_CONFIG_LIT_MATCH("pretty", cval))
+                dump_flag = WT_CURSTD_DUMP_PRETTY;
+            else if (WT_CONFIG_LIT_MATCH("pretty_hex", cval))
+                dump_flag = WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRETTY;
+            else
+                dump_flag = WT_CURSTD_DUMP_HEX;
+            F_SET(cursor, dump_flag);
+
+            /*
+             * Dump cursors should not have owners: only the top-level cursor should be wrapped in a
+             * dump cursor.
+             */
+            WT_RET(__wti_curdump_create(cursor, owner, &cdump));
+            *ownerp = cdump;
+            F_CLR(cursor, WT_CURSTD_CACHEABLE);
+        }
     }
+    *cdumpp = cdump;
 
     /* Readonly? */
     WT_RET(__cursors_must_be_readonly(session, cfg, readonlyp));
@@ -969,39 +1003,6 @@ __cursor_reuse_or_init(WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *
     /* WT_CURSTD_CACHEABLE */
     if (*readonlyp) /* We do not cache read-only cursors. */
         F_CLR(cursor, WT_CURSTD_CACHEABLE);
-
-    /*
-     * If an index cursor is opened with the dump configuration option, then this function is called
-     * on the index files, with the dump config string, and with the index cursor as an owner. We
-     * don't want to create a dump cursor in that case, because we'll create the dump cursor on the
-     * index cursor itself.
-     */
-    WT_RET(__wt_config_gets_def(session, cfg, "dump", 0, &cval));
-    owner = ownerp ? *ownerp : NULL;
-    if (cval.len != 0 && owner == NULL) {
-        uint64_t dump_flag;
-        if (WT_CONFIG_LIT_MATCH("json", cval))
-            dump_flag = WT_CURSTD_DUMP_JSON;
-        else if (WT_CONFIG_LIT_MATCH("print", cval))
-            dump_flag = WT_CURSTD_DUMP_PRINT;
-        else if (WT_CONFIG_LIT_MATCH("pretty", cval))
-            dump_flag = WT_CURSTD_DUMP_PRETTY;
-        else if (WT_CONFIG_LIT_MATCH("pretty_hex", cval))
-            dump_flag = WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRETTY;
-        else
-            dump_flag = WT_CURSTD_DUMP_HEX;
-        F_SET(cursor, dump_flag);
-
-        /*
-         * Dump cursors should not have owners: only the top-level cursor should be wrapped in a
-         * dump cursor.
-         */
-        WT_RET(__wti_curdump_create(cursor, owner, &cdump));
-        *ownerp = cdump;
-        F_CLR(cursor, WT_CURSTD_CACHEABLE);
-    } else
-        cdump = NULL;
-    *cdumpp = cdump;
 
     return (0);
 }
@@ -1012,7 +1013,7 @@ __cursor_reuse_or_init(WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *
  */
 int
 __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_value,
-  WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
+  WT_CURSOR *to_dup, const char **cfg, WT_CURSOR **cursorp)
 {
     WT_CONFIG_ITEM cval;
     WT_CURSOR *cdump, *cursor;
@@ -1029,10 +1030,15 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_v
     have_config =
       (cfg != NULL && cfg[0] != NULL && cfg[1] != NULL && (cfg[2] != NULL || cfg[1][0] != '\0'));
 
+    /* Use a null configuration array when applicable for fastest configuration lookups. */
+    if (!have_config)
+        cfg = NULL;
+
     /* WT_CURSTD_OVERWRITE: Fast path overwrite configuration */
     if (have_config && cfg[2] == NULL && strcmp(cfg[1], "overwrite=false") == 0) {
         have_config = false;
         overwrite_flag = 0;
+        cfg = NULL;
     } else
         overwrite_flag = WT_CURSTD_OVERWRITE;
 

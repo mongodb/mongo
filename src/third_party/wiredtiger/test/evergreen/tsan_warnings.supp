@@ -3,7 +3,8 @@
 # before running tests with TSan. history_size isn't required but it reduces the chance that TSan reports
 # an error that is missing information and the message "failed to restore the stack"
 
-# This function enables threads to set double values in a shared context, and catches all TSan warnings.
+# These functions enable threads to access double values in a shared context, and catch all TSan warnings.
+race:__wt_read_shared_double
 race:__wt_set_shared_double
 
 # Stats are allowed to be fuzzy. Ignore races in TSan
@@ -26,3 +27,26 @@ race:__ref_track_state
 
 # __wt_configure_method intentionally allows for races between threads to avoid the overhead of taking a lock on each API call.  
 race:__wt_configure_method
+
+# FIXME-WT-13074 This Work has been split out into a separate ticket to keep PR sizes down.
+race:__wt_calloc
+race:__sweep_mark
+race:__posix_file_close
+race:__log_newfile
+race:__handle_close
+race:__sweep_remove_handles
+race:__stash_discard
+race:__evict_lru_walk
+race:__log_file_server
+race:__tree_walk_internal
+race:__evict_queue_empty
+race:__evict_get_ref
+race:__evict_clear_all_walks
+race:__session_clear
+
+# FIXME-WT-13075 Address these warnings separately as they may have perf impacts
+race:hazard.c
+race:__wt_tree_modify_set
+race:__wt_cond_auto_wait_signal
+race:__wt_ref_addr_copy
+

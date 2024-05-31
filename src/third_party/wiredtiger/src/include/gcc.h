@@ -255,30 +255,14 @@ __wt_atomic_storevbool(volatile bool *vp, bool v)
 #define WT_ACQUIRE_BARRIER() WT_COMPILER_BARRIER()
 #define WT_RELEASE_BARRIER() WT_COMPILER_BARRIER()
 
-#elif defined(i386) || defined(__i386__)
-#define WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
-#define WT_FULL_BARRIER()                                         \
-    do {                                                          \
-        __asm__ volatile("lock; addl $0, 0(%%esp)" ::: "memory"); \
-    } while (0)
-#define WT_ACQUIRE_BARRIER() WT_FULL_BARRIER()
-#define WT_ACQUIRE_BARRIER() WT_FULL_BARRIER()
-#define WT_RELEASE_BARRIER() WT_FULL_BARRIER()
-
 #elif defined(__mips64el__) || defined(__mips__) || defined(__mips64__) || defined(__mips64)
 #define WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
 #define WT_FULL_BARRIER()                                                                  \
     do {                                                                                   \
         __asm__ volatile("sync; ld $0, %0" ::"m"(*(long *)0xffffffff80000000) : "memory"); \
     } while (0)
-#define WT_ACQUIRE_BARRIER()                                                               \
-    do {                                                                                   \
-        __asm__ volatile("sync; ld $0, %0" ::"m"(*(long *)0xffffffff80000000) : "memory"); \
-    } while (0)
-#define WT_RELEASE_BARRIER()                                                               \
-    do {                                                                                   \
-        __asm__ volatile("sync; ld $0, %0" ::"m"(*(long *)0xffffffff80000000) : "memory"); \
-    } while (0)
+#define WT_ACQUIRE_BARRIER() WT_FULL_BARRIER()
+#define WT_RELEASE_BARRIER() WT_FULL_BARRIER()
 
 #elif defined(__PPC64__) || defined(PPC64)
 /* ori 0,0,0 is the PPC64 noop instruction */
@@ -362,18 +346,9 @@ __wt_atomic_storevbool(volatile bool *vp, bool v)
         __asm__ volatile("membar #StoreLoad" ::: "memory"); \
     } while (0)
 
-/*
- * On UltraSparc machines, TSO is used, and so there is no need for membar. READ_BARRIER =
- * #LoadLoad, and WRITE_BARRIER = #StoreStore are noop.
- */
-#define WT_ACQUIRE_BARRIER()               \
-    do {                                   \
-        __asm__ volatile("" ::: "memory"); \
-    } while (0)
-#define WT_RELEASE_BARRIER()               \
-    do {                                   \
-        __asm__ volatile("" ::: "memory"); \
-    } while (0)
+/* On UltraSparc machines, TSO is used, and so there is no need for membar. */
+#define WT_ACQUIRE_BARRIER() WT_COMPILER_BARRIER()
+#define WT_RELEASE_BARRIER() WT_COMPILER_BARRIER()
 
 #elif defined(__riscv) && (__riscv_xlen == 64)
 
@@ -396,21 +371,19 @@ __wt_atomic_storevbool(volatile bool *vp, bool v)
  * https://five-embeddev.com/riscv-isa-manual/latest/memory.html#sec:mm:fence
  *
  * On RISC-V, the fence instruction takes explicit flags that indicate the predecessor and successor
- * sets. Based on the file comment description of WT_ACQUIRE_BARRIER and WT_RELEASE_BARRIER, those
- * barriers only synchronize read/read and write/write respectively. The predecessor and successor
- * sets here are selected to match that description.
+ * sets.
  */
 #define WT_FULL_BARRIER()                              \
     do {                                               \
         __asm__ volatile("fence rw, rw" ::: "memory"); \
     } while (0)
-#define WT_ACQUIRE_BARRIER()                         \
-    do {                                             \
-        __asm__ volatile("fence r, r" ::: "memory"); \
+#define WT_ACQUIRE_BARRIER()                          \
+    do {                                              \
+        __asm__ volatile("fence r, rw" ::: "memory"); \
     } while (0)
-#define WT_RELEASE_BARRIER()                         \
-    do {                                             \
-        __asm__ volatile("fence w, w" ::: "memory"); \
+#define WT_RELEASE_BARRIER()                          \
+    do {                                              \
+        __asm__ volatile("fence rw, w" ::: "memory"); \
     } while (0)
 
 #elif defined(__loongarch64)
@@ -419,14 +392,8 @@ __wt_atomic_storevbool(volatile bool *vp, bool v)
     do {                                         \
         __asm__ volatile("dbar 0" ::: "memory"); \
     } while (0)
-#define WT_ACQUIRE_BARRIER()                     \
-    do {                                         \
-        __asm__ volatile("dbar 0" ::: "memory"); \
-    } while (0)
-#define WT_RELEASE_BARRIER()                     \
-    do {                                         \
-        __asm__ volatile("dbar 0" ::: "memory"); \
-    } while (0)
+#define WT_ACQUIRE_BARRIER() WT_FULL_BARRIER()
+#define WT_RELEASE_BARRIER() WT_FULL_BARRIER()
 #else
-#error "No release barrier implementation for this hardware"
+#error "No barrier implementation for this hardware"
 #endif

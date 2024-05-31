@@ -1869,7 +1869,7 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
          * the reconciliation of the root page. For now, make sure the eviction threads don't see us
          * as a threat.
          */
-        if (page->memory_footprint > WT_MEGABYTE * 2)
+        if (__wt_atomic_loadsize(&page->memory_footprint) > WT_MEGABYTE * 2)
             __wt_cache_page_inmem_decr(session, page, WT_MEGABYTE);
     }
     __wt_root_ref_init(session, &ss->root_ref, page, false);

@@ -106,15 +106,16 @@ struct __wt_data_handle {
     WT_DATA_SOURCE *dsrc; /* Data source for this handle */
     void *handle;         /* Generic handle */
 
-    enum {
+    wt_shared enum {
         WT_DHANDLE_TYPE_BTREE,
         WT_DHANDLE_TYPE_TABLE,
         WT_DHANDLE_TYPE_TIERED,
         WT_DHANDLE_TYPE_TIERED_TREE
     } type;
 
-#define WT_DHANDLE_BTREE(dhandle) \
-    ((dhandle)->type == WT_DHANDLE_TYPE_BTREE || (dhandle)->type == WT_DHANDLE_TYPE_TIERED)
+#define WT_DHANDLE_BTREE(dhandle)                                        \
+    (__wt_atomic_load_enum(&(dhandle)->type) == WT_DHANDLE_TYPE_BTREE || \
+      __wt_atomic_load_enum(&(dhandle)->type) == WT_DHANDLE_TYPE_TIERED)
 
     bool compact_skip; /* If the handle failed to compact */
 

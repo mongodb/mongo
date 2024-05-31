@@ -301,7 +301,7 @@ struct __wt_import_list {
         if ((skipp) != (bool *)NULL)                                        \
             *(bool *)(skipp) = true;                                        \
         if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP)) {  \
-            if (__conn->hot_backup_start == 0) {                            \
+            if (__wt_atomic_load64(&__conn->hot_backup_start) == 0) {       \
                 if ((skipp) != (bool *)NULL)                                \
                     *(bool *)(skipp) = false;                               \
                 op;                                                         \
@@ -309,7 +309,7 @@ struct __wt_import_list {
         } else {                                                            \
             __wt_readlock(session, &__conn->hot_backup_lock);               \
             FLD_SET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_READ); \
-            if (__conn->hot_backup_start == 0) {                            \
+            if (__wt_atomic_load64(&__conn->hot_backup_start) == 0) {       \
                 if ((skipp) != (bool *)NULL)                                \
                     *(bool *)(skipp) = false;                               \
                 op;                                                         \

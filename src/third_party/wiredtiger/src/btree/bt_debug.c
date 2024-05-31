@@ -885,7 +885,7 @@ __debug_tree_shape_info(WT_REF *ref, char *buf, size_t len)
     const char *unit;
 
     page = ref->page;
-    v = page->memory_footprint;
+    v = __wt_atomic_loadsize(&page->memory_footprint);
 
     if (v > WT_GIGABYTE) {
         v /= WT_GIGABYTE;
@@ -1289,7 +1289,8 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
         WT_RET(ds->f(ds, " | split_gen: %" PRIu64, split_gen));
     if (mod != NULL)
         WT_RET(ds->f(ds, " | page_state: %" PRIu32, __wt_atomic_load32(&mod->page_state)));
-    WT_RET(ds->f(ds, " | page_mem_size: %" WT_SIZET_FMT, page->memory_footprint));
+    WT_RET(
+      ds->f(ds, " | page_mem_size: %" WT_SIZET_FMT, __wt_atomic_loadsize(&page->memory_footprint)));
     return (ds->f(ds, "\n"));
 }
 

@@ -188,10 +188,11 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              * have to visit them anyway.
              */
             page = walk->page;
-            if (__wt_page_is_modified(page) && WT_TXNID_LT(page->modify->update_txn, oldest_id)) {
+            if (__wt_page_is_modified(page) &&
+              WT_TXNID_LT(__wt_atomic_load64(&page->modify->update_txn), oldest_id)) {
                 if (txn->isolation == WT_ISO_READ_COMMITTED)
                     __wt_txn_get_snapshot(session);
-                leaf_bytes += page->memory_footprint;
+                leaf_bytes += __wt_atomic_loadsize(&page->memory_footprint);
                 ++leaf_pages;
                 WT_ERR(__wt_reconcile(session, walk, NULL, WT_REC_CHECKPOINT));
             }
@@ -296,13 +297,13 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             }
 
             if (is_internal) {
-                internal_bytes += page->memory_footprint;
+                internal_bytes += __wt_atomic_loadsize(&page->memory_footprint);
                 ++internal_pages;
                 /* Slow down checkpoints. */
                 if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_SLOW_CKPT))
                     __wt_sleep(0, 10 * WT_THOUSAND);
             } else {
-                leaf_bytes += page->memory_footprint;
+                leaf_bytes += __wt_atomic_loadsize(&page->memory_footprint);
                 ++leaf_pages;
             }
 
@@ -346,7 +347,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              * Update checkpoint IO tracking data if configured to log verbose progress messages.
              */
             if (conn->ckpt_timer_start.tv_sec > 0) {
-                conn->ckpt_write_bytes += page->memory_footprint;
+                conn->ckpt_write_bytes += __wt_atomic_loadsize(&page->memory_footprint);
                 ++conn->ckpt_write_pages;
 
                 /* Periodically log checkpoint progress. */

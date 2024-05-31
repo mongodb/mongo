@@ -93,7 +93,7 @@ __global_calibrate_ticks(void)
     __wt_process.tsc_nsec_ratio = WT_TSC_DEFAULT_RATIO;
     __wt_process.use_epochtime = true;
 
-#if defined(__i386) || defined(__amd64) || defined(__aarch64__)
+#if defined(__amd64) || defined(__aarch64__)
     {
         struct timespec start, stop;
         double ratio;

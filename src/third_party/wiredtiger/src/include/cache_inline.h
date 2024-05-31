@@ -297,8 +297,8 @@ __wt_eviction_dirty_target(WT_CACHE *cache)
 {
     double dirty_target, scrub_target;
 
-    dirty_target = cache->eviction_dirty_target;
-    scrub_target = cache->eviction_scrub_target;
+    dirty_target = __wt_read_shared_double(&cache->eviction_dirty_target);
+    scrub_target = __wt_read_shared_double(&cache->eviction_scrub_target);
 
     return (scrub_target > 0 && scrub_target < dirty_target ? scrub_target : dirty_target);
 }

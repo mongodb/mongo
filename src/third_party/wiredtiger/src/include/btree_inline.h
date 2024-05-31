@@ -198,7 +198,7 @@ __wt_btree_bytes_evictable(WT_SESSION_IMPL *session)
     root_page = btree->root.page;
 
     bytes_inmem = __wt_atomic_load64(&btree->bytes_inmem);
-    bytes_root = root_page == NULL ? 0 : root_page->memory_footprint;
+    bytes_root = root_page == NULL ? 0 : __wt_atomic_loadsize(&root_page->memory_footprint);
     evictable_bytes = bytes_inmem - bytes_root;
 
     return (bytes_inmem <= bytes_root ? 0 : __wt_cache_bytes_plus_overhead(cache, evictable_bytes));
@@ -327,7 +327,7 @@ __wt_cache_decr_check_size(WT_SESSION_IMPL *session, size_t *vp, size_t v, const
      * It's a bug if this accounting underflowed but allow the application to proceed - the
      * consequence is we use more cache than configured.
      */
-    *vp = 0;
+    __wt_atomic_storesize(vp, 0);
     __wt_errx(session, "%s went negative with decrement of %" WT_SIZET_FMT, fld, v);
 
 #ifdef HAVE_DIAGNOSTIC
@@ -342,7 +342,9 @@ __wt_cache_decr_check_size(WT_SESSION_IMPL *session, size_t *vp, size_t v, const
 static WT_INLINE void
 __wt_cache_decr_check_uint64(WT_SESSION_IMPL *session, uint64_t *vp, uint64_t v, const char *fld)
 {
-    uint64_t orig = *vp;
+    uint64_t orig;
+
+    orig = __wt_atomic_load64(vp);
 
     if (v == 0 || __wt_atomic_sub64(vp, v) < WT_EXABYTE)
         return;
@@ -351,7 +353,7 @@ __wt_cache_decr_check_uint64(WT_SESSION_IMPL *session, uint64_t *vp, uint64_t v,
      * It's a bug if this accounting underflowed but allow the application to proceed - the
      * consequence is we use more cache than configured.
      */
-    *vp = 0;
+    __wt_atomic_store64(vp, 0);
     __wt_errx(
       session, "%s was %" PRIu64 ", went negative with decrement of %" PRIu64, fld, orig, v);
 
@@ -509,7 +511,7 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
      *
      * Take care to read the memory_footprint once in case we are racing with updates.
      */
-    size = page->memory_footprint;
+    size = __wt_atomic_loadsize(&page->memory_footprint);
     if (WT_PAGE_IS_INTERNAL(page)) {
         (void)__wt_atomic_add64(&cache->pages_dirty_intl, 1);
         (void)__wt_atomic_add64(&cache->bytes_dirty_intl, size);
@@ -600,17 +602,17 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
     modify = page->modify;
 
     /* Update the bytes in-memory to reflect the eviction. */
-    __wt_cache_decr_check_uint64(
-      session, &btree->bytes_inmem, page->memory_footprint, "WT_BTREE.bytes_inmem");
-    __wt_cache_decr_check_uint64(
-      session, &cache->bytes_inmem, page->memory_footprint, "WT_CACHE.bytes_inmem");
+    __wt_cache_decr_check_uint64(session, &btree->bytes_inmem,
+      __wt_atomic_loadsize(&page->memory_footprint), "WT_BTREE.bytes_inmem");
+    __wt_cache_decr_check_uint64(session, &cache->bytes_inmem,
+      __wt_atomic_loadsize(&page->memory_footprint), "WT_CACHE.bytes_inmem");
 
     /* Update the bytes_internal value to reflect the eviction */
     if (WT_PAGE_IS_INTERNAL(page)) {
-        __wt_cache_decr_check_uint64(
-          session, &btree->bytes_internal, page->memory_footprint, "WT_BTREE.bytes_internal");
-        __wt_cache_decr_check_uint64(
-          session, &cache->bytes_internal, page->memory_footprint, "WT_CACHE.bytes_internal");
+        __wt_cache_decr_check_uint64(session, &btree->bytes_internal,
+          __wt_atomic_loadsize(&page->memory_footprint), "WT_BTREE.bytes_internal");
+        __wt_cache_decr_check_uint64(session, &cache->bytes_internal,
+          __wt_atomic_loadsize(&page->memory_footprint), "WT_CACHE.bytes_internal");
     }
 
     /* Update the cache's dirty-byte count. */
@@ -637,7 +639,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
     }
 
     /* Update bytes and pages evicted. */
-    (void)__wt_atomic_add64(&cache->bytes_evict, page->memory_footprint);
+    (void)__wt_atomic_add64(&cache->bytes_evict, __wt_atomic_loadsize(&page->memory_footprint));
     (void)__wt_atomic_addv64(&cache->pages_evicted, 1);
 
     /*
@@ -727,8 +729,8 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
     }
 
     /* Check if this is the largest transaction ID to update the page. */
-    if (WT_TXNID_LT(page->modify->update_txn, session->txn->id))
-        page->modify->update_txn = session->txn->id;
+    if (WT_TXNID_LT(__wt_atomic_load64(&page->modify->update_txn), session->txn->id))
+        __wt_atomic_store64(&page->modify->update_txn, session->txn->id);
 }
 
 /*
@@ -1769,7 +1771,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
      * correctness (the page must be reconciled again before being evicted after the split,
      * information from a previous reconciliation will be wrong, so we can't evict immediately).
      */
-    if (page->memory_footprint < btree->splitmempage)
+    if (__wt_atomic_loadsize(&page->memory_footprint) < btree->splitmempage)
         return (false);
     if (WT_PAGE_IS_INTERNAL(page))
         return (false);
@@ -1793,7 +1795,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  * are 5 items on the page.
  */
 #define WT_MAX_SPLIT_COUNT 5
-    if (page->memory_footprint > (size_t)btree->maxleafpage * 2) {
+    if (__wt_atomic_loadsize(&page->memory_footprint) > (size_t)btree->maxleafpage * 2) {
         for (count = 0, ins = ins_head->head[0]; ins != NULL; ins = ins->next[0]) {
             if (++count < WT_MAX_SPLIT_COUNT)
                 continue;
@@ -2099,7 +2101,7 @@ __wt_btree_lsm_over_size(WT_SESSION_IMPL *session, uint64_t maxsize)
     if (child->type != WT_PAGE_ROW_LEAF) /* not a single leaf page */
         return (true);
 
-    return (child->memory_footprint > maxsize);
+    return (__wt_atomic_loadsize(&child->memory_footprint) > maxsize);
 }
 
 /*

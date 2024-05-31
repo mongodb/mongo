@@ -41,7 +41,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
      * the disk image size takes into account large values that have
      * already been written and should not trigger forced eviction.
      */
-    footprint = page->memory_footprint;
+    footprint = __wt_atomic_loadsize(&page->memory_footprint);
     if (page->dsk != NULL)
         footprint -= page->dsk->mem_size;
 

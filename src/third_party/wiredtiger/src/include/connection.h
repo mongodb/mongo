@@ -86,7 +86,7 @@ struct __wt_background_compact_exclude {
  *	Structure dedicated to the background compaction server
  */
 struct __wt_background_compact {
-    bool running;             /* Compaction supposed to run */
+    wt_shared bool running;   /* Compaction supposed to run */
     bool run_once;            /* Background compaction is executed once */
     bool signalled;           /* Compact signalled */
     bool tid_set;             /* Thread set */
@@ -285,10 +285,10 @@ struct __wt_name_flag {
  * WT_CONN_HOTBACKUP_START --
  *	Macro to set connection data appropriately for when we commence hot backup.
  */
-#define WT_CONN_HOTBACKUP_START(conn)                        \
-    do {                                                     \
-        (conn)->hot_backup_start = (conn)->ckpt_most_recent; \
-        (conn)->hot_backup_list = NULL;                      \
+#define WT_CONN_HOTBACKUP_START(conn)                                             \
+    do {                                                                          \
+        __wt_atomic_store64(&(conn)->hot_backup_start, (conn)->ckpt_most_recent); \
+        (conn)->hot_backup_list = NULL;                                           \
     } while (0)
 
 /*
@@ -431,7 +431,7 @@ struct __wt_connection_impl {
     /* Locked: handles in each bucket */
     uint64_t *dh_bucket_count;
     uint64_t dhandle_count;                  /* Locked: handles in the queue */
-    u_int open_btree_count;                  /* Locked: open writable btree count */
+    wt_shared u_int open_btree_count;        /* Locked: open writable btree count */
     uint32_t next_file_id;                   /* Locked: file ID counter */
     wt_shared uint32_t open_file_count;      /* Atomic: open file handle count */
     wt_shared uint32_t open_cursor_count;    /* Atomic: open cursor handle count */
@@ -467,8 +467,9 @@ struct __wt_connection_impl {
     uint32_t recovery_ckpt_snapshot_count;
 
     WT_RWLOCK hot_backup_lock; /* Hot backup serialization */
-    uint64_t hot_backup_start; /* Clock value of most recent checkpoint needed by hot backup */
-    char **hot_backup_list;    /* Hot backup file list */
+    wt_shared uint64_t
+      hot_backup_start;     /* Clock value of most recent checkpoint needed by hot backup */
+    char **hot_backup_list; /* Hot backup file list */
     uint32_t *partial_backup_remove_ids; /* Remove btree id list for partial backup */
 
     WT_SESSION_IMPL *ckpt_session;       /* Checkpoint thread session */

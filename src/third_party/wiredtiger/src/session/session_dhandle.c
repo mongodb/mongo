@@ -795,9 +795,9 @@ __wt_session_dhandle_sweep(WT_SESSION_IMPL *session)
      * Periodically sweep for dead handles; if we've swept recently, don't do it again.
      */
     __wt_seconds(session, &now);
-    if (now - session->last_sweep < conn->sweep_interval)
+    if (now - __wt_atomic_load64(&session->last_sweep) < conn->sweep_interval)
         return;
-    session->last_sweep = now;
+    __wt_atomic_store64(&session->last_sweep, now);
 
     WT_STAT_CONN_INCR(session, dh_session_sweeps);
 

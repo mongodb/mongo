@@ -1187,7 +1187,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
      * can copy the files in any way they choose, and a log file rename might confuse things.
      */
     create_log = true;
-    if (conn->log_prealloc > 0 && conn->hot_backup_start == 0) {
+    if (conn->log_prealloc > 0 && __wt_atomic_load64(&conn->hot_backup_start) == 0) {
         WT_WITH_HOTBACKUP_READ_LOCK(
           session, ret = __log_alloc_prealloc(session, log->fileid), &skipp);
 
@@ -1216,7 +1216,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
          * hot backup is not in progress. We are deliberately not using pre-allocated log files
          * during backup (see comment above).
          */
-        if (conn->hot_backup_start == 0 && !conn_open)
+        if (__wt_atomic_load64(&conn->hot_backup_start) == 0 && !conn_open)
             log->prep_missed++;
         WT_RET(__wt_log_allocfile(session, log->fileid, WT_LOG_FILENAME));
     }
@@ -1405,7 +1405,7 @@ __log_truncate_file(WT_SESSION_IMPL *session, WT_FH *log_fh, wt_off_t offset)
     conn = S2C(session);
     log = conn->log;
 
-    if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP) && conn->hot_backup_start == 0) {
+    if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP) && __wt_atomic_load64(&conn->hot_backup_start) == 0) {
         WT_WITH_HOTBACKUP_READ_LOCK(session, ret = __wt_ftruncate(session, log_fh, offset), &skipp);
         if (!skipp) {
             if (ret != ENOTSUP)

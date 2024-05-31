@@ -26,7 +26,8 @@ __schema_backup_check_int(WT_SESSION_IMPL *session, const char *name)
      * There is a window at the end of a backup where the list has been cleared from the connection
      * but the flag is still set. It is safe to drop at that point.
      */
-    if (conn->hot_backup_start == 0 || (backup_list = conn->hot_backup_list) == NULL) {
+    if (__wt_atomic_load64(&conn->hot_backup_start) == 0 ||
+      (backup_list = conn->hot_backup_list) == NULL) {
         return (0);
     }
     for (i = 0; backup_list[i] != NULL; ++i) {
@@ -50,7 +51,7 @@ __wti_schema_backup_check(WT_SESSION_IMPL *session, const char *name)
     WT_DECL_RET;
 
     conn = S2C(session);
-    if (conn->hot_backup_start == 0)
+    if (__wt_atomic_load64(&conn->hot_backup_start) == 0)
         return (0);
     WT_WITH_HOTBACKUP_READ_LOCK_UNCOND(session, ret = __schema_backup_check_int(session, name));
     return (ret);

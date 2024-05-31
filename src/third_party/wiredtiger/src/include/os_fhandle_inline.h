@@ -72,7 +72,8 @@ __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
     /* Make sure we don't try to shrink the file during backup. */
     if (handle->fh_size != NULL) {
         WT_RET(handle->fh_size(handle, (WT_SESSION *)session, &cur_size));
-        WT_ASSERT(session, cur_size <= offset || S2C(session)->hot_backup_start == 0);
+        WT_ASSERT(
+          session, cur_size <= offset || __wt_atomic_load64(&S2C(session)->hot_backup_start) == 0);
     }
 #endif
     if (handle->fh_extend_nolock != NULL)
@@ -165,7 +166,8 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
     /* Make sure we don't try to shrink the file during backup. */
     if (handle->fh_size != NULL) {
         WT_RET(handle->fh_size(handle, (WT_SESSION *)session, &cur_size));
-        WT_ASSERT(session, cur_size <= offset || S2C(session)->hot_backup_start == 0);
+        WT_ASSERT(
+          session, cur_size <= offset || __wt_atomic_load64(&S2C(session)->hot_backup_start) == 0);
     }
 #endif
     if (handle->fh_truncate != NULL)

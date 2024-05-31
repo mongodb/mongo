@@ -331,8 +331,10 @@ __wti_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STATP_CONN_SET(session, stats, cache_bytes_other, __wt_cache_bytes_other(cache));
     WT_STATP_CONN_SET(session, stats, cache_bytes_updates, __wt_cache_bytes_updates(cache));
 
-    WT_STATP_CONN_SET(session, stats, cache_eviction_maximum_page_size, cache->evict_max_page_size);
-    WT_STATP_CONN_SET(session, stats, cache_eviction_maximum_milliseconds, cache->evict_max_ms);
+    WT_STATP_CONN_SET(session, stats, cache_eviction_maximum_page_size,
+      __wt_atomic_load64(&cache->evict_max_page_size));
+    WT_STATP_CONN_SET(session, stats, cache_eviction_maximum_milliseconds,
+      __wt_atomic_load64(&cache->evict_max_ms));
     WT_STATP_CONN_SET(
       session, stats, cache_reentry_hs_eviction_milliseconds, cache->reentry_hs_eviction_ms);
     WT_STATP_CONN_SET(

@@ -17,14 +17,7 @@
 static WT_INLINE uint64_t
 __wt_rdtsc(void)
 {
-#if defined(__i386)
-    {
-        uint64_t x;
-
-        __asm__ volatile("rdtsc" : "=A"(x));
-        return (x);
-    }
-#elif defined(__amd64)
+#if defined(__amd64)
     {
         uint64_t a, d;
 

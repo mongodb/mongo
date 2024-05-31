@@ -478,7 +478,7 @@ extern int __wt_cursor_bounds_restore(WT_SESSION_IMPL *session, WT_CURSOR *curso
 extern int __wt_cursor_bounds_save(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
   WT_CURSOR_BOUNDS_STATE *bounds_state) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_value,
-  WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
+  WT_CURSOR *to_dup, const char **cfg, WT_CURSOR **cursorp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_cursor_cached(WT_CURSOR *cursor) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_cursor_config_notsup(WT_CURSOR *cursor, const char *config)
@@ -2169,6 +2169,8 @@ static WT_INLINE const char *__wt_prepare_state_str(uint8_t val)
 static WT_INLINE const char *__wt_update_type_str(uint8_t val)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE double __wt_eviction_dirty_target(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE double __wt_read_shared_double(double *to_read)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_btcur_bounds_early_exit(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
   bool next, bool *key_out_of_boundsp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
