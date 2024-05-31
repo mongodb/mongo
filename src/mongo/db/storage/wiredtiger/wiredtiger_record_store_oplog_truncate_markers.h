@@ -64,7 +64,15 @@ public:
      */
     void kill();
 
-    void awaitHasExcessMarkersOrDead(OperationContext* opCtx);
+    /**
+     * Waits for excess oplog space to be available for reclamation.
+     * Returns true if we can proceed to reclaim space in the oplog.
+     * Otherwise, returns false if the containing record store instance is being destroyed
+     * or if we reached the deadline for waiting.
+     * Throws exception if interrupted.
+     * See 'oplogTruncationCheckPeriodSeconds' server parameter.
+     */
+    bool awaitHasExcessMarkersOrDead(OperationContext* opCtx) override;
 
     // Clears all the markers of the instance whenever the current WUOW commits.
     void clearMarkersOnCommit(OperationContext* opCtx);

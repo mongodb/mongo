@@ -232,7 +232,7 @@ public:
 
     Status updateOplogSize(OperationContext* opCtx, long long newOplogSize) override;
 
-    bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) override;
+    std::shared_ptr<CollectionTruncateMarkers> getCollectionTruncateMarkers() override;
 
     /**
      * Attempts to truncate oplog entries before the pinned oplog timestamp. Truncation will occur
