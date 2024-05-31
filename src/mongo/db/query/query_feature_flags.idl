@@ -65,8 +65,7 @@ feature_flags:
       description: "Feature flag for enabling full queryStats collection."
       cpp_varname: gFeatureFlagQueryStats
       default: true
-      version: 7.2
-      shouldBeFCVGated: true
+      shouldBeFCVGated: false
 
     featureFlagQueryStatsDataBearingNodes:
       description: "Feature flag for enabling aggregation of queryStats from data bearing nodes."
