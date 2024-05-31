@@ -1244,7 +1244,6 @@ tasks:
       [
         "assigned_to_jira_team_devprod_build",
         "release_critical",
-        "incompatible_mac",
         "requires_compile_variant",
         "stitch",
         "bazel_check",
