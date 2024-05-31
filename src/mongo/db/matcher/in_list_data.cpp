@@ -33,6 +33,8 @@
 #include "mongo/util/string_listset.h"
 
 #include <algorithm>
+#include <bitset>
+#include <concepts>
 #include <functional>
 #include <iterator>
 
@@ -54,7 +56,8 @@ InListData::InListData(CloneCtorTag, const InListData& other)
       _arr(other._arr),
       _oldBackingArr(other._oldBackingArr),
       _originalElements(other._originalElements),
-      _sortedElements(boost::in_place_init, cloneSortedElements(other._sortedElements)) {}
+      _sortedElements(boost::in_place_init, cloneSortedElements(other._sortedElements)),
+      _firstOfEachTypeElements(other._firstOfEachTypeElements) {}
 
 void InListData::appendElements(BSONArrayBuilder& bab, bool getSortedAndDeduped) {
     for (const auto& elem : getElements(getSortedAndDeduped)) {
@@ -63,16 +66,22 @@ void InListData::appendElements(BSONArrayBuilder& bab, bool getSortedAndDeduped)
 }
 
 std::vector<BSONElement> InListData::getFirstOfEachType(bool getSortedAndDeduped) const {
-    stdx::unordered_set<int> seenTypes;
-    std::vector<BSONElement> result;
-
-    for (const auto& elem : getElements(getSortedAndDeduped)) {
-        if (seenTypes.insert(canonicalizeBSONType(elem.type())).second) {
-            result.emplace_back(elem);
+    if (getSortedAndDeduped && !_wasPreSortedAndDeduped) {
+        // Registers if an element of a given canonical type has been observed in the elements
+        // array. Uses one bit for each canonical type.
+        CanonicalTypeMask observedElementsCanonicalTypeMask;
+        std::vector<BSONElement> result;
+        for (const auto& elem : getElements()) {
+            const auto normalizedCanonicalType = getNormalizedCanonicalType(elem.type());
+            if (!observedElementsCanonicalTypeMask.test(normalizedCanonicalType)) {
+                result.emplace_back(elem);
+                observedElementsCanonicalTypeMask.set(normalizedCanonicalType);
+            }
         }
+        return result;
+    } else {
+        return {_firstOfEachTypeElements.cbegin(), _firstOfEachTypeElements.cend()};
     }
-
-    return result;
 }
 
 Status InListData::setElementsImpl(boost::optional<BSONObj> arr,
@@ -90,6 +99,11 @@ Status InListData::setElementsImpl(boost::optional<BSONObj> arr,
     bool hasMultipleUniqueElements = false;
 
     uint32_t typeMask = 0;
+
+    // Registers if an element of a given canonical type has been observed in the elements array.
+    // Uses one bit for each canonical type.
+    CanonicalTypeMask observedElementsCanonicalTypeMask;
+
     bool hasEmptyArray = false;
     bool hasEmptyObject = false;
     bool hasNonEmptyArray = false;
@@ -97,6 +111,9 @@ Status InListData::setElementsImpl(boost::optional<BSONObj> arr,
     bool hasLargeStrings = false;
 
     std::vector<BSONElement> elements;
+
+    // A vector of BSONElements of the first observed elements of each distinct canonical type.
+    SmallBSONElementVector firstOfEachTypeElements;
 
     if (arr) {
         const uint32_t arrSizeInBytes = arr->objsize();
@@ -145,7 +162,15 @@ Status InListData::setElementsImpl(boost::optional<BSONObj> arr,
                 elements.emplace_back(e);
             }
 
-            typeMask |= getBSONTypeMask(type);
+            const auto bsonTypeMask = getBSONTypeMask(type);
+            if ((typeMask & bsonTypeMask) == 0) {
+                const auto normalizedCanonicalType = getNormalizedCanonicalType(type);
+                if (!observedElementsCanonicalTypeMask.test(normalizedCanonicalType)) {
+                    firstOfEachTypeElements.emplace_back(e);
+                    observedElementsCanonicalTypeMask.set(normalizedCanonicalType);
+                }
+                typeMask |= bsonTypeMask;
+            }
 
             if (type == BSONType::String || type == BSONType::Symbol) {
                 uint32_t len = e.valuestrsize() - 1;
@@ -243,6 +268,7 @@ Status InListData::setElementsImpl(boost::optional<BSONObj> arr,
     // state, and mark the elements as being initialized.
     _originalElements = std::move(elements);
     _sortedElements.emplace();
+    _firstOfEachTypeElements = std::move(firstOfEachTypeElements);
     _elementsInitialized = true;
 
     // Record what we observed about '_originalElements' regarding whether it's been pre-sorted
@@ -351,6 +377,22 @@ void InListData::makeBSONOwned() {
     tassert(status);
 }
 
+namespace {
+// Updates each BSONElement in container 'elements' to refer to backing buffer 'newBuffer' given
+// that each element refers to backing buffer 'previousBuffer'.
+template <typename C>
+requires std::same_as<typename C::value_type, BSONElement> && requires(C c) {
+    { std::begin(c) } -> std::same_as<typename C::iterator>;
+    { std::end(c) } -> std::same_as<typename C::iterator>;
+}
+void remapElements(C& elements, const char* previousBuffer, const char* newBuffer) {
+    for (auto& e : elements) {
+        const char* newAddress = newBuffer + (e.rawdata() - previousBuffer);
+        e = BSONElement(newAddress, e.fieldNameSize(), BSONElement::TrustedInitTag{});
+    }
+}
+}  // namespace
+
 void InListData::makeArrOwned() {
     if (!_arr || _arr->isOwned()) {
         return;
@@ -364,18 +406,19 @@ void InListData::makeArrOwned() {
     const char* newBuf = _arr->objdata();
 
     // Update each BSONElement in '_originalElements' to refer to the new buffer.
-    for (auto& e : _originalElements) {
-        const char* newData = newBuf + (e.rawdata() - oldBuf);
-        e = BSONElement(newData, e.fieldNameSize(), BSONElement::TrustedInitTag{});
-    }
+    remapElements(_originalElements, oldBuf, newBuf);
 
     // If '_sortedElements' holds a vector, update each BSONElement in '_sortedElements' to
     // refer to the new buffer.
     if (std::vector<BSONElement>* sortedElems = _sortedElements->getIfInitialized()) {
-        for (auto& e : *sortedElems) {
-            const char* newData = newBuf + (e.rawdata() - oldBuf);
-            e = BSONElement(newData, e.fieldNameSize(), BSONElement::TrustedInitTag{});
-        }
+        remapElements(*sortedElems, oldBuf, newBuf);
     }
+
+    // Update each BSONElement in '_firstOfEachTypeElements' to refer to the new buffer.
+    remapElements(_firstOfEachTypeElements, oldBuf, newBuf);
+}
+
+std::size_t InListData::getNormalizedCanonicalType(BSONType type) {
+    return canonicalizeBSONType(type) - kCanonicalTypeMinValue;
 }
 }  // namespace mongo
