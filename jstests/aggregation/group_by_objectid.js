@@ -4,8 +4,7 @@
 //   # run this test on in-memory variants.
 //   requires_persistence,
 // ]
-// TODO SERVER-90234: Use jsTestName() instead of a string.
-const collName = "group_by_objectid";
+const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
 
