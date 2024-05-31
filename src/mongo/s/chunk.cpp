@@ -123,7 +123,7 @@ BSONObj ChunkInfo::toBSON() const {
     bob.append("maxKeyString", _maxKeyString);
     bob.append("shardId", _shardId);
     _lastmod.serialize("lastmod", &bob);
-    bob.append("jumbo", _jumbo);
+    bob.append("jumbo", _jumbo.load());
 
     BSONArrayBuilder historyArr{bob.subarrayStart("history")};
     for (const auto& historyEntry : _history) {
@@ -134,7 +134,7 @@ BSONObj ChunkInfo::toBSON() const {
 }
 
 void ChunkInfo::markAsJumbo() {
-    _jumbo = true;
+    _jumbo.store(true);
 }
 
 void Chunk::throwIfMoved() const {
