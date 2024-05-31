@@ -148,15 +148,13 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
                                                                  AddAttrsFn addAttrsWithoutData,
                                                                  AddAttrsFn addAttrsWithData) {
             logv2::DynamicAttributes attrs;
+            attrs.add("reason", reason);
             attrs.add("bucketId", batch->bucketHandle.bucketId.oid);
             attrs.add("collectionUUID", batch->bucketHandle.bucketId.collectionUUID);
             addAttrsWithoutData(attrs);
 
-            LOGV2_WARNING(8807500,
-                          "Failed data verification inserting into compressed column",
-                          "reason"_attr = reason,
-                          "bucketId"_attr = batch->bucketHandle.bucketId.oid,
-                          "collectionUUID"_attr = batch->bucketHandle.bucketId.collectionUUID);
+            LOGV2_WARNING(
+                8807500, "Failed data verification inserting into compressed column", attrs);
 
             attrs = {};
             auto seqLogDataFields = [](const details::Measurement& measurement) {
