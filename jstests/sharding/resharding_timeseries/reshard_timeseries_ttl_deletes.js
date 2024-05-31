@@ -41,11 +41,10 @@ const timeseriesCollection = reshardingTest.createShardedCollection({
 });
 
 function assertNumOfDocs(expected) {
-    const docs = st.s0.getCollection(ns).find({}).toArray();
-    assert.eq(expected,
-              docs.length,
-              "Expected " + expected + " docs, but there are " + docs.length +
-                  " docs. Documents in collection: " + tojson(docs));
+    assert.soon(() => {
+        const docs = st.s0.getCollection(ns).find({}).toArray();
+        return expected === docs.length;
+    }, "Expected " + expected + " docs in the collection.");
 }
 
 function insertDocsToBeDeleted() {
@@ -69,6 +68,7 @@ assertNumOfDocs(2);
 const mongos = timeseriesCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donor0 = new Mongo(topology.shards[donorShardNames[0]].primary);
+const donor1 = new Mongo(topology.shards[donorShardNames[1]].primary);
 const recipient0 = new Mongo(topology.shards[recipientShardNames[0]].primary);
 
 const hangTTLMonitorFP = configureFailPoint(donor0, 'hangTTLMonitorBetweenPasses');
@@ -76,22 +76,27 @@ insertDocsToBeDeleted();
 assertNumOfDocs(4);
 hangTTLMonitorFP.wait();
 
-reshardingTest.withReshardingInBackground({
-    newShardKeyPattern: {'meta.y': 1},
-    newChunks: [
-        {min: {'meta.y': MinKey}, max: {'meta.y': 0}, shard: recipientShardNames[0]},
-        {min: {'meta.y': 0}, max: {'meta.y': MaxKey}, shard: recipientShardNames[1]},
-    ],
-},
-                                          () => {
-                                              reshardingTest.awaitCloneTimestampChosen();
-                                              hangTTLMonitorFP.off();
+reshardingTest.withReshardingInBackground(
+    {
+        newShardKeyPattern: {'meta.y': 1},
+        newChunks: [
+            {min: {'meta.y': MinKey}, max: {'meta.y': 0}, shard: recipientShardNames[0]},
+            {min: {'meta.y': 0}, max: {'meta.y': MaxKey}, shard: recipientShardNames[1]},
+        ],
+    },
+    () => {
+        reshardingTest.awaitCloneTimestampChosen();
+        hangTTLMonitorFP.off();
 
-                                              // Wait for TTL to delete the docs on the source
-                                              // collection.
-                                              TTLUtil.waitForPass(donor0.getDB('reshardingDb'));
-                                              assertNumOfDocs(2);
-                                          });
+        // Refresh donor shards to avoid staleConfig errors.
+        assert.commandWorked(donor0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+        assert.commandWorked(donor1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+
+        // Wait for TTL to delete the docs on the source
+        // collection.
+        TTLUtil.waitForPass(donor0.getDB('reshardingDb'));
+        assertNumOfDocs(2);
+    });
 
 // Verify that donor has delete oplog entry and recipient has a corresponding applyOps entry.
 const bucketNss = "reshardingDb.system.buckets.coll";
