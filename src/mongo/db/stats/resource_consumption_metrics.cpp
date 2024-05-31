@@ -131,13 +131,12 @@ ResourceConsumption::MetricsCollector& ResourceConsumption::MetricsCollector::ge
     return getMetricsCollector(opCtx);
 }
 
-void ResourceConsumption::TotalUnitWriteCounter::observeOneDocForTotalWrites(int64_t datumBytes) {
+void ResourceConsumption::TotalUnitWriteCounter::observeOneDocument(int64_t datumBytes) {
     // If we have accumulated document bytes, calculate units along with any past index bytes.
     // Accumulate the current document bytes for use in a later unit calculation.
     if (_accumulatedDocumentBytes > 0) {
-        _units +=
-            (_accumulatedIndexBytes + _accumulatedDocumentBytes + (kTotalUnitWriteSizeBytes - 1)) /
-            kTotalUnitWriteSizeBytes;
+        _units += std::ceil((_accumulatedIndexBytes + _accumulatedDocumentBytes) /
+                            static_cast<float>(unitSize()));
         _accumulatedIndexBytes = 0;
         _accumulatedDocumentBytes = datumBytes;
         return;
@@ -146,8 +145,7 @@ void ResourceConsumption::TotalUnitWriteCounter::observeOneDocForTotalWrites(int
     // If we have accumulated index bytes, associate them with the current document and calculate
     // units.
     if (_accumulatedIndexBytes > 0) {
-        _units += (_accumulatedIndexBytes + datumBytes + (kTotalUnitWriteSizeBytes - 1)) /
-            kTotalUnitWriteSizeBytes;
+        _units += std::ceil((_accumulatedIndexBytes + datumBytes) / static_cast<float>(unitSize()));
         _accumulatedIndexBytes = 0;
         return;
     }
@@ -156,9 +154,20 @@ void ResourceConsumption::TotalUnitWriteCounter::observeOneDocForTotalWrites(int
     _accumulatedDocumentBytes = datumBytes;
 }
 
-void ResourceConsumption::TotalUnitWriteCounter::observeOneIdxEntryForTotalWrites(
-    int64_t datumBytes) {
+void ResourceConsumption::TotalUnitWriteCounter::observeOneIndexEntry(int64_t datumBytes) {
     _accumulatedIndexBytes += datumBytes;
+}
+
+int ResourceConsumption::DocumentUnitCounter::unitSize() const {
+    return gDocumentUnitSizeBytes;
+}
+
+int ResourceConsumption::IdxEntryUnitCounter::unitSize() const {
+    return gIndexEntryUnitSizeBytes;
+}
+
+int ResourceConsumption::TotalUnitWriteCounter::unitSize() const {
+    return gTotalUnitWriteSizeBytes;
 }
 
 void ResourceConsumption::ReadMetrics::toBson(BSONObjBuilder* builder) const {
@@ -236,7 +245,7 @@ void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* 
 
 void ResourceConsumption::MetricsCollector::_incrementOneDocRead(StringData uri,
                                                                  int64_t docBytesRead) {
-    _metrics.readMetrics.docsRead.observeOneDoc(docBytesRead);
+    _metrics.readMetrics.docsRead.observeOne(docBytesRead);
     LOGV2_DEBUG(6523900,
                 2,
                 "ResourceConsumption::MetricsCollector::incrementOneDocRead",
@@ -246,7 +255,7 @@ void ResourceConsumption::MetricsCollector::_incrementOneDocRead(StringData uri,
 
 void ResourceConsumption::MetricsCollector::_incrementOneIdxEntryRead(StringData uri,
                                                                       int64_t bytesRead) {
-    _metrics.readMetrics.idxEntriesRead.observeOneIdxEntry(bytesRead);
+    _metrics.readMetrics.idxEntriesRead.observeOne(bytesRead);
 
     LOGV2_DEBUG(6523901,
                 2,
@@ -267,8 +276,8 @@ void ResourceConsumption::MetricsCollector::_incrementDocUnitsReturned(
 
 void ResourceConsumption::MetricsCollector::_incrementOneDocWritten(StringData uri,
                                                                     int64_t bytesWritten) {
-    _metrics.writeMetrics.docsWritten.observeOneDoc(bytesWritten);
-    _metrics.writeMetrics.totalWritten.observeOneDocForTotalWrites(bytesWritten);
+    _metrics.writeMetrics.docsWritten.observeOne(bytesWritten);
+    _metrics.writeMetrics.totalWritten.observeOneDocument(bytesWritten);
     LOGV2_DEBUG(6523905,
                 2,
                 "ResourceConsumption::MetricsCollector::incrementOneDocWritten",
@@ -278,8 +287,8 @@ void ResourceConsumption::MetricsCollector::_incrementOneDocWritten(StringData u
 
 void ResourceConsumption::MetricsCollector::_incrementOneIdxEntryWritten(StringData uri,
                                                                          int64_t bytesWritten) {
-    _metrics.writeMetrics.idxEntriesWritten.observeOneIdxEntry(bytesWritten);
-    _metrics.writeMetrics.totalWritten.observeOneIdxEntryForTotalWrites(bytesWritten);
+    _metrics.writeMetrics.idxEntriesWritten.observeOne(bytesWritten);
+    _metrics.writeMetrics.totalWritten.observeOneIndexEntry(bytesWritten);
     LOGV2_DEBUG(6523906,
                 2,
                 "ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten",

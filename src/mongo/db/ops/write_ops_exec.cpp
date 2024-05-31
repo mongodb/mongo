@@ -922,7 +922,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
 
     if (docFound) {
         ResourceConsumption::DocumentUnitCounter docUnitsReturned;
-        docUnitsReturned.observeOneDoc(docFound->objsize());
+        docUnitsReturned.observeOne(docFound->objsize());
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
         metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
@@ -1028,7 +1028,7 @@ long long performDelete(OperationContext* opCtx,
 
     if (docFound) {
         ResourceConsumption::DocumentUnitCounter docUnitsReturned;
-        docUnitsReturned.observeOneDoc(docFound->objsize());
+        docUnitsReturned.observeOne(docFound->objsize());
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
         metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
