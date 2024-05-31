@@ -104,7 +104,9 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
         MiniDumpWithFullMemory;
 #else
         static_cast<MINIDUMP_TYPE>(MiniDumpNormal | MiniDumpWithIndirectlyReferencedMemory |
-                                   MiniDumpWithProcessThreadData);
+                                   MiniDumpWithProcessThreadData | MiniDumpWithThreadInfo |
+                                   MiniDumpWithUnloadedModules | MiniDumpIgnoreInaccessibleMemory |
+                                   MiniDumpWithTokenInformation);
 #endif
     LOGV2(23132,
           "Writing minidump diagnostic file",
