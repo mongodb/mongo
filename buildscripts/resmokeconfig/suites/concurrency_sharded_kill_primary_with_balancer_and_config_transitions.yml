@@ -63,19 +63,6 @@ selector:
     # Time-series collections are not supported on mongos.
     - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
-    # TODO SERVER-89841: Performs many sharding DDL operations and can time out taking the DDL lock
-    # on slower variants.
-    - jstests/concurrency/fsm_workloads/agg_lookup.js
-    - jstests/concurrency/fsm_workloads/agg_lookup_in_txn.js
-    - jstests/concurrency/fsm_workloads/agg_out.js
-    - jstests/concurrency/fsm_workloads/agg_sort.js
-    - jstests/concurrency/fsm_workloads/rename_sharded_collection.js
-    - jstests/concurrency/fsm_workloads/rename_capped_collection_chain.js
-    - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js
-    - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
-    - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_droptarget.js
-    - jstests/concurrency/fsm_workloads/timeseries_agg_out.js
-
     ##
     # Denylists from concurrency_sharded_kill_primary_with_balancer
     ##
