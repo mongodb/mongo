@@ -118,3 +118,6 @@
 
 // Defined if using tracing profiler stats collection
 @mongo_config_use_tracing_profiler@
+
+// Defined if the build includes stream processing module
+@mongo_config_streams@

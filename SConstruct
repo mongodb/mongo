@@ -6387,6 +6387,9 @@ def shouldBuildStreams(thisEnv):
 
 
 env.AddMethod(shouldBuildStreams, "ShouldBuildStreams")
+if env.ShouldBuildStreams():
+    # Set a config indicating this build has the stream processing module enabled (enterprise/src/streams)
+    env.SetConfigHeaderDefine("MONGO_CONFIG_STREAMS")
 
 
 def prefix_libdir_rpath_generator(env, source, target, for_signature):

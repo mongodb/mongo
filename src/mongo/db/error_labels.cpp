@@ -123,6 +123,14 @@ bool ErrorLabelBuilder::isNonResumableChangeStreamError() const {
     return _code && ErrorCodes::isNonResumableChangeStreamError(_code.value());
 }
 
+bool ErrorLabelBuilder::isStreamProcessorUserError() const {
+    return _code && mongo::isStreamProcessorUserError(_code.value());
+}
+
+bool ErrorLabelBuilder::isStreamProcessorRetryableError() const {
+    return _code && mongo::isStreamProcessorRetryableError(_code.value());
+}
+
 bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     // Determine whether this operation is a candidate for the ResumableChangeStreamError label.
     const bool mayNeedResumableChangeStreamErrorLabel =
@@ -208,6 +216,20 @@ void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
     } else if (isNonResumableChangeStreamError()) {
         labels << ErrorLabel::kNonResumableChangeStream;
     }
+
+#ifdef MONGO_CONFIG_STREAMS
+    if (_commandName == "streams_startStreamProcessor" ||
+        _commandName == "streams_listStreamProcessors") {
+        // This config is only set in special stream processing enabled builds for Atlas Stream
+        // Processing. If the config is set, add labels for the stream processing error categories.
+        if (isStreamProcessorUserError()) {
+            labels << ErrorLabel::kStreamProcessorUserError;
+        }
+        if (isStreamProcessorRetryableError()) {
+            labels << ErrorLabel::kStreamProcessorRetryableError;
+        }
+    }
+#endif
 }
 
 bool ErrorLabelBuilder::_isCommitOrAbort() const {
@@ -292,6 +314,17 @@ bool isTransientTransactionError(ErrorCodes::Error code,
     }
 
     return isTransient;
+}
+
+bool isStreamProcessorUserError(ErrorCodes::Error code) {
+    return ErrorCodes::isStreamProcessorUserError(code);
+}
+
+bool isStreamProcessorRetryableError(ErrorCodes::Error code) {
+    // All non-user errors are unexpected internal errors. The internal errors alert the
+    // on-call and we work on a mitigation. We keep these errors as retryable to make
+    // the mitigation easier.
+    return !isStreamProcessorUserError(code) || ErrorCodes::isStreamProcessorRetryableError(code);
 }
 
 }  // namespace mongo

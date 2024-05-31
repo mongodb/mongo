@@ -30,6 +30,9 @@ error_categories:
   # This category includes parsing errors caught by the IDL including unknown field, missing
   # field, and duplicate field.  It currently does not include all errors caught by the IDL.
   - IDLParseError
+  # Atlas Stream Processing uses these error categories.
+  - StreamProcessorUserError
+  - StreamProcessorRetryableError
   # Codes for internal use only. The codes can be passed between servers in a cluster, but must
   # never be returned to the client in a network response.
   - InternalOnly
@@ -780,6 +783,24 @@ error_codes:
     }
 
   - {code: 414, name: AddOrRemoveShardInProgress}
+
+  - {code: 415, name: StreamProcessorDoesNotExist}
+  # The stream processor of the specified name is already running.
+  - {code: 416, name: StreamProcessorAlreadyExists}
+  # The stream processing worker is shutting down.
+  - {code: 417, name: StreamProcessorWorkerShuttingDown}
+  # The user's stream processing query took up more memory than it was allowed to.
+  - {
+      code: 418,
+      name: StreamProcessorWorkerOutOfMemory,
+      categories: [StreamProcessorUserError],
+    }
+  # The stream processor encountered an error connecting to a Kafka target.
+  - {
+      code: 419,
+      name: StreamProcessorKafkaConnectionError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 

@@ -827,5 +827,50 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedNotAppliedDuringTransientTransact
     ASSERT_BSONOBJ_EQ(actualErrorLabels, BSON(kErrorLabelsFieldName << expectedLabelArray.arr()));
 }
 
+#ifdef MONGO_CONFIG_STREAMS
+// This tests validates stream processing labels that are only applied in special builds with
+// the streams module enabled.
+TEST_F(ErrorLabelBuilderTest, StreamProcessorErrorLabels) {
+    OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
+    sessionInfo.setTxnNumber(1);
+    sessionInfo.setAutocommit(false);
+    std::string commandName = "streams_startStreamProcessor";
+
+    {
+        auto actualErrorLabels = getErrorLabels(opCtx(),
+                                                sessionInfo,
+                                                commandName,
+                                                ErrorCodes::StreamProcessorKafkaConnectionError,
+                                                boost::none,
+                                                false /* isInternalClient */,
+                                                false /* isMongos */,
+                                                false /* isComingFromRouter */,
+                                                kOpTime,
+                                                kOpTime);
+        BSONArrayBuilder expectedLabelArray;
+        expectedLabelArray << ErrorLabel::kStreamProcessorUserError;
+        expectedLabelArray << ErrorLabel::kStreamProcessorRetryableError;
+        ASSERT_BSONOBJ_EQ(actualErrorLabels,
+                          BSON(kErrorLabelsFieldName << expectedLabelArray.arr()));
+    }
+    {
+        auto actualErrorLabels = getErrorLabels(opCtx(),
+                                                sessionInfo,
+                                                commandName,
+                                                ErrorCodes::StreamProcessorWorkerOutOfMemory,
+                                                boost::none,
+                                                false /* isInternalClient */,
+                                                false /* isMongos */,
+                                                false /* isComingFromRouter */,
+                                                kOpTime,
+                                                kOpTime);
+        BSONArrayBuilder expectedLabelArray;
+        expectedLabelArray << ErrorLabel::kStreamProcessorUserError;
+        ASSERT_BSONOBJ_EQ(actualErrorLabels,
+                          BSON(kErrorLabelsFieldName << expectedLabelArray.arr()));
+    }
+}
+#endif
+
 }  // namespace
 }  // namespace mongo
