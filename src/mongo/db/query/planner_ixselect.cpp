@@ -265,10 +265,9 @@ void QueryPlannerIXSelect::getFields(const MatchExpression* node,
     if (Indexability::nodeCanUseIndexOnOwnField(node)) {
         bool supportSparse = Indexability::nodeSupportedBySparseIndex(node);
         (*out)[prefix + node->path().toString()] = {supportSparse};
-    } else if (Indexability::arrayUsesIndexOnChildren(node) && !node->path().empty()) {
+    } else if (Indexability::isBoundsGeneratingElemMatchObject(node)) {
         // If the array uses an index on its children, it's something like
         // {foo : {$elemMatch: {bar: 1}}}, in which case the predicate is really over foo.bar.
-        // Note we skip empty path components since they are not allowed in index key patterns.
         prefix += node->path().toString() + ".";
 
         for (size_t i = 0; i < node->numChildren(); ++i) {
