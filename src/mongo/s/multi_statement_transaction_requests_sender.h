@@ -45,10 +45,12 @@ namespace transaction_request_sender_details {
 std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     OperationContext* opCtx, const std::vector<AsyncRequestsSender::Request>& requests);
 
-void processReplyMetadata(OperationContext* opCtx, const AsyncRequestsSender::Response& response);
 void processReplyMetadata(OperationContext* opCtx,
-                          const ShardId& shardId,
-                          const BSONObj& responseBson);
+                          const AsyncRequestsSender::Response& response,
+                          bool forAsyncGetMore = false);
+void processReplyMetadataForAsyncGetMore(OperationContext* opCtx,
+                                         const ShardId& shardId,
+                                         const BSONObj& responseBson);
 }  // namespace transaction_request_sender_details
 
 /**
@@ -75,7 +77,7 @@ public:
 
     bool done();
 
-    AsyncRequestsSender::Response next();
+    AsyncRequestsSender::Response next(bool forMergeCursors = false);
 
     void stopRetrying();
 

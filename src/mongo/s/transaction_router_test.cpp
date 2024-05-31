@@ -119,9 +119,6 @@ const BSONObj kOkReadOnlyTrueAdditionalParticipantsReadOnlyTrueResponse = BSON(
 const BSONObj kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly =
     BSON("ok" << 1 << "readOnly" << false << "additionalParticipants"
               << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3")))));
-const BSONObj kOkReadOnlyTrueAdditionalParticipantsMissingReadOnly =
-    BSON("ok" << 1 << "readOnly" << true << "additionalParticipants"
-              << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3")))));
 const BSONObj kErrorWithAdditionalParticipantsResponse =
     BSON("ok" << 0 << "additionalParticipants"
               << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3")))));
@@ -908,72 +905,12 @@ TEST_F(
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
-       TwoPhaseCommitIfNotAllAdditionalParticpantsResponded) {
-    TxnNumber txnNum{3};
-    operationContext()->setTxnNumber(txnNum);
-
-    auto txnRouter = TransactionRouter::get(operationContext());
-
-    txnRouter.beginOrContinueTxn(
-        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter.setDefaultAtClusterTime(operationContext());
-
-    // Shard3 will be marked as read-only
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                      shard3,
-                                      BSON("insert"
-                                           << "test"));
-    txnRouter.processParticipantResponse(operationContext(), shard3, kOkReadOnlyTrueResponse);
-
-    // Shard1 targets shard3, and responds back to router before getting response from shard3
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                      shard1,
-                                      BSON("insert"
-                                           << "test"));
-    txnRouter.processParticipantResponse(
-        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly);
-
-    // The router should choose to do a 2 phase commit because shard1 did a write, and we do not yet
-    // know whether shard3 did a write on its last request
-    txnRouter.beginOrContinueTxn(
-        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
-
-    // Shard3 would be chosen as the coordinator, because it was the first participant
-    TxnRecoveryToken recoveryToken;
-    recoveryToken.setRecoveryShardId(shard3);
-
-    auto future =
-        launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQ(hostAndPort3, request.target);
-        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
-
-        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
-        ASSERT_EQ(cmdName, "coordinateCommitTransaction");
-
-        std::set<std::string> expectedParticipants = {shard1.toString(), shard3.toString()};
-        auto participantElements = request.cmdObj["participants"].Array();
-        ASSERT_EQ(expectedParticipants.size(), participantElements.size());
-
-        for (const auto& element : participantElements) {
-            auto shardId = element["shardId"].str();
-            ASSERT_EQ(1ull, expectedParticipants.count(shardId));
-            expectedParticipants.erase(shardId);
-        }
-
-        return BSON("ok" << 1);
-    });
-
-    future.default_timed_get();
-}
-
-TEST_F(TransactionRouterTestWithDefaultSession,
-       OutstandingAdditionalParticipantNeverMarkedReadOnly) {
+       MarkAdditionalParticipantsReadOnlyIfReadOnlyMissingIfGetMore) {
     TxnNumber txnNum{3};
     operationContext()->setTxnNumber(txnNum);
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(
-        readConcernArgs.initialize(BSON("insert"
+        readConcernArgs.initialize(BSON("find"
                                         << "test" << repl::ReadConcernArgs::kReadConcernFieldName
                                         << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
                                                 << kInMemoryLogicalTime.asTimestamp()
@@ -984,68 +921,40 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     auto txnRouter = TransactionRouter::get(operationContext());
 
     txnRouter.beginOrContinueTxn(
-        operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
 
-    // Shard1 targets shard3, and responds back to router before getting a response from shard3.
-    // Shard3's readOnly value will remain unset because it did not have a previous value.
     txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                       shard1,
                                       BSON("insert"
                                            << "test"));
-    txnRouter.processParticipantResponse(
-        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly);
+    txnRouter.processParticipantResponse(operationContext(),
+                                         shard1,
+                                         kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly,
+                                         true /* fromAsyncGetMore*/);
 
-    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
-    ASSERT(participants);
-    auto shard3Res = participants->find(shard3.toString());
-    ASSERT(shard3Res != participants->end());
-    ASSERT(shard3Res->second == boost::none);
+    auto future =
+        launchAsync([&] { txnRouter.commitTransaction(operationContext(), boost::none); });
 
-    // Now, we get a response with readOnly: true for shard3. The router will update the readOnly
-    // value to true
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                      shard1,
-                                      BSON("insert"
-                                           << "test"));
-    txnRouter.processParticipantResponse(
-        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsReadOnlyTrueResponse);
+    // The requests are scheduled in a nondeterministic order, since they are scheduled by iterating
+    // over the participant list, which is stored as a hash map. So, just check that all expected
+    // hosts and ports were targeted at the end.
+    std::set<HostAndPort> expectedHostAndPorts{hostAndPort1, hostAndPort3};
+    std::set<HostAndPort> seenHostAndPorts;
+    for (int i = 0; i < 2; i++) {
+        onCommand([&](const RemoteCommandRequest& request) {
+            seenHostAndPorts.insert(request.target);
 
-    participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
-    ASSERT(participants);
-    shard3Res = participants->find(shard3.toString());
-    ASSERT(shard3Res != participants->end());
-    ASSERT(shard3Res->second == boost::make_optional<bool>(true));
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
-    // Shard1 targets shard3 again, and responds back to router before getting response from shard3,
-    // so shard3's readOnly value will be marked as outstanding to avoid accidentally doing a read
-    // optimized commit.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                      shard1,
-                                      BSON("insert"
-                                           << "test"));
-    txnRouter.processParticipantResponse(
-        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly);
+            auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+            ASSERT_EQ(cmdName, "commitTransaction");
+            return kOkReadOnlyTrueResponse;
+        });
+    }
 
-    participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
-    ASSERT(participants);
-    shard3Res = participants->find(shard3.toString());
-    ASSERT(shard3Res != participants->end());
-    ASSERT(shard3Res->second == boost::none);
-
-    // Now, we again get a response with readOnly: true for shard3. The router will NOT update the
-    // readOnly value.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                      shard1,
-                                      BSON("insert"
-                                           << "test"));
-    txnRouter.processParticipantResponse(
-        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsReadOnlyTrueResponse);
-
-    participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
-    ASSERT(participants);
-    shard3Res = participants->find(shard3.toString());
-    ASSERT(shard3Res != participants->end());
-    ASSERT(shard3Res->second == boost::none);
+    future.default_timed_get();
+    ASSERT(expectedHostAndPorts == seenHostAndPorts);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, NotReadOnlyParticipantUnchangedOnEmptyReadOnly) {
@@ -1645,43 +1554,6 @@ TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantDidWriteAnd
     ASSERT(additionalParticipant != nullptr);
     ASSERT(additionalParticipant->readOnly ==
            TransactionRouter::Participant::ReadOnly::kNotReadOnly);
-    ASSERT(txnRouter.getRecoveryShardId());
-    ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard3);
-}
-
-TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantOutstandingIsRecoveryShard) {
-    TxnNumber txnNum{3};
-    operationContext()->setTxnNumber(txnNum);
-
-    auto txnRouter = TransactionRouter::get(operationContext());
-    txnRouter.beginOrContinueTxn(
-        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter.setDefaultAtClusterTime(operationContext());
-
-    // The recovery shard is unset initially.
-    ASSERT_FALSE(txnRouter.getRecoveryShardId());
-
-    // Attach request fields for a request to shard1
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
-
-    // First, process a response from shard1 indicating that it's readOnly, and that it added
-    // shard3 as an additional participant which was readOnly. The transaction router will only mark
-    // an additionalParticipant as outstanding if it first had marked it readOnly.
-    txnRouter.processParticipantResponse(
-        operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsReadOnlyTrueResponse);
-
-    // Now, process a response from shard1 still indicating that it's readOnly and that it added
-    // shard3 as an additional participant, but that it has not yet heard back from shard3 (so,
-    // there is no readOnly value for shard3). Assert that shard3 was added to the participants list
-    // and marked as outstanding. Because there are no other write shards and the shard will be
-    // treated as a write shard at commit time, the transaction router should pick shard3 as the
-    // recovery shard.
-    txnRouter.processParticipantResponse(
-        operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsMissingReadOnly);
-    auto additionalParticipant = txnRouter.getParticipant(shard3);
-    ASSERT(additionalParticipant != nullptr);
-    ASSERT(additionalParticipant->readOnly ==
-           TransactionRouter::Participant::ReadOnly::kOutstandingAdditionalParticipant);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard3);
 }
@@ -3277,6 +3149,75 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                         shard3,
+                                                        BSON("insert"
+                                                             << "test"));
+        ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
+    }
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, RetryOnSubRouterResetsClusterTime) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+    operationContext()->setIsStartingMultiDocumentTransaction(true);
+    operationContext()->setActiveTransactionParticipant();
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(
+        readConcernArgs.initialize(BSON("insert"
+                                        << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                                        << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                                << kInMemoryLogicalTime.asTimestamp()
+                                                << repl::ReadConcernArgs::kLevelFieldName
+                                                << "snapshot"))));
+    repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+
+    // Create a sub router
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+
+    BSONObj expectedReadConcern = BSON("level"
+                                       << "snapshot"
+                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp());
+
+    {
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                                        shard1,
+                                                        BSON("insert"
+                                                             << "test"));
+        ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
+    }
+
+    // Advance the latest time in the logical clock so the retry attempt will pick a later time.
+    LogicalTime laterTime(Timestamp(1000, 1));
+    ASSERT_GT(laterTime, kInMemoryLogicalTime);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTime);
+
+    repl::ReadConcernArgs updatedReadConcernArgs;
+    ASSERT_OK(updatedReadConcernArgs.initialize(
+        BSON("insert"
+             << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+             << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                     << laterTime.asTimestamp() << repl::ReadConcernArgs::kLevelFieldName
+                     << "snapshot"))));
+
+    repl::ReadConcernArgs::get(operationContext()) = updatedReadConcernArgs;
+
+    // Simulate a view resolution error which will clear the participants
+    txnRouter.onViewResolutionError(operationContext(),
+                                    NamespaceString::createNamespaceString_forTest("test.foo"));
+
+    // Now simulate the sub-router retrying at the same txnNumber
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+
+    // Assert that the sub-router attaches the updated clusterTime
+    expectedReadConcern = BSON("level"
+                               << "snapshot"
+                               << "atClusterTime" << laterTime.asTimestamp());
+    {
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                                        shard1,
                                                         BSON("insert"
                                                              << "test"));
         ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());

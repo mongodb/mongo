@@ -1096,7 +1096,6 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
 }
 
 void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
-    const OperationSessionInfoFromClient& sessionOptions = _ecd->getSessionOptions();
     auto& execContext = _ecd->getExecutionContext();
     auto opCtx = execContext.getOpCtx();
 
@@ -1114,15 +1113,14 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
         // Exceptions are used to resolve views in a sharded cluster, so they should be handled
         // specially to avoid unnecessary aborts.
 
-        // If "startTransaction" is present, it must be true.
-        if (sessionOptions.getStartTransaction()) {
+        if (opCtx->isStartingMultiDocumentTransaction()) {
             // If the first command a shard receives in a transactions fails with this code, the
             // shard may not be included in the final participant list if the router's retry after
             // resolving the view does not re-target it, which is possible if the underlying
             // collection is sharded. The shard's transaction should be preemptively aborted to
             // avoid leaving it orphaned in this case, which is fine even if it is re-targeted
-            // because the retry will include "startTransaction" again and "restart" a transaction
-            // at the active txnNumber.
+            // because the retry will include "startTransaction" or "startOrContinueTransaction"
+            // again and "restart" a transaction at the active txnNumber.
             return;
         }
 
