@@ -10,6 +10,7 @@ env.Library(
     target="mongot_cursor",
     source=[
         "internal_search_cluster_parameters.idl",
+        "internal_search_mongot_remote_spec.idl",
         "mongot_cursor.cpp",
         "mongot_cursor_getmore_strategy.cpp",
     ],

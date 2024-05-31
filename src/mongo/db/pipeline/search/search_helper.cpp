@@ -213,14 +213,14 @@ parseMongotResponseCursors(std::vector<std::unique_ptr<executor::TaskExecutorCur
 }
 }  // namespace
 
-InternalSearchMongotRemoteSpec planShardedSearch(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& searchRequest) {
+void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       InternalSearchMongotRemoteSpec* remoteSpec) {
     // Mongos issues the 'planShardedSearch' command rather than 'search' in order to:
     // * Create the merging pipeline.
     // * Get a sortSpec.
     const auto cmdObj = [&]() {
         PlanShardedSearchSpec cmd(std::string(expCtx->ns.coll()) /* planShardedSearch */,
-                                  searchRequest /* query */);
+                                  remoteSpec->getMongotQuery() /* query */);
 
         if (expCtx->explain) {
             cmd.setExplain(BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->explain)));
@@ -235,15 +235,12 @@ InternalSearchMongotRemoteSpec planShardedSearch(
     // Send the planShardedSearch to the remote, retrying on network errors.
     auto response = mongot_cursor::runSearchCommandWithRetries(expCtx, cmdObj);
 
-    InternalSearchMongotRemoteSpec remoteSpec(searchRequest.getOwned(),
-                                              response.data["protocolVersion"_sd].Int());
+    remoteSpec->setMetadataMergeProtocolVersion(response.data["protocolVersion"_sd].Int());
     auto parsedPipeline = mongo::Pipeline::parseFromArray(response.data["metaPipeline"], expCtx);
-    remoteSpec.setMergingPipeline(parsedPipeline->serializeToBson());
+    remoteSpec->setMergingPipeline(parsedPipeline->serializeToBson());
     if (response.data.hasElement("sortSpec")) {
-        remoteSpec.setSortSpec(response.data["sortSpec"].Obj().getOwned());
+        remoteSpec->setSortSpec(response.data["sortSpec"].Obj().getOwned());
     }
-
-    return remoteSpec;
 }
 
 bool hasReferenceToSearchMeta(const DocumentSource& ds) {

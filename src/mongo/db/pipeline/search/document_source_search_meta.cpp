@@ -119,6 +119,9 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
     // the second (longer) form which is serialized from mongos to the shards and includes more
     // information such as merging pipeline.
 
+    // See note in DocumentSourceSearch::createFromBson() about making sure mongotQuery is owned
+    // within the mongot remote spec.
+
     // Avoid any calls to mongot during desugaring.
     if (expCtx->isParsingViewDefinition) {
         auto executor = executor::getMongotTaskExecutor(expCtx->opCtx->getServiceContext());

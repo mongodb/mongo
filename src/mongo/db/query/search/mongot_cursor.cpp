@@ -212,8 +212,6 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     if (feature_flags::gFeatureFlagSearchBatchSizeTuning.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         minDocsNeededBounds.has_value() && maxDocsNeededBounds.has_value()) {
-        // TODO SERVER-87077 This manual check for storedSource shouldn't be necessary if we pass
-        // all arguments via the mongot remote spec.
         const auto storedSourceElem = query[kReturnStoredSourceArg];
         bool isStoredSource = !storedSourceElem.eoo() && storedSourceElem.Bool();
         batchSize = computeInitialBatchSize(
