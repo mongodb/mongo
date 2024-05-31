@@ -20,6 +20,7 @@ import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 // This workload involves running commands outside a session.
 TestData.disableImplicitSessions = true;
@@ -406,6 +407,15 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
             try {
                 res = txnDb.adminCommand(internalTxnTestCmdObj);
                 print(`Response: ${tojsononeline(res)}`);
+
+                // This error is handled on mongos, if the client is talking directly to a mongod,
+                // pull out the originalError thrown (similar to what mongos would do) for the
+                // client to handle. This error should never escape a mongos and be seen by a
+                // client, so allow the error to be thrown if the client is talking to a mongos.
+                if (res.code == ErrorCodes.TransactionParticipantFailedUnyield &&
+                    !isMongos(txnDb)) {
+                    res = res.originalError;
+                }
                 assert.commandWorked(res);
             } catch (e) {
                 if ((executionCtxType == this.executionContextTypes.kClientRetryableWrite) &&
