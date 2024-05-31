@@ -352,6 +352,25 @@ buildvariants:
     tasks:
       - name: sharding_gen
 
+  # This build variant is used to test feature parity between replica set and sharded cluster
+  # connected via replica set endpoint.
+  - &enterprise-rhel-80-64-bit-dynamic-replica-set-endpoint-all-feature-flags
+    <<: *linux_x86_dynamic_compile_variant_dependency
+    name: enterprise-rhel-80-64-bit-dynamic-replica-set-endpoint
+    display_name: "* Shared Library Enterprise RHEL 8.0 (Replica Set Endpoint all feature flags)"
+    tags: ["suggested"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel80-small
+    stepback: false
+    activate: true
+    expansions: &enterprise-rhel-80-64-bit-dynamic-replica-set-endpoint-expansions
+      <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+      test_flags: >-
+        --runAllFeatureFlagTests
+    tasks:
+      - name: .replica_set_endpoint
+
   - name: &enterprise-rhel-80-benchmarks enterprise-rhel-80-benchmarks
     display_name: "* Enterprise RHEL 8.0 (Benchmarks)"
     tags: ["suggested"]

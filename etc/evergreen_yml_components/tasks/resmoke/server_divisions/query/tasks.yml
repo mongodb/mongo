@@ -536,7 +536,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
-        "default",
+        "experimental",
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
@@ -660,7 +660,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
-        "default",
+        "experimental",
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
@@ -704,7 +704,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
-        "default",
+        "experimental",
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
@@ -734,7 +734,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
-        "default",
+        "experimental",
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
