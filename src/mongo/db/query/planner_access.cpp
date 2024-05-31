@@ -698,6 +698,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
     const MatchExpression* expr,
     IndexBoundsBuilder::BoundsTightness* tightnessOut,
     interval_evaluation_tree::Builder* ietBuilder) {
+    // TODO SERVER-90975: Consider moving this interrupt check into IndexBoundsBuilder::translate
+    query.getOpCtx()->checkForInterrupt();
+
     // We're guaranteed that all GEO_NEARs are first.  This slightly violates the "sort index
     // predicates by their position in the compound index" rule but GEO_NEAR isn't an ixscan.
     // This saves our bacon when we have {foo: 1, bar: "2dsphere"} and the predicate on bar is a
