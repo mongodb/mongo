@@ -33,6 +33,7 @@
 #include <concepts>
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -429,6 +430,8 @@ concept Materializer = requires(T& t,
                                 BSONBinData binVal,
                                 BSONCode codeVal,
                                 BSONElement bsonVal) {
+    typename T::Element;
+
     { T::materialize(alloc, true) } -> std::same_as<typename T::Element>;
     { T::materialize(alloc, (int32_t)1) } -> std::same_as<typename T::Element>;
     { T::materialize(alloc, (int64_t)1) } -> std::same_as<typename T::Element>;
@@ -458,6 +461,15 @@ concept Materializer = requires(T& t,
     { T::materializePreallocated(bsonVal) } -> std::same_as<typename T::Element>;
 
     { T::materializeMissing(alloc) } -> std::same_as<typename T::Element>;
+
+    { T::isMissing(typename T::Element()) } -> std::same_as<bool>;
+
+    { T::canonicalType(typename T::Element()) } -> std::same_as<int>;
+
+    {
+        T::compare(
+            typename T::Element(), typename T::Element(), (const StringDataComparator*)nullptr)
+        } -> std::same_as<int>;
 };
 
 /**
@@ -831,6 +843,181 @@ public:
                                     simple8b::kSingleZero /* lastNonRLEBlock */,
                                     [](size_t count, uint64_t lastNonRLEBlock) {});
     }
+
+    template <typename Encoding>
+    static const char* lastDelta(const char* ptr, const char* end, Encoding& out) {
+        uint64_t lastNonRLEBlock = simple8b::kSingleZero;
+
+        while (ptr < end) {
+            uint8_t control = *ptr;
+            if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                isInterleavedStartControlByte(control))
+                return ptr;
+
+            uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+            uassert(9095623,
+                    "Invalid control byte in BSON Column",
+                    bsoncolumn::scaleIndexForControlByte(control) ==
+                        Simple8bTypeUtil::kMemoryAsInteger);
+
+            out += simple8b::sum<Encoding>(ptr + 1, size, lastNonRLEBlock);
+
+            ptr += 1 + size;
+        }
+
+        return ptr;
+    }
+
+    template <typename Encoding>
+    static const char* lastDeltaOfDelta(const char* ptr, const char* end, Encoding& out) {
+        Encoding prefix = 0;
+        uint64_t lastNonRLEBlock = simple8b::kSingleZero;
+
+        while (ptr < end) {
+            uint8_t control = *ptr;
+            if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                isInterleavedStartControlByte(control))
+                return ptr;
+
+            uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+            uassert(9095624,
+                    "Invalid control byte in BSON Column",
+                    bsoncolumn::scaleIndexForControlByte(control) ==
+                        Simple8bTypeUtil::kMemoryAsInteger);
+
+            out += simple8b::prefixSum<Encoding>(ptr + 1, size, prefix, lastNonRLEBlock);
+
+            ptr += 1 + size;
+        }
+
+        return ptr;
+    }
+
+    static const char* lastDouble(const char* ptr, const char* end, double& last) {
+        uint64_t lastNonRLEBlock = simple8b::kSingleZero;
+        int64_t lastValue = 0;
+        uint8_t scaleIndex = bsoncolumn::kInvalidScaleIndex;
+
+        while (ptr < end) {
+            uint8_t control = *ptr;
+            if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                isInterleavedStartControlByte(control))
+                return ptr;
+
+            uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+            scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
+            uassert(9095625,
+                    "Invalid control byte in BSON Column",
+                    scaleIndex != bsoncolumn::kInvalidScaleIndex);
+            auto encodedDouble = Simple8bTypeUtil::encodeDouble(last, scaleIndex);
+            uassert(9095626, "Invalid double encoding in BSON Column", encodedDouble);
+            lastValue = *encodedDouble;
+            lastValue += simple8b::sum<int64_t>(ptr + 1, size, lastNonRLEBlock);
+
+            last = Simple8bTypeUtil::decodeDouble(lastValue, scaleIndex);
+
+            ptr += 1 + size;
+        }
+
+        return ptr;
+    }
+
+    static const char* lastString(const char* ptr,
+                                  const char* end,
+                                  boost::optional<int128_t> last,
+                                  int128_t& out,
+                                  int128_t& uncompressed) {
+        uint64_t lastNonRLEBlock = simple8b::kSingleZero;
+        uncompressed = last.value_or(0);
+        out = uncompressed;
+
+        if (last) {
+            while (ptr < end) {
+                uint8_t control = *ptr;
+                if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                    isInterleavedStartControlByte(control))
+                    return ptr;
+
+                uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+                uassert(9095627,
+                        "Invalid control byte in BSON Column",
+                        bsoncolumn::scaleIndexForControlByte(control) ==
+                            Simple8bTypeUtil::kMemoryAsInteger);
+
+                out += simple8b::sum<int128_t>(ptr + 1, size, lastNonRLEBlock);
+
+                ptr += 1 + size;
+            }
+        } else {
+            int128_t lastNonZero{0};
+            while (ptr < end) {
+                uint8_t control = *ptr;
+                if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                    isInterleavedStartControlByte(control)) {
+
+                    if (lastNonZero != 0) {
+                        uncompressed = lastNonZero;
+                    }
+                    return ptr;
+                }
+
+
+                uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+                uassert(9095628,
+                        "Invalid control byte in BSON Column",
+                        bsoncolumn::scaleIndexForControlByte(control) ==
+                            Simple8bTypeUtil::kMemoryAsInteger);
+
+                simple8b::visitAll<int128_t>(
+                    ptr + 1,
+                    size,
+                    lastNonRLEBlock,
+                    [&](int128_t delta) {
+                        if (delta != 0) {
+                            lastNonZero = delta;
+                        }
+                        out = expandDelta(out, delta);
+                    },
+                    []() {});
+
+                ptr += 1 + size;
+            }
+        }
+
+        return ptr;
+    }
+
+    template <class Encoding>
+    static const char* validateLiteral(const char* ptr, const char* end) {
+        uint64_t lastNonRLEBlock = simple8b::kSingleZero;
+        while (ptr < end) {
+            const uint8_t control = *ptr;
+            if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                isInterleavedStartControlByte(control))
+                break;
+
+            uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+            uassert(9095629,
+                    "Invalid control byte in BSON Column",
+                    bsoncolumn::scaleIndexForControlByte(control) ==
+                        Simple8bTypeUtil::kMemoryAsInteger);
+
+            simple8b::visitAll<int64_t>(
+                ptr + 1,
+                size,
+                lastNonRLEBlock,
+                [](int64_t v) {
+                    uassert(
+                        9095630, "Post literal delta blocks should only contain skip or 0", v == 0);
+                },
+                []() {},
+                []() {});
+
+            ptr += 1 + size;
+        }
+
+        return ptr;
+    }
 };
 
 /**
@@ -859,6 +1046,47 @@ public:
         return allocatedElem.element();
     }
 
+    template <typename T>
+    static T get(const Element& elem) {
+        if constexpr (std::is_same_v<T, double>) {
+            return BSONElementValue(elem.value()).Double();
+        } else if constexpr (std::is_same_v<T, StringData>) {
+            return BSONElementValue(elem.value()).String();
+        } else if constexpr (std::is_same_v<T, BSONObj>) {
+            return BSONElementValue(elem.value()).Obj();
+        } else if constexpr (std::is_same_v<T, BSONArray>) {
+            return BSONElementValue(elem.value()).Array();
+        } else if constexpr (std::is_same_v<T, BSONBinData>) {
+            return BSONElementValue(elem.value()).BinData();
+        } else if constexpr (std::is_same_v<T, OID>) {
+            return BSONElementValue(elem.value()).ObjectID();
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return BSONElementValue(elem.value()).Boolean();
+        } else if constexpr (std::is_same_v<T, Date_t>) {
+            return BSONElementValue(elem.value()).Date();
+        } else if constexpr (std::is_same_v<T, BSONRegEx>) {
+            return BSONElementValue(elem.value()).Regex();
+        } else if constexpr (std::is_same_v<T, BSONDBRef>) {
+            return BSONElementValue(elem.value()).DBRef();
+        } else if constexpr (std::is_same_v<T, BSONCode>) {
+            return BSONElementValue(elem.value()).Code();
+        } else if constexpr (std::is_same_v<T, BSONSymbol>) {
+            return BSONElementValue(elem.value()).Symbol();
+        } else if constexpr (std::is_same_v<T, BSONCodeWScope>) {
+            return BSONElementValue(elem.value()).CodeWScope();
+        } else if constexpr (std::is_same_v<T, int32_t>) {
+            return BSONElementValue(elem.value()).Int32();
+        } else if constexpr (std::is_same_v<T, Timestamp>) {
+            return BSONElementValue(elem.value()).timestamp();
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return BSONElementValue(elem.value()).Int64();
+        } else if constexpr (std::is_same_v<T, Decimal128>) {
+            return BSONElementValue(elem.value()).Decimal();
+        }
+        invariant(false);
+        return T{};
+    }
+
     static BSONElement materializePreallocated(BSONElement val) {
         return val;
     }
@@ -869,6 +1097,17 @@ public:
 
     static bool isMissing(const Element& elem) {
         return elem.eoo();
+    }
+
+    static int canonicalType(const Element& elem) {
+        return elem.canonicalType();
+    }
+
+    static int compare(const Element& lhs,
+                       const Element& rhs,
+                       const StringDataComparator* comparator) {
+        return BSONElement::compareElements(
+            lhs, rhs, BSONElement::ComparisonRules::kConsiderFieldName, comparator);
     }
 
 private:

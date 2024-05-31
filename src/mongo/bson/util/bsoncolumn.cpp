@@ -779,26 +779,6 @@ BSONColumnBlockBased::BSONColumnBlockBased(BSONBinData bin)
     tassert(8471202, "Invalid BSON type for column", bin.type == BinDataType::Column);
 }
 
-BSONElement BSONColumnBlockBased::first() const {
-    invariant(false, "not implemented");
-    return BSONElement();
-}
-
-BSONElement BSONColumnBlockBased::last() const {
-    invariant(false, "not implemented");
-    return BSONElement();
-}
-
-BSONElement BSONColumnBlockBased::min(const StringDataComparator* comparator) const {
-    invariant(false, "not implemented");
-    return BSONElement();
-}
-
-BSONElement BSONColumnBlockBased::max(const StringDataComparator* comparator) const {
-    invariant(false, "not implemented");
-    return BSONElement();
-}
-
 BSONElement BSONColumnBlockBased::sum() const {
     invariant(false, "not implemented");
     return BSONElement();
