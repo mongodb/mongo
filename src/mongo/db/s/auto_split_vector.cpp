@@ -171,6 +171,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
         auto getIdxScanner = [&](const BSONObj& minKey,
                                  const BSONObj& maxKey,
                                  BoundInclusion inclusion,
+                                 PlanYieldPolicy::YieldPolicy yieldPolicy,
                                  InternalPlanner::Direction direction) {
             return InternalPlanner::shardKeyIndexScan(opCtx,
                                                       &(*collection),
@@ -178,16 +179,21 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                                                       minKey,
                                                       maxKey,
                                                       inclusion,
-                                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                      yieldPolicy,
                                                       direction);
         };
 
         // Setup the index scanner that will be used to find the split points
-        auto idxScanner = forward
-            ? getIdxScanner(
-                  minKey, maxKey, BoundInclusion::kIncludeStartKeyOnly, InternalPlanner::FORWARD)
-            : getIdxScanner(
-                  maxKey, minKey, BoundInclusion::kIncludeEndKeyOnly, InternalPlanner::BACKWARD);
+        auto idxScanner = forward ? getIdxScanner(minKey,
+                                                  maxKey,
+                                                  BoundInclusion::kIncludeStartKeyOnly,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  InternalPlanner::FORWARD)
+                                  : getIdxScanner(maxKey,
+                                                  minKey,
+                                                  BoundInclusion::kIncludeEndKeyOnly,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  InternalPlanner::BACKWARD);
         // Get first key belonging to the chunk
         BSONObj firstKeyInOriginalChunk;
         {
@@ -203,12 +209,18 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
         bool chunkCanBeSplit = true;
         {
             BSONObj lastKeyInChunk;
+            // Use INTERRUPT_ONLY since it just fetches the last key. Using YIELD_AUTO could
+            // invalidate idxScanner below.
             auto rangeEndIdxScanner = forward
-                ? getIdxScanner(
-                      maxKey, minKey, BoundInclusion::kIncludeEndKeyOnly, InternalPlanner::BACKWARD)
+                ? getIdxScanner(maxKey,
+                                minKey,
+                                BoundInclusion::kIncludeEndKeyOnly,
+                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                InternalPlanner::BACKWARD)
                 : getIdxScanner(minKey,
                                 maxKey,
                                 BoundInclusion::kIncludeStartKeyOnly,
+                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                 InternalPlanner::FORWARD);
 
             PlanExecutor::ExecState state = rangeEndIdxScanner->getNext(&lastKeyInChunk, nullptr);
@@ -336,14 +348,18 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                 // Fairly recalculate the last `nSplitPointsToReposition` split points.
                 splitKeys.erase(splitKeys.end() - nSplitPointsToReposition, splitKeys.end());
 
-                auto idxScanner = forward
+                // Since the previous idxScanner is finished, we are not violating the requirement
+                // that only one yieldable plan is active.
+                idxScanner = forward
                     ? getIdxScanner(splitKeys.empty() ? firstKeyElement : splitKeys.back(),
                                     maxKey,
                                     BoundInclusion::kIncludeStartKeyOnly,
+                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                     InternalPlanner::FORWARD)
                     : getIdxScanner(splitKeys.empty() ? firstKeyElement : splitKeys.back(),
                                     minKey,
                                     BoundInclusion::kIncludeBothStartAndEndKeys,
+                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                     InternalPlanner::BACKWARD);
 
                 numScannedKeys = 0;
