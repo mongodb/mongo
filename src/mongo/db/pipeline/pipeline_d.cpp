@@ -287,7 +287,18 @@ bool areSortFieldsModifiedByEventProjection(const SortPattern& sortPattern,
                                             const DocumentSource::GetModPathsReturn& modPaths) {
     return std::any_of(sortPattern.begin(), sortPattern.end(), [&](const auto& sortPatternPart) {
         const auto& fieldPath = sortPatternPart.fieldPath;
-        return !fieldPath || modPaths.canModify(*fieldPath);
+        // We don't support the bounded sort optimization for sort by $meta.
+        if (!fieldPath) {
+            return true;
+        }
+
+        if (modPaths.canModify(*fieldPath)) {
+            return true;
+        }
+
+        auto&& fieldPathStr = fieldPath->fullPath();
+        return (modPaths.renames.contains(fieldPathStr) ||
+                modPaths.complexRenames.contains(fieldPathStr));
     });
 }
 
