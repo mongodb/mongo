@@ -281,4 +281,48 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
     ASSERT(stepUpFuture.isReady());
 }
 
+TEST_F(ShardingDDLCoordinatorServiceTest, CoordinatorCreationMustFailOnSecondaries) {
+    auto opCtx = makeOperationContext();
+
+    // Reaching a steady state to start the test
+    ddlService()->waitForRecoveryCompletion(opCtx.get());
+
+    stepDown();
+
+    ASSERT_THROWS_CODE(ddlService()->getOrCreateInstance(opCtx.get(), BSONObj()),
+                       DBException,
+                       ErrorCodes::NotWritablePrimary);
+
+    ASSERT_THROWS_CODE(ddlService()->waitForRecoveryCompletion(opCtx.get()),
+                       DBException,
+                       ErrorCodes::NotWritablePrimary);
+}
+
+TEST_F(ShardingDDLCoordinatorServiceTest, StepdownDuringServiceRebuilding) {
+    auto opCtx = makeOperationContext();
+
+    // Reaching a steady state to start the test
+    ddlService()->waitForRecoveryCompletion(opCtx.get());
+
+    stepDown();
+
+    auto pauseOnRecoveryFailPoint =
+        globalFailPointRegistry().find("pauseShardingDDLCoordinatorServiceOnRecovery");
+    const auto fpCount = pauseOnRecoveryFailPoint->setMode(FailPoint::alwaysOn);
+
+    stepUp(opCtx.get());
+
+    pauseOnRecoveryFailPoint->waitForTimesEntered(fpCount + 1);
+
+    stepDown();
+
+    pauseOnRecoveryFailPoint->setMode(FailPoint::off);
+
+    stepUp(opCtx.get());
+
+    // Reaching a steady state to start the test
+    ddlService()->waitForRecoveryCompletion(opCtx.get());
+}
+
+
 }  // namespace mongo

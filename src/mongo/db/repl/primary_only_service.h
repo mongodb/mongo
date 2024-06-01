@@ -467,6 +467,11 @@ private:
     };
 
     /**
+     * Called as part of the POS onStepUp hook before rebuilding the service.
+     */
+    virtual void _onServiceInitialization() {}
+
+    /**
      * Called as part of the POS onStepDown/onShutdown hooks before interrupting instances.
      */
     virtual void _onServiceTermination() {}
