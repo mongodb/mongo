@@ -41,7 +41,7 @@ namespace direct_connection_util {
  * Throws ErrorCodes::Unauthorized if the command is a direct connection and the user does not have
  * sufficient permissions.
  */
-void checkDirectShardOperationAllowed(OperationContext* opCtx, const DatabaseName& dbName);
+void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceString& nss);
 
 }  // namespace direct_connection_util
 }  // namespace mongo

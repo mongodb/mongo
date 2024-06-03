@@ -434,8 +434,8 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
     }
 
     // Check if this operation is a direct connection and if it is authorized to be one.
-    const auto& dbName = sortedAcquisitionRequests.begin()->second.prerequisites.nss.dbName();
-    direct_connection_util::checkDirectShardOperationAllowed(opCtx, dbName);
+    const auto& nss = sortedAcquisitionRequests.begin()->second.prerequisites.nss;
+    direct_connection_util::checkDirectShardOperationAllowed(opCtx, nss);
 
     return acquisitions;
 }
@@ -1459,7 +1459,7 @@ void restoreTransactionResourcesToOperationContext(
             // Check if this operation is a direct connection and if it is authorized to be one
             // after reacquiring locks or snapshots.
             direct_connection_util::checkDirectShardOperationAllowed(
-                opCtx, transactionResources.acquiredCollections.front().prerequisites.nss.dbName());
+                opCtx, transactionResources.acquiredCollections.front().prerequisites.nss);
 
             // TODO: This will be removed when we no longer snapshot sharding state on CollectionPtr
             invariant(acquiredCollection.collectionDescription);

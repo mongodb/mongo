@@ -47,8 +47,14 @@ MONGO_FAIL_POINT_DEFINE(skipDirectConnectionChecks);
 
 namespace direct_connection_util {
 
-void checkDirectShardOperationAllowed(OperationContext* opCtx, const DatabaseName& dbName) {
+void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceString& nss) {
     if (MONGO_unlikely(skipDirectConnectionChecks.shouldFail())) {
+        return;
+    }
+    // Skip direct shard connection checks for namespaces which can have independent contents on
+    // each shard. The direct shard connection check still applies to the sharding metadata
+    // collection namespaces because those collections exist on a single, particular shard.
+    if ((nss.isDbOnly() && nss.dbName().isInternalDb()) || nss.isShardLocalNamespace()) {
         return;
     }
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
@@ -71,7 +77,7 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const DatabaseNam
                 (AuthorizationSession::exists(opCtx->getClient()) &&
                  AuthorizationSession::get(opCtx->getClient())
                      ->isAuthorizedForActionsOnResource(
-                         ResourcePattern::forClusterResource(dbName.tenantId()),
+                         ResourcePattern::forClusterResource(nss.tenantId()),
                          ActionType::issueDirectShardOperations));
 
             if (!directShardOperationsAllowed) {
