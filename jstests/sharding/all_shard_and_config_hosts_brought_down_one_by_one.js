@@ -24,6 +24,11 @@ var st = new ShardingTest({
     },
     config: 3
 });
+// TODO (SERVER-83433): Add back the test coverage for running db hash and validation check on
+// replica set that is fsync locked and has replica set endpoint enabled.
+const stopOpts = {
+    skipValidation: st.isReplicaSetEndpointActive()
+};
 
 // The default read concern is local, which is incompatible with secondary reads when the primary is
 // down.
@@ -39,7 +44,7 @@ assert.eq([{_id: 0, count}], st.s0.getDB('TestDB').TestColl.find().toArray());
 
 jsTest.log('Config nodes up: 2 of 3, shard nodes up: 2 of 2: ' +
            'Inserts and queries must work');
-st.configRS.stop(0, undefined, undefined, {forRestart: true});
+st.configRS.stop(0, undefined /* signal */, stopOpts, {forRestart: true});
 st.restartMongos(0);
 assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
     {_id: 0}, {$inc: {count: 1}}, {upsert: true, writeConcern: {w: 2, wtimeout: 30000}}));
@@ -50,7 +55,7 @@ if (!TestData.configShard) {
     // For a config shard, the config server is the shard, so we can't have a different number up.
     jsTest.log('Config nodes up: 1 of 3, shard nodes up: 2 of 2: ' +
                'Inserts and queries must work');
-    st.configRS.stop(1, undefined, undefined, {forRestart: true});
+    st.configRS.stop(1, undefined /* signal */, stopOpts, {forRestart: true});
     st.restartMongos(0);
     assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
         {_id: 0}, {$inc: {count: 1}}, {upsert: true, writeConcern: {w: 2, wtimeout: 30000}}));
@@ -60,7 +65,7 @@ if (!TestData.configShard) {
 
 jsTest.log('Config nodes up: 1 of 3, shard nodes up: 1 of 2: ' +
            'Only queries will work (no shard primary)');
-st.rs0.stop(0);
+st.rs0.stop(0, undefined /* signal */, stopOpts);
 st.restartMongos(0);
 st.s0.setSecondaryOk();
 assert.eq([{_id: 0, count}], st.s0.getDB('TestDB').TestColl.find().toArray());
@@ -69,7 +74,7 @@ if (!TestData.configShard) {
     // For a config shard, the config server is the shard, so we can't have a different number up.
     jsTest.log('Config nodes up: 1 of 3, shard nodes up: 0 of 2: ' +
                'MongoS must start, but no operations will work (no shard nodes available)');
-    st.rs0.stop(1);
+    st.rs0.stop(1, undefined /* signal */, stopOpts);
     st.restartMongos(0);
     assert.throws(function() {
         st.s0.getDB('TestDB').TestColl.find().toArray();
@@ -79,13 +84,13 @@ if (!TestData.configShard) {
 jsTest.log('Config nodes up: 0 of 3, shard nodes up: 0 of 2: ' +
            'Metadata cannot be loaded at all, no operations will work');
 if (!TestData.configShard) {
-    st.configRS.stop(2);
+    st.configRS.stop(2, undefined /* signal */, stopOpts);
 } else if (TestData.configShard) {
-    st.configRS.stop(1, undefined, undefined, {forRestart: true});
+    st.configRS.stop(1, undefined /* signal */, stopOpts, {forRestart: true});
     // Restart mongos while a config server is still up.
     st.restartMongos(0);
     // After taking down the last config/shard node, no user data operations will work.
-    st.configRS.stop(2, undefined, undefined, {forRestart: true});
+    st.configRS.stop(2, undefined /* signal */, stopOpts, {forRestart: true});
     assert.throws(function() {
         st.s0.getDB('TestDB').TestColl.find().toArray();
     });
@@ -115,4 +120,4 @@ for (var i = 0; i < 2; i++) {
 
 // Restart two config server nodes to ensure that teardown checks may be executed
 st.restartAllConfigServers();
-st.stop();
+st.stop(stopOpts);
