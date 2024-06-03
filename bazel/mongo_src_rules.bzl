@@ -807,53 +807,40 @@ UNDEFINED_SANITIZER_DEFINES = select({
 # However, this flag cannot be included when using the fuzzer sanitizer
 # if we want to suppress errors to uncover new ones.
 
-# this is a workaround, dive deeper with the folowing
-# TODO: https://jira.mongodb.org/browse/SERVER-90130
-
-UBSAN_EXPANSION_MINUS_VPTR = ",".join(
-    [
-        "alignment",
-        "array-bounds",
-        "bool",
-        "builtin",
-        "enum",
-        "float-cast-overflow",
-        "integer-divide-by-zero",
-        "nonnull-attribute",
-        "null",
-        "pointer-overflow",
-        "return",
-        "returns-nonnull-attribute",
-        "shift-base",
-        "shift-exponent",
-        "signed-integer-overflow",
-        "unreachable",
-        "vla-bound",
-    ],
-)
+# In dynamic builds, the `vptr` sanitizer check can
+# require additional dependency edges. That is very
+# inconvenient, because such builds can't use z,defs. The
+# result is a very fragile link graph, where refactoring
+# the link graph in one place can have surprising effects
+# in others. Instead, we just disable the `vptr` sanitizer
+# for dynamic builds. We tried some other approaches in
+# SERVER-49798 of adding a new descriptor type, but
+# that didn't address the fundamental issue that the
+# correct link graph for a dynamic+ubsan build isn't the
+# same as the correct link graph for a regular dynamic
+# build.
 
 UNDEFINED_SANITIZER_COPTS = select({
-    "//bazel/config:sanitize_undefined_static_link_settings": ["-fsanitize=" + UBSAN_EXPANSION_MINUS_VPTR + ",vptr"],
-    "//bazel/config:sanitize_undefined_dynamic_link_settings": ["-fno-sanitize=vptr", "-fsanitize=" + UBSAN_EXPANSION_MINUS_VPTR],
+    "//bazel/config:ubsan_enabled": ["-fsanitize=undefined"],
     "//conditions:default": [],
 }) + select({
-    ("//bazel/config:sanitize_undefined_without_fuzzer_settings"): ["-fno-sanitize-recover"],
-    ("//conditions:default"): [],
+    "//bazel/config:sanitize_undefined_dynamic_link_settings": ["-fno-sanitize=vptr"],
+    "//conditions:default": [],
 }) + select({
-    "//bazel/config:ubsan_enabled": [
-        "-fsanitize-blacklist=$(location //etc:ubsan_denylist_h)",
-    ],
-    "//bazel/config:ubsan_disabled": [],
-}, no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "undefined")
+    "//bazel/config:sanitize_undefined_without_fuzzer_settings": ["-fno-sanitize-recover"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:ubsan_enabled": ["-fsanitize-blacklist=$(location //etc:ubsan_denylist_h)"],
+    "//conditions:default": [],
+})
 
 UNDEFINED_SANITIZER_LINKFLAGS = select({
-    "//bazel/config:sanitize_undefined_static_link_settings": ["-fsanitize=" + UBSAN_EXPANSION_MINUS_VPTR + ",vptr"],
-    "//bazel/config:sanitize_undefined_dynamic_link_settings": ["-fno-sanitize=vptr", "-fsanitize=" + UBSAN_EXPANSION_MINUS_VPTR],
-    "//bazel/config:ubsan_disabled": [],
+    "//bazel/config:ubsan_enabled": ["-fsanitize=undefined"],
+    "//conditions:default": [],
 }) + select({
-    ("//bazel/config:sanitize_undefined_dynamic_link_settings"): ["-fno-sanitize=vptr"],
-    ("//conditions:default"): [],
-}, no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "undefined")
+    "//bazel/config:sanitize_undefined_dynamic_link_settings": ["-fno-sanitize=vptr"],
+    "//conditions:default": [],
+})
 
 REQUIRED_SETTINGS_DYNAMIC_LINK_ERROR_MESSAGE = (
     "\nError:\n" +
