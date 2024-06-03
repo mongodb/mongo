@@ -10,7 +10,7 @@ In order to acquire a release or latest mongot binary, from your ~/mongo directo
 
 ######
 
-     python3 -m pipx upgrade db-contrib-tool
+    python3 -m pipx upgrade db-contrib-tool
 
 2. Know your virtual workstations OS and architecture. Assuming your VM is on ubuntu (the default), run `lscpu` in your terminal and inspect the first line of the response to confirm your VM's architecture.
 
@@ -18,49 +18,49 @@ The default behavior of setup-mongot-repro assume you want to download the lates
 
 ######
 
-     db-contrib-tool setup-mongot-repro-env --installDir build/install/bin
+    db-contrib-tool setup-mongot-repro-env --installDir build/install/bin
 
 However, you can be more verbose and get the same result via:
 
 ######
 
-     db-contrib-tool setup-mongot-repro-env --architecture x86_64  --installDir build/install/bin
+    db-contrib-tool setup-mongot-repro-env --architecture x86_64  --installDir build/install/bin
 
 and
 
 ######
 
-     db-contrib-tool setup-mongot-repro-env --architecture x86_64 --platform linux --installDir build/install/bin
+    db-contrib-tool setup-mongot-repro-env --architecture x86_64 --platform linux --installDir build/install/bin
 
 and even
 
 ######
 
-     db-contrib-tool setup-mongot-repro-env latest --architecture x86_64 --platform linux --installDir build/install/bin
+    db-contrib-tool setup-mongot-repro-env latest --architecture x86_64 --platform linux --installDir build/install/bin
 
 To install the production mongot linux x86_64 binary, you should run:
 
 ######
 
-     db-contrib-tool setup-mongot-repro-env release  --architecture x86_64 --installDir build/install/bin
+    db-contrib-tool setup-mongot-repro-env release  --architecture x86_64 --installDir build/install/bin
 
 If your architecture is of type aarch64, to install the latest mongot binary, you should run:
 
 ######
 
-     db-contrib-tool setup-mongot-repro-env --architecture aarch64 --installDir build/install/bin
+    db-contrib-tool setup-mongot-repro-env --architecture aarch64 --installDir build/install/bin
 
 If your VM is running macos, you can install the latest macos compatible mongot binary via:
 
 ######
 
-     db-contrib-tool setup-mongot-repro-env --platform macos --installDir build/install/bin
+    db-contrib-tool setup-mongot-repro-env --platform macos --installDir build/install/bin
 
 Clearly, many options to play around with! To learn more about setup-mongot-repro-env command line options, use
 
 ######
 
-     db-contrib-tool setup-mongot-repro-env --help
+    db-contrib-tool setup-mongot-repro-env --help
 
 ## Compiling mongot from source
 
@@ -70,7 +70,7 @@ If you want to need to include unmerged changes in your mongot binary, you can c
 
 ######
 
-     git clone git@github.com:10gen/mongot.git
+    git clone git@github.com:10gen/mongot.git
 
 2. **cd into your mongot repo and checkout the in-development branch you're interested in**
 3. **Compile mongot**
@@ -78,25 +78,25 @@ If you want to need to include unmerged changes in your mongot binary, you can c
 
 ######
 
-     PLATFORM=linux_x86_64 make build.deploy.localdev
+    PLATFORM=linux_x86_64 make build.deploy.localdev
 
 If your VM is linux aarch64:
 
 ######
 
-     PLATFORM=linux_aarch64 make build.deploy.localdev
+    PLATFORM=linux_aarch64 make build.deploy.localdev
 
 4. **Extract the mongot-localdev binary from the result tarball**
 
 ######
 
-     tar -xvzf bazel-bin/deploy/mongot-localdev.tgz
+    tar -xvzf bazel-bin/deploy/mongot-localdev.tgz
 
 5. **Move the resulting mongot binary** into the build directory that the server build system places mongod, mongos and shell binaries:
 
 ######
 
-     mv mongot-localdev ~/mongo/build/install/bin
+    mv mongot-localdev ~/mongo/build/install/bin
 
 ## Adding Tests
 
@@ -106,13 +106,13 @@ To create a new search integration test, add a jstest to **jstests/with_mongot/e
 
 ######
 
-     buildscripts/resmoke.py run --suites=search_end_to_end_single_node
+    buildscripts/resmoke.py run --suites=search_end_to_end_single_node
 
 **To run your test as a sharded cluster:**
 
 ######
 
-     buildscripts/resmoke.py run --suites=search_end_to_end_sharded_cluster
+    buildscripts/resmoke.py run --suites=search_end_to_end_sharded_cluster
 
 To note, until SERVER-86616 is completed, your test will have to follow a particular order:
 
