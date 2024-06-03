@@ -66,7 +66,7 @@ proc read_record {name} {
             sectionvalue $desc
           }
           $WT_LOGREC_CHECKPOINT {
-            # __wt_txn_checkpoint_logread
+            # __wti_txn_checkpoint_logread
             set desc [strcut [xentry optype { format_enum [unpack_I] $WT_LOGOP_n }] WT_LOGOP_]
             append desc " sz:[xentry size { unpack_I }]"
             append desc " f:[xentry -var file { unpack_I }]"

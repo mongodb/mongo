@@ -140,7 +140,7 @@ __wt_block_salvage_next(
          * otherwise, move past it.
          */
         if (!__wti_block_offset_invalid(block, offset, size) &&
-          __wt_block_read_off(session, block, tmp, objectid, offset, size, checksum) == 0)
+          __wti_block_read_off(session, block, tmp, objectid, offset, size, checksum) == 0)
             break;
 
         /* Free the allocation-size block. */

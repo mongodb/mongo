@@ -301,11 +301,11 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __wt_txn_log_commit --
+ * __wti_txn_log_commit --
  *     Write the operations of a transaction to the log at commit time.
  */
 int
-__wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
+__wti_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_TXN *txn;
 
@@ -356,11 +356,11 @@ err:
 }
 
 /*
- * __wt_txn_checkpoint_logread --
+ * __wti_txn_checkpoint_logread --
  *     Read a log record for a checkpoint operation.
  */
 int
-__wt_txn_checkpoint_logread(
+__wti_txn_checkpoint_logread(
   WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, WT_LSN *ckpt_lsn)
 {
     WT_DECL_RET;
@@ -380,11 +380,11 @@ __wt_txn_checkpoint_logread(
 }
 
 /*
- * __wt_txn_ts_log --
+ * __wti_txn_ts_log --
  *     Write a log record recording timestamps in the transaction.
  */
 int
-__wt_txn_ts_log(WT_SESSION_IMPL *session)
+__wti_txn_ts_log(WT_SESSION_IMPL *session)
 {
     struct timespec t;
     WT_ITEM *logrec;

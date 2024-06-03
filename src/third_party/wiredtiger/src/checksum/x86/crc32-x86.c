@@ -36,12 +36,12 @@
 #if !defined(HAVE_NO_CRC32_HARDWARE)
 #if (defined(__amd64) || defined(__x86_64))
 /*
- * __wt_checksum_with_seed_hw --
+ * __checksum_with_seed_hw --
  *     Return a checksum for a chunk of memory, computed in hardware using 8 byte steps. Start with
  *     the given seed.
  */
 static uint32_t
-__wt_checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
+__checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
 {
     uint32_t crc;
     size_t nqwords;
@@ -73,24 +73,24 @@ __wt_checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
 }
 
 /*
- * __wt_checksum_hw --
+ * __checksum_hw --
  *     Return a checksum for a chunk of memory, computed in hardware using 8 byte steps.
  */
 static uint32_t
-__wt_checksum_hw(const void *chunk, size_t len)
+__checksum_hw(const void *chunk, size_t len)
 {
-    return (__wt_checksum_with_seed_hw(0, chunk, len));
+    return (__checksum_with_seed_hw(0, chunk, len));
 }
 #endif
 
 #if defined(_M_AMD64)
 /*
- * __wt_checksum_with_seed_hw --
+ * __checksum_with_seed_hw --
  *     Return a checksum for a chunk of memory, computed in hardware using 8 byte steps. Start with
  *     the given seed.
  */
 static uint32_t
-__wt_checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
+__checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
 {
     uint32_t crc;
     size_t nqwords;
@@ -121,13 +121,13 @@ __wt_checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
 }
 
 /*
- * __wt_checksum_hw --
+ * __checksum_hw --
  *     Return a checksum for a chunk of memory, computed in hardware using 8 byte steps.
  */
 static uint32_t
-__wt_checksum_hw(const void *chunk, size_t len)
+__checksum_hw(const void *chunk, size_t len)
 {
-    return (__wt_checksum_with_seed_hw(0, chunk, len));
+    return (__checksum_with_seed_hw(0, chunk, len));
 }
 #endif
 #endif
@@ -170,7 +170,7 @@ uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 
 #define CPUID_ECX_HAS_SSE42 (1 << 20)
     if (ecx & CPUID_ECX_HAS_SSE42)
-        return (crc32c_func = __wt_checksum_hw);
+        return (crc32c_func = __checksum_hw);
     return (crc32c_func = __wt_checksum_sw);
 
 #elif defined(_M_AMD64)
@@ -180,7 +180,7 @@ uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 
 #define CPUID_ECX_HAS_SSE42 (1 << 20)
     if (cpuInfo[2] & CPUID_ECX_HAS_SSE42)
-        return (crc32c_func = __wt_checksum_hw);
+        return (crc32c_func = __checksum_hw);
     return (crc32c_func = __wt_checksum_sw);
 #else
     return (crc32c_func = __wt_checksum_sw);
@@ -217,7 +217,7 @@ uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_
 
 #define CPUID_ECX_HAS_SSE42 (1 << 20)
     if (ecx & CPUID_ECX_HAS_SSE42)
-        return (crc32c_func = __wt_checksum_with_seed_hw);
+        return (crc32c_func = __checksum_with_seed_hw);
     return (crc32c_func = __wt_checksum_with_seed_sw);
 
 #elif defined(_M_AMD64)
@@ -227,7 +227,7 @@ uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_
 
 #define CPUID_ECX_HAS_SSE42 (1 << 20)
     if (cpuInfo[2] & CPUID_ECX_HAS_SSE42)
-        return (crc32c_func = __wt_checksum_with_seed_hw);
+        return (crc32c_func = __checksum_with_seed_hw);
     return (crc32c_func = __wt_checksum_with_seed_sw);
 #else
     return (crc32c_func = __wt_checksum_with_seed_sw);

@@ -163,6 +163,9 @@ of the documentation.
     - @ref arch-cache
     - @ref arch-eviction
 
+- @subpage arch-toc-int-wt-dev
+    - @ref arch-concurrency
+
 - @subpage arch-toc-mem-disk
     - @ref arch-block
     - @ref arch-data-file
@@ -272,6 +275,12 @@ make up in-memory Btrees and subordinate data structures.
 
 Eviction represents the process or removing old data from the cache,
 writing it to disk if it is dirty.
+
+*/
+
+/*! @page arch-toc-int-wt-dev Internal WiredTiger Development
+
+@subpage arch-concurrency
 
 */
 

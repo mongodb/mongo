@@ -316,11 +316,11 @@ __blkcache_estimate_filesize(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_blkcache_get --
+ * __wti_blkcache_get --
  *     Get a block from the cache.
  */
 void
-__wt_blkcache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size,
+__wti_blkcache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size,
   WT_BLKCACHE_ITEM **blkcache_retp, bool *foundp, bool *skip_cache_putp)
 {
     WT_BLKCACHE *blkcache;

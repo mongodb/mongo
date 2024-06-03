@@ -45,8 +45,8 @@ __directory_list_worker(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, con
     WT_ERR(__wt_scr_alloc(session, pathlen + 3, &pathbuf));
     WT_ERR(__wt_buf_fmt(session, pathbuf, "%s\\*", dir_copy));
 
-    WT_ERR(__wt_to_utf16_string(session, pathbuf->data, &pathbuf_wide));
-    WT_ERR(__wt_to_utf16_string(session, prefix, &prefix_wide));
+    WT_ERR(__wti_to_utf16_string(session, pathbuf->data, &pathbuf_wide));
+    WT_ERR(__wti_to_utf16_string(session, prefix, &prefix_wide));
     prefix_widelen = wcslen(prefix_wide->data);
 
     findhandle = FindFirstFileW(pathbuf_wide->data, &finddata);
@@ -70,7 +70,7 @@ __directory_list_worker(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, con
             goto skip;
 
         WT_ERR(__wt_realloc_def(session, &dirallocsz, count + 1, &entries));
-        WT_ERR(__wt_to_utf8_string(session, finddata.cFileName, &file_utf8));
+        WT_ERR(__wti_to_utf8_string(session, finddata.cFileName, &file_utf8));
         WT_ERR(__wt_strdup(session, file_utf8->data, &entries[count]));
         ++count;
         __wt_scr_free(session, &file_utf8);

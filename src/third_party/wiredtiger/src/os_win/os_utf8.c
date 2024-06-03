@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_to_utf16_string --
+ * __wti_to_utf16_string --
  *     Convert UTF-8 encoded string to UTF-16.
  */
 int
-__wt_to_utf16_string(WT_SESSION_IMPL *session, const char *utf8, WT_ITEM **outbuf)
+__wti_to_utf16_string(WT_SESSION_IMPL *session, const char *utf8, WT_ITEM **outbuf)
 {
     WT_DECL_RET;
     DWORD windows_error;
@@ -46,11 +46,11 @@ __wt_to_utf16_string(WT_SESSION_IMPL *session, const char *utf8, WT_ITEM **outbu
 }
 
 /*
- * __wt_to_utf8_string --
+ * __wti_to_utf8_string --
  *     Convert UTF-16 encoded string to UTF-8.
  */
 int
-__wt_to_utf8_string(WT_SESSION_IMPL *session, const wchar_t *wide, WT_ITEM **outbuf)
+__wti_to_utf8_string(WT_SESSION_IMPL *session, const wchar_t *wide, WT_ITEM **outbuf)
 {
     WT_DECL_RET;
     DWORD windows_error;

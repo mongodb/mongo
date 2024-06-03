@@ -42,7 +42,7 @@ __wt_bm_read(
 #endif
 
     /* Read the block. */
-    WT_ERR(__wt_block_read_off(session, block, buf, objectid, offset, size, checksum));
+    WT_ERR(__wti_block_read_off(session, block, buf, objectid, offset, size, checksum));
 
     /* Optionally discard blocks from the system's buffer cache. */
     WT_ERR(__wti_block_discard(session, block, (size_t)size));
@@ -158,11 +158,11 @@ err:
 #endif
 
 /*
- * __wt_block_read_off --
+ * __wti_block_read_off --
  *     Read an addr/size pair referenced block into a buffer.
  */
 int
-__wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint32_t objectid,
+__wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint32_t objectid,
   wt_off_t offset, uint32_t size, uint32_t checksum)
 {
     WT_BLOCK_HEADER *blk, swap;

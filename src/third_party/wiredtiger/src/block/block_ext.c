@@ -1180,7 +1180,7 @@ __wti_block_extlist_read(
 
     WT_RET(__wt_scr_alloc(session, el->size, &tmp));
     WT_ERR(
-      __wt_block_read_off(session, block, tmp, el->objectid, el->offset, el->size, el->checksum));
+      __wti_block_read_off(session, block, tmp, el->objectid, el->offset, el->size, el->checksum));
 
     p = WT_BLOCK_HEADER_BYTE(tmp->mem);
     WT_ERR(__wt_extlist_read_pair(&p, &off, &size));

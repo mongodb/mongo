@@ -21,11 +21,11 @@ static int __clsm_reset_cursors(WT_CURSOR_LSM *, WT_CURSOR *);
 static int __clsm_search_near(WT_CURSOR *cursor, int *exactp);
 
 /*
- * __wti_clsm_request_switch --
+ * __clsm_request_switch --
  *     Request an LSM tree switch for a cursor operation.
  */
-int
-__wti_clsm_request_switch(WT_CURSOR_LSM *clsm)
+static int
+__clsm_request_switch(WT_CURSOR_LSM *clsm)
 {
     WT_DECL_RET;
     WT_LSM_TREE *lsm_tree;
@@ -53,11 +53,11 @@ __wti_clsm_request_switch(WT_CURSOR_LSM *clsm)
 }
 
 /*
- * __wti_clsm_await_switch --
+ * __clsm_await_switch --
  *     Wait for a switch to have completed in the LSM tree
  */
-int
-__wti_clsm_await_switch(WT_CURSOR_LSM *clsm)
+static int
+__clsm_await_switch(WT_CURSOR_LSM *clsm)
 {
     WT_LSM_TREE *lsm_tree;
     WT_SESSION_IMPL *session;
@@ -134,13 +134,13 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
     }
 
     /* Request a switch. */
-    WT_RET(__wti_clsm_request_switch(clsm));
+    WT_RET(__clsm_request_switch(clsm));
 
     /* If we only overflowed the soft limit, we're done. */
     if (have_primary && !hard_limit)
         return (0);
 
-    WT_RET(__wti_clsm_await_switch(clsm));
+    WT_RET(__clsm_await_switch(clsm));
 
     return (0);
 }

@@ -83,11 +83,11 @@ __wt_crc32c_le(unsigned int crc, const unsigned char *buf, size_t len)
 DEFINE_CRC32_VX(__wt_crc32c_le_vx, __wt_crc32c_le_vgfm_16, __wt_crc32c_le)
 
 /*
- * __wt_checksum_hw --
+ * __checksum_hw --
  *     WiredTiger: return a checksum for a chunk of memory.
  */
 static uint32_t
-__wt_checksum_hw(const void *chunk, size_t len)
+__checksum_hw(const void *chunk, size_t len)
 {
     return (~__wt_crc32c_le_vx(0xffffffff, chunk, len));
 }
@@ -114,7 +114,7 @@ uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 #if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
     caps = getauxval(AT_HWCAP);
     if (caps & HWCAP_S390_VX)
-        return (crc32c_func = __wt_checksum_hw);
+        return (crc32c_func = __checksum_hw);
     else
         return (crc32c_func = __wt_checksum_sw);
 #else
@@ -123,11 +123,11 @@ uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 }
 
 /*
- * __wt_crc32c_le_wrapper --
+ * __crc32c_le_wrapper --
  *     Wrapper function for CRC in software in the little endian format.
  */
 static uint32_t
-__wt_crc32c_le_wrapper(uint32_t seed, const void *chunk, size_t len)
+__crc32c_le_wrapper(uint32_t seed, const void *chunk, size_t len)
 {
     return (~__wt_crc32c_le(~seed, chunk, len));
 }
@@ -139,5 +139,5 @@ __wt_crc32c_le_wrapper(uint32_t seed, const void *chunk, size_t len)
  */
 uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t)
 {
-    return (__wt_crc32c_le_wrapper);
+    return (__crc32c_le_wrapper);
 }

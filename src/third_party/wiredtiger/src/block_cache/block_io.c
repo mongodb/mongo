@@ -94,7 +94,7 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, 
 
     /* Check the block cache. */
     if (!found && blkcache->type != WT_BLKCACHE_UNCONFIGURED) {
-        __wt_blkcache_get(session, addr, addr_size, &blkcache_item, &found, &skip_cache_put);
+        __wti_blkcache_get(session, addr, addr_size, &blkcache_item, &found, &skip_cache_put);
         if (found) {
             blkcache_found = true;
             ip->data = blkcache_item->data;

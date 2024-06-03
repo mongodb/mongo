@@ -499,7 +499,7 @@ __txn_log_recover(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, WT_LS
     switch (rectype) {
     case WT_LOGREC_CHECKPOINT:
         if (r->metadata_only)
-            WT_RET(__wt_txn_checkpoint_logread(session, &p, end, &r->ckpt_lsn));
+            WT_RET(__wti_txn_checkpoint_logread(session, &p, end, &r->ckpt_lsn));
         break;
     case WT_LOGREC_COMMIT:
         if ((ret = __wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &txnid_unused)) != 0)

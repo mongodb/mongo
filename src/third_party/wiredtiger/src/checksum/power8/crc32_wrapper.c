@@ -7,21 +7,21 @@
 unsigned int crc32_vpmsum(unsigned int crc, const unsigned char *p, unsigned long len);
 
 /*
- * __wt_checksum_with_seed_hw --
+ * __checksum_with_seed_hw --
  *     WiredTiger: return a checksum for a chunk of memory when given a starting seed.
  */
 static uint32_t
-__wt_checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
+__checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
 {
     return (crc32_vpmsum(seed, chunk, len));
 }
 
 /*
- * __wt_checksum_hw --
+ * __checksum_hw --
  *     WiredTiger: return a checksum for a chunk of memory.
  */
 static uint32_t
-__wt_checksum_hw(const void *chunk, size_t len)
+__checksum_hw(const void *chunk, size_t len)
 {
     return (crc32_vpmsum(0, chunk, len));
 }
@@ -46,7 +46,7 @@ extern uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *
 uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 {
 #if defined(__powerpc64__) && !defined(HAVE_NO_CRC32_HARDWARE)
-    return (__wt_checksum_hw);
+    return (__checksum_hw);
 #else
     return (__wt_checksum_sw);
 #endif
@@ -60,7 +60,7 @@ uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t)
 {
 #if defined(__powerpc64__) && !defined(HAVE_NO_CRC32_HARDWARE)
-    return (__wt_checksum_with_seed_hw);
+    return (__checksum_with_seed_hw);
 #else
     return (__wt_checksum_with_seed_sw);
 #endif

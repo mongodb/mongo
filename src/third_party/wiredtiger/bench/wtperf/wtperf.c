@@ -1317,6 +1317,7 @@ backup_worker(void *arg)
     WT_CONNECTION *conn;
     WT_DECL_RET;
     WT_SESSION *session;
+    uint64_t start, stop, secs;
     uint32_t i;
     int nfiles, nranges;
     bool first;
@@ -1352,6 +1353,7 @@ backup_worker(void *arg)
         if (opts->backup_complete == 0)
             backup_read(wtperf, session);
         else {
+            start = __wt_clock(NULL);
             if (first) {
                 testutil_backup_create_full(
                   conn, wtperf->home, (int)thread->backup.ops, false, 1024, &nfiles);
@@ -1361,7 +1363,10 @@ backup_worker(void *arg)
                 testutil_backup_create_incremental(conn, wtperf->home, (int)thread->backup.ops,
                   (int)thread->backup.ops - 1, false, &nfiles, &nranges, NULL);
             }
-            lprintf(wtperf, 0, 0, "Backed up %d files, %d ranges", nfiles, nranges);
+            stop = __wt_clock(NULL);
+            secs = WT_CLOCKDIFF_SEC(stop, start);
+            lprintf(wtperf, 0, 0, "%s: Backed up %d files, %d ranges in %" PRIu64 " secs",
+              first ? "Full" : "Incremental", nfiles, nranges, secs);
             testutil_delete_old_backups(BACKUP_RETAIN);
         }
         wtperf->backup = false;

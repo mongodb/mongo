@@ -16,6 +16,8 @@
  * object.
  */
 
+static void __gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation);
+
 /*
  * __gen_name --
  *     Return the generation name.
@@ -96,7 +98,7 @@ __wt_gen_next_drain(WT_SESSION_IMPL *session, int which)
 
     v = __wt_atomic_addv64(&S2C(session)->generations[which], 1);
 
-    __wt_gen_drain(session, which, v);
+    __gen_drain(session, which, v);
 }
 
 /*
@@ -226,11 +228,11 @@ __gen_drain_callback(
 }
 
 /*
- * __wt_gen_drain --
+ * __gen_drain --
  *     Wait for the resource to drain.
  */
-void
-__wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
+static void
+__gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
 {
     WT_GENERATION_DRAIN_COOKIE cookie;
 

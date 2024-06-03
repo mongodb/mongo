@@ -284,7 +284,7 @@ __wt_block_checkpoint_last(WT_SESSION_IMPL *session, WT_BLOCK *block, char **met
          * block isn't valid, skip to the next possible block.
          */
         if (__wti_block_offset_invalid(block, offset, size) ||
-          __wt_block_read_off(session, block, tmp, objectid, offset, size, checksum) != 0) {
+          __wti_block_read_off(session, block, tmp, objectid, offset, size, checksum) != 0) {
             size = WT_BTREE_MIN_ALLOC_SIZE;
             continue;
         }

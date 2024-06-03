@@ -38,7 +38,7 @@ __wt_config_collapse(WT_SESSION_IMPL *session, const char **cfg, char **config_r
     while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
         if (k.type != WT_CONFIG_ITEM_STRING && k.type != WT_CONFIG_ITEM_ID)
             WT_ERR_MSG(session, EINVAL, "Invalid configuration key found: '%s'", k.str);
-        WT_ERR(__wt_config_get(session, cfg, &k, &v));
+        WT_ERR(__wti_config_get(session, cfg, &k, &v));
         /* Include the quotes around string keys/values. */
         if (k.type == WT_CONFIG_ITEM_STRING)
             WT_CONFIG_PRESERVE_QUOTES(session, &k);

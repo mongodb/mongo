@@ -52,12 +52,12 @@
     __asm__("crc32cb %w[c], %w[c], %w[v]" : [c] "+r"(*&crc) : [v] "r"(+value))
 
 /*
- * __wt_checksum_with_seed_hw --
+ * __checksum_with_seed_hw --
  *     Return a checksum for a chunk of memory, computed in hardware using 8 byte steps. Start with
  *     the given seed.
  */
 static uint32_t
-__wt_checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
+__checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
 {
     uint32_t crc;
     uint64_t uint64_v;
@@ -104,13 +104,13 @@ __wt_checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
 }
 
 /*
- * __wt_checksum_hw --
+ * __checksum_hw --
  *     Return a checksum for a chunk of memory, computed in hardware using 8 byte steps.
  */
 static uint32_t
-__wt_checksum_hw(const void *chunk, size_t len)
+__checksum_hw(const void *chunk, size_t len)
 {
-    return (__wt_checksum_with_seed_hw(0, chunk, len));
+    return (__checksum_with_seed_hw(0, chunk, len));
 }
 #endif
 
@@ -147,7 +147,7 @@ uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 #if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
     caps = getauxval(AT_HWCAP);
     if (caps & HWCAP_CRC32)
-        return (crc32c_func = __wt_checksum_hw);
+        return (crc32c_func = __checksum_hw);
     return (crc32c_func = __wt_checksum_sw);
 #else
     return (crc32c_func = __wt_checksum_sw);
@@ -176,7 +176,7 @@ uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_
 #if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
     caps = getauxval(AT_HWCAP);
     if (caps & HWCAP_CRC32)
-        return (crc32c_func = __wt_checksum_with_seed_hw);
+        return (crc32c_func = __checksum_with_seed_hw);
     return (crc32c_func = __wt_checksum_with_seed_sw);
 #else
     return (crc32c_func = __wt_checksum_with_seed_sw);

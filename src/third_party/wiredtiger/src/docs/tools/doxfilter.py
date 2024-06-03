@@ -69,16 +69,17 @@ def process_arch(source):
             prefix = groups[0]
             doxy_name = groups[1]
             title = groups[2]
-
             page_info = arch_doc_lookup[doxy_name]
+            has_table = len(page_info.data_structures) > 0 or len(page_info.files) > 0
             data_structures_str = '<code>' + '<br>'.join(page_info.data_structures) + '</code>'
             files_str = '<code>' + '<br>'.join(page_info.files) + '</code>'
             result += prefix + '@arch_page_top{' + \
                 doxy_name + ',' + \
                 title + '}\n'
-            result += '@arch_page_table{' + \
-                data_structures_str + ',' + \
-                files_str + '}\n'
+            if has_table:
+                result += '@arch_page_table{' + \
+                    data_structures_str + ',' + \
+                    files_str + '}\n'
             result += '@arch_page_caution\n'
         else:
             result += line + '\n'

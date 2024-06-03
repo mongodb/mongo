@@ -143,7 +143,7 @@ __verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], bool *quitp
 #if !defined(HAVE_DIAGNOSTIC)
         WT_RET_MSG(session, ENOTSUP, "the WiredTiger library was not built in diagnostic mode");
 #else
-        WT_TRET(__wt_debug_offset_blind(session, (wt_off_t)offset, NULL));
+        WT_TRET(__wti_debug_offset_blind(session, (wt_off_t)offset, NULL));
 #endif
     }
     return (ret == WT_NOTFOUND ? 0 : ret);
@@ -491,9 +491,9 @@ __verify_tree(
 #ifdef HAVE_DIAGNOSTIC
     /* Optionally dump the blocks or page in debugging mode. */
     if (vs->dump_blocks)
-        WT_RET(__wt_debug_disk(session, page->dsk, NULL, vs->dump_all_data, vs->dump_key_data));
+        WT_RET(__wti_debug_disk(session, page->dsk, NULL, vs->dump_all_data, vs->dump_key_data));
     if (vs->dump_pages)
-        WT_RET(__wt_debug_page(session, NULL, ref, NULL, vs->dump_all_data, vs->dump_key_data));
+        WT_RET(__wti_debug_page(session, NULL, ref, NULL, vs->dump_all_data, vs->dump_key_data));
 #endif
 
     /* Make sure the page we got belongs in this kind of tree. */

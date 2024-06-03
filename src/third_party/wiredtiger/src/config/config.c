@@ -554,11 +554,11 @@ __config_getraw(WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value, 
 }
 
 /*
- * __wt_config_get --
+ * __wti_config_get --
  *     Given a NULL-terminated list of configuration strings, find the final value for a given key.
  */
 int
-__wt_config_get(
+__wti_config_get(
   WT_SESSION_IMPL *session, const char **cfg_arg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
     WT_CONFIG cparser;
@@ -596,7 +596,7 @@ __wt_config_gets(WT_SESSION_IMPL *session, const char **cfg, const char *key, WT
 {
     WT_CONFIG_ITEM key_item = {key, strlen(key), 0, WT_CONFIG_ITEM_STRING};
 
-    return (__wt_config_get(session, cfg, &key_item, value));
+    return (__wti_config_get(session, cfg, &key_item, value));
 }
 
 /*
