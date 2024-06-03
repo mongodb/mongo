@@ -475,6 +475,42 @@ export class MagicRestoreUtils {
     }
 
     /**
+     * A helper function that makes multiple assertions on the restore node. Helpful to avoid
+     * needing to make each individual assertion in each test.
+     */
+    postRestoreChecks({
+        node,
+        expectedConfig,
+        dbName,
+        collName,
+        expectedOplogCountForNs,
+        opFilter,
+        expectedNumDocsSnapshot,
+        rolesCollUuid,
+        userCollUuid,
+        logPath,
+        shardLastOplogEntryTs
+    }) {
+        node.setSecondaryOk();
+        const restoredConfig =
+            assert.commandWorked(node.adminCommand({replSetGetConfig: 1})).config;
+        this._assertConfigIsCorrect(expectedConfig, restoredConfig);
+        this.assertOplogCountForNamespace(
+            node, dbName + "." + collName, expectedOplogCountForNs, opFilter);
+        this._assertMinValidIsCorrect(node);
+        this._assertStableCheckpointIsCorrectAfterRestore(node, shardLastOplogEntryTs);
+        this._assertCannotDoSnapshotRead(
+            node, expectedNumDocsSnapshot /* expectedNumDocsSnapshot */, dbName, collName);
+        if (rolesCollUuid && userCollUuid) {
+            assert.eq(rolesCollUuid, this.getCollUuid(node, "admin", "system.roles"));
+            assert.eq(userCollUuid, this.getCollUuid(node, "admin", "system.users"));
+        }
+        if (logPath) {
+            this._checkRestoreSpecificLogs(logPath);
+        }
+    }
+
+    /**
      * Performs a find on the oplog for the given name space and asserts that the expected number of
      * entries exists. Optionally takes an op type to filter.
      */
@@ -517,7 +553,7 @@ export class MagicRestoreUtils {
      * Asserts that two config arguments are equal. If we are testing higher term behavior in the
      * test, modifies the expected term on the source config.
      */
-    assertConfigIsCorrect(srcConfig, dstConfig) {
+    _assertConfigIsCorrect(srcConfig, dstConfig) {
         // If we passed in a value for the 'restoreToHigherTermThan' field in the restore config, a
         // no-op oplog entry was inserted in the oplog with that term value + 100. On startup, the
         // replica set node sets its term to this value. A new election occurred when the replica
@@ -538,7 +574,7 @@ export class MagicRestoreUtils {
      * inserts a no-op oplog entry with a higher term, the stable checkpoint timestamp should be
      * equal to the timestamp of that entry.
      */
-    assertStableCheckpointIsCorrectAfterRestore(restoreNode, lastOplogEntryTs = undefined) {
+    _assertStableCheckpointIsCorrectAfterRestore(restoreNode, lastOplogEntryTs = undefined) {
         let lastStableCheckpointTs =
             this.isPit ? this.pointInTimeTimestamp : this.checkpointTimestamp;
 
@@ -573,7 +609,7 @@ export class MagicRestoreUtils {
     /**
      * Assert that the minvalid document has been set correctly in magic restore.
      */
-    assertMinValidIsCorrect(restoreNode) {
+    _assertMinValidIsCorrect(restoreNode) {
         const minValid = restoreNode.getCollection('local.replset.minvalid').findOne();
         assert.eq(minValid,
                   {_id: ObjectId("000000000000000000000000"), t: -1, ts: Timestamp(0, 1)});
@@ -583,13 +619,13 @@ export class MagicRestoreUtils {
      * Assert that a restored node cannot complete a snapshot read at a timestamp earlier than the
      * last stable checkpoint timestamp.
      */
-    assertCannotDoSnapshotRead(restoreNode, expectedNumDocs) {
+    _assertCannotDoSnapshotRead(restoreNode, expectedNumDocsSnapshot, db = "db", coll = "coll") {
         const {lastStableRecoveryTimestamp} =
             assert.commandWorked(restoreNode.adminCommand({replSetGetStatus: 1}));
         // A restored node will not preserve any history. The oldest timestamp should be set to the
         // stable timestamp at the end of a non-PIT restore.
-        let res = restoreNode.getDB("db").runCommand({
-            find: "coll",
+        let res = restoreNode.getDB(db).runCommand({
+            find: coll,
             readConcern: {
                 level: "snapshot",
                 atClusterTime: Timestamp(lastStableRecoveryTimestamp.getTime() - 1,
@@ -599,12 +635,12 @@ export class MagicRestoreUtils {
         assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld);
 
         // A snapshot read at the last stable timestamp should succeed.
-        res = restoreNode.getDB("db").runCommand({
-            find: "coll",
+        res = restoreNode.getDB(db).runCommand({
+            find: coll,
             readConcern: {level: "snapshot", atClusterTime: lastStableRecoveryTimestamp}
         });
         assert.commandWorked(res);
-        assert.eq(res.cursor.firstBatch.length, expectedNumDocs);
+        assert.eq(res.cursor.firstBatch.length, expectedNumDocsSnapshot);
     }
 
     /**
@@ -618,7 +654,7 @@ export class MagicRestoreUtils {
      * Checks the log file specified at 'logpath', and ensures that it contains logs with the
      * 'RESTORE' component. The function also ensures the first and last log lines are as expected.
      */
-    checkRestoreSpecificLogs(logpath) {
+    _checkRestoreSpecificLogs(logpath) {
         // When splitting the logs on new lines, the last element will be an empty string, so we
         // should filter it out.
         let logs = cat(logpath)
