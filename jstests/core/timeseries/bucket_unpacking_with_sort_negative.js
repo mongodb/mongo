@@ -192,3 +192,9 @@ runDoesntRewriteTest({t: 1},
                      {'m.a': 1, t: 1, 'm.array': 1},
                      metaCollSubFields,
                      [{$match: {'m.a': 7}}]);
+
+// Test that a pipeline with the renamed time field by $addFields or $project will not be rewritten.
+// In this case, the new 't' fields hide the timeField 't' and so the $sort that follows the
+// $addFields or $project will not sort data by 't' and can't be rewritten into a bounded sort.
+runDoesntRewriteTest({t: 1}, null, {}, coll, [{$addFields: {t: "$a"}}]);
+runDoesntRewriteTest({t: 1}, null, {}, coll, [{$project: {t: "$a"}}]);
