@@ -92,8 +92,11 @@ export const $config = (function() {
                                includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
                         // Rethrow so the auto transaction retry logic will retry.
                         //
-                        // TODO SERVER-89555: Remove when operations on tracked unsharded
-                        // collections don't hit MovePrimaryInProgress errors.
+                        // With background config shard transitions, movePrimary may be called while
+                        // untracked collections exist on the draining shard, which can cause
+                        // operations to fail with MovePrimaryInProgress. The movePrimary uses a
+                        // fail point to prevent actually moving the collections, but they may still
+                        // throw this error.
                         throw e;
                     } else {
                         assert.contains(
@@ -161,8 +164,10 @@ export const $config = (function() {
                            includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
                     // Rethrow so the auto transaction retry logic will retry.
                     //
-                    // TODO SERVER-89555: Remove when operations on tracked unsharded collections
-                    // don't hit MovePrimaryInProgress errors.
+                    // With background config shard transitions, movePrimary may be called while
+                    // untracked collections exist on the draining shard, which can cause operations
+                    // to fail with MovePrimaryInProgress. The movePrimary uses a fail point to
+                    // prevent actually moving the collections, but they may still throw this error.
                     throw e;
                 } else {
                     // dropIndex can cause queries to throw if these queries yield.

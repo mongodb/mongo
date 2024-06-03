@@ -135,10 +135,6 @@ selector:
     # infrastructure. See SERVER-77039 for full details.
     - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
-    # TODO SERVER-89555: Timeseries collections hit movePrimaryInProgress errors and the temporary
-    # retry logic for this hook leads to breaking a test assertion.
-    - jstests/concurrency/fsm_workloads/timeseries_mirrored_writes.js
-
     # TODO SERVER-89841: Performs many sharding DDL operations and can time out taking the DDL lock
     # on slower variants.
     - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
