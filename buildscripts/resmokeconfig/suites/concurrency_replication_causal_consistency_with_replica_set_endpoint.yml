@@ -36,6 +36,9 @@ selector:
     # TODO (SERVER-88469): CursorEstablisher::waitForResponse() is noexcept but its code can throw an
     # exception.
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+    # TODO (SERVER-91129): Investigate why the teardown phase in agg_unionWith_interrupt_cleanup.js
+    # could fail with FailedToSatisfyReadPreference
+    - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
 
   exclude_with_any_tags:
     - does_not_support_causal_consistency

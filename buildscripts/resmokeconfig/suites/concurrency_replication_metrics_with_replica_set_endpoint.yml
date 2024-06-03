@@ -39,6 +39,9 @@ selector:
     # TODO (SERVER-89363): Re-enable this test after investigating the undefined' error in the
     # checkConsistency state.
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+    # TODO (SERVER-91129): Investigate why the teardown phase in agg_unionWith_interrupt_cleanup.js
+    # could fail with FailedToSatisfyReadPreference
+    - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
 
   exclude_with_any_tags:
     - requires_sharding
