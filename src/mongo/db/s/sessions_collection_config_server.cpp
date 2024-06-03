@@ -83,8 +83,8 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
     try {
         checkSessionsCollectionExists(opCtx);
         return;
-    } catch (const DBException&) {
-        // If the sessions collection doesn't exist, create it
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
+        // If the sessions collection isn't sharded, shard it.
     }
 
     // If we don't have any shards, we can't set up this collection yet.
