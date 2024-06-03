@@ -818,7 +818,7 @@ write_ops::UpdateCommandRequest buildSingleUpdateOp(const write_ops::UpdateComma
                                                     size_t opIndex) {
     write_ops::UpdateCommandRequest singleUpdateOp(wholeOp.getNamespace(),
                                                    {wholeOp.getUpdates()[opIndex]});
-    auto commandBase = singleUpdateOp.getWriteCommandRequestBase();
+    auto& commandBase = singleUpdateOp.getWriteCommandRequestBase();
     commandBase.setOrdered(wholeOp.getOrdered());
     commandBase.setBypassDocumentValidation(wholeOp.getBypassDocumentValidation());
 
