@@ -1176,10 +1176,8 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
 
                        const auto cmdObj = [&] {
                            FindCommandRequest request(NamespaceStringOrUUID{nss});
-                           request.setReadConcern(
-                               repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern)
-                                   .toBSONInner());
-                           return request.toBSON(BSONObj());
+                           request.setReadConcern(repl::ReadConcernArgs::kMajority);
+                           return request.toBSON();
                        }();
 
                        auto keyDocs =

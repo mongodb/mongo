@@ -91,19 +91,15 @@ MONGO_FAIL_POINT_DEFINE(fleCleanupHangBeforeCleanupESCNonAnchors);
 MONGO_FAIL_POINT_DEFINE(fleCleanupHangAfterCleanupESCAnchors);
 MONGO_FAIL_POINT_DEFINE(fleCleanupHangAfterDropTempCollection);
 
-const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
-                                                               << "majority"));
 /**
- * Issue a simple success/fail command such as renameCollection or drop
- * using majority write concern.
+ * Issue a simple success/fail command such as renameCollection or drop.
  */
 template <typename Request>
 Status doRunCommand(OperationContext* opCtx, const DatabaseName& dbname, const Request& request) {
     DBDirectClient client(opCtx);
-    BSONObj cmd = request.toBSON(kMajorityWriteConcern);
     auto reply = client
                      .runCommand(OpMsgRequestBuilder::create(
-                         auth::ValidatedTenancyScope::kNotRequired, dbname, std::move(cmd)))
+                         auth::ValidatedTenancyScope::kNotRequired, dbname, request.toBSON()))
                      ->getCommandReply();
     return getStatusFromCommandResult(reply);
 }
@@ -114,6 +110,7 @@ void createQEClusteredStateCollection(OperationContext* opCtx, const NamespaceSt
     CreateCollectionRequest request;
     request.setClusteredIndex(std::variant<bool, mongo::ClusteredIndexSpec>(clusterIdxSpec));
     createCmd.setCreateCollectionRequest(std::move(request));
+    createCmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
     auto status = doRunCommand(opCtx, nss.dbName(), createCmd);
     if (!status.isOK()) {
         if (status != ErrorCodes::NamespaceExists) {
@@ -131,6 +128,7 @@ void dropQEStateCollection(OperationContext* opCtx,
                            boost::optional<UUID> collId) {
     Drop cmd(nss);
     cmd.setCollectionUUID(collId);
+    cmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
     uassertStatusOK(doRunCommand(opCtx, nss.dbName(), cmd));
 }
 
@@ -282,6 +280,7 @@ bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
         RenameCollectionCommand cmd(ecocNss, ecocRenameNss);
         cmd.setDropTarget(false);
         cmd.setCollectionUUID(state.getEcocUuid().value());
+        cmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
 
         uassertStatusOK(doRunCommand(opCtx.get(), DatabaseName::kAdmin, cmd));
         *newEcocRenameUuid = state.getEcocUuid();

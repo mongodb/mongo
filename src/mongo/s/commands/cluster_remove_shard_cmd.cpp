@@ -111,15 +111,16 @@ public:
         ConfigSvrRemoveShard configsvrRequest{target};
         configsvrRequest.setRemoveShardRequestBase(request.getRemoveShardRequestBase());
         configsvrRequest.setDbName(request.getDbName());
+        configsvrRequest.setGenericArguments(request.getGenericArguments());
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto cmdResponseStatus = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             DatabaseName::kAdmin,
-            CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendGenericCommandArgs(cmdObj, configsvrRequest.toBSON()),
-                opCtx->getWriteConcern()),
+            CommandHelpers::filterCommandRequestForPassthrough(
+                CommandHelpers::appendMajorityWriteConcern(configsvrRequest.toBSON(),
+                                                           opCtx->getWriteConcern())),
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);
 

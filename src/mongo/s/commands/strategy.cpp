@@ -60,6 +60,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/default_max_time_ms_cluster_parameter.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
@@ -67,7 +68,6 @@
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_time_tracker.h"
-#include "mongo/db/query/max_time_ms_parser.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -135,8 +135,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeCheckingMongosShutdownInterrupt);
 const auto kOperationTime = "operationTime"_sd;
 
 void runCommandInvocation(const RequestExecutionContext* rec, CommandInvocation* invocation) {
-    CommandHelpers::runCommandInvocation(
-        rec->getOpCtx(), rec->getRequest(), invocation, rec->getReplyBuilder());
+    CommandHelpers::runCommandInvocation(rec->getOpCtx(), invocation, rec->getReplyBuilder());
 }
 
 /**
@@ -259,14 +258,6 @@ void ExecCommandClient::_prologue() {
             "Invalid database name: '{}'"_format(dbname.toStringForErrorMsg()),
             DatabaseName::isValid(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
 
-    StringDataSet topLevelFields(8);
-    for (auto&& element : request.body) {
-        StringData fieldName = element.fieldNameStringData();
-        uassert(ErrorCodes::FailedToParse,
-                "Parsed command object contains duplicate top level key: {}"_format(fieldName),
-                topLevelFields.insert(fieldName).second);
-    }
-
     try {
         _invocation->checkAuthorization(opCtx, request);
     } catch (const DBException& e) {
@@ -370,10 +361,6 @@ public:
 
     void run();
 
-    const CommonRequestArgs& getCommonRequestArgs() const {
-        return _requestArgs;
-    }
-
 private:
     class RunInvocation;
     class RunAndRetry;
@@ -395,7 +382,6 @@ private:
     OperationSessionInfoFromClient _osi;
     boost::optional<WriteConcernOptions> _wc;
     boost::optional<bool> _isHello;
-    CommonRequestArgs _requestArgs;
 };
 
 /*
@@ -519,43 +505,30 @@ void ParseAndRunCommand::_parseCommand() {
 
     CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
 
-    _requestArgs = CommonRequestArgs::parse(IDLParserContext("request",
-                                                             request.validatedTenancyScope,
-                                                             request.getValidatedTenantId(),
-                                                             request.getSerializationContext()),
-                                            request.body);
+    invariant(!auth::ValidatedTenancyScope::get(opCtx).has_value() ||
+              (request.validatedTenancyScope &&
+               *auth::ValidatedTenancyScope::get(opCtx) == *(request.validatedTenancyScope)));
 
-    // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
-    // the OperationContext. Be sure to do this as soon as possible so that further processing by
-    // subsequent code has the deadline available. The 'maxTimeMS' option unfortunately has a
-    // different meaning for a getMore command, where it is used to communicate the maximum time to
-    // wait for new inserts on tailable cursors, not as a deadline for the operation.
-    // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will
-    // require introducing a new 'max await time' parameter for getMore, and eventually banning
-    // maxTimeMS altogether on a getMore command.
-    uassert(ErrorCodes::InvalidOptions,
-            "no such command option $maxTimeMs; use maxTimeMS instead",
-            !_requestArgs.getDollarMaxTimeMS());
+    auth::ValidatedTenancyScope::set(opCtx, request.validatedTenancyScope);
+
+    _invocation = command->parse(opCtx, request);
 
     // If the command includes a 'comment' field, set it on the current OpCtx.
-    if (auto& commentField = _requestArgs.getComment()) {
+    if (auto& commentField = _invocation->getGenericArguments().getComment()) {
         stdx::lock_guard<Client> lk(*client);
         opCtx->setComment(commentField->getElement().wrap());
     }
 
-    validateAPIParameters(request.body, _requestArgs.getAPIParametersFromClient(), command);
-
+    auto apiParams = parseAndValidateAPIParameters(*_invocation);
     {
         // We must obtain the client lock to set APIParameters on the operation context, as it may
         // be concurrently read by CurrentOp.
         stdx::lock_guard<Client> lk(*client);
-        APIParameters::get(opCtx) =
-            APIParameters::fromClient(_requestArgs.getAPIParametersFromClient());
+        APIParameters::get(opCtx) = APIParameters::fromClient(std::move(apiParams));
     }
 
-    rpc::readRequestMetadata(opCtx, _requestArgs, request, command->requiresAuth());
+    rpc::readRequestMetadata(opCtx, _invocation->getGenericArguments(), command->requiresAuth());
 
-    _invocation = command->parse(opCtx, request);
     CommandInvocation::set(opCtx, _invocation);
 
     // Set the logical optype, command object and namespace as soon as we identify the command. If
@@ -574,7 +547,8 @@ void ParseAndRunCommand::_parseCommand() {
 
     _osi = initializeOperationSessionInfo(opCtx,
                                           request.getValidatedTenantId(),
-                                          _requestArgs.getOperationSessionInfoFromClientBase(),
+                                          generic_argument_util::getOperationSessionInfoFromClient(
+                                              _invocation->getGenericArguments()),
                                           command->requiresAuth(),
                                           command->attachLogicalSessionsToOpCtx(),
                                           true);
@@ -592,26 +566,20 @@ void ParseAndRunCommand::_parseCommand() {
     }
     validateSessionOptions(_osi, command, namespaces, allowTransactionsOnConfigDatabase);
 
-    _wc.emplace(uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body)));
+    _wc.emplace(
+        _invocation->getGenericArguments().getWriteConcern().value_or(WriteConcernOptions()));
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    Status readConcernParseStatus = Status::OK();
     {
         // We must obtain the client lock to set ReadConcernArgs on the operation context, as it may
         // be concurrently read by CurrentOp.
         stdx::lock_guard<Client> lk(*client);
-        if (_requestArgs.getReadConcern()) {
-            readConcernParseStatus = readConcernArgs.parse(*_requestArgs.getReadConcern());
+        if (auto& rc = _invocation->getGenericArguments().getReadConcern()) {
+            readConcernArgs = *rc;
         }
     }
 
-    if (MONGO_unlikely(!readConcernParseStatus.isOK())) {
-        auto builder = replyBuilder->getBodyBuilder();
-        CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);
-        iassert(Status(ErrorCodes::SkipCommandExecution, "Failed to parse read concern"));
-    }
-
-    if (MONGO_unlikely(_requestArgs.getHelp().value_or(false))) {
+    if (MONGO_unlikely(_invocation->getGenericArguments().getHelp().value_or(false))) {
         const Command* c = _invocation->definition();
         auto result = _rec->getReplyBuilder();
         auto body = result->getBodyBuilder();
@@ -632,11 +600,11 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     auto command = _parc->_rec->getCommand();
     const auto& request = _parc->_rec->getRequest();
     auto replyBuilder = _parc->_rec->getReplyBuilder();
-    auto requestArgs = _parc->getCommonRequestArgs();
+    auto& genericArgs = invocation->getGenericArguments();
 
     if (command->getLogicalOp() != LogicalOp::opGetMore) {
         auto [requestOrDefaultMaxTimeMS, usesDefaultMaxTimeMS] = getRequestOrDefaultMaxTimeMS(
-            opCtx, requestArgs.getMaxTimeMS(), invocation->isReadOperation());
+            opCtx, genericArgs.getMaxTimeMS(), invocation->isReadOperation());
         if (auto maxTimeMS = requestOrDefaultMaxTimeMS.value_or(Milliseconds{0});
             requestOrDefaultMaxTimeMS > Milliseconds::zero()) {
             opCtx->setDeadlineAfterNowBy(maxTimeMS, ErrorCodes::MaxTimeMSExpired);
@@ -713,7 +681,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     }
 
     bool supportsWriteConcern = invocation->supportsWriteConcern();
-    if (MONGO_unlikely(!supportsWriteConcern && requestArgs.getWriteConcern())) {
+    if (MONGO_unlikely(!supportsWriteConcern && genericArgs.getWriteConcern())) {
         // This command doesn't do writes so it should not be passed a writeConcern.
         const auto errorMsg = "Command does not support writeConcern";
         return appendStatusToReplyAndSkipCommandExecution({ErrorCodes::InvalidOptions, errorMsg});
@@ -747,7 +715,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
                     5569900,
                     "received command without explicit writeConcern on an internalClient connection {}"_format(
                         redact(request.body.toString())),
-                    requestArgs.getWriteConcern());
+                    genericArgs.getWriteConcern());
             } else {
                 // This command is not from a DBDirectClient or internal client, and supports WC,
                 // but wasn't given one - so apply the default, if there is one.

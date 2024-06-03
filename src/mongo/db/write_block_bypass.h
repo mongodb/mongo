@@ -44,7 +44,7 @@ public:
     }
 
     bool isWriteBlockBypassEnabled() const;
-    void setFromMetadata(OperationContext* opCtx, const BSONElement& elem);
+    void setFromMetadata(OperationContext* opCtx, boost::optional<bool> val);
     void set(bool bypassEnabled);
     void writeAsMetadata(BSONObjBuilder* builder);
 

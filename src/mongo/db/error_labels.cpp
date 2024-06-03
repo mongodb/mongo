@@ -157,13 +157,11 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
         ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
         : SerializationContext::stateCommandRequest();
 
-    bool apiStrict = APIParameters::get(_opCtx).getAPIStrict().value_or(false);
     // Do enough parsing to confirm that this is a well-formed pipeline with a $changeStream.
-    const auto swLitePipe =
-        [this, &vts, &cmdObj, apiStrict, &sc]() -> StatusWith<LiteParsedPipeline> {
+    const auto swLitePipe = [this, &vts, &cmdObj, &sc]() -> StatusWith<LiteParsedPipeline> {
         try {
             auto aggRequest =
-                aggregation_request_helper::parseFromBSON(cmdObj, vts, boost::none, apiStrict, sc);
+                aggregation_request_helper::parseFromBSON(cmdObj, vts, boost::none, sc);
             return LiteParsedPipeline(aggRequest);
         } catch (const DBException& ex) {
             return ex.toStatus();

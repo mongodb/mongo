@@ -112,7 +112,9 @@ public:
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 cmd.getDbName(),
-                CommandHelpers::appendMajorityWriteConcern(cmd.toBSON(), opCtx->getWriteConcern()),
+                CommandHelpers::appendMajorityWriteConcern(
+                    CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
+                    opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(response.commandStatus);
         }

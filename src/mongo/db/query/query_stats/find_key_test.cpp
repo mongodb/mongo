@@ -122,7 +122,7 @@ TEST_F(FindKeyTest, SizeOfFindKeyWithAndWithoutReadConcern) {
     auto expCtxWithReadConcern = make_intrusive<ExpressionContextForTest>();
     auto fcrWithReadConcern = std::make_unique<FindCommandRequest>(kDefaultTestNss);
     fcrWithReadConcern->setFilter(query.getOwned());
-    fcrWithReadConcern->setReadConcern(fromjson(R"({level: "local"})"));
+    fcrWithReadConcern->setReadConcern(repl::ReadConcernArgs::kLocal);
     auto parsedFindWithReadConcern = uassertStatusOK(
         parsed_find_command::parse(expCtxWithReadConcern, {std::move(fcrWithReadConcern)}));
     auto keyWithReadConcern = std::make_unique<query_stats::FindKey>(

@@ -372,9 +372,8 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
                     std::string(*queryResponse.getShardId()) /* shardId */,
                     *queryResponse.getTargetDoc() /* targetDocId */);
 
-                auto writeRes =
-                    txnClient.runCommandSync(sharedBlock->nss.dbName(),
-                                             clusterWriteWithoutShardKeyCommand.toBSON(BSONObj()));
+                auto writeRes = txnClient.runCommandSync(
+                    sharedBlock->nss.dbName(), clusterWriteWithoutShardKeyCommand.toBSON());
                 uassertStatusOK(getStatusFromCommandResult(writeRes));
 
                 sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(

@@ -51,6 +51,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
@@ -58,8 +59,10 @@
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
@@ -95,6 +98,11 @@ static const int kUUIDSize = 21;
 // This constant accounts for the size of a 32-bit integer.
 static const int kIntSize = 4;
 
+// Write command size estimation doesn't take into account most generic arguments, but this won't
+// result in any BSONObjTooLarge errors so long as the arguments fit within the 16KiB of wiggle room
+// allowed when creating a BSONObj.
+static constexpr int kGenericArgumentSizeAllowance = BSONObjMaxInternalSize - BSONObjMaxUserSize;
+
 template <class T>
 void checkOpCountForCommand(const T& op, size_t numOps) {
     uassert(ErrorCodes::InvalidLength,
@@ -120,7 +128,8 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
 }
 
 // Utility which estimates the size of 'WriteCommandRequestBase' when serialized.
-int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base) {
+int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base,
+                                   const GenericArguments& genericArgs) {
     static const int kSizeOfOrderedField =
         write_ops::WriteCommandRequestBase::kOrderedFieldName.size() + kBoolSize +
         kPerElementOverhead;
@@ -130,6 +139,12 @@ int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base) {
 
     auto estSize = static_cast<int>(BSONObj::kMinBSONLength) + kSizeOfOrderedField +
         kSizeOfBypassDocumentValidationField;
+
+    // While most metadata attached to a command is limited to less than a KB, Impersonation
+    // metadata may grow to an arbitrary size.
+    if (auto& md = genericArgs.getDollarAudit()) {
+        estSize += rpc::estimateImpersonatedUserMetadataSize(md.get());
+    }
 
     if (auto stmtId = base.getStmtId(); stmtId) {
         estSize += write_ops::WriteCommandRequestBase::kStmtIdFieldName.size() +
@@ -524,7 +539,9 @@ bool verifySizeEstimate(const InsertCommandRequest& insertReq,
     if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
         return true;
     }
-    return size >= insertReq.toBSON({} /* commandPassthroughFields */).objsize();
+
+    auto serialized = insertReq.toBSON();
+    return size + kGenericArgumentSizeAllowance >= serialized.objsize();
 }
 
 bool verifySizeEstimate(const UpdateCommandRequest& updateReq,
@@ -551,7 +568,7 @@ bool verifySizeEstimate(const UpdateCommandRequest& updateReq,
     if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
         return true;
     }
-    return size >= updateReq.toBSON({} /* commandPassthroughFields */).objsize();
+    return size + kGenericArgumentSizeAllowance >= updateReq.toBSON().objsize();
 }
 
 bool verifySizeEstimate(const DeleteCommandRequest& deleteReq,
@@ -571,11 +588,12 @@ bool verifySizeEstimate(const DeleteCommandRequest& deleteReq,
     if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
         return true;
     }
-    return size >= deleteReq.toBSON({} /* commandPassthroughFields */).objsize();
+    return size + kGenericArgumentSizeAllowance >= deleteReq.toBSON().objsize();
 }
 
 int getInsertHeaderSizeEstimate(const InsertCommandRequest& insertReq) {
-    int size = getWriteCommandRequestBaseSize(insertReq.getWriteCommandRequestBase()) +
+    int size = getWriteCommandRequestBaseSize(insertReq.getWriteCommandRequestBase(),
+                                              insertReq.getGenericArguments()) +
         write_ops::InsertCommandRequest::kDocumentsFieldName.size() + kPerElementOverhead +
         static_cast<int>(BSONObj::kMinBSONLength);
 
@@ -585,7 +603,8 @@ int getInsertHeaderSizeEstimate(const InsertCommandRequest& insertReq) {
 }
 
 int getUpdateHeaderSizeEstimate(const UpdateCommandRequest& updateReq) {
-    int size = getWriteCommandRequestBaseSize(updateReq.getWriteCommandRequestBase());
+    int size = getWriteCommandRequestBaseSize(updateReq.getWriteCommandRequestBase(),
+                                              updateReq.getGenericArguments());
 
     size += UpdateCommandRequest::kCommandName.size() + kPerElementOverhead +
         updateReq.getNamespace().size() + 1 /* ns string null terminator */;
@@ -608,7 +627,8 @@ int getUpdateHeaderSizeEstimate(const UpdateCommandRequest& updateReq) {
 }
 
 int getDeleteHeaderSizeEstimate(const DeleteCommandRequest& deleteReq) {
-    int size = getWriteCommandRequestBaseSize(deleteReq.getWriteCommandRequestBase());
+    int size = getWriteCommandRequestBaseSize(deleteReq.getWriteCommandRequestBase(),
+                                              deleteReq.getGenericArguments());
 
     size += DeleteCommandRequest::kCommandName.size() + kPerElementOverhead +
         deleteReq.getNamespace().size() + 1 /* ns string null terminator */;

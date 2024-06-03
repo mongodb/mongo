@@ -29,12 +29,14 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/basic_types.h"
+        - "mongo/idl/generic_argument.h"
         - "mongo/s/shard_version.h"
 
 imports:
     - "mongo/client/read_preference_setting.idl"
     - "mongo/db/basic_types.idl"
     - "mongo/db/repl/read_concern.idl"
+    - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/vector_clock.idl"
@@ -42,8 +44,6 @@ imports:
     - "mongo/rpc/metadata/impersonated_user_metadata.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/s/gossiped_routing_cache.idl"
-
-# This file lists the generic arguments accepted by all commands.
 
 structs:
     GenericArguments:
@@ -70,21 +70,21 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "stable"
-            $db:
-                type: IDLAnyType
-                cpp_name: "dbName"
-                forward_to_shards: false
-                # The IDL compiler injects this directly into command requests, so we ignore it here.
-                ignore: true
-                stability: "stable"
+            # The IDL compiler injects this directly into command requests, so we ignore it here.
+            # $db:
+            #     type: database_name
+            #     cpp_name: "dbName"
+            #     forward_to_shards: false
+            #     ignore: true
+            #     stability: "stable"
             maxTimeMS:
-                type: safeInt64
-                validator: { gte: 0 }
+                type: exactInt64
+                validator: { gte: 0, lte: 2147483647 } # [0, 2^31 - 1]
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
             readConcern:
-                type: ReadConcernIdl
+                type: ReadConcern
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
@@ -121,15 +121,22 @@ structs:
             stmtId:
                 type: StmtId
                 forward_to_shards: true
-                optional: true
+                # Various write commands treat this argument differently, so we ignore it at the generic argument
+                # level and instead defer to the individual commands' definitions of it. They should all use the same
+                # serialization rules, though.
+                #
+                # Note that if a command does not include a stmtId field in its definition, the re-serialized BSON
+                # of a parsed instance of that command struct will not contain stmtId, even if the original request
+                # did.
+                ignore: true
                 stability: "stable"
             comment:
-                type: IDLAnyType
+                type: IDLAnyTypeOwned
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
             $readPreference:
-                type: ReadPreferenceIdl
+                type: readPreference
                 cpp_name: "readPreference"
                 forward_to_shards: false
                 optional: true
@@ -164,7 +171,7 @@ structs:
                 optional: true
                 stability: "internal"
             $oplogQueryData:
-                type: object_owned
+                type: IDLAnyTypeOwned
                 cpp_name: "dollarOplogQueryData"
                 forward_to_shards: false
                 optional: true
@@ -176,7 +183,7 @@ structs:
                 optional: true
                 stability: "internal"
             $replData:
-                type: IDLAnyType
+                type: IDLAnyTypeOwned
                 cpp_name: "dollarReplData"
                 forward_to_shards: false
                 optional: true
@@ -207,8 +214,8 @@ structs:
                 optional: true
                 stability: "internal"
             maxTimeMSOpOnly:
-                type: safeInt64
-                validator: { gte: 0 }
+                type: exactInt64
+                validator: { callback: "::mongo::validateMaxTimeMSOpOnly" }
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
@@ -236,7 +243,7 @@ structs:
                 stability: "internal"
             mayBypassWriteBlocking:
                 type: bool
-                forward_to_shards: true
+                forward_to_shards: false
                 optional: true
                 stability: "internal"
             expectPrefix:
@@ -245,7 +252,7 @@ structs:
                 optional: true
                 stability: "internal"
             requestGossipRoutingCache:
-                type: array<IDLAnyType>
+                type: array<IDLAnyTypeOwned>
                 forward_to_shards: false
                 optional: true
                 stability: "internal"

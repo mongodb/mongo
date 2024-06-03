@@ -68,33 +68,30 @@ namespace aggregation_request_helper {
 /**
  * Validate the aggregate command object.
  */
-void validate(const BSONObj& cmdObj,
+void validate(const AggregateCommandRequest& aggregate,
+              const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity);
 
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    bool apiStrict) {
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
     try {
-        return parseFromBSON(
-            cmdObj, vts, explainVerbosity, apiStrict, SerializationContext::stateDefault());
+        return parseFromBSON(cmdObj, vts, explainVerbosity, SerializationContext::stateDefault());
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }
 }
 
+
 AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
                                       const boost::optional<auth::ValidatedTenancyScope>& vts,
                                       boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                      bool apiStrict,
                                       const SerializationContext& serializationContext) {
     auto tenantId = vts.has_value() ? boost::make_optional(vts->tenantId()) : boost::none;
     auto request = idl::parseCommandDocument<AggregateCommandRequest>(
-        IDLParserContext("aggregate", vts, std::move(tenantId), serializationContext),
-        apiStrict,
-        cmdObj);
+        IDLParserContext("aggregate", vts, std::move(tenantId), serializationContext), cmdObj);
     if (explainVerbosity) {
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "The '" << AggregateCommandRequest::kExplainFieldName
@@ -103,17 +100,18 @@ AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
         request.setExplain(explainVerbosity);
     }
 
-    validate(cmdObj, request.getNamespace(), explainVerbosity);
+    validate(request, cmdObj, request.getNamespace(), explainVerbosity);
+
     return request;
 }
 
 BSONObj serializeToCommandObj(const AggregateCommandRequest& request) {
-    return request.toBSON(BSONObj());
+    return request.toBSON();
 }
 
 Document serializeToCommandDoc(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                const AggregateCommandRequest& request) {
-    MutableDocument doc(Document(request.toBSON(BSONObj()).getOwned()));
+    MutableDocument doc(Document(request.toBSON().getOwned()));
 
     if (auto querySettingsBSON = expCtx->getQuerySettings().toBSON();
         !querySettingsBSON.isEmpty()) {
@@ -123,15 +121,14 @@ Document serializeToCommandDoc(const boost::intrusive_ptr<ExpressionContext>& ex
     return doc.freeze();
 }
 
-void validate(const BSONObj& cmdObj,
+void validate(const AggregateCommandRequest& aggregate,
+              const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
-    bool hasCursorElem = cmdObj.hasField(AggregateCommandRequest::kCursorFieldName);
-    bool hasExplainElem = cmdObj.hasField(AggregateCommandRequest::kExplainFieldName);
-    bool hasExplain = explainVerbosity ||
-        (hasExplainElem && cmdObj[AggregateCommandRequest::kExplainFieldName].Bool());
-    bool hasFromMongosElem = cmdObj.hasField(AggregateCommandRequest::kFromMongosFieldName);
-    bool hasNeedsMergeElem = cmdObj.hasField(AggregateCommandRequest::kNeedsMergeFieldName);
+    bool hasExplainElem = aggregate.getExplain().has_value();
+    bool hasExplain = explainVerbosity.has_value() || aggregate.getExplain().has_value();
+    bool hasFromMongosElem = aggregate.getFromMongos().has_value();
+    bool hasNeedsMergeElem = aggregate.getNeedsMerge().has_value();
 
     uassert(ErrorCodes::InvalidNamespace,
             fmt::format("Invalid collection name specified '{}'",
@@ -144,33 +141,24 @@ void validate(const BSONObj& cmdObj,
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The '" << AggregateCommandRequest::kCursorFieldName
                           << "' option is required, except for aggregate with the explain argument",
-            hasCursorElem || hasExplainElem);
+            hasExplainElem || cmdObj.hasField(AggregateCommandRequest::kCursorFieldName));
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "Aggregation explain does not support the'"
                           << WriteConcernOptions::kWriteConcernField << "' option",
-            !hasExplain || !cmdObj[WriteConcernOptions::kWriteConcernField]);
+            !hasExplain || !aggregate.getWriteConcern().has_value());
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "Cannot specify '" << AggregateCommandRequest::kNeedsMergeFieldName
                           << "' without '" << AggregateCommandRequest::kFromMongosFieldName << "'",
             (!hasNeedsMergeElem || hasFromMongosElem));
 
-    auto requestReshardingResumeTokenElem =
-        cmdObj[AggregateCommandRequest::kRequestReshardingResumeTokenFieldName];
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << AggregateCommandRequest::kRequestReshardingResumeTokenFieldName
-                          << " must be a boolean type",
-            !requestReshardingResumeTokenElem || requestReshardingResumeTokenElem.isBoolean());
-    bool hasRequestReshardingResumeToken =
-        requestReshardingResumeTokenElem && requestReshardingResumeTokenElem.boolean();
     uassert(ErrorCodes::FailedToParse,
             str::stream() << AggregateCommandRequest::kRequestReshardingResumeTokenFieldName
                           << " must only be set for the oplog namespace, not "
                           << nss.toStringForErrorMsg(),
-            !hasRequestReshardingResumeToken || nss.isOplog());
+            !aggregate.getRequestReshardingResumeToken().value_or(false) || nss.isOplog());
 
-    auto requestResumeTokenElem = cmdObj[AggregateCommandRequest::kRequestResumeTokenFieldName];
     // We need to use isEnabledUseLastLTSFCVWhenUninitialized here because an aggregate
     // command with $_requestResumeToken could be sent directly to an initial sync node with
     // uninitialized FCV, and creating/parsing/validating this command invocation happens before
@@ -178,25 +166,21 @@ void validate(const BSONObj& cmdObj,
     uassert(
         90675,
         "$_requestResumeToken is not supported without Resharding Improvements",
-        !requestResumeTokenElem ||
+        !aggregate.getRequestResumeToken().has_value() ||
             resharding::gFeatureFlagReshardingImprovements.isEnabledUseLastLTSFCVWhenUninitialized(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << AggregateCommandRequest::kRequestResumeTokenFieldName
-                          << " must be a boolean type",
-            !requestResumeTokenElem || requestResumeTokenElem.isBoolean());
-    bool hasRequestResumeToken = requestResumeTokenElem && requestResumeTokenElem.boolean();
+    bool hasRequestResumeToken = aggregate.getRequestResumeToken().value_or(false);
     uassert(ErrorCodes::FailedToParse,
             str::stream() << AggregateCommandRequest::kRequestResumeTokenFieldName
                           << " must be set for non-oplog namespace",
             !hasRequestResumeToken || !nss.isOplog());
     if (hasRequestResumeToken) {
-        auto hintElem = cmdObj[AggregateCommandRequest::kHintFieldName];
+        auto hintElem = aggregate.getHint();
         uassert(ErrorCodes::BadValue,
                 "hint must be {$natural:1} if 'requestResumeToken' is enabled",
-                hintElem && hintElem.isABSONObj() &&
+                hintElem.has_value() &&
                     SimpleBSONObjComparator::kInstance.evaluate(
-                        hintElem.Obj() == BSON(query_request_helper::kNaturalSortField << 1)));
+                        hintElem.value() == BSON(query_request_helper::kNaturalSortField << 1)));
     }
 }
 

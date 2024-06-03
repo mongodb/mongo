@@ -106,9 +106,12 @@ public:
             // On secondaries, the database and shard version check is only performed for commands
             // that specify a readConcern (that is not "available"). Therefore, to opt into the
             // check, explicitly attach the readConcern.
+            auto newRequest = request();
+            if (!newRequest.getReadConcern()) {
+                newRequest.setReadConcern(extractReadConcern(opCtx));
+            }
             const auto unversionedCmdObj =
-                CommandHelpers::filterCommandRequestForPassthrough(request().toBSON(BSON(
-                    repl::ReadConcernArgs::kReadConcernFieldName << extractReadConcern(opCtx))));
+                CommandHelpers::filterCommandRequestForPassthrough(newRequest.toBSON());
 
             while (true) {
                 // Select a random shard.
@@ -146,9 +149,18 @@ public:
                     buildVersionedRequests(expCtx, nss, cri, {shardId}, unversionedCmdObj);
                 invariant(requests.size() == 1);
 
+                ReadPreferenceSetting readPref = [&]() {
+                    if (auto rp = request().getReadPreference()) {
+                        return *rp;
+                    } else {
+                        // "secondaryPreferred" is used as the default to minimize the impact on
+                        // user workloads.
+                        return ReadPreferenceSetting(ReadPreference::SecondaryPreferred);
+                    }
+                }();
                 auto response = std::move(gatherResponses(opCtx,
                                                           DatabaseName::kAdmin,
-                                                          request().getReadPreference(),
+                                                          std::move(readPref),
                                                           Shard::RetryPolicy::kIdempotent,
                                                           requests)
                                               .front());

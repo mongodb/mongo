@@ -35,13 +35,12 @@
 namespace mongo {
 std::pair<boost::optional<Milliseconds>, bool> getRequestOrDefaultMaxTimeMS(
     OperationContext* opCtx,
-    const boost::optional<mongo::IDLAnyType>& requestMaxTimeMS,
+    boost::optional<std::int64_t> requestMaxTimeMS,
     const bool isReadOperation) {
 
     // Always uses the user-defined value if it's passed in.
     if (requestMaxTimeMS) {
-        return {Milliseconds{uassertStatusOK(parseMaxTimeMS(requestMaxTimeMS->getElement()))},
-                false};
+        return {Milliseconds{*requestMaxTimeMS}, false};
     }
 
     // Currently, defaultMaxTimeMS is only applicable to read operations.

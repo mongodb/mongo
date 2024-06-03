@@ -89,11 +89,8 @@ std::unique_ptr<ParsedFindCommand> generateSmallParsedFindRequest(
     bob.appendElements(BSON("find" << nss.coll().toString() << "$db"
                                    << nss.dbName().serializeWithoutTenantPrefix_UNSAFE() << "filter"
                                    << rawFilter));
-    auto findCmd = query_request_helper::makeFromFindCommand(std::move(bob.asTempObj()),
-                                                             boost::none /* vts */,
-                                                             nss.tenantId(),
-                                                             kSerializationContext,
-                                                             false /* apiStrict */);
+    auto findCmd = query_request_helper::makeFromFindCommand(
+        std::move(bob.asTempObj()), boost::none /* vts */, nss.tenantId(), kSerializationContext);
     return uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCmd)}));
 }
 
@@ -126,11 +123,8 @@ std::unique_ptr<ParsedFindCommand> generateMediumParsedFindRequest(
     bob.appendElements(BSON("find" << nss.coll().toString() << "$db"
                                    << nss.dbName().serializeWithoutTenantPrefix_UNSAFE() << "filter"
                                    << rawFilter << "projection" << rawProjection));
-    auto findCmd = query_request_helper::makeFromFindCommand(std::move(bob.asTempObj()),
-                                                             boost::none /* vts */,
-                                                             nss.tenantId(),
-                                                             kSerializationContext,
-                                                             false /* apiStrict */);
+    auto findCmd = query_request_helper::makeFromFindCommand(
+        std::move(bob.asTempObj()), boost::none /* vts */, nss.tenantId(), kSerializationContext);
     return uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCmd)}));
 }
 
@@ -192,11 +186,8 @@ std::unique_ptr<ParsedFindCommand> generateLargeParsedFindRequest(
                                    << nss.dbName().serializeWithoutTenantPrefix_UNSAFE() << "filter"
                                    << rawFilter << "projection" << rawProjection << "sort"
                                    << rawSort));
-    auto findCmd = query_request_helper::makeFromFindCommand(std::move(bob.asTempObj()),
-                                                             boost::none /* vts */,
-                                                             nss.tenantId(),
-                                                             kSerializationContext,
-                                                             false /* apiStrict */);
+    auto findCmd = query_request_helper::makeFromFindCommand(
+        std::move(bob.asTempObj()), boost::none /* vts */, nss.tenantId(), kSerializationContext);
     return uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCmd)}));
 }
 
@@ -328,7 +319,7 @@ public:
 
             return parsedFindRequest;
         }();
-        auto querySize = parsedFind->findCommandRequest->toBSON(BSONObj()).objsize();
+        auto querySize = parsedFind->findCommandRequest->toBSON().objsize();
 
         state.SetLabel(str::stream()
                        << "QuerySettingsCount=" << state.range(0) << " QuerySizeBytes=" << querySize

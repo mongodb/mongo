@@ -48,6 +48,7 @@
 #include "mongo/db/write_concern_options_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {

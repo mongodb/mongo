@@ -154,6 +154,10 @@ public:
         return _batchedRequest;
     }
 
+    const GenericArguments& getGenericArguments() const override {
+        return getBatchedRequest().getGenericArguments();
+    }
+
     bool getBypass() const {
         return _batchedRequest.getBypassDocumentValidation();
     }

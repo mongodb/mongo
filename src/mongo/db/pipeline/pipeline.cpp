@@ -906,12 +906,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     boost::optional<BSONObj> readConcern;
     // If readConcern is set on opts and aggRequest, assert they are equal.
     if (opts.readConcern && aggRequest.getReadConcern()) {
+        readConcern = aggRequest.getReadConcern()->toBSONInner();
         tassert(7393501,
                 "Read concern on aggRequest and makePipelineOpts must match.",
-                opts.readConcern->binaryEqual(*aggRequest.getReadConcern()));
-        readConcern = aggRequest.getReadConcern();
+                opts.readConcern->binaryEqual(*readConcern));
     } else {
-        readConcern = aggRequest.getReadConcern() ? aggRequest.getReadConcern() : opts.readConcern;
+        readConcern = aggRequest.getReadConcern() ? aggRequest.getReadConcern()->toBSONInner()
+                                                  : opts.readConcern;
     }
 
     auto pipeline = Pipeline::parse(aggRequest.getPipeline(), expCtx, opts.validator);

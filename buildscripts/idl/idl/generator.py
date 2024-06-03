@@ -327,20 +327,11 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
         if len(required_fields) == 0:
             return
 
-        # To build this bitmask, we assume less then 64 fields. If we exceed this count, we will need a new approach
-        assert self.field_count < 64
-
         required_fields = sorted(required_fields, key=lambda f: f.cpp_name)
 
-        bitmask = " | ".join(
-            ["(1ULL << %s)" % (_gen_field_usage_constant(rf)) for rf in required_fields]
-        )
-
-        self._writer.write_line(f"constexpr std::uint64_t requiredFieldBitMask = {bitmask};")
-
-        self._writer.write_line(
-            "std::bitset<%d> requiredFields(requiredFieldBitMask);" % (self.field_count)
-        )
+        self._writer.write_line("std::bitset<%d> requiredFields;" % (self.field_count))
+        for rf in required_fields:
+            self._writer.write_line(f"requiredFields.set({_gen_field_usage_constant(rf)});")
 
         self._writer.write_line(
             "bool hasMissingRequiredFields = (requiredFields & usedFields) != requiredFields;"
@@ -2334,13 +2325,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # End of for fields
             # Generate strict check for extranous fields
             if struct.strict:
-                # For commands, check if this is a well known command field that the IDL parser
-                # should ignore regardless of strict mode.
                 command_predicate = None
-                if isinstance(struct, ast.Command):
-                    command_predicate = "!mongo::isGenericArgument(fieldName)"
 
-                # Ditto for command replies
+                # For command replies, check if this is a well known command field that the IDL
+                # parser should ignore regardless of strict mode.
                 if struct.is_command_reply:
                     command_predicate = "!mongo::isGenericReply(fieldName)"
 
@@ -3002,15 +2990,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # Add a blank line after each block
             self._writer.write_empty_line()
 
-        # Append passthrough elements
-        if isinstance(struct, ast.Command):
-            known_name = "_knownOP_MSGFields" if is_op_msg_request else "_knownBSONFields"
-            self._writer.write_line(
-                "::mongo::appendGenericCommandArguments(commandPassthroughFields, %s, builder);"
-                % (known_name)
-            )
-            self._writer.write_empty_line()
-
     def gen_bson_serializer_method(self, struct):
         # type: (ast.Struct) -> None
         """Generate the serialize method definition."""
@@ -3654,8 +3633,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         if spec.commands:
             header_list.append("mongo/db/auth/authorization_contract.h")
-            header_list.append("mongo/idl/command_generic_argument.h")
-        elif len([s for s in spec.structs if s.is_command_reply]) > 0:
+
+        if any(s.is_command_reply for s in spec.structs):
+            # Needed for shouldForwardFromShards and isGenericReply
             header_list.append("mongo/idl/command_generic_argument.h")
 
         if spec.server_parameters:

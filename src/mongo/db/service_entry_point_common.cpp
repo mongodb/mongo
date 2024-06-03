@@ -78,7 +78,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/common_request_args_gen.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
@@ -88,13 +87,13 @@
 #include "mongo/db/default_max_time_ms_cluster_parameter.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/query/max_time_ms_parser.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -217,8 +216,7 @@ namespace {
 using namespace fmt::literals;
 
 void runCommandInvocation(const RequestExecutionContext& rec, CommandInvocation* invocation) {
-    CommandHelpers::runCommandInvocation(
-        rec.getOpCtx(), rec.getRequest(), invocation, rec.getReplyBuilder());
+    CommandHelpers::runCommandInvocation(rec.getOpCtx(), invocation, rec.getReplyBuilder());
 }
 
 /*
@@ -578,10 +576,6 @@ public:
         return atom == helloAtom || atom == isMasterAtom;
     }
 
-    const CommonRequestArgs& getCommonRequestArgs() const {
-        return _requestArgs;
-    }
-
 private:
     void _parseCommand() {
         auto opCtx = _execContext.getOpCtx();
@@ -590,41 +584,40 @@ private:
 
         CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
 
-        _requestArgs = CommonRequestArgs::parse(IDLParserContext("request",
-                                                                 request.validatedTenancyScope,
-                                                                 request.getValidatedTenantId(),
-                                                                 request.getSerializationContext()),
-                                                request.body);
+        invariant(!auth::ValidatedTenancyScope::get(opCtx).has_value() ||
+                  (request.validatedTenancyScope &&
+                   *auth::ValidatedTenancyScope::get(opCtx) == *(request.validatedTenancyScope)));
 
-        validateAPIParameters(request.body, _requestArgs.getAPIParametersFromClient(), command);
+        auth::ValidatedTenancyScope::set(opCtx, request.validatedTenancyScope);
 
+        _invocation = command->parse(opCtx, request);
+        CommandInvocation::set(opCtx, _invocation);
+
+        auto apiParameters = parseAndValidateAPIParameters(*_invocation);
+
+        _startOperationTime = getClientOperationTime(opCtx);
         Client* client = opCtx->getClient();
         {
             stdx::lock_guard<Client> lk(*client);
             // We construct a legacy $cmd namespace so we can fill in curOp using
             // the existing logic that existed for OP_QUERY commands
             CurOp::get(opCtx)->setGenericOpRequestDetails_inlock(
-                NamespaceString::makeCommandNamespace(_requestArgs.getDbName()),
+                NamespaceString::makeCommandNamespace(_invocation->db()),
                 command,
                 request.body,
                 _execContext.op());
             // We must obtain the client lock to set APIParameters on the operation context, as it
             // may be concurrently read by CurrentOp.
-            APIParameters::get(opCtx) =
-                APIParameters::fromClient(_requestArgs.getAPIParametersFromClient());
+            APIParameters::get(opCtx) = APIParameters::fromClient(apiParameters);
         }
 
-        _startOperationTime = getClientOperationTime(opCtx);
-
-        rpc::readRequestMetadata(opCtx, _requestArgs, request, command->requiresAuth());
-
-        _invocation = command->parse(opCtx, request);
-        CommandInvocation::set(opCtx, _invocation);
+        rpc::readRequestMetadata(
+            opCtx, _invocation->getGenericArguments(), command->requiresAuth());
 
         const auto session = _execContext.getOpCtx()->getClient()->session();
         if (session) {
             if (!opCtx->isExhaust() || !isHello()) {
-                InExhaustHello::get(session.get())->setInExhaust(false, request.getCommandName());
+                InExhaustHello::get(session.get())->setInExhaust(false, command->getName());
             }
         }
     }
@@ -675,7 +668,6 @@ private:
     std::shared_ptr<CommandInvocation> _invocation;
     LogicalTime _startOperationTime;
     OperationSessionInfoFromClient _sessionOptions;
-    CommonRequestArgs _requestArgs;
 
     boost::optional<RunCommandOpTimes> _runCommandOpTimes;
     boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
@@ -818,7 +810,7 @@ void InvokeCommand::run() try {
     auto& execContext = _ecd->getExecutionContext();
     const auto dbName = _ecd->getInvocation()->ns().dbName();
     tenant_migration_access_blocker::checkIfCanRunCommandOrBlock(
-        execContext.getOpCtx(), dbName, execContext.getRequest())
+        execContext.getOpCtx(), dbName, execContext.getCommand()->getName())
         .get(execContext.getOpCtx());
     runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
 } catch (const ExceptionForCat<ErrorCategory::TenantMigrationConflictError>& ex) {
@@ -834,7 +826,7 @@ void CheckoutSessionAndInvokeCommand::run() {
             auto& execContext = _ecd->getExecutionContext();
             const auto dbName = _ecd->getInvocation()->ns().dbName();
             tenant_migration_access_blocker::checkIfCanRunCommandOrBlock(
-                execContext.getOpCtx(), dbName, execContext.getRequest())
+                execContext.getOpCtx(), dbName, execContext.getCommand()->getName())
                 .get(execContext.getOpCtx());
 
             if (auto scoped = failWithErrorCodeAfterSessionCheckOut.scoped();
@@ -1209,7 +1201,6 @@ void RunCommandImpl::_prologue() {
 void RunCommandImpl::_epilogue() {
     auto& execContext = _ecd->getExecutionContext();
     auto opCtx = execContext.getOpCtx();
-    auto& request = execContext.getRequest();
     auto command = execContext.getCommand();
     auto replyBuilder = execContext.getReplyBuilder();
     auto& behaviors = execContext.behaviors;
@@ -1224,6 +1215,7 @@ void RunCommandImpl::_epilogue() {
                 &waitAfterCommandFinishesExecution, opCtx, "waitAfterCommandFinishesExecution");
         },
         [&](const BSONObj& data) {
+            auto& request = execContext.getRequest();
             auto commands =
                 data.hasField("commands") ? data["commands"].Array() : std::vector<BSONElement>();
             bool requestMatchesComment = data.hasField("comment")
@@ -1275,14 +1267,16 @@ void RunCommandImpl::_epilogue() {
     }
 
     auto commandBodyBob = replyBuilder->getBodyBuilder();
-    behaviors.appendReplyMetadata(opCtx, _ecd->getCommonRequestArgs(), &commandBodyBob);
+    behaviors.appendReplyMetadata(
+        opCtx, _ecd->getInvocation()->getGenericArguments(), &commandBodyBob);
     appendClusterAndOperationTime(
         opCtx, &commandBodyBob, &commandBodyBob, _ecd->getStartOperationTime());
 }
 
 void RunCommandImpl::_runImpl() {
     auto& execContext = _ecd->getExecutionContext();
-    execContext.behaviors.uassertCommandDoesNotSpecifyWriteConcern(_ecd->getCommonRequestArgs());
+    execContext.behaviors.uassertCommandDoesNotSpecifyWriteConcern(
+        _ecd->getInvocation()->getGenericArguments());
     _runCommand();
 }
 
@@ -1344,16 +1338,15 @@ void RunCommandAndWaitForWriteConcern::_runImpl() {
 }
 
 void RunCommandAndWaitForWriteConcern::_setup() {
-    auto invocation = _ecd->getInvocation();
+    const auto& invocation = *_ecd->getInvocation();
     OperationContext* opCtx = _execContext.getOpCtx();
-    const Command* command = invocation->definition();
-    const OpMsgRequest& request = _execContext.getRequest();
-    const CommonRequestArgs& requestArgs = _ecd->getCommonRequestArgs();
+    const Command* command = invocation.definition();
+    const GenericArguments& genericArgs = invocation.getGenericArguments();
 
     if (command->getLogicalOp() == LogicalOp::opGetMore) {
         // WriteConcern will be set up during command processing, it must not be specified on
         // the command body.
-        _execContext.behaviors.uassertCommandDoesNotSpecifyWriteConcern(requestArgs);
+        _execContext.behaviors.uassertCommandDoesNotSpecifyWriteConcern(genericArgs);
     } else {
         // WriteConcern should always be explicitly specified by operations received on shard
         // and config servers, even if it is empty (ie. writeConcern: {}).  In this context
@@ -1369,21 +1362,22 @@ void RunCommandAndWaitForWriteConcern::_setup() {
                 uassert(
                     4569201,
                     "received command without explicit writeConcern on an internalClient connection {}"_format(
-                        redact(request.body.toString())),
-                    requestArgs.getWriteConcern());
+                        redact(_execContext.getRequest().body.toString())),
+                    genericArgs.getWriteConcern());
             } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
                        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                if (!requestArgs.getWriteConcern()) {
+                if (!genericArgs.getWriteConcern()) {
                     // TODO: Disabled until after SERVER-44539, to avoid log spam.
                     // LOGV2(21959, "Missing writeConcern on {command}", "Missing "
                     // "writeConcern on command", "command"_attr = command->getName());
                 }
             }
         }
-        _extractedWriteConcern.emplace(
-            uassertStatusOK(extractWriteConcern(opCtx, request.body, _isInternalClient())));
+
+        _extractedWriteConcern.emplace(uassertStatusOK(extractWriteConcern(
+            opCtx, invocation.getGenericArguments(), command->getName(), _isInternalClient())));
         if (_ecd->getSessionOptions().getAutocommit()) {
-            validateWriteConcernForTransaction(*_extractedWriteConcern, invocation->definition());
+            validateWriteConcernForTransaction(*_extractedWriteConcern, invocation.definition());
         }
 
         // Ensure that the WC being set on the opCtx has provenance.
@@ -1450,14 +1444,10 @@ void RunCommandAndWaitForWriteConcern::_checkWriteConcern() {
  */
 StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
     OperationContext* opCtx, bool startTransaction, bool startOrContinueTransaction) {
-    auto& request = _execContext.getRequest();
     repl::ReadConcernArgs readConcernArgs;
 
-    if (_requestArgs.getReadConcern()) {
-        auto readConcernParseStatus = readConcernArgs.parse(*_requestArgs.getReadConcern());
-        if (!readConcernParseStatus.isOK()) {
-            return readConcernParseStatus;
-        }
+    if (auto& rc = _invocation->getGenericArguments().getReadConcern()) {
+        readConcernArgs = *rc;
     }
     bool clientSuppliedReadConcern = !readConcernArgs.isEmpty();
     bool customDefaultWasApplied = false;
@@ -1488,7 +1478,7 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
             uassert(
                 4569200,
                 "received command without explicit readConcern on an internalClient connection {}"_format(
-                    redact(request.body.toString())),
+                    redact(_execContext.getRequest().body.toString())),
                 readConcernArgs.isSpecified());
         } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
@@ -1589,9 +1579,10 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
 
 void ExecCommandDatabase::_initiateCommand() {
     auto opCtx = _execContext.getOpCtx();
-    auto& request = _execContext.getRequest();
+    auto validatedTenancyScope = _execContext.getRequest().validatedTenancyScope;
     auto command = _execContext.getCommand();
     auto replyBuilder = _execContext.getReplyBuilder();
+    auto& genericArgs = _invocation->getGenericArguments();
 
     // Record the time here to ensure that maxTimeMS, if set by the command, considers the time
     // spent before the deadline is set on `opCtx`.
@@ -1603,14 +1594,15 @@ void ExecCommandDatabase::_initiateCommand() {
     auto authzSession = AuthorizationSession::get(client);
     authzSession->startContractTracking();
 
-    if (auto scope = request.validatedTenancyScope; scope && scope->hasAuthenticatedUser()) {
+    if (validatedTenancyScope && validatedTenancyScope->hasAuthenticatedUser()) {
         uassert(ErrorCodes::Unauthorized,
                 fmt::format("Command {} is not supported in multitenancy mode", command->getName()),
                 command->allowedWithSecurityToken());
-        _tokenAuthorizationSessionGuard.emplace(opCtx, request.validatedTenancyScope.value());
+        _tokenAuthorizationSessionGuard.emplace(opCtx, validatedTenancyScope.value());
     }
 
     if (MONGO_unlikely(isHello())) {
+        auto& request = _execContext.getRequest();
         // Preload generic ClientMetadata ahead of our first hello request. After the first
         // request, metaElement should always be empty.
         auto metaElem = request.body[kMetadataDocumentName];
@@ -1627,13 +1619,13 @@ void ExecCommandDatabase::_initiateCommand() {
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
-    _sessionOptions =
-        initializeOperationSessionInfo(opCtx,
-                                       request.getValidatedTenantId(),
-                                       _requestArgs.getOperationSessionInfoFromClientBase(),
-                                       command->requiresAuth(),
-                                       command->attachLogicalSessionsToOpCtx(),
-                                       replCoord->getSettings().isReplSet());
+    _sessionOptions = initializeOperationSessionInfo(
+        opCtx,
+        validatedTenancyScope.map([](auto& scope) { return scope.tenantId(); }),
+        generic_argument_util::getOperationSessionInfoFromClient(genericArgs),
+        command->requiresAuth(),
+        command->attachLogicalSessionsToOpCtx(),
+        replCoord->getSettings().isReplSet());
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, getInvocation());
 
@@ -1656,22 +1648,18 @@ void ExecCommandDatabase::_initiateCommand() {
     validateSessionOptions(
         _sessionOptions, command, _invocation->allNamespaces(), allowTransactionsOnConfigDatabase);
 
-    if (auto& commentField = _requestArgs.getComment()) {
+    if (auto& commentField = genericArgs.getComment()) {
         stdx::lock_guard<Client> lk(*client);
         opCtx->setComment(commentField->getElement().wrap());
     }
 
-    uassert(ErrorCodes::InvalidOptions,
-            "no such command option $maxTimeMs; use maxTimeMS instead",
-            !_requestArgs.getDollarMaxTimeMS());
-
-    if (_requestArgs.getMaxTimeMSOpOnly()) {
+    if (genericArgs.getMaxTimeMSOpOnly()) {
         uassert(ErrorCodes::InvalidOptions,
                 "Can not specify maxTimeMSOpOnly for non internal clients",
                 _isInternalClient());
     }
 
-    if (MONGO_unlikely(_requestArgs.getHelp().value_or(false))) {
+    if (MONGO_unlikely(genericArgs.getHelp().value_or(false))) {
         CurOp::get(opCtx)->ensureStarted();
         // We disable not-primary-error tracker for help requests due to SERVER-11492, because
         // config servers use help requests to determine which commands are database writes, and so
@@ -1690,7 +1678,7 @@ void ExecCommandDatabase::_initiateCommand() {
         authzSession->startContractTracking();
     }
 
-    _invocation->checkAuthorization(opCtx, request);
+    _invocation->checkAuthorization(opCtx, _execContext.getRequest());
 
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {
@@ -1752,14 +1740,13 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (command->adminOnly()) {
-        LOGV2_DEBUG(21961, 2, "Admin only command", "command"_attr = request.getCommandName());
+        LOGV2_DEBUG(21961, 2, "Admin only command", "command"_attr = command->getName());
     }
 
     if (command->shouldAffectCommandCounter()) {
         globalOpCounters.gotCommand();
         if (analyze_shard_key::supportsSamplingQueries(opCtx)) {
-            analyze_shard_key::QueryAnalysisSampler::get(opCtx).gotCommand(
-                request.getCommandName());
+            analyze_shard_key::QueryAnalysisSampler::get(opCtx).gotCommand(command->getName());
         }
     }
 
@@ -1768,8 +1755,8 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     auto [requestOrDefaultMaxTimeMS, usesDefaultMaxTimeMS] = getRequestOrDefaultMaxTimeMS(
-        opCtx, _requestArgs.getMaxTimeMS(), getInvocation()->isReadOperation());
-    if (requestOrDefaultMaxTimeMS || _requestArgs.getMaxTimeMSOpOnly()) {
+        opCtx, genericArgs.getMaxTimeMS(), getInvocation()->isReadOperation());
+    if (requestOrDefaultMaxTimeMS || genericArgs.getMaxTimeMSOpOnly()) {
         // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
         // the OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a
         // getMore command, where it is used to communicate the maximum time to wait for new inserts
@@ -1779,8 +1766,7 @@ void ExecCommandDatabase::_initiateCommand() {
         // require introducing a new 'max await time' parameter for getMore, and eventually banning
         // maxTimeMS altogether on a getMore command.
         const auto maxTimeMS = requestOrDefaultMaxTimeMS.value_or(Milliseconds{0});
-        const auto maxTimeMSOpOnly = Milliseconds{uassertStatusOK(parseMaxTimeMSOpOnly(
-            _requestArgs.getMaxTimeMSOpOnly().value_or(IDLAnyType()).getElement()))};
+        const auto maxTimeMSOpOnly = Milliseconds(genericArgs.getMaxTimeMSOpOnly().value_or(0));
 
         if ((maxTimeMS > Milliseconds::zero() || maxTimeMSOpOnly > Milliseconds::zero()) &&
             command->getLogicalOp() != LogicalOp::opGetMore) {
@@ -1801,7 +1787,7 @@ void ExecCommandDatabase::_initiateCommand() {
                 opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMS,
                                          ErrorCodes::MaxTimeMSExpired);
             }
-            opCtx->setUsesDefaultMaxTimeMS(_requestArgs.getUsesDefaultMaxTimeMS().value_or(false) ||
+            opCtx->setUsesDefaultMaxTimeMS(genericArgs.getUsesDefaultMaxTimeMS().value_or(false) ||
                                            usesDefaultMaxTimeMS);
         }
     }
@@ -1857,8 +1843,8 @@ void ExecCommandDatabase::_initiateCommand() {
     enforceRequireAPIVersion(opCtx, command);
 
     if (!opCtx->getClient()->isInDirectClient()) {
-        const boost::optional<ShardVersion>& shardVersion = _requestArgs.getShardVersion();
-        const boost::optional<DatabaseVersion>& databaseVersion = _requestArgs.getDatabaseVersion();
+        const boost::optional<ShardVersion>& shardVersion = genericArgs.getShardVersion();
+        const boost::optional<DatabaseVersion>& databaseVersion = genericArgs.getDatabaseVersion();
 
         if (shardVersion || databaseVersion) {
             if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kAvailableReadConcern) {
@@ -1907,13 +1893,13 @@ const CommandNameAtom getMoreAtom("getMore");
 
 void ExecCommandDatabase::_commandExec() {
     auto opCtx = _execContext.getOpCtx();
-    auto& request = _execContext.getRequest();
 
     // If this command should start a new transaction, waitForReadConcern will be invoked
     // after invoking the TransactionParticipant, which will determine whether a transaction
     // is being started or continued.
     if (!opCtx->inMultiDocumentTransaction()) {
-        _execContext.behaviors.waitForReadConcern(opCtx, getInvocation(), request);
+        _execContext.behaviors.waitForReadConcern(
+            opCtx, getInvocation(), _execContext.getRequest());
     }
     _execContext.behaviors.setPrepareConflictBehaviorForReadConcern(opCtx, getInvocation());
 
@@ -2099,12 +2085,10 @@ bool ExecCommandDatabase::_canRetryCommand(const Status& execError) {
         SerializationContext serializationCtx = opMsgRequest.getSerializationContext();
 
         const AggregateCommandRequest aggregationRequest =
-            aggregation_request_helper::parseFromBSON(
-                opMsgRequest.body,
-                opMsgRequest.validatedTenancyScope,
-                boost::none,
-                APIParameters::get(opCtx).getAPIStrict().value_or(false),
-                serializationCtx);
+            aggregation_request_helper::parseFromBSON(opMsgRequest.body,
+                                                      opMsgRequest.validatedTenancyScope,
+                                                      boost::none,
+                                                      serializationCtx);
 
         const auto& pipeline = aggregationRequest.getPipeline();
         const auto hasMergeCursor =
@@ -2134,7 +2118,6 @@ void ExecCommandDatabase::_handleFailure(Status status) {
         return;
 
     auto opCtx = _execContext.getOpCtx();
-    auto& request = _execContext.getRequest();
     auto command = _execContext.getCommand();
     auto replyBuilder = _execContext.getReplyBuilder();
     const auto& behaviors = _execContext.behaviors;
@@ -2157,7 +2140,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
                                         getLastOpAfterRun());
 
     BSONObjBuilder metadataBob;
-    behaviors.appendReplyMetadata(opCtx, getCommonRequestArgs(), &metadataBob);
+    behaviors.appendReplyMetadata(opCtx, _invocation->getGenericArguments(), &metadataBob);
 
     // The read concern may not have yet been placed on the operation context, so attempt to parse
     // it here, so if it is valid it can be used to compute the proper operationTime.
@@ -2177,10 +2160,10 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     LOGV2_DEBUG(21962,
                 1,
                 "Assertion while executing command",
-                "command"_attr = request.getCommandName(),
-                "db"_attr = request.readDatabaseForLogging(),
-                "commandArgs"_attr = redact(
-                    ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body)),
+                "command"_attr = _execContext.getRequest().getCommandName(),
+                "db"_attr = _execContext.getRequest().readDatabaseForLogging(),
+                "commandArgs"_attr = redact(ServiceEntryPointCommon::getRedactedCopyForLogging(
+                    command, _execContext.getRequest().body)),
                 "error"_attr = redact(status.toString()));
 
     generateErrorResponse(
@@ -2260,7 +2243,6 @@ void executeCommand(HandleRequest::ExecutionContext& execContext) {
 DbResponse makeCommandResponse(const HandleRequest::ExecutionContext& execContext) {
     auto opCtx = execContext.getOpCtx();
     const Message& message = execContext.getMessage();
-    OpMsgRequest request = execContext.getRequest();
     const Command* c = execContext.getCommand();
     auto replyBuilder = execContext.getReplyBuilder();
 
@@ -2273,8 +2255,8 @@ DbResponse makeCommandResponse(const HandleRequest::ExecutionContext& execContex
             uasserted(ErrorCodes::NotWritablePrimary,
                       fmt::format("Not-primary error while processing '{}' operation  on '{}' "
                                   "database via fire-and-forget command execution.",
-                                  request.getCommandName(),
-                                  request.readDatabaseForLogging()));
+                                  execContext.getRequest().getCommandName(),
+                                  execContext.getRequest().readDatabaseForLogging()));
         }
         return {};  // Don't reply.
     }

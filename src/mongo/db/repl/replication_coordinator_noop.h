@@ -315,7 +315,7 @@ public:
                                       const ReplSetRequestVotesArgs&,
                                       ReplSetRequestVotesResponse*) final;
 
-    void prepareReplMetadata(const CommonRequestArgs&, const OpTime&, BSONObjBuilder*) const final;
+    void prepareReplMetadata(const GenericArguments&, const OpTime&, BSONObjBuilder*) const final;
 
     Status processHeartbeatV1(const ReplSetHeartbeatArgsV1&, ReplSetHeartbeatResponse*) final;
 

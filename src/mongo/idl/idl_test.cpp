@@ -3533,7 +3533,7 @@ TEST(IDLDocSequence, TestBasic) {
 
     // Positive: Test we can round trip to a document sequence from the just parsed document
     {
-        OpMsgRequest loopbackRequest = testStruct.serialize(BSONObj());
+        OpMsgRequest loopbackRequest = testStruct.serialize();
 
         assertOpMsgEquals(request, loopbackRequest);
         ASSERT_EQUALS(loopbackRequest.sequences.size(), 2UL);
@@ -3569,7 +3569,7 @@ TEST(IDLDocSequence, TestBasic) {
         objects.push_back(BSON("foo" << 1));
         one_new.setObjects(objects);
 
-        OpMsgRequest serializeRequest = one_new.serialize(BSONObj());
+        OpMsgRequest serializeRequest = one_new.serialize();
 
         assertOpMsgEquals(request, serializeRequest);
     }
@@ -3624,7 +3624,7 @@ void TestDocSequence(StringData name) {
     ASSERT_EQUALS("hello", testStruct.getStructs()[0].getValue());
     ASSERT_EQUALS("world", testStruct.getStructs()[1].getValue());
 
-    auto opmsg = testStruct.serialize(BSONObj());
+    auto opmsg = testStruct.serialize();
     ASSERT_EQUALS(2UL, opmsg.sequences.size());
 
     assertOpMsgEquals(opmsg, request);
@@ -3820,98 +3820,6 @@ TEST(IDLDocSequence, TestEmptySequence) {
     }
 }
 
-// Positive: Test all the OpMsg well known fields are ignored
-TEST(IDLDocSequence, TestWellKnownFieldsAreIgnored) {
-    IDLParserContext ctxt("root");
-
-    auto knownFields = {"$audit",
-                        "$client",
-                        "$configServerState",
-                        "$oplogQueryData",
-                        "$queryOptions",
-                        "$readPreference",
-                        "$replData",
-                        "$clusterTime",
-                        "maxTimeMS",
-                        "readConcern",
-                        "shardVersion",
-                        "tracking_info",
-                        "writeConcern"};
-
-    for (auto knownField : knownFields) {
-        auto testTempDoc = BSON("DocSequenceCommand"
-                                << "coll1"
-                                << "field1" << 3 << "field2"
-                                << "five" << knownField << "extra"
-                                << "structs"
-                                << BSON_ARRAY(BSON("value"
-                                                   << "hello")
-                                              << BSON("value"
-                                                      << "world"))
-                                << "objects" << BSON_ARRAY(BSON("foo" << 1)));
-
-
-        OpMsgRequest request =
-            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
-                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-                                        testTempDoc);
-
-        // Validate it can be parsed as a OpMsgRequest.
-        {
-            auto testStruct = DocSequenceCommand::parse(ctxt, request);
-            ASSERT_EQUALS(2UL, testStruct.getStructs().size());
-        }
-
-        // Validate it can be parsed as just a BSON document.
-        {
-            auto testStruct = DocSequenceCommand::parse(ctxt, request.body);
-            ASSERT_EQUALS(2UL, testStruct.getStructs().size());
-        }
-    }
-}
-
-// Positive: Test all the OpMsg well known fields are passed through except $db.
-TEST(IDLDocSequence, TestWellKnownFieldsPassthrough) {
-    IDLParserContext ctxt("root");
-
-    auto knownFields = {"$audit",
-                        "$client",
-                        "$configServerState",
-                        "$oplogQueryData",
-                        "$queryOptions",
-                        "$readPreference",
-                        "$replData",
-                        "$clusterTime",
-                        "maxTimeMS",
-                        "readConcern",
-                        "shardVersion",
-                        "tracking_info",
-                        "writeConcern"};
-
-    for (auto knownField : knownFields) {
-        auto testTempDoc = BSON("DocSequenceCommand"
-                                << "coll1"
-                                << "field1" << 3 << "field2"
-                                << "five"
-                                << "$db"
-                                << "db" << knownField << "extra"
-                                << "structs"
-                                << BSON_ARRAY(BSON("value"
-                                                   << "hello")
-                                              << BSON("value"
-                                                      << "world"))
-                                << "objects" << BSON_ARRAY(BSON("foo" << 1)));
-
-        OpMsgRequest request;
-        request.body = testTempDoc;
-        auto testStruct = DocSequenceCommand::parse(ctxt, request);
-        ASSERT_EQUALS(2UL, testStruct.getStructs().size());
-
-        auto reply = testStruct.serialize(testTempDoc);
-        assertOpMsgEquals(request, reply);
-    }
-}
-
 // Postive: Extra Fields in non-strict parser
 TEST(IDLDocSequence, TestNonStrict) {
     IDLParserContext ctxt("root");
@@ -3987,7 +3895,7 @@ TEST(IDLDocSequence, TestArrayVariant) {
 
     // Positive: Test we can round trip to a document sequence from the just parsed document
     {
-        OpMsgRequest loopbackRequest = testStruct.serialize(BSONObj());
+        OpMsgRequest loopbackRequest = testStruct.serialize();
 
         assertOpMsgEquals(request, loopbackRequest);
         ASSERT_EQUALS(loopbackRequest.sequences.size(), 1UL);  // just "structs"
@@ -4001,52 +3909,6 @@ TEST(IDLDocSequence, TestArrayVariant) {
         ASSERT_EQ(get<Insert_variant_struct>(testStruct.getStructs()[1]).getInsert(), 12);
     }
 }
-
-// Postive: Test a Command known field does not propagate from passthrough to the final BSON if it
-// is included as a field in the command.
-TEST(IDLCommand, TestKnownFieldDuplicate) {
-    IDLParserContext ctxt("root");
-
-    auto testPassthrough = BSON("$db"
-                                << "foo"
-                                << "maxTimeMS" << 6 << "$client"
-                                << "foo");
-
-    auto testDoc = BSON("KnownFieldCommand"
-                        << "coll1"
-                        << "$db"
-                        << "db"
-                        << "field1" << 28 << "maxTimeMS" << 42);
-
-    auto testStruct = KnownFieldCommand::parse(ctxt, makeOMR(testDoc));
-    ASSERT_EQUALS(28, testStruct.getField1());
-    ASSERT_EQUALS(42, testStruct.getMaxTimeMS());
-
-    // OpMsg request serializes original '$db' out because it is part of the OP_MSG request
-    auto expectedOpMsgDoc = BSON("KnownFieldCommand"
-                                 << "coll1"
-
-                                 << "field1" << 28 << "maxTimeMS" << 42 << "$db"
-                                 << "db"
-
-                                 << "$client"
-                                 << "foo");
-
-    ASSERT_BSONOBJ_EQ(expectedOpMsgDoc, testStruct.serialize(testPassthrough).body);
-
-    // BSON serialize does not round-trip '$db' because it can passed in passthrough data
-    auto expectedBSONDoc = BSON("KnownFieldCommand"
-                                << "coll1"
-
-                                << "field1" << 28 << "maxTimeMS" << 42 << "$db"
-                                << "foo"
-
-                                << "$client"
-                                << "foo");
-
-    ASSERT_BSONOBJ_EQ(expectedBSONDoc, testStruct.toBSON(testPassthrough));
-}
-
 
 // Positive: Test an inline nested chain struct works
 TEST(IDLChainedStruct, TestInline) {
@@ -4403,7 +4265,7 @@ TEST(IDLTypeCommand, TestString) {
         CommandTypeStringCommand one_new("foo");
         one_new.setField1(3);
         one_new.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
-        OpMsgRequest reply = one_new.serialize(BSONObj());
+        OpMsgRequest reply = one_new.serialize();
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
@@ -4789,6 +4651,61 @@ TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithMultitenancySupportOn) {
     ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 }
 
+// Verifies that parsed structs that are marked is_generic_cmd_list: "arg" are automatically chained
+// to command structs by the IDL compiler. In particular, this test verifies that the arguments
+// defined in TestGenericArguments in unittest.idl are chained properly.
+TEST(IDLCommand, TestCommandGenericArguments) {
+    IDLParserContext ctxt("root");
+
+    {
+        auto testDoc = BSON(CommandTypeStringCommand::kCommandName
+                            << "foo"
+                            << "field1" << 3 << TestGenericArguments::kGenericArgFieldName << "here"
+                            << TestGenericArguments::kUnstableGenericArgFieldName << "also here"
+                            << "$db"
+                            << "db");
+
+        DeserializationContext dctx;
+        auto testStruct = CommandTypeStringCommand::parse(ctxt, testDoc, &dctx);
+
+        // Verify that the command struct is properly identified as a view due to the chained
+        // generic arguments even though the command's own fields are not views.
+        ASSERT_FALSE(testStruct.isOwned());
+
+        // Verify that both generic arguments included in the TestGenericArguments struct were
+        // automatically bound to the command and have working getters/setters.
+        ASSERT_TRUE(testStruct.getGenericArg());
+        ASSERT_EQ(testStruct.getGenericArg()->getElement().String(), "here");
+        auto newArg = BSON(TestGenericArguments::kGenericArgFieldName << "now here");
+        testStruct.setGenericArg(IDLAnyType(newArg.firstElement()));
+        ASSERT_TRUE(testStruct.getGenericArg());
+        ASSERT_EQ(testStruct.getGenericArg()->getElement().String(), "now here");
+
+        ASSERT_EQ(testStruct.getUnstableGenericArg(), "also here"_sd);
+        testStruct.setUnstableGenericArg("unstable here"_sd);
+        ASSERT_EQ(testStruct.getUnstableGenericArg(), "unstable here"_sd);
+
+        // Verify that apiStrict validation fails due to the presence of the unstable argument.
+        ASSERT_THROWS_CODE(dctx.validateApiStrict(), DBException, ErrorCodes::APIStrictError);
+
+        // Verify that serializing the command back to BSON does not omit the generic arguments.
+        ASSERT_BSONOBJ_EQ(serializeCmd(CommandTypeStringCommand::parse(ctxt, testDoc)), testDoc);
+    }
+
+    // Verify that apiStrict validation succeeds when no unstable generic arguments are present.
+    {
+        auto stableDoc =
+            BSON(CommandTypeStringCommand::kCommandName << "foo"
+                                                        << "field1" << 3 << "genericArg"
+                                                        << "here"
+                                                        << "$db"
+                                                        << "db");
+        DeserializationContext dctx;
+        auto testStruct = CommandTypeStringCommand::parse(ctxt, stableDoc, &dctx);
+        ASSERT_DOES_NOT_THROW(dctx.validateApiStrict());
+    }
+}
+
 TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
@@ -4861,7 +4778,7 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceStruct_WithTenant) {
 
     // Positive: Test we can round trip to a document sequence from the just parsed document
     {
-        OpMsgRequest loopbackRequest = testStruct.serialize(BSONObj());
+        OpMsgRequest loopbackRequest = testStruct.serialize();
         OpMsgRequest request = makeOMR(testDoc);
 
         assertOpMsgEquals(request, loopbackRequest);

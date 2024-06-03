@@ -241,10 +241,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_targetAggr
     AggregateCommandRequest request(_nss, rawPipeline);
     request.setCollectionUUID(_collUUID);
 
-    request.setReadConcern(
-        BSON(repl::ReadConcernArgs::kLevelFieldName
-             << repl::readConcernLevels::toString(repl::ReadConcernLevel::kMajorityReadConcern)
-             << repl::ReadConcernArgs::kAfterClusterTimeFieldName << _minFetchTimestamp));
+    request.setReadConcern(repl::ReadConcernArgs(LogicalTime(_minFetchTimestamp),
+                                                 repl::ReadConcernLevel::kMajorityReadConcern));
 
     // The read preference on the request is merely informational (e.g. for profiler entries) -- the
     // pipeline's opCtx setting is actually used when sending the request.

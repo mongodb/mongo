@@ -378,7 +378,6 @@ public:
             viewAggCmd,
             vts,
             verbosity,
-            APIParameters::get(opCtx).getAPIStrict().value_or(false),
             canonicalDistinct.getQuery()->getFindCommandRequest().getSerializationContext());
 
         // Propagate the query settings with the request to the shards if present.

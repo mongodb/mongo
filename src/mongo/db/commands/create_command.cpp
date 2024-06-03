@@ -70,6 +70,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/view.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/rpc/op_msg.h"
@@ -387,7 +388,8 @@ public:
                             str::stream()
                                 << cmd.getNamespace().toStringForErrorMsg()
                                 << ": 'timeseries' is not allowed with '" << fieldName << "'",
-                            timeseries::kAllowedCollectionCreationOptions.contains(fieldName));
+                            timeseries::kAllowedCollectionCreationOptions.contains(fieldName) ||
+                                isGenericArgument(fieldName));
                 }
 
                 auto hasDot = [](StringData field) -> bool {

@@ -40,6 +40,8 @@ COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID = "concatenate_with_db_or_uuid"
 COMMAND_NAMESPACE_IGNORED = "ignored"
 COMMAND_NAMESPACE_TYPE = "type"
 
+GENERIC_ARGS_FILENAME = "mongo/idl/generic_argument.idl"
+
 
 def title_case(name):
     # type: (str) -> str

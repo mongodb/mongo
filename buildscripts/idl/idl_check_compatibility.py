@@ -1606,6 +1606,25 @@ def check_command_params_or_type_struct_fields(
     allow_list += ["collMod-param-isTimeseriesNamespace"]
 
     for old_field in old_struct_fields or []:
+        allow_name: str = cmd_name + "-param-" + old_field.name
+
+        # Determines whether the old field missing in the new struct should result in an error.
+        def field_must_exist():
+            if is_unstable(old_field.stability):
+                return False
+            if allow_name in allow_list:
+                return False
+            # Starting in 8.0, generic arguments like maxTimeMS are automatically injected into commands at bind time.
+            # This script only performs parsing, so we manually check here to see if the missing argument would have
+            # been injected as a generic argument. This is needed for commands like aggregate that previously defined
+            # some of the generic arguments explicitly in their command IDL definition.
+            if is_command_parameter:
+                for generic_arg_struct in new_idl_file.spec.symbols.generic_argument_lists:
+                    for arg in generic_arg_struct.fields:
+                        if arg.name == old_field.name:
+                            return False
+            return True
+
         new_field_exists = False
         for new_field in new_struct_fields or []:
             if new_field.name == old_field.name:
@@ -1624,12 +1643,8 @@ def check_command_params_or_type_struct_fields(
                 )
 
                 break
-        allow_name: str = cmd_name + "-param-" + old_field.name
-        if (
-            not new_field_exists
-            and not is_unstable(old_field.stability)
-            and allow_name not in allow_list
-        ):
+
+        if not new_field_exists and field_must_exist():
             ctxt.add_new_param_or_command_type_field_missing_error(
                 cmd_name, old_field.name, old_idl_file_path, old_struct.name, is_command_parameter
             )
@@ -2251,13 +2266,16 @@ def check_generic_arguments_compatibility(
     new_arguments, new_reply_fields = get_generic_arguments(new_gen_args_file_path, new_includes)
 
     for old_argument in old_arguments:
-        if old_argument not in new_arguments:
+        # We allow $db to be ignored here since the IDL compiler injects it into commands separately and so
+        # is omitted from generic_argument.idl.
+        if old_argument not in new_arguments and old_argument != "$db":
             ctxt.add_generic_argument_removed(old_argument, new_gen_args_file_path)
 
     for old_reply_field in old_reply_fields:
         if old_reply_field not in new_reply_fields:
             ctxt.add_generic_argument_removed_reply_field(old_reply_field, new_gen_args_file_path)
 
+    ctxt.errors.dump_errors()
     return ctxt.errors
 
 

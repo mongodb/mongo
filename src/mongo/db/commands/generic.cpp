@@ -55,6 +55,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
@@ -122,7 +123,21 @@ public:
         static Request parse(const IDLParserContext&,
                              const OpMsgRequest& request,
                              DeserializationContext* dctx = nullptr) {
-            return Request{request, request.parseDbName()};
+            return Request{
+                request,
+                GenericArguments::parse(IDLParserContext("GenericArguments",
+                                                         request.validatedTenancyScope,
+                                                         request.getValidatedTenantId(),
+                                                         request.getSerializationContext()),
+                                        request.body),
+                request.parseDbName()};
+        }
+
+        const GenericArguments& getGenericArguments() const {
+            return stableArgs;
+        }
+        GenericArguments& getGenericArguments() {
+            return stableArgs;
         }
 
         const DatabaseName& getDbName() const {
@@ -130,7 +145,8 @@ public:
         }
 
         const OpMsgRequest& request;
-        const DatabaseName dbName;
+        GenericArguments stableArgs;
+        DatabaseName dbName;
     };
 
     class Invocation final : public MinimalInvocationBase {

@@ -86,18 +86,6 @@ TEST(CommandWriteOpsParsers, CommonFields_Ordered) {
     }
 }
 
-TEST(CommandWriteOpsParsers, CommonFields_IgnoredFields) {
-    // These flags are ignored, so there is nothing to check other than that this doesn't throw.
-    auto cmd = BSON("insert"
-                    << "bar"
-                    << "documents" << BSON_ARRAY(BSONObj()) << "maxTimeMS" << 1000 << "shardVersion"
-                    << BSONObj() << "writeConcern" << BSONObj());
-    for (bool seq : {false, true}) {
-        auto request = toOpMsg("foo", cmd, seq);
-        InsertOp::parse(request);
-    }
-}
-
 TEST(CommandWriteOpsParsers, GarbageFieldsAtTopLevel_Body) {
     auto cmd = BSON("insert"
                     << "bar"

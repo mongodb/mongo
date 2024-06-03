@@ -173,7 +173,7 @@ TaskExecutorCursor::~TaskExecutorCursor() {
             };
         }
         auto swCallback = _executor->scheduleRemoteCommand(
-            _createRequest(nullptr, KillCursorsCommandRequest(_ns, {_cursorId}).toBSON(BSONObj{})),
+            _createRequest(nullptr, KillCursorsCommandRequest(_ns, {_cursorId}).toBSON()),
             callbackToRun);
 
         // It's possible the executor is already shutdown and rejects work. If so, run the callback

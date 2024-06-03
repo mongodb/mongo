@@ -45,7 +45,6 @@
 #include "mongo/client/read_preference_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -82,9 +81,6 @@ Status validateReadPreferenceMode(const std::string& prefStr, const boost::optio
     }
     return Status::OK();
 }
-
-const OperationContext::Decoration<ReadPreferenceSetting> ReadPreferenceSetting::get =
-    OperationContext::declareDecoration<ReadPreferenceSetting>();
 
 const BSONObj& ReadPreferenceSetting::secondaryPreferredMetadata() {
     // This is a static method rather than a static member only because it is used by another TU

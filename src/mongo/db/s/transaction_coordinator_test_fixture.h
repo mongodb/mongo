@@ -71,7 +71,7 @@ protected:
 
     void assertCommandSentAndRespondWith(StringData commandName,
                                          const StatusWith<BSONObj>& response,
-                                         boost::optional<BSONObj> expectedWriteConcern);
+                                         boost::optional<WriteConcernOptions> expectedWriteConcern);
     /**
      * These tests use the network task executor mock, which doesn't automatically execute tasks,
      * which are scheduled with delay. This helper function advances the clock by 1 second (which is

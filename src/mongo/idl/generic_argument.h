@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,45 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/max_time_ms_parser.h"
+#pragma once
 
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
-#include "query_request_helper.h"
-#include <fmt/format.h>
-
+#include "mongo/base/status.h"
 
 namespace mongo {
-namespace {
 
-TEST(MaxTimeMSParser, maxTimeMSOpOnlyOK) {
-    BSONObjBuilder builder;
-    builder.append("maxTimeMSOpOnly", 1);
-    ASSERT_OK(parseMaxTimeMSOpOnly(builder.obj().firstElement()));
-}
+/**
+ * Utility functions used by generic_argument.idl which are included in anything that includes it.
+ * Therefore, this cannot include generic_argument_gen.h
+ */
 
-TEST(MaxTimeMSParser, maxTimeMSOpOnlyMisnamedField) {
-    BSONObjBuilder builder;
-    builder.append("maxTimeMS", INT_MAX);
-    auto status = parseMaxTimeMSOpOnly(builder.obj().firstElement());
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(ErrorCodes::BadValue, status.getStatus().code());
-    ASSERT_EQ("FieldName should be maxTimeMSOpOnly", status.getStatus().reason());
-}
+/**
+ * 'maxTimeMSOpOnly' values are allowed to exceed the max allowed value for 'maxTimeMS' by a small
+ * constant (100). This is because mongod and mongos server processes add a small amount to the
+ * 'maxTimeMS' value they are given before passing it on as 'maxTimeMSOpOnly', to allow for clock
+ * precision.
+ */
+Status validateMaxTimeMSOpOnly(std::int64_t val);
 
-TEST(MaxTimeMSParser, maxTimeMSOpOnlyOutOfRange) {
-    using namespace fmt::literals;
-    auto badValue = double(INT_MAX) + query_request_helper::kMaxTimeMSOpOnlyMaxPadding + 1;
-
-    BSONObjBuilder builder;
-    builder.append("maxTimeMSOpOnly", badValue);
-    auto status = parseMaxTimeMSOpOnly(builder.obj().firstElement());
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(ErrorCodes::BadValue, status.getStatus().code());
-    ASSERT_EQ("{} value for maxTimeMSOpOnly is out of range [{}, {}]"_format(
-                  badValue, 0, double(INT_MAX) + query_request_helper::kMaxTimeMSOpOnlyMaxPadding),
-              status.getStatus().reason());
-}
-
-}  // namespace
 }  // namespace mongo

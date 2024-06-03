@@ -80,7 +80,6 @@ Status checkAuthForCreateOrModifyView(OperationContext* opCtx,
                          << DatabaseNameUtil::serialize(viewOnNs.dbName(), serializationContext)),
         auth::ValidatedTenancyScope::get(opCtx),
         boost::none,
-        false,
         serializationContext);
 
     auto statusWithPrivs = getPrivilegesForAggregate(authzSession, viewOnNs, request, isMongos);

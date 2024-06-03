@@ -44,6 +44,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
@@ -209,19 +210,22 @@ void registerIndexCatalogEntry(OperationContext* opCtx,
             ShardsvrCommitIndexParticipant shardsvrCommitIndexParticipantRequest(userCollectionNss);
             shardsvrCommitIndexParticipantRequest.setIndexCatalogType(index);
             shardsvrCommitIndexParticipantRequest.setDbName(DatabaseName::kAdmin);
+            generic_argument_util::setOperationSessionInfo(shardsvrCommitIndexParticipantRequest,
+                                                           osi);
+            generic_argument_util::setMajorityWriteConcern(shardsvrCommitIndexParticipantRequest);
 
-            sharding_util::sendCommandToShards(
-                opCtx,
-                userCollectionNss.dbName(),
-                CommandHelpers::appendMajorityWriteConcern(
-                    shardsvrCommitIndexParticipantRequest.toBSON(osi.toBSON())),
-                shardIds,
-                executor);
+            sharding_util::sendCommandToShards(opCtx,
+                                               userCollectionNss.dbName(),
+                                               shardsvrCommitIndexParticipantRequest.toBSON(),
+                                               shardIds,
+                                               executor);
 
             // Now commit the change in the config server.
             ConfigsvrCommitIndex configsvrCommitIndexRequest(userCollectionNss);
             configsvrCommitIndexRequest.setIndexCatalogType(index);
             configsvrCommitIndexRequest.setDbName(DatabaseName::kAdmin);
+            generic_argument_util::setOperationSessionInfo(configsvrCommitIndexRequest, osi);
+            generic_argument_util::setMajorityWriteConcern(configsvrCommitIndexRequest);
             auto commitIndexEntryResponse =
                 Grid::get(opCtx)
                     ->shardRegistry()
@@ -230,8 +234,7 @@ void registerIndexCatalogEntry(OperationContext* opCtx,
                         opCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                         DatabaseName::kAdmin,
-                        CommandHelpers::appendMajorityWriteConcern(
-                            configsvrCommitIndexRequest.toBSON(osi.toBSON())),
+                        configsvrCommitIndexRequest.toBSON(),
                         Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(commitIndexEntryResponse));
@@ -266,6 +269,8 @@ void unregisterIndexCatalogEntry(OperationContext* opCtx,
             configsvrDropIndexCatalogRequest.setUnregisterIndexCatalogRequest(
                 dropIndexCatalogRequest);
             configsvrDropIndexCatalogRequest.setDbName(DatabaseName::kAdmin);
+            generic_argument_util::setOperationSessionInfo(configsvrDropIndexCatalogRequest, osi);
+            generic_argument_util::setMajorityWriteConcern(configsvrDropIndexCatalogRequest);
             auto commitIndexEntryResponse =
                 Grid::get(opCtx)
                     ->shardRegistry()
@@ -274,8 +279,7 @@ void unregisterIndexCatalogEntry(OperationContext* opCtx,
                         opCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                         DatabaseName::kAdmin,
-                        CommandHelpers::appendMajorityWriteConcern(
-                            configsvrDropIndexCatalogRequest.toBSON(osi.toBSON())),
+                        configsvrDropIndexCatalogRequest.toBSON(),
                         Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(commitIndexEntryResponse));
@@ -286,14 +290,15 @@ void unregisterIndexCatalogEntry(OperationContext* opCtx,
             shardsvrDropIndexCatalogEntryRequest.setUnregisterIndexCatalogRequest(
                 dropIndexCatalogRequest);
             shardsvrDropIndexCatalogEntryRequest.setDbName(DatabaseName::kAdmin);
+            generic_argument_util::setOperationSessionInfo(shardsvrDropIndexCatalogEntryRequest,
+                                                           osi);
+            generic_argument_util::setMajorityWriteConcern(shardsvrDropIndexCatalogEntryRequest);
 
-            sharding_util::sendCommandToShards(
-                opCtx,
-                DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(
-                    shardsvrDropIndexCatalogEntryRequest.toBSON(osi.toBSON())),
-                shardIdsVec,
-                executor);
+            sharding_util::sendCommandToShards(opCtx,
+                                               DatabaseName::kAdmin,
+                                               shardsvrDropIndexCatalogEntryRequest.toBSON(),
+                                               shardIdsVec,
+                                               executor);
         });
 }
 }  // namespace sharding_index_catalog_util

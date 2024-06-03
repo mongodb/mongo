@@ -371,7 +371,7 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
                                KillCursorsCommandRequest(NamespaceStringUtil::deserialize(
                                                              dbName, body["collection"].String()),
                                                          {CursorId{firstElement.Long()}})
-                                   .toBSON(BSONObj{}))
+                                   .toBSON())
                                .serialize())
             .get();
         return true;

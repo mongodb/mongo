@@ -74,7 +74,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
@@ -844,9 +843,8 @@ BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
     NamespaceString fullNameNS = getCollectionNS();
     FindCommandRequest findCmd{fullNameNS};
     findCmd.setFilter(BSON("_id" << uuid));
-    findCmd.setReadConcern(
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern).toBSONInner());
-    ReadPreferenceSetting readPref{ReadPreference::PrimaryPreferred};
+    findCmd.setReadConcern(repl::ReadConcernArgs::kMajority);
+    findCmd.setReadPreference(ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
 
     Client* client = &cc();
     auto opCtx = client->getOperationContext();
@@ -856,8 +854,7 @@ BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
         vts = auth::ValidatedTenancyScope::get(opCtx);
     }
 
-    OpMsgRequest req = OpMsgRequestBuilder::create(
-        vts, fullNameNS.dbName(), findCmd.toBSON(readPref.toContainingBSON()));
+    OpMsgRequest req = OpMsgRequestBuilder::create(vts, fullNameNS.dbName(), findCmd.toBSON());
 
     BSONObj dataKeyObj = doFindOne(req);
 

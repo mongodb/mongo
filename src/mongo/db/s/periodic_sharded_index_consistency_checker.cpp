@@ -187,10 +187,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                                               nss.dbName(), SerializationContext::stateDefault()));
                     requestBuilder.appendElements(aggRequestBSON);
                     auto request = aggregation_request_helper::parseFromBSON(
-                        requestBuilder.obj(),
-                        auth::ValidatedTenancyScope::get(opCtx),
-                        boost::none,
-                        false);
+                        requestBuilder.obj(), auth::ValidatedTenancyScope::get(opCtx), boost::none);
 
                     auto routingInfoCache = RoutingInformationCache::get(opCtx);
                     shardVersionRetry(

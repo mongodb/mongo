@@ -49,6 +49,7 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -93,50 +94,54 @@ const StatusWith<BSONObj> kPrepareOkButWriteConcernError =
 class TransactionCoordinatorServiceTestFixture : public TransactionCoordinatorTestFixture {
 protected:
     void assertPrepareSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith(
-            PrepareTransaction::kCommandName, kPrepareOk, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kPrepareOk,
+                                        generic_argument_util::kMajorityWriteConcern);
     }
 
     void assertPrepareSentAndRespondWithSuccessAndWriteConcernError() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kPrepareOkButWriteConcernError,
-                                        WriteConcernOptions::Majority);
+                                        generic_argument_util::kMajorityWriteConcern);
         advanceClockAndExecuteScheduledTasks();
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransaction() {
-        assertCommandSentAndRespondWith(
-            PrepareTransaction::kCommandName, kNoSuchTransaction, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kNoSuchTransaction,
+                                        generic_argument_util::kMajorityWriteConcern);
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransactionAndWriteConcernError() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kNoSuchTransactionAndWriteConcernError,
-                                        WriteConcernOptions::Majority);
+                                        generic_argument_util::kMajorityWriteConcern);
         advanceClockAndExecuteScheduledTasks();
     }
 
     // Abort responses
 
     void assertAbortSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith("abortTransaction", kOk, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith(
+            "abortTransaction", kOk, generic_argument_util::kMajorityWriteConcern);
     }
 
     void assertAbortSentAndRespondWithSuccessAndWriteConcernError() {
-        assertCommandSentAndRespondWith(
-            "abortTransaction", kOkButWriteConcernError, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith("abortTransaction",
+                                        kOkButWriteConcernError,
+                                        generic_argument_util::kMajorityWriteConcern);
         advanceClockAndExecuteScheduledTasks();
     }
 
     void assertAbortSentAndRespondWithNoSuchTransaction() {
         assertCommandSentAndRespondWith(
-            "abortTransaction", kNoSuchTransaction, WriteConcernOptions::Majority);
+            "abortTransaction", kNoSuchTransaction, generic_argument_util::kMajorityWriteConcern);
     }
 
     void assertAbortSentAndRespondWithNoSuchTransactionAndWriteConcernError() {
         assertCommandSentAndRespondWith("abortTransaction",
                                         kNoSuchTransactionAndWriteConcernError,
-                                        WriteConcernOptions::Majority);
+                                        generic_argument_util::kMajorityWriteConcern);
         advanceClockAndExecuteScheduledTasks();
     }
 
@@ -144,19 +149,20 @@ protected:
 
     void assertCommitSentAndRespondWithSuccess() {
         assertCommandSentAndRespondWith(
-            CommitTransaction::kCommandName, kOk, WriteConcernOptions::Majority);
+            CommitTransaction::kCommandName, kOk, generic_argument_util::kMajorityWriteConcern);
     }
 
     void assertCommitSentAndRespondWithSuccessAndWriteConcernError() {
         assertCommandSentAndRespondWith(CommitTransaction::kCommandName,
                                         kOkButWriteConcernError,
-                                        WriteConcernOptions::Majority);
+                                        generic_argument_util::kMajorityWriteConcern);
         advanceClockAndExecuteScheduledTasks();
     }
 
     void assertCommitSentAndRespondWithRetryableError() {
-        assertCommandSentAndRespondWith(
-            CommitTransaction::kCommandName, kRetryableError, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith(CommitTransaction::kCommandName,
+                                        kRetryableError,
+                                        generic_argument_util::kMajorityWriteConcern);
         advanceClockAndExecuteScheduledTasks();
     }
 

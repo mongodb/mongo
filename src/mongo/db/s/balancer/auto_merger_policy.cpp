@@ -346,8 +346,7 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
         auto pipeline = Pipeline::create(std::move(stages), expCtx);
         auto aggRequest =
             AggregateCommandRequest(CollectionType::ConfigNS, pipeline->serializeToBson());
-        aggRequest.setReadConcern(
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+        aggRequest.setReadConcern(repl::ReadConcernArgs::kMajority);
 
         DBDirectClient client(opCtx);
         auto cursor = uassertStatusOKWithContext(

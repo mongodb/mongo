@@ -804,8 +804,7 @@ void encodeFindCommandRequest(const CanonicalQuery& cq, BufBuilder* bufBuilder) 
     bool isAvailableReadConcern{false};
     if (const auto readConcern = findCommand.getReadConcern()) {
         isAvailableReadConcern =
-            readConcern->getField(repl::ReadConcernArgs::kLevelFieldName).valueStringDataSafe() ==
-            repl::readConcernLevels::toString(repl::ReadConcernLevel::kAvailableReadConcern);
+            readConcern->getLevel() == repl::ReadConcernLevel::kAvailableReadConcern;
     }
     bufBuilder->appendChar(isAvailableReadConcern ? 't' : 'f');
 }

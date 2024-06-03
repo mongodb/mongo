@@ -387,7 +387,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
     // pass a readConcern than we must explicitly initialize an empty readConcern so that it ends up
     // in the serialized version of the find command which will be sent across the wire.
     if (!_findRequest->getReadConcern()) {
-        _findRequest->setReadConcern(BSONObj{});
+        _findRequest->setReadConcern(repl::ReadConcernArgs());
     }
 }
 

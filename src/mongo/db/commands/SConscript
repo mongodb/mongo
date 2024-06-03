@@ -80,7 +80,7 @@ env.Library(
         "fle2_compact.cpp",
         "fle2_compact.idl",
         "generic.cpp",
-        "generic_gen.cpp",
+        "generic.idl",
         "hashcmd.cpp",
         "kill_all_sessions_by_pattern_command.cpp",
         "kill_all_sessions_command.cpp",

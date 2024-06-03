@@ -93,13 +93,11 @@ StatusWith<BSONObj> countCommandAsAggregationCommand(const CountCommandRequest& 
         }
     }
 
-    if (auto readConcern = cmd.getReadConcern()) {
-        if (!readConcern->isEmpty()) {
-            aggregationBuilder.append(kReadConcernField, readConcern.value());
-        }
+    if (auto& readConcern = cmd.getReadConcern(); readConcern && !readConcern->isEmpty()) {
+        aggregationBuilder.append(kReadConcernField, readConcern->toBSONInner());
     }
 
-    if (auto unwrapped = cmd.getQueryOptions()) {
+    if (auto unwrapped = cmd.getUnwrappedReadPref()) {
         if (!unwrapped->isEmpty()) {
             aggregationBuilder.append(query_request_helper::kUnwrappedReadPrefField,
                                       unwrapped.value());

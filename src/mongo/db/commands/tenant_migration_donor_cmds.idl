@@ -83,6 +83,7 @@ commands:
       readPreference:
         description: "The read preference settings that the donor will pass on to the recipient."
         type: readPreference
+        cpp_name: ReadPreferenceSettings
       protocol:
         description: "Which migration protocol to use, default 'multitenant migrations'."
         type: MigrationProtocol

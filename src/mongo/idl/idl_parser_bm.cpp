@@ -69,10 +69,10 @@ BSONObj getFindDocWithDb() {
 BSONObj getClusterTime() {
     char hash_bytes[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    return BSON(
-        "clusterTime" << Timestamp(1654272333, 13) << "signature"
-                      << BSON("hash" << BSONBinData(hash_bytes, sizeof(hash_bytes), BinDataGeneral))
-                      << "keyId" << 0);
+    return BSON("clusterTime" << Timestamp(1654272333, 13) << "signature"
+                              << BSON("hash"
+                                      << BSONBinData(hash_bytes, sizeof(hash_bytes), BinDataGeneral)
+                                      << "keyId" << 0));
 }
 
 void BM_FIND_ONE_BSON(benchmark::State& state) {

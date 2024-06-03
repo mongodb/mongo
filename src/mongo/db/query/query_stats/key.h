@@ -295,7 +295,7 @@ protected:
     Key(OperationContext* opCtx,
         std::unique_ptr<query_shape::Shape> queryShape,
         boost::optional<BSONObj> hint,
-        boost::optional<BSONObj> readConcern,
+        boost::optional<repl::ReadConcernArgs> readConcern,
         bool maxTimeMS,
         query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
 

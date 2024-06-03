@@ -236,12 +236,13 @@ protected:
 
     void expectSetFeatureCompatibilityVersion(const HostAndPort& target,
                                               StatusWith<BSONObj> response,
-                                              BSONObj writeConcern) {
+                                              WriteConcernOptions writeConcern) {
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         SetFeatureCompatibilityVersion fcvCmd(multiversion::GenericFCV::kLatest);
         fcvCmd.setFromConfigServer(true);
         fcvCmd.setDbName(DatabaseName::kAdmin);
-        const auto setFcvObj = fcvCmd.toBSON(BSON("writeConcern" << writeConcern));
+        fcvCmd.setWriteConcern(writeConcern);
+        const auto setFcvObj = fcvCmd.toBSON();
 
         onCommandForAddShard([&, target, response](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
@@ -775,7 +776,7 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     expectClusterParametersPullRequest(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern.toBSON());
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern);
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -870,7 +871,7 @@ TEST_F(AddShardTest, StandaloneBasicPushSuccess) {
     expectClusterParametersPushRequest(shardTarget, {boost::none}, localClusterParameters);
 
     // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern.toBSON());
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern);
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -964,7 +965,7 @@ TEST_F(AddShardTest, StandaloneMultitenantPullSuccess) {
     expectClusterParametersPullRequest(shardTarget, tenantsOnTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern.toBSON());
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern);
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -1073,7 +1074,7 @@ TEST_F(AddShardTest, StandaloneMultitenantPushSuccess) {
                                        localClusterParameters);
 
     // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern.toBSON());
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern);
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -1165,7 +1166,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 
     // The shard receives the setFeatureCompatibilityVersion command
     expectSetFeatureCompatibilityVersion(
-        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
+        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern());
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -1572,7 +1573,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
-        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
+        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern());
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -1711,7 +1712,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
-        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
+        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern());
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);

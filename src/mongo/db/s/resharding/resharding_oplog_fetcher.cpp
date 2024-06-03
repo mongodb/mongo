@@ -333,7 +333,7 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
         auto readConcernArgs = repl::ReadConcernArgs(
             boost::optional<LogicalTime>(_startAt.getClusterTime()),
             boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
-        aggRequest.setReadConcern(readConcernArgs.toBSONInner());
+        aggRequest.setReadConcern(readConcernArgs);
     }
 
     ReadPreferenceSetting readPref(ReadPreference::Nearest,

@@ -27,6 +27,7 @@
 #
 """Utility methods and classes for testing IDL passes."""
 
+import io
 import unittest
 from typing import Any, Tuple
 
@@ -54,12 +55,12 @@ class NothingImportResolver(idl.parser.ImportResolverBase):
     def resolve(self, base_file, imported_file_name):
         # type: (str, str) -> str
         """Return the complete path to an imported file name."""
-        raise NotImplementedError()
+        return imported_file_name
 
     def open(self, imported_file_name):
         # type: (str) -> Any
-        """Return an io.Stream for the requested file."""
-        raise NotImplementedError()
+        """Return an empty io.Stream."""
+        return io.StringIO("")
 
 
 class IDLTestcase(unittest.TestCase):

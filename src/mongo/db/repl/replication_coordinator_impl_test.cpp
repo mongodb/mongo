@@ -44,7 +44,6 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/common_request_args_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
@@ -77,6 +76,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -6842,12 +6842,14 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
 
     auto opCtx = makeOperationContext();
 
-    auto requestArgs = CommonRequestArgs::parse(
-        IDLParserContext("mockRequest"),
-        BSON(rpc::kOplogQueryMetadataFieldName << 1 << rpc::kReplSetMetadataFieldName << 1 << "$db"
-                                               << "test"));
+    GenericArguments args;
+    BSONObj oplogQueryData = BSON(GenericArguments::kDollarOplogQueryDataFieldName << 1);
+    args.setDollarOplogQueryData(IDLAnyTypeOwned(oplogQueryData.firstElement(), oplogQueryData));
+    BSONObj replData = BSON("$replData" << 1);
+    args.setDollarReplData(IDLAnyTypeOwned(replData.firstElement(), replData));
+
     BSONObjBuilder metadataBob;
-    getReplCoord()->prepareReplMetadata(requestArgs, OpTime(), &metadataBob);
+    getReplCoord()->prepareReplMetadata(std::move(args), OpTime(), &metadataBob);
 
     BSONObj metadata = metadataBob.done();
     LOGV2(21506, "{metadata}", "metadata"_attr = metadata);

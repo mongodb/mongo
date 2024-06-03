@@ -43,8 +43,10 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/synchronized_value.h"
@@ -61,26 +63,20 @@ MaybeImpersonatedUserMetadata getImpersonatedUserMetadata(OperationContext* opCt
     return opCtx ? getForOpCtx(opCtx).get() : boost::none;
 }
 
-void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opCtx) {
-    // If we have no opCtx, which does appear to happen, don't do anything.
-    if (!opCtx) {
-        return;
-    }
-
+void setImpersonatedUserMetadata(OperationContext* opCtx,
+                                 const boost::optional<ImpersonatedUserMetadata>& data) {
     // Always reset the current impersonation data to boost::none.
-    MaybeImpersonatedUserMetadata newData;
-    if (elem.type() == Object) {
-        IDLParserContext errCtx(kImpersonationMetadataSectionName);
-        auto data = ImpersonatedUserMetadata::parse(errCtx, elem.embeddedObject());
-
-        auto newImpersonatedUser = data.getUser();
+    boost::optional<ImpersonatedUserMetadata> newData;
+    if (data) {
+        auto newImpersonatedUser = data->getUser();
 
         // Set the impersonation data only if there are actually impersonated
         // users/roles.
-        if (newImpersonatedUser.has_value() || !data.getRoles().empty()) {
-            newData = std::move(data);
+        if (newImpersonatedUser.has_value() || !data->getRoles().empty()) {
+            newData = data;
         }
     }
+
     *getForOpCtx(opCtx) = std::move(newData);
 }
 
@@ -121,20 +117,8 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
     }
 }
 
-std::size_t estimateImpersonatedUserMetadataSize(OperationContext* opCtx) {
-    if (!opCtx) {
-        return 0;
-    }
-
-    // Otherwise construct a metadata section from the list of authenticated users/roles
-    auto authSession = AuthorizationSession::get(opCtx->getClient());
-    auto userName = authSession->getImpersonatedUserName();
-    auto roleNames = authSession->getImpersonatedRoleNames();
-    if (!userName && !roleNames.more()) {
-        userName = authSession->getAuthenticatedUserName();
-        roleNames = authSession->getAuthenticatedRoleNames();
-    }
-
+std::size_t estimateImpersonatedUserMetadataSize(const boost::optional<UserName>& userName,
+                                                 RoleNameIterator roleNames) {
     // If there are no users/roles being impersonated just exit
     if (!userName && !roleNames.more()) {
         return 0;
@@ -164,6 +148,28 @@ std::size_t estimateImpersonatedUserMetadataSize(OperationContext* opCtx) {
     ret += 1 + 1 + 1;
 
     return ret;
+}
+
+std::size_t estimateImpersonatedUserMetadataSize(OperationContext* opCtx) {
+    if (!opCtx) {
+        return 0;
+    }
+
+    // Otherwise construct a metadata section from the list of authenticated users/roles
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    auto userName = authSession->getImpersonatedUserName();
+    auto roleNames = authSession->getImpersonatedRoleNames();
+    if (!userName && !roleNames.more()) {
+        userName = authSession->getAuthenticatedUserName();
+        roleNames = authSession->getAuthenticatedRoleNames();
+    }
+
+    return estimateImpersonatedUserMetadataSize(userName, roleNames);
+}
+
+std::size_t estimateImpersonatedUserMetadataSize(const ImpersonatedUserMetadata& md) {
+    return estimateImpersonatedUserMetadataSize(md.getUser(),
+                                                makeRoleNameIteratorForContainer(md.getRoles()));
 }
 
 }  // namespace rpc

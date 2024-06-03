@@ -108,9 +108,9 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     // AsyncRPC ignores impersonation metadata so we need to manually attach them to
     // the command
     if (auto meta = rpc::getAuthDataToImpersonatedUserMetadata(opCtx)) {
-        originalOpts->genericArgs.setDollarAudit(*meta);
+        originalOpts->cmd.setDollarAudit(*meta);
     }
-    originalOpts->genericArgs.setMayBypassWriteBlocking(
+    originalOpts->cmd.setMayBypassWriteBlocking(
         WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
 
     std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<typename CommandType::Reply>>> futures;
@@ -123,17 +123,13 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         std::unique_ptr<async_rpc::Targeter> targeter =
             std::make_unique<async_rpc::ShardIdTargeter>(
                 originalOpts->exec, opCtx, shardIds[i], readPref);
-        bool startTransaction = originalOpts->genericArgs.getStartTransaction()
-            ? *originalOpts->genericArgs.getStartTransaction()
+        bool startTransaction = originalOpts->cmd.getStartTransaction()
+            ? *originalOpts->cmd.getStartTransaction()
             : false;
         auto retryPolicy = std::make_shared<async_rpc::ShardRetryPolicyWithIsStartingTransaction>(
             Shard::RetryPolicy::kIdempotentOrCursorInvalidated, startTransaction);
-        auto opts =
-            std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(originalOpts->exec,
-                                                                      cancelSource.token(),
-                                                                      originalOpts->cmd,
-                                                                      originalOpts->genericArgs,
-                                                                      retryPolicy);
+        auto opts = std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(
+            originalOpts->exec, cancelSource.token(), originalOpts->cmd, retryPolicy);
         futures.push_back(async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));
         (*indexToShardId)[i] = shardIds[i];
     }

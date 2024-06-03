@@ -234,7 +234,7 @@ public:
     }
 
     void uassertCommandDoesNotSpecifyWriteConcern(
-        const CommonRequestArgs& requestArgs) const override {
+        const GenericArguments& requestArgs) const override {
         uassert(ErrorCodes::InvalidOptions,
                 "Command does not support writeConcern",
                 !commandSpecifiesWriteConcern(requestArgs));
@@ -245,7 +245,7 @@ public:
     }
 
     void appendReplyMetadata(OperationContext* opCtx,
-                             const CommonRequestArgs& requestArgs,
+                             const GenericArguments& genericArgs,
                              BSONObjBuilder* metadataBob) const override {
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
         const bool isReplSet = replCoord->getSettings().isReplSet();
@@ -254,17 +254,15 @@ public:
             // Attach our own last opTime.
             repl::OpTime lastOpTimeFromClient =
                 repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-            replCoord->prepareReplMetadata(requestArgs, lastOpTimeFromClient, metadataBob);
+            replCoord->prepareReplMetadata(genericArgs, lastOpTimeFromClient, metadataBob);
         }
 
         // Gossip back requested routing table cache versions.
-        if (requestArgs.getRequestGossipRoutingCache()) {
-            const auto collectionsToGossip = *requestArgs.getRequestGossipRoutingCache();
-
+        if (auto& collectionsToGossip = genericArgs.getRequestGossipRoutingCache()) {
             const auto catalogCache = Grid::get(opCtx)->catalogCache();
 
             BSONArrayBuilder arrayBuilder;
-            for (const auto& collectionToGossip : collectionsToGossip) {
+            for (const auto& collectionToGossip : *collectionsToGossip) {
                 const auto nss =
                     NamespaceStringUtil::deserialize(boost::none,
                                                      collectionToGossip.getElement().String(),

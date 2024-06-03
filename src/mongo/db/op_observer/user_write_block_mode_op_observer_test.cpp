@@ -326,7 +326,7 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledWithBypass) {
     authSession->grantInternalAuthorization(opCtx.get());
     ASSERT(authSession->mayBypassWriteBlockingMode());
 
-    WriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), BSONElement());
+    WriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
     ASSERT(WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure writes succeed
@@ -374,7 +374,7 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
     authSession->grantInternalAuthorization(opCtx.get());
     ASSERT(authSession->mayBypassWriteBlockingMode());
 
-    WriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), BSONElement());
+    WriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
     ASSERT(WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure user writes succeed

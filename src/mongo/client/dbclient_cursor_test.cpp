@@ -837,13 +837,13 @@ TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
     DBClientConnectionForTest conn;
     const NamespaceString nss = NamespaceString::kRsOplogNamespace;
     const BSONObj filterObj = BSON("ts" << BSON("$gte" << Timestamp(123, 4)));
-    const BSONObj readConcernObj = BSON("afterClusterTime" << Timestamp(0, 1));
+    const auto readConcern = repl::ReadConcernArgs(LogicalTime(Timestamp(0, 1)), boost::none);
     const long long maxTimeMS = 5000LL;
     const long long term = 5;
 
     FindCommandRequest findCmd{nss};
     findCmd.setFilter(filterObj);
-    findCmd.setReadConcern(readConcernObj);
+    findCmd.setReadConcern(readConcern);
     findCmd.setMaxTimeMS(maxTimeMS);
     findCmd.setTerm(term);
     findCmd.setTailable(true);
@@ -872,7 +872,7 @@ TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
     ASSERT_EQ(msg.body["maxTimeMS"].numberLong(), maxTimeMS) << msg.body;
     ASSERT_EQ(msg.body["batchSize"].number(), 0) << msg.body;
     ASSERT_EQ(msg.body["term"].numberLong(), term) << msg.body;
-    ASSERT_BSONOBJ_EQ(msg.body["readConcern"].Obj(), readConcernObj);
+    ASSERT_BSONOBJ_EQ(msg.body["readConcern"].Obj(), readConcern.toBSONInner());
 
     cursor.setAwaitDataTimeoutMS(Milliseconds{5000});
     ASSERT_EQ(cursor.getAwaitDataTimeoutMS(), Milliseconds{5000});

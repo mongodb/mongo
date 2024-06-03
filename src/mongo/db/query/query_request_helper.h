@@ -97,13 +97,10 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommand(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts,
     const boost::optional<TenantId>& tenantId,
-    const SerializationContext& sc,
-    bool apiStrict);
+    const SerializationContext& sc);
 
 std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
-    const BSONObj& cmdObj,
-    boost::optional<NamespaceString> nss = boost::none,
-    bool apiStrict = false);
+    const BSONObj& cmdObj, boost::optional<NamespaceString> nss = boost::none);
 
 /**
  * Helper function to identify text search sort key
@@ -123,7 +120,7 @@ static constexpr auto kUnwrappedReadPrefField = "$queryOptions";
 
 // Names of the maxTimeMS command and query option.
 // Char arrays because they are used in static initialization.
-static constexpr auto cmdOptionMaxTimeMS = "maxTimeMS";
+static constexpr auto cmdOptionMaxTimeMS = GenericArguments::kMaxTimeMSFieldName;
 static constexpr auto queryOptionMaxTimeMS = "$maxTimeMS";
 
 // Names of the $meta projection values.
@@ -135,12 +132,6 @@ static constexpr auto metaTextScore = "textScore";
 
 
 static constexpr auto kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
-
-// A constant by which 'maxTimeMSOpOnly' values are allowed to exceed the max allowed value for
-// 'maxTimeMS'.  This is because mongod and mongos server processes add a small amount to the
-// 'maxTimeMS' value they are given before passing it on as 'maxTimeMSOpOnly', to allow for
-// clock precision.
-static constexpr auto kMaxTimeMSOpOnlyMaxPadding = 100LL;
 
 static constexpr auto kDefaultBatchSize = 101ll;
 

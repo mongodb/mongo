@@ -106,8 +106,8 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShar
     const OperationSessionInfo& osi,
     bool ignoreResponses,
     WriteConcernOptions wc = WriteConcernOptions()) {
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(opts->genericArgs, wc);
-    async_rpc::AsyncRPCCommandHelpers::appendOSI(opts->genericArgs, osi);
+    generic_argument_util::setMajorityWriteConcern(opts->cmd.getGenericArguments(), &wc);
+    generic_argument_util::setOperationSessionInfo(opts->cmd.getGenericArguments(), osi);
     return sharding_ddl_util::sendAuthenticatedCommandToShards(
         opCtx, opts, shardIds, ignoreResponses);
 }
@@ -229,7 +229,7 @@ std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToPri
     // 'performViewChange' flag only to the primary shard.
     request.setPerformViewChange(true);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-        **executor, token, request, GenericArguments());
+        **executor, token, request);
 
     try {
         return sendAuthenticatedCommandWithOsiToShards(opCtx,
@@ -254,7 +254,7 @@ std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToPar
     const CancellationToken& token) {
     request.setPerformViewChange(false);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-        **executor, token, request, GenericArguments());
+        **executor, token, request);
 
     // The collMod command targets all shards, regardless of whether they have chunks. The shards
     // that have no chunks for the collection will not be included in the responses.
@@ -349,7 +349,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
                     auto opts =
                         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-                            **executor, token, blockCRUDOperationsRequest, GenericArguments());
+                            **executor, token, blockCRUDOperationsRequest);
                     std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
                     if (_shardingInfo->isPrimaryOwningChunks) {
                         shards.push_back(_shardingInfo->primaryShard);
@@ -423,11 +423,11 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             // strip out other incompatible options.
                             auto dryRunRequest = ShardsvrCollModParticipant{
                                 originalNss(), makeCollModDryRunRequest(_request)};
-                            GenericArguments args;
-                            async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+                            generic_argument_util::setMajorityWriteConcern(
+                                dryRunRequest.getGenericArguments());
                             auto optsDryRun = std::make_shared<
                                 async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-                                **executor, token, dryRunRequest, args);
+                                **executor, token, dryRunRequest);
                             std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
                             if (_shardingInfo->isPrimaryOwningChunks) {
                                 shards.push_back(_shardingInfo->primaryShard);

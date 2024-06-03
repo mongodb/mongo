@@ -122,7 +122,7 @@ TEST(KillCursorsRequestTest, toBSON) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("db.coll");
     std::vector<CursorId> cursorIds = {CursorId(123)};
     KillCursorsCommandRequest request(nss, cursorIds);
-    BSONObj requestObj = request.toBSON(BSONObj{});
+    BSONObj requestObj = request.toBSON();
     BSONObj expectedObj = BSON("killCursors"
                                << "coll"
                                << "cursors" << BSON_ARRAY(CursorId(123)));

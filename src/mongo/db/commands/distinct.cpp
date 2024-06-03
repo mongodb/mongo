@@ -559,11 +559,7 @@ public:
             ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
             : SerializationContext::stateCommandRequest();
         auto viewAggRequest = aggregation_request_helper::parseFromBSON(
-            viewAggCmd,
-            vts,
-            verbosity,
-            APIParameters::get(opCtx).getAPIStrict().value_or(false),
-            serializationContext);
+            viewAggCmd, vts, verbosity, serializationContext);
         viewAggRequest.setQuerySettings(cq.getExpCtx()->getQuerySettings());
 
         // If running explain distinct on view, then aggregate is executed without privilege checks

@@ -103,6 +103,10 @@ public:
                 opCtx, ns(), _cmd.getCommandParameter(), _cmd.getTerm().is_initialized());
         }
 
+        const GenericArguments& getGenericArguments() const override {
+            return _cmd.getGenericArguments();
+        }
+
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             // Counted as a getMore, not as a command.
             globalOpCounters.gotGetMore();

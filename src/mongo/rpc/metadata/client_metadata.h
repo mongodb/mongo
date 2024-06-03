@@ -238,14 +238,14 @@ public:
     static void setFromMetadata(Client* client, BSONElement& elem, bool isInternalClient);
 
     /**
-     * Set the ClientMetadata for the OperationContext by reading it from the given BSONElement.
+     * Set the ClientMetadata for the OperationContext by reading it from the given BSONObj.
      *
      * This function throws if called more than once for the same OperationContext.
      *
      * This function is only valid to invoke if you are on the Client's thread. This function takes
      * the Client lock.
      */
-    static void setFromMetadataForOperation(OperationContext* opCtx, const BSONElement& elem);
+    static void setFromMetadataForOperation(OperationContext* opCtx, const BSONObj& obj);
 
     /**
      * Read from the $client field in requests.

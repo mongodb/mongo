@@ -35,6 +35,11 @@
 namespace mongo {
 
 /**
+ * This file is included by every IDL-generated command and provides functionality used in
+ * serialization and deserialization.
+ */
+
+/**
  * Returns true if the provided argument is one that is handled by the command processing layer
  * and should generally be ignored by individual command implementations. In particular,
  * commands that fail on unrecognized arguments must not fail for any of these.
@@ -61,13 +66,5 @@ bool shouldForwardToShards(StringData arg);
  * See 'CommandHelpers::filterCommandReplyForPassthrough'.
  */
 bool shouldForwardFromShards(StringData replyField);
-
-/**
- * Take all the well known command generic arguments from commandPassthroughFields, but ignore
- * fields that are already part of the command and append the rest to builder.
- */
-void appendGenericCommandArguments(const BSONObj& commandPassthroughFields,
-                                   const std::vector<StringData>& knownFields,
-                                   BSONObjBuilder* builder);
 
 }  // namespace mongo

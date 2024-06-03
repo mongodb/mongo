@@ -252,11 +252,13 @@ def _parse_imports(ctxt, spec, node):
     # type: (errors.ParserContext, syntax.IDLSpec, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse an imports section in the IDL file."""
     if not ctxt.is_scalar_sequence(node, "imports"):
-        return
-
-    imports = syntax.Import(ctxt.file_name, node.start_mark.line, node.start_mark.column)
-    imports.imports = ctxt.get_list(node)
-    spec.imports = imports
+        imports = syntax.Import(ctxt.file_name, None, None)
+        imports.imports = []
+        spec.imports = imports
+    else:
+        imports = syntax.Import(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+        imports.imports = ctxt.get_list(node)
+        spec.imports = imports
 
 
 def _parse_type(ctxt, spec, name, node):
@@ -1190,9 +1192,13 @@ def parse(stream, input_file_name, resolver, parse_non_forward_compatible_sectio
         return root_doc
 
     imports = []  # type: List[Tuple[common.SourceLocation, str, str]]
+
+    if root_doc.spec.symbols.commands:
+        imports.append((None, input_file_name, common.GENERIC_ARGS_FILENAME))
+
     needs_include = []  # type: List[str]
     if root_doc.spec.imports:
-        imports = [
+        imports += [
             (root_doc.spec.imports, input_file_name, import_file_name)
             for import_file_name in root_doc.spec.imports.imports
         ]

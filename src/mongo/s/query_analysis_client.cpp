@@ -186,8 +186,8 @@ void QueryAnalysisClient::insert(OperationContext* opCtx,
         wcb.setBypassDocumentValidation(false);
         return wcb;
     }());
-    auto insertCmdObj = insertCmd.toBSON(
-        {BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON())});
+    insertCmd.setWriteConcern(kMajorityWriteConcern);
+    auto insertCmdObj = insertCmd.toBSON();
 
     executeCommandOnPrimary(opCtx, nss.dbName(), std::move(insertCmdObj), uassertCmdStatusFn);
 }

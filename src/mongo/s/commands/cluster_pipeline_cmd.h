@@ -74,9 +74,7 @@ public:
         const OpMsgRequest& opMsgRequest,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
         const auto aggregationRequest =
-            Impl::parseAggregationRequest(opMsgRequest,
-                                          explainVerbosity,
-                                          APIParameters::get(opCtx).getAPIStrict().value_or(false));
+            Impl::parseAggregationRequest(opMsgRequest, explainVerbosity);
 
         auto privileges = uassertStatusOK(
             auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
@@ -104,6 +102,10 @@ public:
               _aggregationRequest(std::move(aggregationRequest)),
               _liteParsedPipeline(LiteParsedPipeline(_aggregationRequest)),
               _privileges(std::move(privileges)) {}
+
+        const GenericArguments& getGenericArguments() const override {
+            return _aggregationRequest.getGenericArguments();
+        }
 
         bool isReadOperation() const override {
             // Only checks for the last stage since currently write stages are only allowed to be at

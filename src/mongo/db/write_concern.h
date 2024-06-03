@@ -37,9 +37,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/common_request_args_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -55,15 +55,15 @@ class OpTime;
 /**
  * Returns true if 'cmdObj' has a 'writeConcern' field.
  */
-bool commandSpecifiesWriteConcern(const CommonRequestArgs& requestArgs);
+bool commandSpecifiesWriteConcern(const GenericArguments& requestArgs);
 
 /**
- * Attempts to extract a writeConcern from cmdObj.
- * Verifies that the writeConcern is of type Object (BSON type) and
- * that the resulting writeConcern is valid for this particular host.
+ * Attempts to extract a WriteConcernOptions from a command's generic arguments.
+ * Verifies that the resulting writeConcern is valid for this particular host.
  */
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
-                                                    const BSONObj& cmdObj,
+                                                    const GenericArguments& invocation,
+                                                    StringData commandName,
                                                     bool isInternalClient);
 
 /**

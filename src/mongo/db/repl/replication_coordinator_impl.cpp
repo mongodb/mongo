@@ -6078,12 +6078,12 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     return Status::OK();
 }
 
-void ReplicationCoordinatorImpl::prepareReplMetadata(const CommonRequestArgs& requestArgs,
+void ReplicationCoordinatorImpl::prepareReplMetadata(const GenericArguments& genericArgs,
                                                      const OpTime& lastOpTimeFromClient,
                                                      BSONObjBuilder* builder) const {
 
-    bool hasReplSetMetadata = !!requestArgs.getReplData();
-    bool hasOplogQueryMetadata = !!requestArgs.getOplogQueryData();
+    bool hasReplSetMetadata = genericArgs.getDollarReplData().has_value();
+    bool hasOplogQueryMetadata = genericArgs.getDollarOplogQueryData().has_value();
     // Don't take any locks if we do not need to.
     if (!hasReplSetMetadata && !hasOplogQueryMetadata) {
         return;

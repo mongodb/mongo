@@ -317,9 +317,7 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
     // (re)shardCollection by design uses simple collation for comparing shard key values.
     aggRequest.setCollation(CollationSpec::kSimpleSpec);
     // Use readConcern "available" to avoid shard filtering since it is expensive.
-    aggRequest.setReadConcern(
-        BSON(repl::ReadConcernArgs::kLevelFieldName
-             << repl::readConcernLevels::toString(repl::ReadConcernLevel::kAvailableReadConcern)));
+    aggRequest.setReadConcern(repl::ReadConcernArgs::kAvailable);
 
     return aggRequest;
 }

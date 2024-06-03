@@ -1899,7 +1899,7 @@ Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(
     BSONObj query =
         BSON("find" << NamespaceString::kRsOplogNamespace.coll() << "sort" << BSON("$natural" << -1)
                     << "limit" << 1 << ReadConcernArgs::kReadConcernFieldName
-                    << ReadConcernArgs::kLocal);
+                    << ReadConcernArgs::kLocal.toBSONInner());
 
     _lastOplogEntryFetcher = std::make_unique<Fetcher>(
         *_attemptExec,

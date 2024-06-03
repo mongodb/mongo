@@ -98,12 +98,9 @@ private:
  */
 class IngressHandshakeMetricsCommandHooks : public CommandInvocationHooks {
 public:
-    void onBeforeRun(OperationContext* opCtx,
-                     const OpMsgRequest& request,
-                     CommandInvocation* invocation) override;
+    void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) override;
 
     void onAfterRun(OperationContext* opCtx,
-                    const OpMsgRequest& request,
                     CommandInvocation* invocation,
                     rpc::ReplyBuilderInterface* response) override;
 };

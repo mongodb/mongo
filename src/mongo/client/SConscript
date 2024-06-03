@@ -38,11 +38,9 @@ env.Library(
         "read_preference",
     ],
     source=[
-        "read_preference.cpp",
-        "read_preference_setting.idl",
+        "read_preference_decoration.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/service_context",
     ],

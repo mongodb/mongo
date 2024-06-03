@@ -48,12 +48,14 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/api_parameters.h"
+#include "mongo/db/api_parameters_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_time_tracker.h"
@@ -594,7 +596,7 @@ BatchedCommandResponse SEPTransactionClient::runCRUDOpSync(const BatchedCommandR
 
 ExecutorFuture<BulkWriteCommandReply> SEPTransactionClient::_runCRUDOp(
     const BulkWriteCommandRequest& cmd) const {
-    BSONObjBuilder cmdBob(cmd.toBSON(BSONObj()));
+    BSONObjBuilder cmdBob(cmd.toBSON());
     // BulkWrite can only execute on admin DB.
     return runCommand(DatabaseName::kAdmin, cmdBob.obj())
         .thenRunOn(_executor)
@@ -783,7 +785,7 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(const DatabaseName& dbName, Stri
             // concern to avoid double applying a transaction due to a transient NoSuchTransaction
             // error response.
             cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                              CommandHelpers::kMajorityWriteConcern.toBSON());
+                              generic_argument_util::kMajorityWriteConcern.toBSON());
         } else {
             cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern);
         }
@@ -947,28 +949,43 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
                 << redact(cmdBuilder->asTempObj()));
     }
 
+    auto assertDoesNotHaveField = [&cmdBuilder](StringData fieldName) {
+        iassert(8579100,
+                fmt::format("Command object passed to the internal transaction API should not "
+                            "contain the '{}' field",
+                            fieldName),
+                !cmdBuilder->hasField(fieldName));
+    };
+
     stdx::lock_guard<Latch> lg(_mutex);
 
+    for (auto fieldName : OperationSessionInfo::fieldNames) {
+        assertDoesNotHaveField(fieldName);
+    }
     _sessionInfo.serialize(cmdBuilder);
 
     if (_state.is(TransactionState::kInit)) {
         _state.transitionTo(TransactionState::kStarted);
         _sessionInfo.setStartTransaction(boost::none);
-        cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, _readConcern);
+
+        assertDoesNotHaveField(GenericArguments::kReadConcernFieldName);
+        cmdBuilder->append(GenericArguments::kReadConcernFieldName, _readConcern);
     }
 
     // Append the new recalculated maxTimeMS
     if (_opDeadline) {
-        uassert(5956600,
-                "Command object passed to the transaction api should not contain maxTimeMS field",
-                !cmdBuilder->hasField(kMaxTimeMSField));
+        assertDoesNotHaveField(GenericArguments::kMaxTimeMSFieldName);
         auto now = _service->getServiceContext()->getFastClockSource()->now();
         auto timeLeftover = std::max(Milliseconds(0), *_opDeadline - now);
-        cmdBuilder->append(kMaxTimeMSField, durationCount<Milliseconds>(timeLeftover));
+        cmdBuilder->append(GenericArguments::kMaxTimeMSFieldName,
+                           durationCount<Milliseconds>(timeLeftover));
     }
 
     // If the transaction API caller had API parameters, we should forward them in all requests.
     if (_apiParameters.getParamsPassed()) {
+        for (auto fieldName : APIParametersFromClient::fieldNames) {
+            assertDoesNotHaveField(fieldName);
+        }
         _apiParameters.appendInfo(cmdBuilder);
     }
 

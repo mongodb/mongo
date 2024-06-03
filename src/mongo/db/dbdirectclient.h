@@ -46,6 +46,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/hostandport.h"
@@ -95,7 +96,7 @@ public:
                     int options = 0,
                     int limit = 0,
                     int skip = 0,
-                    boost::optional<BSONObj> readConcernObj = boost::none) override;
+                    boost::optional<repl::ReadConcernArgs> readConcernObj = boost::none) override;
 
     /**
      * The insert, update, and remove commands only check the top level error status. The caller is

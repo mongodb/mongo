@@ -53,6 +53,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
@@ -95,9 +96,10 @@ const int kFailedFindCommandDebugLevel = 3;
 const char kWriteConcernField[] = "writeConcern";
 
 // Returns true if found to be authorized, false if undecided. Throws if unauthorized.
-bool checkAuthorizationImplPreParse(OperationContext* opCtx,
-                                    const Command* command,
-                                    const OpMsgRequest& request) {
+bool checkAuthorizationImplPreParse(
+    OperationContext* opCtx,
+    const Command* command,
+    const boost::optional<auth::ValidatedTenancyScope>& validatedTenancyScope) {
     auto client = opCtx->getClient();
     if (client->isInDirectClient())
         return true;
@@ -126,8 +128,7 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Command " << command->getName() << " requires authentication",
             !command->requiresAuth() || authzSession->isAuthenticated() ||
-                (request.validatedTenancyScope &&
-                 request.validatedTenancyScope->hasAuthenticatedUser()));
+                (validatedTenancyScope && validatedTenancyScope->hasAuthenticatedUser()));
 
     return false;
 }
@@ -167,13 +168,6 @@ void CommandInvocationHooks::set(ServiceContext* serviceContext,
 //////////////////////////////////////////////////////////////
 // CommandHelpers
 
-const WriteConcernOptions CommandHelpers::kMajorityWriteConcern(
-    WriteConcernOptions::kMajority,
-    // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
-    // supported by the mongod.
-    WriteConcernOptions::SyncMode::UNSET,
-    WriteConcernOptions::kWriteConcernTimeoutUserCommand);
-
 BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request) {
     auto command = getCommandRegistry(opCtx)->findCommand(request.getCommandName());
     invariant(command);
@@ -203,25 +197,23 @@ Future<void> CommandHelpers::runCommandInvocation(std::shared_ptr<RequestExecuti
                                                   bool useDedicatedThread) {
     if (useDedicatedThread)
         return makeReadyFutureWith([rec = std::move(rec), invocation = std::move(invocation)] {
-            runCommandInvocation(
-                rec->getOpCtx(), rec->getRequest(), invocation.get(), rec->getReplyBuilder());
+            runCommandInvocation(rec->getOpCtx(), invocation.get(), rec->getReplyBuilder());
         });
     return runCommandInvocationAsync(std::move(rec), std::move(invocation));
 }
 
 void CommandHelpers::runCommandInvocation(OperationContext* opCtx,
-                                          const OpMsgRequest& request,
                                           CommandInvocation* invocation,
                                           rpc::ReplyBuilderInterface* response) {
     auto&& hooks = getCommandInvocationHooks(opCtx->getServiceContext());
     if (hooks) {
-        hooks->onBeforeRun(opCtx, request, invocation);
+        hooks->onBeforeRun(opCtx, invocation);
     }
 
     invocation->run(opCtx, response);
 
     if (hooks) {
-        hooks->onAfterRun(opCtx, request, invocation, response);
+        hooks->onAfterRun(opCtx, invocation, response);
     }
 }
 
@@ -520,12 +512,12 @@ BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,
         return appendWCToObj(cmdObj, parsedWC);
     } else if (!defaultWC.usedDefaultConstructedWC) {
         defaultWC.w = WriteConcernOptions::kMajority;
-        if (defaultWC.wTimeout < kMajorityWriteConcern.wTimeout) {
-            defaultWC.wTimeout = kMajorityWriteConcern.wTimeout;
+        if (defaultWC.wTimeout < generic_argument_util::kMajorityWriteConcern.wTimeout) {
+            defaultWC.wTimeout = generic_argument_util::kMajorityWriteConcern.wTimeout;
         }
         return appendWCToObj(cmdObj, defaultWC);
     } else {
-        return appendWCToObj(cmdObj, kMajorityWriteConcern);
+        return appendWCToObj(cmdObj, generic_argument_util::kMajorityWriteConcern);
     }
 }
 
@@ -575,7 +567,7 @@ bool CommandHelpers::uassertShouldAttemptParse(OperationContext* opCtx,
                                                const Command* command,
                                                const OpMsgRequest& request) {
     try {
-        return checkAuthorizationImplPreParse(opCtx, command, request);
+        return checkAuthorizationImplPreParse(opCtx, command, request.validatedTenancyScope);
     } catch (const ExceptionFor<ErrorCodes::Unauthorized>& e) {
         if (command->auditAuthorizationFailure()) {
             CommandHelpers::auditLogAuthEvent(opCtx, nullptr, request, e.code());
@@ -918,7 +910,7 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
                 str::stream() << c->getName() << " may only be run against the admin database.",
                 !c->adminOnly() || db().isAdminDB());
 
-        if (checkAuthorizationImplPreParse(opCtx, c, request)) {
+        if (checkAuthorizationImplPreParse(opCtx, c, request.validatedTenancyScope)) {
             // Blanket authorization: don't need to check anything else.
         } else {
             try {
@@ -954,7 +946,12 @@ public:
         : CommandInvocation(command),
           _command(command),
           _request(request),
-          _dbName(request.parseDbName()) {}
+          _dbName(request.parseDbName()),
+          _genericArgs(GenericArguments::parse(IDLParserContext(_command->getName(),
+                                                                request.validatedTenancyScope,
+                                                                request.getValidatedTenantId(),
+                                                                request.getSerializationContext()),
+                                               _request.body)) {}
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
@@ -1032,9 +1029,14 @@ private:
         return _request.body;
     }
 
+    const GenericArguments& getGenericArguments() const override {
+        return _genericArgs;
+    }
+
     BasicCommandWithReplyBuilderInterface* const _command;
     const OpMsgRequest _request;
     const DatabaseName _dbName;
+    const GenericArguments _genericArgs;
 };
 
 CommandNameAtom::CommandNameAtom(StringData s) {

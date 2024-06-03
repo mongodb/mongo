@@ -193,7 +193,7 @@ TEST_F(AggKeyTest, SizeOfAggKeyWithAndWithoutReadConcern) {
     auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
     AggregateCommandRequest acrWithReadConcern(kDefaultTestNss.nss());
     acrWithReadConcern.setPipeline(rawPipeline);
-    acrWithReadConcern.setReadConcern(fromjson(R"({level: "local"})"));
+    acrWithReadConcern.setReadConcern(repl::ReadConcernArgs::kLocal);
     auto pipelineWithReadConcern = Pipeline::parse(rawPipeline, expCtx);
     auto keyWithReadConcern =
         std::make_unique<AggKey>(acrWithReadConcern,

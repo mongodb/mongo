@@ -71,6 +71,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
@@ -212,7 +213,8 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
                                                              const CanonicalQuery& query,
                                                              const boost::optional<UUID> sampleId,
                                                              bool appendGeoNearDistanceProjection,
-                                                             bool requestQueryStatsFromRemotes) {
+                                                             bool requestQueryStatsFromRemotes,
+                                                             const UUID& opKey) {
     std::unique_ptr<FindCommandRequest> findCommand;
     if (shardIds.size() > 1) {
         findCommand = uassertStatusOK(transformQueryForShards(query.getFindCommandRequest(),
@@ -223,10 +225,18 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
         findCommand = std::make_unique<FindCommandRequest>(query.getFindCommandRequest());
     }
 
+    // Reset the input request's generic arguments and only set the ones needed for the query.
+    // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
+    GenericArguments args;
+    std::swap(findCommand->getGenericArguments(), args);
+    findCommand->setUnwrappedReadPref(std::move(args.getUnwrappedReadPref()));
+    findCommand->setMaxTimeMS(args.getMaxTimeMS());
+    findCommand->setReadConcern(std::move(args.getReadConcern()));
+
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (readConcernArgs.wasAtClusterTimeSelected()) {
         // If mongos selected atClusterTime or received it from client, transmit it to shard.
-        findCommand->setReadConcern(readConcernArgs.toBSONInner());
+        findCommand->setReadConcern(readConcernArgs);
     }
 
     query.getExpCtx()->initializeReferencedSystemVariables();
@@ -253,6 +263,16 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
             findCommand->setIncludeQueryStatsMetrics(true);
         }
     }
+
+    // Only set lsid and txnNumber here. Other transaction-related arguments such as
+    // startTransaction will be appended later as needed by the transaction machinery. We don't
+    // necessarily want to forward all transaction arguments directly from the input request since
+    // we may have already started a transaction for internal purposes (e.g. FLE does this).
+    if (auto& lsid = opCtx->getLogicalSessionId()) {
+        findCommand->setLsid(generic_argument_util::toLogicalSessionFromClient(*lsid));
+    }
+    findCommand->setTxnNumber(opCtx->getTxnNumber());
+    findCommand->setClientOperationKey(opKey);
 
     return findCommand;
 }
@@ -286,6 +306,7 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
             cmdBuilder.append("databaseVersion", cm.dbVersion().toBSON());
         }
     };
+
     auto appendSampleId = [&](const auto& shardId, auto& cmdBuilder) {
         if (shardId == sampleShardId) {
             analyze_shard_key::appendSampleId(&cmdBuilder, *sampleId);
@@ -294,12 +315,14 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
 
     // Constructs the shard request by appending additional attributes to the serialized
     // 'findCommandToForward'.
-    auto findCommandToForward = makeFindCommandForShards(opCtx,
-                                                         shardIds,
-                                                         query,
-                                                         sampleId,
-                                                         appendGeoNearDistanceProjection,
-                                                         requestQueryStatsFromRemotes);
+    const auto findCommandToForward = makeFindCommandForShards(opCtx,
+                                                               shardIds,
+                                                               query,
+                                                               sampleId,
+                                                               appendGeoNearDistanceProjection,
+                                                               requestQueryStatsFromRemotes,
+                                                               opKey);
+
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto makeShardRequest = [&](const auto& shardId) {
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
@@ -307,8 +330,6 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
 
         BSONObjBuilder cmdBuilder;
         findCommandToForward->serialize(&cmdBuilder);
-        logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &cmdBuilder);
-        appendOpKey(opKey, &cmdBuilder);
         appendShardVersion(shardId, cmdBuilder);
         appendSampleId(shardId, cmdBuilder);
 

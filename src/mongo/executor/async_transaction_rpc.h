@@ -58,10 +58,7 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
     if (auto txnRouter = TransactionRouter::get(opCtx); txnRouter) {
         cmdBSON = txnRouter.attachTxnFieldsIfNeeded(opCtx, targeter->getShardId(), cmdBSON);
     }
-    auto genericArgs = options->genericArgs.toBSON();
-    auto cmdBsonWithArgs = cmdBSON.addFields(genericArgs);
-    return detail::sendCommandWithRunner(
-               options, opCtx, runner, std::move(targeter), cmdBsonWithArgs)
+    return detail::sendCommandWithRunner(options, opCtx, runner, std::move(targeter), cmdBSON)
         .onCompletion([opCtx, shardId](StatusWith<ReplyType> swResponse) -> StatusWith<ReplyType> {
             auto txnRouter = TransactionRouter::get(opCtx);
             if (!txnRouter) {

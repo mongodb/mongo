@@ -41,6 +41,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -83,7 +84,8 @@ void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId) {
                     entry.setUpsert(true);
                     return entry;
                 }()});
-                return updateOp.toBSON(kMajorityWriteConcern);
+                updateOp.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+                return updateOp.toBSON();
             }());
 
         auto res = client.runCommand(opMsgRequest)->getCommandReply();

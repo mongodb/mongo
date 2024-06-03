@@ -85,7 +85,7 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc);
  */
 SemiFuture<void> checkIfCanRunCommandOrBlock(OperationContext* opCtx,
                                              const DatabaseName& dbName,
-                                             const OpMsgRequest& request);
+                                             StringData commandName);
 
 /**
  * If the operation has read concern "linearizable", throws TenantMigrationCommitted error if the

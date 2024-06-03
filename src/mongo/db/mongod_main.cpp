@@ -388,10 +388,8 @@ void logStartup(OperationContext* opCtx) {
 void initializeCommandHooks(ServiceContext* serviceContext) {
     class MongodCommandInvocationHooks final : public CommandInvocationHooks {
     public:
-        void onBeforeRun(OperationContext* opCtx,
-                         const OpMsgRequest& request,
-                         CommandInvocation* invocation) override {
-            _nextHook.onBeforeRun(opCtx, request, invocation);
+        void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) override {
+            _nextHook.onBeforeRun(opCtx, invocation);
         }
 
         void onBeforeAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
@@ -400,10 +398,9 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
         }
 
         void onAfterRun(OperationContext* opCtx,
-                        const OpMsgRequest& request,
                         CommandInvocation* invocation,
                         rpc::ReplyBuilderInterface* response) override {
-            _nextHook.onAfterRun(opCtx, request, invocation, response);
+            _nextHook.onAfterRun(opCtx, invocation, response);
             _onAfterRunImpl(opCtx);
         }
 

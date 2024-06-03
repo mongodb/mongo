@@ -650,7 +650,7 @@ OpTime TenantMigrationRecipientService::Instance::_getDonorMajorityOpTime(
     FindCommandRequest findCmd{NamespaceString::kRsOplogNamespace};
     findCmd.setSort(BSON("$natural" << -1));
     findCmd.setProjection(oplogOpTimeFields);
-    findCmd.setReadConcern(ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    findCmd.setReadConcern(ReadConcernArgs::kMajority);
     auto majorityOpTimeBson = client->findOne(
         std::move(findCmd), ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
     uassert(5272003, "Found no entries in the remote oplog", !majorityOpTimeBson.isEmpty());
@@ -939,11 +939,7 @@ boost::optional<OpTime> TenantMigrationRecipientService::Instance::_getOldestAct
     // config.transactions collection aren't coalesced for multi-statement transactions during
     // secondary oplog application, unlike the retryable writes where updates to config.transactions
     // collection are coalesced on secondaries.
-    findCmd.setReadConcern(
-        BSON(repl::ReadConcernArgs::kLevelFieldName
-             << repl::readConcernLevels::toString(repl::ReadConcernLevel::kSnapshotReadConcern)
-             << repl::ReadConcernArgs::kAtClusterTimeFieldName << ReadTimestamp
-             << repl::ReadConcernArgs::kAllowTransactionTableSnapshot << true));
+    findCmd.setReadConcern(ReadConcernArgs::snapshot(LogicalTime(ReadTimestamp), true));
 
     auto earliestOpenTransactionBson = _client->findOne(std::move(findCmd), _readPreference);
     LOGV2_DEBUG(4880602,
@@ -1018,10 +1014,7 @@ TenantMigrationRecipientService::Instance::_makeCommittedTransactionsAggregation
     AggregateCommandRequest aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
                                        std::move(serializedPipeline));
 
-    auto readConcern = repl::ReadConcernArgs(
-        boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
-    aggRequest.setReadConcern(readConcern.toBSONInner());
-
+    aggRequest.setReadConcern(ReadConcernArgs::kMajority);
     aggRequest.setHint(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
     aggRequest.setCursor(SimpleCursorOptions());
     // We must set a writeConcern on internal commands.
@@ -1289,9 +1282,7 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
     // that majority commit point. So we need to do a local read to fetch the retryable writes
     // so that we don't miss the config.transactions record and later do a majority read on the
     // donor's last applied operationTime to make sure the fetched results are majority committed.
-    auto readConcernArgs = repl::ReadConcernArgs(
-        boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kLocalReadConcern));
-    aggRequest.setReadConcern(readConcernArgs.toBSONInner());
+    aggRequest.setReadConcern(ReadConcernArgs::kLocal);
     // We must set a writeConcern on internal commands.
     aggRequest.setWriteConcern(WriteConcernOptions());
     // Allow aggregation to write to temporary files in case it reaches memory restriction.
@@ -2145,7 +2136,7 @@ void TenantMigrationRecipientService::Instance::_compareRecipientAndDonorFCV() c
     }
     FindCommandRequest findCmd{NamespaceString::kServerConfigurationNamespace};
     findCmd.setFilter(BSON("_id" << multiversion::kParameterName));
-    findCmd.setReadConcern(ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    findCmd.setReadConcern(ReadConcernArgs::kMajority);
     auto donorFCVbson = _client->findOne(std::move(findCmd),
                                          ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
 

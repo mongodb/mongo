@@ -221,11 +221,11 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         blockCRUDOperationsRequest.setBlockType(
             mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
         blockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
-        GenericArguments args;
-        async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-        async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+        generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
+        generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
+                                                       getNewSession(opCtx));
         auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-            **executor, token, blockCRUDOperationsRequest, args);
+            **executor, token, blockCRUDOperationsRequest);
         sharding_ddl_util::sendAuthenticatedCommandToShards(
             opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
     }
@@ -278,11 +278,11 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
         unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
         unblockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
-        GenericArguments args;
-        async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-        async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+        generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
+        generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
+                                                       getNewSession(opCtx));
         auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-            **executor, token, unblockCRUDOperationsRequest, args);
+            **executor, token, unblockCRUDOperationsRequest);
         sharding_ddl_util::sendAuthenticatedCommandToShards(
             opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
     }
@@ -439,15 +439,14 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         std::remove(participants.begin(), participants.end(), primaryShardId),
                         participants.end());
 
-                    GenericArguments args;
-                    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-                    async_rpc::AsyncRPCCommandHelpers::appendDbVersionIfPresent(
-                        args, *metadata().getDatabaseVersion());
+                    generic_argument_util::setMajorityWriteConcern(dropDatabaseParticipantCmd);
+                    generic_argument_util::setDbVersionIfPresent(dropDatabaseParticipantCmd,
+                                                                 *metadata().getDatabaseVersion());
                     // Drop DB on all other shards, attaching the dbVersion to the request to ensure
                     // idempotency.
                     auto opts = std::make_shared<
                         async_rpc::AsyncRPCOptions<ShardsvrDropDatabaseParticipant>>(
-                        **executor, token, dropDatabaseParticipantCmd, args);
+                        **executor, token, dropDatabaseParticipantCmd);
                     try {
                         sharding_ddl_util::sendAuthenticatedCommandToShards(
                             opCtx, opts, participants);
@@ -496,13 +495,12 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 FlushDatabaseCacheUpdatesWithWriteConcern flushDbCacheUpdatesCmd(db);
                 flushDbCacheUpdatesCmd.setSyncFromConfig(true);
                 flushDbCacheUpdatesCmd.setDbName(DatabaseName::kAdmin);
-                GenericArguments args;
-                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+                generic_argument_util::setMajorityWriteConcern(flushDbCacheUpdatesCmd);
 
                 IgnoreAPIParametersBlock ignoreApiParametersBlock{opCtx};
                 auto opts = std::make_shared<
                     async_rpc::AsyncRPCOptions<FlushDatabaseCacheUpdatesWithWriteConcern>>(
-                    **executor, token, flushDbCacheUpdatesCmd, args);
+                    **executor, token, flushDbCacheUpdatesCmd);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
             }
 

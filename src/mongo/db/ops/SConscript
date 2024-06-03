@@ -102,10 +102,12 @@ env.Library(
         "$BUILD_DIR/mongo/db/repl/optime",
         "$BUILD_DIR/mongo/idl/idl_parser",
         "$BUILD_DIR/mongo/rpc/command_status",
+        "$BUILD_DIR/mongo/rpc/metadata_impersonated_user",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/crypto/encrypted_field_config",
         "$BUILD_DIR/mongo/crypto/fle_fields",
+        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 

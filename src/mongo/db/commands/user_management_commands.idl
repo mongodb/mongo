@@ -122,10 +122,6 @@ commands:
                 description: "True if the server should digest the password, false for pre-digested"
                 type: safeBool
                 default: true
-            writeConcern:
-                description: "The level of write concern for the creation operation"
-                type: object
-                optional: true
             authenticationRestrictions:
                 description: "Authentication restrictions to enforce on the user"
                 type: array<address_restriction>
@@ -160,10 +156,6 @@ commands:
                 description: "True if the server should digest the password, false for pre-digested"
                 type: safeBool
                 default: true
-            writeConcern:
-                description: "The level of write concern for the update operation"
-                type: object
-                optional: true
             authenticationRestrictions:
                 description: "Authentication restrictions to enforce on the user"
                 type: array<address_restriction>

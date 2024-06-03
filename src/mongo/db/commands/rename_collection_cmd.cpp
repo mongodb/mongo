@@ -91,7 +91,7 @@ public:
         }
 
         void typedRun(OperationContext* opCtx) {
-            const auto& fromNss = ns();
+            const auto& fromNss = getFrom();
             const auto& toNss = request().getTo();
 
             uassert(ErrorCodes::IllegalOperation,
@@ -114,8 +114,16 @@ public:
         }
 
     private:
-        NamespaceString ns() const override {
+        const NamespaceString& getFrom() const {
             return request().getCommandParameter();
+        }
+
+        NamespaceString ns() const override {
+            return getFrom();
+        }
+
+        const DatabaseName& db() const override {
+            return request().getDbName();
         }
 
         bool supportsWriteConcern() const override {

@@ -296,11 +296,11 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 blockCRUDOperationsRequest.setBlockType(
                     CriticalSectionBlockTypeEnum::kReadsAndWrites);
                 blockCRUDOperationsRequest.setReason(_critSecReason);
-                GenericArguments args;
-                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-                async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+                generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
+                generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
+                                                               getNewSession(opCtx));
                 auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-                    **executor, token, blockCRUDOperationsRequest, args);
+                    **executor, token, blockCRUDOperationsRequest);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(
                     opCtx, opts, getShardsWithDataForCollection(opCtx, nss()));
 
@@ -378,11 +378,11 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 unblockCRUDOperationsRequest.setReason(_critSecReason);
                 unblockCRUDOperationsRequest.setClearFilteringMetadata(true);
 
-                GenericArguments args;
-                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-                async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+                generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
+                generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
+                                                               getNewSession(opCtx));
                 auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-                    **executor, token, unblockCRUDOperationsRequest, args);
+                    **executor, token, unblockCRUDOperationsRequest);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(
                     opCtx, opts, getShardsWithDataForCollection(opCtx, nss()));
             }))

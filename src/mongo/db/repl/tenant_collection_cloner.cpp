@@ -181,13 +181,12 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::TenantCollectionClonerSta
 }
 
 BaseCloner::AfterStageBehavior TenantCollectionCloner::countStage() {
-    auto count =
-        getClient()->count(_sourceDbAndUuid,
-                           {} /* Query */,
-                           QueryOption_SecondaryOk,
-                           0 /* limit */,
-                           0 /* skip */,
-                           ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    auto count = getClient()->count(_sourceDbAndUuid,
+                                    {} /* Query */,
+                                    QueryOption_SecondaryOk,
+                                    0 /* limit */,
+                                    0 /* skip */,
+                                    ReadConcernArgs::kMajority);
 
     // The count command may return a negative value after an unclean shutdown,
     // so we set it to zero here to avoid aborting the collection clone.
@@ -236,8 +235,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::checkIfDonorCollectionIsE
     FindCommandRequest findRequest{_sourceDbAndUuid};
     findRequest.setProjection(BSON("_id" << 1));
     findRequest.setLimit(1);
-    findRequest.setReadConcern(
-        ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    findRequest.setReadConcern(ReadConcernArgs::kMajority);
     auto cursor = getClient()->find(std::move(findRequest),
                                     ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
     _donorCollectionWasEmptyBeforeListIndexes = !cursor->more();
@@ -509,7 +507,7 @@ void TenantCollectionCloner::runQuery() {
     }
 
     findCmd.setNoCursorTimeout(true);
-    findCmd.setReadConcern(ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    findCmd.setReadConcern(ReadConcernArgs::kMajority);
     if (_collectionClonerBatchSize) {
         findCmd.setBatchSize(_collectionClonerBatchSize);
     }

@@ -46,6 +46,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/assert.h"
@@ -158,11 +159,10 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesReadPreference) {
 TEST(ResolvedViewTest, ExpandingAggRequestPreservesReadConcern) {
     const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
     AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
-    aggRequest.setReadConcern(BSON("level"
-                                   << "linearizable"));
+    aggRequest.setReadConcern(repl::ReadConcernArgs::kLinearizable);
 
     auto result = resolvedView.asExpandedViewAggregation(aggRequest);
-    ASSERT_BSONOBJ_EQ(result.getReadConcern().value_or(BSONObj()),
+    ASSERT_BSONOBJ_EQ(result.getReadConcern().value_or(repl::ReadConcernArgs()).toBSONInner(),
                       BSON("level"
                            << "linearizable"));
 }

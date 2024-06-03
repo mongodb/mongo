@@ -322,11 +322,10 @@ void renameIndexMetadataInShards(OperationContext* opCtx,
         {doc->getNewTargetCollectionUuid().get_value_or(doc->getSourceUUID().value()),
          newIndexVersion});
     renameIndexCatalogReq.setDbName(toNss.dbName());
-    GenericArguments args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
+    generic_argument_util::setMajorityWriteConcern(renameIndexCatalogReq);
+    generic_argument_util::setOperationSessionInfo(renameIndexCatalogReq, osi);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrRenameIndexMetadata>>(
-        executor, token, renameIndexCatalogReq, args);
+        executor, token, renameIndexCatalogReq);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
 }
 
@@ -344,13 +343,13 @@ std::vector<ShardId> getLatestCollectionPlacementInfoFor(OperationContext* opCtx
     DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
     distinctRequest.setKey(ChunkType::shard.name());
     distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << uuid));
-    auto rc = BSON(repl::ReadConcernArgs::kReadConcernFieldName << repl::ReadConcernArgs::kLocal);
+    distinctRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
 
     auto reply = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
         DatabaseName::kConfig,
-        distinctRequest.toBSON({rc}),
+        distinctRequest.toBSON(),
         Shard::RetryPolicy::kIdempotent));
 
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(reply));
@@ -1088,12 +1087,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     std::remove(participants.begin(), participants.end(), primaryShardId),
                     participants.end());
 
-                GenericArguments args;
-                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-                async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+                generic_argument_util::setMajorityWriteConcern(renameCollParticipantRequest);
+                generic_argument_util::setOperationSessionInfo(renameCollParticipantRequest,
+                                                               getNewSession(opCtx));
                 auto opts = std::make_shared<
                     async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionParticipant>>(
-                    **executor, token, renameCollParticipantRequest, args);
+                    **executor, token, renameCollParticipantRequest);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {primaryShardId});
             }))
@@ -1174,12 +1173,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 unblockParticipantRequest.setRenameCollectionRequest(_request);
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
-                GenericArguments args;
-                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-                async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+                generic_argument_util::setMajorityWriteConcern(unblockParticipantRequest);
+                generic_argument_util::setOperationSessionInfo(unblockParticipantRequest,
+                                                               getNewSession(opCtx));
                 auto opts = std::make_shared<
                     async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionUnblockParticipant>>(
-                    **executor, token, unblockParticipantRequest, args);
+                    **executor, token, unblockParticipantRequest);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
 
                 // Delete chunks belonging to the previous incarnation of the target collection.

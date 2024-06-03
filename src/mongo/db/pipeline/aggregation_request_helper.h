@@ -88,14 +88,12 @@ AggregateCommandRequest parseFromBSON(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    bool apiStrict,
     const SerializationContext& serializationContext = SerializationContext());
 
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts = boost::none,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
-    bool apiStrict = false);
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
 
 /**
  * Serializes the options to a Document. Note that this serialization includes the original

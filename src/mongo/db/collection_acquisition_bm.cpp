@@ -191,7 +191,7 @@ void BM_acquireCollectionLockFreeFunc(benchmark::State& state,
     auto opCtx = fixture.getOperationContext();
 
     const auto nss = NamespaceString::createNamespaceString_forTest("test.test");
-    const auto readConcern = repl::ReadConcernArgs::fromBSONThrows(repl::ReadConcernArgs::kLocal);
+    const auto readConcern = repl::ReadConcernArgs::kLocal;
     for (auto _ : state) {
         // Building the request is part of the work required to acquire a collection, so we include
         // this in the benchmark.
@@ -212,7 +212,7 @@ void BM_acquireCollectionFunc(benchmark::State& state, CollectionAcquisitionBenc
     auto opCtx = fixture.getOperationContext();
 
     const auto nss = NamespaceString::createNamespaceString_forTest("test.test");
-    const auto readConcern = repl::ReadConcernArgs::fromBSONThrows(repl::ReadConcernArgs::kLocal);
+    const auto readConcern = repl::ReadConcernArgs::kLocal;
     for (auto _ : state) {
         // Building the request is part of the work required to acquire a collection, so we include
         // this in the benchmark.
@@ -235,7 +235,7 @@ void BM_acquireMultiCollectionFunc(benchmark::State& state,
 
     const auto nss1 = NamespaceString::createNamespaceString_forTest("test.test1");
     const auto nss2 = NamespaceString::createNamespaceString_forTest("test.test2");
-    const auto readConcern = repl::ReadConcernArgs::fromBSONThrows(repl::ReadConcernArgs::kLocal);
+    const auto readConcern = repl::ReadConcernArgs::kLocal;
     for (auto _ : state) {
         // Building the request is part of the work required to acquire a collection, so we include
         // this in the benchmark.

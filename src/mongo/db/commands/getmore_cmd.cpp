@@ -428,6 +428,10 @@ public:
                                                       _cmd.getTerm().has_value()));
         }
 
+        const GenericArguments& getGenericArguments() const override {
+            return _cmd.getGenericArguments();
+        }
+
         /**
          * Implements populating 'nextBatch' with up to 'batchSize' documents from the plan executor
          * 'exec'. Outputs the number of documents and relevant size statistics in 'numResults' and

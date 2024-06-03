@@ -39,6 +39,7 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstdint>
+#include <fmt/format.h>
 #include <functional>
 #include <iterator>
 #include <list>
@@ -238,14 +239,21 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
         cmdForShards.reset(wrapAggAsExplain(cmdForShards.freeze(), *explainVerbosity));
     }
 
-    if (expCtx->opCtx->getTxnNumber()) {
-        invariant(
-            cmdForShards.peek()[OperationSessionInfoFromClient::kTxnNumberFieldName].missing(),
-            str::stream() << "Command for shards unexpectedly had the "
-                          << OperationSessionInfoFromClient::kTxnNumberFieldName
-                          << " field set: " << cmdForShards.peek().toString());
-        cmdForShards[OperationSessionInfoFromClient::kTxnNumberFieldName] =
-            Value(static_cast<long long>(*expCtx->opCtx->getTxnNumber()));
+    if (auto txnNumber = expCtx->opCtx->getTxnNumber()) {
+        auto cmdTxnNumber = cmdForShards.peek()[GenericArguments::kTxnNumberFieldName];
+
+        if (cmdTxnNumber.missing()) {
+            cmdForShards[GenericArguments::kTxnNumberFieldName] =
+                Value(static_cast<long long>(*expCtx->opCtx->getTxnNumber()));
+        } else {
+            massert(8579101,
+                    fmt::format("aggregate command for shards had a different value for {} than "
+                                "expected (found {}, expected {})",
+                                GenericArguments::kTxnNumberFieldName,
+                                cmdTxnNumber.coerceToInt(),
+                                *txnNumber),
+                    cmdTxnNumber.coerceToInt() == *txnNumber);
+        }
     }
 
     if (readConcern) {

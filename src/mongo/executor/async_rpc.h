@@ -86,7 +86,6 @@
 namespace mongo::async_rpc {
 using executor::TaskExecutor;
 
-
 /**
  * The response type used by `sendCommand(...)`  functions, containing the typed response to the
  * command as well as the host it was run on
@@ -115,31 +114,13 @@ struct AsyncRPCOptions {
                     CancellationToken token,
                     const CommandType& cmd,
                     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
-                    GenericArguments genericArgs = GenericArguments(),
                     BatonHandle baton = nullptr)
-        : exec{exec},
-          token{token},
-          cmd{cmd},
-          retryPolicy{retryPolicy},
-          genericArgs{genericArgs},
-          baton{std::move(baton)} {}
-    AsyncRPCOptions(const std::shared_ptr<executor::TaskExecutor>& exec,
-                    CancellationToken token,
-                    const CommandType& cmd,
-                    GenericArguments genericArgs,
-                    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
-                    BatonHandle baton = nullptr)
-        : exec{exec},
-          token{token},
-          cmd{cmd},
-          retryPolicy{retryPolicy},
-          genericArgs{genericArgs},
-          baton{std::move(baton)} {}
+        : exec{exec}, token{token}, cmd{cmd}, retryPolicy{retryPolicy}, baton{std::move(baton)} {}
+
     std::shared_ptr<executor::TaskExecutor> exec;
     CancellationToken token;
     CommandType cmd;
     std::shared_ptr<RetryPolicy> retryPolicy;
-    GenericArguments genericArgs;
     BatonHandle baton;
 };
 
@@ -267,7 +248,7 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
                                     targeter.get(),
                                     options->cmd.getDbName(),
                                     cmdBSON,
-                                    options->genericArgs.getClientOperationKey());
+                                    options->cmd.getGenericArguments().getClientOperationKey());
     };
     auto resFuture =
         AsyncTry<decltype(tryBody)>(std::move(tryBody))
@@ -329,11 +310,16 @@ void createOperationKeyIfNeeded(GenericArguments& genericArgs) {
 /**
  * Execute the command asynchronously on the given target with the provided executor.
  *
- * The command type specified must have a `toBSON(BSONObj)` member function that transforms the
- * command into BSON suitable for sending over-the-wire. It also must have a nested `Reply` type
- * with a static `Reply parseSharingOwnership(BSONObj)` member function that parses BSON recieved in
- * response to the command into the `Reply` type. Note all IDL-defined command types meet these
- * requirements. Returns an ExecutorFuture with the reply from the IDL command.
+ * The command type specified must meet the following requirements:
+ *    - A `toBSON()` member function that transforms the command into BSON suitable for sending
+ *      over-the-wire.
+ *    - A nested `Reply` type with a static `Reply parseSharingOwnership(BSONObj)` member
+ *      function that parses BSON recieved in response to the command into the `Reply` type.
+ *    - A `GenericArguments& getGenericArguments()` member function that returns the generic
+ *      arguments struct used by the request.
+ *
+ * Note all IDL-defined command types meet these requirements.
+ * Returns an ExecutorFuture with the reply from the IDL command.
  *
  * If there is any error, local or remote, while executing the command, the future is set with
  * ErrorCodes::RemoteCommandExecutionError. This is the only error returned by the API. Additional
@@ -357,9 +343,8 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
     OperationContext* opCtx,
     std::unique_ptr<Targeter> targeter) {
     auto runner = detail::AsyncRPCRunner::get(opCtx->getServiceContext());
-    createOperationKeyIfNeeded(options->genericArgs);
-    auto genericArgs = options->genericArgs.toBSON();
-    auto cmdBSON = options->cmd.toBSON(genericArgs);
+    createOperationKeyIfNeeded(options->cmd.getGenericArguments());
+    auto cmdBSON = options->cmd.toBSON();
     return detail::sendCommandWithRunner(options, opCtx, runner, std::move(targeter), cmdBSON);
 }
 
@@ -377,9 +362,8 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
     // Wrapping this function allows us to separate the CommandType parsing logic from the
     // implementation details of executing the remote command asynchronously.
     auto runner = detail::AsyncRPCRunner::get(svcCtx);
-    createOperationKeyIfNeeded(options->genericArgs);
-    auto genericArgs = options->genericArgs.toBSON();
-    auto cmdBSON = options->cmd.toBSON(genericArgs);
+    createOperationKeyIfNeeded(options->cmd.getGenericArguments());
+    auto cmdBSON = options->cmd.toBSON();
     return detail::sendCommandWithRunner(options, nullptr, runner, std::move(targeter), cmdBSON);
 }
 
@@ -395,9 +379,8 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
     std::unique_ptr<Targeter> targeter =
         std::make_unique<ShardIdTargeter>(options->exec, opCtx, shardId, readPref);
     auto runner = detail::AsyncRPCRunner::get(opCtx->getServiceContext());
-    createOperationKeyIfNeeded(options->genericArgs);
-    auto genericArgs = options->genericArgs.toBSON();
-    auto cmdBSON = options->cmd.toBSON(genericArgs);
+    createOperationKeyIfNeeded(options->cmd.getGenericArguments());
+    auto cmdBSON = options->cmd.toBSON();
     return detail::sendCommandWithRunner(options, opCtx, runner, std::move(targeter), cmdBSON);
 }
 
@@ -418,9 +401,8 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
         std::make_unique<AsyncRemoteCommandTargeterAdapter>(readPref, remoteCommandTargeter);
 
     auto runner = detail::AsyncRPCRunner::get(opCtx->getServiceContext());
-    createOperationKeyIfNeeded(options->genericArgs);
-    auto genericArgs = options->genericArgs.toBSON();
-    auto cmdBSON = options->cmd.toBSON(genericArgs);
+    createOperationKeyIfNeeded(options->cmd.getGenericArguments());
+    auto cmdBSON = options->cmd.toBSON();
     return detail::sendCommandWithRunner(options, opCtx, runner, std::move(targeter), cmdBSON);
 }
 

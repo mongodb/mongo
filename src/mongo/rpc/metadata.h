@@ -38,8 +38,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/common_request_args_gen.h"
 #include "mongo/db/database_name.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/rpc/op_msg.h"
 
 namespace mongo {
@@ -62,8 +62,7 @@ BSONObj makeEmptyMetadata();
  * Reads metadata from a metadata object and sets it on this OperationContext.
  */
 void readRequestMetadata(OperationContext* opCtx,
-                         const CommonRequestArgs& requestArgs,
-                         const OpMsgRequest& request,
+                         const GenericArguments& requestArgs,
                          bool cmdRequiresAuth);
 
 /**

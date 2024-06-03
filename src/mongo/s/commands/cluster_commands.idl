@@ -130,11 +130,6 @@ commands:
                 description: "Specifies whether or not forcing jumbo chunks move"
                 default: false
 
-            writeConcern:
-                type: object_owned
-                description: "A document that expresses the write concern that the _secondaryThrottle will use to wait for secondaries during the chunk migration."
-                default: BSONObj()
-
             # Secondary throttle can be specified by passing one of the following 2 parameters
             secondaryThrottle:
                 type: optionalBool

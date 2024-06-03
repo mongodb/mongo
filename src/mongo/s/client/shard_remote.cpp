@@ -56,6 +56,8 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_gen.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/executor/remote_command_request.h"
@@ -346,20 +348,15 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         return readPrefToReturn;
     }();
 
-    BSONObj readConcernObj = [&] {
-        auto readConcern = [&] {
-            if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
-                repl::OpTime configOpTime{configTime.asTimestamp(),
-                                          mongo::repl::OpTime::kUninitializedTerm};
-                return repl::ReadConcernArgs{configOpTime, readConcernLevel};
-            } else {
-                invariant(readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
-                return repl::ReadConcernArgs{configTime, readConcernLevel};
-            }
-        }();
-        BSONObjBuilder bob;
-        readConcern.appendInfo(&bob);
-        return bob.done().getObjectField(repl::ReadConcernArgs::kReadConcernFieldName).getOwned();
+    repl::ReadConcernArgs readConcern = [&] {
+        if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
+            repl::OpTime configOpTime{configTime.asTimestamp(),
+                                      mongo::repl::OpTime::kUninitializedTerm};
+            return repl::ReadConcernArgs(configOpTime, readConcernLevel);
+        } else {
+            invariant(readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
+            return repl::ReadConcernArgs(configTime, readConcernLevel);
+        }
     }();
 
     const Milliseconds maxTimeMS = getExhaustiveFindOnConfigMaxTimeMS(opCtx, nss);
@@ -370,7 +367,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         FindCommandRequest findCommand(nss);
         findCommand.setFilter(query.getOwned());
         findCommand.setSort(sort.getOwned());
-        findCommand.setReadConcern(readConcernObj.getOwned());
+        findCommand.setReadConcern(readConcern);
         findCommand.setLimit(limit ? static_cast<boost::optional<std::int64_t>>(*limit)
                                    : boost::none);
         if (hint) {

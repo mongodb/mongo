@@ -54,6 +54,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -269,10 +270,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAg
         request.setHint(*hint);
     }
 
-    request.setReadConcern(
-        BSON(repl::ReadConcernArgs::kLevelFieldName
-             << repl::readConcernLevels::toString(repl::ReadConcernLevel::kSnapshotReadConcern)
-             << repl::ReadConcernArgs::kAtClusterTimeFieldName << _atClusterTime));
+    request.setReadConcern(repl::ReadConcernArgs::snapshot(LogicalTime(_atClusterTime)));
 
     // The read preference on the request is merely informational (e.g. for profiler entries) -- the
     // pipeline's opCtx setting is actually used when sending the request.
@@ -446,15 +444,10 @@ public:
                 cursor->getCursorResponse().getNSS().coll().toString());
             BSONObj cmdObj;
             if (opCtx->getLogicalSessionId()) {
-                BSONObjBuilder cmdObjWithLsidBuilder;
-                BSONObjBuilder lsidBuilder(cmdObjWithLsidBuilder.subobjStart(
-                    OperationSessionInfoFromClient::kSessionIdFieldName));
-                opCtx->getLogicalSessionId()->serialize(&lsidBuilder);
-                lsidBuilder.doneFast();
-                cmdObj = getMoreRequest.toBSON(cmdObjWithLsidBuilder.done());
-            } else {
-                cmdObj = getMoreRequest.toBSON();
+                getMoreRequest.setLsid(generic_argument_util::toLogicalSessionFromClient(
+                    *opCtx->getLogicalSessionId()));
             }
+            cmdObj = getMoreRequest.toBSON();
 
             const HostAndPort& cursorHost = cursor->getHostAndPort();
             _shardIds.push_back(ShardId(cursor->getShardId().toString()));
@@ -630,12 +623,9 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
 
     const Document serializedCommand =
         aggregation_request_helper::serializeToCommandDoc(expCtx, request);
-
-    auto readConcern =
-        BSON(repl::ReadConcernArgs::kLevelFieldName
-             << repl::readConcernLevels::toString(repl::ReadConcernLevel::kSnapshotReadConcern)
-             << repl::ReadConcernArgs::kAtClusterTimeFieldName << _atClusterTime
-             << repl::ReadConcernArgs::kWaitLastStableRecoveryTimestamp << true);
+    repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
+    readConcern.setArgsAtClusterTimeForSnapshot(_atClusterTime);
+    readConcern.setWaitLastStableRecoveryTimestamp(true);
     request.setReadConcern(readConcern);
 
     // The read preference on the request is merely informational (e.g. for profiler entries) -- the
@@ -652,7 +642,7 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
                                                    boost::none /* explain */,
                                                    boost::none /* cri */,
                                                    ShardTargetingPolicy::kAllowed,
-                                                   readConcern,
+                                                   readConcern.toBSONInner(),
                                                    std::move(designatedHostsMap),
                                                    std::move(resumeTokenMap),
                                                    std::move(shardsToSkip));

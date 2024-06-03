@@ -113,12 +113,11 @@ public:
 
         SerializationContext serializationCtx = opMsgRequest.getSerializationContext();
 
-        const auto aggregationRequest = aggregation_request_helper::parseFromBSON(
-            opMsgRequest.body,
-            opMsgRequest.validatedTenancyScope,
-            explainVerbosity,
-            APIParameters::get(opCtx).getAPIStrict().value_or(false),
-            serializationCtx);
+        const auto aggregationRequest =
+            aggregation_request_helper::parseFromBSON(opMsgRequest.body,
+                                                      opMsgRequest.validatedTenancyScope,
+                                                      explainVerbosity,
+                                                      serializationCtx);
 
         auto privileges = uassertStatusOK(
             auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
@@ -235,6 +234,10 @@ public:
             // Only checks for the last stage since currently write stages are only allowed to be at
             // the end of the pipeline.
             return !_liteParsedPipeline.endsWithWriteStage();
+        }
+
+        const GenericArguments& getGenericArguments() const override {
+            return _aggregationRequest.getGenericArguments();
         }
 
     private:

@@ -141,7 +141,6 @@ void IngressHandshakeMetrics::onResponseSent(Milliseconds processingDuration,
 }
 
 void IngressHandshakeMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
-                                                      const OpMsgRequest& request,
                                                       CommandInvocation* invocation) {
     if (const auto& session = opCtx->getClient()->session()) {
         IngressHandshakeMetrics::get(*session).onCommandReceived(invocation->definition());
@@ -149,7 +148,6 @@ void IngressHandshakeMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
 }
 
 void IngressHandshakeMetricsCommandHooks::onAfterRun(OperationContext* opCtx,
-                                                     const OpMsgRequest& request,
                                                      CommandInvocation* invocation,
                                                      rpc::ReplyBuilderInterface* response) {
     if (const auto& session = opCtx->getClient()->session()) {

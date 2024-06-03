@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "validate_api_parameters.h"
-#include "mongo/db/api_parameters_gen.h"
+#include "mongo/db/validate_api_parameters.h"
+
 #include <memory>
 #include <set>
 #include <string>
@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/api_parameters.h"
+#include "mongo/db/api_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
@@ -53,27 +54,29 @@
 
 namespace mongo {
 
-void validateAPIParameters(const BSONObj& requestBody,
-                           const APIParametersFromClient& apiParamsFromClient,
-                           Command* command) {
+void validateAPIParameters(const CommandInvocation& invocation) {
+    auto command = invocation.definition();
+
     if (command->skipApiVersionCheck()) {
         return;
     }
 
-    if (apiParamsFromClient.getApiDeprecationErrors() || apiParamsFromClient.getApiStrict()) {
+    auto& genericArgs = invocation.getGenericArguments();
+
+    if (genericArgs.getApiDeprecationErrors() || genericArgs.getApiStrict()) {
         uassert(4886600,
                 "Provided apiStrict and/or apiDeprecationErrors without passing apiVersion",
-                apiParamsFromClient.getApiVersion());
+                genericArgs.getApiVersion());
     }
 
-    if (auto apiVersion = apiParamsFromClient.getApiVersion(); apiVersion) {
+    if (auto apiVersion = genericArgs.getApiVersion(); apiVersion) {
         // Validates the API version.
         getAPIVersion(*apiVersion, acceptApiVersion2);
     }
 
-    if (apiParamsFromClient.getApiStrict() && *apiParamsFromClient.getApiStrict()) {
-        auto cmdApiVersions = command->apiVersions();
-        auto apiVersionFromClient = apiParamsFromClient.getApiVersion()->toString();
+    if (genericArgs.getApiStrict().value_or(false)) {
+        auto& cmdApiVersions = command->apiVersions();
+        auto apiVersionFromClient = genericArgs.getApiVersion()->toString();
         bool strictAssert = (cmdApiVersions.find(apiVersionFromClient) != cmdApiVersions.end());
         uassert(ErrorCodes::APIStrictError,
                 fmt::format("Provided apiStrict:true, but the command {} is not in API Version {}. "
@@ -83,33 +86,20 @@ void validateAPIParameters(const BSONObj& requestBody,
                             apiVersionFromClient,
                             apiVersionFromClient),
                 strictAssert);
-        bool strictDoesntWriteToSystemJS =
-            !(command->getReadWriteType() == BasicCommand::ReadWriteType::kWrite &&
-              requestBody.firstElementType() == BSONType::String &&
-              requestBody.firstElement().String() == "system.js");
-
-        // Need to handle bulkWrite case.
-        if (requestBody.hasField("nsInfo")) {
-            auto namespaces = requestBody.getField("nsInfo").Array();
-            for (auto& ns : namespaces) {
-                auto nss = NamespaceStringUtil::deserialize(boost::none,
-                                                            ns.Obj().getField("ns").String(),
-                                                            SerializationContext::stateDefault());
-                if (nss.coll() == "system.js") {
-                    strictDoesntWriteToSystemJS = false;
-                }
+        if (invocation.definition()->getReadWriteType() == Command::ReadWriteType::kWrite) {
+            for (auto& ns : invocation.allNamespaces()) {
+                uassert(ErrorCodes::APIStrictError,
+                        fmt::format("Provided apiStrict:true, but the command {} attempts to "
+                                    "write to system.js.",
+                                    invocation.definition()->getName()),
+                        !ns.isSystemDotJavascript());
             }
         }
-        uassert(ErrorCodes::APIStrictError,
-                fmt::format(
-                    "Provided apiStrict:true, but the command {} attempts to write to system.js.",
-                    command->getName()),
-                strictDoesntWriteToSystemJS);
     }
 
-    if (apiParamsFromClient.getApiDeprecationErrors().get_value_or(false)) {
-        auto cmdDepApiVersions = command->deprecatedApiVersions();
-        auto apiVersionFromClient = apiParamsFromClient.getApiVersion()->toString();
+    if (genericArgs.getApiDeprecationErrors().value_or(false)) {
+        auto& cmdDepApiVersions = command->deprecatedApiVersions();
+        auto apiVersionFromClient = genericArgs.getApiVersion()->toString();
         bool deprecationAssert =
             (cmdDepApiVersions.find(apiVersionFromClient) == cmdDepApiVersions.end());
         uassert(ErrorCodes::APIDeprecationError,
@@ -121,11 +111,12 @@ void validateAPIParameters(const BSONObj& requestBody,
     }
 }
 
-APIParametersFromClient parseAndValidateAPIParameters(const BSONObj& requestBody,
-                                                      Command* command) {
-    auto apiParams =
-        APIParametersFromClient::parse(IDLParserContext{"APIParametersFromClient"}, requestBody);
-    validateAPIParameters(requestBody, apiParams, command);
+APIParametersFromClient parseAndValidateAPIParameters(const CommandInvocation& invocation) {
+    validateAPIParameters(invocation);
+    APIParametersFromClient apiParams;
+    apiParams.setApiStrict(invocation.getGenericArguments().getApiStrict());
+    apiParams.setApiVersion(invocation.getGenericArguments().getApiVersion());
+    apiParams.setApiDeprecationErrors(invocation.getGenericArguments().getApiDeprecationErrors());
     return apiParams;
 }
 

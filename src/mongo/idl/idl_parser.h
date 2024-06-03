@@ -290,6 +290,7 @@ public:
      */
     static constexpr auto kOpMsgDollarDB = "$db"_sd;
     static constexpr auto kOpMsgDollarDBDefault = "admin"_sd;
+    static constexpr auto kTenantIdField = "$tenant"_sd;
 
     explicit IDLParserContext(StringData fieldName)
         : IDLParserContext{fieldName,
@@ -589,28 +590,29 @@ T parseApiStrict(const IDLParserContext& ctx, const BSONObj& cmdObj) {
 
 /**
  * Parse an IDL-defined command from a command request document.
- * If `apiStrict` is true and the command request contains any unstable fields, an
- * exception will be thrown.
+ * If the request includes apiStrict: true along with any unstable fields, an exception will be
+ * thrown.
  */
 template <typename T>
-T parseCommandDocument(const IDLParserContext& ctx, bool apiStrict, const BSONObj& cmdObj) {
-    if (apiStrict) {
-        return parseApiStrict<T>(ctx, cmdObj);
-    } else {
-        return T::parse(ctx, cmdObj);
+T parseCommandDocument(const IDLParserContext& ctx, const BSONObj& cmdObj) {
+    DeserializationContext dctx;
+    auto cmd = T::parse(ctx, cmdObj, &dctx);
+    if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
+        dctx.validateApiStrict();
     }
+    return cmd;
 }
 
 /**
- * Parse an IDL-defined command from a command request document.
- * If `apiStrict` is true and the command request contains any unstable fields, an
- * exception will be thrown.
+ * Parse an IDL-defined command from a command request.
+ * If the request includes apiStrict: true along with any unstable fields, an exception will be
+ * thrown.
  */
 template <typename T>
-T parseCommandRequest(const IDLParserContext& ctx, bool apiStrict, const OpMsgRequest& req) {
+T parseCommandRequest(const IDLParserContext& ctx, const OpMsgRequest& req) {
     DeserializationContext dctx;
     auto cmd = T::parse(ctx, req, &dctx);
-    if (apiStrict) {
+    if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
         dctx.validateApiStrict();
     }
     return cmd;

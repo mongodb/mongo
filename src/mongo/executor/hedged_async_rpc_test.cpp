@@ -136,7 +136,6 @@ public:
         CommandType cmd,
         std::vector<HostAndPort> hosts,
         std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
-        GenericArguments genericArgs = GenericArguments(),
         BatonHandle bh = nullptr) {
         // Use a readPreference that's elgible for hedging.
         ReadPreferenceSetting readPref(ReadPreference::Nearest);
@@ -158,7 +157,6 @@ public:
                                  std::move(targeter),
                                  retryPolicy,
                                  readPref,
-                                 genericArgs,
                                  bh);
     }
 
@@ -267,14 +265,11 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRequestWithGenericArgs) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    // Populate generic arguments to be passed along when the command is converted
-    // to BSON.
-    GenericArguments genericArgs;
     auto configTime = Timestamp(1, 1);
-    genericArgs.setDollarConfigTime(configTime);
+    helloCmd.setDollarConfigTime(configTime);
 
-    auto resultFuture = sendHedgedCommandWithHosts(
-        helloCmd, kTwoHosts, std::make_shared<NeverRetryPolicy>(), genericArgs);
+    auto resultFuture =
+        sendHedgedCommandWithHosts(helloCmd, kTwoHosts, std::make_shared<NeverRetryPolicy>());
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -1106,8 +1101,8 @@ TEST_F(HedgedAsyncRPCTest, RemoteErrorAttemptedTargetsContainActual) {
 
 TEST_F(HedgedAsyncRPCTest, BatonTest) {
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>();
-    auto resultFuture = sendHedgedCommandWithHosts(
-        testFindCmd, kTwoHosts, retryPolicy, GenericArguments(), getOpCtx()->getBaton());
+    auto resultFuture =
+        sendHedgedCommandWithHosts(testFindCmd, kTwoHosts, retryPolicy, getOpCtx()->getBaton());
 
     Notification<void> seenNetworkRequests;
     // This thread will respond to the requests we sent via sendHedgedCommandWithHosts above.
@@ -1149,8 +1144,7 @@ TEST_F(HedgedAsyncRPCTest, BatonShutdownExecutorAlive) {
     for (int i = 0; i < maxNumRetries; ++i)
         retryPolicy->pushRetryDelay(retryDelay);
     auto subBaton = getOpCtx()->getBaton()->makeSubBaton();
-    auto resultFuture = sendHedgedCommandWithHosts(
-        testFindCmd, kTwoHosts, retryPolicy, GenericArguments(), *subBaton);
+    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts, retryPolicy, *subBaton);
 
     subBaton.shutdown();
     auto net = getNetworkInterfaceMock();
@@ -1204,15 +1198,10 @@ TEST_F(HedgedAsyncRPCTest, OperationKeyIsSetByDefault) {
 TEST_F(HedgedAsyncRPCTest, UseOperationKeyWhenProvided) {
     const auto opKey = UUID::gen();
 
-    // Set OperationKey via GenericArguments
-    GenericArguments args;
-    args.setClientOperationKey(opKey);
-    auto future =
-        sendHedgedCommandWithHosts(write_ops::InsertCommandRequest(testNS, {BSON("id" << 1)}),
-                                   kTwoHosts,
-                                   std::make_shared<NeverRetryPolicy>(),
-                                   args,
-                                   nullptr);
+    auto request = write_ops::InsertCommandRequest(testNS, {BSON("id" << 1)});
+    request.setClientOperationKey(opKey);
+    auto future = sendHedgedCommandWithHosts(
+        std::move(request), kTwoHosts, std::make_shared<NeverRetryPolicy>(), nullptr);
     onCommand([&](const auto& request) {
         ASSERT_EQ(getOpKeyFromCommand(request.cmdObj), opKey);
         return write_ops::InsertCommandReply().toBSON();
@@ -1221,11 +1210,11 @@ TEST_F(HedgedAsyncRPCTest, UseOperationKeyWhenProvided) {
 }
 
 TEST_F(HedgedAsyncRPCTest, RewriteOperationKeyWhenHedging) {
+    auto request = testFindCmd;
     const auto opKey = UUID::gen();
-    GenericArguments args;
-    args.setClientOperationKey(opKey);
+    request.setClientOperationKey(opKey);
     auto future = sendHedgedCommandWithHosts(
-        testFindCmd, kTwoHosts, std::make_shared<NeverRetryPolicy>(), args, nullptr);
+        testFindCmd, kTwoHosts, std::make_shared<NeverRetryPolicy>(), nullptr);
     onCommand([&](const auto& request) {
         ASSERT_NE(getOpKeyFromCommand(request.cmdObj), opKey);
         return CursorResponse(testNS, 0LL, {testFirstBatch})

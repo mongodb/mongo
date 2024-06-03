@@ -59,7 +59,7 @@ IndexHintSpecs parse(boost::optional<TenantId> tenantId,
             result.reserve(elements.size());
             for (const auto& element : elements) {
                 IDLParserContext parserContext(
-                    "IndexHintSpec", boost::none /*vts=*/, tenantId, context);
+                    "IndexHintSpec", /*vts=*/boost::none, tenantId, context);
                 result.emplace_back(IndexHintSpec::parse(parserContext, element.Obj()));
             }
             return result;

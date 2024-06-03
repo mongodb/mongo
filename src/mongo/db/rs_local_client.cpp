@@ -233,10 +233,7 @@ Status RSLocalClient::runAggregation(
             repl::ReadConcernArgs{_getLastOpTime(), repl::ReadConcernLevel::kLocalReadConcern};
     } else {
         // initialize read concern args
-        auto readConcernParseStatus = requestReadConcernArgs.parse(*aggRequest.getReadConcern());
-        if (!readConcernParseStatus.isOK()) {
-            return readConcernParseStatus;
-        }
+        requestReadConcernArgs = *aggRequest.getReadConcern();
 
         // if after cluster time is set, change it with lastOp time if this comes later
         if (requestReadConcernArgs.getArgsAfterClusterTime()) {

@@ -138,9 +138,10 @@ public:
         }
     }
 
-    void appendCommandMetadataTo(BSONObjBuilder* commandBuilder) const {
+    template <typename CommandType>
+    void setCommandMetadata(CommandType& req) const {
         if (_clientInfo && _clientInfo.get().apiParameters.getParamsPassed()) {
-            _clientInfo.get().apiParameters.appendInfo(commandBuilder);
+            _clientInfo.get().apiParameters.setInfo(req);
         }
     }
 
@@ -160,8 +161,10 @@ public:
                          const WriteConcernOptions& writeConcern,
                          boost::optional<ExternalClientInfo>&& clientInfo)
         : CommandInfo(request.getFromShard(), request.getCommandParameter(), std::move(clientInfo)),
-          _request(request),
-          _wc(writeConcern) {}
+          _request(request) {
+        _request.setWriteConcern(writeConcern);
+        setCommandMetadata(_request);
+    }
 
     const ShardsvrMoveRange& getMoveRangeRequest() {
         return _request;
@@ -169,15 +172,12 @@ public:
 
     BSONObj serialise() const override {
         BSONObjBuilder commandBuilder;
-        _request.serialize(&commandBuilder,
-                           BSON(WriteConcernOptions::kWriteConcernField << _wc.toBSON()));
-        appendCommandMetadataTo(&commandBuilder);
+        _request.serialize(&commandBuilder);
         return commandBuilder.obj();
     }
 
 private:
-    const ShardsvrMoveRange _request;
-    const WriteConcernOptions _wc;
+    ShardsvrMoveRange _request;
 };
 
 class DisableBalancerCommandInfo : public CommandInfo {

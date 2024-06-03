@@ -126,12 +126,12 @@ TransactionCoordinatorTestFixture::makeShardingCatalogClient() {
 void TransactionCoordinatorTestFixture::assertCommandSentAndRespondWith(
     StringData commandName,
     const StatusWith<BSONObj>& response,
-    boost::optional<BSONObj> expectedWriteConcern) {
+    boost::optional<WriteConcernOptions> expectedWriteConcern) {
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT_EQ(commandName, request.cmdObj.firstElement().fieldNameStringData());
         if (expectedWriteConcern) {
             ASSERT_BSONOBJ_EQ(
-                *expectedWriteConcern,
+                expectedWriteConcern->toBSON(),
                 request.cmdObj.getObjectField(WriteConcernOptions::kWriteConcernField));
         }
         return response;

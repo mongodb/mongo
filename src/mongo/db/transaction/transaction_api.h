@@ -81,7 +81,6 @@ class TransactionWithRetries;
 // used by the driver's convenient transactions API:
 // https://github.com/mongodb/specifications/blob/92d77a6d/source/transactions-convenient-api/transactions-convenient-api.rst
 static constexpr int kTxnRetryLimit = 120;
-static constexpr auto kMaxTimeMSField = "maxTimeMS";
 
 /**
  * Encapsulates the command status and write concern error from a response to a commitTransaction
@@ -123,6 +122,10 @@ public:
 
     /**
      * Runs the given command as part of the transaction that owns this transaction client.
+     *
+     * If the provided command already contains transaction metadata fields (e.g. because it was
+     * forwarded from the user's request without stripping them out), then an exception will be
+     * thrown. See Transaction::prepareRequest for more info.
      */
     virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const = 0;
     virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const = 0;
@@ -155,6 +158,9 @@ public:
      * Note that only one "pre" or "post" image can be stored per transaction, so only one
      * findAndModify per transaction may have a non -1 statement id.
      *
+     * If the provided command already contains transaction metadata fields (e.g. because it was
+     * forwarded from the user's request without stripping them out), then an exception will be
+     * thrown. See Transaction::prepareRequest for more info.
      */
     virtual SemiFuture<BatchedCommandResponse> runCRUDOp(const BatchedCommandRequest& cmd,
                                                          std::vector<StmtId> stmtIds) const = 0;
@@ -467,6 +473,9 @@ public:
 
     /**
      * Attaches transaction metadata to the given command and updates internal transaction state.
+     *
+     * If the builder already contains transaction metadata fields (including session info,
+     * readConcern, maxTimeMS, API paramters), an exception will be thrown.
      */
     void prepareRequest(BSONObjBuilder* cmdBuilder);
 

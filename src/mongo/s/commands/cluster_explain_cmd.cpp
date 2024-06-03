@@ -113,6 +113,11 @@ public:
           _ns{CommandHelpers::parseNsFromCommand(_outerRequest->parseDbName(),
                                                  _outerRequest->body)},
           _verbosity{std::move(verbosity)},
+          _genericArgs(GenericArguments::parse(IDLParserContext("explain",
+                                                                request.validatedTenancyScope,
+                                                                request.getValidatedTenantId(),
+                                                                request.getSerializationContext()),
+                                               _outerRequest->body)),
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}
 
@@ -122,6 +127,10 @@ public:
             ErrorCodes::InvalidOptions,
             "Explain does not permit default readConcern to be applied."};
         return {Status::OK(), {kDefaultReadConcernNotPermitted}};
+    }
+
+    const GenericArguments& getGenericArguments() const override {
+        return _genericArgs;
     }
 
 private:
@@ -163,6 +172,7 @@ private:
     const OpMsgRequest* _outerRequest;
     NamespaceString _ns;
     ExplainOptions::Verbosity _verbosity;
+    const GenericArguments _genericArgs;
     std::unique_ptr<OpMsgRequest> _innerRequest;  // Lifespan must enclose that of _innerInvocation.
     std::unique_ptr<CommandInvocation> _innerInvocation;
 };
@@ -207,10 +217,12 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
 
     // To enforce API versioning
-
-    const auto apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
     auto cmdObj = idl::parseCommandRequest<ExplainCommandRequest>(
-        IDLParserContext(ExplainCommandRequest::kCommandName), apiStrict, request);
+        IDLParserContext(ExplainCommandRequest::kCommandName,
+                         request.validatedTenancyScope,
+                         request.getValidatedTenantId(),
+                         request.getSerializationContext()),
+        request);
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
     // This is the nested command which we are explaining. We need to propagate generic
     // arguments into the inner command since it is what is passed to the virtual

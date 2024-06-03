@@ -251,16 +251,9 @@ Future<ConfigServerHealthObserver::CheckResult> ConfigServerHealthObserver::_che
 void ConfigServerHealthObserver::_runSmokeReadShardsCommand(std::shared_ptr<CheckContext> ctx) {
     const ReadPreferenceSetting readPref(ReadPreference::Nearest, TagSet{});
 
-    BSONObj readConcernObj = [&] {
-        repl::ReadConcernArgs readConcern{repl::ReadConcernLevel::kAvailableReadConcern};
-        BSONObjBuilder bob;
-        readConcern.appendInfo(&bob);
-        return bob.done().getObjectField(repl::ReadConcernArgs::kReadConcernFieldName).getOwned();
-    }();
-
     BSONObjBuilder findCmdBuilder;
     FindCommandRequest findCommand(NamespaceString::kConfigsvrShardsNamespace);
-    findCommand.setReadConcern(readConcernObj);
+    findCommand.setReadConcern(repl::ReadConcernArgs::kAvailable);
     findCommand.setLimit(1);
     findCommand.setSingleBatch(true);
     findCommand.setMaxTimeMS(Milliseconds(kServerRequestTimeout).count());

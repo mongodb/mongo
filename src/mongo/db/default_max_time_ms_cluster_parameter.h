@@ -28,6 +28,7 @@
  */
 
 #include <boost/optional/optional.hpp>
+#include <cstdint>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/basic_types.h"
@@ -42,7 +43,5 @@ static constexpr auto kDefaultMaxTimeMSClusterParameterName = "defaultMaxTimeMS"
  * used. Also returns if 'defaultMaxTimeMS' was used.
  */
 std::pair<boost::optional<Milliseconds>, bool> getRequestOrDefaultMaxTimeMS(
-    OperationContext* opCtx,
-    const boost::optional<IDLAnyType>& requestMaxTimeMS,
-    bool isReadOperation);
+    OperationContext* opCtx, boost::optional<std::int64_t> requestMaxTimeMS, bool isReadOperation);
 }  // namespace mongo

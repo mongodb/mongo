@@ -52,13 +52,6 @@ struct ParsedDistinctCommand {
     std::unique_ptr<CollatorInterface> collator;
     std::unique_ptr<MatchExpression> query;
 
-    // The IDL parser does not handle generic command arguments thus you can't get them from
-    // DistinctCommandRequest. Since the canonical distinct requires the following options, manually
-    // parse and keep them beside distinctCommandRequest.
-    boost::optional<int> maxTimeMS;
-    boost::optional<BSONObj> queryOptions;
-    boost::optional<BSONObj> readConcern;
-
     // All other parameters to the find command which do not have AST-like types and can be
     // appropriately tracked as raw value types like ints. The fields above like 'query' are all
     // still present in their raw form on this DistinctCommandRequest, but it is not expected that

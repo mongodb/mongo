@@ -173,8 +173,6 @@ BatchedCommandResponse ClusterParameterDBClientService::updateParameterOnDisk(
     BSONObj update,
     const WriteConcernOptions& writeConcern,
     const boost::optional<auth::ValidatedTenancyScope>& validatedTenancyScope) {
-    const auto writeConcernObj =
-        BSON(WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());
     const auto tenantId = (validatedTenancyScope && validatedTenancyScope->hasTenantId())
         ? boost::make_optional(validatedTenancyScope->tenantId())
         : boost::none;
@@ -189,8 +187,8 @@ BatchedCommandResponse ClusterParameterDBClientService::updateParameterOnDisk(
             entry.setUpsert(true);
             return entry;
         }()});
-
-        return updateOp.toBSON(writeConcernObj);
+        updateOp.setWriteConcern(writeConcern);
+        return updateOp.toBSON();
     }());
 
     BSONObj res = _dbClient.runCommand(request)->getCommandReply();

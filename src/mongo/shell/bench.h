@@ -163,8 +163,7 @@ struct BenchRunOp {
     // resources that a snapshot transaction would hold for a time.
     int maxRandomMillisecondDelayBeforeGetMore{0};
 
-    // Format: {$readPreference: {mode: modeStr}}.  Only mode field is allowed.
-    BSONObj readPrefObj;
+    boost::optional<ReadPreferenceSetting> readPref;
 
     // This is an owned copy of the raw operation. All unowned members point into this.
     BSONObj myBsonOp;

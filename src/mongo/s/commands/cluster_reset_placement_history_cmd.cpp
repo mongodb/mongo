@@ -43,6 +43,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -85,15 +86,15 @@ public:
         void typedRun(OperationContext* opCtx) {
             ConfigsvrResetPlacementHistory configsvrRequest;
             configsvrRequest.setDbName(DatabaseName::kAdmin);
+            configsvrRequest.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            const auto commandResponse = uassertStatusOK(configShard->runCommand(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                configsvrRequest.toBSON(
-                    BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority)),
-                Shard::RetryPolicy::kIdempotent));
+            const auto commandResponse = uassertStatusOK(
+                configShard->runCommand(opCtx,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        DatabaseName::kAdmin,
+                                        configsvrRequest.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(commandResponse));
         }
 

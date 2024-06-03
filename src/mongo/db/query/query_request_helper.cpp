@@ -217,13 +217,11 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommand(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts,
     const boost::optional<TenantId>& tenantId,
-    const SerializationContext& sc,
-    bool apiStrict) {
+    const SerializationContext& sc) {
 
     auto findCommand =
         std::make_unique<FindCommandRequest>(idl::parseCommandDocument<FindCommandRequest>(
             IDLParserContext("FindCommandRequest", vts, tenantId ? tenantId : boost::none, sc),
-            apiStrict,
             cmdObj));
 
     addMetaProjection(findCommand.get());
@@ -240,12 +238,11 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommand(
 }
 
 std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
-    const BSONObj& cmdObj, boost::optional<NamespaceString> nss, bool apiStrict) {
+    const BSONObj& cmdObj, boost::optional<NamespaceString> nss) {
     return makeFromFindCommand(cmdObj,
                                boost::none /*vts*/,
                                nss ? nss->tenantId() : boost::none,
-                               SerializationContext::stateDefault(),
-                               apiStrict);
+                               SerializationContext::stateDefault());
 }
 
 bool isTextScoreMeta(BSONElement elt) {

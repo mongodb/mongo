@@ -95,8 +95,8 @@ void updatePersistedDefaultRWConcernDocument(OperationContext* opCtx, const RWCo
             entry.setUpsert(true);
             return entry;
         }()});
-        return updateOp.serialize(
-            BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
+        updateOp.setWriteConcern(opCtx->getWriteConcern());
+        return updateOp.serialize();
     }());
     uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
 }

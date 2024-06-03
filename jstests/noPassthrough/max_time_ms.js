@@ -296,9 +296,6 @@ function executeTest(db, isMongos) {
             t.find().maxTimeMS(-0.1).itcount();
         });
         assert.throws(function() {
-            t.find().maxTimeMS().itcount();
-        });
-        assert.throws(function() {
             t.find().maxTimeMS("").itcount();
         });
         assert.throws(function() {
@@ -307,15 +304,16 @@ function executeTest(db, isMongos) {
         assert.throws(function() {
             t.find().maxTimeMS({}).itcount();
         });
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: 0.1}), ErrorCodes.BadValue);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: 0.1}),
+                                     [ErrorCodes.FailedToParse, ErrorCodes.BadValue]);
         assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: -0.1}),
-                                     ErrorCodes.BadValue);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: undefined}),
-                                     ErrorCodes.BadValue);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: ""}), ErrorCodes.BadValue);
+                                     [ErrorCodes.FailedToParse, ErrorCodes.BadValue]);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: ""}),
+                                     [ErrorCodes.TypeMismatch, ErrorCodes.BadValue]);
         assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: true}),
-                                     ErrorCodes.BadValue);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: {}}), ErrorCodes.BadValue);
+                                     [ErrorCodes.TypeMismatch, ErrorCodes.BadValue]);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: {}}),
+                                     [ErrorCodes.TypeMismatch, ErrorCodes.BadValue]);
 
         // Verify that the server rejects invalid command argument $maxTimeMS.
         assert.commandFailed(t.getDB().runCommand({ping: 1, $maxTimeMS: 0}),

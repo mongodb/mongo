@@ -58,6 +58,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -95,9 +96,6 @@ const std::map<OpType, std::string> kOpTypeNames{{OpType::NONE, "none"},
 const int kNoOptions = 0;
 const int kStartTransactionOption = 1 << 0;
 const int kMultiStatementTransactionOption = 1 << 1;
-
-const BSONObj readConcernSnapshot = BSON("level"
-                                         << "snapshot");
 
 class BenchRunWorkerStateGuard {
     BenchRunWorkerStateGuard(const BenchRunWorkerStateGuard&) = delete;
@@ -242,12 +240,11 @@ int runQueryWithReadCommands(DBClientBase* conn,
                              boost::optional<TxnNumber> txnNumber,
                              std::unique_ptr<FindCommandRequest> findCommand,
                              Milliseconds delayBeforeGetMore,
-                             BSONObj readPrefObj,
                              BSONObj* objOut) {
     const auto dbName = findCommand->getNamespaceOrUUID().dbName();
 
+    BSONObj findCommandObj = findCommand->toBSON();
     BSONObj findCommandResult;
-    BSONObj findCommandObj = findCommand->toBSON(readPrefObj);
     runCommandWithSession(conn,
                           dbName,
                           findCommandObj,
@@ -313,13 +310,8 @@ Timestamp getLatestClusterTime(DBClientBase* conn) {
     invariant(query_request_helper::validateFindCommandRequest(*findCommand));
 
     BSONObj oplogResult;
-    int count = runQueryWithReadCommands(conn,
-                                         boost::none,
-                                         boost::none,
-                                         std::move(findCommand),
-                                         Milliseconds(0),
-                                         BSONObj(),
-                                         &oplogResult);
+    int count = runQueryWithReadCommands(
+        conn, boost::none, boost::none, std::move(findCommand), Milliseconds(0), &oplogResult);
     uassert(ErrorCodes::OperationFailed,
             str::stream() << "Find cmd on the oplog collection failed; reply was: " << oplogResult,
             count == 1);
@@ -676,7 +668,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
                 throw;
             }
 
-            myOp.readPrefObj = ReadPreferenceSetting(mode).toContainingBSON();
+            myOp.readPref = ReadPreferenceSetting(mode);
         } else {
             uassert(34394, str::stream() << "Benchrun op has unsupported field: " << name, false);
         }
@@ -1095,9 +1087,10 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             findCommand->setLimit(1LL);
             findCommand->setSingleBatch(true);
             findCommand->setSort(this->sort);
+            findCommand->setReadPreference(readPref);
 
             if (config.useSnapshotReads) {
-                findCommand->setReadConcern(readConcernSnapshot);
+                findCommand->setReadConcern(repl::ReadConcernArgs::kSnapshot);
             }
             invariant(query_request_helper::validateFindCommandRequest(*findCommand));
 
@@ -1108,13 +1101,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 txnNumberForOp = state->txnNumber;
                 state->inProgressMultiStatementTxn = true;
             }
-            runQueryWithReadCommands(conn,
-                                     lsid,
-                                     txnNumberForOp,
-                                     std::move(findCommand),
-                                     Milliseconds(0),
-                                     readPrefObj,
-                                     &result);
+            runQueryWithReadCommands(
+                conn, lsid, txnNumberForOp, std::move(findCommand), Milliseconds(0), &result);
             LOGV2_DEBUG(22796, 5, "Result from benchRun thread [findOne]", "result"_attr = result);
 
             if (!this->expectedDoc.isEmpty() && this->expectedDoc.woCompare(result) != 0) {
@@ -1190,9 +1178,9 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 findCommand->setSort(this->sort);
             }
 
-            BSONObjBuilder readConcernBuilder;
+            repl::ReadConcernArgs rc;
             if (config.useSnapshotReads) {
-                readConcernBuilder.append("level", "snapshot");
+                rc = repl::ReadConcernArgs::kSnapshot;
             }
             if (this->useAClusterTimeWithinPastSeconds > 0) {
                 invariant(config.useSnapshotReads);
@@ -1200,9 +1188,10 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 // 'useAClusterTimeWithinPastSeconds' in the past.
                 Timestamp atClusterTime = getAClusterTimeSecondsInThePast(
                     conn, state->rng->nextInt32(this->useAClusterTimeWithinPastSeconds));
-                readConcernBuilder.append("atClusterTime", atClusterTime);
+                rc.setArgsAtClusterTimeForSnapshot(atClusterTime);
             }
-            findCommand->setReadConcern(readConcernBuilder.obj());
+            findCommand->setReadConcern(std::move(rc));
+            findCommand->setReadPreference(readPref);
 
             invariant(query_request_helper::validateFindCommandRequest(*findCommand));
 
@@ -1223,7 +1212,6 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                              txnNumberForOp,
                                              std::move(findCommand),
                                              Milliseconds(delayBeforeGetMore),
-                                             readPrefObj,
                                              nullptr);
 
             if (this->expected >= 0 && count != this->expected) {

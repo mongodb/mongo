@@ -129,7 +129,13 @@ public:
           _dbName(request.parseDbName()),
           _verbosity{std::move(verbosity)},
           _innerRequest{std::move(innerRequest)},
-          _innerInvocation{std::move(innerInvocation)} {}
+          _innerInvocation{std::move(innerInvocation)},
+          _genericArgs(
+              GenericArguments::parse(IDLParserContext("explain",
+                                                       _outerRequest->validatedTenancyScope,
+                                                       _outerRequest->getValidatedTenantId(),
+                                                       _outerRequest->getSerializationContext()),
+                                      _outerRequest->body)) {}
 
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
         // Explain is never allowed in multi-document transactions.
@@ -181,6 +187,10 @@ public:
         _innerInvocation->checkAuthorization(opCtx, *_innerRequest);
     }
 
+    const GenericArguments& getGenericArguments() const override {
+        return _genericArgs;
+    }
+
 private:
     const CmdExplain* command() const {
         return static_cast<const CmdExplain*>(definition());
@@ -191,6 +201,7 @@ private:
     ExplainOptions::Verbosity _verbosity;
     std::unique_ptr<OpMsgRequest> _innerRequest;  // Lifespan must enclose that of _innerInvocation.
     std::unique_ptr<CommandInvocation> _innerInvocation;
+    const GenericArguments _genericArgs;
 };
 
 std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
@@ -199,8 +210,10 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
 
     // To enforce API versioning
     auto cmdObj = idl::parseCommandRequest<ExplainCommandRequest>(
-        IDLParserContext(ExplainCommandRequest::kCommandName),
-        APIParameters::get(opCtx).getAPIStrict().value_or(false),
+        IDLParserContext(ExplainCommandRequest::kCommandName,
+                         request.validatedTenancyScope,
+                         request.getValidatedTenantId(),
+                         request.getSerializationContext()),
         request);
     auto const dbName = cmdObj.getDbName();
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();

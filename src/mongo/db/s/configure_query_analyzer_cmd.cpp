@@ -255,7 +255,7 @@ public:
 
             auto writeResult = [&] {
                 if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-                    request.setWriteConcern(WriteConcerns::kMajorityWriteConcernNoTimeout.toBSON());
+                    request.setWriteConcern(WriteConcerns::kMajorityWriteConcernNoTimeout);
 
                     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
                     auto swResponse = configShard->runCommandWithFixedRetryAttempts(
@@ -272,7 +272,7 @@ public:
                 DBDirectClient client(opCtx);
                 // It is illegal to wait for replication while holding a lock so instead wait below
                 // after releasing the lock.
-                request.setWriteConcern(BSONObj());
+                request.setWriteConcern(WriteConcernOptions());
                 return client.findAndModify(request);
             }();
 

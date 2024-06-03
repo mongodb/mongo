@@ -70,7 +70,7 @@ void runCommand(OperationContext* opCtx,
             str::stream() << "Invalid database name: '" << dbname.toStringForErrorMsg() << "'",
             DatabaseName::isValid(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
 
-    const auto apiParamsFromClient = parseAndValidateAPIParameters(request.body, command);
+    const auto apiParamsFromClient = parseAndValidateAPIParameters(*invocation);
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setCommand_inlock(command);

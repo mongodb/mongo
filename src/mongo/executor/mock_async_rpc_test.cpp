@@ -231,8 +231,9 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, OnCommand) {
     getMockRunner().onCommand([&](const RequestInfo& ri) {
         // OperationKey not provided, so internally created OperationKey must be extracted to make
         // this assertion valid
-        ASSERT_BSONOBJ_EQ(hello.toBSON(BSON("clientOperationKey" << getOpKeyFromCommand(ri._cmd))),
-                          ri._cmd);
+        auto expected = hello;
+        hello.setClientOperationKey(getOpKeyFromCommand(ri._cmd));
+        ASSERT_BSONOBJ_EQ(hello.toBSON(), ri._cmd);
         return expectedResultObj;
     });
     ASSERT_BSONOBJ_EQ(responseFut.get().response.toBSON(), helloReply.toBSON());
@@ -256,8 +257,9 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, SyncMockAsyncRPCRunnerWithRetryPolicy)
     initializeCommand(hello);
 
     getMockRunner().onCommand([&](const RequestInfo& ri) {
-        ASSERT_BSONOBJ_EQ(hello.toBSON(BSON("clientOperationKey" << getOpKeyFromCommand(ri._cmd))),
-                          ri._cmd);
+        auto expected = hello;
+        hello.setClientOperationKey(getOpKeyFromCommand(ri._cmd));
+        ASSERT_BSONOBJ_EQ(hello.toBSON(), ri._cmd);
         return expectedResultObj;
     });
     auto net = getNetworkInterfaceMock();
@@ -267,8 +269,9 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, SyncMockAsyncRPCRunnerWithRetryPolicy)
     }
 
     getMockRunner().onCommand([&](const RequestInfo& ri) {
-        ASSERT_BSONOBJ_EQ(hello.toBSON(BSON("clientOperationKey" << getOpKeyFromCommand(ri._cmd))),
-                          ri._cmd);
+        auto expected = hello;
+        hello.setClientOperationKey(getOpKeyFromCommand(ri._cmd));
+        ASSERT_BSONOBJ_EQ(hello.toBSON(), ri._cmd);
         return expectedResultObj;
     });
     ASSERT_BSONOBJ_EQ(responseFut.get().response.toBSON(), helloReply.toBSON());
@@ -483,9 +486,8 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, UnexpectedRequests) {
     ASSERT_EQ(unexpectedRequests.size(), 1);
     HelloCommand hello;
     initializeCommand(hello);
-    ASSERT_BSONOBJ_EQ(unexpectedRequests[0].cmdBSON,
-                      hello.toBSON(BSON("clientOperationKey"
-                                        << getOpKeyFromCommand(unexpectedRequests[0].cmdBSON))));
+    hello.setClientOperationKey(getOpKeyFromCommand(unexpectedRequests[0].cmdBSON));
+    ASSERT_BSONOBJ_EQ(unexpectedRequests[0].cmdBSON, hello.toBSON());
     ASSERT_EQ(unexpectedRequests[0].dbName, "testdb"_sd);
     HostAndPort localhost = HostAndPort("localhost", serverGlobalParams.port);
     ASSERT_EQ(unexpectedRequests[0].target, localhost);

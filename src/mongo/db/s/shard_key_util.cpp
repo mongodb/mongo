@@ -436,12 +436,12 @@ void ValidationBehaviorsShardCollection::verifyCanCreateShardKeyIndex(const Name
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
     FindCommandRequest findCommand(nss);
     findCommand.setLimit(1);
-    findCommand.setReadConcern(readConcern.toBSONInner());
+    findCommand.setReadConcern(readConcern);
     Shard::QueryResponse response = uassertStatusOK(
         _dataShard->runExhaustiveCursorCommand(_opCtx,
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                                nss.dbName(),
-                                               findCommand.toBSON(BSONObj()),
+                                               findCommand.toBSON(),
                                                Milliseconds(-1)));
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "Please create an index that starts with the proposed shard key before"

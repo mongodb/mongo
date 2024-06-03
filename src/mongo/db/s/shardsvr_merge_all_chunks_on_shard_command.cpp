@@ -42,6 +42,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -104,15 +105,15 @@ public:
             configSvrCommitMergeAllChunksOnShard.setShard(request().getShard());
             configSvrCommitMergeAllChunksOnShard.setMaxNumberOfChunksToMerge(
                 request().getMaxNumberOfChunksToMerge());
+            configSvrCommitMergeAllChunksOnShard.setWriteConcern(
+                generic_argument_util::kMajorityWriteConcern);
 
             auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto swCommandResponse = config->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 DatabaseName::kAdmin,
-                configSvrCommitMergeAllChunksOnShard.toBSON(
-                    BSON(WriteConcernOptions::kWriteConcernField
-                         << ShardingCatalogClient::kMajorityWriteConcern.toBSON())),
+                configSvrCommitMergeAllChunksOnShard.toBSON(),
                 Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swCommandResponse));

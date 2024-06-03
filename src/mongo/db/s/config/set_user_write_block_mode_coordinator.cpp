@@ -42,6 +42,7 @@
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -88,13 +89,14 @@ void sendSetUserWriteBlockModeCmdToAllShards(OperationContext* opCtx,
                                              const OperationSessionInfo& osi) {
     const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
-    const auto shardsvrSetUserWriteBlockModeCmd =
-        makeShardsvrSetUserWriteBlockModeCommand(block, phase);
+    auto shardsvrSetUserWriteBlockModeCmd = makeShardsvrSetUserWriteBlockModeCommand(block, phase);
+
+    generic_argument_util::setOperationSessionInfo(shardsvrSetUserWriteBlockModeCmd, osi);
+    generic_argument_util::setMajorityWriteConcern(shardsvrSetUserWriteBlockModeCmd);
 
     sharding_util::sendCommandToShards(opCtx,
                                        shardsvrSetUserWriteBlockModeCmd.getDbName(),
-                                       CommandHelpers::appendMajorityWriteConcern(
-                                           shardsvrSetUserWriteBlockModeCmd.toBSON(osi.toBSON())),
+                                       shardsvrSetUserWriteBlockModeCmd.toBSON(),
                                        allShards,
                                        executor);
 }

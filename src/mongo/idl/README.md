@@ -202,17 +202,19 @@ Commands are part of the MongoDB RPC protocol. As such, commands have special ru
 field of the command must be its name. IDL supports the unique needs of commands with additional
 fields on the `commands` object.
 
-The special features of commands:
+The special features/requirements of commands:
 
-1. First element must match the name of the command
+1. First element must match the name of the command, and the parsing rules of this element
+   can be customized via the `namespace` field.
 2. In `OP_MSG`, `$db` must be present or defaults to `admin`
 3. Commands may have a `struct` as a reply
 4. Commands may be a part of API Version 1
-5. Commands and command replies ignore the generic arguments fields like `$db`, `comment`, `ok`, etc
-   during parsing. The list of these fields is in [`generic_arguments.idl`](generic_argument.idl).
-   Even if a `command` is marked as `strict: true` these generic arguments are ignored by IDL
-   parsers. These fields are parsed by common request and reply parsing code in
-   `service_entry_point_common.cpp`.
+5. Any structs marked with `is_generic_cmd_list: "arg"` that are in imported IDL files
+   will automatically be chained to all commands. The IDL compiler imports
+   [`generic_argument.idl`](generic_argument.idl) by default, so any generic argument struct
+   defined in that file will be chained to all commands by default.
+6. Command replies ignore the generic arguments fields like `$clusterTime`, `ok`, etc
+   during parsing. The list of these fields is in [`generic_argument.idl`](generic_argument.idl).
 
 Example Command:
 
@@ -260,13 +262,6 @@ commands:
       encryptionType:
         type: string
 ```
-
-Commands have a few unique features compared to structs:
-
-1. Generic fields like `comment` and `$db` are implicitly ignored during parsing. The list of these
-   fields is in [`generic_arguments.idl`](generic_argument.idl).
-2. The generated code has a method `const NamespaceString getNamespace()` to get the target of the
-   command.
 
 To see how to integrate a command IDL file in SCons, see the example above for structs.
 
@@ -744,7 +739,8 @@ is not affected as this option is only syntactic sugar.
   `is_command_reply` generates a parser that ignores known generic or common fields across all
   replies when parsing replies (i.e. `ok`, `errmsg`, etc)
 - `is_generic_cmd_list` - string - choice [`arg`, `reply`], if set, generates functions `bool
-hasField(StringData)` and `bool shouldForwardToShards(StringData)` for each field in the struct
+hasField(StringData)` and `bool shouldForwardToShards(StringData)` for each field in the
+  struct. If set to `arg`, the struct will automatically be chained to every `command`.
 - `query_shape_component` - bool - true indicates this special serialization code will be generated
   to serialize as a query shape
 - `unsafe_dangerous_disable_extra_field_duplicate_checks` - bool - undocumented, DO NOT USE
@@ -810,11 +806,17 @@ the `command` object when compared to `struct`.
 
 The special features:
 
-1. First element must match the name of the command
+1. First element must match the name of the command, and the parsing rules of this element
+   can be customized via the `namespace` field.
 2. In `OP_MSG`, `$db` must be present or defaults to `admin`
 3. Commands may have a `struct` as a reply
 4. Commands may be a part of API Version 1
-5. Commands and command replies ignore the generic arguments fields like `$db`, `comment`, `ok`, etc
+5. Any structs marked with `is_generic_cmd_list: "arg"` that are in imported IDL files
+   will automatically be chained to all commands. The IDL compiler imports
+   [`generic_argument.idl`](generic_argument.idl) by default, so any generic argument struct
+   defined in that file will be chained to all commands by default.
+6. Command replies ignore the generic arguments fields like `$clusterTime`, `ok`, etc
+   during parsing. The list of these fields is in [`generic_argument.idl`](generic_argument.idl).
 
 The `namespace` field is the field that describes one kind of parameter a command takes.
 

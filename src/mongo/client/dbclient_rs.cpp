@@ -514,8 +514,7 @@ std::unique_ptr<DBClientCursor> DBClientReplicaSet::find(FindCommandRequest find
                                                          const ReadPreferenceSetting& readPref,
                                                          ExhaustMode exhaustMode) {
     invariant(findRequest.getNamespaceOrUUID().isNamespaceString());
-    if (_isSecondaryQuery(
-            findRequest.getNamespaceOrUUID().nss(), findRequest.toBSON(BSONObj{}), readPref)) {
+    if (_isSecondaryQuery(findRequest.getNamespaceOrUUID().nss(), findRequest.toBSON(), readPref)) {
         LOGV2_DEBUG(5951202,
                     3,
                     "dbclient_rs query using secondary or tagged node selection",

@@ -48,6 +48,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -190,6 +191,11 @@ void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
     // Unset error details because they will be repopulated below.
     response->unsetErrDetails();
 
+    // Strip out any transaction-related arguments specified in the original request before running
+    // it in an internal transaction.
+    generic_argument_util::prepareRequestForInternalTransactionPassthrough(
+        request->getGenericArguments());
+
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
 
@@ -204,7 +210,9 @@ void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
         NamespaceString nss;
         BSONObj response;
     };
-    BSONObjBuilder cmdWithStmtId(request->toBSON());
+
+    BSONObjBuilder cmdWithStmtId(
+        CommandHelpers::filterCommandRequestForPassthrough(request->toBSON()));
     cmdWithStmtId.append(write_ops::WriteCommandRequestBase::kStmtIdFieldName, 0);
     auto sharedBlock = std::make_shared<SharedBlock>(cmdWithStmtId.obj(), request->getNS());
 
@@ -256,7 +264,6 @@ struct UpdateShardKeyResult {
 
 UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
     OperationContext* opCtx,
-    BatchedCommandRequest* request,
     const NamespaceString& nss,
     BatchedCommandResponse* response,
     const WouldChangeOwningShardInfo& changeInfo) {
@@ -324,7 +331,7 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         if (txnRouter) {
             auto updateResult = handleWouldChangeOwningShardErrorTransaction(
-                opCtx, request, nss, response, *wouldChangeOwningShardErrorInfo);
+                opCtx, nss, response, *wouldChangeOwningShardErrorInfo);
             updatedShardKey = updateResult.updatedShardKey;
             upsertedId = std::move(updateResult.upsertedId);
         } else {

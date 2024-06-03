@@ -349,7 +349,7 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
     // so send it with the uninitialized sentinel statement id to opt out of storing history.
     return txnClient.runCRUDOp(deleteRequest, {kUninitializedStmtId})
         .thenRunOn(txnExec)
-        .then([&txnClient, &nss, &changeInfo, fleCrudProcessed, &vts](
+        .then([&txnClient, &nss, &changeInfo, fleCrudProcessed, vts](
                   auto deleteResponse) -> SemiFuture<BatchedCommandResponse> {
             uassertStatusOK(deleteResponse.toStatus());
 
@@ -376,7 +376,7 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
             auto insertCmdObj = documentShardKeyUpdateUtil::constructShardKeyInsertCmdObj(
                 nss, changeInfo.getPostImage().getOwned(), fleCrudProcessed);
             auto insertOpMsg =
-                OpMsgRequestBuilder::create(vts, nss.dbName(), std::move(insertCmdObj));
+                OpMsgRequestBuilder::create(std::move(vts), nss.dbName(), std::move(insertCmdObj));
             auto insertRequest = BatchedCommandRequest::parseInsert(std::move(insertOpMsg));
 
             // Same as for the insert, retry history isn't necessary so opt out with a sentinel

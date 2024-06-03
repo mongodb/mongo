@@ -69,11 +69,14 @@ env.SConscript(
 env.Library(
     target="server_base",
     source=[
-        "$BUILD_DIR/mongo/idl/command_generic_argument.cpp",
-        "$BUILD_DIR/mongo/idl/generic_argument.idl",
         "$BUILD_DIR/mongo/client/hedging_mode.idl",
+        "$BUILD_DIR/mongo/client/read_preference.cpp",
         "$BUILD_DIR/mongo/client/read_preference.idl",
+        "$BUILD_DIR/mongo/client/read_preference_setting.idl",
         "$BUILD_DIR/mongo/client/read_preference_validators.cpp",
+        "$BUILD_DIR/mongo/idl/command_generic_argument.cpp",
+        "$BUILD_DIR/mongo/idl/generic_argument.cpp",
+        "$BUILD_DIR/mongo/idl/generic_argument.idl",
         "$BUILD_DIR/mongo/rpc/metadata/impersonated_user_metadata.idl",
         "$BUILD_DIR/mongo/s/chunk_version.cpp",
         "$BUILD_DIR/mongo/s/chunk_version.idl",
@@ -98,6 +101,7 @@ env.Library(
         "feature_compatibility_version_document.idl",
         "feature_compatibility_version_parser.cpp",
         "feature_flag.cpp",
+        "generic_argument_util.cpp",
         "index_names.cpp",
         "keypattern.cpp",
         "logical_time.cpp",
@@ -106,6 +110,8 @@ env.Library(
         "read_write_concern_provenance.cpp",
         "read_write_concern_provenance_base.idl",
         "repl/read_concern.idl",
+        "repl/read_concern_args.cpp",
+        "repl/read_concern_args.idl",
         "repl/read_concern_idl.cpp",
         "server_options.cpp",
         "server_parameter.cpp",
@@ -931,6 +937,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/admission/execution_admission_context",
         "$BUILD_DIR/mongo/db/admission/ingress_admission_context",
         "$BUILD_DIR/mongo/db/query/cursor_response_idl",
+        "$BUILD_DIR/mongo/rpc/rpc",
         "api_parameters",
         "server_base",
     ],
@@ -938,7 +945,6 @@ env.Library(
         "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
         "$BUILD_DIR/mongo/rpc/command_status",
         "$BUILD_DIR/mongo/rpc/rewrite_state_change_errors",
-        "$BUILD_DIR/mongo/rpc/rpc",
         "$BUILD_DIR/mongo/transport/service_executor",
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
         "$BUILD_DIR/mongo/util/diagnostic_info"
@@ -1281,22 +1287,6 @@ env.Library(
 )
 
 env.Library(
-    target="service_request_common",
-    source=[
-        "common_request_args.idl",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/query/query_request",
-        "$BUILD_DIR/mongo/db/session/logical_session_id",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-        "$BUILD_DIR/mongo/s/common_s",
-        "api_parameters",
-        "vector_clock",
-    ],
-)
-
-env.Library(
     target="service_entry_point_common",
     source=[
         "service_entry_point_common.cpp",
@@ -1327,7 +1317,6 @@ env.Library(
         "repl/tenant_migration_access_blocker",
         "rw_concern_d",
         "server_feature_flags",
-        "service_request_common",
         "session/session_catalog_mongod",
         "shared_request_handling",
         "stats/api_version_metrics",

@@ -213,6 +213,11 @@ class SymbolTable(object):
                 struct.imported = True
                 self.structs.append(struct)
 
+                if struct.is_generic_cmd_list == "arg":
+                    self.add_generic_argument_list(struct)
+                elif struct.is_generic_cmd_list == "reply":
+                    self.add_generic_reply_field_list(struct)
+
         for idl_enum in imported_symbols.enums:
             if not self._is_duplicate(ctxt, idl_enum, idl_enum.name, "enum"):
                 idl_enum.imported = True

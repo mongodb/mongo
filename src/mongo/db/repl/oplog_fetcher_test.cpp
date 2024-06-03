@@ -874,7 +874,7 @@ TEST_F(OplogFetcherTest,
     ASSERT_BSONOBJ_EQ(BSON("level"
                            << "local"
                            << "afterClusterTime" << Timestamp(0, 1)),
-                      *readConcern);
+                      readConcern->toBSONInner());
 
     auto term = findCmdRequest.getTerm();
     ASSERT(term);
@@ -902,7 +902,7 @@ TEST_F(OplogFetcherTest,
     ASSERT_BSONOBJ_EQ(BSON("level"
                            << "local"
                            << "afterClusterTime" << Timestamp(0, 1)),
-                      *readConcern);
+                      readConcern->toBSONInner());
 
     auto term = findCmdRequest.getTerm();
     ASSERT(!term);

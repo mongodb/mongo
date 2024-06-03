@@ -47,14 +47,14 @@ bool WriteBlockBypass::isWriteBlockBypassEnabled() const {
     return _writeBlockBypassEnabled;
 }
 
-void WriteBlockBypass::setFromMetadata(OperationContext* opCtx, const BSONElement& elem) {
+void WriteBlockBypass::setFromMetadata(OperationContext* opCtx, boost::optional<bool> val) {
     // If we are in direct client, the bypass state should already be set by the initial call of
     // setFromMetadata.
     if (opCtx->getClient()->isInDirectClient()) {
         return;
     }
     auto as = AuthorizationSession::get(opCtx->getClient());
-    if (elem) {
+    if (val.has_value()) {
         // If the mayBypassWriteBlocking field is set, then (after ensuring the client is
         // authorized) set our state from that field.
         uassert(
@@ -62,7 +62,7 @@ void WriteBlockBypass::setFromMetadata(OperationContext* opCtx, const BSONElemen
             "Client is not properly authorized to propagate mayBypassWriteBlocking",
             as->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(as->getUserTenantId()), ActionType::internal));
-        set(elem.Bool());
+        set(*val);
     } else {
         // Otherwise, set our state based on the AuthorizationSession state.
         set(as->mayBypassWriteBlockingMode());

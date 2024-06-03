@@ -69,12 +69,30 @@ auto getOpAsBson(const BatchItemRef& op) {
     }
 }
 
+// Prevents arguments from the user's original request from being incorrectly included in the
+// multi-update's inner command to be executed by the shard(s). As an example, this ensures a
+// { w: 0 } write concern specified on the original request will not interfere with the router's
+// ability to receive responses from the shard(s).
+//
+// This currently just drops all of the generic arguments.
+void filterRequestGenericArguments(GenericArguments& args) {
+    args = {};
+}
+
+// Serializes the batched request's underlying command request to BSON, dropping all generic
+// arguments.
 auto getRequestBson(const BatchedCommandRequest& clientRequest) {
     switch (clientRequest.getBatchType()) {
-        case BatchedCommandRequest::BatchType_Update:
-            return clientRequest.getUpdateRequest().toBSON();
-        case BatchedCommandRequest::BatchType_Delete:
-            return clientRequest.getDeleteRequest().toBSON();
+        case BatchedCommandRequest::BatchType_Update: {
+            auto req = clientRequest.getUpdateRequest();
+            filterRequestGenericArguments(req.getGenericArguments());
+            return req.toBSON();
+        }
+        case BatchedCommandRequest::BatchType_Delete: {
+            auto req = clientRequest.getDeleteRequest();
+            filterRequestGenericArguments(req.getGenericArguments());
+            return req.toBSON();
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -102,6 +120,10 @@ BSONObj makeCommandForOp(BatchWriteOp& batchOp,
 
 BSONObj makeCommandForOp(bulk_write_exec::BulkWriteOp& bulkWriteOp,
                          const BulkWriteCRUDOp& bulkCrudOp) {
+    // Drop generic arguments not intended to be forwarded in the body of a
+    // _shardsvrCoordinateMultiUpdate command.
+    auto req = bulkWriteOp.getClientRequest();
+    filterRequestGenericArguments(req.getGenericArguments());
     return bulkWriteOp.getClientRequest().toBSON().addField(
         BSON("ops" << BSON_ARRAY(bulkCrudOp.toBSON())).firstElement());
 }

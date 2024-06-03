@@ -133,9 +133,17 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     }
 
     if (_activeMoveChunkState) {
-        auto activeMoveChunkStateBSON = _activeMoveChunkState->args.toBSON();
+        auto moveChunkStateToBSON = [](ShardsvrMoveRange mr) {
+            // Reset the generic args so that the comparison below only considers
+            // shardSvrModeRange-specific fields.
+            mr.setGenericArguments({});
+            return mr.toBSON();
+        };
 
-        if (activeMoveChunkStateBSON.woCompare(args.toBSON()) == 0) {
+        auto activeMoveChunkStateBSON = moveChunkStateToBSON(_activeMoveChunkState->args);
+        auto argsBSON = moveChunkStateToBSON(args);
+
+        if (activeMoveChunkStateBSON.woCompare(argsBSON) == 0) {
             LOGV2(6386800,
                   "Registering new chunk donation",
                   logAttrs(args.getCommandParameter()),
@@ -149,7 +157,7 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
               "Rejecting donate chunk due to conflicting migration in progress",
               logAttrs(args.getCommandParameter()),
               "runningMigration"_attr = activeMoveChunkStateBSON,
-              "requestedMigration"_attr = args.toBSON());
+              "requestedMigration"_attr = argsBSON);
 
         return _activeMoveChunkState->constructErrorStatus();
     }

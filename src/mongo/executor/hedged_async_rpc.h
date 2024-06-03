@@ -119,8 +119,7 @@ void killOperations(ServiceContext* svcCtx,
         std::move(exec),
         CancellationToken::uncancelable(),
         std::move(cmd),
-        std::make_shared<NeverRetryPolicy>(),
-        GenericArguments());
+        std::make_shared<NeverRetryPolicy>());
     for (const auto& target : targets) {
         LOGV2_DEBUG(7301601,
                     2,
@@ -156,7 +155,6 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     std::unique_ptr<Targeter> targeter,
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
     ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-    GenericArguments genericArgs = GenericArguments(),
     BatonHandle baton = nullptr) {
     using SingleResponse = AsyncRPCResponse<typename CommandType::Reply>;
 
@@ -169,8 +167,8 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     auto proxyExec = std::make_shared<detail::ProxyingExecutor>(exec, baton);
     auto tryBody = [=, targeter = std::move(targeter)]() mutable {
         HedgeOptions opts = getHedgeOptions(CommandType::kCommandName, readPref);
-        auto operationKey =
-            hedging_rpc_details::getOrCreateOperationKey(opts.isHedgeEnabled, genericArgs);
+        auto operationKey = hedging_rpc_details::getOrCreateOperationKey(opts.isHedgeEnabled,
+                                                                         cmd.getGenericArguments());
 
         return targeter->resolve(token)
             .thenRunOn(proxyExec)
@@ -214,8 +212,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                         exec,
                         hedgeCancellationToken.token(),
                         cmd,
-                        std::make_shared<NeverRetryPolicy>(),
-                        genericArgs);
+                        std::make_shared<NeverRetryPolicy>());
 
                     // If the request is a hedged request, set maxTimeMSOpOnly to the smaller of
                     // the server parameter maxTimeMSForHedgedReads or remaining max time from the
@@ -229,7 +226,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                             }
                         }
 
-                        options->genericArgs.setMaxTimeMSOpOnly(maxTimeMSOpOnly);
+                        options->cmd.getGenericArguments().setMaxTimeMSOpOnly(maxTimeMSOpOnly);
                     }
 
                     options->baton = baton;

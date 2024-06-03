@@ -81,7 +81,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
         }
         auto host = std::move(swHost.getValue());
         executor::RemoteCommandRequest request(
-            host, DatabaseName::kAdmin, listDbCommand.toBSON(BSONObj()), opCtx);
+            host, DatabaseName::kAdmin, listDbCommand.toBSON(), opCtx);
 
         executor::RemoteCommandResponse response =
             Status(ErrorCodes::InternalError, "Internal error running command");
@@ -123,7 +123,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
             shard->runCommand(opCtx,
                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                               DatabaseName::kAdmin,
-                              listDbCommand.toBSON(BSONObj()),
+                              listDbCommand.toBSON(),
                               Shard::RetryPolicy::kIdempotent);
         if (!swListDbResponse.isOK()) {
             return swListDbResponse.getStatus();

@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters_gen.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -47,9 +48,8 @@ class OperationContext;
  * Validates the provided API parameters, unless not required for the specified command,
  * and throws if the validation fails.
  */
-void validateAPIParameters(const BSONObj& requestBody,
-                           const APIParametersFromClient& apiParamsFromClient,
-                           Command* command);
+void validateAPIParameters(const CommandInvocation& invocation);
+APIParametersFromClient parseAndValidateAPIParameters(const CommandInvocation& invocation);
 
 template <typename StringType>
 int getAPIVersion(StringType apiVersion, bool allowTestVersion) {
@@ -62,8 +62,6 @@ int getAPIVersion(StringType apiVersion, bool allowTestVersion) {
         uasserted(ErrorCodes::APIVersionError, "API version must be \"1\"");
     }
 }
-
-APIParametersFromClient parseAndValidateAPIParameters(const BSONObj& requestBody, Command* command);
 
 /**
  * If the server parameter "requireApiVersion" is set, enforce it.

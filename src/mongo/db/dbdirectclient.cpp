@@ -223,8 +223,8 @@ long long DBDirectClient::count(const NamespaceStringOrUUID nsOrUuid,
                                 int options,
                                 int limit,
                                 int skip,
-                                boost::optional<BSONObj> readConcernObj) {
-    invariant(!readConcernObj,
+                                boost::optional<repl::ReadConcernArgs> readConcern) {
+    invariant(!readConcern,
               "passing readConcern to DBDirectClient functions is not supported as it has to use "
               "the parent operation's readConcern");
     BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip, boost::none);

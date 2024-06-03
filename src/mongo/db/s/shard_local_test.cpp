@@ -112,10 +112,8 @@ protected:
         findAndModifyRequest.setUpdate(write_ops::UpdateModification::parseFromClassicUpdate(set));
         findAndModifyRequest.setUpsert(true);
         findAndModifyRequest.setNew(true);
-        findAndModifyRequest.setWriteConcern(
-            WriteConcernOptions(
-                WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(15))
-                .toBSON());
+        findAndModifyRequest.setWriteConcern(WriteConcernOptions(
+            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(15)));
 
         return _shardLocal->runCommandWithFixedRetryAttempts(
             _opCtx.get(),

@@ -120,7 +120,7 @@ public:
         }
 
         NamespaceString ns() const override {
-            return NamespaceString::kEmpty;
+            return NamespaceString(request().getDbName());
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

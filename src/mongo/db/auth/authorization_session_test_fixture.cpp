@@ -147,8 +147,7 @@ AggregateCommandRequest AuthorizationSessionTestFixture::buildAggReq(const Names
         BSON("aggregate" << nss.coll() << "pipeline" << pipeline << "cursor" << BSONObj() << "$db"
                          << nss.db_forTest()),
         makeVTS(nss),
-        boost::none,
-        false /* apiStrict */));
+        boost::none));
 }
 
 AggregateCommandRequest AuthorizationSessionTestFixture::buildAggReq(const NamespaceString& nss,
@@ -159,8 +158,7 @@ AggregateCommandRequest AuthorizationSessionTestFixture::buildAggReq(const Names
                          << "bypassDocumentValidation" << bypassDocValidation << "$db"
                          << nss.db_forTest()),
         makeVTS(nss),
-        boost::none,
-        false /* apiStrict */));
+        boost::none));
 }
 
 }  // namespace mongo

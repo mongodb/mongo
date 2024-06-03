@@ -40,44 +40,30 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 namespace mongo {
 namespace repl {
-namespace {
-
-const OperationContext::Decoration<ReadConcernArgs> handle =
-    OperationContext::declareDecoration<ReadConcernArgs>();
-
-}  // namespace
-
-ReadConcernArgs& ReadConcernArgs::get(OperationContext* opCtx) {
-    return handle(opCtx);
-}
-
-const ReadConcernArgs& ReadConcernArgs::get(const OperationContext* opCtx) {
-    return handle(opCtx);
-}
 
 // The "kImplicitDefault" read concern, used by internal operations, is deliberately empty (no
 // 'level' specified). This allows internal operations to specify a read concern, while still
 // allowing it to be either local or available on sharded secondaries.
-const BSONObj ReadConcernArgs::kImplicitDefault;
-
+const ReadConcernArgs ReadConcernArgs::kImplicitDefault;
 // The "kLocal" read concern just specifies that the read concern is local. This is used for
 // internal operations intended to be run only on a certain target cluster member.
-const BSONObj ReadConcernArgs::kLocal =
-    BSON(kLevelFieldName << readConcernLevels::toString(ReadConcernLevel::kLocalReadConcern));
+const ReadConcernArgs ReadConcernArgs::kLocal(ReadConcernLevel::kLocalReadConcern);
+const ReadConcernArgs ReadConcernArgs::kMajority(ReadConcernLevel::kMajorityReadConcern);
+const ReadConcernArgs ReadConcernArgs::kAvailable(ReadConcernLevel::kAvailableReadConcern);
+const ReadConcernArgs ReadConcernArgs::kLinearizable(ReadConcernLevel::kLinearizableReadConcern);
+const ReadConcernArgs ReadConcernArgs::kSnapshot(ReadConcernLevel::kSnapshotReadConcern);
 
 ReadConcernArgs::ReadConcernArgs() : _specified(false) {}
 

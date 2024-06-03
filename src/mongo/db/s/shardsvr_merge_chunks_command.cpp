@@ -54,6 +54,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/active_migrations_registry.h"
@@ -93,14 +94,14 @@ Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
     ConfigSvrMergeChunks request{nss, shardingState->shardId(), metadata.getUUID(), chunkRange};
     request.setEpoch(epoch);
     request.setTimestamp(timestamp);
+    request.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
 
     auto cmdResponse =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,
-            request.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                << ShardingCatalogClient::kMajorityWriteConcern.toBSON())),
+            request.toBSON(),
             Shard::RetryPolicy::kIdempotent));
 
     return cmdResponse;

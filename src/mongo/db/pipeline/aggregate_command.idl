@@ -223,20 +223,9 @@ commands:
                 type: aggregateCursor
                 default: SimpleCursorOptions()
                 stability: stable
-            maxTimeMS:
-                description: "Specifies a time limit in milliseconds for processing operations on a cursor. If you do not specify a value for maxTimeMS, operations will not time out."
-                type: safeInt64
-                validator: { gte: 0 }
-                optional: true
-                stability: stable
             bypassDocumentValidation:
                 description: "True if this should bypass the document validation."
                 type: safeBool
-                optional: true
-                stability: stable
-            readConcern:
-                description: "Specifies the read concern."
-                type: object_owned
                 optional: true
                 stability: stable
             collation:
@@ -254,11 +243,6 @@ commands:
               type: QuerySettings
               optional: true
               stability: unstable
-            writeConcern:
-                description: "A document that expresses the write concern to use with the $out or $merge stage."
-                type: WriteConcern
-                optional: true
-                stability: stable
             let:
                 description: "A document containing user-specified let parameter constants; i.e. values that do not change once computed."
                 type: object_owned
@@ -272,12 +256,6 @@ commands:
                 description: "True if this request originated from a mongoS."
                 type: optionalBool
                 stability: internal
-            $queryOptions:
-                description: "The unwrapped readPreference object, if one was given to us by the mongos command processor. This object will be empty when no readPreference is specified or if the request does not originate from mongos."
-                cpp_name: unwrappedReadPref
-                type: object_owned
-                optional: true
-                stability: unstable
             $_requestReshardingResumeToken:
                 description: "True if this requests resharding resume token."
                 cpp_name: requestReshardingResumeToken

@@ -157,11 +157,12 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
     if (findCommand.getQuerySettings()) {
         result.setQuerySettings(findCommand.getQuerySettings());
     }
-    if (findCommand.getReadConcern()) {
-        result.setReadConcern(findCommand.getReadConcern()->getOwned());
+    if (auto& rc = findCommand.getReadConcern()) {
+        result.setReadConcern(rc);
     }
-    if (!findCommand.getUnwrappedReadPref().isEmpty()) {
-        result.setUnwrappedReadPref(findCommand.getUnwrappedReadPref().getOwned());
+
+    if (auto& rp = findCommand.getUnwrappedReadPref(); rp && !rp->isEmpty()) {
+        result.setUnwrappedReadPref(rp);
     }
     if (findCommand.getAllowDiskUse().has_value()) {
         result.setAllowDiskUse(findCommand.getAllowDiskUse());

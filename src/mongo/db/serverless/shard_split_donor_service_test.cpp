@@ -170,8 +170,14 @@ public:
         return true;
     }
 
+    const GenericArguments& getGenericArguments() const override {
+        return _args;
+    }
+
 private:
     void doCheckAuthorization(OperationContext* opCtx) const final {}
+
+    GenericArguments _args;
 };
 
 class MockReplReconfigCommand : public Command {

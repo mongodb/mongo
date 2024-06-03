@@ -192,7 +192,6 @@ void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
 LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
 
-    bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
     auto send = [&](BSONObj toSend) -> BSONObj {
         // If there is no '$db', append it.
         toSend = OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
@@ -203,8 +202,7 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
             query_request_helper::makeFromFindCommand(toSend,
                                                       auth::ValidatedTenancyScope::get(opCtx),
                                                       boost::none,
-                                                      SerializationContext::stateDefault(),
-                                                      apiStrict);
+                                                      SerializationContext::stateDefault());
         auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = makeExpressionContext(opCtx, *findCommand),
             .parsedFind = ParsedFindCommandParams{

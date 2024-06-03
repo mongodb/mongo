@@ -711,7 +711,7 @@ Status ReplicationCoordinatorMock::processReplSetRequestVotes(
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::prepareReplMetadata(const CommonRequestArgs& requestArgs,
+void ReplicationCoordinatorMock::prepareReplMetadata(const GenericArguments& genericArgs,
                                                      const OpTime& lastOpTimeFromClient,
                                                      BSONObjBuilder* builder) const {}
 

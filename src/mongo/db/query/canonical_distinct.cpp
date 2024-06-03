@@ -56,7 +56,6 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/max_time_ms_parser.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/idl/idl_parser.h"
@@ -248,14 +247,13 @@ StatusWith<BSONObj> CanonicalDistinct::asAggregationCommand() const {
         aggregationBuilder.append(query_request_helper::cmdOptionMaxTimeMS, maxTimeMS);
     }
 
-    if (findCommand.getReadConcern() && !findCommand.getReadConcern()->isEmpty()) {
-        aggregationBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName,
-                                  *findCommand.getReadConcern());
+    if (auto rc = findCommand.getReadConcern(); rc && !rc->isEmpty()) {
+        aggregationBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, rc->toBSONInner());
     }
 
-    if (!findCommand.getUnwrappedReadPref().isEmpty()) {
+    if (findCommand.getUnwrappedReadPref() && !findCommand.getUnwrappedReadPref()->isEmpty()) {
         aggregationBuilder.append(query_request_helper::kUnwrappedReadPrefField,
-                                  findCommand.getUnwrappedReadPref());
+                                  *findCommand.getUnwrappedReadPref());
     }
 
     // Specify the 'cursor' option so that aggregation uses the cursor interface.
@@ -279,17 +277,17 @@ CanonicalDistinct CanonicalDistinct::parse(const boost::intrusive_ptr<Expression
     }
     findRequest->setProjection(getDistinctProjection(std::string(distinctRequest.getKey())));
     findRequest->setHint(distinctRequest.getHint().getOwned());
-    if (auto rc = parsedDistinct->readConcern) {
-        findRequest->setReadConcern(rc->getOwned());
+    if (auto& rc = distinctRequest.getReadConcern()) {
+        findRequest->setReadConcern(rc);
     }
-    if (parsedDistinct->maxTimeMS) {
-        findRequest->setMaxTimeMS(*parsedDistinct->maxTimeMS);
+    if (auto maxTimeMS = distinctRequest.getMaxTimeMS()) {
+        findRequest->setMaxTimeMS(maxTimeMS);
     }
     if (auto collation = distinctRequest.getCollation()) {
         findRequest->setCollation(collation.get().getOwned());
     }
-    if (parsedDistinct->queryOptions) {
-        findRequest->setUnwrappedReadPref(*parsedDistinct->queryOptions);
+    if (auto& queryOptions = distinctRequest.getUnwrappedReadPref()) {
+        findRequest->setUnwrappedReadPref(queryOptions->getOwned());
     }
 
     auto parsedFind = uassertStatusOK(

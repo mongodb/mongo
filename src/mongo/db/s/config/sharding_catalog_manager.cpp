@@ -60,6 +60,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -194,11 +195,8 @@ void startTransactionWithNoopFind(OperationContext* opCtx,
     findCommand.setBatchSize(0);
     findCommand.setSingleBatch(true);
 
-    auto res = runCommandInLocalTxn(opCtx,
-                                    nss.dbName(),
-                                    true /*startTransaction*/,
-                                    txnNumber,
-                                    findCommand.toBSON(BSONObj()))
+    auto res = runCommandInLocalTxn(
+                   opCtx, nss.dbName(), true /*startTransaction*/, txnNumber, findCommand.toBSON())
                    .body;
     uassertStatusOK(getStatusFromCommandResult(res));
 }
@@ -1042,9 +1040,9 @@ Status ShardingCatalogManager::_notifyClusterOnNewDatabases(
         // Compose the request and decorate it with the needed write concern and auth parameters.
         ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kDatabasesAdded,
                                                    event.toBSON());
+        request.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
         BSONObjBuilder bob;
-        request.serialize(
-            &bob, BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+        request.serialize(&bob);
         rpc::writeAuthDataToImpersonatedUserMetadata(altOpCtx, &bob);
 
         // send cmd
@@ -1173,11 +1171,8 @@ boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
     findCommand.setSingleBatch(true);
     findCommand.setLimit(1);
 
-    auto res = runCommandInLocalTxn(opCtx,
-                                    nss.dbName(),
-                                    false /*startTransaction*/,
-                                    txnNumber,
-                                    findCommand.toBSON(BSONObj()))
+    auto res = runCommandInLocalTxn(
+                   opCtx, nss.dbName(), false /*startTransaction*/, txnNumber, findCommand.toBSON())
                    .body;
     uassertStatusOK(getStatusFromCommandResult(res));
 
@@ -1381,13 +1376,13 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
             entry.setMulti(true);
             return entry;
         }()});
+        deleteOp.setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
 
         uassertStatusOK(_localConfigShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             NamespaceString::kConfigsvrPlacementHistoryNamespace.dbName(),
-            deleteOp.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                 << ShardingCatalogClient::kLocalWriteConcern.toBSON())),
+            deleteOp.toBSON(),
             Shard::RetryPolicy::kNotIdempotent));
 
         const auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
@@ -1452,7 +1447,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
         aggRequest.setUnwrappedReadPref({});
         repl::ReadConcernArgs readConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         readConcernArgs.setArgsAtClusterTimeForSnapshot(initializationTime);
-        aggRequest.setReadConcern(readConcernArgs.toBSONInner());
+        aggRequest.setReadConcern(readConcernArgs);
         aggRequest.setWriteConcern({});
         auto noopCallback = [](const std::vector<BSONObj>& batch,
                                const boost::optional<BSONObj>& postBatchResumeToken) {
@@ -1533,7 +1528,7 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
     auto aggRequest = pipeline.buildAsAggregateCommandRequest();
 
     repl::ReadConcernArgs readConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-    aggRequest.setReadConcern(readConcernArgs.toBSONInner());
+    aggRequest.setReadConcern(readConcernArgs);
 
     /*
      * 2.2 For each namespace found, compose a delete statement.

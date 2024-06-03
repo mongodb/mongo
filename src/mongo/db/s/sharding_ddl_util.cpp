@@ -64,6 +64,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -310,14 +311,17 @@ void setAllowMigrations(OperationContext* opCtx,
                         bool allowMigrations) {
     ConfigsvrSetAllowMigrations configsvrSetAllowMigrationsCmd(nss, allowMigrations);
     configsvrSetAllowMigrationsCmd.setCollectionUUID(expectedCollectionUUID);
+    generic_argument_util::setMajorityWriteConcern(configsvrSetAllowMigrationsCmd);
+    if (osi) {
+        generic_argument_util::setOperationSessionInfo(configsvrSetAllowMigrationsCmd, *osi);
+    }
 
     const auto swSetAllowMigrationsResult =
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,
-            CommandHelpers::appendMajorityWriteConcern(
-                configsvrSetAllowMigrationsCmd.toBSON(osi ? osi->toBSON() : BSONObj())),
+            configsvrSetAllowMigrationsCmd.toBSON(),
             Shard::RetryPolicy::kIdempotent  // Although ConfigsvrSetAllowMigrations is not really
                                              // idempotent (because it will cause the collection
                                              // version to be bumped), it is safe to be retried.
@@ -356,12 +360,14 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
     // Remove config.tags entries
     ConfigsvrRemoveTags configsvrRemoveTagsCmd(nss);
     configsvrRemoveTagsCmd.setDbName(DatabaseName::kAdmin);
+    generic_argument_util::setMajorityWriteConcern(configsvrRemoveTagsCmd);
+    generic_argument_util::setOperationSessionInfo(configsvrRemoveTagsCmd, osi);
 
     const auto swRemoveTagsResult = configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         DatabaseName::kAdmin,
-        CommandHelpers::appendMajorityWriteConcern(configsvrRemoveTagsCmd.toBSON(osi.toBSON())),
+        configsvrRemoveTagsCmd.toBSON(),
         Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(swRemoveTagsResult),
@@ -537,12 +543,11 @@ void performNoopRetryableWriteOnShards(OperationContext* opCtx,
                                        const std::vector<ShardId>& shardIds,
                                        const OperationSessionInfo& osi,
                                        const std::shared_ptr<executor::TaskExecutor>& executor) {
-    const auto updateOp = buildNoopWriteRequestCommand();
-    GenericArguments args;
-    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto updateOp = buildNoopWriteRequestCommand();
+    generic_argument_util::setOperationSessionInfo(updateOp, osi);
+    generic_argument_util::setMajorityWriteConcern(updateOp);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>>(
-        executor, CancellationToken::uncancelable(), updateOp, args);
+        executor, CancellationToken::uncancelable(), updateOp);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
@@ -577,11 +582,10 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
     dropCollectionParticipant.setFromMigrate(fromMigrate);
     dropCollectionParticipant.setDropSystemCollections(dropSystemCollections);
     dropCollectionParticipant.setCollectionUUID(collectionUUID);
-    GenericArguments args;
-    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    generic_argument_util::setOperationSessionInfo(dropCollectionParticipant, osi);
+    generic_argument_util::setMajorityWriteConcern(dropCollectionParticipant);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>>(
-        executor, CancellationToken::uncancelable(), dropCollectionParticipant, args);
+        executor, CancellationToken::uncancelable(), dropCollectionParticipant);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 

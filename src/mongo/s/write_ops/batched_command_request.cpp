@@ -50,22 +50,11 @@ template <class T>
 BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request) {
     auto batchRequest = BatchedCommandRequest{T::parse(request)};
 
-    auto shardVersionField = request.body[ShardVersion::kShardVersionField];
-    if (!shardVersionField.eoo()) {
-        auto shardVersion = ShardVersion::parse(shardVersionField);
-        if (shardVersion == ShardVersion::UNSHARDED()) {
-            batchRequest.setDbVersion(DatabaseVersion(request.body));
-        }
-        batchRequest.setShardVersion(shardVersion);
-    }
-
     // The 'isTimeseriesNamespace' is an internal parameter used for communication between mongos
     // and mongod.
-    auto isTimeseriesNamespace =
-        request.body[write_ops::WriteCommandRequestBase::kIsTimeseriesNamespaceFieldName];
     uassert(5916401,
             "the 'isTimeseriesNamespace' parameter cannot be used on mongos",
-            !isTimeseriesNamespace.trueValue());
+            !batchRequest.getWriteCommandRequestBase().getIsTimeseriesNamespace().value_or(false));
 
     return batchRequest;
 }
@@ -220,18 +209,49 @@ const write_ops::WriteCommandRequestBase& BatchedCommandRequest::getWriteCommand
 
 void BatchedCommandRequest::setWriteCommandRequestBase(
     write_ops::WriteCommandRequestBase writeCommandBase) {
-    return _visit([&](auto&& op) { op.setWriteCommandRequestBase(std::move(writeCommandBase)); });
+    _visit([&](auto&& op) { op.setWriteCommandRequestBase(std::move(writeCommandBase)); });
 }
 
 void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
     _visit([&](auto&& op) { op.serialize(builder); });
-    if (_shardVersion) {
-        _shardVersion->serialize(ShardVersion::kShardVersionField, builder);
-    }
+}
 
-    if (_dbVersion) {
-        builder->append("databaseVersion", _dbVersion->toBSON());
-    }
+void BatchedCommandRequest::setShardVersion(ShardVersion shardVersion) {
+    _visit([sv = std::move(shardVersion)](auto&& op) { op.setShardVersion(std::move(sv)); });
+}
+
+bool BatchedCommandRequest::hasShardVersion() const {
+    return _visit([](auto&& op) { return op.getShardVersion().has_value(); });
+}
+
+const ShardVersion& BatchedCommandRequest::getShardVersion() const {
+    return _visit([](auto&& op) -> const ShardVersion& {
+        invariant(op.getShardVersion());
+        return *op.getShardVersion();
+    });
+}
+
+void BatchedCommandRequest::setDbVersion(DatabaseVersion dbVersion) {
+    _visit([dbv = std::move(dbVersion)](auto&& op) { op.setDatabaseVersion(std::move(dbv)); });
+}
+
+bool BatchedCommandRequest::hasDbVersion() const {
+    return false;
+}
+
+const DatabaseVersion& BatchedCommandRequest::getDbVersion() const {
+    return _visit([](auto&& op) -> const DatabaseVersion& {
+        invariant(op.getDatabaseVersion());
+        return *op.getDatabaseVersion();
+    });
+}
+
+GenericArguments& BatchedCommandRequest::getGenericArguments() {
+    return _visit([&](auto&& op) -> GenericArguments& { return op.getGenericArguments(); });
+}
+
+const GenericArguments& BatchedCommandRequest::getGenericArguments() const {
+    return _visit([&](auto&& op) -> const GenericArguments& { return op.getGenericArguments(); });
 }
 
 BSONObj BatchedCommandRequest::toBSON() const {

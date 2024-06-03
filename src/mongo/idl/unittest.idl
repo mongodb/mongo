@@ -1161,12 +1161,37 @@ structs:
             swim:
                 type: IDLAnyType
                 forward_to_shards: false
+                optional: true
             swimmer:
                 type: IDLAnyType
                 forward_to_shards: false
+                optional: true
             swimmed: # Note: spelled wrong on purpose
                 type: IDLAnyType
                 forward_to_shards: false
+                optional: true
+
+##################################################################################################
+#
+# Generic argument structs
+#
+##################################################################################################
+
+    TestGenericArguments:
+        description: "List of generic arguments"
+        is_generic_cmd_list: "arg"
+        strict: false
+        fields:
+            genericArg:
+                type: IDLAnyType
+                forward_to_shards: true
+                optional: true
+                stability: "stable"
+            unstableGenericArg:
+                type: string
+                forward_to_shards: false
+                optional: true
+                stability: "unstable"
 
 ##################################################################################################
 #
@@ -1210,15 +1235,6 @@ commands:
         non_const_getter: true
         fields:
             field1: int
-
-    KnownFieldCommand:
-        description: UnitTest for a command that has a field that is special known generic command field
-        command_name: KnownFieldCommand
-        namespace: concatenate_with_db
-        api_version: ""
-        fields:
-            field1: int
-            maxTimeMS: int
 
     DocSequenceCommand:
         description: UnitTest for a basic command with fields marked with supports_doc_sequence

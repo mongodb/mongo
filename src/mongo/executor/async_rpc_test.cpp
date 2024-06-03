@@ -196,11 +196,9 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
 
     // Populate generic arguments to be passed along when the command is converted
     // to BSON.
-    GenericArguments genericArgs;
-
-    genericArgs.setAutocommit(false);
+    helloCmd.setAutocommit(false);
     const UUID clientOpKey = UUID::gen();
-    genericArgs.setClientOperationKey(clientOpKey);
+    helloCmd.setClientOperationKey(clientOpKey);
 
     // Populate struct for generic reply fields that are expected to be parsed from the
     // response object.
@@ -212,15 +210,11 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
     clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
     genericReplyFields.setDollarClusterTime(clusterTime);
     auto configTime = Timestamp(1, 1);
-    genericArgs.setDollarConfigTime(configTime);
+    helloCmd.setDollarConfigTime(configTime);
 
     auto opCtxHolder = makeOperationContext();
-    auto options =
-        std::make_shared<AsyncRPCOptions<HelloCommand>>(getExecutorPtr(),
-                                                        _cancellationToken,
-                                                        helloCmd,
-                                                        std::make_shared<NeverRetryPolicy>(),
-                                                        genericArgs);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        getExecutorPtr(), _cancellationToken, helloCmd, std::make_shared<NeverRetryPolicy>());
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
         sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
@@ -1012,7 +1006,7 @@ TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnRemoteEr
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shardId);
 }
 
-TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandWithGenericArgs) {
+TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandWithGenericArguments) {
     ShardId shardId("shard");
     ReadPreferenceSetting readPref;
     std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
@@ -1034,20 +1028,15 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandWithGenericArgs) {
     // Populate generic arguments to be passed along when the command is converted
     // to BSON. This is simply to test that generic args are passed properly and they should not
     // contribute to any other behaviors of this test.
-    GenericArguments genericArgs;
     const UUID clientOpKey = UUID::gen();
-    genericArgs.setClientOperationKey(clientOpKey);
+    findCmd.setClientOperationKey(clientOpKey);
     auto configTime = Timestamp(1, 1);
-    genericArgs.setDollarConfigTime(configTime);
+    findCmd.setDollarConfigTime(configTime);
     auto expectedShardVersion = ShardVersion();
-    genericArgs.setShardVersion(expectedShardVersion);
+    findCmd.setShardVersion(expectedShardVersion);
 
-    auto options =
-        std::make_shared<AsyncRPCOptions<FindCommandRequest>>(getExecutorPtr(),
-                                                              _cancellationToken,
-                                                              findCmd,
-                                                              std::make_shared<NeverRetryPolicy>(),
-                                                              genericArgs);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        getExecutorPtr(), _cancellationToken, findCmd, std::make_shared<NeverRetryPolicy>());
     auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -1273,10 +1262,9 @@ TEST_F(AsyncRPCTestFixture, UseOperationKeyWhenProvided) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     FindCommandRequest findCmd(nss);
+    findCmd.setClientOperationKey(opKey);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
         getExecutorPtr(), _cancellationToken, findCmd);
-    // Set OperationKey via AsyncRPCOptions.
-    options->genericArgs.setClientOperationKey(opKey);
     auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
     onCommand([&](const auto& request) {
         ASSERT_EQ(getOpKeyFromCommand(request.cmdObj), opKey);

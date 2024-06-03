@@ -56,6 +56,7 @@
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -297,16 +298,16 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                          const txn::ParticipantsList& participants) {
     PrepareTransaction prepareTransaction;
     prepareTransaction.setDbName(DatabaseName::kAdmin);
-    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber"
-                                   << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
-                                   << false << WriteConcernOptions::kWriteConcernField
-                                   << WriteConcernOptions::Majority));
+    prepareTransaction.setLsid(generic_argument_util::toLogicalSessionFromClient(lsid));
+    prepareTransaction.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
+    prepareTransaction.setAutocommit(false);
+    prepareTransaction.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-        bob.append(OperationSessionInfoFromClient::kTxnRetryCounterFieldName, *txnRetryCounter);
+        prepareTransaction.setTxnRetryCounter(*txnRetryCounter);
     }
-    apiParams.appendInfo(&bob);
-    auto prepareObj = prepareTransaction.toBSON(bob.obj());
+    apiParams.setInfo(prepareTransaction);
+    auto prepareObj = prepareTransaction.toBSON();
 
     std::vector<Future<PrepareResponse>> responses;
 
@@ -517,16 +518,16 @@ Future<void> sendCommit(ServiceContext* service,
     CommitTransaction commitTransaction;
     commitTransaction.setDbName(DatabaseName::kAdmin);
     commitTransaction.setCommitTimestamp(commitTimestamp);
-    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber"
-                                   << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
-                                   << false << WriteConcernOptions::kWriteConcernField
-                                   << WriteConcernOptions::Majority));
+    commitTransaction.setLsid(generic_argument_util::toLogicalSessionFromClient(lsid));
+    commitTransaction.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
+    commitTransaction.setAutocommit(false);
+    commitTransaction.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-        bob.append(OperationSessionInfoFromClient::kTxnRetryCounterFieldName, *txnRetryCounter);
+        commitTransaction.setTxnRetryCounter(*txnRetryCounter);
     }
-    apiParams.appendInfo(&bob);
-    auto commitObj = commitTransaction.toBSON(bob.obj());
+    apiParams.setInfo(commitTransaction);
+    auto commitObj = commitTransaction.toBSON();
 
     OperationContextFn operationContextFn = [lsid,
                                              txnNumberAndRetryCounter](OperationContext* opCtx) {
@@ -561,16 +562,16 @@ Future<void> sendAbort(ServiceContext* service,
                        const txn::ParticipantsList& participants) {
     AbortTransaction abortTransaction;
     abortTransaction.setDbName(DatabaseName::kAdmin);
-    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber"
-                                   << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
-                                   << false << WriteConcernOptions::kWriteConcernField
-                                   << WriteConcernOptions::Majority));
+    abortTransaction.setLsid(generic_argument_util::toLogicalSessionFromClient(lsid));
+    abortTransaction.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
+    abortTransaction.setAutocommit(false);
+    abortTransaction.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-        bob.append(OperationSessionInfoFromClient::kTxnRetryCounterFieldName, *txnRetryCounter);
+        abortTransaction.setTxnRetryCounter(*txnRetryCounter);
     }
-    apiParams.appendInfo(&bob);
-    auto abortObj = abortTransaction.toBSON(bob.obj());
+    apiParams.setInfo(abortTransaction);
+    auto abortObj = abortTransaction.toBSON();
 
     OperationContextFn operationContextFn = [lsid,
                                              txnNumberAndRetryCounter](OperationContext* opCtx) {

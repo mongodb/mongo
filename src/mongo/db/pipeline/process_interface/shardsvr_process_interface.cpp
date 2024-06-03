@@ -45,6 +45,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_merge.h"
@@ -451,7 +452,7 @@ void ShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
         NamespaceString(NamespaceString::kAggTempCollections),
         std::vector<BSONObj>({BSON(
             "_id" << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))})});
-    writeToLocalShard(opCtx, bcr, CommandHelpers::kMajorityWriteConcern);
+    writeToLocalShard(opCtx, bcr, generic_argument_util::kMajorityWriteConcern);
 
     // Create the collection. Note we don't set the 'temp: true' option. The temporary-ness comes
     // from having registered on kAggTempCollections.
@@ -553,7 +554,7 @@ void ShardServerProcessInterface::dropTempCollection(OperationContext* opCtx,
         {write_ops::DeleteOpEntry(BSON("_id" << NamespaceStringUtil::serialize(
                                            nss, SerializationContext::stateDefault())),
                                   false /* multi */)}});
-    writeToLocalShard(opCtx, std::move(bcr), CommandHelpers::kMajorityWriteConcern);
+    writeToLocalShard(opCtx, std::move(bcr), generic_argument_util::kMajorityWriteConcern);
 }
 
 void ShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,

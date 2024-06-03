@@ -172,6 +172,12 @@ protected:
         return getRandomInt(2) == 0;
     }
 
+    BSONObj appendDbName(BSONObj&& cmd, const NamespaceString& nss) const {
+        BSONObjBuilder bob(cmd);
+        bob.append("$db", nss.db_forTest());
+        return bob.obj();
+    }
+
     SampledCommandNameEnum getRandomSampledReadCommandName() const {
         return kSampledReadCommandNames[getRandomInt(kSampledReadCommandNames.size())];
     }
@@ -203,7 +209,7 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kUpdate,
-                cmd.toBSON(BSON("$db" << nss.db_forTest().toString())),
+                appendDbName(cmd.toBSON(), nss),
                 Date_t::now() +
                     mongo::Milliseconds(
                         analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};
@@ -219,7 +225,7 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kDelete,
-                cmd.toBSON(BSON("$db" << nss.db_forTest().toString())),
+                appendDbName(cmd.toBSON(), nss),
                 Date_t::now() +
                     mongo::Milliseconds(
                         analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};
@@ -243,7 +249,7 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kFindAndModify,
-                cmd.toBSON(BSON("$db" << nss.db_forTest().toString())),
+                appendDbName(cmd.toBSON(), nss),
                 Date_t::now() +
                     mongo::Milliseconds(
                         analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};
@@ -286,9 +292,7 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kBulkWrite,
-                cmd.toBSON(
-                    BSON(BulkWriteCommandRequest::kDbNameFieldName << DatabaseNameUtil::serialize(
-                             DatabaseName::kAdmin, SerializationContext::stateCommandRequest()))),
+                appendDbName(cmd.toBSON(), nss),
                 Date_t::now() +
                     mongo::Milliseconds(
                         analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};
@@ -322,9 +326,7 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kBulkWrite,
-                cmd.toBSON(
-                    BSON(BulkWriteCommandRequest::kDbNameFieldName << DatabaseNameUtil::serialize(
-                             DatabaseName::kAdmin, SerializationContext::stateCommandRequest()))),
+                appendDbName(cmd.toBSON(), nss),
                 Date_t::now() +
                     mongo::Milliseconds(
                         analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};

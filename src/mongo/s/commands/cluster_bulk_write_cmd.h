@@ -167,6 +167,10 @@ public:
             return _request.getBypassDocumentValidation();
         }
 
+        const GenericArguments& getGenericArguments() const override {
+            return _request.getGenericArguments();
+        }
+
     private:
         void preRunImplHook(OperationContext* opCtx) const {
             Impl::checkCanRunHere(opCtx);
@@ -182,6 +186,17 @@ public:
 
         NamespaceString ns() const final {
             return NamespaceString(_request.getDbName());
+        }
+
+        std::vector<NamespaceString> allNamespaces() const final {
+            const auto& nsInfos = _request.getNsInfo();
+            std::vector<NamespaceString> result(nsInfos.size());
+
+            for (auto& nsInfo : nsInfos) {
+                result.emplace_back(nsInfo.getNs());
+            }
+
+            return result;
         }
 
         const DatabaseName& db() const final {

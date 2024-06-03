@@ -247,11 +247,7 @@ public:
                                                           viewAggregation.getValue())
                                   .body;
             auto viewAggRequest = aggregation_request_helper::parseFromBSON(
-                viewAggCmd,
-                opMsgRequest.validatedTenancyScope,
-                verbosity,
-                APIParameters::get(opCtx).getAPIStrict().value_or(false),
-                serializationCtx);
+                viewAggCmd, opMsgRequest.validatedTenancyScope, verbosity, serializationCtx);
 
             // An empty PrivilegeVector is acceptable because these privileges are only checked on
             // getMore and explain will not open a cursor.

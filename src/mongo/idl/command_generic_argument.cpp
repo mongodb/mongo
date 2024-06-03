@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include "command_generic_argument.h"
+#include "mongo/idl/command_generic_argument.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/generic_argument_gen.h"
-#include "mongo/util/serialization_context.h"
+#include "mongo/idl/idl_parser.h"
 
 namespace mongo {
 
 bool isGenericArgument(StringData arg) {
-    return GenericArguments::hasField(arg);
+    return GenericArguments::hasField(arg) || arg == IDLParserContext::kOpMsgDollarDB;
 }
 
 bool isGenericReply(StringData arg) {
@@ -44,26 +45,10 @@ bool isGenericReply(StringData arg) {
 }
 
 bool shouldForwardToShards(StringData arg) {
-    return GenericArguments::shouldForwardToShards(arg);
+    return GenericArguments::shouldForwardToShards(arg) && arg != IDLParserContext::kOpMsgDollarDB;
 }
 
 bool shouldForwardFromShards(StringData replyField) {
     return GenericReplyFields::shouldForwardFromShards(replyField);
 }
-
-void appendGenericCommandArguments(const BSONObj& commandPassthroughFields,
-                                   const std::vector<StringData>& knownFields,
-                                   BSONObjBuilder* builder) {
-
-    for (const auto& element : commandPassthroughFields) {
-
-        StringData name = element.fieldNameStringData();
-        // Include a passthrough field as long the IDL class has not defined it.
-        if (isGenericArgument(name) &&
-            std::find(knownFields.begin(), knownFields.end(), name) == knownFields.end()) {
-            builder->append(element);
-        }
-    }
-}
-
 }  // namespace mongo

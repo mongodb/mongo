@@ -31,6 +31,8 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_idl.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -82,12 +84,20 @@ class WriteConcernTest : public WriteConcernEphemeralTest {
     }
 };
 
+GenericArguments makeGenericArgs(const WriteConcernIdl& wc) {
+    GenericArguments args;
+    args.setWriteConcern(uassertStatusOK(WriteConcernOptions::parse(wc.toBSON())));
+    return args;
+}
+
+constexpr auto kCommandName = "doSomeWrite"_sd;
+
 TEST_F(WriteConcernTest, ExtractOverridesWMajorityJFalse) {
-    auto commandBSON = BSON("doSomeWrite" << 1 << "writeConcern"
-                                          << BSON("w"
-                                                  << "majority"
-                                                  << "j" << false));
-    auto swWriteConcernOptions = extractWriteConcern(_opCtx.get(), commandBSON, false /*internal*/);
+    WriteConcernIdl wc;
+    wc.setWriteConcernW(WriteConcernW("majority"));
+    wc.setJ(false);
+    auto swWriteConcernOptions =
+        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT(writeConcernOptions.isMajority());
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::JOURNAL);
@@ -96,12 +106,12 @@ TEST_F(WriteConcernTest, ExtractOverridesWMajorityJFalse) {
 
 TEST_F(WriteConcernTest,
        ExtractDoesNotOverrideWMajorityJFalseWhenWriteConcernMajorityDefaultIsFalse) {
-    auto commandBSON = BSON("doSomeWrite" << 1 << "writeConcern"
-                                          << BSON("w"
-                                                  << "majority"
-                                                  << "j" << false));
+    WriteConcernIdl wc;
+    wc.setWriteConcernW(WriteConcernW("majority"));
+    wc.setJ(false);
     _mockReplCoord->setWriteConcernMajorityShouldJournal(false);
-    auto swWriteConcernOptions = extractWriteConcern(_opCtx.get(), commandBSON, false /*internal*/);
+    auto swWriteConcernOptions =
+        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT(writeConcernOptions.isMajority());
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::NONE);
@@ -109,8 +119,11 @@ TEST_F(WriteConcernTest,
 }
 
 TEST_F(WriteConcernTest, ExtractDoesNotOverrideW1JFalse) {
-    auto commandBSON = BSON("doSomeWrite" << 1 << "writeConcern" << BSON("w" << 1 << "j" << false));
-    auto swWriteConcernOptions = extractWriteConcern(_opCtx.get(), commandBSON, false /*internal*/);
+    WriteConcernIdl wc;
+    wc.setWriteConcernW(WriteConcernW(1));
+    wc.setJ(false);
+    auto swWriteConcernOptions =
+        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT_EQ(writeConcernOptions.w, WriteConcernW{1});
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::NONE);
@@ -118,10 +131,10 @@ TEST_F(WriteConcernTest, ExtractDoesNotOverrideW1JFalse) {
 }
 
 TEST_F(WriteConcernTest, ExtractDoesNotOverrideWMajorityJUnset) {
-    auto commandBSON = BSON("doSomeWrite" << 1 << "writeConcern"
-                                          << BSON("w"
-                                                  << "majority"));
-    auto swWriteConcernOptions = extractWriteConcern(_opCtx.get(), commandBSON, false /*internal*/);
+    WriteConcernIdl wc;
+    wc.setWriteConcernW(WriteConcernW("majority"));
+    auto swWriteConcernOptions =
+        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT(writeConcernOptions.isMajority());
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::UNSET);
@@ -129,11 +142,11 @@ TEST_F(WriteConcernTest, ExtractDoesNotOverrideWMajorityJUnset) {
 }
 
 TEST_F(WriteConcernTest, ExtractDoesNotOverrideWMajorityJTrue) {
-    auto commandBSON = BSON("doSomeWrite" << 1 << "writeConcern"
-                                          << BSON("w"
-                                                  << "majority"
-                                                  << "j" << true));
-    auto swWriteConcernOptions = extractWriteConcern(_opCtx.get(), commandBSON, false /*internal*/);
+    WriteConcernIdl wc;
+    wc.setWriteConcernW(WriteConcernW("majority"));
+    wc.setJ(true);
+    auto swWriteConcernOptions =
+        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT(writeConcernOptions.isMajority());
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::JOURNAL);
@@ -143,11 +156,11 @@ TEST_F(WriteConcernTest, ExtractDoesNotOverrideWMajorityJTrue) {
 TEST_F(WriteConcernEphemeralTest, ExtractDoesNotOverrideWMajorityJFalseOnEphemeral) {
     // If we override {"w" : "majority", "j" : false } to {"j" : true} on an ephemeral storage
     // engine, the command will fail.  So make sure we don't do that.
-    auto commandBSON = BSON("doSomeWrite" << 1 << "writeConcern"
-                                          << BSON("w"
-                                                  << "majority"
-                                                  << "j" << false));
-    auto swWriteConcernOptions = extractWriteConcern(_opCtx.get(), commandBSON, false /*internal*/);
+    WriteConcernIdl wc;
+    wc.setWriteConcernW(WriteConcernW("majority"));
+    wc.setJ(false);
+    auto swWriteConcernOptions =
+        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT(writeConcernOptions.isMajority());
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::NONE);

@@ -1103,7 +1103,9 @@ private:
         requestPhase.setPhase(phase);
         requestPhase.setChangeTimestamp(changeTimestamp);
         uassertStatusOK(ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-            opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase.toBSON())));
+            opCtx,
+            CommandHelpers::appendMajorityWriteConcern(
+                CommandHelpers::filterCommandRequestForPassthrough(requestPhase.toBSON()))));
     }
 
     // This helper function is for any uasserts for users to clean up user collections. Uasserts for

@@ -67,6 +67,20 @@ public:
 
     void appendInfo(BSONObjBuilder* builder) const;
 
+    /**
+     * Set the API parameters on an IDL-defined command or GenericArguments struct.
+     */
+    template <typename CommandType>
+    void setInfo(CommandType& request) const {
+        request.setApiStrict(getAPIStrict());
+        if (auto& apiVersion = getAPIVersion()) {
+            request.setApiVersion(StringData(*apiVersion));
+        } else {
+            request.setApiVersion(boost::none);
+        }
+        request.setApiDeprecationErrors(getAPIDeprecationErrors());
+    }
+
     BSONObj toBSON() const;
 
     const boost::optional<std::string>& getAPIVersion() const {

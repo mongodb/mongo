@@ -55,6 +55,7 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/explain_gen.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -159,7 +160,9 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
     // Parse into OpMsgRequest to append the $db field, which is required for command
     // parsing.
     const auto opMsgRequest =
-        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx), dbName, writeCmd);
+        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
+                                    dbName,
+                                    CommandHelpers::filterCommandRequestForPassthrough(writeCmd));
 
     DatabaseName requestDbName = dbName;
     boost::optional<BulkWriteCommandRequest> bulkWriteRequest;
@@ -196,196 +199,206 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
     // forward the full query to the chosen shard and it will be executed again on the target shard.
     BSONObjBuilder queryBuilder(nss.isTimeseriesBucketsCollection() ? BSONObj() : targetDocId);
 
-    // Parse original write command and set _id as query filter for new command object.
-    if (commandName == BulkWriteCommandRequest::kCommandName) {
-        invariant(bulkWriteRequest.has_value());
-        auto op = BulkWriteCRUDOp(bulkWriteRequest->getOps()[0]);
+    auto cmdObj = [&]() {
+        // Parse original write command and set _id as query filter for new command object.
+        if (commandName == BulkWriteCommandRequest::kCommandName) {
+            invariant(bulkWriteRequest.has_value());
+            auto op = BulkWriteCRUDOp(bulkWriteRequest->getOps()[0]);
 
-        NamespaceInfoEntry newNsEntry = bulkWriteRequest->getNsInfo()[op.getNsInfoIdx()];
-        newNsEntry.setShardVersion(shardVersion);
+            NamespaceInfoEntry newNsEntry = bulkWriteRequest->getNsInfo()[op.getNsInfoIdx()];
+            newNsEntry.setShardVersion(shardVersion);
 
-        if (op.getType() == BulkWriteCRUDOp::kUpdate) {
-            // The update case.
-            auto updateOp = op.getUpdate();
+            if (op.getType() == BulkWriteCRUDOp::kUpdate) {
+                // The update case.
+                auto updateOp = op.getUpdate();
 
-            if (updateOp->getSampleId()) {
-                bulkWriteRequest->setOriginalQuery(updateOp->getFilter());
-                bulkWriteRequest->setOriginalCollation(updateOp->getCollation());
+                if (updateOp->getSampleId()) {
+                    bulkWriteRequest->setOriginalQuery(updateOp->getFilter());
+                    bulkWriteRequest->setOriginalCollation(updateOp->getCollation());
+                }
+
+                // If the original query contains either a positional operator ($) or targets a
+                // time-series collection, include the original query alongside the target doc.
+                BulkWriteUpdateOp newUpdateOp = *updateOp;
+                auto updateOpWithNamespace =
+                    UpdateRequest(bulk_write_common::makeUpdateOpEntryFromUpdateOp(updateOp));
+                updateOpWithNamespace.setNamespaceString(nss);
+                updateOpWithNamespace.setLetParameters(bulkWriteRequest->getLet());
+                if (requiresOriginalQuery(opCtx, updateOpWithNamespace) ||
+                    nss.isTimeseriesBucketsCollection()) {
+                    queryBuilder.appendElementsUnique(updateOp->getFilter());
+                } else {
+                    // Unset the collation and sort because targeting by _id uses default collation
+                    // and we should uniquely target a single document by _id.
+                    newUpdateOp.setCollation(boost::none);
+                    newUpdateOp.setSort(boost::none);
+                }
+
+                newUpdateOp.setFilter(queryBuilder.obj());
+                newUpdateOp.setUpdate(0);
+                bulkWriteRequest->setOps({newUpdateOp});
+            } else {
+                // The delete case.
+                auto deleteOp = op.getDelete();
+
+                if (deleteOp->getSampleId()) {
+                    bulkWriteRequest->setOriginalQuery(deleteOp->getFilter());
+                    bulkWriteRequest->setOriginalCollation(deleteOp->getCollation());
+                }
+
+                // If the query targets a time-series collection, include the original query
+                // alongside the target doc.
+                BulkWriteDeleteOp newDeleteOp = *deleteOp;
+                if (nss.isTimeseriesBucketsCollection()) {
+                    queryBuilder.appendElementsUnique(deleteOp->getFilter());
+                } else {
+                    // Unset the collation because targeting by _id uses default collation.
+                    newDeleteOp.setCollation(boost::none);
+                }
+
+                newDeleteOp.setFilter(queryBuilder.obj());
+                newDeleteOp.setDeleteCommand(0);
+                bulkWriteRequest->setOps({newDeleteOp});
+            }
+            bulkWriteRequest->setNsInfo({newNsEntry});
+            generic_argument_util::prepareRequestForInternalTransactionPassthrough(
+                *bulkWriteRequest);
+
+            return bulkWriteRequest->toBSON();
+        } else if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
+            auto updateRequest = write_ops::UpdateCommandRequest::parse(
+                IDLParserContext("_clusterWriteWithoutShardKeyForUpdate"), opMsgRequest.body);
+
+            // The original query and collation are sent along with the modified command for the
+            // purposes of query sampling.
+            if (updateRequest.getUpdates().front().getSampleId()) {
+                auto writeCommandRequestBase =
+                    write_ops::WriteCommandRequestBase(updateRequest.getWriteCommandRequestBase());
+                writeCommandRequestBase.setOriginalQuery(updateRequest.getUpdates().front().getQ());
+                writeCommandRequestBase.setOriginalCollation(
+                    updateRequest.getUpdates().front().getCollation());
+                updateRequest.setWriteCommandRequestBase(writeCommandRequestBase);
             }
 
             // If the original query contains either a positional operator ($) or targets a
             // time-series collection, include the original query alongside the target doc.
-            BulkWriteUpdateOp newUpdateOp = *updateOp;
-            auto updateOpWithNamespace =
-                UpdateRequest(bulk_write_common::makeUpdateOpEntryFromUpdateOp(updateOp));
-            updateOpWithNamespace.setNamespaceString(nss);
-            updateOpWithNamespace.setLetParameters(bulkWriteRequest->getLet());
+            auto updateOpWithNamespace = UpdateRequest(updateRequest.getUpdates().front());
+            updateOpWithNamespace.setNamespaceString(updateRequest.getNamespace());
+            updateOpWithNamespace.setLetParameters(updateRequest.getLet());
+
             if (requiresOriginalQuery(opCtx, updateOpWithNamespace) ||
                 nss.isTimeseriesBucketsCollection()) {
-                queryBuilder.appendElementsUnique(updateOp->getFilter());
+                queryBuilder.appendElementsUnique(updateRequest.getUpdates().front().getQ());
             } else {
                 // Unset the collation and sort because targeting by _id uses default collation and
                 // we should uniquely target a single document by _id.
-                newUpdateOp.setCollation(boost::none);
-                newUpdateOp.setSort(boost::none);
+                updateRequest.getUpdates().front().setCollation(boost::none);
+                updateRequest.getUpdates().front().setSort(boost::none);
             }
 
-            newUpdateOp.setFilter(queryBuilder.obj());
-            newUpdateOp.setUpdate(0);
-            bulkWriteRequest->setOps({newUpdateOp});
-        } else {
-            // The delete case.
-            auto deleteOp = op.getDelete();
+            updateRequest.getUpdates().front().setQ(queryBuilder.obj());
 
-            if (deleteOp->getSampleId()) {
-                bulkWriteRequest->setOriginalQuery(deleteOp->getFilter());
-                bulkWriteRequest->setOriginalCollation(deleteOp->getCollation());
+            generic_argument_util::prepareRequestForInternalTransactionPassthrough(updateRequest);
+
+            auto batchedCommandRequest = BatchedCommandRequest(updateRequest);
+            batchedCommandRequest.setShardVersion(shardVersion);
+            return batchedCommandRequest.toBSON();
+        } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
+            auto deleteRequest = write_ops::DeleteCommandRequest::parse(
+                IDLParserContext("_clusterWriteWithoutShardKeyForDelete"), opMsgRequest.body);
+
+            // The original query and collation are sent along with the modified command for the
+            // purposes of query sampling.
+            if (deleteRequest.getDeletes().front().getSampleId()) {
+                auto writeCommandRequestBase =
+                    write_ops::WriteCommandRequestBase(deleteRequest.getWriteCommandRequestBase());
+                writeCommandRequestBase.setOriginalQuery(deleteRequest.getDeletes().front().getQ());
+                writeCommandRequestBase.setOriginalCollation(
+                    deleteRequest.getDeletes().front().getCollation());
+                deleteRequest.setWriteCommandRequestBase(writeCommandRequestBase);
             }
 
             // If the query targets a time-series collection, include the original query alongside
             // the target doc.
-            BulkWriteDeleteOp newDeleteOp = *deleteOp;
             if (nss.isTimeseriesBucketsCollection()) {
-                queryBuilder.appendElementsUnique(deleteOp->getFilter());
+                queryBuilder.appendElementsUnique(deleteRequest.getDeletes().front().getQ());
             } else {
                 // Unset the collation because targeting by _id uses default collation.
-                newDeleteOp.setCollation(boost::none);
+                deleteRequest.getDeletes().front().setCollation(boost::none);
             }
 
-            newDeleteOp.setFilter(queryBuilder.obj());
-            newDeleteOp.setDeleteCommand(0);
-            bulkWriteRequest->setOps({newDeleteOp});
-        }
-        bulkWriteRequest->setNsInfo({newNsEntry});
-        return std::make_pair(requestDbName, bulkWriteRequest->toBSON());
-    } else if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
-        auto updateRequest = write_ops::UpdateCommandRequest::parse(
-            IDLParserContext("_clusterWriteWithoutShardKeyForUpdate"), opMsgRequest.body);
+            deleteRequest.getDeletes().front().setQ(queryBuilder.obj());
 
-        // The original query and collation are sent along with the modified command for the
-        // purposes of query sampling.
-        if (updateRequest.getUpdates().front().getSampleId()) {
-            auto writeCommandRequestBase =
-                write_ops::WriteCommandRequestBase(updateRequest.getWriteCommandRequestBase());
-            writeCommandRequestBase.setOriginalQuery(updateRequest.getUpdates().front().getQ());
-            writeCommandRequestBase.setOriginalCollation(
-                updateRequest.getUpdates().front().getCollation());
-            updateRequest.setWriteCommandRequestBase(writeCommandRequestBase);
-        }
+            generic_argument_util::prepareRequestForInternalTransactionPassthrough(deleteRequest);
 
-        // If the original query contains either a positional operator ($) or targets a time-series
-        // collection, include the original query alongside the target doc.
-        auto updateOpWithNamespace = UpdateRequest(updateRequest.getUpdates().front());
-        updateOpWithNamespace.setNamespaceString(updateRequest.getNamespace());
-        updateOpWithNamespace.setLetParameters(updateRequest.getLet());
+            auto batchedCommandRequest = BatchedCommandRequest(deleteRequest);
+            batchedCommandRequest.setShardVersion(shardVersion);
+            return batchedCommandRequest.toBSON();
+        } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
+                   commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
+            auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
+                IDLParserContext("_clusterWriteWithoutShardKeyForFindAndModify"),
+                opMsgRequest.body);
 
-        if (requiresOriginalQuery(opCtx, updateOpWithNamespace) ||
-            nss.isTimeseriesBucketsCollection()) {
-            queryBuilder.appendElementsUnique(updateRequest.getUpdates().front().getQ());
-        } else {
-            // Unset the collation and sort because targeting by _id uses default collation and we
-            // should uniquely target a single document by _id.
-            updateRequest.getUpdates().front().setCollation(boost::none);
-            updateRequest.getUpdates().front().setSort(boost::none);
-        }
+            // The original query and collation are sent along with the modified command for the
+            // purposes of query sampling.
+            if (findAndModifyRequest.getSampleId()) {
+                findAndModifyRequest.setOriginalQuery(findAndModifyRequest.getQuery());
+                findAndModifyRequest.setOriginalCollation(findAndModifyRequest.getCollation());
+            }
 
-        updateRequest.getUpdates().front().setQ(queryBuilder.obj());
+            if (findAndModifyRequest.getUpdate()) {
+                auto updateRequest = UpdateRequest{};
+                updateRequest.setNamespaceString(findAndModifyRequest.getNamespace());
+                update::makeUpdateRequest(opCtx, findAndModifyRequest, boost::none, &updateRequest);
 
-        auto batchedCommandRequest = BatchedCommandRequest(updateRequest);
-        batchedCommandRequest.setShardVersion(shardVersion);
-        return std::make_pair(requestDbName, batchedCommandRequest.toBSON());
-    } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
-        auto deleteRequest = write_ops::DeleteCommandRequest::parse(
-            IDLParserContext("_clusterWriteWithoutShardKeyForDelete"), opMsgRequest.body);
-
-        // The original query and collation are sent along with the modified command for the
-        // purposes of query sampling.
-        if (deleteRequest.getDeletes().front().getSampleId()) {
-            auto writeCommandRequestBase =
-                write_ops::WriteCommandRequestBase(deleteRequest.getWriteCommandRequestBase());
-            writeCommandRequestBase.setOriginalQuery(deleteRequest.getDeletes().front().getQ());
-            writeCommandRequestBase.setOriginalCollation(
-                deleteRequest.getDeletes().front().getCollation());
-            deleteRequest.setWriteCommandRequestBase(writeCommandRequestBase);
-        }
-
-        // If the query targets a time-series collection, include the original query alongside the
-        // target doc.
-        if (nss.isTimeseriesBucketsCollection()) {
-            queryBuilder.appendElementsUnique(deleteRequest.getDeletes().front().getQ());
-        } else {
-            // Unset the collation because targeting by _id uses default collation.
-            deleteRequest.getDeletes().front().setCollation(boost::none);
-        }
-
-        deleteRequest.getDeletes().front().setQ(queryBuilder.obj());
-
-        auto batchedCommandRequest = BatchedCommandRequest(deleteRequest);
-        batchedCommandRequest.setShardVersion(shardVersion);
-        return std::make_pair(requestDbName, batchedCommandRequest.toBSON());
-    } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
-               commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
-        auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-            IDLParserContext("_clusterWriteWithoutShardKeyForFindAndModify"), opMsgRequest.body);
-
-        // The original query and collation are sent along with the modified command for the
-        // purposes of query sampling.
-        if (findAndModifyRequest.getSampleId()) {
-            findAndModifyRequest.setOriginalQuery(findAndModifyRequest.getQuery());
-            findAndModifyRequest.setOriginalCollation(findAndModifyRequest.getCollation());
-        }
-
-        if (findAndModifyRequest.getUpdate()) {
-            auto updateRequest = UpdateRequest{};
-            updateRequest.setNamespaceString(findAndModifyRequest.getNamespace());
-            update::makeUpdateRequest(opCtx, findAndModifyRequest, boost::none, &updateRequest);
-
-            // If the original query contains either a positional operator ($) or targets a
-            // time-series collection, include the original query alongside the target doc.
-            if (requiresOriginalQuery(opCtx,
-                                      updateRequest,
-                                      findAndModifyRequest.getNamespace(),
-                                      findAndModifyRequest.getQuery(),
-                                      findAndModifyRequest.getFields().value_or(BSONObj())) ||
-                nss.isTimeseriesBucketsCollection()) {
-                queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
+                // If the original query contains either a positional operator ($) or targets a
+                // time-series collection, include the original query alongside the target doc.
+                if (requiresOriginalQuery(opCtx,
+                                          updateRequest,
+                                          findAndModifyRequest.getNamespace(),
+                                          findAndModifyRequest.getQuery(),
+                                          findAndModifyRequest.getFields().value_or(BSONObj())) ||
+                    nss.isTimeseriesBucketsCollection()) {
+                    queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
+                } else {
+                    // Unset the collation and sort because targeting by _id uses default collation
+                    // and we should uniquely target a single document by _id.
+                    findAndModifyRequest.setCollation(boost::none);
+                    findAndModifyRequest.setSort(boost::none);
+                }
             } else {
-                // Unset the collation and sort because targeting by _id uses default collation and
-                // we should uniquely target a single document by _id.
-                findAndModifyRequest.setCollation(boost::none);
-                findAndModifyRequest.setSort(boost::none);
+                // If the original query includes a positional operator ($) or targets a time-series
+                // collection, include the original query alongside the target doc.
+                if (requiresOriginalQuery(opCtx,
+                                          boost::none,
+                                          findAndModifyRequest.getNamespace(),
+                                          findAndModifyRequest.getQuery(),
+                                          findAndModifyRequest.getFields().value_or(BSONObj())) ||
+                    nss.isTimeseriesBucketsCollection()) {
+                    queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
+                } else {
+                    // Unset the collation and sort because targeting by _id uses default collation
+                    // and we should uniquely target a single document by _id.
+                    findAndModifyRequest.setCollation(boost::none);
+                    findAndModifyRequest.setSort(boost::none);
+                }
             }
+
+            findAndModifyRequest.setQuery(queryBuilder.obj());
+            findAndModifyRequest.setShardVersion(shardVersion);
+            generic_argument_util::prepareRequestForInternalTransactionPassthrough(
+                findAndModifyRequest);
+
+            return findAndModifyRequest.toBSON();
         } else {
-            // If the original query includes a positional operator ($) or targets a time-series
-            // collection, include the original query alongside the target doc.
-            if (requiresOriginalQuery(opCtx,
-                                      boost::none,
-                                      findAndModifyRequest.getNamespace(),
-                                      findAndModifyRequest.getQuery(),
-                                      findAndModifyRequest.getFields().value_or(BSONObj())) ||
-                nss.isTimeseriesBucketsCollection()) {
-                queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
-            } else {
-                // Unset the collation and sort because targeting by _id uses default collation and
-                // we should uniquely target a single document by _id.
-                findAndModifyRequest.setCollation(boost::none);
-                findAndModifyRequest.setSort(boost::none);
-            }
+            uasserted(ErrorCodes::InvalidOptions,
+                      "_clusterWriteWithoutShardKey only supports update, delete, and "
+                      "findAndModify commands.");
         }
+    }();
 
-        findAndModifyRequest.setQuery(queryBuilder.obj());
-
-        // Drop the writeConcern as it cannot be specified for commands run in internal
-        // transactions. This object will be used to construct the command request used by
-        // _clusterWriteWithoutShardKey.
-        findAndModifyRequest.setWriteConcern(boost::none);
-        return std::make_pair(requestDbName,
-                              appendShardVersion(findAndModifyRequest.toBSON(), shardVersion));
-    } else {
-        uasserted(ErrorCodes::InvalidOptions,
-                  "_clusterWriteWithoutShardKey only supports update, delete, and "
-                  "findAndModify commands.");
-    }
+    return std::make_pair(std::move(requestDbName), cmdObj);
 }
 
 class ClusterWriteWithoutShardKeyCmd : public TypedCommand<ClusterWriteWithoutShardKeyCmd> {

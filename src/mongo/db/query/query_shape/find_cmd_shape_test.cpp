@@ -374,7 +374,7 @@ TEST_F(FindCmdShapeTest, FindCommandShapeSHA256Hash) {
         // Verify that the hash value is different from the hash value of the template "find"
         // command.
         ASSERT_NE(templateHashValue, shapeHash.toHexString())
-            << findCommandShape->toFindCommandRequest()->toBSON(BSONObj{}).toString();
+            << findCommandShape->toFindCommandRequest()->toBSON().toString();
     }
 
     // Verify that the "find" command shape includes information if the collection of the command is

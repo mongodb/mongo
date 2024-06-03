@@ -615,7 +615,7 @@ AggregateCommandRequest OplogFetcher::_makeAggregateCommandRequest(long long max
     auto serializedPipeline = Pipeline::create(std::move(stages), expCtx)->serializeToBson();
 
     AggregateCommandRequest aggRequest(_nss, std::move(serializedPipeline));
-    aggRequest.setReadConcern(_config.queryReadConcern.toBSONInner());
+    aggRequest.setReadConcern(_config.queryReadConcern);
     aggRequest.setMaxTimeMS(maxTimeMs);
     if (_config.requestResumeToken) {
         aggRequest.setHint(BSON("$natural" << 1));
@@ -672,12 +672,11 @@ FindCommandRequest OplogFetcher::_makeFindCmdRequest(long long findTimeout) cons
     if (_config.queryReadConcern.isEmpty()) {
         // This ensures that the sync source waits for all earlier oplog writes to be visible.
         // Since Timestamp(0, 0) isn't allowed, Timestamp(0, 1) is the minimal we can use.
-        findCmd.setReadConcern(BSON("level"
-                                    << "local"
-                                    << "afterClusterTime" << Timestamp(0, 1)));
+        findCmd.setReadConcern(repl::ReadConcernArgs(LogicalTime(Timestamp(0, 1)),
+                                                     repl::ReadConcernLevel::kLocalReadConcern));
     } else {
         // Caller-provided read concern.
-        findCmd.setReadConcern(_config.queryReadConcern.toBSONInner());
+        findCmd.setReadConcern(_config.queryReadConcern);
     }
     return findCmd;
 }

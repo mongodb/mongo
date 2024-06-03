@@ -32,8 +32,8 @@
 #include <memory>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
@@ -54,57 +54,6 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo::async_rpc {
-
-/**
- * Mirrors command helper methods found in commands.h or cluster_command_helpers.h.
- */
-struct AsyncRPCCommandHelpers {
-    static void appendMajorityWriteConcern(GenericArguments& args,
-                                           WriteConcernOptions defaultWC = WriteConcernOptions()) {
-        if (auto parsedWC = args.getWriteConcern()) {
-            // The command has a writeConcern field and it's majority, so we can return it as-is.
-            if (parsedWC->isMajority()) {
-                return;
-            }
-
-            parsedWC->w = WriteConcernOptions::kMajority;
-            args.setWriteConcern(parsedWC);
-        } else if (!defaultWC.usedDefaultConstructedWC) {
-            defaultWC.w = WriteConcernOptions::kMajority;
-            if (defaultWC.wTimeout < CommandHelpers::kMajorityWriteConcern.wTimeout) {
-                defaultWC.wTimeout = CommandHelpers::kMajorityWriteConcern.wTimeout;
-            }
-            args.setWriteConcern(defaultWC);
-        } else {
-            args.setWriteConcern(CommandHelpers::kMajorityWriteConcern);
-        }
-    }
-
-    static void appendDbVersionIfPresent(GenericArguments& args, DatabaseVersion dbVersion) {
-        if (!dbVersion.isFixed()) {
-            args.setDatabaseVersion(dbVersion);
-        }
-    }
-
-    static LogicalSessionFromClient toLogicalSessionFromClient(const LogicalSessionId& lsid) {
-        LogicalSessionFromClient lsidfc;
-        lsidfc.setId(lsid.getId());
-        lsidfc.setUid(lsid.getUid());
-        lsidfc.setTxnUUID(lsid.getTxnUUID());
-        lsidfc.setTxnNumber(lsid.getTxnNumber());
-        return lsidfc;
-    }
-
-    static void appendOSI(GenericArguments& args, const OperationSessionInfo& osi) {
-        if (auto& lsid = osi.getSessionId()) {
-            args.setLsid(toLogicalSessionFromClient(*lsid));
-        }
-        args.setTxnNumber(osi.getTxnNumber());
-        args.setTxnRetryCounter(osi.getTxnRetryCounter());
-        args.setAutocommit(osi.getAutocommit());
-        args.setStartTransaction(osi.getStartTransaction());
-    }
-};
 
 /**
  * Template to combine futures using a future processing callable.

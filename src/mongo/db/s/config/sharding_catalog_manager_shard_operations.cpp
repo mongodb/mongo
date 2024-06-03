@@ -246,12 +246,11 @@ void waitUntilReadyToBlockNewDDLCoordinators(OperationContext* opCtx) {
 
         // Attach a short MaxTimeMS. If _shardsvrJoinDDLOperations fails with MaxTimeMSExpired on
         // some shard, then it means that some long-running ShardingDDLCoordinators is executing.
-        BSONObjBuilder bob;
-        cmd.serialize(&bob, BSON(CommonRequestArgs::kMaxTimeMSFieldName << 30000));
+        cmd.setMaxTimeMS(30000);
 
         try {
             const auto responses = sharding_util::sendCommandToShards(
-                opCtx, DatabaseName::kAdmin, bob.obj(), allShards, executor);
+                opCtx, DatabaseName::kAdmin, cmd.toBSON(), allShards, executor);
         } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>&) {
             // Return true if any of the shards failed with MaxTimeMSExpired.
             return true;
@@ -281,7 +280,7 @@ void setAddOrRemoveShardInProgressClusterParam(OperationContext* opCtx, bool new
 
             DBDirectClient client(opCtx);
             BSONObj res;
-            client.runCommand(DatabaseName::kAdmin, setClusterParameter.toBSON({}), res);
+            client.runCommand(DatabaseName::kAdmin, setClusterParameter.toBSON(), res);
             uassertStatusOK(getStatusFromWriteCommandReply(res));
             break;
         } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
@@ -301,7 +300,7 @@ void joinOngoingShardingDDLCoordinatorsOnShards(OperationContext* opCtx) {
     cmd.setDbName(DatabaseName::kAdmin);
 
     sharding_util::sendCommandToShards(
-        opCtx, DatabaseName::kAdmin, cmd.toBSON({}), allShards, executor);
+        opCtx, DatabaseName::kAdmin, cmd.toBSON(), allShards, executor);
 }
 
 // Sets the addOrRemoveShardInProgress cluster parameter to prevent new ShardingDDLCoordinators from
@@ -1218,13 +1217,10 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             SetFeatureCompatibilityVersion setFcvCmd(currentFCV);
             setFcvCmd.setDbName(DatabaseName::kAdmin);
             setFcvCmd.setFromConfigServer(true);
+            setFcvCmd.setWriteConcern(opCtx->getWriteConcern());
 
             auto versionResponse = _runCommandForAddShard(
-                opCtx,
-                targeter.get(),
-                DatabaseName::kAdmin,
-                setFcvCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                      << opCtx->getWriteConcern().toBSON())));
+                opCtx, targeter.get(), DatabaseName::kAdmin, setFcvCmd.toBSON());
             if (!versionResponse.isOK()) {
                 return versionResponse.getStatus();
             }
@@ -1828,9 +1824,8 @@ std::unique_ptr<Fetcher> ShardingCatalogManager::_createFetcher(
         targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
 
     FindCommandRequest findCommand(nss);
-    const auto readConcern =
-        repl::ReadConcernArgs(boost::optional<repl::ReadConcernLevel>(readConcernLevel));
-    findCommand.setReadConcern(readConcern.toBSONInner());
+    const auto readConcern = repl::ReadConcernArgs(readConcernLevel);
+    findCommand.setReadConcern(readConcern);
     const Milliseconds maxTimeMS =
         std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(kRemoteCommandTimeout));
     findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));

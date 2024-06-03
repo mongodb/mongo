@@ -144,8 +144,8 @@ BSONObj sendCommitDirectlyToShards(OperationContext* opCtx, const std::vector<Sh
     for (const auto& shardId : shardIds) {
         CommitTransaction commitCmd;
         commitCmd.setDbName(DatabaseName::kAdmin);
-        const auto commitCmdObj = commitCmd.toBSON(
-            BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
+        commitCmd.setWriteConcern(opCtx->getWriteConcern());
+        const auto commitCmdObj = commitCmd.toBSON();
         requests.emplace_back(shardId, commitCmdObj);
     }
 
@@ -1435,8 +1435,8 @@ BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext*
     CoordinateCommitTransaction coordinateCommitCmd;
     coordinateCommitCmd.setDbName(DatabaseName::kAdmin);
     coordinateCommitCmd.setParticipants(participantList);
-    const auto coordinateCommitCmdObj = coordinateCommitCmd.toBSON(
-        BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
+    coordinateCommitCmd.setWriteConcern(opCtx->getWriteConcern());
+    const auto coordinateCommitCmdObj = coordinateCommitCmd.toBSON();
 
     LOGV2_DEBUG(22891,
                 3,
@@ -1906,8 +1906,9 @@ BSONObj TransactionRouter::Router::_commitWithRecoveryToken(OperationContext* op
         CoordinateCommitTransaction coordinateCommitCmd;
         coordinateCommitCmd.setDbName(DatabaseName::kAdmin);
         coordinateCommitCmd.setParticipants({});
-        return coordinateCommitCmd.toBSON(
-            BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
+        coordinateCommitCmd.setWriteConcern(opCtx->getWriteConcern());
+
+        return coordinateCommitCmd.toBSON();
     }();
 
     MultiStatementTransactionRequestsSender ars(

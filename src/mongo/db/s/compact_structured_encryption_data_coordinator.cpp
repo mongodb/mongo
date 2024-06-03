@@ -58,6 +58,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -82,19 +83,15 @@ MONGO_FAIL_POINT_DEFINE(fleCompactHangAfterECOCCreate);
 MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeESCCleanup);
 MONGO_FAIL_POINT_DEFINE(fleCompactSkipECOCDrop);
 
-const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
-                                                               << "majority"));
 /**
- * Issue a simple success/fail command such as renameCollection or drop
- * using majority write concern.
+ * Issue a simple success/fail command such as renameCollection or drop.
  */
 template <typename Request>
 Status doRunCommand(OperationContext* opCtx, const DatabaseName& dbname, const Request& request) {
     DBDirectClient client(opCtx);
-    BSONObj cmd = request.toBSON(kMajorityWriteConcern);
     auto reply = client
                      .runCommand(OpMsgRequestBuilder::create(
-                         auth::ValidatedTenancyScope::get(opCtx), dbname, cmd))
+                         auth::ValidatedTenancyScope::get(opCtx), dbname, request.toBSON()))
                      ->getCommandReply();
     return getStatusFromCommandResult(reply);
 }
@@ -214,6 +211,7 @@ bool doRenameOperation(const CompactionState& state,
         RenameCollectionCommand cmd(ecocNss, ecocRenameNss);
         cmd.setDropTarget(false);
         cmd.setCollectionUUID(state.getEcocUuid().value());
+        cmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
 
         uassertStatusOK(doRunCommand(opCtx.get(), DatabaseName::kAdmin, cmd));
         *newEcocRenameUuid = state.getEcocUuid();
@@ -232,6 +230,7 @@ bool doRenameOperation(const CompactionState& state,
         request.setClusteredIndex(
             std::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
         createCmd.setCreateCollectionRequest(std::move(request));
+        createCmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
         auto status = doRunCommand(opCtx.get(), ecocNss.dbName(), createCmd);
         if (!status.isOK()) {
             if (status != ErrorCodes::NamespaceExists) {
@@ -320,6 +319,7 @@ void doDropOperation(const State& state) {
 
     Drop cmd(ecocNss);
     cmd.setCollectionUUID(state.getEcocRenameUuid().value());
+    cmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
     uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.dbName(), cmd));
 }
 

@@ -49,6 +49,9 @@ commands:
     access_check:
       ignore: true
     fields:
+      # Note: getMore interprets the maxTimeMS generic argument (not listed here but injected automatically) differently than other commands.
+      # Instead of it being a limit on execution time, it instead determines the await data timeout: the number of milliseconds for which a
+      # getMore on a tailable, awaitData query should block.
       collection:
         type: string
         validator: { callback: "query_request_helper::validateGetMoreCollectionName" }
@@ -60,13 +63,6 @@ commands:
         type: safeInt64
         optional: true
         validator: {gte: 0}
-        stability: stable
-      maxTimeMS:
-        description: >
-          The await data timeout: the number of milliseconds for which a getMore on a tailable,
-          awaitData query should block.
-        type: safeInt64
-        optional: true
         stability: stable
       term:
         description: >
@@ -84,3 +80,4 @@ commands:
         type: optionalBool
         stability: internal
     reply_type: CursorGetMoreReply
+

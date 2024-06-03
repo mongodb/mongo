@@ -131,31 +131,20 @@ public:
 
     std::size_t sizeWriteOps() const;
 
-    void setShardVersion(ShardVersion shardVersion) {
-        _shardVersion = std::move(shardVersion);
-    }
+    void setShardVersion(ShardVersion shardVersion);
 
-    bool hasShardVersion() const {
-        return _shardVersion.is_initialized();
-    }
+    bool hasShardVersion() const;
 
-    const ShardVersion& getShardVersion() const {
-        invariant(_shardVersion);
-        return *_shardVersion;
-    }
+    const ShardVersion& getShardVersion() const;
 
-    void setDbVersion(DatabaseVersion dbVersion) {
-        _dbVersion = std::move(dbVersion);
-    }
+    void setDbVersion(DatabaseVersion dbVersion);
 
-    bool hasDbVersion() const {
-        return _dbVersion.is_initialized();
-    }
+    bool hasDbVersion() const;
 
-    const DatabaseVersion& getDbVersion() const {
-        invariant(_dbVersion);
-        return *_dbVersion;
-    }
+    const DatabaseVersion& getDbVersion() const;
+
+    GenericArguments& getGenericArguments();
+    const GenericArguments& getGenericArguments() const;
 
     void setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants);
 
@@ -249,9 +238,6 @@ private:
     std::unique_ptr<write_ops::InsertCommandRequest> _insertReq;
     std::unique_ptr<write_ops::UpdateCommandRequest> _updateReq;
     std::unique_ptr<write_ops::DeleteCommandRequest> _deleteReq;
-
-    boost::optional<ShardVersion> _shardVersion;
-    boost::optional<DatabaseVersion> _dbVersion;
 };
 
 

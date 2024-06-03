@@ -59,6 +59,7 @@
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -184,24 +185,27 @@ protected:
         : TransactionCoordinatorTestFixture(std::move(options)) {}
 
     void assertPrepareSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith(
-            PrepareTransaction::kCommandName, kPrepareOk, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kPrepareOk,
+                                        generic_argument_util::kMajorityWriteConcern);
     }
 
     void assertPrepareSentAndRespondWithSuccess(const Timestamp& timestamp) {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         makePrepareOkResponse(timestamp, kDummyAffectedNamespaces),
-                                        WriteConcernOptions::Majority);
+                                        generic_argument_util::kMajorityWriteConcern);
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransaction() {
-        assertCommandSentAndRespondWith(
-            PrepareTransaction::kCommandName, kNoSuchTransaction, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kNoSuchTransaction,
+                                        generic_argument_util::kMajorityWriteConcern);
     }
 
     void assertPrepareSentAndRespondWithRetryableError() {
-        assertCommandSentAndRespondWith(
-            PrepareTransaction::kCommandName, kRetryableError, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kRetryableError,
+                                        generic_argument_util::kMajorityWriteConcern);
         advanceClockAndExecuteScheduledTasks();
     }
 
@@ -283,13 +287,12 @@ auto makeDummyPrepareCommand(const LogicalSessionId& lsid,
                              const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
     PrepareTransaction prepareCmd;
     prepareCmd.setDbName(DatabaseName::kAdmin);
-    auto prepareObj = prepareCmd.toBSON(
-        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumberAndRetryCounter.getTxnNumber()
-                    << "txnRetryCounter" << *txnNumberAndRetryCounter.getTxnRetryCounter()
-                    << "autocommit" << false << WriteConcernOptions::kWriteConcernField
-                    << WriteConcernOptions::Majority));
-
-    return prepareObj;
+    prepareCmd.setLsid(generic_argument_util::toLogicalSessionFromClient(lsid));
+    prepareCmd.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
+    prepareCmd.setTxnRetryCounter(txnNumberAndRetryCounter.getTxnRetryCounter());
+    prepareCmd.setAutocommit(false);
+    prepareCmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    return prepareCmd.toBSON();
 }
 
 TEST_F(TransactionCoordinatorDriverTest, SendDecisionToParticipantShardReturnsOnImmediateSuccess) {
@@ -646,8 +649,9 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(timestamp);
-    assertCommandSentAndRespondWith(
-        PrepareTransaction::kCommandName, kPrepareOkNoTimestamp, WriteConcernOptions::Majority);
+    assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                    kPrepareOkNoTimestamp,
+                                    generic_argument_util::kMajorityWriteConcern);
 
     auto decision = future.get().decision();
 
@@ -671,7 +675,7 @@ TEST_F(TransactionCoordinatorDriverTest,
         PrepareTransaction::kCommandName,
         BSON("ok" << 0 << "code" << ErrorCodes::ReadConcernMajorityNotEnabled << "errmsg"
                   << "Read concern majority not enabled"),
-        WriteConcernOptions::Majority);
+        generic_argument_util::kMajorityWriteConcern);
 
     auto decision = future.get().decision();
 
@@ -743,13 +747,13 @@ TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardsCollectsAffectedName
         makePrepareOkResponse(timestamp,
                               {NamespaceString::createNamespaceString_forTest("db1.coll1"),
                                NamespaceString::createNamespaceString_forTest("db2.coll2")}),
-        WriteConcernOptions::Majority);
+        generic_argument_util::kMajorityWriteConcern);
     assertCommandSentAndRespondWith(
         PrepareTransaction::kCommandName,
         makePrepareOkResponse(timestamp,
                               {NamespaceString::createNamespaceString_forTest("db1.coll2"),
                                NamespaceString::createNamespaceString_forTest("db2.coll1")}),
-        WriteConcernOptions::Majority);
+        generic_argument_util::kMajorityWriteConcern);
 
     auto response = future.get();
     ASSERT_EQUALS(txn::CommitDecision::kCommit, response.decision().getDecision());

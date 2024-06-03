@@ -140,6 +140,9 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::FailedToParse,
+                    "Missing maxTimeMs",
+                    request().getGenericArguments().getMaxTimeMS());
             const std::string failPointName = request().getCommandParameter().toString();
             FailPoint* failPoint = globalFailPointRegistry().find(failPointName);
             if (failPoint == nullptr)

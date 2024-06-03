@@ -34,6 +34,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
@@ -55,7 +56,7 @@ Status validateNamespace(const NamespaceString& nss);
  *
  * Otherwise, returns an empty BSON object.
  */
-BSONObj extractReadConcern(OperationContext* opCtx);
+repl::ReadConcernArgs extractReadConcern(OperationContext* opCtx);
 
 /**
  * If the shard key is invalid, returns a BadValue error. Otherwise, returns an OK status. This

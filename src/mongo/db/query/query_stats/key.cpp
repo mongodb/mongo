@@ -209,7 +209,7 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob, const SerializationOp
 Key::Key(OperationContext* opCtx,
          std::unique_ptr<query_shape::Shape> queryShape,
          boost::optional<BSONObj> hint,
-         boost::optional<BSONObj> readConcern,
+         boost::optional<repl::ReadConcernArgs> readConcern,
          bool maxTimeMS,
          query_shape::CollectionType collectionType)
     : _universalComponents(
@@ -223,7 +223,7 @@ Key::Key(OperationContext* opCtx,
           opCtx->getWriteConcern().isImplicitDefaultWriteConcern()
               ? boost::none
               : boost::make_optional(opCtx->getWriteConcern().toBSON()),
-          readConcern,
+          readConcern ? boost::make_optional(readConcern->toBSONInner()) : boost::none,
           std::make_unique<APIParameters>(APIParameters::get(opCtx)),
           collectionType,
           maxTimeMS) {}

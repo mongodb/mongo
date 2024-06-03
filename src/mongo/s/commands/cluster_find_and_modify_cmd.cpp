@@ -62,6 +62,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -202,12 +203,11 @@ BSONObj getQueryForShardKey(boost::intrusive_ptr<ExpressionContext> expCtx,
 }
 }  // namespace
 
-void handleWouldChangeOwningShardErrorNonTransaction(
-    OperationContext* opCtx,
-    const ShardId& shardId,
-    const NamespaceString& nss,
-    const write_ops::FindAndModifyCommandRequest& request,
-    BSONObjBuilder* result) {
+void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
+                                                     const ShardId& shardId,
+                                                     const NamespaceString& nss,
+                                                     write_ops::FindAndModifyCommandRequest request,
+                                                     BSONObjBuilder* result) {
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
@@ -223,10 +223,18 @@ void handleWouldChangeOwningShardErrorNonTransaction(
     };
     auto sharedBlock = std::make_shared<SharedBlock>(nss);
 
+    // Strip runtime constants because they will be added again when this command is
+    // recursively sent through the service entry point.
+    request.setLegacyRuntimeConstants(boost::none);
+
+    // Strip out any transaction-related arguments specified in the original request before running
+    // it in an internal transaction.
+    generic_argument_util::prepareRequestForInternalTransactionPassthrough(request);
+
     auto swCommitResult = txn.runNoThrow(
         opCtx,
-        [cmdObj = request.toBSON(), sharedBlock](const txn_api::TransactionClient& txnClient,
-                                                 ExecutorPtr txnExec) {
+        [cmdObj = CommandHelpers::filterCommandRequestForPassthrough(request.toBSON()),
+         sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             return txnClient.runCommand(sharedBlock->nss.dbName(), cmdObj)
                 .thenRunOn(txnExec)
                 .then([sharedBlock](auto res) {
@@ -289,13 +297,12 @@ void updateReplyOnWouldChangeOwningShardSuccess(bool matchedDocOrUpserted,
     result->append("ok", 1.0);
 }
 
-void handleWouldChangeOwningShardErrorTransaction(
-    OperationContext* opCtx,
-    const NamespaceString nss,
-    Status responseStatus,
-    const write_ops::FindAndModifyCommandRequest& request,
-    BSONObjBuilder* result,
-    bool fleCrudProcessed) {
+void handleWouldChangeOwningShardErrorTransaction(OperationContext* opCtx,
+                                                  const NamespaceString nss,
+                                                  Status responseStatus,
+                                                  bool shouldReturnPostImage,
+                                                  BSONObjBuilder* result,
+                                                  bool fleCrudProcessed) {
 
     BSONObjBuilder extraInfoBuilder;
     responseStatus.extraInfo()->serialize(&extraInfoBuilder);
@@ -340,7 +347,6 @@ void handleWouldChangeOwningShardErrorTransaction(
                         .semi();
                 });
 
-        auto shouldReturnPostImage = request.getNew() && *request.getNew();
         updateReplyOnWouldChangeOwningShardSuccess(sharedBlock->matchedDocOrUpserted,
                                                    sharedBlock->changeInfo,
                                                    shouldReturnPostImage,
@@ -614,7 +620,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
             }
 
             auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);
-            return newRequest.first.toBSON(request.body);
+            return newRequest.first.toBSON();
         } else {
             return request.body;
         }
@@ -1191,22 +1197,19 @@ void FindAndModifyCmd::handleWouldChangeOwningShardError(OperationContext* opCtx
     auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
         IDLParserContext("ClusterFindAndModify"), cmdObj);
 
-    // Strip write concern because this command will be sent as part of a
-    // transaction and the write concern has already been loaded onto the opCtx and
-    // will be picked up by the transaction API.
-    parsedRequest.setWriteConcern(boost::none);
-
-    // Strip runtime constants because they will be added again when this command is
-    // recursively sent through the service entry point.
-    parsedRequest.setLegacyRuntimeConstants(boost::none);
     if (txnRouter) {
-        handleWouldChangeOwningShardErrorTransaction(
-            opCtx, nss, responseStatus, parsedRequest, result, getCrudProcessedFromCmd(cmdObj));
+        handleWouldChangeOwningShardErrorTransaction(opCtx,
+                                                     nss,
+                                                     responseStatus,
+                                                     parsedRequest.getNew().value_or(false),
+                                                     result,
+                                                     getCrudProcessedFromCmd(cmdObj));
     } else {
         if (isRetryableWrite) {
             parsedRequest.setStmtId(0);
         }
-        handleWouldChangeOwningShardErrorNonTransaction(opCtx, shardId, nss, parsedRequest, result);
+        handleWouldChangeOwningShardErrorNonTransaction(
+            opCtx, shardId, nss, std::move(parsedRequest), result);
     }
 }
 

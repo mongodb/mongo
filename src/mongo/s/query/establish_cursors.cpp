@@ -456,8 +456,8 @@ void killRemoteCursor(OperationContext* opCtx,
                       RemoteCursor&& cursor,
                       const NamespaceString& nss) {
     const auto& host = cursor.getHostAndPort();
-    BSONObj cmdObj = KillCursorsCommandRequest(nss, {cursor.getCursorResponse().getCursorId()})
-                         .toBSON(BSONObj{});
+    BSONObj cmdObj =
+        KillCursorsCommandRequest(nss, {cursor.getCursorResponse().getCursorId()}).toBSON();
     executor::RemoteCommandRequest request(host, nss.dbName(), cmdObj, opCtx);
 
     // We do not process the response to the killCursors request (we make a good-faith

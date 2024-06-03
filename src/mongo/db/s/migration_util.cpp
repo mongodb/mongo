@@ -59,6 +59,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -514,16 +515,16 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
     updateEntry.setUpsert(true);
     updateOp.setUpdates({updateEntry});
 
-    auto passthroughFields = BSON(WriteConcernOptions::kWriteConcernField
-                                  << WriteConcernOptions::Majority << "lsid" << lsid.toBSON()
-                                  << "txnNumber" << currentTxnNumber + 1);
+    updateOp.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    updateOp.setLsid(generic_argument_util::toLogicalSessionFromClient(lsid));
+    updateOp.setTxnNumber(currentTxnNumber + 1);
 
     hangInAdvanceTxnNumInterruptible.pauseWhileSet(opCtx);
     sharding_util::invokeCommandOnShardWithIdempotentRetryPolicy(
         opCtx,
         recipientId,
         NamespaceString::kServerConfigurationNamespace.dbName(),
-        updateOp.toBSON(passthroughFields));
+        updateOp.toBSON());
 
     if (hangInAdvanceTxnNumThenSimulateErrorUninterruptible.shouldFail()) {
         hangInAdvanceTxnNumThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);

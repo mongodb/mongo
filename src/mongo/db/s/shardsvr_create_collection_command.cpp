@@ -106,8 +106,10 @@ void runCreateCommandDirectClient(OperationContext* opCtx,
                                   const CreateCommand& cmd) {
     BSONObj createRes;
     DBDirectClient localClient(opCtx);
+    CreateCommand c = cmd;
+    APIParameters::get(opCtx).setInfo(c);
     // Forward the api check rules enforced by the client
-    localClient.runCommand(ns.dbName(), cmd.toBSON(APIParameters::get(opCtx).toBSON()), createRes);
+    localClient.runCommand(ns.dbName(), c.toBSON(), createRes);
     auto createStatus = getStatusFromCommandResult(createRes);
     uassertStatusOK(createStatus);
 }

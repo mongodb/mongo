@@ -65,6 +65,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -571,6 +572,8 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
 
     auto ownedDeleteRequest =
         write_ops::DeleteCommandRequest::parse(IDLParserContext("delete"), ownedRequest);
+    // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
+    ownedDeleteRequest.setGenericArguments({});
 
     auto ownedDeleteOpEntry = ownedDeleteRequest.getDeletes()[0];
     auto expCtx = makeExpCtx(opCtx, ownedDeleteRequest, ownedDeleteOpEntry);
@@ -673,6 +676,8 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
 
     auto ownedUpdateRequest =
         write_ops::UpdateCommandRequest::parse(IDLParserContext("update"), ownedRequest);
+    // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
+    ownedUpdateRequest.setGenericArguments({});
     auto ownedUpdateOpEntry = ownedUpdateRequest.getUpdates()[0];
 
     auto expCtx = makeExpCtx(opCtx, ownedUpdateRequest, ownedUpdateOpEntry);
@@ -944,6 +949,10 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
 
     auto ownedFindAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
         IDLParserContext("findAndModify"), ownedRequest);
+    // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
+    auto wc = ownedFindAndModifyRequest.getWriteConcern();
+    ownedFindAndModifyRequest.setGenericArguments({});
+    ownedFindAndModifyRequest.setWriteConcern(std::move(wc));
 
     auto expCtx = makeExpCtx(opCtx, ownedFindAndModifyRequest, ownedFindAndModifyRequest);
     auto findAndModifyBlock = std::make_tuple(ownedFindAndModifyRequest, expCtx);
@@ -1044,6 +1053,7 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
 
     newDeleteRequest.getWriteCommandRequestBase().setStmtId(boost::none);
     newDeleteRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
+
     auto deleteReply = queryImpl->deleteDocument(edcNss, stmtId, newDeleteRequest);
     checkWriteErrors(deleteReply);
 
@@ -1152,6 +1162,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     newUpdateRequest.getWriteCommandRequestBase().setStmtId(stmtId);
     newUpdateRequest.getWriteCommandRequestBase().setBypassDocumentValidation(
         bypassDocumentValidation);
+
     ++stmtId;
 
     auto [updateReply, originalDocument] =
@@ -1607,7 +1618,7 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     as->grantInternalAuthorization(opCtx.get());
 
     CountCommandRequest ccr(nss);
-    auto opMsgRequest = ccr.serialize(BSONObj());
+    auto opMsgRequest = ccr.serialize();
 
     DBDirectClient directClient(opCtx.get());
     auto uniqueReply = directClient.runCommand(opMsgRequest);
@@ -1753,6 +1764,8 @@ write_ops::DeleteCommandReply FLEQueryInterfaceImpl::deleteDocument(
     deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
         makeEmptyProcessEncryptionInformation());
 
+    generic_argument_util::prepareRequestForInternalTransactionPassthrough(deleteRequest);
+
     auto response = _txnClient.runCRUDOpSync(BatchedCommandRequest(deleteRequest), {stmtId});
     write_ops::DeleteCommandReply reply;
     responseToReply(response, reply.getWriteCommandReplyBase());
@@ -1833,6 +1846,8 @@ write_ops::UpdateCommandReply FLEQueryInterfaceImpl::update(
     updateRequest.getWriteCommandRequestBase().setEncryptionInformation(
         makeEmptyProcessEncryptionInformation());
 
+    generic_argument_util::prepareRequestForInternalTransactionPassthrough(updateRequest);
+
     dassert(updateRequest.getStmtIds().value_or(std::vector<int32_t>()).empty());
 
     auto response = _txnClient.runCRUDOpSync(BatchedCommandRequest(updateRequest), {stmtId});
@@ -1855,8 +1870,7 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
     auto ei2 = ei;
     ei2.setCrudProcessed(true);
     newFindAndModifyRequest.setEncryptionInformation(ei2);
-    // WriteConcern is set at the transaction level so strip it out
-    newFindAndModifyRequest.setWriteConcern(boost::none);
+    generic_argument_util::prepareRequestForInternalTransactionPassthrough(newFindAndModifyRequest);
 
     auto response = _txnClient.runCommandSync(nss.dbName(), newFindAndModifyRequest.toBSON());
 
@@ -1951,7 +1965,6 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
     }
 
     auto uniqueReply = directClient.runCommand(request);
-
     auto response = uniqueReply->getCommandReply();
 
     auto status = getStatusFromWriteCommandReply(response);

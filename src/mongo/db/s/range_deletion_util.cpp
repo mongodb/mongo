@@ -43,6 +43,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete_stage.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -577,13 +578,13 @@ long long retrieveNumOrphansFromShard(OperationContext* opCtx,
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
     FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
     findCommand.setFilter(BSON("_id" << migrationId));
-    findCommand.setReadConcern(BSONObj());
+    findCommand.setReadConcern(repl::ReadConcernArgs());
     Shard::QueryResponse rangeDeletionResponse =
         uassertStatusOK(recipientShard->runExhaustiveCursorCommand(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             NamespaceString::kRangeDeletionNamespace.dbName(),
-            findCommand.toBSON(BSONObj()),
+            findCommand.toBSON(),
             Milliseconds(-1)));
     if (rangeDeletionResponse.docs.empty()) {
         // In case of shutdown/stepdown, the recipient may have already deleted its range deletion
@@ -626,11 +627,11 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
     write_ops::DeleteCommandRequest deleteOp(NamespaceString::kRangeDeletionNamespace);
     write_ops::DeleteOpEntry query(queryFilter, false /*multi*/);
     deleteOp.setDeletes({query});
+    deleteOp.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
 
     hangInDeleteRangeDeletionOnRecipientInterruptible.pauseWhileSet(opCtx);
 
-    auto cmd = deleteOp.toBSON(
-        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    auto cmd = deleteOp.toBSON();
     sharding_util::invokeCommandOnShardWithIdempotentRetryPolicy(
         opCtx, recipientId, NamespaceString::kRangeDeletionNamespace.dbName(), cmd);
 
@@ -699,11 +700,11 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
     updateEntry.setMulti(false);
     updateEntry.setUpsert(false);
     updateOp.setUpdates({updateEntry});
+    updateOp.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
 
     sharding_util::retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
         opCtx, "ready remote range deletion", [&](OperationContext* newOpCtx) {
-            auto cmd = updateOp.toBSON(
-                BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+            auto cmd = updateOp.toBSON();
             try {
                 sharding_util::invokeCommandOnShardWithIdempotentRetryPolicy(
                     newOpCtx, recipientId, NamespaceString::kRangeDeletionNamespace.dbName(), cmd);

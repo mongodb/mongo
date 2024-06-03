@@ -126,12 +126,12 @@ public:
             tenant_migration_util::protocolStorageOptionsCompatibilityCheck(opCtx,
                                                                             migrationProtocol);
             tenant_migration_util::protocolReadPreferenceCompatibilityCheck(
-                opCtx, migrationProtocol, cmd.getReadPreference());
+                opCtx, migrationProtocol, cmd.getReadPreferenceSettings());
 
             // tenantId will be set to empty string for the "shard merge" protocol.
             TenantMigrationDonorDocument stateDoc(cmd.getMigrationId(),
                                                   cmd.getRecipientConnectionString().toString(),
-                                                  cmd.getReadPreference());
+                                                  cmd.getReadPreferenceSettings());
             stateDoc.setTenantId(tenantId);
             stateDoc.setTenantIds(tenantIds);
             stateDoc.setProtocol(migrationProtocol);

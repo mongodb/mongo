@@ -61,6 +61,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
@@ -589,7 +590,7 @@ public:
                             int options = 0,
                             int limit = 0,
                             int skip = 0,
-                            boost::optional<BSONObj> readConcernObj = boost::none);
+                            boost::optional<repl::ReadConcernArgs> readConcern = boost::none);
 
     /**
      * Executes an acknowledged command to insert a vector of documents.
@@ -713,7 +714,7 @@ protected:
                       int options,
                       int limit,
                       int skip,
-                      boost::optional<BSONObj> readConcernObj);
+                      boost::optional<repl::ReadConcernArgs> readConcern);
 
     virtual void _auth(const BSONObj& params);
 

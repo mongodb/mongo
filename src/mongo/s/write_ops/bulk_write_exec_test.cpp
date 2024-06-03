@@ -1913,7 +1913,7 @@ TEST_F(BulkWriteOpTest, TestBulkWriteBatchSplittingLargeBaseCommandSize) {
     // BSONObjMaxUserSize,  which is the threshold we use to split batches. This should guarantee
     // that the estimated size we calculate for a sub-batch containing all of these writes
     // would also be bigger than BSONMaxUserObjSize and that we will split into multiple batches.
-    ASSERT(bigReq.toBSON(BSONObj()).objsize() > BSONObjMaxUserSize);
+    ASSERT(bigReq.toBSON().objsize() > BSONObjMaxUserSize);
 
     BulkWriteOp bulkWriteOp(_opCtx, bigReq);
 

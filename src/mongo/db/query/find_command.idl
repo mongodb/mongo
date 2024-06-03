@@ -33,7 +33,6 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/db/namespace_string.h"
-    - "mongo/db/query/max_time_ms_parser.h"
 
 imports:
     - "mongo/crypto/fle_field_schema.idl"
@@ -155,11 +154,6 @@ commands:
         description: "Determines whether to return the record identifier for each document."
         type: optionalBool
         stability: unstable
-      $queryOptions:
-        description: "Deprecated. A mechanism to specify readPreference."
-        cpp_name: unwrappedReadPref
-        type: object_owned_nonempty_serialize
-        stability: unstable
       tailable:
         description: "Returns a tailable cursor for a capped collections."
         type: optionalBool
@@ -220,18 +214,6 @@ commands:
         type: object_owned_nonempty_serialize
         default: mongo::BSONObj()
         stability: unstable
-      maxTimeMS:
-        description: "The cumulative time limit in milliseconds for processing operations on the
-        cursor."
-        type: safeInt64
-        optional: true
-        validator: {gte: 0}
-        stability: stable
-      readConcern:
-        description: "Specifies the read concern."
-        type: object_owned
-        optional: true
-        stability: stable
       runtimeConstants:
         description: "A collection of values that do not change once computed."
         cpp_name: legacyRuntimeConstants

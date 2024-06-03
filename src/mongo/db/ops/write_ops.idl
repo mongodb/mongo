@@ -587,11 +587,6 @@ commands:
                 type: LegacyRuntimeConstants
                 optional: true
                 stability: stable
-            writeConcern:
-                description: "Describes the write concern."
-                type: object
-                optional: true
-                stability: stable
             encryptionInformation:
                 description: "Encryption Information schema and other tokens for CRUD commands"
                 type: EncryptionInformation

@@ -114,7 +114,7 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationNoQuery) {
               aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
-    ASSERT(ar.getValue().getReadConcern().value_or(BSONObj()).isEmpty());
+    ASSERT(!ar.getValue().getReadConcern().has_value());
     ASSERT(ar.getValue().getUnwrappedReadPref().value_or(BSONObj()).isEmpty());
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS().value_or(0), 0u);
 
@@ -154,7 +154,7 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationDottedPathNoQuery) {
               aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
-    ASSERT(ar.getValue().getReadConcern().value_or(BSONObj()).isEmpty());
+    ASSERT(!ar.getValue().getReadConcern().has_value());
     ASSERT(ar.getValue().getUnwrappedReadPref().value_or(BSONObj()).isEmpty());
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS().value_or(0), 0u);
 
@@ -209,9 +209,10 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithAllOptions) {
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()),
                       BSON("locale"
                            << "en_US"));
-    ASSERT_BSONOBJ_EQ(ar.getValue().getReadConcern().value_or(BSONObj()),
-                      BSON("level"
-                           << "linearizable"));
+    ASSERT_BSONOBJ_EQ(
+        ar.getValue().getReadConcern().value_or(repl::ReadConcernArgs()).toBSONInner(),
+        BSON("level"
+             << "linearizable"));
     ASSERT_BSONOBJ_EQ(ar.getValue().getUnwrappedReadPref().value_or(BSONObj()),
                       BSON("readPreference"
                            << "secondary"));
@@ -254,7 +255,7 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithQuery) {
               aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
-    ASSERT(ar.getValue().getReadConcern().value_or(BSONObj()).isEmpty());
+    ASSERT(!ar.getValue().getReadConcern().has_value());
     ASSERT(ar.getValue().getUnwrappedReadPref().value_or(BSONObj()).isEmpty());
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS().value_or(0), 0u);
 
@@ -344,7 +345,7 @@ TEST_F(CanonicalDistinctTest, FailsToParseDistinctWithInvalidKeyType) {
     ASSERT_THROWS_CODE(bsonToParsedDistinct(expCtx, cmdObj), DBException, ErrorCodes::TypeMismatch);
 }
 
-TEST_F(CanonicalDistinctTest, InvalidGenericCommandArgumentsAreIgnored) {
+TEST_F(CanonicalDistinctTest, FailsToParseDistinctWithInvalidGenericCommandArgument) {
     BSONObj cmdObj = fromjson(R"({
         distinct: 'testns',
         key: 'a',
@@ -352,8 +353,7 @@ TEST_F(CanonicalDistinctTest, InvalidGenericCommandArgumentsAreIgnored) {
         $db: 'test'
     })");
 
-    auto pdc = bsonToParsedDistinct(expCtx, cmdObj);
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
+    ASSERT_THROWS_CODE(bsonToParsedDistinct(expCtx, cmdObj), DBException, ErrorCodes::BadValue);
 }
 
 }  // namespace

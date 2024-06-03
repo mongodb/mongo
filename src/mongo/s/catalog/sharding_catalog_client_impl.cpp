@@ -557,7 +557,7 @@ HistoricalPlacement ShardingCatalogClientImpl::_fetchPlacementMetadata(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         DatabaseName::kAdmin,
-        request.toBSON(BSONObj()),
+        request.toBSON(),
         Milliseconds(defaultConfigCommandTimeoutMS.load()),
         Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
 
@@ -584,7 +584,7 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
                   readConcern.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern,
               str::stream() << "Disallowed read concern: " << readConcern.toBSONInner());
 
-    aggRequest.setReadConcern(readConcern.toBSONInner());
+    aggRequest.setReadConcern(readConcern);
     aggRequest.setWriteConcern(WriteConcernOptions());
 
     const auto readPref = [&]() -> ReadPreferenceSetting {

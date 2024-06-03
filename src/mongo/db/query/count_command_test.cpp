@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/count_command_as_aggregation_command.h"
 #include "mongo/db/query/count_command_gen.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/assert.h"
@@ -79,7 +80,7 @@ TEST(CountCommandTest, ParserDealsWithMissingFieldsCorrectly) {
     ASSERT_FALSE(countCmd.getSkip());
     ASSERT_FALSE(countCmd.getCollation());
     ASSERT_FALSE(countCmd.getReadConcern());
-    ASSERT_FALSE(countCmd.getQueryOptions());
+    ASSERT_FALSE(countCmd.getUnwrappedReadPref());
 }
 
 TEST(CountCommandTest, ParserParsesCommandWithAllFieldsCorrectly) {
@@ -108,8 +109,9 @@ TEST(CountCommandTest, ParserParsesCommandWithAllFieldsCorrectly) {
     ASSERT_EQ(countCmd.getMaxTimeMS().value(), 10000u);
     ASSERT_BSONOBJ_EQ(countCmd.getHint(), fromjson("{ b : 5 }"));
     ASSERT_BSONOBJ_EQ(countCmd.getCollation().value(), fromjson("{ locale : 'en_US' }"));
-    ASSERT_BSONOBJ_EQ(countCmd.getReadConcern().value(), fromjson("{ level: 'linearizable' }"));
-    ASSERT_BSONOBJ_EQ(countCmd.getQueryOptions().value(),
+    ASSERT_BSONOBJ_EQ(countCmd.getReadConcern()->toBSONInner(),
+                      fromjson("{ level: 'linearizable' }"));
+    ASSERT_BSONOBJ_EQ(countCmd.getUnwrappedReadPref().value(),
                       fromjson("{ $readPreference: 'secondary' }"));
 }
 
@@ -255,8 +257,8 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryOptions) {
                                                     << "TestColl"
                                                     << "$db"
                                                     << "TestDB"));
-    countCmd.setQueryOptions(BSON("readPreference"
-                                  << "secondary"));
+    countCmd.setUnwrappedReadPref(BSON("readPreference"
+                                       << "secondary"));
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
     auto cmdObj =
         OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
@@ -282,17 +284,16 @@ TEST(CountCommandTest, ConvertToAggregationWithReadConcern) {
                                                     << "TestColl"
                                                     << "$db"
                                                     << "TestDB"));
-    countCmd.setReadConcern(BSON("level"
-                                 << "linearizable"));
+    countCmd.setReadConcern(repl::ReadConcernArgs::kLinearizable);
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
     auto cmdObj =
         OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
             .body;
 
     auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(cmdObj));
-    ASSERT_BSONOBJ_EQ(ar.getReadConcern().value_or(BSONObj()),
-                      BSON("level"
-                           << "linearizable"));
+    ASSERT_TRUE(ar.getReadConcern().has_value());
+    ASSERT_BSONOBJ_EQ(ar.getReadConcern()->toBSONInner(),
+                      repl::ReadConcernArgs::kLinearizable.toBSONInner());
 
     std::vector<BSONObj> expectedPipeline{BSON("$count"
                                                << "count")};

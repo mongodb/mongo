@@ -113,7 +113,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
                       BSON("locale"
                            << "en_US"));
     ASSERT_EQ(*request.getMaxTimeMS(), 100u);
-    ASSERT_BSONOBJ_EQ(*request.getReadConcern(),
+    ASSERT_BSONOBJ_EQ(request.getReadConcern()->toBSONInner(),
                       BSON("level"
                            << "linearizable"));
     ASSERT_BSONOBJ_EQ(request.getUnwrappedReadPref().value_or(BSONObj()),
@@ -191,7 +191,7 @@ TEST(AggregationRequestTest, ShouldParseExplainFlagWithReadConcern) {
     auto request =
         unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(inputBson));
     ASSERT_TRUE(request.getExplain());
-    ASSERT_BSONOBJ_EQ(*request.getReadConcern(),
+    ASSERT_BSONOBJ_EQ(request.getReadConcern()->toBSONInner(),
                       BSON("level"
                            << "majority"));
 }
@@ -235,7 +235,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setUnwrappedReadPref(readPrefObj);
     const auto readConcernObj = BSON("level"
                                      << "linearizable");
-    request.setReadConcern(readConcernObj);
+    request.setReadConcern(repl::ReadConcernArgs::kLinearizable);
     request.setIsMapReduceCommand(true);
     const auto letParamsObj = BSON("foo"
                                    << "bar");
@@ -251,20 +251,20 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
         {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
         {AggregateCommandRequest::kAllowDiskUseFieldName, true},
         {AggregateCommandRequest::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))},
-        {query_request_helper::cmdOptionMaxTimeMS, 10},
         {AggregateCommandRequest::kBypassDocumentValidationFieldName, true},
-        {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
         {AggregateCommandRequest::kCollationFieldName, collationObj},
         {AggregateCommandRequest::kHintFieldName, hintObj},
         {AggregateCommandRequest::kLetFieldName, letParamsObj},
         {AggregateCommandRequest::kNeedsMergeFieldName, true},
         {AggregateCommandRequest::kFromMongosFieldName, true},
-        {query_request_helper::kUnwrappedReadPrefField, readPrefObj},
         {AggregateCommandRequest::kRequestReshardingResumeTokenFieldName, true},
         {AggregateCommandRequest::kIsMapReduceCommandFieldName, true},
         {AggregateCommandRequest::kCollectionUUIDFieldName, uuid},
         {AggregateCommandRequest::kIsClusterQueryWithoutShardKeyCmdFieldName, true},
-        {AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName, true}};
+        {AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName, true},
+        {query_request_helper::cmdOptionMaxTimeMS, 10},
+        {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
+        {query_request_helper::kUnwrappedReadPrefField, readPrefObj}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
                            make_intrusive<ExpressionContextForTest>(nss), request),
                        expectedSerialization);

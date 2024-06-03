@@ -31,7 +31,6 @@ global:
     cpp_includes:
         - "mongo/db/namespace_string.h"
         - "mongo/db/query/count_request.h"
-        - "mongo/db/query/max_time_ms_parser.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -102,22 +101,6 @@ commands:
                 type: object
                 ignore: true
                 stability: unstable
-            readConcern:
-                description: "A BSONObj read concern."
-                type: object
-                optional: true
-                stability: stable
-            maxTimeMS:
-                type: safeInt64
-                validator: {gte: 0}
-                optional: true
-                stability: stable
-            $queryOptions:
-                description: "Unwrapped read preference."
-                cpp_name: queryOptions
-                type: object
-                optional: true
-                stability: stable
             encryptionInformation:
                 description: "Encryption Information schema and other tokens for CRUD commands"
                 type: EncryptionInformation

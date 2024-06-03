@@ -443,11 +443,7 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
     def get_op_msg_request_serializer_method(self):
         # type: () -> Optional[MethodInfo]
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            "serialize",
-            ["const BSONObj& commandPassthroughFields = {}"],
-            "OpMsgRequest",
-            const=True,
+            common.title_case(self._struct.cpp_name), "serialize", [], "OpMsgRequest", const=True
         )
 
     def get_op_msg_request_deserializer_static_method(self):
@@ -494,7 +490,7 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
         return MethodInfo(
             common.title_case(self._struct.cpp_name),
             "serialize",
-            ["BSONObjBuilder* builder", "const BSONObj& commandPassthroughFields = {}"],
+            ["BSONObjBuilder* builder"],
             "void",
             const=True,
         )
@@ -503,11 +499,7 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
         # type: () -> MethodInfo
         # Commands that require namespaces require it as a parameter to serialize()
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            "toBSON",
-            ["const BSONObj& commandPassthroughFields = {}"],
-            "BSONObj",
-            const=True,
+            common.title_case(self._struct.cpp_name), "toBSON", [], "BSONObj", const=True
         )
 
     def gen_serializer(self, indented_writer):
@@ -563,7 +555,7 @@ class _CommandFromType(_CommandBaseTypeInfo):
         return MethodInfo(
             common.title_case(self._struct.cpp_name),
             "serialize",
-            ["BSONObjBuilder* builder", "const BSONObj& commandPassthroughFields = {}"],
+            ["BSONObjBuilder* builder"],
             "void",
             const=True,
         )
@@ -571,11 +563,7 @@ class _CommandFromType(_CommandBaseTypeInfo):
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            "toBSON",
-            ["const BSONObj& commandPassthroughFields = {}"],
-            "BSONObj",
-            const=True,
+            common.title_case(self._struct.cpp_name), "toBSON", [], "BSONObj", const=True
         )
 
     def get_deserializer_method(self):
@@ -648,7 +636,7 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
         return MethodInfo(
             common.title_case(self._struct.cpp_name),
             "serialize",
-            ["BSONObjBuilder* builder", "const BSONObj& commandPassthroughFields = {}"],
+            ["BSONObjBuilder* builder"],
             "void",
             const=True,
         )
@@ -656,11 +644,7 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            "toBSON",
-            ["const BSONObj& commandPassthroughFields = {}"],
-            "BSONObj",
-            const=True,
+            common.title_case(self._struct.cpp_name), "toBSON", [], "BSONObj", const=True
         )
 
     def get_deserializer_method(self):
@@ -756,7 +740,7 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
         return MethodInfo(
             common.title_case(self._struct.cpp_name),
             "serialize",
-            ["BSONObjBuilder* builder", "const BSONObj& commandPassthroughFields = {}"],
+            ["BSONObjBuilder* builder"],
             "void",
             const=True,
         )
@@ -764,11 +748,7 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            "toBSON",
-            ["const BSONObj& commandPassthroughFields = {}"],
-            "BSONObj",
-            const=True,
+            common.title_case(self._struct.cpp_name), "toBSON", [], "BSONObj", const=True
         )
 
     def get_deserializer_method(self):

@@ -375,8 +375,12 @@ def _compute_struct_is_view(struct, ctxt, symbols):
             if _compute_chained_item_is_view(struct, ctxt, symbols, chained_struct):
                 return True
 
-    # Check command parameter.
+    # Check command parameter and chained generic arguments.
     if isinstance(struct, syntax.Command):
+        for generic_arg_list in symbols.generic_argument_lists:
+            if _compute_struct_is_view(generic_arg_list, ctxt, symbols):
+                return True
+
         if struct.type is not None and _compute_command_type_is_view(
             struct, ctxt, symbols, struct.type
         ):
@@ -457,7 +461,7 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     for chained_struct in struct.chained_structs or []:
         _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct)
 
-    # Parse the fields last so that they are serialized after chained stuff.
+    # Parse the fields next so that they are serialized after chained stuff.
     for field in struct.fields or []:
         ast_field = _bind_field(ctxt, parsed_spec, field)
         if ast_field:
@@ -563,8 +567,8 @@ def _bind_struct(ctxt, parsed_spec, struct):
     return ast_struct
 
 
-def _inject_hidden_command_fields(command):
-    # type: (syntax.Command) -> None
+def _get_hidden_command_fields(command):
+    # type: (syntax.Command) -> List[syntax.Field]
     """Inject hidden fields to aid deserialization/serialization for OpMsg parsing of commands."""
 
     # Inject a "$db" which we can decode during command parsing
@@ -579,7 +583,7 @@ def _inject_hidden_command_fields(command):
     if command.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB:
         db_field.constructed = True
 
-    command.fields.append(db_field)
+    return [db_field]
 
 
 def _bind_struct_type(struct):
@@ -905,10 +909,22 @@ def _bind_command(ctxt, parsed_spec, command):
     ast_command.command_name = command.command_name
     ast_command.command_alias = command.command_alias
 
-    # Inject special fields used for command parsing
-    _inject_hidden_command_fields(command)
-
     _bind_struct_common(ctxt, parsed_spec, command, ast_command)
+
+    # Inject generic arguments into the command after the command's regular fields.
+    for struct in parsed_spec.symbols.generic_argument_lists:
+        chained_struct = syntax.ChainedStruct(struct.file_name, struct.line, struct.column)
+        chained_struct.name = struct.name
+        chained_struct.cpp_name = struct.cpp_name or struct.name
+        _bind_chained_struct(ctxt, parsed_spec, ast_command, chained_struct)
+
+    # Inject special fields used for command parsing at the end (e.g. $db).
+    for field in _get_hidden_command_fields(command):
+        ast_field = _bind_field(ctxt, parsed_spec, field)
+        if ast_field and not _is_duplicate_field(
+            ctxt, ast_command.name, ast_command.fields, ast_field
+        ):
+            ast_command.fields.append(ast_field)
 
     ast_command.access_checks = _bind_access_check(ctxt, parsed_spec, command)
     if command.api_version != "" and command.access_check is None:
@@ -1361,9 +1377,18 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
     # Merge all the fields from resolved struct into this ast struct.
     for field in struct.fields or []:
         ast_field = _bind_field(ctxt, parsed_spec, field)
+        if ast_field is None:
+            return
+
         # Don't use internal fields in chained types, stick to local access only
-        if ast_field.type.internal_only:
+        if ast_field.type and ast_field.type.internal_only:
             continue
+
+        # If the field in the chained struct is marked as ignored and the struct being chained to already
+        # includes the field, just move on instead of raising an error.
+        if field.ignore and field.name in [f.name for f in ast_struct.fields]:
+            continue
+
         if ast_field and not _is_duplicate_field(
             ctxt, chained_struct.name, ast_struct.fields, ast_field
         ):

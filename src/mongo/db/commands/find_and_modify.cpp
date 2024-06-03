@@ -354,7 +354,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                                            ExplainOptions::Verbosity verbosity,
                                            rpc::ReplyBuilderInterface* result) {
     validate(request());
-    const BSONObj& cmdObj = request().toBSON(BSONObj() /* commandPassthroughFields */);
+    const BSONObj& cmdObj = request().toBSON();
 
     auto requestAndMsg = [&]() {
         if (request().getEncryptionInformation()) {

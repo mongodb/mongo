@@ -38,7 +38,7 @@ assert.eq(getMajorityRCCount(), 3);
 
 // Check that the session read concern doesn't break explain.
 assert.commandWorked(coll.runCommand(
-    {explain: {count: collName, query: {"_id": 0}, readConcern: {level: "available"}}}));
+    {explain: {count: collName, query: {"_id": 0}, readConcern: {level: "local"}}}));
 assert.commandWorked(coll.runCommand({explain: {count: collName, query: {"_id": 0}}}));
 
 // Transaction-level

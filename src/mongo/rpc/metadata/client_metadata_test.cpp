@@ -404,31 +404,11 @@ TEST(ClientMetadataTest, TestInvalidDocWhileSettingOpCtxMetadata) {
     auto svcCtx = ServiceContext::make();
     auto client = svcCtx->getService()->makeClient("ClientMetadataTest");
     auto opCtx = client->makeOperationContext();
-    // metadataElem is of BSON type int
     auto obj = BSON("a" << 4);
-    auto metadataElem = obj["a"];
 
-    // We expect parsing to fail because metadata must be of BSON type "document"
-    ASSERT_THROWS_CODE(ClientMetadata::setFromMetadataForOperation(opCtx.get(), metadataElem),
+    ASSERT_THROWS_CODE(ClientMetadata::setFromMetadataForOperation(opCtx.get(), obj),
                        DBException,
-                       ErrorCodes::TypeMismatch);
-
-    // Ensure we can still safely retrieve a ClientMetadata* from the opCtx, and that it was left
-    // unset
-    auto clientMetaDataPtr = ClientMetadata::getForOperation(opCtx.get());
-    ASSERT_FALSE(clientMetaDataPtr);
-}
-
-TEST(ClientMetadataTest, TestEooElemAsValueToSetOpCtxMetadata) {
-    auto svcCtx = ServiceContext::make();
-    auto client = svcCtx->getService()->makeClient("ClientMetadataTest");
-    auto opCtx = client->makeOperationContext();
-    // metadataElem is of BSON type eoo
-    auto metadataElem = BSONElement();
-
-    // BSON type "eoo" represents no data; we expect setting the metadata to be a no-op in this
-    // case.
-    ClientMetadata::setFromMetadataForOperation(opCtx.get(), metadataElem);
+                       ErrorCodes::ClientMetadataMissingField);
 
     // Ensure we can still safely retrieve a ClientMetadata* from the opCtx, and that it was left
     // unset

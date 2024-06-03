@@ -248,7 +248,7 @@ LogicalSessionIdSet SessionsCollection::_doFindRemoved(
     auto wrappedSend = [&](BSONObj batch) {
         BSONObjBuilder batchWithReadConcernLocal(batch);
         batchWithReadConcernLocal.append(repl::ReadConcernArgs::kReadConcernFieldName,
-                                         repl::ReadConcernArgs::kLocal);
+                                         repl::ReadConcernArgs::kLocal.toBSONInner());
         auto swBatchResult = send(batchWithReadConcernLocal.obj());
 
         auto result = SessionsCollectionFetchResult::parse(
@@ -289,9 +289,8 @@ BSONObj SessionsCollection::generateCreateIndexesCmd() {
 
     CreateIndexesCommand createIndexes(NamespaceString::kLogicalSessionsNamespace);
     createIndexes.setIndexes({index.toBSON()});
-
-    return createIndexes.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                     << WriteConcernOptions::kInternalWriteDefault));
+    createIndexes.setWriteConcern(WriteConcernOptions());
+    return createIndexes.toBSON();
 }
 
 BSONObj SessionsCollection::generateCollModCmd() {

@@ -29,6 +29,8 @@
 
 #include "mongo/s/analyze_shard_key_common.h"
 
+#include <boost/none.hpp>
+
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 
@@ -54,9 +56,10 @@ Status validateNamespace(const NamespaceString& nss) {
     return Status::OK();
 }
 
-BSONObj extractReadConcern(OperationContext* opCtx) {
-    return repl::ReadConcernArgs::get(opCtx).toBSONInner().removeField(
-        ReadWriteConcernProvenanceBase::kSourceFieldName);
+repl::ReadConcernArgs extractReadConcern(OperationContext* opCtx) {
+    auto rc = repl::ReadConcernArgs::get(opCtx).toReadConcernIdl();
+    rc.setProvenance(boost::none);
+    return repl::ReadConcernArgs::fromIDLThrows(std::move(rc));
 }
 
 double round(double val, int n) {

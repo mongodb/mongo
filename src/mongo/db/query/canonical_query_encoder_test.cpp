@@ -707,14 +707,12 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeySBEWithReadConcern) {
 
     // Find command with read concern "majority".
     findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setReadConcern(
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    findCommand->setReadConcern(repl::ReadConcernArgs::kMajority);
     testComputeSBEKey(gctx, "{a: 1}", "{a: 1}", "{}", std::move(findCommand));
 
     // Find command with read concern "available".
     findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setReadConcern(
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kAvailableReadConcern).toBSONInner());
+    findCommand->setReadConcern(repl::ReadConcernArgs::kAvailable);
     testComputeSBEKey(gctx, "{a: 1}", "{a: 1}", "{}", std::move(findCommand));
 }
 

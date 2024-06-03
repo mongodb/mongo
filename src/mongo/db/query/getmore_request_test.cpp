@@ -44,6 +44,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 
 namespace {
@@ -111,7 +112,7 @@ TEST(GetMoreRequestTest, toBSONNoMissingFields) {
                                              << "batchSize" << 99 << "maxTimeMS" << 789 << "term"
                                              << 1 << "lastKnownCommittedOpTime"
                                              << BSON("ts" << Timestamp(0, 10) << "t" << 2LL));
-    ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
+    ASSERT_BSONOBJ_EQ_UNORDERED(requestObj, expectedRequest);
 }
 
 }  // namespace

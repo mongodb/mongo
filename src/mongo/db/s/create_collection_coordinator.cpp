@@ -67,6 +67,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/list_indexes_gen.h"
@@ -142,7 +143,6 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
-
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 MONGO_FAIL_POINT_DEFINE(failAtCommitCreateCollectionCoordinator);
@@ -369,8 +369,9 @@ Status createCollectionLocally(OperationContext* opCtx,
     auto cmd = create_collection_util::makeCreateCommand(opCtx, nss, request);
     BSONObj createRes;
     DBDirectClient localClient(opCtx);
+    APIParameters::get(opCtx).setInfo(cmd);
     // Forward the api check rules enforced by the client
-    auto bson = cmd.toBSON(APIParameters::get(opCtx).toBSON());
+    auto bson = cmd.toBSON();
     localClient.runCommand(nss.dbName(), bson, createRes);
     return getStatusFromCommandResult(createRes);
 }
@@ -470,12 +471,12 @@ bool checkIfCollectionIsEmpty(OperationContext* opCtx,
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dataShard));
     FindCommandRequest findCommand(nss);
     findCommand.setLimit(1);
-    findCommand.setReadConcern(readConcern.toBSONInner());
+    findCommand.setReadConcern(readConcern);
     Shard::QueryResponse response = uassertStatusOK(recipientShard->runExhaustiveCursorCommand(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         nss.dbName(),
-        findCommand.toBSON(BSONObj()),
+        findCommand.toBSON(),
         Milliseconds(-1)));
     return response.docs.empty();
 }
@@ -495,12 +496,14 @@ void cleanupPartialChunksFromPreviousAttempt(OperationContext* opCtx,
     // Remove the chunks matching uuid
     ConfigsvrRemoveChunks configsvrRemoveChunksCmd(uuid);
     configsvrRemoveChunksCmd.setDbName(DatabaseName::kAdmin);
+    generic_argument_util::setMajorityWriteConcern(configsvrRemoveChunksCmd);
+    generic_argument_util::setOperationSessionInfo(configsvrRemoveChunksCmd, osi);
 
     const auto swRemoveChunksResult = configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         DatabaseName::kAdmin,
-        CommandHelpers::appendMajorityWriteConcern(configsvrRemoveChunksCmd.toBSON(osi.toBSON())),
+        configsvrRemoveChunksCmd.toBSON(),
         Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(swRemoveChunksResult),
@@ -1091,10 +1094,10 @@ void createCollectionOnShards(OperationContext* opCtx,
         createCollectionParticipantRequest.setOptions(collOptions);
         createCollectionParticipantRequest.setIdIndex(idIndex);
         createCollectionParticipantRequest.setIndexes(indexes);
+        generic_argument_util::setOperationSessionInfo(createCollectionParticipantRequest, osi);
+        generic_argument_util::setMajorityWriteConcern(createCollectionParticipantRequest);
 
-        requests.emplace_back(shard,
-                              CommandHelpers::appendMajorityWriteConcern(
-                                  createCollectionParticipantRequest.toBSON(osi.toBSON())));
+        requests.emplace_back(shard, createCollectionParticipantRequest.toBSON());
     }
 
     if (!requests.empty()) {
@@ -1931,12 +1934,11 @@ void CreateCollectionCoordinator::_exitCriticalSectionOnShards(
     unblockCRUDOperationsRequest.setReason(_critSecReason);
     unblockCRUDOperationsRequest.setClearFilteringMetadata(true);
     unblockCRUDOperationsRequest.setThrowIfReasonDiffers(throwIfReasonDiffers);
-
-    GenericArguments args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+    generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
+    generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
+                                                   getNewSession(opCtx));
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        **executor, token, unblockCRUDOperationsRequest, args);
+        **executor, token, unblockCRUDOperationsRequest);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
@@ -2329,11 +2331,11 @@ void CreateCollectionCoordinator::_enterCriticalSectionOnShards(
     blockCRUDOperationsRequest.setBlockType(blockType);
     blockCRUDOperationsRequest.setReason(_critSecReason);
 
-    GenericArguments args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+    generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
+    generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
+                                                   getNewSession(opCtx));
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        **executor, token, blockCRUDOperationsRequest, args);
+        **executor, token, blockCRUDOperationsRequest);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 

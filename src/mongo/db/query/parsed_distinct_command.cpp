@@ -76,34 +76,6 @@ std::unique_ptr<ParsedDistinctCommand> parse(
                                                     expCtx->getCollator()));
     }
 
-    // The IDL parser above does not handle generic command arguments. Since the underlying query
-    // request requires the following options, manually parse and verify them here.
-
-    // ReadConcern.
-    if (auto readConcernElt = cmd[repl::ReadConcernArgs::kReadConcernFieldName]) {
-        uassert(ErrorCodes::TypeMismatch,
-                str::stream() << "\"" << repl::ReadConcernArgs::kReadConcernFieldName
-                              << "\" had the wrong type. Expected " << typeName(BSONType::Object)
-                              << ", found " << typeName(readConcernElt.type()),
-                readConcernElt.type() == BSONType::Object);
-        parsedDistinct->readConcern = readConcernElt.embeddedObject().getOwned();
-    }
-
-    // QueryOptions.
-    if (auto queryOptionsElt = cmd[query_request_helper::kUnwrappedReadPrefField]) {
-        uassert(ErrorCodes::TypeMismatch,
-                str::stream() << "\"" << query_request_helper::kUnwrappedReadPrefField
-                              << "\" had the wrong type. Expected " << typeName(BSONType::Object)
-                              << ", found " << typeName(queryOptionsElt.type()),
-                queryOptionsElt.type() == BSONType::Object);
-        parsedDistinct->queryOptions = queryOptionsElt.embeddedObject().getOwned();
-    }
-
-    // MaxTimeMS.
-    if (auto maxTimeMSElt = cmd[query_request_helper::cmdOptionMaxTimeMS]) {
-        parsedDistinct->maxTimeMS = uassertStatusOK(parseMaxTimeMS(maxTimeMSElt));
-    }
-
     // Rest of the command.
     parsedDistinct->distinctCommandRequest = std::move(distinctCommand);
 

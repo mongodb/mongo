@@ -121,7 +121,7 @@ public:
             tenant_migration_util::protocolStorageOptionsCompatibilityCheck(opCtx,
                                                                             migrationProtocol);
             tenant_migration_util::protocolReadPreferenceCompatibilityCheck(
-                opCtx, migrationProtocol, cmd.getReadPreference());
+                opCtx, migrationProtocol, cmd.getReadPreferenceSettings());
 
             if (MONGO_unlikely(returnResponseOkForRecipientSyncDataCmd.shouldFail())) {
                 LOGV2(4879608,
@@ -149,7 +149,7 @@ public:
                                                       cmd.getDonorConnectionString().toString(),
                                                       cmd.getTenantId()->toString(),
                                                       cmd.getStartMigrationDonorTimestamp(),
-                                                      cmd.getReadPreference());
+                                                      cmd.getReadPreferenceSettings());
             stateDoc.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
 
             auto recipientService =
@@ -173,7 +173,7 @@ public:
                                                  cmd.getDonorConnectionString().toString(),
                                                  *cmd.getTenantIds(),
                                                  cmd.getStartMigrationDonorTimestamp(),
-                                                 cmd.getReadPreference());
+                                                 cmd.getReadPreferenceSettings());
 
             auto recipientService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
@@ -359,7 +359,7 @@ public:
                                                       cmd.getDonorConnectionString().toString(),
                                                       cmd.getTenantId()->toString(),
                                                       kUnusedStartMigrationTimestamp,
-                                                      cmd.getReadPreference());
+                                                      cmd.getReadPreferenceSettings());
 
             stateDoc.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
             // Set the state to 'kDone' so that we don't create a recipient access blocker
@@ -386,7 +386,7 @@ public:
                                                  cmd.getDonorConnectionString().toString(),
                                                  *cmd.getTenantIds(),
                                                  kUnusedStartMigrationTimestamp,
-                                                 cmd.getReadPreference());
+                                                 cmd.getReadPreferenceSettings());
 
             // Set 'startGarbageCollect' true to not start a migration (and install access blocker
             // or get serverless lock) unncessarily if this recipientForgetMigration command is

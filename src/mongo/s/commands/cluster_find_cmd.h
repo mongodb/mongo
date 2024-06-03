@@ -33,6 +33,7 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
@@ -41,6 +42,8 @@
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/idl/generic_argument_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -68,7 +71,8 @@ public:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) override {
         // TODO: Parse into a QueryRequest here.
-        return std::make_unique<Invocation>(this, opMsgRequest);
+        return std::make_unique<Invocation>(
+            this, auth::ValidatedTenancyScope::get(opCtx), opMsgRequest);
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
@@ -109,8 +113,18 @@ public:
 
     class Invocation final : public CommandInvocation {
     public:
-        Invocation(const ClusterFindCmdBase* definition, const OpMsgRequest& request)
-            : CommandInvocation(definition), _request(request), _dbName(request.parseDbName()) {}
+        Invocation(const ClusterFindCmdBase* definition,
+                   const boost::optional<auth::ValidatedTenancyScope>& vts,
+                   const OpMsgRequest& request)
+            : CommandInvocation(definition),
+              _request(request),
+              _dbName(request.parseDbName()),
+              _genericArgs(
+                  GenericArguments::parse(IDLParserContext("find",
+                                                           request.validatedTenancyScope,
+                                                           request.getValidatedTenantId(),
+                                                           request.getSerializationContext()),
+                                          _request.body)) {}
 
     private:
         bool supportsWriteConcern() const override {
@@ -162,7 +176,7 @@ public:
 
             try {
                 const auto explainCmd = ClusterExplain::wrapAsExplain(
-                    findCommand->toBSON(BSONObj()), verbosity, querySettings.toBSON());
+                    findCommand->toBSON(), verbosity, querySettings.toBSON());
 
                 long long millisElapsed;
                 std::vector<AsyncRequestsSender::Response> shardResponses;
@@ -279,6 +293,10 @@ public:
             }
         }
 
+        const GenericArguments& getGenericArguments() const override {
+            return _genericArgs;
+        }
+
     private:
         /**
          * Parses the command object to a FindCommandRequest, validates that no runtime
@@ -287,12 +305,11 @@ public:
          */
         std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
             OperationContext* opCtx, NamespaceString nss, BSONObj cmdObj) {
-            auto findCommand = query_request_helper::makeFromFindCommand(
-                std::move(cmdObj),
-                auth::ValidatedTenancyScope::get(opCtx),
-                nss.tenantId(),
-                SerializationContext::stateDefault(),
-                APIParameters::get(opCtx).getAPIStrict().value_or(false));
+            auto findCommand =
+                query_request_helper::makeFromFindCommand(std::move(cmdObj),
+                                                          auth::ValidatedTenancyScope::get(opCtx),
+                                                          nss.tenantId(),
+                                                          SerializationContext::stateDefault());
             if (!findCommand->getReadConcern()) {
                 if (opCtx->isStartingMultiDocumentTransaction() ||
                     !opCtx->inMultiDocumentTransaction()) {
@@ -300,7 +317,7 @@ public:
                     // first operation in a transaction, or not running in a transaction, then
                     // use the readConcern from the opCtx (which may be a cluster-wide default).
                     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-                    findCommand->setReadConcern(readConcernArgs.toBSONInner());
+                    findCommand->setReadConcern(readConcernArgs);
                 }
             }
             uassert(51202,
@@ -365,6 +382,7 @@ public:
         const OpMsgRequest& _request;
         const DatabaseName _dbName;
         bool _didDoFLERewrite{false};
+        const GenericArguments _genericArgs;
     };
 };
 

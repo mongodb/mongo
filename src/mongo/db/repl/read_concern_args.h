@@ -48,6 +48,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo {
@@ -66,8 +67,12 @@ public:
     static constexpr StringData kWaitLastStableRecoveryTimestamp =
         ReadConcernIdl::kWaitLastStableRecoveryTimestampFieldName;
 
-    static const BSONObj kImplicitDefault;
-    static const BSONObj kLocal;
+    static const ReadConcernArgs kImplicitDefault;
+    static const ReadConcernArgs kLocal;
+    static const ReadConcernArgs kMajority;
+    static const ReadConcernArgs kAvailable;
+    static const ReadConcernArgs kLinearizable;
+    static const ReadConcernArgs kSnapshot;
 
     /**
      * Represents the internal mechanism an operation uses to satisfy 'majority' read concern.
@@ -94,6 +99,17 @@ public:
 
     ReadConcernArgs(boost::optional<LogicalTime> afterClusterTime,
                     boost::optional<ReadConcernLevel> level);
+
+    static ReadConcernArgs snapshot(
+        LogicalTime atClusterTime,
+        boost::optional<bool> allowTransactionTableSnapshot = boost::none) {
+        auto rc = ReadConcernArgs::kSnapshot;
+        rc.setArgsAtClusterTimeForSnapshot(atClusterTime.asTimestamp());
+        if (allowTransactionTableSnapshot) {
+            rc._allowTransactionTableSnapshot = *allowTransactionTableSnapshot;
+        }
+        return rc;
+    }
 
     /**
      * Format:

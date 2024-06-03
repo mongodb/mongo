@@ -130,6 +130,11 @@ public:
         NamespaceString ns() const override {
             return request().getFrom();
         }
+
+        const DatabaseName& db() const override {
+            return request().getDbName();
+        }
+
         bool supportsWriteConcern() const override {
             return true;
         }

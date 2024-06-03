@@ -71,6 +71,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -82,6 +83,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/serialization_context.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -124,16 +126,14 @@ public:
     /**
      * A behavior to perform before CommandInvocation::run()
      */
-    virtual void onBeforeRun(OperationContext* opCtx,
-                             const OpMsgRequest& request,
-                             CommandInvocation* invocation) = 0;
+    virtual void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) = 0;
 
     /**
      * A behavior to perform before CommandInvocation::asyncRun(). Defaults to `onBeforeRun(...)`.
      */
     virtual void onBeforeAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
                                   CommandInvocation* invocation) {
-        onBeforeRun(rec->getOpCtx(), rec->getRequest(), invocation);
+        onBeforeRun(rec->getOpCtx(), invocation);
     }
 
     /**
@@ -142,7 +142,6 @@ public:
      * response body. However, onAfterRun must not mutate the response body.
      */
     virtual void onAfterRun(OperationContext* opCtx,
-                            const OpMsgRequest& request,
                             CommandInvocation* invocation,
                             rpc::ReplyBuilderInterface* response) = 0;
 
@@ -151,7 +150,7 @@ public:
      */
     virtual void onAfterAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
                                  CommandInvocation* invocation) {
-        onAfterRun(rec->getOpCtx(), rec->getRequest(), invocation, rec->getReplyBuilder());
+        onAfterRun(rec->getOpCtx(), invocation, rec->getReplyBuilder());
     }
 };
 
@@ -159,8 +158,6 @@ public:
 // Would be a namespace, but want to keep it closed rather than open.
 // Some of these may move to the BasicCommand shim if they are only for legacy implementations.
 struct CommandHelpers {
-    static const WriteConcernOptions kMajorityWriteConcern;
-
     // The type of the first field in 'cmdObj' must be mongo::String. The first field is
     // interpreted as a collection name.
     static std::string parseNsFullyQualified(const BSONObj& cmdObj);
@@ -323,7 +320,6 @@ struct CommandHelpers {
      * but may mirror, forward, or do other supplementary actions with the request.
      */
     static void runCommandInvocation(OperationContext* opCtx,
-                                     const OpMsgRequest& request,
                                      CommandInvocation* invocation,
                                      rpc::ReplyBuilderInterface* response);
 
@@ -982,6 +978,8 @@ public:
      */
     void checkAuthorization(OperationContext* opCtx, const OpMsgRequest& request) const;
 
+    virtual const GenericArguments& getGenericArguments() const = 0;
+
 protected:
     ResourcePattern resourcePattern() const;
 
@@ -1290,14 +1288,12 @@ private:
     static RequestType _parseRequest(OperationContext* opCtx,
                                      const DatabaseName& dbName,
                                      const BSONObj& cmdObj) {
-
-        bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
-        auto ctx = IDLParserContext(RequestType::kCommandName,
-                                    auth::ValidatedTenancyScope::get(opCtx),
-                                    dbName.tenantId(),
-                                    SerializationContext::stateDefault());
-
-        return idl::parseCommandDocument<RequestType>(ctx, apiStrict, cmdObj);
+        return idl::parseCommandDocument<RequestType>(
+            IDLParserContext(RequestType::kCommandName,
+                             auth::ValidatedTenancyScope::get(opCtx),
+                             dbName.tenantId(),
+                             SerializationContext::stateDefault()),
+            cmdObj);
     }
 
     RequestType _request;
@@ -1394,14 +1390,23 @@ protected:
         return _opMsgRequest;
     }
 
+    const GenericArguments& getGenericArguments() const override {
+        return request().getGenericArguments();
+    }
+
 private:
     static RequestType _parseRequest(OperationContext* opCtx,
                                      const Command* command,
                                      const OpMsgRequest& opMsgRequest) {
-        bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+        auto ctx = IDLParserContext(command->getName(),
+                                    opMsgRequest.validatedTenancyScope,
+                                    opMsgRequest.getValidatedTenantId(),
+                                    opMsgRequest.getSerializationContext());
+        auto parsed = idl::parseCommandRequest<RequestType>(ctx, opMsgRequest);
+        auto apiStrict = parsed.getGenericArguments().getApiStrict().value_or(false);
 
         // A command with 'apiStrict' cannot be invoked with alias.
-        if (opMsgRequest.getCommandName() != command->getName() && apiStrict) {
+        if (apiStrict && opMsgRequest.getCommandName() != command->getName()) {
             uasserted(ErrorCodes::APIStrictError,
                       str::stream() << "Command invocation with name '"
                                     << opMsgRequest.getCommandName().toString()
@@ -1409,8 +1414,7 @@ private:
                                     << command->getName() << "' instead");
         }
 
-        return idl::parseCommandRequest<RequestType>(
-            IDLParserContext(command->getName()), apiStrict, opMsgRequest);
+        return parsed;
     }
 
     RequestType _request;

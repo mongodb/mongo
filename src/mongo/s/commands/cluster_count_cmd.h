@@ -148,8 +148,7 @@ public:
                 applyReadWriteConcern(
                     opCtx,
                     this,
-                    countRequest.toBSON(
-                        CommandHelpers::filterCommandRequestForPassthrough(cmdObj))),
+                    CommandHelpers::filterCommandRequestForPassthrough(countRequest.toBSON())),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
                 countRequest.getQuery(),
@@ -165,11 +164,8 @@ public:
             const boost::optional<auth::ValidatedTenancyScope>& vts =
                 auth::ValidatedTenancyScope::get(opCtx);
             auto aggCmdOnViewObj = OpMsgRequestBuilder::create(vts, dbName, aggCmdOnView).body;
-            auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
-                aggCmdOnViewObj,
-                vts,
-                boost::none,
-                APIParameters::get(opCtx).getAPIStrict().value_or(false));
+            auto aggRequestOnView =
+                aggregation_request_helper::parseFromBSON(aggCmdOnViewObj, vts, boost::none);
 
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
             auto resolvedAggCmd =
@@ -289,11 +285,8 @@ public:
                 auth::ValidatedTenancyScope::get(opCtx);
             auto aggCmdOnViewObj =
                 OpMsgRequestBuilder::create(vts, nss.dbName(), aggCmdOnView.getValue()).body;
-            auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
-                aggCmdOnViewObj,
-                vts,
-                verbosity,
-                APIParameters::get(opCtx).getAPIStrict().value_or(false));
+            auto aggRequestOnView =
+                aggregation_request_helper::parseFromBSON(aggCmdOnViewObj, vts, verbosity);
 
             auto bodyBuilder = result->getBodyBuilder();
             // An empty PrivilegeVector is acceptable because these privileges are only checked

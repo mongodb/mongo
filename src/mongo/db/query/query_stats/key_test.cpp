@@ -35,6 +35,7 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -87,7 +88,7 @@ public:
     DummyKey(OperationContext* opCtx,
              std::unique_ptr<query_shape::Shape> queryShape,
              boost::optional<BSONObj> hint,
-             boost::optional<BSONObj> readConcern,
+             boost::optional<repl::ReadConcernArgs> readConcern,
              bool maxTimeMS,
              query_shape::CollectionType collectionType,
              DummyKeyComponents dummyComponents)
@@ -167,7 +168,7 @@ TEST_F(UniversalKeyTest, SizeOfKey) {
     auto key = std::make_unique<DummyKey>(expCtx->opCtx,
                                           std::move(shape),
                                           BSONObj(),
-                                          BSONObj(),
+                                          repl::ReadConcernArgs(),
                                           false,
                                           query_shape::CollectionType::kUnknown,
                                           *keyComponents);

@@ -1122,7 +1122,7 @@ TEST_F(AuthorizationSessionTest, CheckAuthForAggregateWithDeeplyNestedLookup) {
         cmdBuilder << "cursor" << BSONObj() << "$db" << nssFoo.db_forTest();
 
         auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-            cmdBuilder.obj(), makeVTS(nssFoo), boost::none, false /* apiStrict */));
+            cmdBuilder.obj(), makeVTS(nssFoo), boost::none));
         PrivilegeVector privileges = uassertStatusOK(
             auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, false));
         ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));

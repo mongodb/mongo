@@ -375,7 +375,7 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
 
 SemiFuture<void> checkIfCanRunCommandOrBlock(OperationContext* opCtx,
                                              const DatabaseName& dbName,
-                                             const OpMsgRequest& request) {
+                                             StringData commandName) {
     if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
         return Status::OK();
     }
@@ -401,8 +401,7 @@ SemiFuture<void> checkIfCanRunCommandOrBlock(OperationContext* opCtx,
     std::vector<ExecutorFuture<void>> futures;
     std::shared_ptr<executor::TaskExecutor> executor;
     if (donorMtab) {
-        auto canRunCommandFuture =
-            donorMtab->getCanRunCommandFuture(opCtx, request.getCommandName());
+        auto canRunCommandFuture = donorMtab->getCanRunCommandFuture(opCtx, commandName);
         if (canRunCommandFuture.isReady()) {
             auto status = canRunCommandFuture.getNoThrow();
             donorMtab->recordTenantMigrationError(status);
@@ -414,8 +413,7 @@ SemiFuture<void> checkIfCanRunCommandOrBlock(OperationContext* opCtx,
         futures.emplace_back(std::move(canRunCommandFuture).semi().thenRunOn(executor));
     }
     if (recipientMtab) {
-        auto canRunCommandFuture =
-            recipientMtab->getCanRunCommandFuture(opCtx, request.getCommandName());
+        auto canRunCommandFuture = recipientMtab->getCanRunCommandFuture(opCtx, commandName);
         if (canRunCommandFuture.isReady()) {
             auto status = canRunCommandFuture.getNoThrow();
             recipientMtab->recordTenantMigrationError(status);

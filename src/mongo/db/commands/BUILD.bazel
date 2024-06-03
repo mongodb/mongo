@@ -12,9 +12,3 @@ idl_generator(
     name = "test_commands_enabled_gen",
     src = "test_commands_enabled.idl",
 )
-
-idl_generator(
-    name = "generic_gen",
-    src = "generic.idl",
-    deps = ["//src/mongo/db:basic_types_gen"],
-)

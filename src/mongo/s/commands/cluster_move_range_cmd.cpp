@@ -97,15 +97,15 @@ public:
             configsvrRequest.setMoveRangeRequestBase(req.getMoveRangeRequestBase());
             configsvrRequest.setForceJumbo(request().getForceJumbo() ? ForceJumbo::kForceManual
                                                                      : ForceJumbo::kDoNotForce);
+            configsvrRequest.setWriteConcern(opCtx->getWriteConcern());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            const auto commandResponse = uassertStatusOK(configShard->runCommand(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                configsvrRequest.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                             << opCtx->getWriteConcern().toBSON())),
-                Shard::RetryPolicy::kIdempotent));
+            const auto commandResponse = uassertStatusOK(
+                configShard->runCommand(opCtx,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        DatabaseName::kAdmin,
+                                        configsvrRequest.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(commandResponse));
         }

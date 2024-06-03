@@ -67,9 +67,11 @@ using MaybeImpersonatedUserMetadata = boost::optional<ImpersonatedUserMetadata>;
 MaybeImpersonatedUserMetadata getImpersonatedUserMetadata(OperationContext* opCtx);
 
 /*
- * Parses any impersonation data out of a metdata bson obj and into the opCtx
+ * Sets the provided impersonated user metadata on the opCtx only if there are actually impersonated
+ * users/roles.
  */
-void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opCtx);
+void setImpersonatedUserMetadata(OperationContext* opCtx,
+                                 const boost::optional<ImpersonatedUserMetadata>& data);
 
 /*
  * Get impersonation metadata off the opCtx
@@ -86,6 +88,7 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
  * Estimates the size of impersonation metadata which will be written by
  * writeAuthDataToImpersonatedUserMetadata.
  */
+std::size_t estimateImpersonatedUserMetadataSize(const ImpersonatedUserMetadata& md);
 std::size_t estimateImpersonatedUserMetadataSize(OperationContext* opCtx);
 
 }  // namespace rpc

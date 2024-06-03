@@ -45,8 +45,10 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/basic_types.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/rpc/metadata.h"
@@ -68,15 +70,16 @@ BSONObj makeEmptyMetadata() {
 }
 
 void readRequestMetadata(OperationContext* opCtx,
-                         const CommonRequestArgs& requestArgs,
-                         const OpMsgRequest& request,
+                         const GenericArguments& requestArgs,
                          bool cmdRequiresAuth) {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+    auto validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx);
 
     if (requestArgs.getClientOperationKey() &&
         (TestingProctor::instance().isEnabled() ||
          authSession->isAuthorizedForActionsOnResource(
-             ResourcePattern::forClusterResource(request.getValidatedTenantId()),
+             ResourcePattern::forClusterResource(
+                 validatedTenancyScope.map([](auto scope) { return scope.tenantId(); })),
              ActionType::internal))) {
         {
             // We must obtain the client lock to set the OperationKey on the operation context as
@@ -92,9 +95,8 @@ void readRequestMetadata(OperationContext* opCtx,
         });
     }
 
-    if (requestArgs.getReadPreference()) {
-        ReadPreferenceSetting::get(opCtx) = uassertStatusOK(
-            ReadPreferenceSetting::fromInnerBSON(requestArgs.getReadPreference()->getElement()));
+    if (auto& rp = requestArgs.getReadPreference()) {
+        ReadPreferenceSetting::get(opCtx) = *rp;
     }
 
     if (opCtx->routedByReplicaSetEndpoint()) {
@@ -107,29 +109,24 @@ void readRequestMetadata(OperationContext* opCtx,
         opCtx->setRoutedByReplicaSetEndpoint(true);
     }
 
-    readImpersonatedUserMetadata(requestArgs.getImpersonation().value_or(IDLAnyType()).getElement(),
-                                 opCtx);
-
-    invariant(!auth::ValidatedTenancyScope::get(opCtx).has_value() ||
-              (request.validatedTenancyScope &&
-               *auth::ValidatedTenancyScope::get(opCtx) == *request.validatedTenancyScope));
-
-    auth::ValidatedTenancyScope::set(opCtx, request.validatedTenancyScope);
+    setImpersonatedUserMetadata(opCtx, requestArgs.getDollarAudit());
 
     // We check for "$client" but not "client" here, because currentOp can filter on "client" as
     // a top-level field.
-    if (requestArgs.getClientMetadata()) {
+    if (const auto& md = requestArgs.getDollarClient()) {
         // The '$client' field is populated by mongos when it sends requests to shards on behalf of
         // its own requests. This may or may not be relevant for SERVER-50804.
-        ClientMetadata::setFromMetadataForOperation(opCtx,
-                                                    requestArgs.getClientMetadata()->getElement());
+        ClientMetadata::setFromMetadataForOperation(opCtx, *md);
     }
 
-    VectorClock::get(opCtx)->gossipIn(
-        opCtx, requestArgs.getGossipedVectorClockComponents(), !cmdRequiresAuth);
 
-    WriteBlockBypass::get(opCtx).setFromMetadata(
-        opCtx, requestArgs.getMayBypassWriteBlocking().value_or(IDLAnyType()).getElement());
+    GossipedVectorClockComponents components;
+    components.setDollarConfigTime(requestArgs.getDollarConfigTime());
+    components.setDollarTopologyTime(requestArgs.getDollarTopologyTime());
+    components.setDollarClusterTime(requestArgs.getDollarClusterTime());
+    VectorClock::get(opCtx)->gossipIn(opCtx, components, !cmdRequiresAuth);
+
+    WriteBlockBypass::get(opCtx).setFromMetadata(opCtx, requestArgs.getMayBypassWriteBlocking());
 }
 
 namespace {

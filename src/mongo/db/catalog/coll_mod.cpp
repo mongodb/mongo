@@ -932,7 +932,7 @@ Status _collModInternal(OperationContext* opCtx,
     auto ts = cmd.getTimeseries();
 
     if (!serverGlobalParams.quiet.load()) {
-        LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmd.toBSON(BSONObj()));
+        LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmd.toBSON());
     }
 
     return writeConflictRetry(opCtx, "collMod", nss, [&] {

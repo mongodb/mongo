@@ -355,6 +355,7 @@ public:
               _ns(cmdRequest->getNamespaceOrUUID().isNamespaceString()
                       ? cmdRequest->getNamespaceOrUUID().nss()
                       : NamespaceString(cmdRequest->getNamespaceOrUUID().dbName())),
+              _genericArgs(cmdRequest->getGenericArguments()),
               _cmdRequest(std::move(cmdRequest)) {
             invariant(_request.body.isOwned());
 
@@ -394,6 +395,12 @@ public:
 
         NamespaceString ns() const override {
             return _ns;
+        }
+
+        const GenericArguments& getGenericArguments() const override {
+            // TODO SERVER-88444: retrieve this directly from _request rather than making a separate
+            // copy.
+            return _genericArgs;
         }
 
         const DatabaseName& db() const override {
@@ -1011,6 +1018,7 @@ public:
         const OpMsgRequest _request;
         const DatabaseName _dbName;
         const NamespaceString _ns;
+        const GenericArguments _genericArgs;
         std::unique_ptr<FindCommandRequest> _cmdRequest;
 
         void _rewriteFLEPayloads(OperationContext* opCtx) {
@@ -1052,8 +1060,7 @@ private:
             request.body,
             vts,
             vts.has_value() ? boost::make_optional(vts->tenantId()) : boost::none,
-            reqSc,
-            APIParameters::get(opCtx).getAPIStrict().value_or(false));
+            reqSc);
 
         if (auto& nss = findCommand->getNamespaceOrUUID(); nss.isNamespaceString()) {
             CommandHelpers::ensureValidCollectionName(nss.nss());

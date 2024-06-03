@@ -189,7 +189,8 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
             << NamespaceString::kRsOplogNamespace.coll() << "limit" << 1 << "sort"
             << BSON("$natural" << 1) << "projection"
             << BSON(OplogEntryBase::kTimestampFieldName << 1 << OplogEntryBase::kTermFieldName << 1)
-            << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kLocal << "term"
+            << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kLocal.toBSONInner()
+            << "term"
             << -1 /* Attach a dummy term so that the find command skips ticket acquisition */),
         [=, this](const StatusWith<Fetcher::QueryResponse>& response,
                   Fetcher::NextAction*,
@@ -214,7 +215,8 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
         BSON("find" << NamespaceString::kRsOplogNamespace.coll() << "filter"
                     << BSON("ts" << BSON("$gte" << _requiredOpTime.getTimestamp() << "$lte"
                                                 << _requiredOpTime.getTimestamp()))
-                    << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kLocal),
+                    << ReadConcernArgs::kReadConcernFieldName
+                    << ReadConcernArgs::kLocal.toBSONInner()),
         [=, this](const StatusWith<Fetcher::QueryResponse>& response,
                   Fetcher::NextAction*,
                   BSONObjBuilder*) {

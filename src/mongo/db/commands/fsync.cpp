@@ -167,7 +167,7 @@ public:
                     // "fsyncLockAcquisitionTimeoutMillis" exists.
                     for (const auto& elem : cmdObj) {
                         if (elem.fieldNameStringData() == "fsyncLockAcquisitionTimeoutMillis") {
-                            deadline = Milliseconds{uassertStatusOK(parseMaxTimeMS(elem))};
+                            deadline = Milliseconds{elem.exactNumberLong()};
                         }
                     }
                 }

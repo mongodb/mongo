@@ -129,15 +129,17 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
         }
     }
 
-    auto response = uassertStatusOK(
-        executeDDLCoordinatorCommandAgainstDatabasePrimary(
-            opCtx,
-            nss.dbName(),
-            dbInfo,
-            CommandHelpers::appendMajorityWriteConcern(req.obj(), opCtx->getWriteConcern()),
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kIdempotent)
-            .swResponse);
+    auto response =
+        uassertStatusOK(executeDDLCoordinatorCommandAgainstDatabasePrimary(
+                            opCtx,
+                            nss.dbName(),
+                            dbInfo,
+                            CommandHelpers::appendMajorityWriteConcern(
+                                CommandHelpers::filterCommandRequestForPassthrough(req.obj()),
+                                opCtx->getWriteConcern()),
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                            Shard::RetryPolicy::kIdempotent)
+                            .swResponse);
 
     BSONObjBuilder result;
     CommandHelpers::filterCommandReplyForPassthrough(response.data, &result);

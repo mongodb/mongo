@@ -345,10 +345,3 @@ commands:
         validator:
           gt: 0
         optional: true
-      $readPreference:
-        type: readPreference
-        cpp_name: readPreference
-        description: >-
-            The read preference to use for metrics calculation. The default is set to
-            "secondaryPreferred" to minimize the impact on user workloads.
-        default: ReadPreferenceSetting{ReadPreference::SecondaryPreferred}

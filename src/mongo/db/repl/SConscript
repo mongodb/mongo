@@ -961,11 +961,14 @@ env.Library(
 env.Library(
     "read_concern_args",
     source=[
-        "read_concern_args.cpp",
+        "read_concern_args_decoration.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/server_base",
         "optime",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 
@@ -2000,8 +2003,8 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/read_write_concern_defaults_mock",
+        "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/serverless/shard_split_utils",
-        "$BUILD_DIR/mongo/db/service_request_common",
         "$BUILD_DIR/mongo/db/storage/storage_options",
         "isself",
         "repl_coordinator_impl",

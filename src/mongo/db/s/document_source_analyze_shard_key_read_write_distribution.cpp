@@ -130,7 +130,7 @@ void fetchSplitPoints(OperationContext* opCtx,
         pipeline.push_back(BSON("$sort" << sort));
         AggregateCommandRequest aggRequest(
             NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace, pipeline);
-        aggRequest.setReadConcern(readConcern.toBSONInner());
+        aggRequest.setReadConcern(readConcern);
         aggRequest.setWriteConcern(WriteConcernOptions());
         aggRequest.setUnwrappedReadPref(ReadPreferenceSetting::get(opCtx).toContainingBSON());
 
