@@ -1729,3 +1729,28 @@ buildvariants:
       - "ubuntu2004-small"
     tasks:
       - name: renew_ssl_cert
+
+  # Variant which runs a single shard cluster with a dedicated
+  # config shard and mongos processes co-located on the
+  # same machine as the mongods.
+  - <<: *amazon_linux2_arm64_compile_variant_dependency
+    name: perf-3-node-replSet-shard-dedicated-csrs-embedded-mongos.arm.aws.2023-11
+    display_name: Shard Dedicated CSRS Co-located Mongos 3-Node ReplSet ARM AWS 2023-11
+    cron: *linux-3-node-cron
+    modules: *perf_modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-dedicated-csrs-embedded-mongos
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: shard-dedicated-csrs-embedded-mongos
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *perf_project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: amazon2-arm64-compile
+    run_on:
+      - "rhel70-perf-shard"
+    tasks:
+      - name: load_test_high_value
+        cron: *high-value-workload-cron
