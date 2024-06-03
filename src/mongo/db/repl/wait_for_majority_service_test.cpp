@@ -188,9 +188,6 @@ TEST_F(WaitForMajorityServiceTest, WaitOneOpTimeForRead) {
     // have just this one as a basic check of the shim.  The mock repl coordinator does not wait
     // for read concern or for the majority snapshot to advance, so the only wait is for there
     // to be a snapshot available.
-    if (!serverGlobalParams.enableMajorityReadConcern)
-        return;
-
     repl::OpTime t1(Timestamp(1, 0), 2);
 
     auto future = waitService()->waitUntilMajorityForRead(t1, CancellationToken::uncancelable());

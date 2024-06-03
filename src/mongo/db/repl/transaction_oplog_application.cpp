@@ -756,16 +756,6 @@ Status applyPrepareTransaction(OperationContext* opCtx,
     switch (mode) {
         case repl::OplogApplication::Mode::kUnstableRecovering:
         case repl::OplogApplication::Mode::kStableRecovering: {
-            if (!serverGlobalParams.enableMajorityReadConcern) {
-                LOGV2_ERROR(21850,
-                            "Cannot replay a prepared transaction when "
-                            "'enableMajorityReadConcern' is "
-                            "set to false. Restart the server with "
-                            "--enableMajorityReadConcern=true "
-                            "to complete recovery");
-                fassertFailed(51146);
-            }
-
             // Don't apply the operations from the prepared transaction until either we
             // see a commit transaction oplog entry during recovery or are at the end of
             // recovery.

@@ -145,8 +145,7 @@ SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanRunCommandFu
     }
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
         // Speculative majority reads are only used for change streams (against the oplog
-        // collection) or when enableMajorityReadConcern=false. So we don't expect speculative
-        // majority reads in serverless.
+        // collection). So we don't expect speculative majority reads in serverless.
 
         auto executor = TenantMigrationAccessBlockerRegistry::get(_serviceContext)
                             .getAsyncBlockingOperationsExecutor();

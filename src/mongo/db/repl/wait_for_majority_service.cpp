@@ -126,10 +126,6 @@ void WaitForMajorityServiceImplBase::startup(ServiceContext* ctx) {
 
 SemiFuture<void> WaitForMajorityService::waitUntilMajorityForRead(
     const repl::OpTime& opTime, const CancellationToken& cancelToken) {
-    uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
-            "Storage engine does not support read concern majority.",
-            serverGlobalParams.enableMajorityReadConcern);
-
     return _readService.waitUntilMajority(opTime, cancelToken);
 }
 
@@ -245,9 +241,7 @@ Status WaitForMajorityServiceForReadImpl::_waitForOpTime(OperationContext* opCtx
 
     auto status = waitForReadConcern(
         opCtx, readConcernArgs, DatabaseName(), false /* allow afterClusterTime */);
-    // This code should only happen when enableMajorityReadConcern is true, which is no longer
-    // permitted.
-    invariant(status.code() != ErrorCodes::ReadConcernMajorityNotEnabled);
+
     return status;
 }
 
