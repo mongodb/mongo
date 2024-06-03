@@ -387,7 +387,7 @@ void DropCollectionCoordinator::_exitCriticalSection(
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
         **executor, token, unblockCRUDOperationsRequest, args);
     sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, getAllShardsAndConfigServerIds(opCtx));
+        opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
 
     LOGV2_DEBUG(7038103, 2, "Released critical section", logAttrs(nss()));
 }

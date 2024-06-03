@@ -1172,7 +1172,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     fromNss, _doc.getSourceUUID().value());
                 unblockParticipantRequest.setDbName(fromNss.dbName());
                 unblockParticipantRequest.setRenameCollectionRequest(_request);
-                auto participants = getAllShardsAndConfigServerIds(opCtx);
+                auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
                 GenericArguments args;
                 async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
