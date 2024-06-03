@@ -24,7 +24,6 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
-          enableMajorityReadConcern: ""
       # Enable causal consistency for change streams suites using 1 node replica sets. Some tests
       # rely on the assumption that a w:majority write will be visible immediately in a subsequently
       # opened change stream. In 1 node replica sets, an operation that majority commits at

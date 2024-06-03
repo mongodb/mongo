@@ -217,11 +217,7 @@ function assertReadsSucceed(coll, timeoutMs = 20000) {
 
 // Set up a set and grab things for later.
 var name = "read_committed_with_catalog_changes";
-var replTest = new ReplSetTest({
-    name: name,
-    nodes: 3,
-    nodeOptions: {enableMajorityReadConcern: ''},
-});
+var replTest = new ReplSetTest({name: name, nodes: 3});
 
 replTest.startSet();
 var nodes = replTest.nodeList();

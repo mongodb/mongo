@@ -801,26 +801,6 @@ var ReplSetTest = function ReplSetTest(opts) {
                 const hasNoSyncSource = (statusRes.syncSourceId === -1);
 
                 const cmdLineOptsRes = assert.commandWorked(conn.adminCommand("getCmdLineOpts"));
-                const hasEMRCFalse =
-                    (cmdLineOptsRes.parsed.replication.enableMajorityReadConcern === false);
-
-                if (isRecovering && hasNoSyncSource && hasEMRCFalse) {
-                    try {
-                        const n = this.getNodeId(conn);
-                        const connToCheck =
-                            this._useBridge ? this._unbridgedNodes[n] : this.nodes[n];
-                        // Confirm that the node is unable to recover after rolling back.
-                        checkLog.contains(
-                            connToCheck,
-                            "remote oplog does not contain entry with optime matching our required optime",
-                            120 * 1000);
-                    } catch (checkLogEx) {
-                        MongoRunner.runHangAnalyzer.enable();
-                        throw originalEx;
-                    }
-                    // Add this info to the original exception.
-                    originalEx.unrecoverableRollbackDetected = true;
-                }
             }
             // Re-throw the original exception in all cases.
             MongoRunner.runHangAnalyzer.enable();
@@ -2443,14 +2423,9 @@ var ReplSetTest = function ReplSetTest(opts) {
         return sessions.map(session => {
             const commandObj = {dbHash: 1};
             const db = session.getDatabase(dbName);
-            // If eMRC=false, we use the old behavior using $_internalReadAtClusterTime.
-            // Otherwise, we use snapshot read concern for dbhash.
+            // Use snapshot read concern for dbhash.
             if (readAtClusterTime !== undefined) {
-                if (jsTest.options().enableMajorityReadConcern !== false) {
-                    commandObj.readConcern = {level: "snapshot", atClusterTime: readAtClusterTime};
-                } else {
-                    commandObj.$_internalReadAtClusterTime = readAtClusterTime;
-                }
+                commandObj.readConcern = {level: "snapshot", atClusterTime: readAtClusterTime};
             }
             if (skipTempCollections) {
                 commandObj.skipTempCollections = 1;

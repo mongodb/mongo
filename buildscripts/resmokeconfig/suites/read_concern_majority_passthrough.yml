@@ -53,5 +53,4 @@ executor:
       set_parameters:
         enableTestCommands: 1
         writePeriodicNoops: 1
-      enableMajorityReadConcern: ""
     num_nodes: 2

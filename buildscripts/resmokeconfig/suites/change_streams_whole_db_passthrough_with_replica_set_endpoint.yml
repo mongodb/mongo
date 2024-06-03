@@ -47,7 +47,6 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
-          enableMajorityReadConcern: ""
           testingReplicaSetEndpoint: true
       # Enable causal consistency for change streams suites using 1 node replica sets. See
       # change_streams.yml for detailed explanation.

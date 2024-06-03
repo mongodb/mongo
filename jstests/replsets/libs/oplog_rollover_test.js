@@ -105,118 +105,76 @@ export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless =
     assert.eq(2, numInsertOplogEntry(primaryOplog));
     assert.eq(2, numInsertOplogEntry(secondaryOplog));
 
-    // Have a more fine-grained test for enableMajorityReadConcern=true to also test oplog
-    // truncation happens at the time we expect it to happen. When
-    // enableMajorityReadConcern=false the lastStableRecoveryTimestamp is not available, so
-    // switch to a coarser-grained mode to only test that oplog truncation will eventually
-    // happen when oplog size exceeds the configured maximum.
-    if (primary.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
-        const awaitCheckpointer = function(timestamp) {
-            assert.soon(
-                () => {
-                    const primaryReplSetStatus =
-                        assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
-                    const primaryRecoveryTimestamp =
-                        primaryReplSetStatus.lastStableRecoveryTimestamp;
-                    const primaryDurableTimestamp = primaryReplSetStatus.optimes.durableOpTime.ts;
-                    const secondaryReplSetStatus =
-                        assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-                    const secondaryRecoveryTimestamp =
-                        secondaryReplSetStatus.lastStableRecoveryTimestamp;
-                    const secondaryDurableTimestamp =
-                        secondaryReplSetStatus.optimes.durableOpTime.ts;
-                    jsTestLog(
-                        "Awaiting durable & last stable recovery timestamp " +
-                        `(primary last stable recovery: ${tojson(primaryRecoveryTimestamp)}, ` +
-                        `primary durable: ${tojson(primaryDurableTimestamp)}, ` +
-                        `secondary last stable recovery: ${tojson(secondaryRecoveryTimestamp)}, ` +
-                        `secondary durable: ${tojson(secondaryDurableTimestamp)}) ` +
-                        `target: ${tojson(timestamp)}`);
-                    return ((timestampCmp(primaryRecoveryTimestamp, timestamp) >= 0) &&
-                            (timestampCmp(primaryDurableTimestamp, timestamp) >= 0) &&
-                            (timestampCmp(secondaryDurableTimestamp, timestamp) >= 0) &&
-                            (timestampCmp(secondaryRecoveryTimestamp, timestamp) >= 0));
-                },
-                "Timeout waiting for checkpointing to catch up",
-                ReplSetTest.kDefaultTimeoutMS,
-                2000);
-        };
-
-        // Wait for checkpointing/stable timestamp to catch up with the second insert so oplog
-        // entry of the first insert is allowed to be deleted by the oplog cap maintainer thread
-        // when a new oplog truncate marker is created. "inMemory" WT engine does not run checkpoint
-        // thread and lastStableRecoveryTimestamp is the stable timestamp in this case.
-        awaitCheckpointer(secondInsertTimestamp);
-
-        // Insert the third document which will trigger a new oplog truncate marker to be created.
-        // The oplog cap maintainer thread will then be unblocked on the creation of the new oplog
-        // marker and will start truncating oplog entries. The oplog entry for the first
-        // insert will be truncated after the oplog cap maintainer thread finishes.
-        const thirdInsertTimestamp =
-            assert
-                .commandWorked(coll.runCommand(
-                    "insert",
-                    {documents: [{_id: 2, longString: longString}], writeConcern: {w: 2}}))
-                .operationTime;
-        jsTestLog("Third insert timestamp: " + tojson(thirdInsertTimestamp));
-
-        // There is a race between how we calculate the pinnedOplog and checkpointing. The timestamp
-        // of the pinnedOplog could be less than the actual stable timestamp used in a checkpoint.
-        // Wait for the checkpointer to run for another round to make sure the first insert oplog is
-        // not pinned.
-        awaitCheckpointer(thirdInsertTimestamp);
-
-        // Verify that there are three oplog entries while the oplog cap maintainer thread is
-        // paused.
-        assert.eq(3, numInsertOplogEntry(primaryOplog));
-        assert.eq(3, numInsertOplogEntry(secondaryOplog));
-
-        // Let the oplog cap maintainer thread start truncating the oplog.
-        assert.commandWorked(primary.adminCommand(
-            {configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
-        assert.commandWorked(secondary.adminCommand(
-            {configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
-
-        // Test that oplog entry of the initial insert rolls over on both primary and secondary.
-        // Use assert.soon to wait for oplog cap maintainer thread to run.
+    const awaitCheckpointer = function(timestamp) {
         assert.soon(() => {
-            return numInsertOplogEntry(primaryOplog) === 2;
-        }, "Timeout waiting for oplog to roll over on primary");
-        assert.soon(() => {
-            return numInsertOplogEntry(secondaryOplog) === 2;
-        }, "Timeout waiting for oplog to roll over on secondary");
+            const primaryReplSetStatus =
+                assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
+            const primaryRecoveryTimestamp = primaryReplSetStatus.lastStableRecoveryTimestamp;
+            const primaryDurableTimestamp = primaryReplSetStatus.optimes.durableOpTime.ts;
+            const secondaryReplSetStatus =
+                assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+            const secondaryRecoveryTimestamp = secondaryReplSetStatus.lastStableRecoveryTimestamp;
+            const secondaryDurableTimestamp = secondaryReplSetStatus.optimes.durableOpTime.ts;
+            jsTestLog("Awaiting durable & last stable recovery timestamp " +
+                      `(primary last stable recovery: ${tojson(primaryRecoveryTimestamp)}, ` +
+                      `primary durable: ${tojson(primaryDurableTimestamp)}, ` +
+                      `secondary last stable recovery: ${tojson(secondaryRecoveryTimestamp)}, ` +
+                      `secondary durable: ${tojson(secondaryDurableTimestamp)}) ` +
+                      `target: ${tojson(timestamp)}`);
+            return ((timestampCmp(primaryRecoveryTimestamp, timestamp) >= 0) &&
+                    (timestampCmp(primaryDurableTimestamp, timestamp) >= 0) &&
+                    (timestampCmp(secondaryDurableTimestamp, timestamp) >= 0) &&
+                    (timestampCmp(secondaryRecoveryTimestamp, timestamp) >= 0));
+        }, "Timeout waiting for checkpointing to catch up", ReplSetTest.kDefaultTimeoutMS, 2000);
+    };
 
-        const res = primary.getDB("test").runCommand({serverStatus: 1});
-        assert.commandWorked(res);
-        assert.eq(res.oplogTruncation.truncateCount, 1, tojson(res.oplogTruncation));
-        assert.gt(res.oplogTruncation.totalTimeTruncatingMicros, 0, tojson(res.oplogTruncation));
-    } else {
-        // Let the oplog cap maintainer thread start truncating the oplog.
-        assert.commandWorked(primary.adminCommand(
-            {configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
-        assert.commandWorked(secondary.adminCommand(
-            {configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+    // Wait for checkpointing/stable timestamp to catch up with the second insert so oplog
+    // entry of the first insert is allowed to be deleted by the oplog cap maintainer thread
+    // when a new oplog truncate marker is created. "inMemory" WT engine does not run checkpoint
+    // thread and lastStableRecoveryTimestamp is the stable timestamp in this case.
+    awaitCheckpointer(secondInsertTimestamp);
 
-        // Only test that oplog truncation will eventually happen.
-        let numInserted = 2;
-        assert.soon(function() {
-            // Insert more documents.
-            assert.commandWorked(
-                coll.insert({_id: numInserted++, longString: longString}, {writeConcern: {w: 2}}));
-            const numInsertOplogEntryPrimary = numInsertOplogEntry(primaryOplog);
-            const numInsertOplogEntrySecondary = numInsertOplogEntry(secondaryOplog);
-            // Oplog has been truncated if the number of insert oplog entries is less than
-            // number of inserted.
-            if (numInsertOplogEntryPrimary < numInserted &&
-                numInsertOplogEntrySecondary < numInserted)
-                return true;
-            jsTestLog("Awaiting oplog truncation: number of oplog entries: " +
-                      `(primary: ${tojson(numInsertOplogEntryPrimary)}, ` +
-                      `secondary: ${tojson(numInsertOplogEntrySecondary)}) ` +
-                      `number inserted: ${numInserted}`);
-            return false;
-        }, "Timeout waiting for oplog to roll over", ReplSetTest.kDefaultTimeoutMS, 1000);
-    }
+    // Insert the third document which will trigger a new oplog truncate marker to be created.
+    // The oplog cap maintainer thread will then be unblocked on the creation of the new oplog
+    // marker and will start truncating oplog entries. The oplog entry for the first
+    // insert will be truncated after the oplog cap maintainer thread finishes.
+    const thirdInsertTimestamp =
+        assert
+            .commandWorked(coll.runCommand(
+                "insert", {documents: [{_id: 2, longString: longString}], writeConcern: {w: 2}}))
+            .operationTime;
+    jsTestLog("Third insert timestamp: " + tojson(thirdInsertTimestamp));
+
+    // There is a race between how we calculate the pinnedOplog and checkpointing. The timestamp
+    // of the pinnedOplog could be less than the actual stable timestamp used in a checkpoint.
+    // Wait for the checkpointer to run for another round to make sure the first insert oplog is
+    // not pinned.
+    awaitCheckpointer(thirdInsertTimestamp);
+
+    // Verify that there are three oplog entries while the oplog cap maintainer thread is
+    // paused.
+    assert.eq(3, numInsertOplogEntry(primaryOplog));
+    assert.eq(3, numInsertOplogEntry(secondaryOplog));
+
+    // Let the oplog cap maintainer thread start truncating the oplog.
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+    assert.commandWorked(
+        secondary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+
+    // Test that oplog entry of the initial insert rolls over on both primary and secondary.
+    // Use assert.soon to wait for oplog cap maintainer thread to run.
+    assert.soon(() => {
+        return numInsertOplogEntry(primaryOplog) === 2;
+    }, "Timeout waiting for oplog to roll over on primary");
+    assert.soon(() => {
+        return numInsertOplogEntry(secondaryOplog) === 2;
+    }, "Timeout waiting for oplog to roll over on secondary");
+
+    const res = primary.getDB("test").runCommand({serverStatus: 1});
+    assert.commandWorked(res);
+    assert.eq(res.oplogTruncation.truncateCount, 1, tojson(res.oplogTruncation));
+    assert.gt(res.oplogTruncation.totalTimeTruncatingMicros, 0, tojson(res.oplogTruncation));
 
     replSet.stopSet();
 }

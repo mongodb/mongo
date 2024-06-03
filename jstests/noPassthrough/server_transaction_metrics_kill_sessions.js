@@ -9,7 +9,7 @@ function verifyMetricsChange(initialStats, newStats, valueName, expectedIncremen
 }
 
 // Set up the replica set and enable majority read concern for atClusterTime snapshot reads.
-const rst = new ReplSetTest({nodes: 1, nodeOptions: {enableMajorityReadConcern: "true"}});
+const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 

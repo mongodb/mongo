@@ -75,13 +75,6 @@ function inspectFirstCommandForAfterClusterTime(conn, cmdName, isCausal, expectR
             assert(cmd.readConcern.hasOwnProperty("afterClusterTime"),
                    "Expected " + tojson(cmd) + " to have an afterClusterTime.");
         } else {
-            if (TestData.hasOwnProperty("enableMajorityReadConcern") &&
-                TestData.enableMajorityReadConcern === false) {
-                // Commands not allowed in a transaction without causal consistency will not
-                // have a read concern on variants that don't enable majority read concern.
-                continue;
-            }
-
             assert(cmd.hasOwnProperty("readConcern"),
                    "Expected " + tojson(cmd) + " to have a read concern.");
             assert(!cmd.readConcern.hasOwnProperty("afterClusterTime"),
@@ -197,10 +190,5 @@ function runTest() {
 }
 
 runTest();
-
-// With read concern majority disabled.
-TestData.enableMajorityReadConcern = false;
-runTest();
-delete TestData.enableMajorityReadConcern;
 
 rst.stopSet();

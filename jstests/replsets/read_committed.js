@@ -52,8 +52,7 @@ const testCases = {
 
 // Set up a set and grab things for later.
 var name = "read_committed";
-var replTest =
-    new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}});
+var replTest = new ReplSetTest({name: name, nodes: 3});
 
 replTest.startSet();
 var nodes = replTest.nodeList();

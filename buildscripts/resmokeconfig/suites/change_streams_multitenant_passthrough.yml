@@ -69,7 +69,6 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
-          enableMajorityReadConcern: ""
           tenantId: "636d957b2646ddfaf9b5e13f"
           hashTestNamesForMultitenancy: true
       # Enable causal consistency for change streams suites using 1 node replica sets. See

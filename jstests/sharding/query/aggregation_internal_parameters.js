@@ -6,7 +6,7 @@ import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
-const st = new ShardingTest({shards: 2, rs: {nodes: 1, enableMajorityReadConcern: ''}});
+const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];

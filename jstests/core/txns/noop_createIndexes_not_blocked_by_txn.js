@@ -25,11 +25,9 @@ const createIndexesCommand = {
 };
 assert.commandWorked(sessionDB.runCommand(createIndexesCommand));
 
-// Default read concern level to use for transactions. Snapshot read concern is not supported in
-// sharded transactions when majority reads are disabled.
+// Default read concern level to use for transactions.
 if (!TestData.hasOwnProperty('defaultTransactionReadConcernLevel')) {
-    TestData.defaultTransactionReadConcernLevel =
-        TestData.enableMajorityReadConcern !== false ? 'snapshot' : 'local';
+    TestData.defaultTransactionReadConcernLevel = 'snapshot';
 }
 
 // TODO(SERVER-39704): We use the withTxnAndAutoRetryOnMongos

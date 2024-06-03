@@ -51,7 +51,6 @@ const rst = new ReplSetTest({
     nodes: 1,
     name: rsName,
     nodeOptions: {
-        enableMajorityReadConcern: "",
         shardsvr: "",
     }
 });

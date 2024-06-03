@@ -31,7 +31,6 @@ delete m2result.parsed.setParameter;
 delete m2result.parsed.storage.engine;
 delete m2result.parsed.storage.inMemory;
 delete m2result.parsed.storage.wiredTiger;
-delete m2result.parsed.replication;  // Removes enableMajorityReadConcern setting.
 delete m2result.parsed.net.tls;
 delete m2result.parsed.net.grpc;
 assert.docEq(m2expected.parsed, m2result.parsed);
@@ -57,7 +56,6 @@ delete m3result.parsed.setParameter;
 delete m3result.parsed.storage.engine;
 delete m3result.parsed.storage.inMemory;
 delete m3result.parsed.storage.wiredTiger;
-delete m3result.parsed.replication;  // Removes enableMajorityReadConcern setting.
 delete m3result.parsed.net.tls;
 delete m3result.parsed.net.grpc;
 assert.docEq(m3expected.parsed, m3result.parsed);

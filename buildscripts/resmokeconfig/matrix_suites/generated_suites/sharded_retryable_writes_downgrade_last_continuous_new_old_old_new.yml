@@ -46,7 +46,6 @@ executor:
       num_nodes: 2
     mixed_bin_versions: new_old_old_new
     mongod_options:
-      enableMajorityReadConcern: ''
       set_parameters:
         enableElectionHandoff: 0
         enableTestCommands: 1

@@ -5,8 +5,7 @@
 // majority read.
 // @tags: [requires_majority_read_concern]
 var name = 'lastOpVisible';
-var replTest = new ReplSetTest(
-    {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}, waitForKeys: true});
+var replTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
 replTest.startSet();
 replTest.initiate();
 

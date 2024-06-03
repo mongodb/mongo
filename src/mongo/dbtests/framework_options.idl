@@ -74,14 +74,6 @@ configs:
         description: 'Number of back runs of perf stats to display'
         arg_vartype: Unsigned
         cpp_varname: 'frameworkGlobalParams.perfHist'
-    "replication.enableMajorityReadConcern":
-        # If set to true, storage engine maintains the data history.
-        # Else, it won't maintain the data history.
-        # This setting applies only to 'wiredTiger' storage engine.
-        description: 'Enables majority readConcern'
-        arg_vartype: Bool
-        short_name: enableMajorityReadConcern
-        default: true
     "storage.engine":
         description: 'What storage engine to use'
         arg_vartype: String

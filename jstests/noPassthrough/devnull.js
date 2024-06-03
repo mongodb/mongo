@@ -1,11 +1,3 @@
-const emrcFalseConn =
-    MongoRunner.runMongod({storageEngine: "devnull", enableMajorityReadConcern: false});
-assert(!emrcFalseConn);
-var logContents = rawMongoProgramOutput();
-assert(logContents.indexOf("enableMajorityReadConcern:false is no longer supported") > 0);
-
-// Even though enableMajorityReadConcern: true is the default, the server internally changes
-// this value to false when running with the devnull storage engine.
 const emrcDefaultConn = MongoRunner.runMongod({storageEngine: "devnull"});
 const db = emrcDefaultConn.getDB("test");
 

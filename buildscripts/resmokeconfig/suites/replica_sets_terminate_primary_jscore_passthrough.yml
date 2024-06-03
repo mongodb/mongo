@@ -143,7 +143,6 @@ executor:
   fixture:
     class: ReplicaSetFixture
     mongod_options:
-      enableMajorityReadConcern: ""
       syncdelay: 5
       set_parameters:
         enableTestCommands: 1

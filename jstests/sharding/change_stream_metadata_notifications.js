@@ -7,11 +7,7 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 
 const st = new ShardingTest({
     shards: 2,
-    rs: {
-        nodes: 1,
-        enableMajorityReadConcern: '',
-        setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
-    }
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
 });
 
 const mongosDB = st.s0.getDB(jsTestName());

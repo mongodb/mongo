@@ -73,7 +73,6 @@ executor:
   fixture:
     class: ReplicaSetFixture
     mongod_options:
-      enableMajorityReadConcern: ""
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:

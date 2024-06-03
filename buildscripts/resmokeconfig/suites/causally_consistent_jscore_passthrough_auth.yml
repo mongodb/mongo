@@ -179,7 +179,6 @@ executor:
             verbosity: 1
             asio: 2
     mongod_options:
-      enableMajorityReadConcern: ""
       auth: ""
       keyFile: *keyFile
       set_parameters:

@@ -33,7 +33,6 @@ executor:
         TestData:
           alwaysInjectTransactionNumber: true
           defaultReadConcernLevel: majority
-          enableMajorityReadConcern: ''
           hashTestNamesForMultitenancy: true
           logRetryAttempts: true
           multitenancyExpectPrefix: true
@@ -55,7 +54,6 @@ executor:
     class: ReplicaSetFixture
     mongod_options:
       bind_ip_all: ''
-      enableMajorityReadConcern: ''
       noscripting: ''
       serverless: true
       set_parameters:

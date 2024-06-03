@@ -13,7 +13,6 @@ let rst = new ReplSetTest({
     nodes: 3,
     name: replSetName,
     nodeOptions: {
-        enableMajorityReadConcern: "",
         shardsvr: "",
     }
 });

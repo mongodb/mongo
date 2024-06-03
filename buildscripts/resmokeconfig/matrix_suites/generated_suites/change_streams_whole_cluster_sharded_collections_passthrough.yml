@@ -20,7 +20,6 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
-          enableMajorityReadConcern: ''
   fixture:
     class: ShardedClusterFixture
     mongod_options:

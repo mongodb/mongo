@@ -162,7 +162,6 @@ executor:
   fixture:
     class: ReplicaSetFixture
     mongod_options:
-      enableMajorityReadConcern: ""
       syncdelay: 5
       wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
       set_parameters:

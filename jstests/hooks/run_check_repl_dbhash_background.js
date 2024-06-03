@@ -150,49 +150,21 @@ function checkReplDbhashBackgroundThread(hosts) {
             session.advanceClusterTime(signedClusterTime);
 
             // We need to make sure the secondary has applied up to 'clusterTime' and advanced
-            // its majority commit point.
-
-            if (jsTest.options().enableMajorityReadConcern !== false) {
-                // If majority reads are supported, we can issue an afterClusterTime read on
-                // a nonexistent collection and wait on it. This has the advantage of being
-                // easier to debug in case of a timeout.
-                let res = assert.commandWorked(db.runCommand({
-                    find: 'run_check_repl_dbhash_background',
-                    readConcern: {level: 'majority', afterClusterTime: clusterTime},
-                    limit: 1,
-                    singleBatch: true,
-                }),
-                                               debugInfo);
-                debugInfo.push({
-                    "node": db.getMongo(),
-                    "session": session,
-                    "majorityReadOpTime": res['operationTime']
-                });
-            } else {
-                // If majority reads are not supported, then our only option is to poll for the
-                // appliedOpTime on the secondary to catch up.
-                assert.soon(
-                    function() {
-                        const rsStatus =
-                            assert.commandWorked(db.adminCommand({replSetGetStatus: 1}));
-
-                        // The 'atClusterTime' waits for the appliedOpTime to advance to
-                        // 'clusterTime'.
-                        const appliedOpTime = rsStatus.optimes.appliedOpTime;
-                        if (bsonWoCompare(appliedOpTime.ts, clusterTime) >= 0) {
-                            debugInfo.push({
-                                "node": db.getMongo(),
-                                "session": session,
-                                "appliedOpTime": appliedOpTime.ts
-                            });
-                        }
-
-                        return bsonWoCompare(appliedOpTime.ts, clusterTime) >= 0;
-                    },
-                    "The majority commit point on secondary " + i + " failed to reach " +
-                        tojson(clusterTime),
-                    10 * 60 * 1000);
-            }
+            // its majority commit point. Issue an afterClusterTime read on  a nonexistent
+            // collection and wait on it. This has the advantage of being easier to debug in case of
+            // a timeout.
+            let res = assert.commandWorked(db.runCommand({
+                find: 'run_check_repl_dbhash_background',
+                readConcern: {level: 'majority', afterClusterTime: clusterTime},
+                limit: 1,
+                singleBatch: true,
+            }),
+                                           debugInfo);
+            debugInfo.push({
+                "node": db.getMongo(),
+                "session": session,
+                "majorityReadOpTime": res['operationTime']
+            });
         }
     };
 

@@ -18,7 +18,6 @@ function assertAfterClusterTimeReadSucceeds(db, readConcernObj) {
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
-        enableMajorityReadConcern: "",
         shardsvr: "",
     }
 });

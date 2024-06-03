@@ -60,5 +60,4 @@ executor:
         enableTestCommands: 1
         writePeriodicNoops: 1
         minSnapshotHistoryWindowInSeconds: 3600
-      enableMajorityReadConcern: ""
     num_nodes: 2

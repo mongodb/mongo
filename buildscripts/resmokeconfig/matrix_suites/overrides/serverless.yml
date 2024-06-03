@@ -6,7 +6,6 @@
           global_vars:
             TestData:
               defaultReadConcernLevel: null
-              enableMajorityReadConcern: ""
               hashTestNamesForMultitenancy: true
               tenantId: "636d957b2646ddfaf9b5e13f"
               useResponsePrefixChecking: true

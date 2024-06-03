@@ -16,7 +16,6 @@ const st = new ShardingTest({
     shards: 2,
     rs: {
         nodes: 1,
-        enableMajorityReadConcern: '',
         // Use the noop writer with a higher frequency for periodic noops to speed up the test.
         setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}
     }

@@ -10,8 +10,7 @@ function log(arg) {
 
 // Set up a set and grab things for later.
 var name = "read_majority_two_arbs";
-var replTest =
-    new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}});
+var replTest = new ReplSetTest({name: name, nodes: 3});
 
 replTest.startSet({setParameter: {allowMultipleArbiters: true}});
 var nodes = replTest.nodeList();

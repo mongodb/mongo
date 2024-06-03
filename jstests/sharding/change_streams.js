@@ -15,7 +15,6 @@ function runTest(collName, shardKey) {
         shards: 2,
         rs: {
             nodes: 1,
-            enableMajorityReadConcern: '',
             // Intentionally disable the periodic no-op writer in order to allow the test have
             // control of advancing the cluster time. For when it is enabled later in the test,
             // use a higher frequency for periodic noops to speed up the test.

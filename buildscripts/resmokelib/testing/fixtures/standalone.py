@@ -476,7 +476,6 @@ class MongodLauncher(object):
         _add_testing_set_parameters(suite_set_parameters)
 
         shortcut_opts = {
-            "enableMajorityReadConcern": self.config.MAJORITY_READ_CONCERN,
             "storageEngine": self.config.STORAGE_ENGINE,
             "wiredTigerCollectionConfigString": self.config.WT_COLL_CONFIG,
             "wiredTigerEngineConfigString": self.config.WT_ENGINE_CONFIG,

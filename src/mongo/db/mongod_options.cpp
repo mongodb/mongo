@@ -224,12 +224,6 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
         return false;
     }
 
-    if (params.count("replication.enableMajorityReadConcern") &&
-        params["replication.enableMajorityReadConcern"].as<bool>() == false) {
-        LOGV2_FATAL_CONTINUE(5324700, "enableMajorityReadConcern:false is no longer supported");
-        return false;
-    }
-
     return true;
 }
 

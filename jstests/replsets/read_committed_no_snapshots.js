@@ -21,7 +21,6 @@ var replTest = new ReplSetTest({
             rsConfig: {priority: 0}
         }
     ],
-    nodeOptions: {enableMajorityReadConcern: ''},
     settings: {protocolVersion: 1}
 });
 

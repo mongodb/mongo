@@ -365,11 +365,6 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         // 3. Check if the rollback node is caught up.
         //
         // If any conditions are unmet, retry.
-        //
-        // If {enableMajorityReadConcern:false} is set, it will use the rollbackViaRefetch
-        // algorithm. That can lead to unrecoverable rollbacks, particularly in unclean shutdown
-        // suites, as it is possible in rare cases for the sync source to lose the entry
-        // corresponding to the optime the rollback node chose as its minValid.
         log(`Wait for ${curSecondary.host} to finish rollback`);
         assert.soonNoExcept(
             () => {

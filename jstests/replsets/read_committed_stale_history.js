@@ -19,7 +19,6 @@ var rst = new ReplSetTest({
         {},
         {rsConfig: {priority: 0}},
     ],
-    nodeOptions: {enableMajorityReadConcern: ""},
     useBridge: true
 });
 

@@ -19,7 +19,6 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
-          enableMajorityReadConcern: ''
           nonClusteredConfigTransactions: true
   fixture:
     class: ShardedClusterFixture

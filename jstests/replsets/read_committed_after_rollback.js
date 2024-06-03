@@ -22,8 +22,7 @@ function doDirtyRead(coll) {
 
 // Set up a set and grab things for later.
 var name = "read_committed_after_rollback";
-var replTest = new ReplSetTest(
-    {name: name, nodes: 5, useBridge: true, nodeOptions: {enableMajorityReadConcern: ''}});
+var replTest = new ReplSetTest({name: name, nodes: 5, useBridge: true});
 replTest.startSet({setParameter: {allowMultipleArbiters: true}});
 
 var nodes = replTest.nodeList();

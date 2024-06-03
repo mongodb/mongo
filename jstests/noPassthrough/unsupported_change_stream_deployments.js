@@ -11,7 +11,7 @@ function assertChangeStreamNotSupportedOnConnection(conn) {
                     notReplicaSetErrorCode);
 }
 
-const conn = MongoRunner.runMongod({enableMajorityReadConcern: ""});
+const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 // $changeStream cannot run on a non-existent database.
 assert.commandWorked(conn.getDB("test").ensure_db_exists.insert({}));

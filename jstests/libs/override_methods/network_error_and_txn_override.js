@@ -362,12 +362,11 @@ function validateCmdNetworkErrorCompatibility(cmdName, cmdObj) {
     }
 }
 
-// Default read concern level to use for transactions. Snapshot read concern is not supported in
-// sharded transactions when majority reads are disabled.
+// Default read concern level to use for transactions.
 const kDefaultTransactionReadConcernLevel =
     TestData.hasOwnProperty("defaultTransactionReadConcernLevel")
     ? TestData.defaultTransactionReadConcernLevel
-    : (TestData.enableMajorityReadConcern !== false ? "snapshot" : "local");
+    : "snapshot";
 
 const kDefaultTransactionWriteConcernW = TestData.hasOwnProperty("defaultTransactionWriteConcernW")
     ? TestData.defaultTransactionWriteConcernW
@@ -379,8 +378,7 @@ const kDefaultReadConcernLevel = (function() {
         return TestData.defaultReadConcernLevel;
     }
 
-    // Use majority if the suite didn't specify a level, unless the variant doesn't support it.
-    return TestData.enableMajorityReadConcern !== false ? "majority" : "local";
+    return "majority";
 })();
 
 // Default write concern w to use for both transactions and non-transactions.

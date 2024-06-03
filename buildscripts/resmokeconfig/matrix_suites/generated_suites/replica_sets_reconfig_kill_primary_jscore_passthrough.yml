@@ -42,7 +42,6 @@ executor:
     all_nodes_electable: true
     class: ReplicaSetFixture
     mongod_options:
-      enableMajorityReadConcern: ''
       set_parameters:
         enableElectionHandoff: 0
         enableTestCommands: 1

@@ -23,7 +23,6 @@ executor:
   fixture:
     class: ShardedClusterFixture
     mongod_options:
-      enableMajorityReadConcern: ''
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:

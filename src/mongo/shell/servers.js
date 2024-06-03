@@ -1567,14 +1567,6 @@ function appendSetParameterArgs(argArray) {
                 }
             }
 
-            if (programMajorMinorVersion >= 360) {
-                if (jsTest.options().enableMajorityReadConcern !== undefined &&
-                    !argArrayContains("--enableMajorityReadConcern")) {
-                    argArray.push(...['--enableMajorityReadConcern',
-                                      jsTest.options().enableMajorityReadConcern.toString()]);
-                }
-            }
-
             // Since options may not be backward compatible, mongod options are not
             // set on older versions, e.g., mongod-3.0.
             if (baseProgramName === 'mongod' &&

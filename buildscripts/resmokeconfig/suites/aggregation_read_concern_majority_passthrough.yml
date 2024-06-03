@@ -35,7 +35,6 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: majority
-          enableMajorityReadConcern: ""
       eval: >-
         globalThis.testingReplication = true;
         await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
@@ -49,7 +48,6 @@ executor:
   fixture:
     class: ReplicaSetFixture
     mongod_options:
-      enableMajorityReadConcern: ""
       set_parameters:
         enableTestCommands: 1
     num_nodes: 2

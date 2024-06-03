@@ -278,7 +278,6 @@ def mongo_shell_program(
 
     shortcut_opts = {
         "backupOnRestartDir": (config.BACKUP_ON_RESTART_DIR, None),
-        "enableMajorityReadConcern": (config.MAJORITY_READ_CONCERN, True),
         "mixedBinVersions": (config.MIXED_BIN_VERSIONS, ""),
         "multiversionBinVersion": (shell_mixed_version, ""),
         "storageEngine": (config.STORAGE_ENGINE, ""),
@@ -538,7 +537,6 @@ def dbtest_program(
     if suites is not None:
         args.extend(suites)
 
-    kwargs["enableMajorityReadConcern"] = config.MAJORITY_READ_CONCERN
     if config.STORAGE_ENGINE is not None:
         kwargs["storageEngine"] = config.STORAGE_ENGINE
 

@@ -100,7 +100,6 @@ executor:
             verbosity: 1
             asio: 2
     mongod_options:
-      enableMajorityReadConcern: ""
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:

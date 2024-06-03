@@ -26,8 +26,7 @@ function log(arg) {
 }
 // Set up a set and grab things for later.
 var name = "read_committed_on_secondary";
-var replTest =
-    new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}});
+var replTest = new ReplSetTest({name: name, nodes: 3});
 replTest.startSet();
 var nodes = replTest.nodeList();
 var config = {

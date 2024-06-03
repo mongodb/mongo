@@ -13,8 +13,7 @@ import {
 
 var name = "operation_time_read_and_write_concern";
 
-var replTest = new ReplSetTest(
-    {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ""}, waitForKeys: true});
+var replTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
 replTest.startSet();
 replTest.initiate();
 

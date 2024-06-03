@@ -23,8 +23,7 @@ function testReadConcernLevel(level) {
     var replTest = new ReplSetTest({
         nodes: 1,
         oplogSize: 2,
-        nodeOptions:
-            {setParameter: 'testingSnapshotBehaviorInIsolation=true', enableMajorityReadConcern: ''}
+        nodeOptions: {setParameter: 'testingSnapshotBehaviorInIsolation=true'}
     });
     replTest.startSet();
     // Cannot wait for a stable recovery timestamp with 'testingSnapshotBehaviorInIsolation'

@@ -15,8 +15,6 @@
  *      incompatible_with_windows_tls,
  *    # failpoint pauseTenantMigrationBeforeLeavingCommittedState only exists on the latest branch.
  *      requires_fcv_60,
- *    # Tenant migrations will not be run with enableMajorityReadConcern=false in production.
- *      requires_majority_read_concern,
  *    # Tenant migrations will not be run with the inMemory storage engine in production.
  *      requires_persistence,
  *    # Tenant migrations are only used in serverless.

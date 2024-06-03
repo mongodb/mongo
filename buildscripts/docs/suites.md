@@ -99,7 +99,6 @@ config:
     global_vars:
       TestData:
         defaultReadConcernLevel: null
-        enableMajorityReadConcern: ""
     nodb: ""
     gssapiServiceName: "mockservice"
     eval: >-

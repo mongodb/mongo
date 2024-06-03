@@ -110,7 +110,6 @@
       fixture:
         class: ReplicaSetFixture
         mongod_options:
-          enableMajorityReadConcern: ""
           syncdelay: 5 # set to a low value to increase coverage of timestamping code.
           wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
           set_parameters:
@@ -184,7 +183,6 @@
       fixture:
         class: ReplicaSetFixture
         mongod_options:
-          enableMajorityReadConcern: ""
           wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
           set_parameters:
             enableTestCommands: 1

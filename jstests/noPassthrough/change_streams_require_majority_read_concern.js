@@ -10,7 +10,7 @@ import {
     stopReplicationOnSecondaries
 } from "jstests/libs/write_concern_util.js";
 
-const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
+const rst = new ReplSetTest({nodes: 2});
 
 rst.startSet();
 rst.initiate();

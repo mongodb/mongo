@@ -168,11 +168,7 @@ function runTests(coll, mongodConnection) {
 var replTest = new ReplSetTest({
     nodes: 1,
     oplogSize: 2,
-    nodeOptions: {
-        setParameter: 'testingSnapshotBehaviorInIsolation=true',
-        enableMajorityReadConcern: '',
-        shardsvr: ''
-    }
+    nodeOptions: {setParameter: 'testingSnapshotBehaviorInIsolation=true', shardsvr: ''}
 });
 replTest.startSet();
 // Cannot wait for a stable recovery timestamp with 'testingSnapshotBehaviorInIsolation' set.

@@ -145,11 +145,6 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
         LOGV2(22492, "Flow Control enabled");
     }
 
-    if (params.count("replication.enableMajorityReadConcern")) {
-        serverGlobalParams.enableMajorityReadConcern =
-            params["replication.enableMajorityReadConcern"].as<bool>();
-    }
-
     if (params.count("setParameter")) {
         std::map<std::string, std::string> parameters =
             params["setParameter"].as<std::map<std::string, std::string>>();
