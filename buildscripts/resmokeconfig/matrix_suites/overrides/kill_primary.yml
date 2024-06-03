@@ -35,6 +35,39 @@
           # retry logic in auto_retry_on_network_error.js.
           nodb: ""
 
+- name: replica_sets_shell_options_mixed_binary
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            globalThis.testingReplication = true;
+            await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+            globalThis.db = connect(TestData.connectionString);
+            await import("jstests/libs/override_methods/enable_sessions.js");
+            await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
+          global_vars:
+            TestData:
+              nonClusteredConfigTransactions: true
+              alwaysInjectTransactionNumber: true
+              defaultReadConcernLevel: "majority"
+              logRetryAttempts: true
+              networkErrorAndTxnOverrideConfig:
+                retryOnNetworkErrors: true
+              overrideRetryAttempts: 3
+              sessionOptions:
+                readConcern:
+                  level: "majority"
+                # Force DBClientRS to find the primary for non-write commands.
+                readPreference:
+                  mode: "primary"
+                retryWrites: true
+          # We specify nodb so the shell used by each test will attempt to connect after loading the
+          # retry logic in auto_retry_on_network_error.js.
+          nodb: ""
+
 - name: replica_sets_shell_options_retry_attempts
   value:
     executor:
@@ -78,7 +111,7 @@
         class: ReplicaSetFixture
         mongod_options:
           enableMajorityReadConcern: ""
-          syncdelay: 5
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
           wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
           set_parameters:
             enableTestCommands: 1
@@ -91,6 +124,56 @@
                 recovery: 2
         all_nodes_electable: true
         num_nodes: 3
+        replset_config_options:
+          settings:
+            catchUpTimeoutMillis: 0
+
+- name: replica_sets_fixture_last_lts_new_new_old
+  value:
+    executor:
+      fixture:
+        class: ReplicaSetFixture
+        mongod_options:
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
+          wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+          set_parameters:
+            enableTestCommands: 1
+            enableElectionHandoff: 0
+            logComponentVerbosity:
+              replication:
+                heartbeats: 2
+                rollback: 2
+              storage:
+                recovery: 2
+        all_nodes_electable: true
+        num_nodes: 3
+        old_bin_version: last_lts
+        mixed_bin_versions: new_new_old
+        replset_config_options:
+          settings:
+            catchUpTimeoutMillis: 0
+
+- name: replica_sets_fixture_last_lts_new_old_old
+  value:
+    executor:
+      fixture:
+        class: ReplicaSetFixture
+        mongod_options:
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
+          wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+          set_parameters:
+            enableTestCommands: 1
+            enableElectionHandoff: 0
+            logComponentVerbosity:
+              replication:
+                heartbeats: 2
+                rollback: 2
+              storage:
+                recovery: 2
+        all_nodes_electable: true
+        num_nodes: 3
+        old_bin_version: last_lts
+        mixed_bin_versions: new_old_old
         replset_config_options:
           settings:
             catchUpTimeoutMillis: 0

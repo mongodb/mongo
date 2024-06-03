@@ -53,6 +53,9 @@
         # Inserts enough data that recovery takes more than 8 seconds, so we never get a working primary.
         - jstests/core/**/geo_s2ordering.js
 
+        # This test may fail due to network errors and does not test server behavior, so exclude it.
+        - jstests/core/mixed_version_replica_set.js
+
 - name: kill_primary_jscore_passthrough_exclude_files_fle
   value:
     exclude_files:
@@ -133,6 +136,9 @@
         - jstests/core/**/geo_s2ordering.js
         - jstests/fle2/**/*.js
         - src/mongo/db/modules/*/jstests/fle2/**/*.js
+
+        # This test may fail due to network errors and does not test server behavior, so exclude it.
+        - jstests/core/mixed_version_replica_set.js
 
 - name: kill_primary_jscore_passthrough_exclude_with_any_tags
   value:
