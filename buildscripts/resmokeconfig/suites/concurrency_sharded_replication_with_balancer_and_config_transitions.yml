@@ -164,7 +164,8 @@ executor:
             import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
           transitioningConfigShard: true
   hooks:
-  - class: ContinuousConfigShardTransition
+  - class: ContinuousAddRemoveShard
+    transition_configsvr: true
     move_primary_comment: *movePrimaryComment
   - class: CheckShardFilteringMetadata
   - class: CheckReplDBHashInBackground
