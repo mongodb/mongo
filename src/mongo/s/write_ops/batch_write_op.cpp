@@ -28,6 +28,7 @@
  */
 
 #include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/write_op.h"
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -242,8 +243,8 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
     }
 }
 
-bool shouldCoordinateMultiUpdate(OperationContext* opCtx, bool isMultiWrite) {
-    if (opCtx->isCommandForwardedFromRouter() || !isMultiWrite) {
+bool shouldCoordinateMultiUpdate(OperationContext* opCtx, bool isMultiWrite, bool isUpsert) {
+    if (opCtx->isCommandForwardedFromRouter() || !isMultiWrite || isUpsert) {
         return false;
     }
 
@@ -446,17 +447,17 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             writeItem.getOpType() == BatchedCommandRequest::BatchType_Update ||
             writeItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
 
-            auto isMultiWrite = [&] {
+            auto [isMultiWrite, isUpsert] = [&] {
                 if (writeItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
                     auto updateReq = writeItem.getUpdateRef();
-                    return updateReq.getMulti();
+                    return std::make_tuple(updateReq.getMulti(), updateReq.getUpsert());
                 } else {
                     auto deleteReq = writeItem.getDeleteRef();
-                    return deleteReq.getMulti();
+                    return std::make_tuple(deleteReq.getMulti(), false);
                 }
             }();
 
-            if (shouldCoordinateMultiUpdate(opCtx, isMultiWrite)) {
+            if (shouldCoordinateMultiUpdate(opCtx, isMultiWrite, isUpsert)) {
                 // Multi writes blocking migrations should be in their own batch.
                 if (!batchMap.empty()) {
                     writeOp.resetWriteToReady();
