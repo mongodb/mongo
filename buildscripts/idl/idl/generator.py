@@ -1682,17 +1682,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 with self._predicate(check):
                     if ast_type.is_variant:
                         # _gen_variant_deserializer generates code to parse the variant into the variable "_" + field.cpp_name,
-                        # so we create a local variable '_tmp'
-                        # and change cpp_name (for the duration of the _gen_variant_deserializer call) to 'tmp' so we can pass '_tmp'
-                        # to values.push_back below.
+                        # so we create a local variable '_tmp'.
                         self._writer.write_line("%s _tmp;" % ast_type.cpp_type)
-                        cpp_name = field.cpp_name
-                        field.cpp_name = "tmp"
-                        array_value = self._gen_variant_deserializer(
-                            field, "arrayElement", tenant, is_catalog_ctxt
+                        self._gen_variant_deserializer(
+                            field, "_tmp", "arrayElement", tenant, is_catalog_ctxt
                         )
-                        field.cpp_name = cpp_name
-                        self._writer.write_line("values.push_back(std::move(%s));" % (array_value))
+                        self._writer.write_line("values.push_back(std::move(_tmp));")
                     else:
                         array_value = self._gen_field_deserializer_expression(
                             "arrayElement", field, ast_type, tenant, is_catalog_ctxt
@@ -1730,8 +1725,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         else:
             self._writer.write_line("%s = std::move(values);" % (_get_field_member_name(field)))
 
-    def _gen_variant_deserializer(self, field, bson_element, tenant, is_catalog_ctxt):
-        # type: (ast.Field, str, str, bool) -> str
+    def _gen_variant_deserializer(self, field, field_name, bson_element, tenant, is_catalog_ctxt):
+        # type: (ast.Field, str, str, str, bool) -> None
         """Generate the C++ deserializer piece for a variant field."""
         self._writer.write_empty_line()
         self._writer.write_line("const BSONType variantType = %s.type();" % (bson_element,))
@@ -1802,8 +1797,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             with self._block("case Object: {", "} break;"):
                 self._gen_variant_deserializer_from_obj(
                     field,
-                    field_name=_get_field_member_name(field),
-                    bson_element="%s.Obj()" % bson_element,
+                    field_name=field_name,
+                    bson_element=bson_element,
+                    tenant=tenant,
+                    from_doc_seq=False,
                 )
 
         self._writer.write_line("default:")
@@ -1820,12 +1817,28 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # End of outer switch statement.
         self._writer.write_line("}")
 
-        # Used by _gen_array_deserializer for arrays of variant.
-        return _get_field_member_name(field)
-
-    def _gen_variant_deserializer_from_obj(self, field, field_name, bson_element):
+    def _gen_variant_deserializer_from_obj(
+        self, field, field_name, bson_element, tenant, from_doc_seq
+    ):
         def on_variant_alternative_match(variant_type):
-            value_expr = f"{variant_type.cpp_type}::parse(ctxt, {bson_element}, dctx)"
+            assert variant_type.is_struct
+            validated_tenancy_scope = "ctxt.getValidatedTenancyScope()"
+            if "request" in tenant:
+                validated_tenancy_scope = "request.validatedTenancyScope"
+            self._writer.write_line(
+                "IDLParserContext tempContext(%s, &ctxt, %s, %s, %s);"
+                % (
+                    _get_field_constant_name(field),
+                    validated_tenancy_scope,
+                    "getSerializationContext()",
+                    tenant,
+                )
+            )
+            if from_doc_seq:
+                value_expr = f"{variant_type.cpp_type}::parse(tempContext, {bson_element}, dctx)"
+            else:
+                self._writer.write_line("const auto localObject = %s.Obj();" % (bson_element))
+                value_expr = f"{variant_type.cpp_type}::parse(tempContext, localObject, dctx)"
             if field.optional:
                 cpp_type_info = cpp_types.get_cpp_type(field)
                 value_expr = f"{cpp_type_info.get_getter_setter_type()}({value_expr})"
@@ -1840,7 +1853,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if len(struct_types_list) == 1:
             on_variant_alternative_match(struct_types_list[0])
         else:
-            key = f"{bson_element}.firstElement().fieldNameStringData()"
+            operand = bson_element
+            if not from_doc_seq:
+                operand += ".Obj()"
+            key = operand + ".firstElement().fieldNameStringData()"
             with self._block("[&](StringData s) {", f"}}({key});"):
                 with self._block("auto onMatch = [&](int found) {", "};"):
                     with self._block("switch (found) {", "}"):
@@ -1900,7 +1916,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         elif field_type.is_variant:
             self._gen_usage_check(field, bson_element, field_usage_check)
-            self._gen_variant_deserializer(field, bson_element, tenant, is_catalog_ctxt)
+            self._gen_variant_deserializer(
+                field, _get_field_member_name(field), bson_element, tenant, is_catalog_ctxt
+            )
             return
 
         def validate_and_assign_or_uassert(field, expression):
@@ -2011,7 +2029,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             elif field.type.is_variant:
                 self._writer.write_line("%s _tmp;" % field.type.cpp_type)
                 self._gen_variant_deserializer_from_obj(
-                    field, field_name="_tmp", bson_element="sequenceObject"
+                    field,
+                    field_name="_tmp",
+                    bson_element="sequenceObject",
+                    tenant=tenant,
+                    from_doc_seq=True,
                 )
                 array_value = "_tmp"
             else:
