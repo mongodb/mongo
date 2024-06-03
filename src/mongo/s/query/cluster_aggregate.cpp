@@ -421,8 +421,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return resolvedNsCM.isSharded();
     };
 
-    liteParsedPipeline.verifyIsSupported(
-        opCtx, isSharded, request.getExplain(), serverGlobalParams.enableMajorityReadConcern);
+    liteParsedPipeline.verifyIsSupported(opCtx, isSharded, request.getExplain());
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     const auto& involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
     auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);

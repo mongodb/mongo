@@ -255,10 +255,7 @@ public:
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
             return _liteParsedPipeline.supportsReadConcern(
-                level,
-                isImplicitDefault,
-                _aggregationRequest.getExplain(),
-                serverGlobalParams.enableMajorityReadConcern);
+                level, isImplicitDefault, _aggregationRequest.getExplain());
         }
 
         bool allowsSpeculativeMajorityReads() const override {

@@ -179,10 +179,10 @@ public:
     /**
      * Verifies that this pipeline is allowed to run with the specified read concern level.
      */
-    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                 bool isImplicitDefault,
-                                                 boost::optional<ExplainOptions::Verbosity> explain,
-                                                 bool enableMajorityReadConcern) const;
+    ReadConcernSupportResult supportsReadConcern(
+        repl::ReadConcernLevel level,
+        bool isImplicitDefault,
+        boost::optional<ExplainOptions::Verbosity> explain) const;
 
     /**
      * Checks that all of the stages in this pipeline are allowed to run with the specified read
@@ -215,8 +215,7 @@ public:
      */
     void verifyIsSupported(OperationContext* opCtx,
                            std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
-                           boost::optional<ExplainOptions::Verbosity> explain,
-                           bool enableMajorityReadConcern) const;
+                           boost::optional<ExplainOptions::Verbosity> explain) const;
 
     /**
      * Returns true if the first stage in the pipeline does not require an input source.

@@ -51,21 +51,9 @@ namespace mongo {
 ReadConcernSupportResult LiteParsedPipeline::supportsReadConcern(
     repl::ReadConcernLevel level,
     bool isImplicitDefault,
-    boost::optional<ExplainOptions::Verbosity> explain,
-    bool enableMajorityReadConcern) const {
+    boost::optional<ExplainOptions::Verbosity> explain) const {
     // Start by assuming that we will support both readConcern and cluster-wide default.
     ReadConcernSupportResult result = ReadConcernSupportResult::allSupportedAndDefaultPermitted();
-
-    // 1. Determine whether the given read concern must be rejected for any pipeline-global reasons.
-    if (!hasChangeStream() && !enableMajorityReadConcern &&
-        (level == repl::ReadConcernLevel::kMajorityReadConcern)) {
-        // Reject non change stream aggregation queries that try to use "majority" read concern when
-        // enableMajorityReadConcern=false.
-        result.readConcernSupport = {
-            ErrorCodes::ReadConcernMajorityNotEnabled,
-            "Only change stream aggregation queries support 'majority' read concern when "
-            "enableMajorityReadConcern=false"};
-    }
 
     // 2. Determine whether the default read concern must be denied for any pipeline-global reasons.
     if (explain) {
@@ -113,10 +101,8 @@ void LiteParsedPipeline::assertSupportsMultiDocumentTransaction(
 void LiteParsedPipeline::assertSupportsReadConcern(
     OperationContext* opCtx, boost::optional<ExplainOptions::Verbosity> explain) const {
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    auto readConcernSupport = supportsReadConcern(readConcernArgs.getLevel(),
-                                                  readConcernArgs.isImplicitDefault(),
-                                                  explain,
-                                                  serverGlobalParams.enableMajorityReadConcern);
+    auto readConcernSupport = supportsReadConcern(
+        readConcernArgs.getLevel(), readConcernArgs.isImplicitDefault(), explain);
     if (readConcernArgs.hasLevel()) {
         if (!readConcernSupport.readConcernSupport.isOK()) {
             uassertStatusOK(readConcernSupport.readConcernSupport.withContext(
@@ -128,8 +114,7 @@ void LiteParsedPipeline::assertSupportsReadConcern(
 void LiteParsedPipeline::verifyIsSupported(
     OperationContext* opCtx,
     const std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
-    const boost::optional<ExplainOptions::Verbosity> explain,
-    bool enableMajorityReadConcern) const {
+    const boost::optional<ExplainOptions::Verbosity> explain) const {
     // Verify litePipe can be run in a transaction.
     const bool inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
     if (inMultiDocumentTransaction) {
