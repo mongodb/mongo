@@ -70,6 +70,7 @@
 #include "mongo/db/audit_interface.h"
 #include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
@@ -1632,6 +1633,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                                    &shutdownTimeElapsedBuilder,
                                                    &shutdownInfoBuilder);
         });
+
+    UserCacheInvalidator::stop(serviceContext);
 
     // If we don't have shutdownArgs, we're shutting down from a signal, or other clean shutdown
     // path.
