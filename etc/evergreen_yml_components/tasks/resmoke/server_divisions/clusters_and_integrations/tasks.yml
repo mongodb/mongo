@@ -651,55 +651,56 @@ tasks:
       use_large_distro: "true"
       fallback_num_sub_suites: 10
 
-- <<: *gen_task_template
-  name: tenant_migration_causally_consistent_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
+# TODO(SERVER-88891): Delete these tenant migration suites
+# - <<: *gen_task_template
+#   name: tenant_migration_causally_consistent_jscore_passthrough_gen
+#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+#   commands:
+#   - func: "generate resmoke tasks"
+#     vars:
+#       use_large_distro: "true"
 
-- <<: *gen_task_template
-  name: tenant_migration_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
+# - <<: *gen_task_template
+#   name: tenant_migration_jscore_passthrough_gen
+#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+#   commands:
+#   - func: "generate resmoke tasks"
+#     vars:
+#       use_large_distro: "true"
 
-- <<: *gen_task_template
-  name: tenant_migration_kill_primary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      fallback_num_sub_suites: 10
+# - <<: *gen_task_template
+#   name: tenant_migration_kill_primary_jscore_passthrough_gen
+#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+#   commands:
+#   - func: "generate resmoke tasks"
+#     vars:
+#       use_large_distro: "true"
+#       fallback_num_sub_suites: 10
 
-- <<: *gen_task_template
-  name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless", "txn"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
+# - <<: *gen_task_template
+#   name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
+#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless", "txn"]
+#   commands:
+#   - func: "generate resmoke tasks"
+#     vars:
+#       use_large_distro: "true"
 
-- <<: *gen_task_template
-  name: tenant_migration_stepdown_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
+# - <<: *gen_task_template
+#   name: tenant_migration_stepdown_jscore_passthrough_gen
+#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+#   commands:
+#   - func: "generate resmoke tasks"
+#     vars:
+#       use_large_distro: "true"
 
-- <<: *gen_task_template
-  name: tenant_migration_terminate_primary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      fallback_num_sub_suites: 10
+# - <<: *gen_task_template
+#   name: tenant_migration_terminate_primary_jscore_passthrough_gen
+#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+#   commands:
+#   - func: "generate resmoke tasks"
+#     vars:
+#       use_large_distro: "true"
+#       fallback_num_sub_suites: 10
 
 # This is a separate task because it is only supported on Ubuntu 16.04+ which are not inmemory builders
 - <<: *task_template

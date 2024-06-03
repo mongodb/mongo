@@ -16,6 +16,10 @@ selector:
   - jstests/core/txns/**/*.js
   # Skip any tests that run with auth explicitly.
   - jstests/core/administrative/*[aA]uth*.js
+  # Skip time-series tests which need special handling to not fail validate.
+  # Currently, the validate hook is run before migration reaches the recipient kConsistent stage
+  # which is fine for regular collections, but will show as corruption for system.buckets collections.
+  - jstests/core/timeseries/*.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
