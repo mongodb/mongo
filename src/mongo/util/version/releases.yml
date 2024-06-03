@@ -51,7 +51,7 @@ eolVersions:
   - "3.6" # 2021-04
   - "4.0" # 2022-04
   - "4.2" # 2023-04
-  # - "4.4" # 2024-02
+  - "4.4" # 2024-02
   # - "5.0" # 2024-10
   - "5.1" # 2022-01
   - "5.2" # 2022-04
@@ -60,6 +60,7 @@ eolVersions:
   - "6.2" # 2023-03
   - "6.3" # 2023-08
   - "7.1" # 2024-01
+  - "7.2" # 2024-04
 
 # Optional.
 # Using this special override extends FCV constant generation down to the previous value of
