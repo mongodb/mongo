@@ -350,6 +350,14 @@ public:
      */
     bool isConfigServer(const HostAndPort& host) const;
 
+    /**
+     * Returns true if the config server is in the shard registry as a shard, and false otherwise.
+     * This function should only be used for serverStatus metric reporting where a result that is
+     * stale by a few seconds is okay. This function will not refresh the shard registry or
+     * otherwise perform any network traffic.
+     */
+    bool cachedClusterHasConfigShard() const;
+
     // TODO SERVER-50206: Remove usage of these non-causally consistent accessors.
     //
     // Their most important current users are dispatching requests to hosts, and processing
