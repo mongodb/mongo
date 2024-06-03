@@ -62,6 +62,11 @@ public:
     static void start(ServiceContext* serviceCtx, OperationContext* opCtx);
 
     /**
+     * Waits for the job to complete and stops the thread.
+     */
+    static void stop(ServiceContext* serviceCtx);
+
+    /**
      * Set the period of the background job. This should only be used internally (by the
      * setParameter).
      */
