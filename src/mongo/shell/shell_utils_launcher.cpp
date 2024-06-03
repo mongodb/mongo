@@ -99,14 +99,10 @@
 
 namespace mongo {
 
-using std::cout;
-using std::endl;
-using std::make_pair;
-using std::map;
-using std::pair;
+using std::cout;  // NOLINT(misc-unused-using-decls) - used on Windows
+using std::endl;  // NOLINT(misc-unused-using-decls) - used on Windows
 using std::string;
 using std::stringstream;
-using std::unique_ptr;
 using std::vector;
 
 /**

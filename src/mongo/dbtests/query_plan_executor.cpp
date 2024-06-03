@@ -84,7 +84,6 @@
 namespace mongo {
 namespace {
 
-using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 

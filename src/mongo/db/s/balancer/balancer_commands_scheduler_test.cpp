@@ -72,7 +72,6 @@
 namespace mongo {
 namespace {
 
-using unittest::assertGet;
 
 class BalancerCommandsSchedulerTest : public ConfigServerTestFixture {
 public:

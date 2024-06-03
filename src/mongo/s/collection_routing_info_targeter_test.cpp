@@ -75,7 +75,6 @@
 namespace mongo {
 namespace {
 
-using unittest::assertGet;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 

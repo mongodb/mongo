@@ -71,7 +71,6 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hangBeforeDocumentSourceCursorLoadBatch);
 
 using boost::intrusive_ptr;
-using std::shared_ptr;
 using std::string;
 
 const char* DocumentSourceCursor::getSourceName() const {

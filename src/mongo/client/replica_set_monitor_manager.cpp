@@ -70,7 +70,6 @@
 
 namespace mongo {
 
-using std::set;
 using std::shared_ptr;
 using std::string;
 using std::vector;
@@ -78,7 +77,6 @@ using std::vector;
 using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutor;
-using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
 
 namespace {

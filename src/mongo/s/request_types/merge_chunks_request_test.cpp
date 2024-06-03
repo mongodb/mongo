@@ -48,7 +48,6 @@
 namespace mongo {
 namespace {
 
-using unittest::assertGet;
 
 ChunkRange chunkRange(BSON("a" << 1), BSON("a" << 10));
 IDLParserContext ctx("_configsvrCommitChunksMerge");

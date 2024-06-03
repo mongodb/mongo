@@ -87,7 +87,6 @@ namespace {
 
 using ChunkDistributionMap = stdx::unordered_map<ShardId, size_t>;
 using ZoneShardMap = StringMap<std::vector<ShardId>>;
-using boost::intrusive_ptr;
 
 std::vector<ShardId> getAllNonDrainingShardIdsShuffled(OperationContext* opCtx) {
     const auto shardsAndOpTime = uassertStatusOKWithContext(

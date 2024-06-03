@@ -39,7 +39,6 @@ namespace mongo::optimizer {
 namespace {
 
 using sbe::MakeObjSpec;
-using sbe::value::TypeTags;
 
 using FieldAction = MakeObjSpec::FieldAction;
 using FieldActions = std::vector<std::pair<StringData, FieldAction>>;

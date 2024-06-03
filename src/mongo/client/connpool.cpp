@@ -95,10 +95,7 @@ void recordWaitTime(PoolForHost& p, DBClientBase* conn, Date_t connRequestedAt) 
 
 MONGO_FAIL_POINT_DEFINE(injectWaitTimeForConnpoolAcquisition);
 
-using std::endl;
 using std::list;
-using std::map;
-using std::set;
 using std::string;
 using std::vector;
 

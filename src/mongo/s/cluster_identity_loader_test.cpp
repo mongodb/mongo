@@ -65,10 +65,7 @@
 namespace mongo {
 namespace {
 
-using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
-using executor::TaskExecutor;
-using unittest::assertGet;
 
 BSONObj getReplSecondaryOkMetadata() {
     BSONObjBuilder o;

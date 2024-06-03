@@ -74,9 +74,7 @@ namespace mongo {
 namespace {
 
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
 using std::vector;
-using unittest::assertGet;
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("foo.bar");

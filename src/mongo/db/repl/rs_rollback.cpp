@@ -126,11 +126,9 @@
 
 namespace mongo {
 
-using std::list;
 using std::map;
 using std::pair;
 using std::set;
-using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 

@@ -39,7 +39,6 @@
 
 namespace {
 
-using mongo::ErrorCodes;
 using mongo::FieldRef;
 using mongo::Status;
 using mongo::fieldchecker::isPositional;

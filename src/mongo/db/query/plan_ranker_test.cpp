@@ -50,7 +50,6 @@ namespace {
 using std::make_unique;
 using std::string;
 using std::unique_ptr;
-using std::vector;
 
 unique_ptr<PlanStageStats> makeStats(const char* name,
                                      StageType type,

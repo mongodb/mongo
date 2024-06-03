@@ -84,7 +84,6 @@
 namespace mongo {
 namespace {
 
-using std::pair;
 using std::string;
 using std::unique_ptr;
 

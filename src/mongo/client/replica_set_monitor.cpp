@@ -45,7 +45,6 @@
 
 namespace mongo {
 
-using std::numeric_limits;
 using std::set;
 using std::shared_ptr;
 using std::string;

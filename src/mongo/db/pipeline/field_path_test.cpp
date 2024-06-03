@@ -38,7 +38,6 @@ namespace mongo {
 namespace {
 
 using std::string;
-using std::vector;
 
 /** FieldPath constructed from empty string. */
 TEST(FieldPathTest, Empty) {

@@ -106,9 +106,7 @@ namespace mongo {
 using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
 using executor::ShardingTaskExecutor;
-using unittest::assertGet;
 
 namespace {
 

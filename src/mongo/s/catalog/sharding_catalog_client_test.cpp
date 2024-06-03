@@ -85,10 +85,7 @@
 namespace mongo {
 namespace {
 
-using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
-using executor::TaskExecutor;
 using repl::OpTime;
 using rpc::ReplSetMetadata;
 using std::vector;

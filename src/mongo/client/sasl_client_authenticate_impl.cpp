@@ -80,8 +80,6 @@
 namespace mongo {
 
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
-using std::endl;
 
 namespace {
 

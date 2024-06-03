@@ -55,7 +55,6 @@ namespace {
 
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
-using unittest::assertGet;
 
 bool stringContains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;

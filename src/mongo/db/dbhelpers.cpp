@@ -80,7 +80,6 @@
 
 namespace mongo {
 
-using std::set;
 using std::string;
 using std::unique_ptr;
 

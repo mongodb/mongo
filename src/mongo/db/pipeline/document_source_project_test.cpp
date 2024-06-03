@@ -60,7 +60,6 @@
 
 namespace mongo {
 namespace {
-using boost::intrusive_ptr;
 using std::vector;
 
 //

@@ -73,7 +73,6 @@
 namespace {
 
 using namespace mongo;
-using std::endl;
 using std::unique_ptr;
 
 void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {

@@ -54,7 +54,6 @@
 
 namespace mongo {
 
-using std::min;
 using std::string;
 using std::stringstream;
 

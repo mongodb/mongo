@@ -67,8 +67,6 @@
 
 namespace mongo {
 
-using std::endl;
-using std::map;
 using std::set;
 using std::shared_ptr;
 using std::string;

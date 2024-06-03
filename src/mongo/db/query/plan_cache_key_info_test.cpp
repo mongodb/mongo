@@ -65,7 +65,6 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-using unittest::assertGet;
 
 std::ostream& operator<<(std::ostream& stream, const PlanCacheKeyInfo& key) {
     stream << key.toString() << " settings: " << key.querySettings().toBSON().toString();

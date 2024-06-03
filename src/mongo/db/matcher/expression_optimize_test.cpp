@@ -68,7 +68,6 @@ namespace {
 static const NamespaceString nss =
     NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 
-using unittest::assertGet;
 
 /**
  * Helper function to parse the given BSON object as a MatchExpression, checks the status,

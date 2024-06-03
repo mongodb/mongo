@@ -48,7 +48,6 @@
 namespace mongo {
 
 using std::unique_ptr;
-using std::vector;
 
 // static
 const char* DistinctScan::kStageType = "DISTINCT_SCAN";

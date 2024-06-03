@@ -56,7 +56,6 @@ namespace mongo {
 namespace repl {
 namespace {
 
-using unittest::EnsureFCV;
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
     ReplicationCoordinatorExternalStateMock rses;

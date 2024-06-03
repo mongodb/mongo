@@ -88,12 +88,9 @@ namespace mongo {
 using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
-using unittest::assertGet;
 
 using std::string;
 using std::vector;
-using unittest::assertGet;
 
 namespace {
 ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly);

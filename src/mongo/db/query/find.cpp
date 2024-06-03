@@ -53,7 +53,6 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 
 // Failpoint for checking whether we've received a getmore.
 MONGO_FAIL_POINT_DEFINE(failReceivedGetmore);

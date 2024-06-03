@@ -50,8 +50,6 @@ namespace mongo {
 namespace {
 
 using CompareNodeTest = UpdateTestFixture;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
 
 DEATH_TEST_REGEX(CompareNodeTest,
                  InitFailsForEmptyElement,

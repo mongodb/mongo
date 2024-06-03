@@ -51,8 +51,6 @@ namespace mongo {
 namespace {
 
 using PullAllNodeTest = UpdateTestFixture;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
 
 TEST(PullAllNodeTest, InitWithIntFails) {
     auto update = fromjson("{$pullAll: {a: 1}}");

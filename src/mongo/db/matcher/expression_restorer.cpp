@@ -38,7 +38,6 @@ namespace mongo {
 namespace {
 using boolean_simplification::BitsetTerm;
 using boolean_simplification::BitsetTreeNode;
-using boolean_simplification::Maxterm;
 using boolean_simplification::Minterm;
 class MatchExpressionRestorer {
 public:

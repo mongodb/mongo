@@ -45,7 +45,6 @@
 namespace mongo {
 
 using std::unique_ptr;
-using std::vector;
 
 const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 

@@ -48,7 +48,6 @@
 namespace mongo {
 namespace {
 
-using unittest::assertGet;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("db.coll");
 const BSONObj kKeyPattern = BSON("a" << 1);

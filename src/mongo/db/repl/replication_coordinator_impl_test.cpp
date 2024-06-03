@@ -111,7 +111,6 @@ using executor::RemoteCommandResponse;
 using rpc::OplogQueryMetadata;
 using rpc::ReplSetMetadata;
 using unittest::assertGet;
-using unittest::EnsureFCV;
 
 typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 // Helper class to wrap Timestamp as an OpTime with term 1.

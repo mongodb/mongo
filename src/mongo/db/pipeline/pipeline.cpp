@@ -181,7 +181,6 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
 MONGO_FAIL_POINT_DEFINE(disablePipelineOptimization);
 
 using boost::intrusive_ptr;
-using std::endl;
 using std::ostringstream;
 using std::string;
 using std::vector;

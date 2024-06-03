@@ -82,7 +82,6 @@ using chunks_test_util::calculateShardsMaxValidAfter;
 using chunks_test_util::calculateShardVersions;
 using chunks_test_util::genChunkVector;
 using chunks_test_util::genRandomChunkVector;
-using chunks_test_util::getShardId;
 using chunks_test_util::performRandomChunkOperations;
 
 namespace {

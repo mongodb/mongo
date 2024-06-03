@@ -51,8 +51,6 @@ namespace mongo {
 namespace {
 
 using AddToSetNodeTest = UpdateTestFixture;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
 
 DEATH_TEST_REGEX(AddToSetNodeTest,
                  InitFailsForEmptyElement,

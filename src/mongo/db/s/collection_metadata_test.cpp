@@ -54,7 +54,6 @@
 namespace mongo {
 namespace {
 
-using unittest::assertGet;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
 const ShardId kThisShard("thisShard");

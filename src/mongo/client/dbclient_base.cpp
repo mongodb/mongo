@@ -87,7 +87,6 @@
 
 namespace mongo {
 
-using std::endl;
 using std::list;
 using std::string;
 using std::stringstream;
@@ -95,7 +94,6 @@ using std::unique_ptr;
 using std::vector;
 
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
 
 AtomicWord<long long> DBClientBase::ConnectionIdSequence;
 

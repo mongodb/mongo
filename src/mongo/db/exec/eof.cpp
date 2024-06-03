@@ -35,7 +35,6 @@
 namespace mongo {
 
 using std::unique_ptr;
-using std::vector;
 
 // static
 const char* EOFStage::kStageType = "EOF";

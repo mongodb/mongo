@@ -52,7 +52,6 @@
 namespace {
 using namespace mongo;
 using namespace mongo::rpc;
-using mongo::unittest::assertGet;
 
 BSONObj addDollarDB(BSONObj command, StringData db) {
     return BSONObjBuilder(std::move(command)).append("$db", db).obj();

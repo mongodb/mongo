@@ -51,7 +51,6 @@
 namespace mongo {
 namespace {
 
-using unittest::assertGet;
 
 class MigrationDestinationManagerTest : public ShardServerTestFixture {
 protected:

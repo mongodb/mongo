@@ -70,7 +70,6 @@ namespace {
 
 using namespace mongo;
 using namespace plan_enumerator;
-using std::endl;
 using std::set;
 using std::string;
 using std::unique_ptr;

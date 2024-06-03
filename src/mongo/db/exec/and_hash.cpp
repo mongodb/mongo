@@ -53,7 +53,6 @@ const size_t kDefaultMaxMemUsageBytes = 32 * 1024 * 1024;
 namespace mongo {
 
 using std::unique_ptr;
-using std::vector;
 
 const size_t AndHashStage::kLookAheadWorks = 10;
 

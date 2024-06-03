@@ -81,7 +81,6 @@ bool isCompoundWildcardIndex(const IndexDescriptor* indexDescriptor) {
 }  // namespace
 
 using std::unique_ptr;
-using std::vector;
 
 // static
 const char* CountScan::kStageType = "COUNT_SCAN";

@@ -45,7 +45,6 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 using executor::RemoteCommandRequest;
-using executor::TaskExecutorCursor;
 
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(vectorSearch,
                                            LiteParsedSearchStage::parse,

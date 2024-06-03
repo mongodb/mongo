@@ -70,9 +70,6 @@
 namespace mongo {
 namespace {
 
-using std::make_pair;
-using std::map;
-using std::pair;
 using std::string;
 using std::unique_ptr;
 using std::vector;

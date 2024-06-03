@@ -47,7 +47,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
 
 namespace {
 const double DELTA = 0.0001;

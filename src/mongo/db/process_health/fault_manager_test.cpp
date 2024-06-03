@@ -39,7 +39,6 @@ namespace mongo {
 namespace process_health {
 
 using test::FaultManagerTest;
-using test::FaultManagerTestImpl;
 
 namespace {
 

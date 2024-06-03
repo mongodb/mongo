@@ -92,7 +92,6 @@ namespace {
 const std::string kTestingDurableHistoryPinName = "_testing";
 
 using repl::UnreplicatedWritesBlock;
-using std::endl;
 using std::string;
 using std::stringstream;
 

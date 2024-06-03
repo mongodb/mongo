@@ -96,7 +96,6 @@ namespace mongo {
 namespace {
 
 using boost::intrusive_ptr;
-using std::unique_ptr;
 using std::vector;
 
 static const NamespaceString nss =

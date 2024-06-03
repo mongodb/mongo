@@ -91,11 +91,9 @@ namespace mongo {
 using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
 using repl::ReplicationCoordinator;
 using repl::ReplicationCoordinatorMock;
 using repl::ReplSettings;
-using unittest::assertGet;
 
 ShardingMongoDTestFixture::ShardingMongoDTestFixture(Options options, bool setUpMajorityReads)
     : ServiceContextMongoDTest(std::move(options)), _setUpMajorityReads(setUpMajorityReads) {}

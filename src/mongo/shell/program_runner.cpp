@@ -94,8 +94,7 @@ namespace mongo::shell_utils {
 
 using std::cout;
 using std::endl;
-using std::make_pair;
-using std::pair;
+using std::make_pair;  // NOLINT(misc-unused-using-decls) - used on Windows
 using std::string;
 using std::stringstream;
 using std::vector;

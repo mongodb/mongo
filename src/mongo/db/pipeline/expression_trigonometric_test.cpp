@@ -42,7 +42,6 @@
 
 namespace expression_tests {
 
-using boost::intrusive_ptr;
 using namespace mongo;
 
 // assertApproxEq is a helper function for asserting approximate results.

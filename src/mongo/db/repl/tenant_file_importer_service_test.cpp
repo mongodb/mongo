@@ -70,8 +70,6 @@
 
 namespace mongo {
 
-using executor::TaskExecutor;
-using executor::ThreadPoolExecutorTest;
 
 namespace repl {
 

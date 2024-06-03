@@ -42,7 +42,6 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/processinfo.h"
 
-using boost::optional;
 using mongo::unittest::TempDir;
 
 namespace mongo {

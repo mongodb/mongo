@@ -45,8 +45,6 @@
 
 namespace mongo {
 
-using std::unique_ptr;
-
 namespace {
 
 typedef unsigned char HashDigest[16];

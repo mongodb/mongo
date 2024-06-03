@@ -64,7 +64,6 @@
 
 namespace mongo {
 
-using std::endl;
 using std::string;
 
 TEST(MatchExpressionParserLeafTest, NullCollation) {

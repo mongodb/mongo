@@ -54,7 +54,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-using boost::intrusive_ptr;
 using boost::optional;
 
 namespace mongo {

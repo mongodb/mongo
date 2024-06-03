@@ -49,8 +49,6 @@
 namespace mongo {
 namespace {
 using ObjectTransformExecutorTest = UpdateTestFixture;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
 
 TEST_F(ObjectTransformExecutorTest, Noop) {
     BSONObj input = fromjson("{a: 1, b: 2}");
