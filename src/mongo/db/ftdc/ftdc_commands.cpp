@@ -42,6 +42,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_commands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -107,6 +108,56 @@ public:
     }
 };
 MONGO_REGISTER_COMMAND(GetDiagnosticDataCommand).forShard();
+
+/**
+ * Triggers a rotate of the FTDC file
+ */
+class TriggerRotateFTDCCmd : public TypedCommand<TriggerRotateFTDCCmd> {
+public:
+    using Request = TriggerRotateFTDC;
+
+    class Invocation : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            FTDCController::get(opCtx->getServiceContext())->triggerRotate();
+        }
+
+    private:
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            auto* client = opCtx->getClient();
+
+            auto checkAuth = [&](auto&& resource, auto&&... actions) {
+                auto ok = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                    resource, {actions...});
+                uassert(ErrorCodes::Unauthorized, "Unauthorized", ok);
+            };
+            checkAuth(ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                      ActionType::serverStatus,
+                      ActionType::replSetGetStatus);
+            checkAuth(ResourcePattern::forExactNamespace(NamespaceString::kRsOplogNamespace),
+                      ActionType::collStats);
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName());
+        }
+    };
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+};
+MONGO_REGISTER_COMMAND(TriggerRotateFTDCCmd).forRouter().forShard();
 
 }  // namespace
 

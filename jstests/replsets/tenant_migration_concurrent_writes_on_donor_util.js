@@ -648,6 +648,7 @@ export const TenantMigrationConcurrentWriteUtil = {
         revokeRolesFromUser: {skip: isAuthCommand},
         rolesInfo: {skip: isNotWriteCommand},
         rotateCertificates: {skip: isAuthCommand},
+        rotateFTDC: {skip: isNotRunOnUserDatabase},
         saslContinue: {skip: isAuthCommand},
         saslStart: {skip: isAuthCommand},
         sbe: {skip: isNotRunOnUserDatabase},

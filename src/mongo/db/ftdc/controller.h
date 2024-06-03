@@ -41,6 +41,7 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -172,11 +173,16 @@ public:
      */
     BSONObj getMostRecentPeriodicDocument();
 
+    /*
+     * Forces a rotate before the next FTDC log is written.
+     */
+    void triggerRotate();
+
 private:
     /**
      * Do periodic statistics collection, and all other work on the background thread.
      */
-    void doLoop(Service* service) noexcept;
+    void doLoop(Service* service);
 
 private:
     /**
@@ -219,6 +225,9 @@ private:
     // Mutex to protect the condvar, configuration changes, and most recent periodic document.
     Mutex _mutex = MONGO_MAKE_LATCH("FTDCController::_mutex");
     stdx::condition_variable _condvar;
+
+    // Indicates that a rotate should be triggered before the next FTDC log is written.
+    Atomic<bool> _triggerRotate = false;
 
     // Config settings that are used by controller, file manager, and all other classes.
     // Copied from _configTemp periodically to get a consistent snapshot.

@@ -752,6 +752,7 @@ let testCases = {
     },
     rolesInfo: {skip: "does not accept read or write concern"},
     rotateCertificates: {skip: "does not accept read or write concern"},
+    rotateFTDC: {skip: "does not accept read or write concern"},
     saslContinue: {skip: "does not accept read or write concern"},
     saslStart: {skip: "does not accept read or write concern"},
     sbe: {skip: "internal command"},
