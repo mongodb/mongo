@@ -336,9 +336,10 @@ void MongoBase::trace(JSTracer* trc, JSObject* obj) {
     if (!client || !(*client)) {
         return;
     }
-    auto conn = (*client)->getConnection();
+    // Trace the encrypted connection if it has been allocated.
+    auto encryptedConn = (*client)->getEncryptedConnection();
 
-    auto callbackPtr = dynamic_cast<EncryptionCallbacks*>(conn.get());
+    auto callbackPtr = dynamic_cast<EncryptionCallbacks*>(encryptedConn.get());
     if (callbackPtr != nullptr) {
         callbackPtr->trace(trc);
     }
