@@ -427,9 +427,7 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
 
     boost::optional<Timestamp> startPoint =
         _storageInterface->getRecoveryTimestamp(opCtx->getServiceContext());
-    if (!startPoint) {
-        fassert(31436, "No recovery timestamp, cannot recover from the oplog");
-    }
+    fassert(31436, !!startPoint);  // No recovery timestamp, cannot recover from the oplog
 
     startPoint = _adjustStartPointIfNecessary(opCtx, startPoint.value());
 

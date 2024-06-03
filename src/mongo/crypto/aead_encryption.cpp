@@ -67,15 +67,8 @@ std::pair<size_t, size_t> aesCBCExpectedPlaintextLen(size_t cipherTextLength) {
 
 void aeadGenerateIV(DataRange buffer) {
     static_assert(aesCTRIVSize == aesCBCIVSize);
-
-    if (buffer.length() < aesCBCIVSize) {
-        fassert(51235, "IV buffer is too small for selected mode");
-    }
-
-    auto status = engineRandBytes(buffer.slice(aesCBCIVSize));
-    if (!status.isOK()) {
-        fassert(51236, status);
-    }
+    fassert(51235, buffer.length() >= aesCBCIVSize);  // IV buffer is too small for selected mode
+    fassert(51236, engineRandBytes(buffer.slice(aesCBCIVSize)));
 }
 
 StatusWith<std::size_t> _aesEncrypt(const SymmetricKey& key,

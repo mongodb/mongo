@@ -44,7 +44,7 @@ namespace mongo::sdam {
 MockTopologyManager::MockTopologyManager() {}
 
 bool MockTopologyManager::onServerDescription(const HelloOutcome& helloOutcome) {
-    fassert(5429100, "MockTopologyManager does not support onServerDescription");
+    fasserted(5429100);  // MockTopologyManager does not support onServerDescription
     return true;
 }
 
