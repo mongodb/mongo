@@ -84,10 +84,11 @@ void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
 }
 
 /**
- * Adds a BSONObj object, but with a invalid size smaller than the minimum 5 bytes the
- * the validator expects.
+ * Adds a BSONObj object with given field name and size.
+ * Typically used to add an object field with an invalid size smaller than the
+ * minimum 5 bytes expected by the the validator.
  */
-void appendObjectElementWithInvalidSize(const char* fieldName, BufBuilder* bb, int objectSize) {
+void appendObjectNameAndSize(const char* fieldName, BufBuilder* bb, int objectSize) {
     bb->appendChar(Object);
     bb->appendStr(fieldName, /*withNUL*/ true);
     bb->appendNum(objectSize);
@@ -613,7 +614,7 @@ TEST(BSONValidateFast, InvalidObjectWithInvalidSizeInNestedObjectWithId) {
     BSONObjBuilder ob(bb);
     ob.append("x", 2.0);
     // Minimum size to pass validation is 5 bytes.
-    appendObjectElementWithInvalidSize("invalid", &bb, 4);
+    appendObjectNameAndSize("invalid", &bb, 4);
     const BSONObj nestedInvalid = ob.done();
     const BSONObj x = BSON("_id" << 1 << "nested"
                                  << BSON_ARRAY("a"
@@ -629,7 +630,7 @@ TEST(BSONValidateFast, InvalidObjectWithZeroSizeInNestedObjectWithId) {
     BufBuilder bb;
     BSONObjBuilder ob(bb);
     ob.append("x", 2.0);
-    appendObjectElementWithInvalidSize("invalid", &bb, 0);
+    appendObjectNameAndSize("invalid", &bb, 0);
     const BSONObj nestedInvalid = ob.done();
     const BSONObj x = BSON("_id" << 1 << "nested"
                                  << BSON_ARRAY("a"
@@ -645,7 +646,7 @@ TEST(BSONValidateFast, InvalidObjectWithNegativeSizeInNestedObjectWithId) {
     BufBuilder bb;
     BSONObjBuilder ob(bb);
     ob.append("x", 2.0);
-    appendObjectElementWithInvalidSize("invalid", &bb, -999);
+    appendObjectNameAndSize("invalid", &bb, -999);
     const BSONObj nestedInvalid = ob.done();
     const BSONObj x = BSON("_id" << 1 << "nested"
                                  << BSON_ARRAY("a"
@@ -661,7 +662,7 @@ TEST(BSONValidateFast, InvalidObjectWithNegativeSizeInNestedObjectWithIdWithoutA
     BufBuilder bb;
     BSONObjBuilder ob(bb);
     ob.append("x", 2.0);
-    appendObjectElementWithInvalidSize("invalid", &bb, -888);
+    appendObjectNameAndSize("invalid", &bb, -888);
     const BSONObj nestedInvalid = ob.done();
     const BSONObj x = BSON("_id" << 1 << "nested" << nestedInvalid);
     const Status status = validateBSON(x);
@@ -675,7 +676,7 @@ TEST(BSONValidateFast, InvalidObjectWithNegativeSizeInNestedObjectWithIdTopLevel
     BufBuilder bb;
     BSONObjBuilder ob(bb);
     ob.append("_id", 1);
-    appendObjectElementWithInvalidSize("invalid", &bb, -777);
+    appendObjectNameAndSize("invalid", &bb, -777);
     const BSONObj x = ob.done();
     const Status status = validateBSON(x);
     ASSERT_NOT_OK(status);
