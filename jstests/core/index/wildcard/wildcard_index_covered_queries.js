@@ -8,6 +8,7 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
+ *   requires_getmore,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
