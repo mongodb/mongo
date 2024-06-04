@@ -288,7 +288,7 @@ def new_test_thread_logger(parent, test_kind, thread_id, tenant_id=None):
 
 def new_hook_logger(hook_class, job_num):
     """Create a new hook logger from a given fixture logger."""
-    name = "{}:job{:d}".format(hook_class, job_num)
+    name = "hook:{}:job{:d}".format(hook_class, job_num)
     logger = logging.Logger(name)
     logger.parent = _FIXTURE_LOGGER_REGISTRY[job_num]
     return logger
