@@ -159,9 +159,11 @@ static const char *const __stats_dsrc_desc[] = {
   "compression: number of blocks with compress ratio smaller than 8",
   "compression: page written failed to compress",
   "compression: page written was too small to compress",
+  "cursor: Total number of deleted pages skipped during tree walk",
   "cursor: Total number of entries skipped by cursor next calls",
   "cursor: Total number of entries skipped by cursor prev calls",
   "cursor: Total number of entries skipped to position the history store cursor",
+  "cursor: Total number of in-memory deleted pages skipped during tree walk",
   "cursor: Total number of times a search near has exited due to prefix config",
   "cursor: bulk loaded cursor insert calls",
   "cursor: cache cursors reuse count",
@@ -434,9 +436,11 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->compress_hist_ratio_8 = 0;
     stats->compress_write_fail = 0;
     stats->compress_write_too_small = 0;
+    stats->cursor_tree_walk_del_page_skip = 0;
     stats->cursor_next_skip_total = 0;
     stats->cursor_prev_skip_total = 0;
     stats->cursor_skip_hs_cur_position = 0;
+    stats->cursor_tree_walk_inmem_del_page_skip = 0;
     stats->cursor_search_near_prefix_fast_paths = 0;
     stats->cursor_insert_bulk = 0;
     stats->cursor_reopen = 0;
@@ -698,9 +702,11 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->compress_hist_ratio_8 += from->compress_hist_ratio_8;
     to->compress_write_fail += from->compress_write_fail;
     to->compress_write_too_small += from->compress_write_too_small;
+    to->cursor_tree_walk_del_page_skip += from->cursor_tree_walk_del_page_skip;
     to->cursor_next_skip_total += from->cursor_next_skip_total;
     to->cursor_prev_skip_total += from->cursor_prev_skip_total;
     to->cursor_skip_hs_cur_position += from->cursor_skip_hs_cur_position;
+    to->cursor_tree_walk_inmem_del_page_skip += from->cursor_tree_walk_inmem_del_page_skip;
     to->cursor_search_near_prefix_fast_paths += from->cursor_search_near_prefix_fast_paths;
     to->cursor_insert_bulk += from->cursor_insert_bulk;
     to->cursor_reopen += from->cursor_reopen;
@@ -965,9 +971,12 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->compress_hist_ratio_8 += WT_STAT_READ(from, compress_hist_ratio_8);
     to->compress_write_fail += WT_STAT_READ(from, compress_write_fail);
     to->compress_write_too_small += WT_STAT_READ(from, compress_write_too_small);
+    to->cursor_tree_walk_del_page_skip += WT_STAT_READ(from, cursor_tree_walk_del_page_skip);
     to->cursor_next_skip_total += WT_STAT_READ(from, cursor_next_skip_total);
     to->cursor_prev_skip_total += WT_STAT_READ(from, cursor_prev_skip_total);
     to->cursor_skip_hs_cur_position += WT_STAT_READ(from, cursor_skip_hs_cur_position);
+    to->cursor_tree_walk_inmem_del_page_skip +=
+      WT_STAT_READ(from, cursor_tree_walk_inmem_del_page_skip);
     to->cursor_search_near_prefix_fast_paths +=
       WT_STAT_READ(from, cursor_search_near_prefix_fast_paths);
     to->cursor_insert_bulk += WT_STAT_READ(from, cursor_insert_bulk);
@@ -1308,9 +1317,11 @@ static const char *const __stats_connection_desc[] = {
   "connection: total fsync I/Os",
   "connection: total read I/Os",
   "connection: total write I/Os",
+  "cursor: Total number of deleted pages skipped during tree walk",
   "cursor: Total number of entries skipped by cursor next calls",
   "cursor: Total number of entries skipped by cursor prev calls",
   "cursor: Total number of entries skipped to position the history store cursor",
+  "cursor: Total number of in-memory deleted pages skipped during tree walk",
   "cursor: Total number of times a search near has exited due to prefix config",
   "cursor: bulk cursor count",
   "cursor: cached cursor count",
@@ -1528,6 +1539,7 @@ static const char *const __stats_connection_desc[] = {
   "thread-state: active filesystem fsync calls",
   "thread-state: active filesystem read calls",
   "thread-state: active filesystem write calls",
+  "thread-yield: application thread snapshot refreshed for eviction",
   "thread-yield: application thread time evicting (usecs)",
   "thread-yield: application thread time waiting for cache (usecs)",
   "thread-yield: connection close blocked waiting for transaction state stabilization",
@@ -1888,9 +1900,11 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->fsync_io = 0;
     stats->read_io = 0;
     stats->write_io = 0;
+    stats->cursor_tree_walk_del_page_skip = 0;
     stats->cursor_next_skip_total = 0;
     stats->cursor_prev_skip_total = 0;
     stats->cursor_skip_hs_cur_position = 0;
+    stats->cursor_tree_walk_inmem_del_page_skip = 0;
     stats->cursor_search_near_prefix_fast_paths = 0;
     /* not clearing cursor_bulk_count */
     /* not clearing cursor_cached_count */
@@ -2106,6 +2120,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing thread_fsync_active */
     /* not clearing thread_read_active */
     /* not clearing thread_write_active */
+    stats->application_evict_snapshot_refreshed = 0;
     stats->application_evict_time = 0;
     stats->application_cache_time = 0;
     stats->txn_release_blocked = 0;
@@ -2482,9 +2497,12 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->fsync_io += WT_STAT_READ(from, fsync_io);
     to->read_io += WT_STAT_READ(from, read_io);
     to->write_io += WT_STAT_READ(from, write_io);
+    to->cursor_tree_walk_del_page_skip += WT_STAT_READ(from, cursor_tree_walk_del_page_skip);
     to->cursor_next_skip_total += WT_STAT_READ(from, cursor_next_skip_total);
     to->cursor_prev_skip_total += WT_STAT_READ(from, cursor_prev_skip_total);
     to->cursor_skip_hs_cur_position += WT_STAT_READ(from, cursor_skip_hs_cur_position);
+    to->cursor_tree_walk_inmem_del_page_skip +=
+      WT_STAT_READ(from, cursor_tree_walk_inmem_del_page_skip);
     to->cursor_search_near_prefix_fast_paths +=
       WT_STAT_READ(from, cursor_search_near_prefix_fast_paths);
     to->cursor_bulk_count += WT_STAT_READ(from, cursor_bulk_count);
@@ -2713,6 +2731,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->thread_fsync_active += WT_STAT_READ(from, thread_fsync_active);
     to->thread_read_active += WT_STAT_READ(from, thread_read_active);
     to->thread_write_active += WT_STAT_READ(from, thread_write_active);
+    to->application_evict_snapshot_refreshed +=
+      WT_STAT_READ(from, application_evict_snapshot_refreshed);
     to->application_evict_time += WT_STAT_READ(from, application_evict_time);
     to->application_cache_time += WT_STAT_READ(from, application_cache_time);
     to->txn_release_blocked += WT_STAT_READ(from, txn_release_blocked);

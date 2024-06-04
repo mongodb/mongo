@@ -44,7 +44,7 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
         return (false);
     if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
         return (false);
-    if (!WT_TXNID_LT(txn->snap_max, mod->first_dirty_txn))
+    if (!WT_TXNID_LT(txn->snapshot_data.snap_max, mod->first_dirty_txn))
         return (false);
 
     /*
@@ -523,9 +523,6 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         /* Write all dirty in-cache pages. */
         LF_SET(WT_READ_NO_EVICT);
 
-        /* Read pages with history store entries and evict them asap. */
-        LF_SET(WT_READ_WONT_NEED);
-
         /*
          * Perform checkpoint cleanup when not in startup or shutdown phase by traversing internal
          * pages looking for obsolete child pages. This is row-store specific, column-store pages
@@ -605,9 +602,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              *
              * Regardless of whether eviction succeeds or fails, the walk continues from the
              * previous location. We remember whether we tried eviction, and don't try again. Even
-             * if eviction fails (the page may stay in cache clean but with history that cannot be
-             * discarded), that is not wasted effort because checkpoint doesn't need to write the
-             * page again.
+             * if eviction fails (the page may stay in cache clean), that is not a wasted effort
+             * because checkpoint doesn't need to write the page again.
              *
              * Once the transaction has given up it's snapshot it is no longer safe to reconcile
              * pages. That happens prior to the final metadata checkpoint.

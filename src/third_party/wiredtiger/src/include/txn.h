@@ -242,6 +242,22 @@ struct __wt_txn_op {
     uint32_t flags;
 };
 
+/*
+ * WT_TXN_SNAPSHOT --
+ *	A structure to store the transactions snapshot details.
+ */
+struct __wt_txn_snapshot {
+    /*
+     * Snapshot data:
+     *	txn_ids >= snap_max are invisible,
+     *	txn_ids < snap_min are visible,
+     *	everything else is visible unless it is in the snapshot.
+     */
+    uint64_t snap_max, snap_min;
+    uint64_t *snapshot;
+    uint32_t snapshot_count;
+};
+
 #define WT_TS_VERBOSE_PREFIX "unexpected timestamp usage: "
 
 /*
@@ -255,16 +271,13 @@ struct __wt_txn {
 
     uint32_t forced_iso; /* Isolation is currently forced. */
 
-    /*
-     * Snapshot data:
-     *	ids >= snap_max are invisible,
-     *	ids < snap_min are visible,
-     *	everything else is visible unless it is in the snapshot.
-     */
-    uint64_t snap_min, snap_max;
-    uint64_t *snapshot;
-    uint32_t snapshot_count;
     uint32_t txn_logsync; /* Log sync configuration */
+
+    /* Snapshot data. */
+    WT_TXN_SNAPSHOT snapshot_data;
+
+    /* Backup snapshot data. */
+    WT_TXN_SNAPSHOT *backup_snapshot_data;
 
     /*
      * Timestamp copied into updates created by this transaction.
@@ -336,13 +349,14 @@ struct __wt_txn {
 #define WT_TXN_PREPARE 0x00100u
 #define WT_TXN_PREPARE_IGNORE_API_CHECK 0x00200u
 #define WT_TXN_READONLY 0x00400u
-#define WT_TXN_RUNNING 0x00800u
-#define WT_TXN_SHARED_TS_DURABLE 0x01000u
-#define WT_TXN_SHARED_TS_READ 0x02000u
-#define WT_TXN_SYNC_SET 0x04000u
-#define WT_TXN_TS_ROUND_PREPARED 0x08000u
-#define WT_TXN_TS_ROUND_READ 0x10000u
-#define WT_TXN_UPDATE 0x20000u
+#define WT_TXN_REFRESH_SNAPSHOT 0x00800u
+#define WT_TXN_RUNNING 0x01000u
+#define WT_TXN_SHARED_TS_DURABLE 0x02000u
+#define WT_TXN_SHARED_TS_READ 0x04000u
+#define WT_TXN_SYNC_SET 0x08000u
+#define WT_TXN_TS_ROUND_PREPARED 0x10000u
+#define WT_TXN_TS_ROUND_READ 0x20000u
+#define WT_TXN_UPDATE 0x40000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 

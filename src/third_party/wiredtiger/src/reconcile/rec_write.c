@@ -305,8 +305,16 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
      */
     if (ret == 0 && !(btree->evict_disabled > 0 || !F_ISSET(btree->dhandle, WT_DHANDLE_OPEN)) &&
       F_ISSET(r, WT_REC_EVICT) && !WT_PAGE_IS_INTERNAL(r->page) && r->multi_next == 1 &&
-      F_ISSET(r, WT_REC_CALL_URGENT) && !r->update_used && r->cache_write_restore)
+      F_ISSET(r, WT_REC_CALL_URGENT) && !r->update_used && r->cache_write_restore) {
+        /*
+         * If eviction didn't make any progress, let application threads know they should refresh
+         * the transaction's snapshot (and try to evict the latest content).
+         */
+        if (F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
+            F_SET(session->txn, WT_TXN_REFRESH_SNAPSHOT);
+
         ret = __wt_set_return(session, EBUSY);
+    }
 
 #ifdef HAVE_DIAGNOSTIC
     addr = ref->addr;
@@ -2323,6 +2331,37 @@ __rec_split_dump_keys(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 }
 
 /*
+ * __rec_page_modify_ta_safe_free --
+ *     Any thread that is reviewing the page modify time aggregate in a WT_REF, must also be holding
+ *     a split generation to ensure that the page index they are using remains valid. Use that same
+ *     split generation to ensure that the page modify time aggregate inside the WT_REF remains
+ *     valid while it is being reviewed.
+ */
+static void
+__rec_page_modify_ta_safe_free(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE **ta)
+{
+    WT_DECL_RET;
+    uint64_t split_gen;
+    void *p;
+
+    p = *(void **)ta;
+    if (p == NULL)
+        return;
+
+    do {
+        WT_ORDERED_READ(p, *ta);
+        if (p == NULL)
+            break;
+    } while (!__wt_atomic_cas_ptr(ta, p, NULL));
+
+    split_gen = __wt_gen(session, WT_GEN_SPLIT);
+
+    if (__wt_stash_add(session, WT_GEN_SPLIT, split_gen, p, sizeof(WT_TIME_AGGREGATE)) != 0)
+        WT_IGNORE_RET(__wt_panic(session, ret, "fatal error during page modify ta free"));
+    __wt_gen_next(session, WT_GEN_SPLIT, NULL);
+}
+
+/*
  * __rec_write_wrapup --
  *     Finish the reconciliation.
  */
@@ -2332,9 +2371,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_BM *bm;
     WT_BTREE *btree;
     WT_DECL_RET;
+    WT_MULTI *multi;
     WT_PAGE_MODIFY *mod;
     WT_REF *ref;
-    WT_TIME_AGGREGATE ta;
+    WT_TIME_AGGREGATE stop_ta, *stop_tap, ta;
+    uint32_t i;
 
     btree = S2BT(session);
     bm = btree->bm;
@@ -2412,6 +2453,14 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     /* Reset the reconciliation state. */
     mod->rec_result = 0;
 
+    /*
+     * When the page is being reconciled as part of the checkpoint operation, the REF is not locked.
+     * Concurrent access to the page can be enabled by safe-releasing the time aggregate
+     * information.
+     */
+    __rec_page_modify_ta_safe_free(session, &mod->stop_ta);
+    WT_TIME_AGGREGATE_INIT_MERGE(&stop_ta);
+
     __wt_verbose(session, WT_VERB_RECONCILE, "%p reconciled into %" PRIu32 " pages", (void *)ref,
       r->multi_next);
 
@@ -2464,10 +2513,12 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
             r->multi->addr.addr = NULL;
             mod->mod_disk_image = r->multi->disk_image;
             r->multi->disk_image = NULL;
+            WT_TIME_AGGREGATE_MERGE_OBSOLETE_VISIBLE(session, &stop_ta, &mod->mod_replace.ta);
         } else {
             __wt_checkpoint_tree_reconcile_update(session, &r->multi->addr.ta);
             WT_RET(__rec_write(session, r->wrapup_checkpoint, NULL, NULL, NULL, true,
               F_ISSET(r, WT_REC_CHECKPOINT), r->wrapup_checkpoint_compressed));
+            WT_TIME_AGGREGATE_MERGE_OBSOLETE_VISIBLE(session, &stop_ta, &r->multi->addr.ta);
         }
 
         mod->rec_result = WT_PM_REC_REPLACE;
@@ -2489,7 +2540,17 @@ split:
 
         r->multi = NULL;
         r->multi_next = 0;
+
+        /* Calculate the max stop time point by traversing all multi addresses. */
+        for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i)
+            WT_TIME_AGGREGATE_MERGE_OBSOLETE_VISIBLE(session, &stop_ta, &multi->addr.ta);
         break;
+    }
+
+    if (WT_TIME_AGGREGATE_HAS_STOP(&stop_ta)) {
+        WT_RET(__wt_calloc_one(session, &stop_tap));
+        WT_TIME_AGGREGATE_COPY(stop_tap, &stop_ta);
+        WT_PUBLISH(mod->stop_ta, stop_tap);
     }
 
     return (0);

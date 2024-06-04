@@ -638,6 +638,7 @@ conn_stats = [
     ##########################################
     YieldStat('application_cache_time', 'application thread time waiting for cache (usecs)'),
     YieldStat('application_evict_time', 'application thread time evicting (usecs)'),
+    YieldStat('application_evict_snapshot_refreshed', 'application thread snapshot refreshed for eviction'),
     YieldStat('child_modify_blocked_page', 'page reconciliation yielded due to child modification'),
     YieldStat('conn_close_blocked_lsm', 'connection close yielded for lsm manager shutdown'),
     YieldStat('dhandle_lock_blocked', 'data handle lock yielded'),
@@ -897,6 +898,9 @@ conn_dsrc_stats = [
     CursorStat('cursor_prev_skip_total', 'Total number of entries skipped by cursor prev calls'),
     CursorStat('cursor_search_near_prefix_fast_paths', 'Total number of times a search near has exited due to prefix config'),
     CursorStat('cursor_skip_hs_cur_position', 'Total number of entries skipped to position the history store cursor'),
+    CursorStat('cursor_tree_walk_del_page_skip', 'Total number of deleted pages skipped during tree walk'),
+    CursorStat('cursor_tree_walk_inmem_del_page_skip', 'Total number of in-memory deleted pages skipped during tree walk'),
+
     ##########################################
     # Checkpoint cleanup statistics
     ##########################################
