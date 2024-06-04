@@ -3800,7 +3800,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleUnset) {
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
                            "$_internalChangeStreamCheckTopologyChange",
-                           "$project",
+                           // The two '$unset' stages are coalesced.
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange"});
 }

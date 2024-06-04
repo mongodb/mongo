@@ -33,6 +33,8 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/exclusion_projection_executor.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/query/explain_options.h"
@@ -100,6 +102,48 @@ Value DocumentSourceSingleDocumentTransformation::serialize(
                                : _cachedStageOptions}});
 }
 
+projection_executor::ExclusionNode& DocumentSourceSingleDocumentTransformation::getExclusionNode() {
+    invariant(getTransformerType() == TransformerInterface::TransformerType::kExclusionProjection);
+    auto ret = dynamic_cast<projection_executor::ExclusionProjectionExecutor&>(
+                   getTransformationProcessor()->getTransformer())
+                   .getRoot();
+    invariant(ret);
+    return *ret;
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::maybeCoalesce(
+    Pipeline::SourceContainer::iterator itr,
+    Pipeline::SourceContainer* container,
+    DocumentSourceSingleDocumentTransformation* nextSingleDocTransform) {
+    // Adjacent exclusion projections can be coalesced by unioning their excluded fields.
+    if (getTransformerType() == TransformerInterface::TransformerType::kExclusionProjection &&
+        nextSingleDocTransform->getTransformerType() ==
+            TransformerInterface::TransformerType::kExclusionProjection) {
+        projection_executor::ExclusionNode& thisExclusionNode = getExclusionNode();
+        projection_executor::ExclusionNode& nextExclusionNode =
+            nextSingleDocTransform->getExclusionNode();
+        auto isDotted = [](auto path) {
+            return path.find('.') != std::string::npos;
+        };
+        OrderedPathSet thisExcludedPaths;
+        thisExclusionNode.reportProjectedPaths(&thisExcludedPaths);
+        if (std::any_of(thisExcludedPaths.begin(), thisExcludedPaths.end(), isDotted)) {
+            return std::next(itr);
+        }
+        OrderedPathSet nextExcludedPaths;
+        nextExclusionNode.reportProjectedPaths(&nextExcludedPaths);
+        if (std::any_of(nextExcludedPaths.begin(), nextExcludedPaths.end(), isDotted)) {
+            return std::next(itr);
+        }
+        for (const std::string& nextExcludedPathStr : nextExcludedPaths) {
+            thisExclusionNode.addProjectionForPath(nextExcludedPathStr);
+        }
+        container->erase(std::next(itr));
+        return itr;
+    }
+    return std::next(itr);
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -109,6 +153,10 @@ Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::
     } else if (dynamic_cast<DocumentSourceSkip*>(std::next(itr)->get())) {
         std::swap(*itr, *std::next(itr));
         return itr == container->begin() ? itr : std::prev(itr);
+    } else if (auto nextSingleDocTransform =
+                   dynamic_cast<DocumentSourceSingleDocumentTransformation*>(
+                       std::next(itr)->get())) {
+        return maybeCoalesce(itr, container, nextSingleDocTransform);
     } else if (_transformationProcessor) {
         return _transformationProcessor->getTransformer().doOptimizeAt(itr, container);
     } else {

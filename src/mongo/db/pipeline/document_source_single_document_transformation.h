@@ -45,6 +45,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -171,7 +172,18 @@ protected:
                                                      Pipeline::SourceContainer* container) final;
 
 private:
+    Pipeline::SourceContainer::iterator maybeCoalesce(
+        Pipeline::SourceContainer::iterator itr,
+        Pipeline::SourceContainer* container,
+        DocumentSourceSingleDocumentTransformation* nextSingleDocTransform);
+
     boost::optional<SingleDocumentTransformationProcessor> _transformationProcessor;
+
+    TransformerInterface::TransformerType getTransformerType() {
+        return getTransformationProcessor()->getTransformer().getType();
+    }
+
+    projection_executor::ExclusionNode& getExclusionNode();
 
     // Specific name of the transformation.
     std::string _name;

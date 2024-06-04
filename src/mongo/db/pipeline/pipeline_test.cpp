@@ -4208,6 +4208,93 @@ TEST(PipelineOptimizationTest, MergeUnwindPipelineWithSortLimitPipelinePlacesLim
     assertTwoPipelinesOptimizeAndMergeTo(inputPipe1, inputPipe2, outputPipe);
 }
 
+TEST(PipelineOptimizationTest, CoalesceAdjacentExclusionProjectionsSimple) {
+    const std::string inputPipe =
+        "[{ $project: { a: false } }"
+        ",{ $project: { b: false } }"
+        "]";
+    const std::string outputPipe =
+        "[{ $project: { a: false, b: false, _id: true } }"
+        "]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, CoalesceAdjacentExclusionProjectionsTernary) {
+    const std::string inputPipe =
+        "[{ $project: { a: false } }"
+        ",{ $project: { b: false } }"
+        ",{ $project: { c: false } }"
+        "]";
+    const std::string outputPipe =
+        "[{$project: {a: false, b: false, c: false, _id: true}}"
+        "]";
+    // Projections are coalesced.
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, CoalesceAdjacentExclusionProjectionsIdFalse) {
+    const std::string inputPipe =
+        "[{ $project: { a: false } }"
+        ",{ $project: { _id: false } }"
+        "]";
+    const std::string outputPipe =
+        "[{ $project: { _id: false, a: false } }"
+        "]";
+    // Projections are coalesced.
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, CoalesceAdjacentExclusionProjectionsIdTrue) {
+    const std::string inputPipe =
+        "[{ $project: { _id: true } }"
+        ",{ $project: { a: false, _id: true } }"
+        "]";
+    const std::string outputPipe =
+        "[{ $project: { _id: true } }"
+        ",{ $project: { a: false, _id: true } }"
+        "]";
+    // Projections are not coalesced.
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, CoalesceAdjacentExclusionProjectionsUnset) {
+    const std::string inputPipe =
+        "[{ $unset: 'a' }"
+        ",{ $unset: 'b' }"
+        "]";
+    const std::string outputPipe =
+        "[{ $project: { a: false, b: false, _id: true } }"
+        "]";
+    // Projections are coalesced.
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, CoalesceAdjacentExclusionProjectionsNestedFirst) {
+    const std::string inputPipe =
+        "[{ $project: { a: { b: false } } }"
+        ",{ $project: { a: false } }"
+        "]";
+    const std::string outputPipe =
+        "[{ $project: { a: { b: false }, _id: true } }"
+        ",{ $project: { a: false, _id: true } }"
+        "]";
+    // Projections with nested fields are not coalesced.
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, CoalesceAdjacentExclusionProjectionsNestedSecond) {
+    const std::string inputPipe =
+        "[{ $project: { a: false } }"
+        ",{ $project: { a: { b: false } } }"
+        "]";
+    const std::string outputPipe =
+        "[{ $project: { a: false, _id: true } }"
+        ",{ $project: { a: { b: false }, _id: true } }"
+        "]";
+    // Projections with nested fields are not coalesced.
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
 }  // namespace Local
 
 namespace Sharded {
