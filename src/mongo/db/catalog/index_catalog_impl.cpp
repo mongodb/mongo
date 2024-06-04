@@ -615,6 +615,9 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         if (storageGlobalParams.repair &&
             status.code() == ErrorCodes::InvalidIndexSpecificationOption) {
             uasserted(ErrorCodes::InvalidIndexSpecificationOption, status.reason());
+        } else if (status.code() == ErrorCodes::ConfigTypeLsmNotSupported) {
+            uasserted(ErrorCodes::ConfigTypeLsmNotSupported,
+                      "Configuration 'type=lsm' is not supported.");
         }
 
         LOGV2_FATAL(28782,

@@ -506,7 +506,8 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     }
 
     if (config.find("type=lsm") != std::string::npos) {
-        return {ErrorCodes::Error(6627201), "Configuration 'type=lsm' is not supported."};
+        return {ErrorCodes::ConfigTypeLsmNotSupported,
+                "Configuration 'type=lsm' is not supported."};
     }
 
     if (gFeatureFlagBanEncryptionOptionsInCollectionCreation.isEnabled(
