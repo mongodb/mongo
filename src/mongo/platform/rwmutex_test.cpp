@@ -228,20 +228,22 @@ TEST_F(WriteRarelyRWMutexTest, MultiWriter) {
 TEST(RWMutex, OneWriterAtAnyTime) {
     RWMutex mutex;
     stdx::unique_lock lk(mutex);
+    Atomic<bool> isLockedByMainThread{true};
     ASSERT_FALSE(hasWaiters_forTest(mutex));
     ASSERT_TRUE(isWriteIntentSet_forTest(mutex));
 
     unittest::ThreadAssertionMonitor monitor;
     auto writer = monitor.spawn([&] {
         std::lock_guard anotherLk(mutex);
-        ASSERT_FALSE(lk.owns_lock());
+        ASSERT_FALSE(isLockedByMainThread.load())
+            << "Locked a mutex that is already held by another thread";
     });
 
     // Best effort to allow `writer` to start and try to exclusively acquire `mutex`.
     sleepFor(Microseconds(5));
 
+    isLockedByMainThread.store(false);
     lk.unlock();
-    // Allow `writer` to proceed with acquiring the lock.
     monitor.notifyDone();
     writer.join();
 }
