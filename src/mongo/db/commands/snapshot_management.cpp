@@ -79,10 +79,10 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto snapshotManager = getGlobalServiceContext()->getStorageEngine()->getSnapshotManager();
-        if (!snapshotManager) {
-            uasserted(ErrorCodes::CommandNotSupported, "");
-        }
+        const auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        uassert(ErrorCodes::CommandNotSupported,
+                "makeSnapshot requires a persistent storage engine and a snapshot manager",
+                !storageEngine->isEphemeral() && storageEngine->getSnapshotManager());
 
         Lock::GlobalLock lk(opCtx, MODE_IX);
 
