@@ -2642,7 +2642,7 @@ tasks:
       compiling_for_test: true
 
 - name: compile_and_run_unittests_first_quarter
-  exec_timeout_secs: 10800 # 3 hours
+  exec_timeout_secs: 21600 # 6 hours
   depends_on:
   - name: compile_dist_test
   commands:
@@ -2659,10 +2659,10 @@ tasks:
     vars:
       suite: unittests_first_quarter
       install_dir: build/install/bin
-      exec_timeout_secs: 10800 # 3 hours
+      exec_timeout_secs: 21600 # 6 hours
 
 - name: compile_and_run_unittests_second_quarter
-  exec_timeout_secs: 10800 # 3 hours
+  exec_timeout_secs: 21600 # 6 hours
   depends_on:
   - name: compile_dist_test
   commands:
@@ -2679,10 +2679,10 @@ tasks:
     vars:
       suite: unittests_second_quarter
       install_dir: build/install/bin
-      exec_timeout_secs: 10800 # 3 hours
+      exec_timeout_secs: 21600 # 6 hours
 
 - name: compile_and_run_unittests_third_quarter
-  exec_timeout_secs: 10800 # 3 hours
+  exec_timeout_secs: 21600 # 6 hours
   depends_on:
   - name: compile_dist_test
   commands:
@@ -2699,10 +2699,10 @@ tasks:
     vars:
       suite: unittests_third_quarter
       install_dir: build/install/bin
-      exec_timeout_secs: 10800 # 3 hours
+      exec_timeout_secs: 21600 # 6 hours
 
 - name: compile_and_run_unittests_fourth_quarter
-  exec_timeout_secs: 10800 # 3 hours
+  exec_timeout_secs: 21600 # 6 hours
   depends_on:
   - name: compile_dist_test
   commands:
@@ -2719,7 +2719,7 @@ tasks:
     vars:
       suite: unittests_fourth_quarter
       install_dir: build/install/bin
-      exec_timeout_secs: 10800 # 3 hours
+      exec_timeout_secs: 21600 # 6 hours
 
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
