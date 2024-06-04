@@ -31,14 +31,16 @@ import {
     checkExperimentalCascadesOptimizerEnabled,
     runWithParamsAllNodes
 } from "jstests/libs/optimizer_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 // SERVER-85146: Disable CQF fast path for queries testing the plan cache. Fast path queries do not
 // get cached and may break tests that expect cache entries for fast path-eligible queries.
 runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", value: true}], () => {
     const coll = db.plan_cache_sbe;
     coll.drop();
-    const isSbeEnabled = checkSbeFullyEnabled(db);
+
+    const shouldGenerateSbePlan = checkSbeFullyEnabled(db);
+    const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
     const isBonsaiEnabled = checkExperimentalCascadesOptimizerEnabled(db);
     const isBonsaiPlanCacheEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "OptimizerPlanCache");
 
@@ -47,7 +49,7 @@ runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", val
     }
 
     // Check that a new entry is added to the plan cache even for single plans.
-    if (isSbeEnabled) {
+    if (isUsingSbePlanCache) {
         assert.eq(1, coll.find({a: 1}).itcount());
         // Validate sbe plan cache stats entry.
         const allStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
@@ -77,7 +79,7 @@ runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", val
         assert(stats.hasOwnProperty("cachedPlan"), stats);
         assert(stats.hasOwnProperty("solutionHash"), stats);
 
-        if (isSbeEnabled) {
+        if (shouldGenerateSbePlan) {
             assert(stats.cachedPlan.hasOwnProperty("slots"), stats);
             assert(stats.cachedPlan.hasOwnProperty("stages"), stats);
         } else {
@@ -86,7 +88,7 @@ runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", val
         }
     }
 
-    if (isSbeEnabled) {
+    if (isUsingSbePlanCache) {
         // Test that the plan cached for a query with a $match pushed down to SBE via
         // 'CanonicalQuery::_cqPipeline' is shared across queries with the same shape but different
         // constants.
@@ -113,7 +115,7 @@ runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", val
         }
     }
 
-    if (isSbeEnabled) {
+    if (shouldGenerateSbePlan) {
         // Test that a plan whose match expression has > 512 predicates does not get cached for SBE,
         // because in that case it will not be auto-parameterized, so caching the plan would cause
         // cache flooding with plans that will likely never be resused (SERVER-79867). Also verify
@@ -154,7 +156,7 @@ runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", val
         assert.eq(0, planCacheStats.length, planCacheStats);
     }
 
-    if (isSbeEnabled && !isBonsaiPlanCacheEnabled) {
+    if (shouldGenerateSbePlan && !isBonsaiPlanCacheEnabled) {
         // Test that a plan whose match expression has <= 512 predicates does get cached for SBE.
         // Also verify the results are correct. There is currently an overhead of one parameter, so
         // we must not use more than 511 match predicates, but to future-proof this against any

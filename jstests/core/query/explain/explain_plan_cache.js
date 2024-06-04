@@ -24,15 +24,16 @@ import {
     getRejectedPlans,
     getWinningPlan
 } from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const sbeEnabled = checkSbeFullyEnabled(db);
+const shouldGenerateSbePlan = checkSbeFullyEnabled(db);
+const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
 const coll = db.explain_plan_cache;
 
 // Assert the winning plan is cached and rejected are not.
 function assertWinningPlanCacheStatus(explain, status) {
-    const winningPlan = sbeEnabled ? getQueryPlanner(explain).winningPlan
-                                   : getWinningPlan(getQueryPlanner(explain));
+    const winningPlan = shouldGenerateSbePlan ? getQueryPlanner(explain).winningPlan
+                                              : getWinningPlan(getQueryPlanner(explain));
     assert.eq(winningPlan.isCached, status, explain);
     for (let rejectedPlan of getRejectedPlans(explain)) {
         rejectedPlan = getRejectedPlan(rejectedPlan);
@@ -42,8 +43,8 @@ function assertWinningPlanCacheStatus(explain, status) {
 
 // Assert the winning plan is not cached and a rejected plan using the given name is cached.
 function assertRejectedPlanCached(explain, indexName) {
-    const winningPlan = sbeEnabled ? getQueryPlanner(explain).winningPlan
-                                   : getWinningPlan(getQueryPlanner(explain));
+    const winningPlan = shouldGenerateSbePlan ? getQueryPlanner(explain).winningPlan
+                                              : getWinningPlan(getQueryPlanner(explain));
     assert(!winningPlan.isCached, explain);
     for (const rejectedPlan of getRejectedPlans(explain)) {
         const inputStage = getRejectedPlan(rejectedPlan).inputStage;
@@ -70,7 +71,7 @@ function collScanTest(explainMode) {
     for (let i = 0; i < 5; i++) {
         coll.find({a: 1, b: 1}).toArray();
     }
-    assertWinningPlanCacheStatus(coll.find({a: 2, b: 2}).explain(explainMode), sbeEnabled);
+    assertWinningPlanCacheStatus(coll.find({a: 2, b: 2}).explain(explainMode), isUsingSbePlanCache);
 }
 
 // Tests basic find and aggregations that share the same cache entries report isCached correctly.
