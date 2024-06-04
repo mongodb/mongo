@@ -964,6 +964,20 @@ assert.eq(planStage.collation, {
     version: "57.1",
 });
 
+// Queries that have an index with a matching collation should return correctly ordered results.
+coll = testDb.collation_find22;
+coll.drop();
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en", strength: 2}}));
+assert.commandWorked(coll.createIndex({x: 1, y: 1, z: 1}));
+for (var i = 0; i < 10; ++i) {
+    assert.commandWorked(coll.insert({_id: i, x: 1, y: 10 - i, z: "str" + i % 3}));
+}
+const expectedResultsAsc = [{"z": "str0"}, {"z": "str0"}, {"z": "str1"}, {"z": "str2"}];
+assert.eq(expectedResultsAsc, coll.find({y: {$lt: 5}}, {_id: 0, z: 1}).sort({z: 1}).toArray());
+const expectedResultsDesc = [{"z": "str2"}, {"z": "str1"}, {"z": "str0"}, {"z": "str0"}];
+assert.eq(expectedResultsDesc, coll.find({y: {$lt: 5}}, {_id: 0, z: 1}).sort({z: -1}).toArray());
+
 //
 // Collation tests for findAndModify.
 //

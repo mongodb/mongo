@@ -736,14 +736,6 @@ void IndexScanNode::appendToString(str::stream* ss, int indent) const {
     addCommon(ss, indent);
 }
 
-bool IndexScanNode::hasStringBounds(const string& field) const {
-    std::set<StringData> collatedFields = getFieldsWithStringBounds(bounds, index.keyPattern);
-    if (collatedFields.find(field) != collatedFields.end()) {
-        return true;
-    }
-    return false;
-}
-
 FieldAvailability IndexScanNode::getFieldAvailability(const string& field) const {
     // A $** index whose bounds overlap the object type bracket cannot provide covering, since the
     // index only contains the leaf nodes along each of the object's subpaths.
@@ -770,18 +762,11 @@ FieldAvailability IndexScanNode::getFieldAvailability(const string& field) const
             return FieldAvailability::kNotProvided;
     }
 
-    // If the index and the query collator are the same and the field is in the index we can use it
-    // for sorting and search.
-    if (index.collator && CollatorInterface::collatorsMatch(index.collator, this->queryCollator)) {
-        if (hasStringBounds(field)) {
-            return FieldAvailability::kCollatedProvided;
-        }
-    }
-
     // If the index has a non-simple collation and we have collation keys inside 'field', then this
     // index scan does not provide that field (and the query cannot be covered).
     if (index.collator) {
-        if (hasStringBounds(field)) {
+        std::set<StringData> collatedFields = getFieldsWithStringBounds(bounds, index.keyPattern);
+        if (collatedFields.find(field) != collatedFields.end()) {
             return FieldAvailability::kNotProvided;
         }
     }
