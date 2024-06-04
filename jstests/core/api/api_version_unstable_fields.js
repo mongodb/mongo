@@ -31,7 +31,6 @@ const unstableFieldsForFind = {
     oplogReplay: false,
     awaitData: false,
     readOnce: false,
-    allowSpeculativeMajorityRead: false,
     $_requestResumeToken: false,
     $_resumeAfter: {},
 };

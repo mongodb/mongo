@@ -144,7 +144,6 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     "find-param-awaitData",
     "find-param-allowPartialResults",
     "find-param-readOnce",
-    "find-param-allowSpeculativeMajorityRead",
     "find-param-$_requestResumeToken",
     "find-param-$_resumeAfter",
     "find-param-maxTimeMS",

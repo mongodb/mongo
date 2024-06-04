@@ -193,12 +193,6 @@ commands:
         perform reads that do not need to keep data in the storage engine cache."
         type: optionalBool
         stability: unstable
-      allowSpeculativeMajorityRead:
-        description: "Internal usage only. This flag currently allows change stream queries to use
-        speculative majority reads so that they can be used even when
-        enableMajorityReadConcern:false."
-        type: optionalBool
-        stability: unstable
       $_requestResumeToken:
         description: "Internal usage only. This flag is currently used by the replication system to
         request a resumeToken. If the client requested a resume token and we are scanning the

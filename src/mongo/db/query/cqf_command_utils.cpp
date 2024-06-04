@@ -1336,7 +1336,6 @@ BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
         .setIneligibleIf(request.getLimit().has_value())
         .setIneligibleIf(request.getNoCursorTimeout())
         .setIneligibleIf(request.getAllowPartialResults())
-        .setIneligibleIf(request.getAllowSpeculativeMajorityRead())
         .setIneligibleIf(request.getAwaitData())
         .setIneligibleIf(request.getReadOnce())
         .setIneligibleIf(request.getShowRecordId())

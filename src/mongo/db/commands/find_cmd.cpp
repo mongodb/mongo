@@ -564,12 +564,6 @@ public:
 
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
-            // Only allow speculative majority for internal commands that specify the correct flag.
-            uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
-                    "Majority read concern is not enabled.",
-                    !(repl::ReadConcernArgs::get(opCtx).isSpeculativeMajority() &&
-                      !_cmdRequest->getAllowSpeculativeMajorityRead()));
-
             const bool isFindByUUID = _cmdRequest->getNamespaceOrUUID().isUUID();
             uassert(ErrorCodes::InvalidOptions,
                     "When using the find command by UUID, the collectionUUID parameter cannot also "

@@ -486,7 +486,7 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
         "allowPartialResults: true,"
         "readOnce: true,"
         "includeQueryStatsMetrics: true,"
-        "allowSpeculativeMajorityRead: true, '$db': 'test'}");
+        "'$db': 'test'}");
 
     unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmdObj));
@@ -498,7 +498,6 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
     ASSERT(findCommand->getAllowPartialResults());
     ASSERT(findCommand->getReadOnce());
     ASSERT(findCommand->getIncludeQueryStatsMetrics());
-    ASSERT(findCommand->getAllowSpeculativeMajorityRead());
 }
 
 TEST(QueryRequestTest, OplogReplayFlagIsAllowedButIgnored) {
@@ -1488,14 +1487,6 @@ TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
 TEST(QueryRequestTest, ConvertToAggregationWithReadOnceFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setReadOnce(true);
-    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
-                       DBException,
-                       ErrorCodes::InvalidPipelineOperator);
-}
-
-TEST(QueryRequestTest, ConvertToAggregationWithAllowSpeculativeMajorityReadFails) {
-    FindCommandRequest findCommand(testns);
-    findCommand.setAllowSpeculativeMajorityRead(true);
     ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
                        DBException,
                        ErrorCodes::InvalidPipelineOperator);

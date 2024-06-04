@@ -296,9 +296,6 @@ assertNotSupportedByBonsai({
                            false);
 // allowPartialResults
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}, allowPartialResults: true}, false);
-// allowSpeculativeMajorityRead
-assertNotSupportedByBonsai({find: coll.getName(), filter: {}, allowSpeculativeMajorityRead: true},
-                           false);
 // awaitData
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}, tailable: true, awaitData: true},
                            false);

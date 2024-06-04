@@ -739,9 +739,6 @@ void validateFindCommandOptions(const FindCommandRequest& req) {
     uassert(ErrorCodes::InternalErrorNotSupported,
             "allowPartialResults unsupported in CQF",
             !req.getAllowPartialResults());
-    uassert(ErrorCodes::InternalErrorNotSupported,
-            "allowSpeculativeMajorityRead unsupported in CQF",
-            !req.getAllowSpeculativeMajorityRead());
     uassert(
         ErrorCodes::InternalErrorNotSupported, "awaitData unsupported in CQF", !req.getAwaitData());
     uassert(ErrorCodes::InternalErrorNotSupported,

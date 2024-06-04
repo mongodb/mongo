@@ -195,7 +195,6 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
         cmdBuilder.append("find", nss.coll());
     }
     cmdBuilder.append("filter", filterObj);
-    cmdBuilder.append("allowSpeculativeMajorityRead", true);
     if (readConcern) {
         cmdBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcern);
     }

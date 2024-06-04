@@ -82,11 +82,6 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
                           << " not supported in aggregation.",
             !findCommand.getReadOnce());
 
-    uassert(ErrorCodes::InvalidPipelineOperator,
-            str::stream() << "Option " << FindCommandRequest::kAllowSpeculativeMajorityReadFieldName
-                          << " not supported in aggregation.",
-            !findCommand.getAllowSpeculativeMajorityRead());
-
     // Some options are disallowed when resharding improvements are disabled.
     if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
