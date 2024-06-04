@@ -1,10 +1,6 @@
 // Make sure we only make a DBRef object for objects where the first field is a string named $ref
 // and the second field is $id with any type. Only the first two fields matter for deciding if it
 // is a DBRef. See http://docs.mongodb.org/manual/reference/database-references/#dbrefs.
-// On the v6.0 branch the python driver version used does not support reading the output of
-// $queryStats for DBRefs, which are technically invalid DBRefs like
-// { $ref: { $eq: "?object" } }, { $id: { $eq: "?object" } }.
-// @tags: [skip_for_query_stats]
 var t = db.dbref3;
 
 t.drop();

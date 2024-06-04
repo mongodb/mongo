@@ -1,7 +1,3 @@
-// On the v6.0 branch the python driver version used does not support reading the output of
-// $queryStats for DBRefs, which are technically invalid DBRefs like
-// { $ref: { $eq: "?object" } }, { $id: { $eq: "?object" } }.
-// @tags: [skip_for_query_stats]
 a = db.dbref2a;
 b = db.dbref2b;
 c = db.dbref2c;

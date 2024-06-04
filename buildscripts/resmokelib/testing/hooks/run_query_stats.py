@@ -33,8 +33,15 @@ class RunQueryStats(Hook):
 
     def verify_query_stats(self, querystats_spec):
         """Verify a $queryStats call has all the right properties."""
+        query_stats_pipeline = [
+            {"$queryStats": querystats_spec},
+            # SERVER-90921: The pymongo version we use on this branch has trouble parsing invalid
+            # DBRefs, which can be produced by the 'key' field. We'll overwrite that field with a
+            # dummy one, since the contents aren't important for this test/check.
+            {"$set": {"key": "Redacted due to issues with DBRefs"}}
+        ]
         try:
-            with self.client.admin.aggregate([{"$queryStats": querystats_spec}]) as cursor:
+            with self.client.admin.aggregate(query_stats_pipeline) as cursor:
                 nreturned = 0
                 for operation in cursor:
                     assert "key" in operation

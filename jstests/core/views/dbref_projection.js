@@ -4,10 +4,6 @@
  * Legacy find() queries do not support views, so must use the find() command.
  * @tags: [
  *   assumes_unsharded_collection,
- *   # On the v6.0 branch the python driver version used does not support reading the output of
- *   # $queryStats for DBRefs, which are technically invalid DBRefs like
- *   # { $ref: { $eq: "?object" } }, { $id: { $eq: "?object" } }.
- *   skip_for_query_stats,
  * ]
  */
 (function() {
