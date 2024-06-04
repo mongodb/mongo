@@ -115,6 +115,10 @@ last-continuous:
       ticket: SERVER-90461
     - test_file: jstests/noPassthrough/move_primary_failpoint.js
       ticket: SERVER-90465
+    - test_file: jstests/sharding/change_streams_with_config_transitions.js
+      ticket: SERVER-90358
+    - test_file: jstests/sharding/txn_participant_adds_additional_participants.js
+      ticket: SERVER-89806
     - test_file: jstests/sharding/database_versioning_all_commands.js
       ticket: SERVER-90092
     - test_file: jstests/core/timeseries/timeseries_ixscan_clusteredidxscan_union.js
@@ -220,6 +224,10 @@ last-lts:
       ticket: SERVER-90461
     - test_file: jstests/noPassthrough/move_primary_failpoint.js
       ticket: SERVER-90465
+    - test_file: jstests/sharding/change_streams_with_config_transitions.js
+      ticket: SERVER-90358
+    - test_file: jstests/sharding/txn_participant_adds_additional_participants.js
+      ticket: SERVER-89806
     - test_file: jstests/sharding/database_versioning_all_commands.js
       ticket: SERVER-90092
     - test_file: jstests/core/timeseries/timeseries_ixscan_clusteredidxscan_union.js

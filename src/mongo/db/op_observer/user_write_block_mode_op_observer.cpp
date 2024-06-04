@@ -229,7 +229,8 @@ void UserWriteBlockModeOpObserver::onCollMod(OperationContext* opCtx,
 }
 
 void UserWriteBlockModeOpObserver::onDropDatabase(OperationContext* opCtx,
-                                                  const DatabaseName& dbName) {
+                                                  const DatabaseName& dbName,
+                                                  bool markFromMigrate) {
     _checkWriteAllowed(opCtx, NamespaceString(dbName));
 }
 

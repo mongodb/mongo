@@ -403,7 +403,9 @@ public:
                            const BSONObj& collModCmd,
                            const CollectionOptions& oldCollOptions,
                            boost::optional<IndexCollModInfo> indexInfo) = 0;
-    virtual void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) = 0;
+    virtual void onDropDatabase(OperationContext* opCtx,
+                                const DatabaseName& dbName,
+                                bool markFromMigrate) = 0;
 
     /**
      * This function logs an oplog entry when a 'drop' command on a collection is executed.

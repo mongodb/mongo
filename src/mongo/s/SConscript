@@ -235,6 +235,7 @@ env.Library(
         "catalog/type_index_catalog.idl",
         "catalog/type_mongos.cpp",
         "catalog/type_namespace_placement.idl",
+        "catalog/type_remove_shard_event.idl",
         "catalog/type_shard.cpp",
         "catalog/type_tags.cpp",
         "check_metadata_consistency.idl",

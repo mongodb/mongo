@@ -1258,6 +1258,23 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
                                      shardQuery,
                                      shardTargetingCollation,
                                      mergeShardId);
+
+        // Check that no shard has been removed since the change stream open time to detect a
+        // possible event loss. It is important to execute it after retrieving the most recent list
+        // of shards: anyShardRemovedSince() performs a snapshot read that might miss the effects of
+        // a removeShard(sId) being committed in parallel; when this happens, the change stream
+        // opening is expected to fail at a later stage with a ShardNotFound error which will be
+        // returned to the client; upon retry, anyShardRemovedSince() will return an accurate
+        // response.
+        if (expCtx->inMongos) {
+            const auto changeStreamOpeningTime =
+                ResumeToken::parse(expCtx->initialPostBatchResumeToken).getData().clusterTime;
+            uassert(ErrorCodes::ChangeStreamHistoryLost,
+                    "Change stream events no more available due to removed shard",
+                    !Grid::get(expCtx->opCtx)
+                         ->catalogClient()
+                         ->anyShardRemovedSince(expCtx->opCtx, changeStreamOpeningTime));
+        }
     }
 
     return {std::move(shardQuery),

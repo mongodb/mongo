@@ -85,6 +85,7 @@
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
+#include "mongo/s/catalog/type_remove_shard_event_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
@@ -1793,6 +1794,24 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
 
     return HistoricalPlacement{exactShards, true};
 }
+
+bool ShardingCatalogClientImpl::anyShardRemovedSince(OperationContext* opCtx,
+                                                     const Timestamp& clusterTime) {
+    auto loggedRemoveShardEvents =
+        uassertStatusOK(
+            _exhaustiveFindOnConfig(opCtx,
+                                    kConfigPrimaryPreferredSelector,
+                                    repl::ReadConcernLevel::kMajorityReadConcern,
+                                    NamespaceString::kConfigsvrShardRemovalLogNamespace,
+                                    BSON("_id" << ShardingCatalogClient::kLatestShardRemovalLogId
+                                               << RemoveShardEventType::kTimestampFieldName
+                                               << BSON("$gte" << clusterTime)),
+                                    BSONObj() /*sort*/,
+                                    1 /*limit*/))
+            .value;
+    return !loggedRemoveShardEvents.empty();
+}
+
 
 std::shared_ptr<Shard> ShardingCatalogClientImpl::_getConfigShard(OperationContext* opCtx) {
     if (_overrideConfigShard) {

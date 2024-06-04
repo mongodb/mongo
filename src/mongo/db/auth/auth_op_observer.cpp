@@ -140,7 +140,9 @@ void AuthOpObserver::onCollMod(OperationContext* opCtx,
     AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
-void AuthOpObserver::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
+void AuthOpObserver::onDropDatabase(OperationContext* opCtx,
+                                    const DatabaseName& dbName,
+                                    bool markFromMigrate) {
     const NamespaceString cmdNss(NamespaceString::makeCommandNamespace(dbName));
     const auto cmdObj = BSON("dropDatabase" << 1);
 

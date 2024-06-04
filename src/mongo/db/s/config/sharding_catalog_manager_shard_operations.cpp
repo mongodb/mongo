@@ -66,6 +66,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
@@ -136,6 +137,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
+#include "mongo/s/catalog/type_remove_shard_event_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -1544,17 +1546,15 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             }
         }
 
-        // Now actually drop the databases.
+        // Now actually drop the databases; each request must either succeed or resolve into a
+        // no-op.
         LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = name);
 
         for (auto&& db : trackedDBs) {
-            DBDirectClient client(opCtx);
-            BSONObj result;
-            if (!client.dropDatabase(
-                    db.getDbName(), ShardingCatalogClient::kLocalWriteConcern, &result)) {
-                uassertStatusOK(getStatusFromCommandResult(result));
+            const auto dropStatus = dropDatabase(opCtx, db.getDbName(), true /*markFromMigrate*/);
+            if (dropStatus != ErrorCodes::NamespaceNotFound) {
+                uassertStatusOK(dropStatus);
             }
-
             hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer.pauseWhileSet(opCtx);
         }
 
@@ -2314,8 +2314,28 @@ void ShardingCatalogManager::_removeShardInTransaction(OperationContext* opCtx,
                 return txnClient.runCRUDOp(updateOp, {});
             })
             .thenRunOn(txnExec)
-            .then([removedShardName](auto updateResponse) {
+            .then([&txnClient, newTopologyTime](auto updateResponse) {
                 uassertStatusOK(updateResponse.toStatus());
+                // Log the topology time associated to this commit in a dedicated document (and
+                // delete information about a previous commit if present).
+                write_ops::UpdateCommandRequest upsertOp(
+                    NamespaceString::kConfigsvrShardRemovalLogNamespace);
+                upsertOp.setUpdates({[&]() {
+                    write_ops::UpdateOpEntry entry;
+                    entry.setUpsert(true);
+                    entry.setMulti(false);
+                    entry.setQ(BSON("_id" << ShardingCatalogClient::kLatestShardRemovalLogId));
+                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                        BSON("$set" << BSON(RemoveShardEventType::kTimestampFieldName
+                                            << newTopologyTime))));
+                    return entry;
+                }()});
+
+                return txnClient.runCRUDOp(upsertOp, {});
+            })
+            .thenRunOn(txnExec)
+            .then([removedShardName](auto upsertResponse) {
+                uassertStatusOK(upsertResponse.toStatus());
                 LOGV2_DEBUG(
                     6583701, 1, "Finished removing shard ", "shard"_attr = removedShardName);
             })
