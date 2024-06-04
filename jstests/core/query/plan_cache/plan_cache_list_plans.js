@@ -39,12 +39,12 @@ import {
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
 let coll = db.jstests_plan_cache_list_plans;
 coll.drop();
 
-const isSbeEnabled = checkSbeFullyEnabled(db);
+const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
 
 function dumpPlanCacheState() {
     return coll.aggregate([{$planCacheStats: {}}]).toArray();
@@ -124,7 +124,7 @@ let entry = getPlansForCacheEntry({a: 1, b: 1}, {a: -1}, {_id: 0, a: 1});
 assert(entry.hasOwnProperty('works'), entry);
 assert.eq(entry.isActive, false);
 
-if (!isSbeEnabled) {
+if (!isUsingSbePlanCache) {
     // Note that SBE plan cache entry does not include "creationExecStats". We expect that there
     // were two candidate plans evaluated when the cache entry was created.
     assert(entry.hasOwnProperty("creationExecStats"), entry);
@@ -167,7 +167,7 @@ entry = getPlansForCacheEntry({a: 3, b: 3}, {a: -1}, {_id: 0, a: 1});
 assert(entry.hasOwnProperty('works'), entry);
 assert.eq(entry.isActive, true);
 
-if (!isSbeEnabled) {
+if (!isUsingSbePlanCache) {
     // Note that SBE plan cache entry does not include "creationExecStats". There should be the same
     // number of candidate plan scores as candidate plans.
     assert.eq(entry.creationExecStats.length, entry.candidatePlanScores.length, entry);

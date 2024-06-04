@@ -31,7 +31,7 @@ import {
 } from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.wildcard_cached_plans;
 
@@ -50,7 +50,7 @@ function getCacheEntryForQuery(query) {
     return null;
 }
 
-const isSbeEnabled = checkSbeFullyEnabled(db);
+const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
 
 for (const indexSpec of wildcardIndexes) {
     coll.drop();
@@ -82,7 +82,7 @@ for (const indexSpec of wildcardIndexes) {
     let cacheEntry = getCacheEntryForQuery(query);
     assert.neq(cacheEntry, null);
     assert.eq(cacheEntry.isActive, true);
-    if (!isSbeEnabled) {
+    if (!isUsingSbePlanCache) {
         // Should be at least two plans: one using the {a: 1} index and the other using the b.$**
         // index.
         assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
@@ -128,7 +128,7 @@ for (const indexSpec of wildcardIndexes) {
     // There should only have been one solution for the above query, so it would get cached only by
     // the SBE plan cache.
     cacheEntry = getCacheEntryForQuery({a: 1, b: null});
-    if (isSbeEnabled) {
+    if (isUsingSbePlanCache) {
         assert.neq(cacheEntry, null);
         assert.eq(cacheEntry.isActive, true, cacheEntry);
         assert.eq(cacheEntry.isPinned, true, cacheEntry);

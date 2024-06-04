@@ -7,7 +7,7 @@
  */
 import {getCachedPlan} from "jstests/libs/analyze_plan.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: false}});
 const db = conn.getDB("test");
@@ -46,7 +46,7 @@ assert.eq(1, cachedPlans.length, cachedPlans);
 assert.eq(true, cachedPlans[0].isActive, cachedPlans);
 const cachedPlan = getCachedPlan(cachedPlans[0].cachedPlan);
 const cachedPlanVersion = cachedPlans[0].version;
-if (checkSbeFullyEnabled(db)) {
+if (checkSbeFullFeatureFlagEnabled(db)) {
     // If the SBE plan cache is on, then the cached plan has a different format.
     assert.eq(cachedPlanVersion, "2", cachedPlans);
     assert(cachedPlan.stages.includes("sort"), cachedPlans);

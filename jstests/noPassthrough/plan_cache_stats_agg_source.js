@@ -8,14 +8,14 @@ import {
     getPlanStage,
     getPlanStages,
 } from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start up");
 
 const testDb = conn.getDB("test");
 const coll = testDb.plan_cache_stats_agg_source;
-const isSBEEnabled = checkSbeFullyEnabled(testDb);
+const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(testDb);
 
 function makeMatchForFilteringByShape(query) {
     const keyHash = getPlanCacheKeyFromShape({query: query, collection: coll, db: testDb});
@@ -158,7 +158,8 @@ if (entryStats["version"] === "1") {
     for (let plan of entryStats.creationExecStats) {
         assert(plan.hasOwnProperty("executionStages"));
         // If we are in SBE mode, then explain output format is different for 'creationExecStats'.
-        const stages = getPlanStages(plan.executionStages, isSBEEnabled ? "ixseek" : "IXSCAN");
+        const stages =
+            getPlanStages(plan.executionStages, isUsingSbePlanCache ? "ixseek" : "IXSCAN");
         assert.gt(stages.length, 0);
     }
 

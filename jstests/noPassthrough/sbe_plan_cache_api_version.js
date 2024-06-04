@@ -3,7 +3,7 @@
  * aggregate command.
  */
 
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
@@ -11,7 +11,8 @@ const db = conn.getDB("plan_cache_api_version");
 const coll = db.coll;
 coll.drop();
 
-const isSBEEnabled = checkSbeFullyEnabled(db);
+const shouldGenerateSbePlan = checkSbeFullyEnabled(db);
+const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
 
 assert.commandWorked(coll.insert([{a: 1, b: 1}, {a: 2, b: 2}]));
 
@@ -25,7 +26,7 @@ function runPipeline(pipeline, options, explainOptions = {}) {
     const explain = coll.runCommand(Object.assign({explain: command}, explainOptions));
     assert.commandWorked(explain);
     assert.neq(explain, null);
-    assert.eq(explain.explainVersion, isSBEEnabled ? "2" : "1", explain);
+    assert.eq(explain.explainVersion, shouldGenerateSbePlan ? "2" : "1", explain);
     assert.neq(explain.queryPlanner.planCacheKey, null, explain);
     return explain.queryPlanner.planCacheKey;
 }
@@ -51,7 +52,7 @@ function assertPlanCacheEntryExists(cacheKey, properties = {}) {
     assert.eq(entries.length, 1, entries);
     const entry = entries[0];
 
-    if (isSBEEnabled) {
+    if (isUsingSbePlanCache) {
         // The version:"2" field indicates that this is an SBE plan cache entry.
         assert.eq(entry.version, "2", entry);
         assert.eq(entry.isActive, properties.isActive, entry);
@@ -111,7 +112,7 @@ const classicEngineTestcases = [
     }
 ];
 
-const testcases = isSBEEnabled ? sbeEngineTestcases : classicEngineTestcases;
+const testcases = isUsingSbePlanCache ? sbeEngineTestcases : classicEngineTestcases;
 for (const testcase of testcases) {
     [true, false].forEach((runWithApiStrictFirst) => {
         assert.commandWorked(coll.dropIndexes());

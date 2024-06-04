@@ -29,9 +29,9 @@ import {
     getPlanStages,
     getWinningPlan
 } from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
-const isSBEEnabled = checkSbeFullyEnabled(db);
+const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
 const coll = db.explode_for_sort_plan_cache;
 coll.drop();
 
@@ -202,7 +202,7 @@ assertQueryParameterizedCorrectly({
     newQueryCount: 60,
     // The plan cache entry is always reused for the classic engine but never reused for the SBE
     // engine.
-    reuseEntry: !isSBEEnabled,
+    reuseEntry: !isUsingSbePlanCache,
 });
 
 // Rewriting the $in predicate with $or should reuse the plan cache and gives correct results.
@@ -251,7 +251,7 @@ assertQueryParameterizedCorrectly({
     queryCount: 30,
     newQuery: {a: {$eq: 1}, b: {$in: [1, 2, 3]}},
     newQueryCount: 60,
-    reuseEntry: !isSBEEnabled,
+    reuseEntry: !isUsingSbePlanCache,
     sortSpec: {c: 1},
     isExplodeForSort: true,
 });
@@ -264,14 +264,14 @@ for (let specialValue of [null, {x: 1}, [1]]) {
         queryCount: 30,
         newQuery: {a: {$eq: specialValue}, b: {$in: [1, 2]}},
         newQueryCount: 0,
-        reuseEntry: !isSBEEnabled,
+        reuseEntry: !isUsingSbePlanCache,
     });
     assertQueryParameterizedCorrectly({
         query: {a: {$eq: 1}, b: {$in: [1, 2]}},
         queryCount: 30,
         newQuery: {a: {$eq: 1}, b: {$in: [0, specialValue]}},
         newQueryCount: 0,
-        reuseEntry: !isSBEEnabled,
+        reuseEntry: !isUsingSbePlanCache,
     });
 }
 
@@ -324,7 +324,7 @@ assertQueryParameterizedCorrectly({
     queryCount: 60,
     newQuery: {a: {$eq: 1}, b: {$in: tooLargeToExplodeIn}},
     newQueryCount: 60,
-    reuseEntry: !isSBEEnabled,
+    reuseEntry: !isUsingSbePlanCache,
     sortSpec: {c: 1},
     isExplodeForSort: true,
 });
