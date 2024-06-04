@@ -964,20 +964,19 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // stage on the inner side to get matched foreign documents. The foreign documents are
     // stored in 'foreignRecordSlot'. We also pass in 'snapshotIdSlot', 'indexIdentSlot',
     // 'indexKeySlot' and 'indexKeyPatternSlot' to perform index consistency check during the seek.
-    auto foreignRecordSlot = slotIdGenerator.generate();
-    auto scanNljStage = makeLoopJoinForFetch(std::move(ixScanNljStage),
-                                             foreignRecordSlot,
-                                             slotIdGenerator.generate() /* unused recordId slot */,
-                                             std::vector<std::string>{},
-                                             makeSV(),
-                                             foreignRecordIdSlot,
-                                             snapshotIdSlot,
-                                             indexIdentSlot,
-                                             indexKeySlot,
-                                             indexKeyPatternSlot,
-                                             foreignColl,
-                                             nodeId,
-                                             makeSV() /* slotsToForward */);
+    auto [scanNljStage, foreignRecordSlot, _, __] =
+        makeLoopJoinForFetch(std::move(ixScanNljStage),
+                             std::vector<std::string>{},
+                             foreignRecordIdSlot,
+                             snapshotIdSlot,
+                             indexIdentSlot,
+                             indexKeySlot,
+                             indexKeyPatternSlot,
+                             boost::none /* prefetchedResultSlot */,
+                             foreignColl,
+                             state,
+                             nodeId,
+                             makeSV() /* slotsToForward */);
 
     // 'buildForeignMatches()' filters the foreign records, returned by the index scan, to match
     // those in 'localKeysSetSlot'. This is necessary because some values are encoded with the same
@@ -985,7 +984,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // collisions are possible.
     auto [foreignGroupSlot, foreignGroupStage] = buildForeignMatches(localKeysSetSlot,
                                                                      std::move(scanNljStage),
-                                                                     foreignRecordSlot,
+                                                                     foreignRecordSlot.getId(),
                                                                      foreignFieldName,
                                                                      yieldPolicy,
                                                                      nodeId,

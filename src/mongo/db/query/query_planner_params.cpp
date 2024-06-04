@@ -546,6 +546,20 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     }
 }
 
+void QueryPlannerParams::setTargetSbeStageBuilder(OperationContext* opCtx,
+                                                  const CanonicalQuery& canonicalQuery,
+                                                  const MultipleCollectionAccessor& collections) {
+    // Set 'TARGET_SBE_STAGE_BUILDER' on the main collection and the secondary collections. We
+    // also update 'providedOptions' in case fillOutSecondaryCollectionsPlannerParams() hasn't
+    // been called yet.
+    providedOptions |= QueryPlannerParams::TARGET_SBE_STAGE_BUILDER;
+    mainCollectionInfo.options |= QueryPlannerParams::TARGET_SBE_STAGE_BUILDER;
+
+    for (auto it = secondaryCollectionsInfo.begin(); it != secondaryCollectionsInfo.end(); ++it) {
+        it->second.options |= QueryPlannerParams::TARGET_SBE_STAGE_BUILDER;
+    }
+}
+
 namespace {
 std::vector<IndexEntry> getIndexEntriesForDistinct(
     const QueryPlannerParams::ArgsForDistinct& distinctArgs) {

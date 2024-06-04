@@ -674,6 +674,9 @@ string optionString(size_t options) {
             case QueryPlannerParams::IGNORE_QUERY_SETTINGS:
                 ss << "IGNORE_QUERY_SETTINGS ";
                 break;
+            case QueryPlannerParams::TARGET_SBE_STAGE_BUILDER:
+                ss << "TARGET_SBE_STAGE_BUILDER ";
+                break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;
                 break;

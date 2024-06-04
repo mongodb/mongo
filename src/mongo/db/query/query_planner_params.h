@@ -182,6 +182,10 @@ struct QueryPlannerParams {
 
         // Set this to ignore the query settings imposed constraints over plan selection.
         IGNORE_QUERY_SETTINGS = 1 << 13,
+
+        // Set this if you want the planner to generate a QSN that will be compatible with the
+        // SBE stage builder.
+        TARGET_SBE_STAGE_BUILDER = 1 << 14,
     };
 
     /**
@@ -288,6 +292,14 @@ struct QueryPlannerParams {
     void fillOutSecondaryCollectionsPlannerParams(OperationContext* opCtx,
                                                   const CanonicalQuery& canonicalQuery,
                                                   const MultipleCollectionAccessor& collections);
+
+    /**
+     * This method updates this QueryPlannerParams object as needed so that it can be used with
+     * the SBE engine.
+     */
+    void setTargetSbeStageBuilder(OperationContext* opCtx,
+                                  const CanonicalQuery& canonicalQuery,
+                                  const MultipleCollectionAccessor& collections);
 
     /**
      * If query supports index filters, filters params.indices according to the configuration. In

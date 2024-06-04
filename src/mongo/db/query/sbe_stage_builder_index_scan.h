@@ -77,8 +77,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     const sbe::IndexKeysInclusionSet& fieldBitset,
     const sbe::IndexKeysInclusionSet& sortKeyBitset,
     PlanYieldPolicy* yieldPolicy,
-    bool doIndexConsistencyCheck,
-    bool needsCorruptionCheck);
+    const PlanStageReqs& reqs);
 
 /**
  * Constructs the most simple version of an index scan from the single interval index bounds.
@@ -159,8 +158,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     const sbe::IndexKeysInclusionSet& fieldBitset,
     const sbe::IndexKeysInclusionSet& sortKeyBitset,
     PlanYieldPolicy* yieldPolicy,
-    bool doIndexConsistencyCheck,
-    bool needsCorruptionCheck);
+    const PlanStageReqs& reqs);
 
 /**
  * Checks if 'iets' resolves to a single point interval. It must be a sequence of '$eq' or constant
