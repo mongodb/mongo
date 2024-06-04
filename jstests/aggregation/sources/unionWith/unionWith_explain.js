@@ -105,8 +105,18 @@ function assertExplainEq(union, regular) {
                                            executionStatsIngoredFields),
                buildErrorString(unionStats, regularStats, "executionStages"));
     } else if ("stages" in regular) {
-        assert(arrayEqWithIgnoredFields(union, regular.stages, stagesIgnoredFields),
-               buildErrorString(union, regular, "stages"));
+        // For explains run with the runCommand({explain: ...}) format.
+        if (regular.stages.length > 1 && "$cursor" in regular.stages[0] &&
+            "executionStats" in regular.stages[0]["$cursor"]) {
+            assert(
+                arrayEqWithIgnoredFields(union,
+                                         regular.stages,
+                                         [...stagesIgnoredFields, ...executionStatsIngoredFields]),
+                buildErrorString(union, regular, "stages with executionStats"));
+        } else {
+            assert(arrayEqWithIgnoredFields(union, regular.stages, stagesIgnoredFields),
+                   buildErrorString(union, regular, "stages"));
+        }
     } else if ("queryPlanner" in regular) {
         assert.eq(union.length, 1, "Expected single union stage");
         const unionCursor = union[0].$cursor;
@@ -123,7 +133,7 @@ function assertExplainEq(union, regular) {
 
 function assertExplainMatch(unionExplain, regularExplain) {
     const unionStage = getUnionWithStage(unionExplain);
-    assert(unionStage);
+    assert(unionStage, unionExplain);
     const unionSubExplain = unionStage.$unionWith.pipeline;
     assertExplainEq(unionSubExplain, regularExplain);
 }
@@ -133,6 +143,20 @@ function testPipeline(pipeline) {
                                       {explain: true});
     let queryResult = collB.aggregate(pipeline, {explain: true});
     assertExplainMatch(unionResult, queryResult);
+
+    // Alternative explain invocation. This is a regression test for SERVER-89344.
+    if (!FixtureHelpers.isMongos(db)) {
+        unionResult = db.runCommand({
+            explain: {
+                "aggregate": collA.getName(),
+                "pipeline": [{$unionWith: {coll: collB.getName(), pipeline: pipeline}}],
+                "cursor": {}
+            }
+        });
+        queryResult = db.runCommand(
+            {explain: {"aggregate": collB.getName(), "pipeline": pipeline, "cursor": {}}});
+        assertExplainMatch(unionResult, queryResult);
+    }
 }
 
 testPipeline([{$addFields: {bump: true}}]);
