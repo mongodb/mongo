@@ -15,6 +15,7 @@
 import {
     uniformDistTransitions
 } from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const testDbName = jsTestName() + "_DB";
 const collPrefix = "coll_";
@@ -99,6 +100,11 @@ export const $config = (function() {
             if (TestData.runInsideTransaction) {
                 // TODO SERVER-50484: creating a timeseries/view is not supported
                 // in multi-document transactions.
+                return;
+            }
+            if (TestData.runningWithShardStepdowns &&
+                !FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation")) {
+                // TODO SERVER-90742: Remove the early exit.
                 return;
             }
             const coll = getRandomCollection(db);
