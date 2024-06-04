@@ -46,20 +46,47 @@ namespace mongo {
 namespace {
 
 class VectorClockMongoD : public VectorClockMutable,
-                          public ReplicaSetAwareService<VectorClockMongoD>,
-                          public std::enable_shared_from_this<VectorClockMongoD> {
-    VectorClockMongoD(const VectorClockMongoD&) = delete;
-    VectorClockMongoD& operator=(const VectorClockMongoD&) = delete;
-
+                          public ReplicaSetAwareService<VectorClockMongoD> {
 public:
     static VectorClockMongoD* get(ServiceContext* serviceContext);
 
-    VectorClockMongoD(ServiceContext* ctx);
-    ~VectorClockMongoD() override = default;
+    VectorClockMongoD() = default;
+    ~VectorClockMongoD() override;
 
 private:
-    // VectorClockMutable methods implementation
+    /**
+     * Structure used as keys for the map of waiters for VectorClock durability.
+     */
+    struct ComparableVectorTime {
+        bool operator<(const ComparableVectorTime& other) const {
+            return vt.configTime() < other.vt.configTime() ||
+                vt.topologyTime() < other.vt.topologyTime();
+        }
+        bool operator>=(const ComparableVectorTime& other) const {
+            return vt.configTime() >= other.vt.configTime() ||
+                vt.topologyTime() >= other.vt.topologyTime();
+        }
 
+        VectorTime vt;
+    };
+
+    struct QueueElement {
+        ComparableVectorTime _time;
+        std::unique_ptr<SharedPromise<void>> _promise;
+
+        QueueElement(ComparableVectorTime time, std::unique_ptr<SharedPromise<void>> promise)
+            : _time(std::move(time)), _promise(std::move(promise)) {}
+
+        bool operator<(const QueueElement& other) const {
+            return _time < other._time;
+        }
+    };
+    using Queue = std::list<QueueElement>;
+
+    VectorClockMongoD(const VectorClockMongoD&) = delete;
+    VectorClockMongoD& operator=(const VectorClockMongoD&) = delete;
+
+    // VectorClockMutable methods implementation
     SharedSemiFuture<void> waitForDurableConfigTime() override;
     SharedSemiFuture<void> waitForDurableTopologyTime() override;
     SharedSemiFuture<void> waitForDurable() override;
@@ -69,7 +96,6 @@ private:
     void _tickTo(Component component, LogicalTime newTime) override;
 
     // ReplicaSetAwareService methods implementation
-
     void onStartup(OperationContext* opCtx) override {}
     void onSetCurrentConfig(OperationContext* opCtx) override {}
     void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) override;
@@ -84,68 +110,38 @@ private:
     }
 
     /**
-     * Structure used as keys for the map of waiters for VectorClock durability.
-     */
-    struct ComparableVectorTime {
-        bool operator<(const ComparableVectorTime& other) const {
-            return vt.configTime() < other.vt.configTime() ||
-                vt.topologyTime() < other.vt.topologyTime();
-        }
-        bool operator>(const ComparableVectorTime& other) const {
-            return vt.configTime() > other.vt.configTime() ||
-                vt.topologyTime() > other.vt.topologyTime();
-        }
-        bool operator==(const ComparableVectorTime& other) const {
-            return vt.configTime() == other.vt.configTime() &&
-                vt.topologyTime() == other.vt.topologyTime();
-        }
-
-        VectorTime vt;
-    };
-
-    /**
      * The way the VectorClock durability works is by maintaining an `_queue` of callers, which wait
      * for a particular VectorTime to become durable.
      *
      * When the queue is empty, there is no persistence activity going on. The first caller, who
-     * finds `_loopScheduled` to be false, will set it to true, indicating it will schedule the
-     * asynchronous persistence task. The asynchronous persistence task is effectively the following
-     * loop:
+     * finds `_persisterTask` empty starts a new async task.
      *
-     *  while (!_queue.empty()) {
-     *      timeToPersist = getTime();
-     *      persistTime(timeToPersist);
-     *      _durableTime = timeToPersist;
-     *      // Notify entries in _queue, whose time is <= _durableTime and remove them
-     *  }
+     * After the `onShutdown` we do not accept any more durability request.
      */
-    SharedSemiFuture<void> _enqueueWaiterAndScheduleLoopIfNeeded(stdx::unique_lock<Mutex> ul,
-                                                                 VectorTime time);
-    Future<void> _doWhileQueueNotEmptyOrError();
+    SharedSemiFuture<void> _enqueueWaiterAndStartDurableTaskIfNeeded(WithLock lk, VectorTime time);
+
+    ExecutorFuture<void> _createPersisterTask();
 
     // Protects the shared state below
     Mutex _mutex = MONGO_MAKE_LATCH("VectorClockMongoD::_mutex");
-
-    // If set to true, means that another operation already scheduled the `_queue` draining loop, if
-    // false it means that this operation must do it
-    bool _loopScheduled{false};
-
-    // This value is only boost::none once, just after the object is constructuted. From the moment,
-    // the first operation schedules the `_queue`-draining loop, it will be set to a future, which
-    // will be signaled when the previously-scheduled `_queue` draining loop completes.
-    boost::optional<Future<void>> _currentWhileLoop;
 
     // If boost::none, means the durable time needs to be recovered from disk, otherwise contains
     // the latest-known durable time
     boost::optional<VectorTime> _durableTime;
 
-    // Queue ordered in increasing order of the VectorTimes, which are waiting to be persisted
-    using Queue = std::map<ComparableVectorTime, std::unique_ptr<SharedPromise<void>>>;
     Queue _queue;
 
-    ServiceContext* _serviceContext;
-
     Atomic<bool> _shutdownInitiated{false};
+
+    /**
+     * This is a shared state between threads so any change on this boolean must be guarded by the
+     * _mutex. The value of true means there is an async persister task running.
+     *
+     * After onShutdown the false -> true transition is prohibited (no new persister task after
+     * shutdown initiated). The destructor will wait for this flag to be true in order to not to
+     * destroy the class while a persister task is still running.
+     */
+    WaitableAtomic<bool> _taskIsRunning{false};
 };
 
 }  // namespace

@@ -87,29 +87,27 @@
 namespace mongo {
 namespace {
 
-const auto vectorClockMongoDDecoration =
-    ServiceContext::declareDecoration<std::shared_ptr<VectorClockMongoD>>();
+const auto vectorClockMongoDDecoration = ServiceContext::declareDecoration<VectorClockMongoD>();
 
 const ReplicaSetAwareServiceRegistry::Registerer<VectorClockMongoD>
     vectorClockMongoDServiceRegisterer("VectorClockMongoD-ReplicaSetAwareServiceRegistration");
 
 const ServiceContext::ConstructorActionRegisterer vectorClockMongoDRegisterer(
     "VectorClockMongoD", {"VectorClock"}, [](ServiceContext* service) {
-        VectorClockMongoD::registerVectorClockOnServiceContext(service,
-                                                               VectorClockMongoD::get(service));
+        VectorClockMongoD::registerVectorClockOnServiceContext(
+            service, &vectorClockMongoDDecoration(service));
     });
 
 }  // namespace
 
 VectorClockMongoD* VectorClockMongoD::get(ServiceContext* serviceContext) {
-    auto& clock = vectorClockMongoDDecoration(serviceContext);
-    if (!clock) {
-        clock = std::make_shared<VectorClockMongoD>(serviceContext);
-    }
-    return clock.get();
+    return &vectorClockMongoDDecoration(serviceContext);
 }
 
-VectorClockMongoD::VectorClockMongoD(ServiceContext* ctx) : _serviceContext(ctx) {}
+VectorClockMongoD::~VectorClockMongoD() {
+    // Wait until _taskIsRunning changes value FROM true
+    _taskIsRunning.wait(true);
+}
 
 void VectorClockMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
     stdx::lock_guard lg(_mutex);
@@ -124,11 +122,6 @@ void VectorClockMongoD::onStepDown() {
 void VectorClockMongoD::onShutdown() {
     stdx::lock_guard lg(_mutex);
     _shutdownInitiated.store(true);
-    for (auto& [_, promise] : _queue) {
-        promise->setError(
-            Status(ErrorCodes::ShutdownInProgress, "Not persisting vector clock due to shutdown"));
-    }
-    _queue.clear();
 }
 
 void VectorClockMongoD::onInitialDataAvailable(OperationContext* opCtx,
@@ -185,7 +178,7 @@ SharedSemiFuture<void> VectorClockMongoD::waitForDurableConfigTime() {
     if (_durableTime && _durableTime->configTime() >= time.configTime())
         return SharedSemiFuture<void>();
 
-    return _enqueueWaiterAndScheduleLoopIfNeeded(std::move(ul), std::move(time));
+    return _enqueueWaiterAndStartDurableTaskIfNeeded(ul, std::move(time));
 }
 
 SharedSemiFuture<void> VectorClockMongoD::waitForDurableTopologyTime() {
@@ -195,7 +188,7 @@ SharedSemiFuture<void> VectorClockMongoD::waitForDurableTopologyTime() {
     if (_durableTime && _durableTime->topologyTime() >= time.topologyTime())
         return SharedSemiFuture<void>();
 
-    return _enqueueWaiterAndScheduleLoopIfNeeded(std::move(ul), std::move(time));
+    return _enqueueWaiterAndStartDurableTaskIfNeeded(ul, std::move(time));
 }
 
 SharedSemiFuture<void> VectorClockMongoD::waitForDurable() {
@@ -206,7 +199,7 @@ SharedSemiFuture<void> VectorClockMongoD::waitForDurable() {
         _durableTime->topologyTime() >= time.topologyTime())
         return SharedSemiFuture<void>();
 
-    return _enqueueWaiterAndScheduleLoopIfNeeded(std::move(ul), std::move(time));
+    return _enqueueWaiterAndStartDurableTaskIfNeeded(ul, std::move(time));
 }
 
 VectorClock::VectorTime VectorClockMongoD::recoverDirect(OperationContext* opCtx) {
@@ -238,197 +231,129 @@ VectorClock::VectorTime VectorClockMongoD::recoverDirect(OperationContext* opCtx
     return newDurableTime;
 }
 
-SharedSemiFuture<void> VectorClockMongoD::_enqueueWaiterAndScheduleLoopIfNeeded(
-    stdx::unique_lock<Mutex> ul, VectorTime time) {
+SharedSemiFuture<void> VectorClockMongoD::_enqueueWaiterAndStartDurableTaskIfNeeded(
+    WithLock lk, VectorTime time) {
     if (_shutdownInitiated.load()) {
-        return Future<void>().makeReady(
+        return SharedSemiFuture<void>(
             Status(ErrorCodes::ShutdownInProgress, "Not persisting vector clock due to shutdown"));
     }
 
-    auto [it, unusedEmplaced] =
-        _queue.try_emplace({std::move(time)}, std::make_unique<SharedPromise<void>>());
+    auto& element = _queue.emplace_back(ComparableVectorTime{std::move(time)},
+                                        std::make_unique<SharedPromise<void>>());
+    auto retVal = element._promise->getFuture();
 
-    auto future = it->second->getFuture();
-
-    if (!_loopScheduled) {
-        _loopScheduled = true;
-
-        auto joinPreviousLoop(_currentWhileLoop ? std::move(*_currentWhileLoop)
-                                                : Future<void>::makeReady());
-
-        _currentWhileLoop.emplace(
-            std::move(joinPreviousLoop).onCompletion([this, _ = shared_from_this()](auto) {
-                return _doWhileQueueNotEmptyOrError();
-            }));
+    if (_taskIsRunning.load()) {
+        // we already have a task running
+        return retVal;
     }
 
-    return future;
+    _taskIsRunning.store(true);
+
+    _createPersisterTask().getAsync([](auto) {});
+
+    return retVal;
 }
 
-Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError() {
-    if (_shutdownInitiated.load()) {
-        return Future<void>::makeReady(
-            Status(ErrorCodes::ShutdownInProgress, "Not persisting vector clock due to shutdown"));
-    }
+ExecutorFuture<void> VectorClockMongoD::_createPersisterTask() {
+    return ExecutorFuture<void>(Grid::get(vectorClockMongoDDecoration.owner(this))
+                                    ->getExecutorPool()
+                                    ->getFixedExecutor())
+        .then([this]() {
+            while (true) {
+                ThreadClient tc(
+                    "VectorClockStateOperation",
+                    vectorClockMongoDDecoration.owner(this)->getService(ClusterRole::ShardServer));
+                const auto opCtxHolder = tc->makeOperationContext();
+                auto* const opCtx = opCtxHolder.get();
 
-    // This lambda is only called from the .then and .onError functions.
-    // The only possible way we can lock the mutex if the _shutdownInitiated is true when the
-    // setting of _shutdownInitiated runs parallel with the .then or .onError.
-    // That means the .then or .onError is already scheduled when the onShutdown happens.
-    // Since the threadpool stops later then the onShutdown, the already scheduled tasks will run
-    // on different thread, so it is safe to lock the mutex here.
-    const auto checkShutdownStatusAndLockMutex =
-        [this, _ = shared_from_this()]() -> boost::optional<stdx::unique_lock<Mutex>> {
-        if (_shutdownInitiated.load()) {
-            return boost::none;
-        }
-        return stdx::unique_lock(_mutex);
-    };
+                // This code is used by the TransactionCoordinator. As a result, we need to
+                // skip ticket acquisition in order to prevent possible deadlock when
+                // participants are in the prepared state. See SERVER-82883 and
+                // SERVER-60682.
+                ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
+                    opCtx, AdmissionContext::Priority::kExempt);
 
-    auto [p, f] = makePromiseFuture<VectorTime>();
-    auto future = std::move(f)
-                      .then([this, _ = shared_from_this(), checkShutdownStatusAndLockMutex](
-                                VectorTime newDurableTime) {
-                          auto ul = checkShutdownStatusAndLockMutex();
-                          if (!ul) {
-                              return;
-                          }
+                auto vectorTime = std::invoke([&]() {
+                    if (std::invoke([&] {
+                            stdx::lock_guard lg(_mutex);
+                            return !_durableTime;
+                        })) {
+                        return recoverDirect(opCtx);
+                    }
 
-                          _durableTime.emplace(newDurableTime);
+                    auto vectorTime = getTime();
 
-                          ComparableVectorTime time{*_durableTime};
+                    VectorClockDocument vcd;
+                    vcd.setConfigTime(vectorTime.configTime().asTimestamp());
+                    vcd.setTopologyTime(vectorTime.topologyTime().asTimestamp());
 
-                          std::vector<Queue::value_type::second_type> promises;
-                          for (auto it = _queue.begin(); it != _queue.end();) {
-                              if (it->first > time)
-                                  break;
-                              promises.emplace_back(std::move(it->second));
-                              it = _queue.erase(it);
-                          }
-                          ul->unlock();
+                    PersistentTaskStore<VectorClockDocument> store(
+                        NamespaceString::kVectorClockNamespace);
+                    store.upsert(opCtx,
+                                 BSON(VectorClockDocument::k_idFieldName << vcd.get_id()),
+                                 vcd.toBSON(),
+                                 WriteConcerns::kMajorityWriteConcernNoTimeout);
+                    return vectorTime;
+                });
 
-                          for (auto& p : promises)
-                              p->emplaceValue();
-                      })
-                      .onError([this, _ = shared_from_this(), checkShutdownStatusAndLockMutex](
-                                   Status status) {
-                          auto ul = checkShutdownStatusAndLockMutex();
-                          if (!ul) {
-                              return;
-                          }
+                {
+                    stdx::lock_guard lg(_mutex);
+                    _durableTime = vectorTime;
+                    ComparableVectorTime comparableDurableTime{*_durableTime};
 
-                          std::vector<Queue::value_type::second_type> promises;
-                          for (auto it = _queue.begin(); it != _queue.end();) {
-                              promises.emplace_back(std::move(it->second));
-                              it = _queue.erase(it);
-                          }
-                          ul->unlock();
+                    _queue.sort();
 
-                          for (auto& p : promises)
-                              p->setError(status);
-                      })
-                      .onCompletion([this, _ = shared_from_this()](auto) {
-                          if (_shutdownInitiated.load()) {
-                              return Future<void>::makeReady(
-                                  Status(ErrorCodes::ShutdownInProgress,
-                                         "Not persisting vector clock due to shutdown"));
-                          }
-                          {
-                              stdx::lock_guard lg(_mutex);
-                              if (_queue.empty()) {
-                                  _loopScheduled = false;
-                                  return Future<void>::makeReady();
-                              }
-                          }
-                          return _doWhileQueueNotEmptyOrError();
-                      });
+                    while (!_queue.empty() && comparableDurableTime >= _queue.front()._time) {
+                        _queue.front()._promise->emplaceValue();
+                        _queue.pop_front();
+                    }
 
-    // Blocking work to recover and/or persist the current vector time
-    ExecutorFuture<void>(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor())
-        .then([this, _ = shared_from_this()] {
-            auto mustRecoverDurableTime = [&] {
-                stdx::lock_guard lg(_mutex);
-                return !_durableTime;
-            }();
-
-            ThreadClient tc("VectorClockStateOperation",
-                            _serviceContext->getService(ClusterRole::ShardServer));
-            const auto opCtxHolder = tc->makeOperationContext();
-            auto* const opCtx = opCtxHolder.get();
-
-            // This code is used by the TransactionCoordinator. As a result, we need to skip ticket
-            // acquisition in order to prevent possible deadlock when participants are in the
-            // prepared state. See SERVER-82883 and SERVER-60682.
-            ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
-                opCtx, AdmissionContext::Priority::kExempt);
-
-            if (mustRecoverDurableTime) {
-                return recoverDirect(opCtx);
+                    if (_queue.empty()) {
+                        _taskIsRunning.store(false);
+                        return;
+                    }
+                }
             }
-
-            auto vectorTime = getTime();
-
-            VectorClockDocument vcd;
-            vcd.setConfigTime(vectorTime.configTime().asTimestamp());
-            vcd.setTopologyTime(vectorTime.topologyTime().asTimestamp());
-
-            PersistentTaskStore<VectorClockDocument> store(NamespaceString::kVectorClockNamespace);
-            store.upsert(opCtx,
-                         BSON(VectorClockDocument::k_idFieldName << vcd.get_id()),
-                         vcd.toBSON(),
-                         WriteConcerns::kMajorityWriteConcernNoTimeout);
-
-            return vectorTime;
         })
-        .getAsync(
-            [this, _ = shared_from_this(), promise = std::move(p)](
-                StatusWith<VectorTime> swResult) mutable { promise.setFrom(std::move(swResult)); });
+        .onError([this](Status status) {
+            stdx::lock_guard lg(_mutex);
 
-    return future;
+            for (const auto& element : _queue) {
+                element._promise->setError(status);
+            }
+            _queue.clear();
+
+            _taskIsRunning.store(false);
+        });
 }
 
 LogicalTime VectorClockMongoD::_tick(Component component, uint64_t nTicks) {
-    if (component == Component::ClusterTime) {
-        // Although conceptually ClusterTime can only be ticked when a mongod is able to take writes
-        // (ie. primary, or standalone), this is handled at a higher layer.
-        //
-        // ClusterTime is ticked when replacing zero-valued Timestamps with the current time, which
-        // is usually but not necessarily associated with writes.
-        //
-        // ClusterTime is ticked after winning an election, while persisting the stepUp to the
-        // oplog, which is slightly before the repl state is changed to primary.
-        //
-        // As such, ticking ClusterTime is not restricted here based on repl state.
+    invariant(component == Component::ClusterTime);
 
-        return _advanceComponentTimeByTicks(component, nTicks);
-    }
-
-    // tick is not permitted in other circumstances.
-    MONGO_UNREACHABLE;
+    // Although conceptually ClusterTime can only be ticked when a mongod is able to take writes
+    // (ie. primary, or standalone), this is handled at a higher layer.
+    //
+    // ClusterTime is ticked when replacing zero-valued Timestamps with the current time, which
+    // is usually but not necessarily associated with writes.
+    //
+    // ClusterTime is ticked after winning an election, while persisting the stepUp to the
+    // oplog, which is slightly before the repl state is changed to primary.
+    //
+    // As such, ticking ClusterTime is not restricted here based on repl state.
+    return _advanceComponentTimeByTicks(component, nTicks);
 }
 
 void VectorClockMongoD::_tickTo(Component component, LogicalTime newTime) {
-    if (component == Component::ClusterTime) {
-        // The ClusterTime is allowed to tickTo in certain very limited and trusted cases (eg.
-        // initializing based on oplog timestamps), so we have to allow it here.
-        _advanceComponentTimeTo(component, std::move(newTime));
-        return;
-    }
+    const bool isClusterTime = component == Component::ClusterTime;
+    const bool isConfigServer = serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer);
+    const bool isConfigOrTopologyTime =
+        component == Component::ConfigTime || component == Component::TopologyTime;
 
-    if (component == Component::ConfigTime &&
-        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        _advanceComponentTimeTo(component, std::move(newTime));
-        return;
-    }
+    // The ClusterTime is allowed to tickTo in certain very limited and trusted cases (eg.
+    // initializing based on oplog timestamps), so we have to allow it here.
+    invariant(isClusterTime || (isConfigServer && isConfigOrTopologyTime));
 
-    if (component == Component::TopologyTime &&
-        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        _advanceComponentTimeTo(component, std::move(newTime));
-        return;
-    }
-
-    // tickTo is not permitted in other circumstances.
-    MONGO_UNREACHABLE;
+    _advanceComponentTimeTo(component, std::move(newTime));
 }
 
 }  // namespace mongo

@@ -141,25 +141,25 @@ TEST_F(VectorClockShardServerTest, TickToClusterTime) {
     ASSERT_EQ(LogicalTime(Timestamp(3, 3)), t3.clusterTime());
 }
 
-DEATH_TEST_F(VectorClockShardServerTest, CannotTickConfigTime, "Hit a MONGO_UNREACHABLE") {
+DEATH_TEST_F(VectorClockShardServerTest, CannotTickConfigTime, "invariant") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickConfigTime(1);
 }
 
-DEATH_TEST_F(VectorClockShardServerTest, CannotTickToConfigTime, "Hit a MONGO_UNREACHABLE") {
+DEATH_TEST_F(VectorClockShardServerTest, CannotTickToConfigTime, "invariant") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickConfigTimeTo(LogicalTime());
 }
 
-DEATH_TEST_F(VectorClockShardServerTest, CannotTickTopologyTime, "Hit a MONGO_UNREACHABLE") {
+DEATH_TEST_F(VectorClockShardServerTest, CannotTickTopologyTime, "invariant") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickTopologyTime(1);
 }
 
-DEATH_TEST_F(VectorClockShardServerTest, CannotTickToTopologyTime, "Hit a MONGO_UNREACHABLE") {
+DEATH_TEST_F(VectorClockShardServerTest, CannotTickToTopologyTime, "invariant") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickTopologyTimeTo(LogicalTime());
