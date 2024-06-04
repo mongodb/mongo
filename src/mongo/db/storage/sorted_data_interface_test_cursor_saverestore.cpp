@@ -52,9 +52,9 @@ namespace mongo {
 namespace {
 
 // Insert multiple keys and try to iterate through all of them
-// using a forward cursor while calling savePosition() and
-// restorePosition() in succession.
-TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
+// using a forward cursor while calling save() and
+// restore() in succession.
+TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursor) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
@@ -102,9 +102,9 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
 }
 
 // Insert multiple keys and try to iterate through all of them
-// using a forward cursor with set end position, while calling savePosition() and
-// restorePosition() in succession.
-TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithEndPosition) {
+// using a forward cursor with set end position, while calling save() and
+// restore() in succession.
+TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorWithEndPosition) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
@@ -154,9 +154,9 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithEndPositio
 }
 
 // Insert multiple keys and try to iterate through all of them
-// using a reverse cursor while calling savePosition() and
-// restorePosition() in succession.
-TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
+// using a reverse cursor while calling save() and
+// restore() in succession.
+TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorReversed) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
@@ -206,7 +206,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
 
 // Insert multiple keys on the _id index and try to iterate through all of them using a forward
 // cursor while calling save() and restore() in succession.
-TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorOnIdIndex) {
+TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorOnIdIndex) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newIdIndexSortedDataInterface());
@@ -256,7 +256,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorOnIdIndex) {
 
 // Insert multiple keys on the _id index and try to iterate through all of them using a reverse
 // cursor while calling save() and restore() in succession.
-TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversedOnIdIndex) {
+TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorReversedOnIdIndex) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newIdIndexSortedDataInterface());
@@ -305,10 +305,10 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversedOnIdIn
 }
 
 // Insert the same key multiple times and try to iterate through each
-// occurrence using a forward cursor while calling savePosition() and
-// restorePosition() in succession. Verify that the RecordId is saved
+// occurrence using a forward cursor while calling save() and
+// restore() in succession. Verify that the RecordId is saved
 // as part of the current position of the cursor.
-TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
+TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorWithDupKeys) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
@@ -356,10 +356,10 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
 }
 
 // Insert the same key multiple times and try to iterate through each
-// occurrence using a reverse cursor while calling savePosition() and
-// restorePosition() in succession. Verify that the RecordId is saved
+// occurrence using a reverse cursor while calling save() and
+// restore() in succession. Verify that the RecordId is saved
 // as part of the current position of the cursor.
-TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysReversed) {
+TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorWithDupKeysReversed) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
@@ -407,9 +407,9 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysRev
     }
 }
 
-// Call savePosition() on a forward cursor without ever calling restorePosition().
+// Call save() on a forward cursor without ever calling restore().
 // May be useful to run this test under valgrind to verify there are no leaks.
-TEST(SortedDataInterface, SavePositionWithoutRestore) {
+TEST(SortedDataInterface, saveWithoutRestore) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
@@ -444,9 +444,9 @@ TEST(SortedDataInterface, SavePositionWithoutRestore) {
     }
 }
 
-// Call savePosition() on a reverse cursor without ever calling restorePosition().
+// Call save() on a reverse cursor without ever calling restore().
 // May be useful to run this test under valgrind to verify there are no leaks.
-TEST(SortedDataInterface, SavePositionWithoutRestoreReversed) {
+TEST(SortedDataInterface, saveWithoutRestoreReversed) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
@@ -485,7 +485,7 @@ TEST(SortedDataInterface, SavePositionWithoutRestoreReversed) {
 // Ensure that restore lands as close as possible to original position, even if data inserted
 // while saved.
 enum class IndexType { kId, kUnique, kNonUnique };
-void testSaveAndRestorePositionSeesNewInserts(bool forward, IndexType type) {
+void testSaveAndRestoreSeesNewInserts(bool forward, IndexType type) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     std::unique_ptr<SortedDataInterface> sorted;
     if (IndexType::kId == type) {
@@ -520,28 +520,28 @@ void testSaveAndRestorePositionSeesNewInserts(bool forward, IndexType type) {
 
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc2));
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInserts_Forward_Unique) {
-    testSaveAndRestorePositionSeesNewInserts(true, IndexType::kUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInserts_Forward_Unique) {
+    testSaveAndRestoreSeesNewInserts(true, IndexType::kUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInserts_Forward_Standard) {
-    testSaveAndRestorePositionSeesNewInserts(true, IndexType::kNonUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInserts_Forward_Standard) {
+    testSaveAndRestoreSeesNewInserts(true, IndexType::kNonUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInserts_Forward_Id) {
-    testSaveAndRestorePositionSeesNewInserts(true, IndexType::kId);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInserts_Forward_Id) {
+    testSaveAndRestoreSeesNewInserts(true, IndexType::kId);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInserts_Reverse_Unique) {
-    testSaveAndRestorePositionSeesNewInserts(false, IndexType::kUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInserts_Reverse_Unique) {
+    testSaveAndRestoreSeesNewInserts(false, IndexType::kUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInserts_Reverse_Standard) {
-    testSaveAndRestorePositionSeesNewInserts(false, IndexType::kNonUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInserts_Reverse_Standard) {
+    testSaveAndRestoreSeesNewInserts(false, IndexType::kNonUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInserts_Reverse_Id) {
-    testSaveAndRestorePositionSeesNewInserts(false, IndexType::kId);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInserts_Reverse_Id) {
+    testSaveAndRestoreSeesNewInserts(false, IndexType::kId);
 }
 
 // Ensure that repeated restores lands as close as possible to original position, even if data
 // inserted while saved and the current position removed.
-void testSaveAndRestorePositionSeesNewInsertsAfterRemove(bool forward, IndexType type) {
+void testSaveAndRestoreSeesNewInsertsAfterRemove(bool forward, IndexType type) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     std::unique_ptr<SortedDataInterface> sorted;
     if (IndexType::kId == type) {
@@ -574,29 +574,29 @@ void testSaveAndRestorePositionSeesNewInsertsAfterRemove(bool forward, IndexType
 
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterRemove_Forward_Unique) {
-    testSaveAndRestorePositionSeesNewInsertsAfterRemove(true, IndexType::kUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterRemove_Forward_Unique) {
+    testSaveAndRestoreSeesNewInsertsAfterRemove(true, IndexType::kUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterRemove_Forward_Standard) {
-    testSaveAndRestorePositionSeesNewInsertsAfterRemove(true, IndexType::kNonUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterRemove_Forward_Standard) {
+    testSaveAndRestoreSeesNewInsertsAfterRemove(true, IndexType::kNonUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterRemove_Forward_Id) {
-    testSaveAndRestorePositionSeesNewInsertsAfterRemove(true, IndexType::kId);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterRemove_Forward_Id) {
+    testSaveAndRestoreSeesNewInsertsAfterRemove(true, IndexType::kId);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterRemove_Reverse_Unique) {
-    testSaveAndRestorePositionSeesNewInsertsAfterRemove(false, IndexType::kUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterRemove_Reverse_Unique) {
+    testSaveAndRestoreSeesNewInsertsAfterRemove(false, IndexType::kUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterRemove_Reverse_Standard) {
-    testSaveAndRestorePositionSeesNewInsertsAfterRemove(false, IndexType::kNonUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterRemove_Reverse_Standard) {
+    testSaveAndRestoreSeesNewInsertsAfterRemove(false, IndexType::kNonUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterRemove_Reverse_Id) {
-    testSaveAndRestorePositionSeesNewInsertsAfterRemove(false, IndexType::kId);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterRemove_Reverse_Id) {
+    testSaveAndRestoreSeesNewInsertsAfterRemove(false, IndexType::kId);
 }
 
 // Ensure that repeated restores lands as close as possible to original position, even if data
 // inserted while saved and the current position removed in a way that temporarily makes the
 // cursor EOF.
-void testSaveAndRestorePositionSeesNewInsertsAfterEOF(bool forward, IndexType type) {
+void testSaveAndRestoreSeesNewInsertsAfterEOF(bool forward, IndexType type) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     std::unique_ptr<SortedDataInterface> sorted;
     if (IndexType::kId == type) {
@@ -630,27 +630,27 @@ void testSaveAndRestorePositionSeesNewInsertsAfterEOF(bool forward, IndexType ty
     ASSERT_EQ(cursor->next(), IndexKeyEntry(insertPoint, loc1));
 }
 
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterEOF_Forward_Unique) {
-    testSaveAndRestorePositionSeesNewInsertsAfterEOF(true, IndexType::kUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterEOF_Forward_Unique) {
+    testSaveAndRestoreSeesNewInsertsAfterEOF(true, IndexType::kUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterEOF_Forward_Standard) {
-    testSaveAndRestorePositionSeesNewInsertsAfterEOF(true, IndexType::kNonUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterEOF_Forward_Standard) {
+    testSaveAndRestoreSeesNewInsertsAfterEOF(true, IndexType::kNonUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterEOF_Forward_Id) {
-    testSaveAndRestorePositionSeesNewInsertsAfterEOF(true, IndexType::kId);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterEOF_Forward_Id) {
+    testSaveAndRestoreSeesNewInsertsAfterEOF(true, IndexType::kId);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterEOF_Reverse_Unique) {
-    testSaveAndRestorePositionSeesNewInsertsAfterEOF(false, IndexType::kUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterEOF_Reverse_Unique) {
+    testSaveAndRestoreSeesNewInsertsAfterEOF(false, IndexType::kUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterEOF_Reverse_Standard) {
-    testSaveAndRestorePositionSeesNewInsertsAfterEOF(false, IndexType::kNonUnique);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterEOF_Reverse_Standard) {
+    testSaveAndRestoreSeesNewInsertsAfterEOF(false, IndexType::kNonUnique);
 }
-TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterEOF_Reverse_Id) {
-    testSaveAndRestorePositionSeesNewInsertsAfterEOF(false, IndexType::kId);
+TEST(SortedDataInterface, SaveAndRestoreSeesNewInsertsAfterEOF_Reverse_Id) {
+    testSaveAndRestoreSeesNewInsertsAfterEOF(false, IndexType::kId);
 }
 
 // Make sure we restore to a RecordId at or ahead of save point if same key.
-TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_Forward) {
+TEST(SortedDataInterface, SaveAndRestoreStandardIndexConsidersRecordId_Forward) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto sorted = harnessHelper->newSortedDataInterface(/*unique*/ false,
                                                         /*partial=*/false,
@@ -696,7 +696,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_F
 }
 
 // Test that cursors over unique indices will never return the same key twice.
-TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Forward) {
+TEST(SortedDataInterface, SaveAndRestoreUniqueIndexWontReturnDupKeys_Forward) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto sorted = harnessHelper->newSortedDataInterface(/*unique*/ true,
                                                         /*partial=*/false,
@@ -746,7 +746,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_For
 }
 
 // Make sure we restore to a RecordId at or ahead of save point if same key on reverse cursor.
-TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_Reverse) {
+TEST(SortedDataInterface, SaveAndRestoreStandardIndexConsidersRecordId_Reverse) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto sorted = harnessHelper->newSortedDataInterface(/*unique*/ false,
                                                         /*partial=*/false,
@@ -792,7 +792,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_R
 }
 
 // Test that reverse cursors over unique indices will never return the same key twice.
-TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Reverse) {
+TEST(SortedDataInterface, SaveAndRestoreUniqueIndexWontReturnDupKeys_Reverse) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto sorted = harnessHelper->newSortedDataInterface(/*unique*/ true,
                                                         /*partial=*/false,
