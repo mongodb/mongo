@@ -7,6 +7,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestricted} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
+    getDefaultProtocolVersionForPlanShardedSearch,
     mockPlanShardedSearchResponse,
     mongotCommandForQuery,
     mongotKillCursorResponse,
@@ -32,6 +33,7 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
+const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 
 // Skip the test if running in 'trySbeRestricted' mode with 'SearchInSbe' enabled. In this mode,
 // $search will be pushed down to SBE, but $limit will not.
@@ -78,8 +80,14 @@ function mockShards(mongotQuery, shard0Docs, shard1Docs) {
     const metaId = NumberLong(2);
     const history0 = [
         {
-            expectedCommand: mongotCommandForQuery(
-                mongotQuery, collName, dbName, collUUID0, null, {docsRequested: 2}),
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID0,
+                protocolVersion: protocolVersion,
+                cursorOptions: {docsRequested: 2}
+            }),
             response: mongotMultiCursorResponseForBatch(shard0Docs,
                                                         // Return non-closed cursorId.
                                                         mongotCursorId,
@@ -95,8 +103,14 @@ function mockShards(mongotQuery, shard0Docs, shard1Docs) {
     s0Mongot.setMockResponses(history0, mongotCursorId, metaId);
     const history1 = [
         {
-            expectedCommand: mongotCommandForQuery(
-                mongotQuery, collName, dbName, collUUID0, null, {docsRequested: 2}),
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID0,
+                protocolVersion: protocolVersion,
+                cursorOptions: {docsRequested: 2}
+            }),
             response: mongotMultiCursorResponseForBatch(shard1Docs,
                                                         // Return non-closed cursorId.
                                                         mongotCursorId,

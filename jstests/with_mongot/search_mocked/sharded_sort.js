@@ -10,6 +10,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
+    getDefaultProtocolVersionForPlanShardedSearch,
     mockPlanShardedSearchResponse,
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
@@ -43,6 +44,7 @@ assert.commandWorked(
 
 const testColl = testDB.getCollection(collName);
 const collNS = testColl.getFullName();
+const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 
 assert.commandWorked(testColl.insert([
     {_id: 1, x: "ow", z: 20, a: {b: 20}, c: 1, d: [0, 5, 10]},
@@ -85,7 +87,13 @@ let shard1Conn = st.rs1.getPrimary();
 function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockResponse) {
     const responseOk = 1;
     const history0 = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID0,
+            protocolVersion: protocolVersion
+        }),
         response: mongotMultiCursorResponseForBatch(
             shard0MockResponse, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
     }];
@@ -93,7 +101,13 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
     s0Mongot.setMockResponses(history0, cursorId, secondCursorId);
 
     const history1 = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID1),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID1,
+            protocolVersion: protocolVersion
+        }),
         response: mongotMultiCursorResponseForBatch(
             shard1MockResponse, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
     }];
@@ -483,7 +497,13 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
     ];
     const history0 = [
         {
-            expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0),
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID0,
+                protocolVersion: protocolVersion
+            }),
             response: mongotMultiCursorResponseForBatch(mongot0ResponseBatch.slice(0, 2),
                                                         NumberLong(10),
                                                         [{val: 1}],
@@ -525,7 +545,13 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
     ];
     const history1 = [
         {
-            expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID1),
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID1,
+                protocolVersion: protocolVersion
+            }),
             response: mongotMultiCursorResponseForBatch(mongot1ResponseBatch.slice(0, 1),
                                                         NumberLong(30),
                                                         [{val: 1}],
@@ -630,10 +656,16 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
         "$searchSortValues.z": 1,
     };
     const planShardedSearchHistory = [{
-        expectedCommand: {planShardedSearch: collName, query: mongotQuery, $db: dbName},
+        expectedCommand: {
+            planShardedSearch: collName,
+            query: mongotQuery,
+            $db: dbName,
+            explain: {verbosity: "queryPlanner"},
+            searchFeatures: {shardedSort: 1}
+        },
         response: {
             ok: 1,
-            protocolVersion: NumberInt(1),
+            protocolVersion: protocolVersion,
             metaPipeline: [],
             sortSpec: sortSpec,
         }
@@ -641,9 +673,21 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
     stWithMock.getMockConnectedToHost(stWithMock.st.s)
         .setMockResponses(planShardedSearchHistory, cursorId);
 
-    const history = [{
+    const history0 = [{
         expectedCommand: {
             search: collName,
+            collectionUUID: collUUID0,
+            query: mongotQuery,
+            explain: {verbosity: "queryPlanner"},
+            $db: dbName
+        },
+        response: {explain: explainContents, ok: 1},
+    }];
+
+    const history1 = [{
+        expectedCommand: {
+            search: collName,
+            collectionUUID: collUUID1,
             query: mongotQuery,
             explain: {verbosity: "queryPlanner"},
             $db: dbName
@@ -651,9 +695,9 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
         response: {explain: explainContents, ok: 1},
     }];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
-    s0Mongot.setMockResponses(history, cursorId);
+    s0Mongot.setMockResponses(history0, cursorId);
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
-    s1Mongot.setMockResponses(history, cursorId);
+    s1Mongot.setMockResponses(history1, cursorId);
 
     const result = testColl.explain().aggregate([{$search: mongotQuery}]);
     if (checkSbeRestrictedOrFullyEnabled(testDB) &&

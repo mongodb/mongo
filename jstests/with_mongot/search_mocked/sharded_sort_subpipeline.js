@@ -7,6 +7,7 @@
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
+    getDefaultProtocolVersionForPlanShardedSearch,
     mockPlanShardedSearchResponseOnConn,
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
@@ -30,6 +31,9 @@ const stWithMock = new ShardingTestWithMongotMock({
         rsOptions: {setParameter: {enableTestCommands: 1}},
     }
 });
+
+const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch()
+
 stWithMock.start();
 stWithMock.assertEmptyMocks();
 const st = stWithMock.st;
@@ -91,7 +95,13 @@ function uniqueCursorId() {
 function mockMongotShardResponses(mongotQuery) {
     const responseOk = 1;
     const history0 = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, shardedCollName, dbName, collUUID0),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: shardedCollName,
+            db: dbName,
+            collectionUUID: collUUID0,
+            protocolVersion: protocolVersion
+        }),
         response: mongotMultiCursorResponseForBatch(shard0MockResponse,
                                                     NumberLong(0),
                                                     [{val: 1}],
@@ -103,7 +113,13 @@ function mockMongotShardResponses(mongotQuery) {
     s0Mongot.setMockResponses(history0, uniqueCursorId(), uniqueCursorId());
 
     const history1 = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, shardedCollName, dbName, collUUID1),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: shardedCollName,
+            db: dbName,
+            collectionUUID: collUUID1,
+            protocolVersion: protocolVersion
+        }),
         response: mongotMultiCursorResponseForBatch(shard1MockResponse,
                                                     NumberLong(0),
                                                     [{val: 1}],

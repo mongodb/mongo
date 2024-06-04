@@ -63,8 +63,12 @@ function runTest(customStOpts) {
                 [
                     {
                         // Please note: intermediate results protocol version is not expected.
-                        expectedCommand:
-                            mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0),
+                        expectedCommand: mongotCommandForQuery({
+                            query: mongotQuery,
+                            collName: collName,
+                            db: dbName,
+                            collectionUUID: collUUID0
+                        }),
                         response: {
                             "cursor": {
                                 "id": NumberLong(0),

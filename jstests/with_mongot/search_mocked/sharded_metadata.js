@@ -86,8 +86,13 @@ function setUpMerge(mergeType, localColl, isView) {
                                           collNS,
                                           responseOk);
     const history0 = [{
-        expectedCommand: mongotCommandForQuery(
-            mongotQuery, testColl.getName(), dbName, collUUID, protocolVersion),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: testColl.getName(),
+            db: dbName,
+            collectionUUID: collUUID,
+            protocolVersion: protocolVersion
+        }),
         response: mongot0Response
     }];
 
@@ -105,8 +110,13 @@ function setUpMerge(mergeType, localColl, isView) {
                                           collNS,
                                           responseOk);
     const history1 = [{
-        expectedCommand: mongotCommandForQuery(
-            mongotQuery, testColl.getName(), dbName, collUUID, protocolVersion),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: testColl.getName(),
+            db: dbName,
+            collectionUUID: collUUID,
+            protocolVersion: protocolVersion
+        }),
         response: mongot1Response
     }];
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
@@ -205,8 +215,13 @@ function testMergeAtLocationSearchMeta(mergeType, localColl, isView) {
                                           collNS,
                                           responseOk);
     const history0 = [{
-        expectedCommand: mongotCommandForQuery(
-            mongotQuery, testColl.getName(), dbName, collUUID, protocolVersion),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: testColl.getName(),
+            db: dbName,
+            collectionUUID: collUUID,
+            protocolVersion: protocolVersion
+        }),
         response: mongot0Response
     }];
 
@@ -224,8 +239,13 @@ function testMergeAtLocationSearchMeta(mergeType, localColl, isView) {
                                           collNS,
                                           responseOk);
     const history1 = [{
-        expectedCommand: mongotCommandForQuery(
-            mongotQuery, testColl.getName(), dbName, collUUID, protocolVersion),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: testColl.getName(),
+            db: dbName,
+            collectionUUID: collUUID,
+            protocolVersion: protocolVersion
+        }),
         response: mongot1Response
     }];
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());

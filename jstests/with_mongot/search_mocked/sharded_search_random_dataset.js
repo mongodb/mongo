@@ -91,8 +91,13 @@ function constructMongotResponseBatchForIds(ids, startIdx, endIdx) {
 
 const responseOk = 1;
 
-const expectedMongotCommand =
-    mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0, protocolVersion);
+const expectedMongotCommand = mongotCommandForQuery({
+    query: mongotQuery,
+    collName: collName,
+    db: dbName,
+    collectionUUID: collUUID0,
+    protocolVersion: protocolVersion
+});
 
 // Set up history for the mock associated with the primary of shard 0.
 {

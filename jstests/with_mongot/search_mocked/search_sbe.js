@@ -131,7 +131,16 @@ const pipeline2 = [{$search: searchQuery2}];
 
 // Test SBE pushdown.
 {
-    const history = [{expectedCommand: searchCmd1, response: {explain: explainContents, ok: 1}}];
+    const history = [{
+        expectedCommand: mongotCommandForQuery({
+            query: searchQuery1,
+            collName: coll.getName(),
+            db: "test",
+            collectionUUID: collUUID,
+            explainVerbosity: {verbosity: "queryPlanner"}
+        }),
+        response: {explain: explainContents, ok: 1}
+    }];
     assert.commandWorked(mongotConn.adminCommand(
         {setMockResponses: 1, cursorId: NumberLong(123), history: history}));
 
@@ -321,7 +330,8 @@ function runSearchTest(mongotQuery, pipeline, mongotResponseBatch, expectedDocs)
     const cursorId = NumberLong(123);
     const responseOk = 1;
     const history = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, coll.getName(), dbName, collUUID),
+        expectedCommand: mongotCommandForQuery(
+            {query: mongotQuery, collName: coll.getName(), db: dbName, collectionUUID: collUUID}),
         response: mongotResponseForBatch(
             mongotResponseBatch, NumberLong(0), coll.getFullName(), responseOk),
     }];
@@ -330,7 +340,13 @@ function runSearchTest(mongotQuery, pipeline, mongotResponseBatch, expectedDocs)
 
     // Check the stage is pushed down into SBE.
     const explainHistory = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, coll.getName(), dbName, collUUID),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: coll.getName(),
+            db: dbName,
+            collectionUUID: collUUID,
+            explainVerbosity: {verbosity: "queryPlanner"}
+        }),
         response: {explain: explainContents, ok: 1}
     }];
     mongotmock.setMockResponses(explainHistory, cursorId);

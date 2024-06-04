@@ -58,7 +58,12 @@ function setQueryMockResponses(isSearchMeta) {
                 // Please note: 'protocolVersion' is intentionally left off. There is no merging
                 // pipeline here, so we expect full results - not intermediate results - from the
                 // mongot.
-                expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0),
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID0
+                }),
                 response: {
                     "cursor": {
                         "id": NumberLong(0),

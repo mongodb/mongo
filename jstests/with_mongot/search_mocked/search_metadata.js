@@ -62,7 +62,8 @@ const collUUID = getUUIDFromListCollections(testDB, coll.getName());
         [{_id: 0, foo: 1, score: 1.234, highlights: highlights, scoreInfo: searchScoreDetails}];
 
     const history = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, coll.getName(), dbName, collUUID),
+        expectedCommand: mongotCommandForQuery(
+            {query: mongotQuery, collName: coll.getName(), db: dbName, collectionUUID: collUUID}),
         response: mongotResponseForBatch(
             mongotResponseBatch, NumberLong(0), coll.getFullName(), responseOk),
     }];
@@ -171,7 +172,12 @@ const collUUID = getUUIDFromListCollections(testDB, coll.getName());
 
     const history = [
         {
-            expectedCommand: mongotCommandForQuery(mongotQuery, coll.getName(), dbName, collUUID),
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: coll.getName(),
+                db: dbName,
+                collectionUUID: collUUID
+            }),
             response: mongotResponseForBatch(batchOne, cursorId, coll.getFullName(), 1),
         },
         {
@@ -217,7 +223,8 @@ const collUUID = getUUIDFromListCollections(testDB, coll.getName());
     }];
 
     const makeHistory = (response) => [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, coll.getName(), dbName, collUUID),
+        expectedCommand: mongotCommandForQuery(
+            {query: mongotQuery, collName: coll.getName(), db: dbName, collectionUUID: collUUID}),
         response: mongotResponseForBatch(response, NumberLong(0), coll.getFullName(), 1),
     },
     ];

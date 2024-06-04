@@ -55,12 +55,35 @@ const searchQuery = {
     path: "title"
 };
 const protocolVersion = NumberInt(42);
+
 const mergingPipelineHistory = [{
     expectedCommand: {
         planShardedSearch: coll.getName(),
         query: searchQuery,
         $db: dbName,
-        searchFeatures: {shardedSort: 1}
+        searchFeatures: {shardedSort: 1},
+    },
+    response: {
+        ok: 1,
+        protocolVersion: protocolVersion,
+        metaPipeline: [{
+            "$group": {
+                "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
+                "value": {
+                    "$sum": "$metaVal",
+                }
+            }
+        }]
+    }
+}];
+
+const explainMergingPipelineHistory = [{
+    expectedCommand: {
+        planShardedSearch: coll.getName(),
+        query: searchQuery,
+        $db: dbName,
+        searchFeatures: {shardedSort: 1},
+        explain: {verbosity: currentVerbosity}
     },
     response: {
         ok: 1,
@@ -88,19 +111,25 @@ function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
         if (disablePipelineOptimization) {
             setPipelineOptimizationMode('alwaysOn');
         }
-        mongotConn.setMockResponses(mergingPipelineHistory, 1);
+        mongotConn.setMockResponses(explainMergingPipelineHistory, 1);
 
         const mongotQuery = searchQuery;
         const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), collName);
         const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), collName);
         // History for shard 1.
         {
-            const exampleCursor = searchShardedExampleCursors1(
-                dbName,
-                collNS,
-                collName,
-                // Explain doesn't take protocol version.
-                mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0));
+            const exampleCursor =
+                searchShardedExampleCursors1(dbName,
+                                             collNS,
+                                             collName,
+                                             // Explain doesn't take protocol version.
+                                             mongotCommandForQuery({
+                                                 query: mongotQuery,
+                                                 collName: collName,
+                                                 db: dbName,
+                                                 collectionUUID: collUUID0,
+                                                 explainVerbosity: {verbosity: currentVerbosity}
+                                             }));
             exampleCursor.historyResults[0].response.explain = {destiny: "avatar"};
             const mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
             mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
@@ -109,12 +138,18 @@ function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
 
         // History for shard 2
         {
-            const exampleCursor = searchShardedExampleCursors2(
-                dbName,
-                collNS,
-                collName,
-                // Explain doesn't take protocol version.
-                mongotCommandForQuery(mongotQuery, collName, dbName, collUUID1));
+            const exampleCursor =
+                searchShardedExampleCursors2(dbName,
+                                             collNS,
+                                             collName,
+                                             // Explain doesn't take protocol version.
+                                             mongotCommandForQuery({
+                                                 query: mongotQuery,
+                                                 collName: collName,
+                                                 db: dbName,
+                                                 collectionUUID: collUUID1,
+                                                 explainVerbosity: {verbosity: currentVerbosity}
+                                             }));
             exampleCursor.historyResults[0].response.explain = {destiny: "avatar"};
             const mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
             mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
@@ -165,11 +200,14 @@ function setQueryMockResponses(removeGetMore) {
     const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), collName);
     // History for shard 1.
     {
-        const exampleCursor = searchShardedExampleCursors1(
-            dbName,
-            collNS,
-            collName,
-            mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0, protocolVersion));
+        const exampleCursor =
+            searchShardedExampleCursors1(dbName, collNS, collName, mongotCommandForQuery({
+                                             query: mongotQuery,
+                                             collName: collName,
+                                             db: dbName,
+                                             collectionUUID: collUUID0,
+                                             protocolVersion: protocolVersion
+                                         }));
         // If the query we are setting responses for has a limit, the getMore is not needed.
         if (removeGetMore) {
             exampleCursor.historyResults.pop();
@@ -182,11 +220,14 @@ function setQueryMockResponses(removeGetMore) {
 
     // History for shard 2
     {
-        const exampleCursor = searchShardedExampleCursors2(
-            dbName,
-            collNS,
-            collName,
-            mongotCommandForQuery(mongotQuery, collName, dbName, collUUID1, protocolVersion));
+        const exampleCursor =
+            searchShardedExampleCursors2(dbName, collNS, collName, mongotCommandForQuery({
+                                             query: mongotQuery,
+                                             collName: collName,
+                                             db: dbName,
+                                             collectionUUID: collUUID1,
+                                             protocolVersion: protocolVersion
+                                         }));
         if (removeGetMore) {
             exampleCursor.historyResults.pop();
             exampleCursor.historyResults[0].response.cursors[0].cursor.id = NumberLong(0);

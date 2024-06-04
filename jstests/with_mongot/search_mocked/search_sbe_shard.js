@@ -89,7 +89,8 @@ for (const currentVerbosity of ["queryPlanner", "executionStats", "allPlansExecu
                 planShardedSearch: collName,
                 query: searchQuery,
                 $db: dbName,
-                searchFeatures: {shardedSort: 1}
+                searchFeatures: {shardedSort: 1},
+                explain: {verbosity: currentVerbosity}
             },
             response: {
                 ok: 1,

@@ -97,8 +97,13 @@ const mongot0ResponseBatch = [
     {_id: 4, $searchScore: 1},
     {_id: 1, $searchScore: 0.99},
 ];
-const expectedMongotCommand =
-    mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0, NumberInt(1));
+const expectedMongotCommand = mongotCommandForQuery({
+    query: mongotQuery,
+    collName: collName,
+    db: dbName,
+    collectionUUID: collUUID0,
+    protocolVersion: NumberInt(1)
+});
 
 const history0 = [{
     expectedCommand: expectedMongotCommand,

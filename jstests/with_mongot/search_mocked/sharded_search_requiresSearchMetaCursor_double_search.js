@@ -61,8 +61,13 @@ st.shardColl(shardedColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), shardedCollName);
 const mongotQuery = {};
 const protocolVersion = NumberInt(1);
-const expectedMongotCommand =
-    mongotCommandForQuery(mongotQuery, shardedCollName, dbName, collUUID0, protocolVersion);
+const expectedMongotCommand = mongotCommandForQuery({
+    query: mongotQuery,
+    collName: shardedCollName,
+    db: dbName,
+    collectionUUID: collUUID0,
+    protocolVersion: protocolVersion
+});
 
 let cursorId = NumberLong(123);
 let metaCursorId = NumberLong(cursorId + 1001);

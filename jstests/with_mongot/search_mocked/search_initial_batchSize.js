@@ -130,12 +130,13 @@ function mockRequest(batchSize, isStoredSource) {
     const docsToReturn = isStoredSource ? relevantStoredSourceDocs.slice(0, batchSize)
                                         : relevantSearchDocs.slice(0, batchSize);
     const history = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery,
-                                               collName,
-                                               dbName,
-                                               collUUID,
-                                               /*protocolVersion*/ null,
-                                               /*cursorOptions*/ {batchSize}),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID,
+            cursorOptions: {batchSize}
+        }),
         response:
             mongotResponseForBatch(docsToReturn, NumberLong(0), coll.getFullName(), responseOk),
     }];

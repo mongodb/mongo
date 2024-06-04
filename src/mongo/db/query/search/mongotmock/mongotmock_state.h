@@ -41,9 +41,9 @@
 namespace mongo {
 namespace mongotmock {
 
-// Do a "loose" check that every field in 'expectedCmd' is in 'userCmd'. Does not check in the
-// other direction.
-bool checkUserCommandMatchesExpectedCommand(const BSONObj& userCmd, const BSONObj& expectedCmd);
+// Do a "loose" check that every field in 'expectedCmd' is in 'givenCmd'. Checks that all fields in
+// 'givenCmd' are in 'expectedCmd' expect for fields in 'ignoredFields'.
+bool checkGivenCommandMatchesExpectedCommand(const BSONObj& givenCmd, const BSONObj& expectedCmd);
 
 struct MockedResponse {
     BSONObj expectedCommand;
@@ -72,14 +72,14 @@ public:
         return _remainingResponses.front();
     }
 
-    MockedResponse findCommandResponsePairMatching(const BSONObj& userCmd) const {
+    MockedResponse findCommandResponsePairMatching(const BSONObj& givenCmd) const {
         invariant(hasNextCursorResponse());
         for (const auto& setResponse : _remainingResponses) {
-            if (checkUserCommandMatchesExpectedCommand(userCmd, setResponse.expectedCommand)) {
+            if (checkGivenCommandMatchesExpectedCommand(givenCmd, setResponse.expectedCommand)) {
                 return setResponse;
             }
         }
-        uasserted(6750400, str::stream() << "No command matched " << userCmd);
+        uasserted(6750400, str::stream() << "No command matched " << givenCmd);
     }
 
     void popNextCommandResponsePair() {
@@ -153,7 +153,7 @@ public:
         // find.
         for (auto it = _availableCursorIds.begin(); it != _availableCursorIds.end(); ++it) {
             auto potentialCommand = _cursorStates[*it]->peekNextCommandResponsePair();
-            if (checkUserCommandMatchesExpectedCommand(cmd, potentialCommand.expectedCommand)) {
+            if (checkGivenCommandMatchesExpectedCommand(cmd, potentialCommand.expectedCommand)) {
                 auto cursorID = *it;
                 auto mapIt = _cursorStates.find(cursorID);
                 invariant(mapIt != _cursorStates.end());

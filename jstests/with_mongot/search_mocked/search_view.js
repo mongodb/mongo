@@ -61,7 +61,12 @@ const mockMongots = function() {
     const collUUID = getUUIDFromListCollections(testDB, collName);
     s0Mongot.setMockResponses(
         [{
-            expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID),
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID,
+            }),
             response: mongotResponseForBatch(responseBatch, NumberLong(0), coll.getFullName(), 1),
         }],
         cursorId);

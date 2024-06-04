@@ -84,6 +84,28 @@ function ensureNoResponses() {
     // Run a search which doesn't match its 'expectedCommand'.
     assert.commandFailedWithCode(testDB.runCommand({search: "a different UUID"}), 31086);
 
+    // Reset state associated with cursor id and run a search command which doesn't match its
+    // 'expectedCommand' by having extra fields compared to the expected.
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandFailedWithCode(testDB.runCommand({search: "a UUID", random: "yes"}), 31086);
+
+    // Reset state associated with cursor id and run a search command which should fail since it has
+    // a field that should not be ignored in a subobject.
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandFailedWithCode(
+        testDB.runCommand({search: "a UUID", cursorOptions: {notInIgnoredFieldSet: 1}}), 31086);
+
+    // Reset state associated with cursor id and run a search command which should succeed since it
+    // has fields that should be ignored.
+    // TODO SERVER-91092 remove this test when 'batchSize' and 'docsRequested' are removed from
+    // ignored fields.
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        testDB.runCommand({search: "a UUID", cursorOptions: {docsRequested: 1, batchSize: 1}}));
+
     // Reset the state associated with the cursor id and run a search command which
     // succeeds.
     assert.commandWorked(
