@@ -56,6 +56,7 @@
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
@@ -175,8 +176,7 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
 
     // Force the refresh of the catalog cache to purge outdated information. Note also that this
     // code is indirectly used to notify to secondary nodes to clear their filtering information.
-    const auto catalog = Grid::get(opCtx)->catalogCache();
-    uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, nss));
+    forceShardFilteringMetadataRefresh(opCtx, nss);
     CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
 
     // Ensures the remove of range deletions and the refresh of the catalog cache will be waited for

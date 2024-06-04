@@ -49,4 +49,14 @@ assert.eq(0, st.s.getCollection('config.collections').countDocuments({_id: kNss}
 // Make sure there is no entry on config.chunks.
 assert.eq(0, st.s.getCollection('config.chunks').countDocuments({uuid: collUUID}));
 
+// Make sure that persisted cached metadata was removed from the primary shard.
+const chunksCollName = 'cache.chunks.' + kNss;
+const configDb = st.shard0.getDB("config")
+assert.eq(
+    0,
+    configDb.cache.collections.countDocuments({_id: kNss}),
+    "Found collection entry in 'config.cache.collections' after _shardsvrUntrackUnsplittableCollection for shard " +
+        shard0Name);
+assert(!configDb[chunksCollName].exists());
+
 st.stop();
