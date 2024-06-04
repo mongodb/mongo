@@ -14,7 +14,7 @@
 const coll = db.timeseries_groupby_reorder_expr;
 coll.drop();
 
-import {runGroupRewriteTest} from 'jstests/core/timeseries/timeseries_groupby_reorder.js';
+import {runGroupRewriteTest} from 'jstests/core/timeseries/timeseries_groupby_reorder_helpers.js';
 
 // The rewrite applies here because only the metafield is accessed in the group key, and only min or
 // max is used in the accumulators.
@@ -27,6 +27,7 @@ import {runGroupRewriteTest} from 'jstests/core/timeseries/timeseries_groupby_re
         {time: t, myMeta: 'baR', val: 70},
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [{$group: {_id: {$toUpper: ['$myMeta']}, min: {$min: '$val'}, max: {$max: '$val'}}}],
         [{_id: 'FOO', min: 10, max: 30}, {_id: 'BAR', min: 50, max: 70}]);
@@ -45,6 +46,7 @@ import {runGroupRewriteTest} from 'jstests/core/timeseries/timeseries_groupby_re
         {time: t, myMeta: {a: 'Foo', b: 'Bar'}, val: 70},
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [{
             $group: {
@@ -70,6 +72,7 @@ import {runGroupRewriteTest} from 'jstests/core/timeseries/timeseries_groupby_re
         {time: t, myMeta: 1, key: 'b', val: 70},
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [{$group: {_id: {$toUpper: ['$key']}, min: {$min: '$val'}, max: {$max: '$val'}}}],
         [{_id: 'A', min: 10, max: 30}, {_id: 'B', min: 50, max: 70}]);
@@ -87,6 +90,7 @@ import {runGroupRewriteTest} from 'jstests/core/timeseries/timeseries_groupby_re
         {time: t, myMeta: 'baR', key: 'b', val: 70},
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [{
             $group: {
@@ -112,6 +116,7 @@ import {runGroupRewriteTest} from 'jstests/core/timeseries/timeseries_groupby_re
         {time: t, myField: 'baR', val: 70},
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [{$group: {_id: {m: {$toUpper: ['$myField']}}, min: {$min: '$val'}, max: {$max: '$val'}}}],
         [{_id: {m: 'FOO'}, min: 10, max: 30}, {_id: {m: 'BAR'}, min: 50, max: 70}],
