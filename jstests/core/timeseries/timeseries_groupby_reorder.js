@@ -14,23 +14,7 @@
 const coll = db.timeseries_groupby_reorder;
 coll.drop();
 
-// We will only check correctness of the results here as checking the plan in JSTests is brittle and
-// is better done in document_source_internal_unpack_bucket_test/group_reorder_test.cpp. For the
-// cases when the re-write isn't applicable, the used datasets should yield wrong result if the
-// re-write is applied.
-export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
-    coll.drop();
-    if (excludeMeta) {
-        db.createCollection(coll.getName(), {timeseries: {timeField: "time"}});
-    } else {
-        db.createCollection(coll.getName(), {timeseries: {metaField: "myMeta", timeField: "time"}});
-    }
-    coll.insertMany(docs);
-    assert.sameMembers(expectedResults, coll.aggregate(pipeline).toArray(), () => {
-        return `Pipeline: ${tojson(pipeline)}. Explain: ${
-            tojson(coll.explain().aggregate(pipeline))}`;
-    });
-}
+import {runGroupRewriteTest} from 'jstests/core/timeseries/timeseries_groupby_reorder_helpers.js';
 
 // Test with measurement group key -- a rewrite in this situation would be wrong.
 (function testNonMetaGroupKey() {
@@ -41,10 +25,12 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 1, key: 1, val: 5},  // max for key = 1
         {time: t, myMeta: 1, key: 2, val: 7},  // global max
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$key", min: {$min: "$val"}}}, {$match: {_id: 1}}],
                         [{"_id": 1, "min": 3}]);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$key", max: {$max: "$val"}}}, {$match: {_id: 1}}],
                         [{"_id": 1, "max": 5}]);
 })();
@@ -58,9 +44,9 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(
-        docs, [{$group: {_id: null, min: {$min: "$val"}}}], [{"_id": null, "min": 0}]);
+        coll, docs, [{$group: {_id: null, min: {$min: "$val"}}}], [{"_id": null, "min": 0}]);
     runGroupRewriteTest(
-        docs, [{$group: {_id: null, max: {$max: "$val"}}}], [{"_id": null, "max": 5}]);
+        coll, docs, [{$group: {_id: null, max: {$max: "$val"}}}], [{"_id": null, "max": 5}]);
 })();
 
 // Test with a group key that is optimized to a constant. The $group rewrite applies.
@@ -72,6 +58,7 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [{$group: {_id: {$mod: [10, 5]}, min: {$min: "$val"}, max: {$max: "$val"}}}],
         [{_id: 0, min: 3, max: 5}]);
@@ -85,7 +72,8 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 3, val: 4},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: null, min: {$min: "$val"}, max: {$max: "$val"}}}],
                         [{_id: null, min: 3, max: 5}],
                         true /* excludeMeta */);
@@ -100,10 +88,12 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 2, val: 3},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$match: {myMeta: 2}}, {$group: {_id: null, min: {$min: "$val"}}}],
                         [{"_id": null, "min": 1}]);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$match: {myMeta: 2}}, {$group: {_id: null, max: {$max: "$val"}}}],
                         [{"_id": null, "max": 3}]);
 })();
@@ -116,10 +106,12 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 1, val: 1, include: true},
         {time: t, myMeta: 1, val: 5, include: false},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$match: {include: true}}, {$group: {_id: null, min: {$min: "$val"}}}],
                         [{"_id": null, "min": 1}]);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$match: {include: true}}, {$group: {_id: null, max: {$max: "$val"}}}],
                         [{"_id": null, "max": 1}]);
 })();
@@ -133,10 +125,12 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 2, val: 3},
         {time: t, myMeta: 1, val: 1},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$myMeta", min: {$min: "$val"}}}, {$match: {_id: 2}}],
                         [{"_id": 2, "min": 3}]);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$myMeta", max: {$max: "$val"}}}, {$match: {_id: 2}}],
                         [{"_id": 2, "max": 4}]);
 })();
@@ -150,10 +144,12 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 2, val: 3},
         {time: t, myMeta: 1, val: 1},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$match: {myMeta: 2}}, {$group: {_id: "$myMeta", min: {$min: "$val"}}}],
                         [{"_id": 2, "min": 3}]);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$match: {myMeta: 2}}, {$group: {_id: "$myMeta", max: {$max: "$val"}}}],
                         [{"_id": 2, "max": 4}]);
 })();
@@ -167,10 +163,12 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 1, val: 5, include: false},
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [{$match: {include: true}}, {$group: {_id: "$myMeta", min: {$min: "$val"}}}],
         [{"_id": 1, "min": 4}]);
     runGroupRewriteTest(
+        coll,
         docs,
         [{$match: {include: true}}, {$group: {_id: "$myMeta", max: {$max: "$val"}}}],
         [{"_id": 1, "max": 4}]);
@@ -185,10 +183,12 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 1, a: 2, b: 10},
         {time: t, myMeta: 1, a: 3, b: 1},  // min(a + b)
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$myMeta", min: {$min: {$add: ["$a", "$b"]}}}}],
                         [{"_id": 1, "min": 4}]);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$myMeta", max: {$max: {$add: ["$a", "$b"]}}}}],
                         [{"_id": 1, "max": 21}]);
 })();
@@ -203,7 +203,8 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 3, val: 4},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$myMeta", x: {$sum: "$myMeta"}}}, {$match: {_id: 1}}],
                         [{"_id": 1, "x": 2}]);
 })();
@@ -216,7 +217,10 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 1, include: false},
     ];
     runGroupRewriteTest(
-        docs, [{$match: {include: true}}, {$group: {_id: "$myMeta", x: {$min: "$myMeta"}}}], []);
+        coll,
+        docs,
+        [{$match: {include: true}}, {$group: {_id: "$myMeta", x: {$min: "$myMeta"}}}],
+        []);
 })();
 
 // Test min on the time field (cannot rewrite $min because the control.time.min is rounded
@@ -225,7 +229,8 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
     const docs = [
         {time: ISODate("2023-07-20T23:16:47.683Z"), myMeta: 1},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$myMeta", min: {$min: "$time"}}}],
                         [{_id: 1, min: ISODate("2023-07-20T23:16:47.683Z")}]);
 })();
@@ -236,7 +241,8 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
     const docs = [
         {time: ISODate("2023-07-20T23:16:47.683Z"), myMeta: 1},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$myMeta", max: {$max: "$time"}}}],
                         [{_id: 1, max: ISODate("2023-07-20T23:16:47.683Z")}]);
 })();
@@ -251,6 +257,7 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: {a: 2, b: 10}, val: 5},
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [{
             $group:
@@ -270,6 +277,7 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: {a: 2, b: 10}, val: 5, string: "apple"}
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [{$group: {_id: {a: "$myMeta.a", b: "$string"}, min: {$min: "$val"}, max: {$max: "$val"}}}],
         [
@@ -290,6 +298,7 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: {a: 2, b: 10}, val: 5, string: "apple"}
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [{$group: {_id: {a: "$myMeta.a", b: "$string"}, min: {$min: "$val"}, max: {$max: "$val"}}}],
         [
@@ -313,6 +322,7 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(
+        coll,
         docs,
         [
             {$group: {_id: "$myMeta", x: {$count: {}}, y: {$min: "$val"}, z: {$max: "$val"}}},
@@ -330,8 +340,10 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 3, val: 4},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(
-        docs, [{$group: {_id: "$myMeta", x: {$sum: 1}}}, {$match: {_id: 1}}], [{"_id": 1, "x": 2}]);
+    runGroupRewriteTest(coll,
+                        docs,
+                        [{$group: {_id: "$myMeta", x: {$sum: 1}}}, {$match: {_id: 1}}],
+                        [{"_id": 1, "x": 2}]);
 })();
 
 // Test with a meta group key, and {$sum: 7}. The group rewrite doesn't apply in this case but we
@@ -343,7 +355,8 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, meta: 3, val: 4},
         {time: t, meta: 1, val: 5},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$meta", x: {$sum: 7}}}, {$match: {_id: 1}}],
                         [{"_id": 1, "x": 2 * 7}]);
 })();
@@ -357,7 +370,8 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 3, val: 4},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: null, x: {$sum: 1}}}],
                         [{"_id": null, "x": 3}],
                         true /* excludeMeta */);
@@ -373,7 +387,8 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 3, val: 4},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: "$myMeta", x: {$sum: "$val"}}}],
                         [{"_id": 1, "x": 8}, {"_id": 3, "x": 4}]);
 })();
@@ -387,7 +402,8 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 3, val: 4},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$group: {_id: null, min: {$min: "$val"}}}, {$count: "groupCount"}],
                         [{"groupCount": 1}],
                         true /* excludeMeta */);
@@ -406,29 +422,35 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
     //
     // Tests with inclusion projections.
     //
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$project: {myMeta: 1}}, {$group: {_id: null, o: {$max: "$time"}}}],
                         [{_id: null, o: null}],
                         false /* excludeMeta */);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$project: {myMeta: 1}}, {$group: {_id: null, o: {$max: "$val"}}}],
                         [{_id: null, o: null}],
                         false /* excludeMeta */);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$project: {myMeta: 1}}, {$group: {_id: null, o: {$max: "$myMeta"}}}],
                         [{_id: null, o: 3}],
                         false /* excludeMeta */);
     runGroupRewriteTest(
+        coll,
         docs,
         [{$project: {myMeta: 1}}, {$group: {_id: {x: "$myMeta"}, o: {$max: "$myMeta"}}}],
         [{_id: {x: 1}, o: 1}, {_id: {x: 3}, o: 3}],
         false /* excludeMeta */);
     runGroupRewriteTest(
+        coll,
         docs,
         [{$project: {myMeta: 1}}, {$group: {_id: {x: "$myMeta"}, o: {$max: "$val"}}}],
         [{_id: {x: 1}, o: null}, {_id: {x: 3}, o: null}],
         false /* excludeMeta */);
     runGroupRewriteTest(
+        coll,
         docs,
         [{$project: {myMeta: 1}}, {$group: {_id: {meta: "$myMeta"}, c: {$count: {}}}}],
         [{_id: {meta: 1}, c: 2}, {_id: {meta: 3}, c: 1}],
@@ -437,7 +459,8 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
     //
     // Tests with exclusion projections.
     //
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [
                             {$project: {myMeta: 0}},
                             {$addFields: {m: "$myMeta"}},
@@ -445,25 +468,30 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
                         ],
                         [{_id: null, o: null}],
                         false /* excludeMeta */);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$project: {myMeta: 0}}, {$group: {_id: "$myMeta", o: {$max: "$val"}}}],
                         [{_id: null, o: 5}],
                         false /* excludeMeta */);
     runGroupRewriteTest(
+        coll,
         docs,
         [{$project: {myMeta: 0}}, {$group: {_id: {x: "$myMeta"}, o: {$max: "$val"}}}],
         [{_id: {x: null}, o: 5}],
         false /* excludeMeta */);
     runGroupRewriteTest(
+        coll,
         docs,
         [{$project: {myMeta: 0, val: 0}}, {$group: {_id: {x: "$myMeta"}, o: {$max: "$val"}}}],
         [{_id: {x: null}, o: null}],
         false /* excludeMeta */);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$project: {myMeta: 0}}, {$group: {_id: null, o: {$max: "$val"}}}],
                         [{_id: null, o: 5}],
                         false /* excludeMeta */);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$project: {myMeta: 0}}, {$group: {_id: null, c: {$count: {}}}}],
                         [{_id: null, c: 3}],
                         false /* excludeMeta */);
@@ -478,25 +506,30 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         {time: t, myMeta: 3, val: 4},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$project: {time: "$myMeta"}}, {$group: {_id: null, o: {$max: "$time"}}}],
                         [{_id: null, o: 3}],
                         false /* excludeMeta */);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$project: {val: "$myMeta"}}, {$group: {_id: null, o: {$max: "$val"}}}],
                         [{_id: null, o: 3}],
                         false /* excludeMeta */);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [{$addFields: {myMeta: "5"}}, {$group: {_id: null, o: {$max: "$myMeta"}}}],
                         [{_id: null, o: "5"}],
                         false /* excludeMeta */);
 
     runGroupRewriteTest(
+        coll,
         docs,
         [{$addFields: {myMeta: "x"}}, {$group: {_id: "$myMeta", o: {$max: "$val"}}}],
         [{_id: "x", o: 5}],
         false /* excludeMeta */);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [
                             {$addFields: {myMeta: "y"}},
                             {$project: {val: "$myMeta"}},
@@ -504,7 +537,8 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
                         ],
                         [{_id: {x: null}, o: "y"}],
                         false /* excludeMeta */);
-    runGroupRewriteTest(docs,
+    runGroupRewriteTest(coll,
+                        docs,
                         [
                             {$addFields: {myMeta: "$val"}},
                             {$project: {val: 0}},
