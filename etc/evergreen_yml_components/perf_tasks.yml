@@ -117,18 +117,21 @@ tasks:
     commands:
       - func: f_generate_all_variant_auto_tasks
   - name: schedule_global_auto_tasks
+    patch_only: true
     priority: 5
     commands:
       - func: f_schedule_tasks
         vars:
           tasks: all_tasks
   - name: schedule_variant_auto_tasks
+    patch_only: true
     priority: 5
     commands:
       - func: f_schedule_tasks
         vars:
           tasks: variant_tasks
   - name: schedule_patch_auto_tasks
+    patch_only: true
     priority: 5
     commands:
       - func: f_schedule_tasks
