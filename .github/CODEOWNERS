@@ -1,2 +1,7 @@
 # All backports must be approved by the server release team
 * @10gen/server-release
+
+# Exclude tests in "jstests" and README's from the approval loop
+/jstests/**/*
+/README.md
+**/README.md
