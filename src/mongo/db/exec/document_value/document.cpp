@@ -683,19 +683,19 @@ boost::optional<Value> Document::getNestedScalarFieldNonCachingHelper(const Fiel
 
     // In many cases, the cache is empty and we can skip straight to reading from the backing BSON.
     if (isModified()) {
-        if (auto val = _storage->getFieldCacheOnly(fieldName); !val.missing()) {
+        if (auto val = _storage->getFieldCacheOnly(fieldName); val) {
             // Whether landing on an array (level + 1 == dottedField.getPathLength) or traversing an
             // array, return boost::none.
-            if (val.getType() == BSONType::Array)
+            if (val->getType() == BSONType::Array)
                 return boost::none;
 
             if (level + 1 == dottedField.getPathLength()) {
                 return val;
             }
 
-            if (val.getType() == BSONType::Object) {
-                return val.getDocument().getNestedScalarFieldNonCachingHelper(dottedField,
-                                                                              level + 1);
+            if (val->getType() == BSONType::Object) {
+                return val->getDocument().getNestedScalarFieldNonCachingHelper(dottedField,
+                                                                               level + 1);
             }
 
             // Returns missing when reading the sub-field of a scalar.
