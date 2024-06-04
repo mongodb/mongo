@@ -39,9 +39,12 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
     if (shouldMakeMigrationFailToCommitOnConfig) {
-        // Turn on a failpoint to make the migration commit fail on the config server.
-        assert.commandWorked(st.configRS.getPrimary().adminCommand(
-            {configureFailPoint: "migrationCommitVersionError", mode: "alwaysOn"}));
+        // Turn on a failpoint to make the migration commit fail on the config server. Set failpoint
+        // on each node in case configsvr is also acting as the donor in this test.
+        st.configRS.nodes.forEach(node => {
+            assert.commandWorked(node.adminCommand(
+                {configureFailPoint: "migrationCommitVersionError", mode: "alwaysOn"}));
+        });
     }
 
     jsTest.log("Run the moveChunk asynchronously and wait for " + failpointName + " to be hit.");
@@ -99,7 +102,9 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
 
     if (shouldMakeMigrationFailToCommitOnConfig) {
         // Turn off the failpoint on the config server before returning.
-        assert.commandWorked(st.configRS.getPrimary().adminCommand(
-            {configureFailPoint: "migrationCommitVersionError", mode: "off"}));
+        st.configRS.nodes.forEach(node => {
+            assert.commandWorked(node.adminCommand(
+                {configureFailPoint: "migrationCommitVersionError", mode: "off"}));
+        });
     }
 }
