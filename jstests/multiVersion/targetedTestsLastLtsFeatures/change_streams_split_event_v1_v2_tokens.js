@@ -118,6 +118,32 @@ expectedEvents.push({operationType: "dropDatabase"},
                     {operationType: "invalidate"},
                     {operationType: "dropDatabase"});
 
+// Leave only the last of the events with identical resume tokens, because the previous events will
+// be skipped when resuming from such a token.
+// TODO SERVER-90266: Remove this workaround when no longer needed.
+{
+    const csCursor = testDB.watch([], {
+        showExpandedEvents: true,
+        startAfter: testStartV1HWMToken,
+        $_generateV2ResumeTokens: false
+    });
+
+    // The 'drop' and 'rename' events coming from different shards are likely to get identical
+    // resume tokens in v5.0.
+    for (let prevEvent = csCursor.next(), nextEvent; csCursor.hasNext(); prevEvent = nextEvent) {
+        nextEvent = csCursor.next();
+        if (bsonWoCompare(nextEvent._id, prevEvent._id) === 0) {
+            // If two or more consecutive events have identical resume tokens, remove all but the
+            // last from the expected events.
+            expectedEvents.splice(expectedEvents.findIndex(
+                                      (event) => (event.operationType === prevEvent.operationType)),
+                                  1);
+        }
+    }
+
+    csCursor.close();
+}
+
 // Helper function to assert on the given event fields.
 function assertEventMatches(event, expectedEvent, errorMsg) {
     for (const k in expectedEvent) {
