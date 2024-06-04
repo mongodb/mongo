@@ -41,6 +41,8 @@ selector:
     - jstests/core/**/bench_test1.js
     # TODO SERVER-91073: Validate command does not check if a received shard version is stale before proceeding.
     - jstests/core/index/index_partial_write_ops.js
+    # moveCollection will drop indexes which will reset index statistics this test asserts on.
+    - jstests/core/index/index_stats.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
