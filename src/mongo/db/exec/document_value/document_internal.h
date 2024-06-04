@@ -447,14 +447,14 @@ public:
     }
 
     /**
-     * Retrieves the given field from the cache. Returns an empty Value if the field does not exist.
+     * Retrieves the given field from the cache. Returns a boost::none if the field does not exist.
      */
-    Value getFieldCacheOnly(StringData name) const {
+    boost::optional<Value> getFieldCacheOnly(StringData name) const {
         Position pos = findField(name, LookupPolicy::kCacheOnly);
         if (pos.found()) {
             return getField(pos).val;
         }
-        return Value();
+        return boost::none;
     }
 
     /**
