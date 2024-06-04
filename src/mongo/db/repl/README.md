@@ -768,98 +768,6 @@ error if the command can be serviced by a secondary but the operation’s`$readP
 primary-only. A primary node that receives a `secondary` read preference operation will service it,
 although this case is rare since it requires the node to step up before it receives the operation.
 
-# enableMajorityReadConcern Flag
-
-`readConcern: majority` is enabled by default for WiredTiger in MongoDB. This can be problematic
-for systems that use arbiters because it is possible for writes to be accepted but not majority
-committed. Accepting writes without moving the majority commit point forward will increase WT cache
-pressure until the primary suffers severe performance issues, like stalling. Arbiters cause
-primaries to do this, for example, when secondaries are down for maintenance.
-
-`enableMajorityReadConcern=false` (`eMRC=false`) is the recommended configuration for replica sets
-with arbiters. When majority reads are disabled, the storage engine no longer maintains history as
-far back as the majority commit point. The replication system sets the
-[`stableTimestamp`](#replication-timestamp-glossary) to the newest `all_durable` timestamp, meaning
-that we can take stable checkpoints that are not necessarily majority committed.
-
-Some significant impacts of this flag in the replication system include changes to
-[`Cross Shard Transactions`](#cross-shard-Transactions-and-the-prepared-state), and
-[rollback](#rollback).
-
-For more information on how this impacts `Change Streams`, please refer to the Query Architecture
-Guide. <!-- TODO Link to Change Streams Section in Query Arch Guide -->
-
-## eMRC=false and Rollback
-
-Even though we added support for taking stable checkpoints when `eMRC=false`, we must still use the
-`rollbackViaRefetch` algorithm instead of the [`Recover to A Timestamp` algorithm](#Rollback-recover-to-a-timestamp-RTT).
-As aforementioned, when `eMRC=false`, the replication system will set the `stableTimestamp` to the
-newest `all_durable` timestamp. This allows us to take stable checkpoints that are not necessarily
-majority committed. Consequently, the `stableTimestamp` can advance past the `majority commit point`,
-which will break the `Recover to A Timestamp` algorithm.
-
-### rollbackViaRefetch
-
-Nodes go into rollback if after they receive the first batch of writes from their sync source, they
-realize that the greater than or equal to predicate did not return the last op in their oplog. When
-rolling back, nodes are in the `ROLLBACK` state and reads are prohibited. When a node goes into
-rollback it drops all snapshots.
-
-The rolling-back node first [finds the common point](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rs_rollback.cpp#L1228)
-between its oplog and its sync source's oplog. It then goes through all of the operations in its
-oplog back to the common point and figures out how to undo them.
-
-Simply doing the "inverse" operation is sometimes impossible, such as a document remove where we do
-not log the entire document that is removed. Instead, the node simply refetches the problematic
-documents, or entire collections in the case of undoing a `drop`, from the sync source and replaces
-the local version with that version. Some operations also have special handling, and some just
-fail, such as `dropDatabase`, causing the entire node to shut down.
-
-The node first compiles a list of documents, collections, and indexes to fetch and drop. Before
-actually doing the undo steps, the node "fixes up" the operations by "cancelling out" operations
-that negate each other to reduce work. The node then drops and fetches all data it needs and
-replaces the local version with the remote versions.
-
-The node gets the lastApplied OpTime from the sync source and the Rollback ID to check if a
-rollback has happened during this rollback, in which case it fails rollback and shuts down. The
-lastApplied OpTime is set as the [`minValid`](#replication-timestamp-glossary) for the node and the
-node goes into RECOVERING state. The node resumes fetching and applying operations like a normal
-secondary until it hits that `minValid`. Only at that point does the node go into SECONDARY state.
-
-This process is very similar to initial sync and startup after an unclean shutdown in that
-operations are applied on data that may already reflect those operations and operations in the
-future. This leads to all of the same idempotency concerns and index constraint relaxation.
-
-Though we primarily use the [`Recover To A Timestamp`](#rollback-recover-to-a-timestamp-rtt) algorithm
-from MongoDB 4.0 and onwards, we must still keep the `rollbackViaRefetch` to support `eMRC=false` nodes.
-
-## eMRC=false and Single Replica Set Transactions
-
-[Single replica set transactions](#transactions) either do untimestamped reads or read from the
-[all_durable](#replication-timestamp-glossary) when using `readConcern: snapshot`, so they do not
-rely on storage engine support for reading from a majority committed snapshot. Therefore, single
-replica set transactions should work the same with `readConcern: majority` disabled.
-
-## eMRC=false and Cross Shard Transactions
-
-It is illegal to run a [cross-shard transaction](#cross-shard-Transactions-and-the-prepared-state)
-on shards that contain an arbiter or have a primary with `eMRC=false`. Shards that contain an
-arbiter could indefinitely accept writes but not commit them, which affects the liveness of
-cross-shard transactions. Consider a case where we try to commit a cross-shard transaction, but
-are unable to put the transaction into the prepare state without a majority of the set.
-
-Additionally, the `rollbackViaRefetch` algorithm does not support `prepare` oplog entries, so we
-do not allow cross-shard transactions to run on replica sets that have `eMRC=false` nodes. We
-automatically fail the `prepareTransaction` command in these cases, which will prevent a
-transaction from even being prepared on an invalid shard or replica set node. This is safe because
-it will cause the entire transaction to abort.
-
-In addition to explicitly failing the `prepareTransaction` command, we also crash when replaying
-the `prepare` oplog entry during [startup recovery](#startup-recovery) on `eMRC=false` nodes. This
-allows us to avoid issues regarding replaying `prepare` oplog entries after recovering from an
-unstable checkpoint. The only way to replay these entries and complete recovery is to restart the
-node with `eMRC=true`.
-
 # Transactions
 
 **Multi-document transactions** were introduced in MongoDB to provide atomicity for reads and writes
@@ -2275,12 +2183,9 @@ preceding it are durable on disk; rather, it solely signifies they are committed
 replication consistently [maintains that](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4843-L4861) `stable_timestamp` <= `all_durable`.
 
 **`currentCommittedSnapshot`**: An optime maintained in `ReplicationCoordinator` that is used to
-serve majority reads and is always guaranteed to be <= `lastCommittedOpTime`. When `eMRC=true`, this
+serve majority reads and is always guaranteed to be <= `lastCommittedOpTime`. This
 is currently [set to the stable optime](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4945).
 Since it is reset every time we recalculate the stable optime, it will also be up to date.  
-When `eMRC=false`, this [is set](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4952-L4961)
-to the minimum of the stable optime and the `lastCommittedOpTime`, even though it is not used to
-serve majority reads in that case.
 
 **`initialDataTimestamp`**: A timestamp used to indicate the timestamp at which history “begins”.
 When a node comes out of initial sync, we inform the storage engine that the `initialDataTimestamp`
@@ -2338,10 +2243,7 @@ populated internally from the `currentCommittedSnapshot` timestamp inside `Repli
 checkpoint, which can be thought of as a consistent snapshot of the data. Replication informs the
 storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
 majority committed (other than a specific caveat during restore noted below) so that RTT rollback
-can use it. In the case when [`eMRC=false`](#enableMajorityReadConcern-flag), the stable timestamp
-may not be majority committed, which is why we must use the Rollback via Refetch rollback algorithm.
-This timestamp is also required to increase monotonically except when `eMRC=false`, where in a
-special case during rollback it is possible for the `stableTimestamp` to move backwards.  
+can use it.   
 The calculation of this value in the replication layer occurs [here](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4824-L4881).
 The replication layer will [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4907-L4921)
 if it is earlier than the `initialDataTimestamp`, since data earlier than that timestamp may be
