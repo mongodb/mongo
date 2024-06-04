@@ -871,7 +871,7 @@ class _AddRemoveShardThread(threading.Thread):
                         ), f"Expected remove shard's filtering information to reflect that the shard does not own any chunk for collection {nss}, but found {metadata} on node {removed_shard_node.get_driver_connection_url()}"
 
                 return
-            except (pymongo.errors.AutoReconnect, pymongo.errors.NotPrimaryError):
+            except (pymongo.errors.AutoReconnect, pymongo.errors.NotPrimaryError) as err:
                 # The above operations run directly on a shard, so they may fail getting a
                 # connection if the shard node is killed.
                 self.logger.info(
