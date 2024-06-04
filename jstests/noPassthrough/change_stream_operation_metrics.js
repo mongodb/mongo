@@ -199,6 +199,9 @@ let nextId = nDocs;
 })();
 
 (function changeStreamSecondary() {
+    // Ensure change streams don't see previous writes.
+    rst.awaitReplication();
+
     clearMetrics(secondary);
     const cur = secondaryDB[collName].watch([], {fullDocument: "updateLookup"});
 
