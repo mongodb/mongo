@@ -14,9 +14,6 @@ build_variant_large_distro_exceptions:
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
   - enterprise-macos-arm64
-  - enterprise-rhel-67-s390x
-  - enterprise-rhel-71-ppc64le
-  - enterprise-rhel-71-ppc64le-inmem
   - enterprise-rhel-80-64-bit
   - enterprise-rhel-80-64-bit-coverage
   - enterprise-rhel-81-ppc64le
@@ -37,8 +34,6 @@ build_variant_large_distro_exceptions:
   - macos
   - macos-arm64
   - macos-debug-suggested
-  - rhel7.9-small
-  - rhel7.9-large
   - rhel80
   - rhel80-debug-asan
   - rhel80-debug-asan-all-feature-flags

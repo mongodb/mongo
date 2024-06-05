@@ -1345,44 +1345,6 @@ tasks:
           <<: *powercycle_remote_credentials
         timeout_secs: 1800 # 30 minute timeout for no output
 
-  - name: selinux_rhel7_enterprise
-    tags: ["assigned_to_jira_team_server_security", "experimental"]
-    depends_on:
-      - name: archive_dist_test
-      - name: package
-    commands:
-      - command: manifest.load
-      - func: "git get project and add git tag"
-      - func: "f_expansions_write"
-      - func: "set up venv"
-      - func: "fetch packages"
-      - func: "fetch binaries"
-      - func: "extract binaries"
-      - func: "run selinux tests"
-        vars:
-          user: root
-          distro: rhel76-selinux
-          test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
-
-  - name: selinux_rhel7_org
-    tags: ["assigned_to_jira_team_server_security", "experimental"]
-    depends_on:
-      - name: archive_dist_test
-      - name: package
-    commands:
-      - command: manifest.load
-      - func: "git get project and add git tag"
-      - func: "f_expansions_write"
-      - func: "set up venv"
-      - func: "fetch packages"
-      - func: "fetch binaries"
-      - func: "extract binaries"
-      - func: "run selinux tests"
-        vars:
-          user: root
-          distro: rhel76-selinux
-          test_list: jstests/selinux/*.js
-
   - name: selinux_rhel8_enterprise
     tags: ["assigned_to_jira_team_server_security", "experimental"]
     depends_on:

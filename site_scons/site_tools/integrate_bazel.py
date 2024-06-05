@@ -66,8 +66,6 @@ _DISTRO_PATTERN_MAP = {
     "Amazon Linux 2023": "amazon_linux_2023",
     "Debian GNU/Linux 10": "debian10",
     "Debian GNU/Linux 12": "debian12",
-    "Red Hat Enterprise Linux Server 7*": "rhel7",
-    "Red Hat Enterprise Linux 7*": "rhel7",
     "Red Hat Enterprise Linux 8*": "rhel8",
     "Red Hat Enterprise Linux 9*": "rhel9",
     "SLES 15*": "suse15",
