@@ -70,15 +70,40 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         originalRemoveShard.call(this, db, collName);
     };
 
+    function retryOnRetryableCode(fn, prefix) {
+        assert.soon(() => {
+            try {
+                fn();
+                return true;
+            } catch (e) {
+                if (RetryableWritesUtil.isRetryableCode(e.code)) {
+                    print(prefix + ", err: " + tojson(e));
+                    return false;
+                }
+                throw e;
+            }
+        });
+    }
+
     $config.states.interruptAddShard = function(db, collName, connCache) {
         connCache.config.forEach(conn => {
-            interruptConfigsvrAddShard(conn);
+            // Removing a shard will close its ReplicaSetMonitor, which can lead requests targeting
+            // it, like the aggregation this sends to all shards when the RS endpoint is on, to fail
+            // with ShutdownInProgress.
+            retryOnRetryableCode(() => {
+                interruptConfigsvrAddShard(conn);
+            }, "Retry interrupt add shard on " + tojson(conn));
         });
     };
 
     $config.states.interruptRemoveShard = function(db, collName, connCache) {
         connCache.config.forEach(conn => {
-            interruptConfigsvrRemoveShard(conn);
+            // Removing a shard will close its ReplicaSetMonitor, which can lead requests targeting
+            // it, like the aggregation this sends to all shards when the RS endpoint is on, to fail
+            // with ShutdownInProgress.
+            retryOnRetryableCode(() => {
+                interruptConfigsvrRemoveShard(conn);
+            }, "Retry interrupt remove shard on " + tojson(conn));
         });
     };
 
@@ -91,18 +116,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const hasTwoOrMoreShards = shardDocs.length >= 2;
 
         cluster.getReplicaSets().forEach(rst => {
-            while (true) {
-                try {
-                    checkClusterParameter(rst, hasTwoOrMoreShards)
-                    return;
-                } catch (e) {
-                    if (RetryableWritesUtil.isRetryableCode(e.code)) {
-                        print("Retry cluster parameter check after error: " + tojson(e));
-                        continue;
-                    }
-                    throw e;
-                }
-            }
+            retryOnRetryableCode(() => {
+                checkClusterParameter(rst, hasTwoOrMoreShards);
+            }, "Retry cluster parameter check");
         });
     };
 
