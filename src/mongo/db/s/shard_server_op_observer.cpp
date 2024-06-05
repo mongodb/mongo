@@ -79,6 +79,7 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
@@ -763,9 +764,18 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
         return;
     }
 
-    // Only the shard primay nodes control the collection creation and secondaries just follow
-    // Secondaries CSR will be the defaulted one (UNKNOWN in most of the cases)
+    // Only the shard primary nodes control the collection creation.
     if (!opCtx->writesAreReplicated()) {
+        // On secondaries node of sharded cluster we force the cleanup of the filtering metadata in
+        // order to remove anything that was left from any previous collection instance. This could
+        // happen by first having an UNSHARDED version for a collection that didn't exist followed
+        // by a movePrimary to the current shard.
+        if (ShardingState::get(opCtx)->enabled()) {
+            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                opCtx, collectionName);
+            scopedCsr->clearFilteringMetadata(opCtx);
+        }
+
         return;
     }
 
