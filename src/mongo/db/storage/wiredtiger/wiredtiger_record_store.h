@@ -450,8 +450,11 @@ protected:
      * Perform a bounded seek on the cursor, and return the next matching RecordId, if one exists.
      *
      * If countSeekMetric is false, does not record this seek towards metrics collection.
+     * If restoring is true, this seek is part of a restore operation.
      */
-    RecordId seekIdCommon(const RecordId& id, BoundInclusion boundInclusion);
+    RecordId seekIdCommon(const RecordId& id,
+                          BoundInclusion boundInclusion,
+                          bool restoring = false);
 
     /**
      * Perform an exact seek on the cursor, and return the Record, if one exists.
