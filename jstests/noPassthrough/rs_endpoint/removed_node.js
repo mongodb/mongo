@@ -118,12 +118,22 @@ function runTest({isReplicaSetEndpointEnabled}) {
     config.version = nextVersion;
     assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 
-    jsTest.log("Verify that secondary0 disconnects us when it picks up the new config");
+    jsTest.log("Verify that secondary0 picks up the new config");
     waitForState(secondaries[0], ReplSetTest.State.REMOVED);
 
     jsTest.log("Test commands after removing secondary0");
     testUnremovedNode(primary, {isReplicaSetEndpointEnabled, isPrimary: true});
-    testRemovedNode(secondaries[0]);
+    assert.soon(() => {
+        try {
+            testRemovedNode(secondaries[0]);
+            return true;
+        } catch (e) {
+            // The transition to state REMOVED is expected to cause secondary0 to close connections.
+            assert(isNetworkError(e), e);
+            return false;
+        }
+    });
+
     testUnremovedNode(secondaries[1], {isReplicaSetEndpointEnabled});
 
     jsTest.log("Restart secondary0");
@@ -145,7 +155,7 @@ function runTest({isReplicaSetEndpointEnabled}) {
             testRemovedNode(secondaries[0]);
             return true;
         } catch (e) {
-            // secondary0 just got restarted so it could throw a network error.
+            // The transition to state REMOVED is expected to cause secondary0 to close connections.
             assert(isNetworkError(e), e);
             return false;
         }
