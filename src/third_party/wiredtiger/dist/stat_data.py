@@ -289,8 +289,12 @@ conn_stats = [
     CacheStat('cache_bytes_updates', 'bytes allocated for updates', 'no_clear,no_scale,size'),
     CacheStat('cache_eviction_active_workers', 'eviction worker thread active', 'no_clear'),
     CacheStat('cache_eviction_aggressive_set', 'eviction currently operating in aggressive mode', 'no_clear,no_scale'),
-    CacheStat('cache_eviction_app', 'pages evicted by application threads'),
-    CacheStat('cache_eviction_app_dirty', 'modified pages evicted by application threads'),
+    CacheStat('cache_eviction_app_attempt', 'page evict attempts by application threads'),
+    CacheStat('cache_eviction_app_fail', 'page evict failures by application threads'),
+    # Note cache_eviction_app_attempt - cache_eviction_app_fail = page evict successes by application threads.
+    CacheStat('cache_eviction_app_dirty_attempt', 'modified page evict attempts by application threads'),
+    CacheStat('cache_eviction_app_dirty_fail', 'modified page evict failures by application threads'),
+    # Note cache_eviction_app_dirty_attempt - cache_eviction_app_dirty_fail = modified page evict successes by application threads.
     CacheStat('cache_eviction_app_time', 'application thread time evicting (usecs)'),
     CacheStat('cache_eviction_clear_ordinary', 'pages removed from the ordinary queue to be queued for urgent eviction'),
     CacheStat('cache_eviction_consider_prefetch', 'pages considered for eviction that were brought in by pre-fetch', 'no_clear,no_scale'),
@@ -330,7 +334,9 @@ conn_stats = [
     CacheStat('cache_eviction_pages_queued_urgent_hs_dirty', 'pages queued for urgent eviction from history store due to high dirty content'),
     CacheStat('cache_eviction_queue_empty', 'eviction server candidate queue empty when topping up'),
     CacheStat('cache_eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
-    CacheStat('cache_eviction_server_evicting', 'eviction server evicting pages'),
+    CacheStat('cache_eviction_server_evict_attempt', 'evict page attempts by eviction server'),
+    CacheStat('cache_eviction_server_evict_fail', 'evict page failures by eviction server'),
+    # Note cache_eviction_server_evict_attempt - cache_eviction_server_evict_fail = evict page successes by eviction server.
     CacheStat('cache_eviction_server_skip_checkpointing_trees', 'eviction server skips trees that are being checkpointed'),
     CacheStat('cache_eviction_server_skip_dirty_pages_during_checkpoint', 'eviction server skips dirty pages during a running checkpoint'),
     CacheStat('cache_eviction_server_skip_pages_retry', 'eviction server skips pages that previously failed eviction and likely will again'),
@@ -357,7 +363,9 @@ conn_stats = [
     CacheStat('cache_eviction_walks_active', 'files with active eviction walks', 'no_clear,no_scale'),
     CacheStat('cache_eviction_walks_started', 'files with new eviction walks started'),
     CacheStat('cache_eviction_worker_created', 'eviction worker thread created'),
-    CacheStat('cache_eviction_worker_evicting', 'eviction worker thread evicting pages'),
+    CacheStat('cache_eviction_worker_evict_attempt', 'evict page attempts by eviction worker threads'),
+    CacheStat('cache_eviction_worker_evict_fail', 'evict page failures by eviction worker threads'),
+    # Note cache_eviction_worker_evict_attempt - cache_eviction_worker_evict_fail = evict page successes by eviction worker threads.
     CacheStat('cache_eviction_worker_removed', 'eviction worker thread removed'),
     CacheStat('cache_hazard_checks', 'hazard pointer check calls'),
     CacheStat('cache_hazard_max', 'hazard pointer maximum array length', 'max_aggregate,no_scale'),

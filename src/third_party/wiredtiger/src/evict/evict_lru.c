@@ -2448,6 +2448,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
     WT_TRACK_OP_DECL;
     uint64_t time_start, time_stop;
     uint32_t flags;
+    bool page_is_modified;
 
     WT_TRACK_OP_INIT(session);
 
@@ -2458,18 +2459,21 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
     time_start = 0;
 
     flags = 0;
+    page_is_modified = false;
 
     /*
      * An internal session flags either the server itself or an eviction worker thread.
      */
     if (is_server)
-        WT_STAT_CONN_INCR(session, cache_eviction_server_evicting);
+        WT_STAT_CONN_INCR(session, cache_eviction_server_evict_attempt);
     else if (F_ISSET(session, WT_SESSION_INTERNAL))
-        WT_STAT_CONN_INCR(session, cache_eviction_worker_evicting);
+        WT_STAT_CONN_INCR(session, cache_eviction_worker_evict_attempt);
     else {
-        if (__wt_page_is_modified(ref->page))
-            WT_STAT_CONN_INCR(session, cache_eviction_app_dirty);
-        WT_STAT_CONN_INCR(session, cache_eviction_app);
+        if (__wt_page_is_modified(ref->page)) {
+            page_is_modified = true;
+            WT_STAT_CONN_INCR(session, cache_eviction_app_dirty_attempt);
+        }
+        WT_STAT_CONN_INCR(session, cache_eviction_app_attempt);
         cache->app_evicts++;
         time_start = WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
     }
@@ -2492,6 +2496,19 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
         WT_STAT_CONN_INCRV(
           session, cache_eviction_app_time, WT_CLOCKDIFF_US(time_stop, time_start));
     }
+
+    if (WT_UNLIKELY(ret != 0)) {
+        if (is_server)
+            WT_STAT_CONN_INCR(session, cache_eviction_server_evict_fail);
+        else if (F_ISSET(session, WT_SESSION_INTERNAL))
+            WT_STAT_CONN_INCR(session, cache_eviction_worker_evict_fail);
+        else {
+            if (page_is_modified)
+                WT_STAT_CONN_INCR(session, cache_eviction_app_dirty_fail);
+            WT_STAT_CONN_INCR(session, cache_eviction_app_fail);
+        }
+    }
+
     WT_TRACK_OP_END(session);
     return (ret);
 }

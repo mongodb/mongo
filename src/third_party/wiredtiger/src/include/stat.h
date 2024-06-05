@@ -495,6 +495,10 @@ struct __wt_connection_stats {
     int64_t cache_bytes_write;
     int64_t cache_eviction_blocked_checkpoint;
     int64_t cache_eviction_blocked_checkpoint_hs;
+    int64_t cache_eviction_server_evict_attempt;
+    int64_t cache_eviction_worker_evict_attempt;
+    int64_t cache_eviction_server_evict_fail;
+    int64_t cache_eviction_worker_evict_fail;
     int64_t cache_eviction_get_ref;
     int64_t cache_eviction_get_ref_empty;
     int64_t cache_eviction_get_ref_empty2;
@@ -509,7 +513,6 @@ struct __wt_connection_stats {
     int64_t cache_eviction_walk_passes;
     int64_t cache_eviction_queue_empty;
     int64_t cache_eviction_queue_not_empty;
-    int64_t cache_eviction_server_evicting;
     int64_t cache_eviction_server_skip_dirty_pages_during_checkpoint;
     int64_t cache_eviction_server_skip_intl_page_with_active_child;
     int64_t cache_eviction_server_skip_metatdata_with_history;
@@ -547,7 +550,6 @@ struct __wt_connection_stats {
     int64_t cache_eviction_walk_saved_pos;
     int64_t cache_eviction_active_workers;
     int64_t cache_eviction_worker_created;
-    int64_t cache_eviction_worker_evicting;
     int64_t cache_eviction_worker_removed;
     int64_t cache_eviction_stable_state_workers;
     int64_t cache_eviction_walks_active;
@@ -602,17 +604,19 @@ struct __wt_connection_stats {
     int64_t cache_bytes_max;
     int64_t cache_eviction_maximum_milliseconds;
     int64_t cache_eviction_maximum_page_size;
+    int64_t cache_eviction_app_dirty_attempt;
+    int64_t cache_eviction_app_dirty_fail;
     int64_t cache_eviction_dirty;
-    int64_t cache_eviction_app_dirty;
     int64_t cache_eviction_blocked_multi_block_reconcilation_during_checkpoint;
     int64_t cache_timed_out_ops;
     int64_t cache_eviction_blocked_overflow_keys;
     int64_t cache_read_overflow;
+    int64_t cache_eviction_app_attempt;
+    int64_t cache_eviction_app_fail;
     int64_t cache_eviction_deepen;
     int64_t cache_write_hs;
     int64_t cache_eviction_consider_prefetch;
     int64_t cache_pages_inuse;
-    int64_t cache_eviction_app;
     int64_t cache_eviction_pages_in_parallel_with_checkpoint;
     int64_t cache_eviction_pages_queued;
     int64_t cache_eviction_pages_queued_post_lru;
