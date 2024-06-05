@@ -329,7 +329,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             *out = WorkingSet::INVALID_ID;
         });
     if (restoreStateRet != PlanStage::NEED_TIME) {
-        return ret;
+        return restoreStateRet;
     }
 
     if (_params->returnDeleted) {
