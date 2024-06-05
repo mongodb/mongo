@@ -77,7 +77,6 @@ variables:
     - name: misc_workloads
     - name: mongos_large_catalog_workloads
     - name: mongos_workloads
-      cron: *high-value-workload-cron
     - name: move_chunk_workloads
       cron: *high-value-workload-cron
     - name: smoke_test
@@ -86,6 +85,7 @@ variables:
     - name: tsbs_query_sharded
     - name: tsbs_query_sharded_balancer
     - name: ycsb.2023-09
+      cron: *high-value-workload-cron
     - name: ycsb_read_concern_available.2023-09
     - name: ycsb_single_thread
     - name: ycsb_w1.2023-09
