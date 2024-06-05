@@ -33,8 +33,9 @@
 
 namespace mongo::boolean_simplification {
 namespace {
-std::unique_ptr<MatchExpression> buildOrOfLeafs(int value) {
-    auto operand = BSON("$eq" << value);
+std::unique_ptr<MatchExpression> buildOrOfLeafs(int value, std::vector<BSONObj>& bsonObjs) {
+    BSONObj operand = BSON("$eq" << value);
+    bsonObjs.push_back(operand);
     auto expr = std::make_unique<OrMatchExpression>();
     expr->add(std::make_unique<EqualityMatchExpression>("a"_sd, operand["$eq"]));
     expr->add(std::make_unique<EqualityMatchExpression>("b"_sd, operand["$eq"]));
@@ -42,10 +43,12 @@ std::unique_ptr<MatchExpression> buildOrOfLeafs(int value) {
     return expr;
 }
 
-std::unique_ptr<MatchExpression> buildAndOfOrs(int startValue, int endValue) {
+std::unique_ptr<MatchExpression> buildAndOfOrs(int startValue,
+                                               int endValue,
+                                               std::vector<BSONObj>& bsonObj) {
     auto expr = std::make_unique<AndMatchExpression>();
     for (int value = startValue; value < endValue; ++value) {
-        expr->add(buildOrOfLeafs(value));
+        expr->add(buildOrOfLeafs(value, bsonObj));
     }
     return expr;
 }
@@ -235,9 +238,10 @@ BENCHMARK_TEMPLATE(matchExpressionOptimize_simpleOr, EnableSimplifier);
 template <typename SimplifierStatus>
 void matchExpressionOptimize_mediumComplex(benchmark::State& state) {
     auto expr = std::make_unique<AndMatchExpression>();
-    expr->add(buildAndOfOrs(0, 3));
-    expr->add(buildAndOfOrs(3, 6));
-    expr->add(buildAndOfOrs(6, 9));
+    std::vector<BSONObj> bsonObjs;
+    expr->add(buildAndOfOrs(0, 3, bsonObjs));
+    expr->add(buildAndOfOrs(3, 6, bsonObjs));
+    expr->add(buildAndOfOrs(6, 9, bsonObjs));
 
     for (auto _ : state) {
         benchmark::DoNotOptimize(MatchExpression::optimize(
@@ -254,15 +258,18 @@ BENCHMARK_TEMPLATE(matchExpressionOptimize_mediumComplex, EnableSimplifier);
 template <typename SimplifierStatus>
 void matchExpressionOptimize_maxComplex(benchmark::State& state) {
     auto expr = std::make_unique<AndMatchExpression>();
+    std::vector<BSONObj> bsonObjs;
     {
         auto orExpr = std::make_unique<OrMatchExpression>();
-        orExpr->add(buildAndOfOrs(0, 3));
-        orExpr->add(buildAndOfOrs(3, 6));
-        orExpr->add(buildAndOfOrs(6, 9));
+        orExpr->add(buildAndOfOrs(0, 3, bsonObjs));
+        orExpr->add(buildAndOfOrs(3, 6, bsonObjs));
+        orExpr->add(buildAndOfOrs(6, 9, bsonObjs));
         expr->add(std::move(orExpr));
     }
+
     {
         auto operand = BSON("$gt" << 0);
+        bsonObjs.push_back(operand);
         auto orExpr = std::make_unique<OrMatchExpression>();
         orExpr->add(std::make_unique<GTMatchExpression>("a"_sd, operand["$gt"]));
         orExpr->add(std::make_unique<GTMatchExpression>("b"_sd, operand["$gt"]));
@@ -287,19 +294,20 @@ BENCHMARK_TEMPLATE(matchExpressionOptimize_maxComplex, EnableSimplifier);
  */
 template <typename SimplifierStatus>
 void matchExpressionOptimize_overComplex(benchmark::State& state) {
+    std::vector<BSONObj> bsonObjs;
     auto expr = std::make_unique<AndMatchExpression>();
     {
         auto orExpr = std::make_unique<OrMatchExpression>();
-        orExpr->add(buildAndOfOrs(0, 3));
-        orExpr->add(buildAndOfOrs(3, 6));
-        orExpr->add(buildAndOfOrs(6, 9));
+        orExpr->add(buildAndOfOrs(0, 3, bsonObjs));
+        orExpr->add(buildAndOfOrs(3, 6, bsonObjs));
+        orExpr->add(buildAndOfOrs(6, 9, bsonObjs));
         expr->add(std::move(orExpr));
     }
     {
         auto orExpr = std::make_unique<OrMatchExpression>();
-        orExpr->add(buildAndOfOrs(9, 12));
-        orExpr->add(buildAndOfOrs(12, 15));
-        orExpr->add(buildAndOfOrs(15, 18));
+        orExpr->add(buildAndOfOrs(9, 12, bsonObjs));
+        orExpr->add(buildAndOfOrs(12, 15, bsonObjs));
+        orExpr->add(buildAndOfOrs(15, 18, bsonObjs));
         expr->add(std::move(orExpr));
     }
 
