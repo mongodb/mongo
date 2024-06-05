@@ -67,6 +67,39 @@ class IndexDescriptor;
 struct InsertDeleteOptions;
 
 /**
+ * Special kind of 'IndexCatalogEntryContainer' just for the "ready" indexes maintained by
+ * 'IndexCatalogImpl'. The purpose of this class is to allow for fast access to the ready _id index.
+ */
+class ReadyIndexCatalogEntryContainer : public IndexCatalogEntryContainer {
+public:
+    std::shared_ptr<const IndexCatalogEntry> release(const IndexDescriptor* desc) override {
+        if (auto released = IndexCatalogEntryContainer::release(desc)) {
+            // Some operations can drop the _id index, such as collection truncation or re-indexing.
+            if (desc->isIdIndex()) {
+                _cachedIdIndex = nullptr;
+            }
+            return released;
+        }
+        return nullptr;
+    }
+
+    void add(std::shared_ptr<const IndexCatalogEntry>&& entry) override {
+        if (entry->descriptor()->isIdIndex()) {
+            _cachedIdIndex = entry->descriptor();
+        }
+        IndexCatalogEntryContainer::add(std::move(entry));
+    }
+
+    const IndexDescriptor* getIdIndex() const {
+        return _cachedIdIndex;
+    }
+
+private:
+    // Pointer to the ready _id index, if it exists. Should be kept in sync with _entries.
+    const IndexDescriptor* _cachedIdIndex{nullptr};
+};
+
+/**
  * IndexCatalogImpl is stored as a member of CollectionImpl. When the Collection is cloned this is
  * cloned with it by making shallow copies of the contained IndexCatalogEntry. The IndexCatalogEntry
  * instances are shared across multiple Collection instances.
@@ -368,7 +401,7 @@ private:
      */
     IndexCatalogEntry* _getWritableEntry(const IndexDescriptor* descriptor);
 
-    IndexCatalogEntryContainer _readyIndexes;
+    ReadyIndexCatalogEntryContainer _readyIndexes;
     IndexCatalogEntryContainer _buildingIndexes;
     IndexCatalogEntryContainer _frozenIndexes;
 };

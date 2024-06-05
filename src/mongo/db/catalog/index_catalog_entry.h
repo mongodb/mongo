@@ -210,13 +210,13 @@ public:
     /**
      * Removes from _entries and returns the matching entry or NULL if none matches.
      */
-    std::shared_ptr<const IndexCatalogEntry> release(const IndexDescriptor* desc);
+    virtual std::shared_ptr<const IndexCatalogEntry> release(const IndexDescriptor* desc);
 
     bool remove(const IndexDescriptor* desc) {
         return static_cast<bool>(release(desc));
     }
 
-    void add(std::shared_ptr<const IndexCatalogEntry>&& entry) {
+    virtual void add(std::shared_ptr<const IndexCatalogEntry>&& entry) {
         _entries.push_back(std::move(entry));
     }
 
