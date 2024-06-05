@@ -7,6 +7,8 @@
 // and 'B' will be seen in the changestream before 'C'.
 // @tags: [
 //   does_not_support_stepdowns,
+//   # This test is flaky when running on PPC64 variants.
+//   ppc64le_incompatible,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
