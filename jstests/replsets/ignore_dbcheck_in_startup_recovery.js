@@ -89,8 +89,6 @@ secondary = replSet.start(secondary,
 
 primary = replSet.getPrimary();
 
-replSet.awaitReplication();
-
 const primaryHealthLog = primary.getDB("local").system.healthlog;
 const secondaryHealthLog = secondary.getDB("local").system.healthlog;
 
