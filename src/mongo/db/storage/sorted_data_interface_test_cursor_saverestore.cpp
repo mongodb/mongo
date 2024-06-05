@@ -94,10 +94,16 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursor) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
             cursor->save();
+            cursor->save();  // It is legal to save twice in a row.
             cursor->restore();
         }
         ASSERT(!cursor->next());
         ASSERT_EQ(i, nToInsert);
+
+        cursor->save();
+        cursor->save();  // It is legal to save twice in a row.
+        cursor->restore();
+        ASSERT(!cursor->next());
     }
 }
 
