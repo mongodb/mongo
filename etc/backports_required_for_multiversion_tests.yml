@@ -39,6 +39,8 @@ last-continuous:
     ticket: SERVER-56887
   - test_file: jstests/sharding/resharding_histogram_metrics.js
     ticket: SERVER-57700
+  - test_file: jstests/core/elemmatch_index.js
+    ticket: SERVER-90747
   - test_file: jstests/sharding/write_commands_read_concern_validation.js
     ticket: SERVER-58176
   - test_file: jstests/replsets/write_concern_write_to_local.js
@@ -254,6 +256,8 @@ last-lts:
     ticket: SERVER-57321
   - test_file: jstests/sharding/resharding_histogram_metrics.js
     ticket: SERVER-57700
+  - test_file: jstests/core/elemmatch_index.js
+    ticket: SERVER-90747
   - test_file: jstests/sharding/rewrite_state_change_errors.js
     ticket: SERVER-57772
   - test_file: jstests/sharding/write_commands_read_concern_validation.js
