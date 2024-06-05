@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/stats/counters.h"
 
 namespace mongo {
@@ -171,7 +172,7 @@ void GroupProcessor::add(const Value& groupKey, const Document& root) {
         }
     }
 
-    if (shouldSpillWithAttemptToSaveMemory() || shouldSpillForDebugBuild(inserted)) {
+    if (shouldSpillWithAttemptToSaveMemory() || shouldSpillOnEveryDuplicateId(inserted)) {
         spill();
     }
 }
@@ -227,9 +228,10 @@ bool GroupProcessor::shouldSpillWithAttemptToSaveMemory() {
     return false;
 }
 
-bool GroupProcessor::shouldSpillForDebugBuild(bool isNewGroup) {
-    // In debug mode, spill every time we have a duplicate id to stress merge logic.
-    return (kDebugBuild && !_expCtx->opCtx->readOnly() && !isNewGroup &&  // is not a new group
+bool GroupProcessor::shouldSpillOnEveryDuplicateId(bool isNewGroup) {
+    // Spill every time we have a duplicate id to stress merge logic.
+    return (internalQueryEnableAggressiveSpillsInGroup && !_expCtx->opCtx->readOnly() &&
+            !isNewGroup &&                    // is not a new group
             !_expCtx->inMongos &&             // can't spill to disk in mongos
             _memoryTracker.allowDiskUse() &&  // never spill when disk use is explicitly prohibited
             _sortedFiles.size() < 20);

@@ -98,6 +98,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=requires_http_client
         --enableEnterpriseTests=off
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       compile_variant: *linux_x86_dynamic_debug_wtdevelop_compile_variant_name
     tasks:
       - name: .aggregation !.encrypt !.feature_flag_guarded

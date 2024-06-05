@@ -425,7 +425,9 @@ buildvariants:
       - rhel82-arm64-large
     stepback: false
     expansions:
-      test_flags: --excludeWithAnyTags=requires_latch_analyzer
+      test_flags: >-
+        --excludeWithAnyTags=requires_latch_analyzer
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       compile_flags: >-
         --ssl
         --dbg=on

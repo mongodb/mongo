@@ -137,6 +137,8 @@ buildvariants:
     expansions:
       <<: *enterprise-rhel-80-64-bit-dynamic-expansions
       compile_variant: *enterprise-rhel-80-64-bit-dynamic-debug-mode
+      test_flags: >-
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=rhel80
@@ -227,6 +229,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_windows_tls
         --enableEnterpriseTests=off
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       compile_variant: *windows-debug-suggested
     tasks:
       - name: compile_test_serial_TG
@@ -277,6 +280,7 @@ buildvariants:
       scons_cache_scope: shared
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_windows_tls
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     tasks:
       # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
       # It has a minimal amount of tasks because unoptimized builds are slow, which causes
@@ -306,6 +310,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_macos
         --enableEnterpriseTests=off
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       resmoke_jobs_max: 6
       compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
       compile_flags: >-
@@ -338,7 +343,9 @@ buildvariants:
       - macos-1100
     expansions:
       compile_variant: *enterprise-macos
-      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
+      test_flags: >-
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --excludeWithAnyTags=incompatible_with_macos,requires_gcm
       compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
       compile_flags: >-
         --ssl
@@ -396,6 +403,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible
         --runAllFeatureFlagTests
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       multiversion_platform: rhel80
       multiversion_edition: enterprise
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under UBSAN build.
@@ -422,6 +430,7 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_aubsan
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
@@ -454,6 +463,7 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_aubsan
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     tasks:
       - name: .multiversion_fuzzer
       - name: .multiversion_passthrough
@@ -483,6 +493,7 @@ buildvariants:
       test_flags: >-
         --benchmarkRepetitions=1
         --excludeWithAnyTags=incompatible_aubsan
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       compile_variant: *rhel80-debug-aubsan-benchmarks
     tasks:
       - name: compile_upload_benchmarks_TG
