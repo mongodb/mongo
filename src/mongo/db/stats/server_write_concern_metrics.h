@@ -127,6 +127,10 @@ private:
 
         // Count of operations without an explicit writeConcern with "w" value.
         std::uint64_t notExplicitWCount = 0;
+
+        // Count of operations with explicit write concern { "w" : majority, "j" : false }
+        // overridden to "j" : true.
+        std::uint64_t majorityJFalseOverriddenCount = 0;
     };
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerWriteConcernMetrics::_mutex");

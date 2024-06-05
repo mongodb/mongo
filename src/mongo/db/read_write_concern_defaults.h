@@ -128,7 +128,8 @@ public:
      * Checks if the given RWC is suitable to use as a default, and uasserts if not.
      */
     static void checkSuitabilityAsDefault(const ReadConcern& rc);
-    static void checkSuitabilityAsDefault(const WriteConcern& wc);
+    static void checkSuitabilityAsDefault(const WriteConcern& wc,
+                                          bool writeConcernMajorityShouldJournal);
 
     /**
      * Examines a document key affected by a write to config.settings and will register a WUOW

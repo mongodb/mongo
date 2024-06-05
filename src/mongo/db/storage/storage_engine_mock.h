@@ -50,7 +50,7 @@ public:
     bool supportsCheckpoints() const final {
         return false;
     }
-    bool isEphemeral() const final {
+    bool isEphemeral() const override {
         return true;
     }
     void loadCatalog(OperationContext* opCtx,

@@ -6116,7 +6116,7 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(const CommonRequestArgs& re
 
 bool ReplicationCoordinatorImpl::getWriteConcernMajorityShouldJournal() {
     stdx::unique_lock lock(_mutex);
-    return _rsConfig.getConfig(lock).getWriteConcernMajorityShouldJournal();
+    return getWriteConcernMajorityShouldJournal_inlock(lock);
 }
 
 bool ReplicationCoordinatorImpl::getWriteConcernMajorityShouldJournal_inlock(WithLock lk) const {

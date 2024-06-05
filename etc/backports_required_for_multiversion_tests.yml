@@ -667,6 +667,8 @@ last-continuous:
     ticket: SERVER-90157
   - test_file: jstests/sharding/database_versioning_all_commands.js
     ticket: SERVER-90092
+  - test_file: jstests/replsets/majority_writes_wait_for_all_durable_timestamp.js
+    ticket: SERVER-86685
   suites: null
 last-lts:
   all:
@@ -1390,4 +1392,6 @@ last-lts:
     ticket: SERVER-90157
   - test_file: jstests/sharding/database_versioning_all_commands.js
     ticket: SERVER-90092
+  - test_file: jstests/replsets/majority_writes_wait_for_all_durable_timestamp.js
+    ticket: SERVER-86685
   suites: null
