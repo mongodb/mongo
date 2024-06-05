@@ -33,9 +33,20 @@
 #include <algorithm>
 #include <ostream>
 #include <utility>
+#include <version>
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/stream_utils.h"
+
+#ifdef __has_include
+#if __has_include(<memory_resource>)
+#include <memory_resource>
+#endif
+#endif  // __has_include
+
+#if __cpp_lib_memory_resource >= 201603L
+#define MONGO_QUERY_BITSET_ALGEBRA_HAVE_MEMORY_RESOURCE
+#endif
 
 namespace mongo::boolean_simplification {
 void BitsetTerm::flip() {
@@ -73,28 +84,78 @@ std::string Maxterm::toString() const {
     return oss.str();
 }
 
-void Maxterm::removeRedundancies() {
-    std::sort(minterms.begin(), minterms.end(), [](const auto& lhs, const auto& rhs) {
-        return lhs.mask.count() < rhs.mask.count();
-    });
+namespace {
+struct VectorFactory {
+#if defined(MONGO_QUERY_BITSET_ALGEBRA_HAVE_MEMORY_RESOURCE)
+    static constexpr size_t maxPmrStackElements = 256;
+    static constexpr size_t bufSize = maxPmrStackElements * (2 * sizeof(size_t) + 1) * 2;
 
-    std::vector<Minterm> newMinterms{};
-    newMinterms.reserve(minterms.size());
-
-    for (auto&& minterm : minterms) {
-        bool absorbed = false;
-        for (const auto& seenMinterm : newMinterms) {
-            if (seenMinterm.canAbsorb(minterm)) {
-                absorbed = true;
-                break;
-            }
-        }
-        if (!absorbed) {
-            newMinterms.emplace_back(std::move(minterm));
-        }
+    template <typename T>
+    auto make(size_t reserve) {
+        using A = std::pmr::polymorphic_allocator<T>;
+        std::vector<T, A> ret{A{&_mono}};
+        ret.reserve(reserve);
+        return ret;
     }
 
-    minterms.swap(newMinterms);
+    alignas(std::max_align_t) std::array<std::byte, bufSize> _buf;
+    std::pmr::monotonic_buffer_resource _mono{_buf.data(), _buf.size()};
+#else   // !MONGO_QUERY_BITSET_ALGEBRA_HAVE_MEMORY_RESOURCE
+    template <typename T>
+    auto make(size_t reserve) {
+        std::vector<T> ret;
+        ret.reserve(reserve);
+        return ret;
+    }
+#endif  // !MONGO_QUERY_BITSET_ALGEBRA_HAVE_MEMORY_RESOURCE
+};
+}  // namespace
+
+void Maxterm::removeRedundancies() {
+    VectorFactory factory{};
+    auto perm = factory.make<size_t>(minterms.size());
+    for (size_t i = 0; i != minterms.size(); ++i)
+        perm.push_back(i);
+
+    // Presort perms by population of corresponding masks to bias this N^2 dedupe algorithm.
+    // The counts are memoized to avoid redundant calculation.
+    {
+        auto memo = factory.make<size_t>(minterms.size());
+        for (auto&& m : minterms)
+            memo.push_back(m.mask.count());
+        std::sort(perm.begin(), perm.end(), [&](auto a, auto b) { return memo[a] < memo[b]; });
+    }
+
+    // Implement absorptions by cheaply modifying `perm`.
+    {
+        size_t wIdx = 0;  // survivors
+        for (size_t rIdx = 0; rIdx != perm.size(); ++rIdx) {
+            auto&& candidate = minterms[perm[rIdx]];
+            if (std::none_of(perm.begin(), perm.begin() + wIdx, [&](auto pos) {
+                    return minterms[pos].canAbsorb(candidate);
+                }))
+                perm[wIdx++] = perm[rIdx];  // Unabsorbed: survivor!
+        }
+        perm.erase(perm.begin() + wIdx, perm.end());
+    }
+
+    auto survives = factory.make<unsigned char>(minterms.size());
+    survives.assign(minterms.size(), false);
+    for (auto&& pos : perm)
+        survives[pos] = true;
+
+    {
+        size_t wIdx = 0;
+        for (size_t rIdx = 0; rIdx != minterms.size(); ++rIdx) {
+            if (survives[rIdx]) {
+                if (wIdx != rIdx)
+                    minterms[wIdx] = std::move(minterms[rIdx]);
+                ++wIdx;
+            }
+        }
+        minterms.erase(minterms.begin() + wIdx, minterms.end());
+    }
+    minterms.shrink_to_fit();
 }
 
 void Maxterm::append(size_t bitIndex, bool val) {

@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#define NDEBUG 1
+#include "mongo/util/dynamic_bitset.h"
 
 #include <benchmark/benchmark.h>
 #include <bitset>
 #include <boost/dynamic_bitset.hpp>
-
-#include "mongo/util/dynamic_bitset.h"
 
 namespace mongo::boolean_simplification {
 
@@ -44,6 +42,14 @@ namespace mongo::boolean_simplification {
  * - std::bitset
  */
 
+void benchOp(benchmark::State& state, auto op, auto&&... a) {
+    for (auto _ : state) {
+        (benchmark::DoNotOptimize(&a), ...);
+        auto&& r = op(a...);
+        benchmark::DoNotOptimize(&r);
+    }
+}
+
 /**
  * Logical AND of DynamicBitset: a & b.
  */
@@ -51,10 +57,8 @@ template <size_t NumberOfBlocks, size_t BitsetSize>
 void implMongoBitset_And(benchmark::State& state) {
     DynamicBitset<size_t, NumberOfBlocks> lhs(BitsetSize);
     DynamicBitset<size_t, NumberOfBlocks> rhs(BitsetSize);
-
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(lhs & rhs);
-    }
+    benchOp(
+        state, [](auto&& a, auto&& b) { return a & b; }, lhs, rhs);
 }
 
 /**
@@ -64,10 +68,8 @@ template <size_t BitsetSize>
 void implBoostBitset_And(benchmark::State& state) {
     boost::dynamic_bitset<size_t> lhs(BitsetSize);
     boost::dynamic_bitset<size_t> rhs(BitsetSize);
-
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(lhs & rhs);
-    }
+    benchOp(
+        state, [](auto&& a, auto&& b) { return a & b; }, lhs, rhs);
 }
 
 /**
@@ -77,20 +79,32 @@ template <size_t BitsetSize>
 void implStdBitset_And(benchmark::State& state) {
     std::bitset<BitsetSize> lhs;
     std::bitset<BitsetSize> rhs;
-
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(lhs & rhs);
-    }
+    benchOp(
+        state, [](auto&& a, auto&& b) { return a & b; }, lhs, rhs);
 }
 
 template <typename intType>
 void implInt_And(benchmark::State& state) {
     intType lhs{0};
     intType rhs{0};
+    benchOp(
+        state, [](auto&& a, auto&& b) { return a & b; }, lhs, rhs);
+}
 
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(lhs & rhs);
-    }
+template <size_t NumberOfBlocks, size_t BitsetSize>
+void implMongoBitset_AndEq(benchmark::State& state) {
+    DynamicBitset<size_t, NumberOfBlocks> lhs(BitsetSize);
+    DynamicBitset<size_t, NumberOfBlocks> rhs(BitsetSize);
+    benchOp(
+        state, [](auto&& a, auto&& b) -> decltype(auto) { return a &= b; }, lhs, rhs);
+}
+
+template <size_t BitsetSize>
+void implStdBitset_AndEq(benchmark::State& state) {
+    std::bitset<BitsetSize> lhs;
+    std::bitset<BitsetSize> rhs;
+    benchOp(
+        state, [](auto&& a, auto&& b) -> decltype(auto) { return a &= b; }, lhs, rhs);
 }
 
 /**
@@ -99,10 +113,8 @@ void implInt_And(benchmark::State& state) {
 template <size_t BitsetSize>
 void implBoostBitset_Count(benchmark::State& state) {
     boost::dynamic_bitset<size_t> bitset(BitsetSize);
-
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(bitset.count());
-    }
+    benchOp(
+        state, [](auto&& a) { return a.count(); }, bitset);
 }
 
 /**
@@ -111,19 +123,15 @@ void implBoostBitset_Count(benchmark::State& state) {
 template <size_t BitsetSize>
 void implStdBitset_Count(benchmark::State& state) {
     std::bitset<BitsetSize> bitset;
-
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(bitset.count());
-    }
+    benchOp(
+        state, [](auto&& a) { return a.count(); }, bitset);
 }
 
 template <size_t NumberOfBlocks, size_t BitsetSize>
 void implMongoBitset_Count(benchmark::State& state) {
     DynamicBitset<size_t, NumberOfBlocks> bitset{BitsetSize};
-
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(bitset.count());
-    }
+    benchOp(
+        state, [](auto&& a) { return a.count(); }, bitset);
 }
 
 /**
@@ -134,10 +142,8 @@ void implBoostBitset_EqualityAnd(benchmark::State& state) {
     boost::dynamic_bitset<size_t> lhs(BitsetSize);
     boost::dynamic_bitset<size_t> rhs(BitsetSize);
     boost::dynamic_bitset<size_t> eq{BitsetSize};
-
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(eq == (lhs & rhs));
-    }
+    benchOp(
+        state, [](auto&& a, auto&& b, auto&& eq) { return eq == (a & b); }, lhs, rhs, eq);
 }
 
 /**
@@ -148,10 +154,8 @@ void implStdBitset_EqualityAnd(benchmark::State& state) {
     std::bitset<BitsetSize> lhs{11};
     std::bitset<BitsetSize> rhs{17};
     std::bitset<BitsetSize> eq{23};
-
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(eq == (lhs & rhs));
-    }
+    benchOp(
+        state, [](auto&& a, auto&& b, auto&& eq) { return eq == (a & b); }, lhs, rhs, eq);
 }
 
 template <size_t NumberOfBlocks, size_t BitsetSize>
@@ -159,10 +163,8 @@ void implMongoBitset_EqualityAnd(benchmark::State& state) {
     DynamicBitset<size_t, NumberOfBlocks> lhs(BitsetSize);
     DynamicBitset<size_t, NumberOfBlocks> rhs(BitsetSize);
     DynamicBitset<size_t, NumberOfBlocks> eq(BitsetSize);
-
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(eq == (lhs & rhs));
-    }
+    benchOp(
+        state, [](auto&& a, auto&& b, auto&& eq) { return eq == (a & b); }, lhs, rhs, eq);
 }
 
 template <size_t BitsetSize>
@@ -382,11 +384,16 @@ BENCHMARK_TEMPLATE(implStdBitset_And, 256);
 BENCHMARK_TEMPLATE(implMongoBitset_And, 1, 256);
 BENCHMARK_TEMPLATE(implMongoBitset_And, 2, 256);
 BENCHMARK_TEMPLATE(implMongoBitset_And, 3, 256);
+BENCHMARK_TEMPLATE(implMongoBitset_And, 4, 256);  // This fits
 BENCHMARK_TEMPLATE(implBoostBitset_And, 256);
 BENCHMARK_TEMPLATE(implStdBitset_And, 512);
 BENCHMARK_TEMPLATE(implMongoBitset_And, 1, 512);
 BENCHMARK_TEMPLATE(implMongoBitset_And, 2, 512);
 BENCHMARK_TEMPLATE(implBoostBitset_And, 512);
+
+BENCHMARK_TEMPLATE(implStdBitset_AndEq, 64);
+BENCHMARK_TEMPLATE(implMongoBitset_AndEq, 1, 64);
+BENCHMARK_TEMPLATE(implMongoBitset_AndEq, 2, 64);
 
 BENCHMARK_TEMPLATE(implBoostBitset_Count, 64);
 BENCHMARK_TEMPLATE(implStdBitset_Count, 64);

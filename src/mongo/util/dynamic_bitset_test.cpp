@@ -192,7 +192,7 @@ TEST(DynamicBitsetTests, isEqualToMasked) {
 }
 
 TEST(DynamicBitsetTests, FindFirst) {
-    ASSERT_EQ(Bitset::kNpos, Bitset("0000000000").findFirst());
+    ASSERT_EQ(Bitset::npos, Bitset("0000000000").findFirst());
     ASSERT_EQ(0, Bitset("0000000001").findFirst());
     ASSERT_EQ(9, Bitset("1000000000").findFirst());
     ASSERT_EQ(4, Bitset("1000010000").findFirst());
@@ -208,7 +208,7 @@ TEST(DynamicBitsetTests, FindNext) {
     ASSERT_EQ(10, Bitset("10001010010010101").findNext(7));
     ASSERT_EQ(12, Bitset("10001010010010101").findNext(10));
     ASSERT_EQ(16, Bitset("10001010010010101").findNext(12));
-    ASSERT_EQ(Bitset::kNpos, Bitset("10001010010010101").findNext(16));
+    ASSERT_EQ(Bitset::npos, Bitset("10001010010010101").findNext(16));
 }
 
 TEST(DynamicBitsetTests, FindAllSetBits) {
