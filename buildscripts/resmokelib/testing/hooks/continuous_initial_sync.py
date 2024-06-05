@@ -537,14 +537,28 @@ class _InitialSyncThread(threading.Thread):
         client_conn = fixture.get_driver_connection_url()
         # maxTimeMS: 0 below means don't time out.
         js_cmds = """
+            const timeoutMs = 10 * 60 * 1000; // 10 minutes
+            const retryIntervalMs = 10 * 1000; // 10 seconds
             const conn = '{}';
+            const rst = new ReplSetTest(conn);
+            var res = {{}};
             try {{
-                const rst = new ReplSetTest(conn);
-                assert.commandWorked(rst.getPrimary().getDB("admin").runCommand({{appendOplogNote: 1, data: {{a: 2}}, maxTimeMS: 0}}));
-                rst.awaitReplication();
+                res = rst.getPrimary(timeoutMs, retryIntervalMs).getDB("admin").runCommand({{appendOplogNote: 1, data: {{a: 2}}, maxTimeMS: 0}});
             }} catch (e) {{
-                jsTestLog("WaitForReplication got error: " + tojson(e));
+                jsTestLog("appendOplogNote failed with error: " + e);
                 throw e;
+            }}
+            const passed = res.hasOwnProperty("ok") && res["ok"] == 1;
+            if (passed) {{
+                try {{
+                    rst.awaitReplication();
+                }} catch (e) {{
+                    jsTestLog("WaitForReplication got error: " + tojson(e));
+                    throw e;
+                }}
+            }} else {{
+                jsTestLog(res);
+                throw new Error("Failed to appendOplogNote");
             }}"""
         shell_options = {"nodb": "", "eval": js_cmds.format(client_conn)}
         shell_proc = core.programs.mongo_shell_program(
