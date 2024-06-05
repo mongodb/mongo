@@ -446,5 +446,55 @@ TEST(BSONElementTryCoeceToLongLongTest, CoerceFails) {
         ASSERT_NOT_OK(result) << " for input document " << testCase.toString();
     }
 }
+
+TEST(BSONElement, ArrayToVectorFunctionsBehaveCorrectlyWithValidArray) {
+    // Create a valid array by creating a BSONObj with contiguous array indexes that is then
+    // passed to the BSONArray ctor.
+    BSONObj updateArrAsObj = BSON("0"
+                                  << "foo"
+                                  << "1"
+                                  << "bar");
+    BSONArray updateArr(updateArrAsObj);
+    BSONObj parentObj = BSON("arr" << updateArr);
+    auto arrElem = parentObj.getField("arr");
+
+    // Both 'Array()' and 'ArrayVerifyIndexes()' will not throw, and instead create vectors of
+    // size 2.
+    auto elementVector = arrElem.Array();
+    ASSERT_EQ(elementVector.size(), 2);
+    ASSERT(elementVector[0].binaryEqual(updateArrAsObj.getField("0")));
+    ASSERT(elementVector[1].binaryEqual(updateArrAsObj.getField("1")));
+
+    auto verifiedVector = arrElem.ArrayVerifyIndexes();
+    ASSERT_EQ(verifiedVector.size(), 2);
+
+    // The two vectors should have the same elements.
+    ASSERT(elementVector[0].binaryEqual(verifiedVector[0]));
+    ASSERT(elementVector[1].binaryEqual(verifiedVector[1]));
+}
+
+TEST(BSONElement, ArrayVerifyIndexesThrowsOnInvalidArrayIndexes) {
+    // Create our invalid array by creating a BSONObj with non contiguous array indexes that is then
+    // passed to the BSONArray ctor.
+    BSONObj updateArrAsObj = BSON("0"
+                                  << "foo"
+                                  << "2"
+                                  << "bar");
+    BSONArray updateArr(updateArrAsObj);
+    BSONObj parentObj = BSON("badArray" << updateArr);
+    auto arrElem = parentObj.getField("badArray");
+
+    // The regular 'Array()' will not throw, and instead create an EOO BSONElement at index 1.
+    auto elementVector = arrElem.Array();
+    ASSERT_EQ(elementVector.size(), 3);
+
+    ASSERT(elementVector[0].binaryEqual(updateArrAsObj.getField("0")));
+    ASSERT(elementVector[1].binaryEqual(BSONElement()));
+    ASSERT(elementVector[2].binaryEqual(updateArrAsObj.getField("2")));
+
+    // 'ArrayVerifyIndexes()', on the other hand, will throw.
+    ASSERT_THROWS(arrElem.ArrayVerifyIndexes(), ExceptionFor<ErrorCodes::BadValue>);
+}
+
 }  // namespace
 }  // namespace mongo

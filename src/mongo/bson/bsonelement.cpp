@@ -45,6 +45,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/decimal_counter.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/scopeguard.h"
@@ -447,6 +448,7 @@ int BSONElement::compareElements(const BSONElement& l,
     */
 std::vector<BSONElement> BSONElement::Array() const {
     chk(mongo::Array);
+
     std::vector<BSONElement> v;
     BSONObjIterator i(Obj());
     while (i.more()) {
@@ -463,6 +465,23 @@ std::vector<BSONElement> BSONElement::Array() const {
         } else {
             // ignore?
         }
+    }
+    return v;
+}
+
+std::vector<BSONElement> BSONElement::ArrayVerifyIndexes() const {
+    chk(mongo::Array);
+
+    std::vector<BSONElement> v;
+    DecimalCounter<std::uint32_t> counter(0);
+    for (auto element : Obj()) {
+        auto fieldName = element.fieldNameStringData();
+        uassert(ErrorCodes::BadValue,
+                fmt::format(
+                    "Invalid array index field name: \"{}\", expected \"{}\"", fieldName, counter),
+                fieldName == counter);
+        counter++;
+        v.push_back(element);
     }
     return v;
 }
