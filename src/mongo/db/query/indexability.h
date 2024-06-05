@@ -136,6 +136,20 @@ public:
     }
 
     /**
+     * Returns true if 'me' is ELEM_MATCH_OBJECT and has non-empty path component.
+     *
+     * Note: we skip empty path components since they are not allowed in index key patterns.
+     * Therefore, $elemMatch with an empty path component can never use an index.
+     *
+     * Example: {"": {$elemMatch: {a: "hi", b: "bye"}}.
+     * In this case the predicate cannot use any indexes since the $elemMatch is with an empty path
+     * component.
+     */
+    static bool isBoundsGeneratingElemMatchObject(const MatchExpression* me) {
+        return arrayUsesIndexOnChildren(me) && !me->path().empty();
+    }
+
+    /**
      * Returns true if 'me' is a NOT, and the child of the NOT can use
      * an index on its own field.
      */

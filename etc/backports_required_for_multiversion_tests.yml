@@ -39,6 +39,8 @@ last-continuous:
     ticket: SERVER-51943
   - test_file: jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
     ticket: SERVER-53335
+  - test_file: jstests/core/index/elemmatch_index.js
+    ticket: SERVER-90747
   - test_file: jstests/sharding/migration_server_status.js
     ticket: SERVER-56186
   - test_file: jstests/sharding/cwwc_conflict_add_shard.js
@@ -584,6 +586,8 @@ last-lts:
     ticket: SERVER-55305
   - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_from_vectored_inserts.js
     ticket: SERVER-55305
+  - test_file: jstests/core/index/elemmatch_index.js
+    ticket: SERVER-90747
   - test_file: jstests/sharding/migration_server_status.js
     ticket: SERVER-56186
   - test_file: jstests/sharding/time_zone_info_mongos.js
