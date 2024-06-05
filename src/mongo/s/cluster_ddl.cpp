@@ -251,10 +251,10 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
 
 void createCollectionWithRouterLoop(OperationContext* opCtx,
                                     const ShardsvrCreateCollection& request) {
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), request.getDbName());
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), request.getNamespace());
     router.route(opCtx,
                  "cluster::createCollectionWithRouterLoop",
-                 [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                 [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                      cluster::createCollection(opCtx, request);
                  });
 }
