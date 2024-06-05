@@ -820,26 +820,37 @@ int determineCollscanDirection(const CanonicalQuery& query, const QueryPlannerPa
     return QueryPlannerCommon::determineClusteredScanDirection(query, params).value_or(1);
 }
 
-std::unique_ptr<QuerySolution> buildEofOrCollscanSoln(
-    const CanonicalQuery& query,
-    bool tailable,
-    const QueryPlannerParams& params,
-    boost::optional<int> direction = boost::none) {
-    if (query.getPrimaryMatchExpression()->isTriviallyFalse()) {
-        const mongo::NamespaceString nss = query.nss();
-        const bool isOplog = nss.isOplog();
-        const bool isChangeCollection = nss.isChangeCollection();
-
-        if (!isOplog && !isChangeCollection) {
-            // Return EOF solution for trivially false expressions.
-            // Unless the query is against Oplog (change streams) or change collections (serverless
-            // change streams) because in such cases we still need the scan to happen to advance the
-            // visibility timestamp and resume token.
-            auto soln = std::make_unique<QuerySolution>();
-            soln->setRoot(std::make_unique<EofNode>());
-            return soln;
-        }
+/**
+ * Try build EOF solution if applicable.
+ *
+ * If it is known that this query cannot match any documents, and is not on a "special" collection,
+ * we can use an EOF node safely.
+ *
+ * returns (possibly null) solution
+ */
+std::unique_ptr<QuerySolution> tryEofSoln(const CanonicalQuery& query) {
+    if (!query.getPrimaryMatchExpression()->isTriviallyFalse()) {
+        // Query is not trivially false; it could actually match documents.
+        return nullptr;
     }
+    const auto& nss = query.nss();
+
+    // Return EOF solution for trivially false expressions.
+    // Unless the query is against Oplog (change streams) or change collections (serverless
+    // change streams) because in such cases we still need the scan to happen to advance the
+    // visibility timestamp and resume token.
+    if (nss.isOplog() || nss.isChangeCollection()) {
+        return nullptr;
+    }
+    auto soln = std::make_unique<QuerySolution>();
+    soln->setRoot(std::make_unique<EofNode>());
+    return soln;
+}
+
+std::unique_ptr<QuerySolution> buildCollscanSoln(const CanonicalQuery& query,
+                                                 bool tailable,
+                                                 const QueryPlannerParams& params,
+                                                 boost::optional<int> direction = boost::none) {
     std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::makeCollectionScan(
         query,
         tailable,
@@ -1037,7 +1048,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     } else if (SolutionCacheData::COLLSCAN_SOLN == solnCacheData.solnType) {
         // The cached solution is a collection scan. We don't cache collscans
         // with tailable==true, hence the false below.
-        auto soln = buildEofOrCollscanSoln(query, false, params, solnCacheData.wholeIXSolnDir);
+        auto soln = buildCollscanSoln(query, false, params, solnCacheData.wholeIXSolnDir);
         if (!soln) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "plan cache error: collection scan soln");
@@ -1172,11 +1183,14 @@ bool isColusteredIDXScanSoln(QuerySolution* collscanSoln) {
 
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> attemptCollectionScan(
     const CanonicalQuery& query, bool isTailable, const QueryPlannerParams& params) {
+    if (auto soln = tryEofSoln(query)) {
+        return singleSolution(std::move(soln));
+    }
     if (noTableScan(params)) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "not allowed to output a collection scan because 'notablescan' is enabled");
     }
-    if (auto soln = buildEofOrCollscanSoln(query, isTailable, params)) {
+    if (auto soln = buildCollscanSoln(query, isTailable, params)) {
         return singleSolution(std::move(soln));
     }
     return Status(ErrorCodes::NoQueryExecutionPlans, "Failed to build collection scan soln");
@@ -1630,6 +1644,15 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                       "Failed to build whole-index solution for $hint");
     }
 
+    // Past this point, if an EOF solution is _possible_, it will be used regardless of sort,
+    // project, skip, or limit. Only a hinted index would prevent this, and that has been checked
+    // already.
+    if (auto soln = tryEofSoln(query)) {
+        // A query with a trivially false primary match expression will never have any
+        // results, so a simple EOF is all that is required.
+        return singleSolution(std::move(soln));
+    }
+
     // If a sort order is requested, there may be an index that provides it, even if that
     // index is not over any predicates in the query.
     //
@@ -1795,7 +1818,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         (params.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_COLLSCAN);
 
     // No indexed plans?  We must provide a collscan if possible or else we can't run the query.
-    bool collScanRequired = 0 == out.size();
+    bool collScanRequired = out.empty();
     if (collScanRequired && noTableAndClusteredIDXScan(params)) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "No indexed plans available, and running with 'notablescan'");
@@ -1813,7 +1836,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         boost::optional<int> clusteredScanDirection =
             QueryPlannerCommon::determineClusteredScanDirection(query, params);
         int direction = clusteredScanDirection.value_or(1);
-        auto collscanSoln = buildEofOrCollscanSoln(query, isTailable, params, direction);
+        auto collscanSoln = buildCollscanSoln(query, isTailable, params, direction);
         if (!collscanSoln && collScanRequired) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "Failed to build collection scan soln");

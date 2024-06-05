@@ -536,6 +536,7 @@ env.CppUnitTest(
         "sbe_stage_builder_window_function_test.cpp",
         "shard_filterer_factory_mock.cpp",
         "sort_pattern_test.cpp",
+        "util/cartesian_product_test.cpp",
         "util/deferred_test.cpp",
         "util/hash_roaring_set_test.cpp",
         "util/memory_util_test.cpp",

@@ -578,6 +578,10 @@ void QueryPlannerTest::assertSolutionExists(const std::string& solnJson, size_t 
     FAIL(ss);
 }
 
+void QueryPlannerTest::assertSolutionDoesntExist(const std::string& solnJson) const {
+    assertSolutionExists(solnJson, 0 /* expect zero matches */);
+}
+
 void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& solnStrs) const {
     size_t matches = 0;
     for (std::vector<std::string>::const_iterator it = solnStrs.begin(); it != solnStrs.end();
