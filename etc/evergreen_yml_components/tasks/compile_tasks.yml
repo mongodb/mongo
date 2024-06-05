@@ -145,7 +145,6 @@ variables:
       - enterprise-linux-64-amazon-ami
       - enterprise-macos
       - enterprise-macos-arm64
-      - enterprise-rhel-79-64-bit
       - enterprise-rhel-81-ppc64le
       - enterprise-rhel-80-64-bit
       - enterprise-rhel-80-64-bit-coverage

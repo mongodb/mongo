@@ -108,23 +108,23 @@ variables:
     exec_timeout_factor: 1.5
     large_distro_name: rhel80-medium
 
-  - &enterprise-rhel-79-64-bit-template
-    name: enterprise-rhel-79-64-bit
-    display_name: "Enterprise RHEL 7.9"
+  - &enterprise-rhel-80-64-bit-template
+    name: enterprise-rhel-80-64-bit
+    display_name: "Enterprise RHEL 8.0"
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel7.9-small
-    expansions: &enterprise-rhel-79-64-bit-expansions-template
+      - rhel80-small
+    expansions: &enterprise-rhel-80-64-bit-expansions-template
       additional_package_targets: >-
         archive-mongocryptd
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
-      push_arch: x86_64-enterprise-rhel79
+      push_arch: x86_64-enterprise-rhel80
       compile_flags: >-
         --ssl
-        MONGO_DISTMOD=rhel79
+        MONGO_DISTMOD=rhel80
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --use-diagnostic-latches=on
@@ -132,19 +132,19 @@ variables:
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
       test_flags: --excludeWithAnyTags=requires_ldap_pool
-      multiversion_platform: rhel79
+      multiversion_platform: rhel80
       multiversion_edition: enterprise
       has_packages: true
       packager_script: packager_enterprise.py
       packager_arch: x86_64
-      packager_distro: rhel79
+      packager_distro: rhel80
       repo_edition: enterprise
       scons_cache_scope: shared
-      core_analyzer_distro_name: rhel7.9-large
+      core_analyzer_distro_name: rhel80-large
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - rhel7.9-large
+          - rhel80-large
       - name: .aggfuzzer !.feature_flag_guarded
       - name: audit
       - name: auth_audit_gen
@@ -178,7 +178,7 @@ variables:
       - name: vector_search
       - name: vector_search_auth
       - name: vector_search_ssl
-      - name: selinux_rhel7_enterprise
+      - name: selinux_rhel8_enterprise
       - name: generate_buildid_to_debug_symbols_mapping
 
 buildvariants:
@@ -455,25 +455,25 @@ buildvariants:
       - name: .multiversion !.future_git_tag_incompatible
       - name: .multiversion_future_git_tag
 
-  - <<: *enterprise-rhel-79-64-bit-template
-    name: &hot_backups-rhel-79-64-bit hot_backups-rhel-79-64-bit
-    display_name: "hot_backups RHEL 7.9"
+  - <<: *enterprise-rhel-80-64-bit-template
+    name: &hot_backups-rhel-80-64-bit hot_backups-rhel-80-64-bit
+    display_name: "hot_backups RHEL 8.0"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel7.9-small
+      - rhel80-small
     expansions:
-      <<: *enterprise-rhel-79-64-bit-expansions-template
+      <<: *enterprise-rhel-80-64-bit-expansions-template
       additional_package_targets: ""
       compile_flags: >-
         --ssl
-        MONGO_DISTMOD=rhel79
+        MONGO_DISTMOD=rhel80
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --enterprise-features=hot_backups,magic_restore,ldap,sasl
         --link-model=dynamic
         --use-diagnostic-latches=on
-      compile_variant: *hot_backups-rhel-79-64-bit
+      compile_variant: *hot_backups-rhel-80-64-bit
       has_packages: false
       scons_cache_mode: all
       scons_cache_scope: shared
@@ -481,13 +481,13 @@ buildvariants:
     tasks:
       - name: compile_test_parallel_core_stream_TG
         distros:
-          - rhel7.9-large
+          - rhel80-large
       - name: compile_test_parallel_unittest_stream_TG
         distros:
-          - rhel7.9-large
+          - rhel80-large
       - name: compile_test_parallel_dbtest_stream_TG
         distros:
-          - rhel7.9-large
+          - rhel80-large
       - name: jsCore
       - name: noPassthroughHotBackups_gen
       - name: generate_buildid_to_debug_symbols_mapping
