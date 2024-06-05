@@ -64,7 +64,7 @@ void WireSpec::appendInternalClientWireVersionIfNeeded(BSONObjBuilder* builder) 
 
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        fassert(ErrorCodes::NotYetInitialized, isInitialized());
+        fassert(9097912, isInitialized());
         isInternalClient = _spec->isInternalClient;
         outgoing = _spec->outgoing;
     }
@@ -83,7 +83,7 @@ BSONObj specToBSON(const WireSpec::Specification& spec) {
 
 void WireSpec::initialize(Specification spec) {
     stdx::lock_guard<Latch> lk(_mutex);
-    fassert(ErrorCodes::AlreadyInitialized, !isInitialized());
+    fassert(9097913, !isInitialized());
     BSONObj newSpec = specToBSON(spec);
     _spec = std::make_shared<Specification>(std::move(spec));
     LOGV2(4915701, "Initialized wire specification", "spec"_attr = newSpec);
@@ -106,7 +106,7 @@ void WireSpec::reset(Specification spec) {
 
 std::shared_ptr<const WireSpec::Specification> WireSpec::get() {
     stdx::lock_guard<Latch> lk(_mutex);
-    fassert(ErrorCodes::NotYetInitialized, isInitialized());
+    fassert(9097914, isInitialized());
     return _spec;
 }
 

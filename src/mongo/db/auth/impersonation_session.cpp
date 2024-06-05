@@ -57,7 +57,7 @@ ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* opCtx) : 
                     Privilege(ResourcePattern::forClusterResource(authSession->getUserTenantId()),
                               ActionType::impersonate)));
 
-        fassert(ErrorCodes::InternalError, !authSession->isImpersonating());
+        fassert(9097916, !authSession->isImpersonating());
 
         if (impersonatedUsersAndRoles->getUser()) {
             authSession->setImpersonatedUserData(impersonatedUsersAndRoles->getUser().get(),

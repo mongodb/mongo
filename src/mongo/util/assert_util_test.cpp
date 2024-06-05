@@ -341,47 +341,47 @@ DEATH_TEST_REGEX(TassertTerminationTest,
 }
 
 // fassert and its friends
-DEATH_TEST(FassertionTerminationTest, fassert, "40206") {
+DEATH_TEST(FassertionTerminationTest, BoolCondition, "40206") {
     fassert(40206, false);
 }
 
-DEATH_TEST(FassertionTerminationTest, fassertOverload, "Terminating with fassert") {
+DEATH_TEST(FassertionTerminationTest, Overload, "Terminating with fassert") {
     fassert(40207, {ErrorCodes::InternalError, "Terminating with fassert"});
 }
 
-DEATH_TEST(FassertionTerminationTest, fassertStatusWithOverload, "Terminating with fassert") {
+DEATH_TEST(FassertionTerminationTest, StatusWithOverload, "Terminating with fassert") {
     fassert(50733,
             StatusWith<std::string>{ErrorCodes::InternalError,
                                     "Terminating with fassertStatusWithOverload"});
 }
 
-DEATH_TEST(FassertionTerminationTest, fassertNoTrace, "Terminating with fassertNoTrace") {
+DEATH_TEST(FassertionTerminationTest, NoTrace, "Terminating with fassertNoTrace") {
     fassertNoTrace(50734, Status(ErrorCodes::InternalError, "Terminating with fassertNoTrace"));
 }
 
-DEATH_TEST(FassertionTerminationTest, fassertNoTraceOverload, "Terminating with fassertNoTrace") {
+DEATH_TEST(FassertionTerminationTest, NoTraceOverload, "Terminating with fassertNoTrace") {
     fassertNoTrace(50735,
                    StatusWith<std::string>(ErrorCodes::InternalError,
                                            "Terminating with fassertNoTraceOverload"));
 }
 
-DEATH_TEST(FassertionTerminationTest, fassertFailed, "40210") {
+DEATH_TEST(FassertionTerminationTest, FassertFailed, "40210") {
     fassertFailed(40210);
 }
 
-DEATH_TEST(FassertionTerminationTest, fassertFailedNoTrace, "40211") {
+DEATH_TEST(FassertionTerminationTest, FassertFailedNoTrace, "40211") {
     fassertFailedNoTrace(40211);
 }
 
 DEATH_TEST(FassertionTerminationTest,
-           fassertFailedWithStatus,
+           FassertFailedWithStatus,
            "Terminating with fassertFailedWithStatus") {
     fassertFailedWithStatus(
         40212, {ErrorCodes::InternalError, "Terminating with fassertFailedWithStatus"});
 }
 
 DEATH_TEST(FassertionTerminationTest,
-           fassertFailedWithStatusNoTrace,
+           FassertFailedWithStatusNoTrace,
            "Terminating with fassertFailedWithStatusNoTrace") {
     fassertFailedWithStatusNoTrace(
         40213, {ErrorCodes::InternalError, "Terminating with fassertFailedWithStatusNoTrace"});
@@ -539,6 +539,14 @@ void someRiskyBusiness() {
 DEATH_TEST(ScopedDebugInfo, PrintedOnInvariant, "mission: ATestInjectedString") {
     ScopedDebugInfo g("mission", "ATestInjectedString");
     someRiskyBusiness();
+}
+
+void mustNotCompile() {
+#if 0
+    fassert(9079709, "match");
+    fassert(true, Status::OK());
+    fassert(ErrorCodes::InternalError, "hi");
+#endif
 }
 
 }  // namespace

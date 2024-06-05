@@ -27,19 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/util/assert_util.h"
 
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include <exception>
 #include <ostream>
 
-#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/config.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/redaction.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
@@ -50,8 +46,8 @@
 
 
 #define TRIPWIRE_ASSERTION_ID 4457000
-#define STR(x) #x
-#define XSTR(x) STR(x)
+#define XSTR_INNER_(x) #x
+#define XSTR(x) XSTR_INNER_(x)
 
 namespace mongo {
 namespace {
@@ -190,55 +186,59 @@ MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status,
     callAbort();
 }
 
-MONGO_COMPILER_NOINLINE void fassertFailedWithLocation(int msgid,
-                                                       const char* file,
-                                                       unsigned line) noexcept {
-    LOGV2_FATAL_CONTINUE(
-        23089, "Fatal assertion", "msgid"_attr = msgid, "file"_attr = file, "line"_attr = line);
+namespace fassert_detail {
+
+MONGO_COMPILER_NOINLINE void failed(SourceLocation loc, MsgId msgid) noexcept {
+    LOGV2_FATAL_CONTINUE(23089,
+                         "Fatal assertion",
+                         "msgid"_attr = msgid.id,
+                         "file"_attr = loc.file_name(),
+                         "line"_attr = loc.line());
     breakpoint();
     LOGV2_FATAL_CONTINUE(23090, "\n\n***aborting after fassert() failure\n\n");
     callAbort();
 }
 
-MONGO_COMPILER_NOINLINE void fassertFailedNoTraceWithLocation(int msgid,
-                                                              const char* file,
-                                                              unsigned line) noexcept {
-    LOGV2_FATAL_CONTINUE(
-        23091, "Fatal assertion", "msgid"_attr = msgid, "file"_attr = file, "line"_attr = line);
-    breakpoint();
-    LOGV2_FATAL_CONTINUE(23092, "\n\n***aborting after fassert() failure\n\n");
-    quickExit(ExitCode::abrupt);
-}
-
-MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
-                                                                 const Status& status,
-                                                                 const char* file,
-                                                                 unsigned line) noexcept {
+MONGO_COMPILER_NORETURN void failed(SourceLocation loc,
+                                    MsgId msgid,
+                                    const Status& status) noexcept {
     LOGV2_FATAL_CONTINUE(23093,
                          "Fatal assertion",
-                         "msgid"_attr = msgid,
+                         "msgid"_attr = msgid.id,
                          "error"_attr = redact(status),
-                         "file"_attr = file,
-                         "line"_attr = line);
+                         "file"_attr = loc.file_name(),
+                         "line"_attr = loc.line());
     breakpoint();
     LOGV2_FATAL_CONTINUE(23094, "\n\n***aborting after fassert() failure\n\n");
     callAbort();
 }
 
-MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgid,
-                                                                        const Status& status,
-                                                                        const char* file,
-                                                                        unsigned line) noexcept {
+MONGO_COMPILER_NOINLINE void failedNoTrace(SourceLocation loc, MsgId msgid) noexcept {
+    LOGV2_FATAL_CONTINUE(23091,
+                         "Fatal assertion",
+                         "msgid"_attr = msgid.id,
+                         "file"_attr = loc.file_name(),
+                         "line"_attr = loc.line());
+    breakpoint();
+    LOGV2_FATAL_CONTINUE(23092, "\n\n***aborting after fassert() failure\n\n");
+    quickExit(ExitCode::abrupt);
+}
+
+MONGO_COMPILER_NORETURN void failedNoTrace(SourceLocation loc,
+                                           MsgId msgid,
+                                           const Status& status) noexcept {
     LOGV2_FATAL_CONTINUE(23095,
                          "Fatal assertion",
-                         "msgid"_attr = msgid,
+                         "msgid"_attr = msgid.id,
                          "error"_attr = redact(status),
-                         "file"_attr = file,
-                         "line"_attr = line);
+                         "file"_attr = loc.file_name(),
+                         "line"_attr = loc.line());
     breakpoint();
     LOGV2_FATAL_CONTINUE(23096, "\n\n***aborting after fassert() failure\n\n");
     quickExit(ExitCode::abrupt);
 }
+
+}  // namespace fassert_detail
 
 MONGO_COMPILER_NOINLINE void uassertedWithLocation(const Status& status,
                                                    const char* file,
@@ -298,32 +298,12 @@ void warnIfTripwireAssertionsOccurred() {
 }
 
 std::string causedBy(StringData e) {
-    constexpr auto prefix = " :: caused by :: "_sd;
+    static constexpr auto prefix = " :: caused by :: "_sd;
     std::string out;
     out.reserve(prefix.size() + e.size());
-    out.append(prefix.rawData(), prefix.size());
-    out.append(e.rawData(), e.size());
+    out.append(std::string_view{prefix});  // NOLINT
+    out.append(std::string_view{e});       // NOLINT
     return out;
-}
-
-std::string causedBy(const char* e) {
-    return causedBy(StringData(e));
-}
-
-std::string causedBy(const DBException& e) {
-    return causedBy(e.toString());
-}
-
-std::string causedBy(const std::exception& e) {
-    return causedBy(e.what());
-}
-
-std::string causedBy(const std::string& e) {
-    return causedBy(StringData(e));
-}
-
-std::string causedBy(const Status& e) {
-    return causedBy(e.toString());
 }
 
 std::string demangleName(const std::type_info& typeinfo) {

@@ -96,15 +96,15 @@ private:
     };
 
     // Either warn about the violation or crash the process.
-    void _handleViolation(ErrorCodes::Error ec,
+    void _handleViolation(int msgId,
                           StringData message,
                           const latch_detail::Identity& identity,
                           Client* client) noexcept;
-    void _handleAcquireViolation(ErrorCodes::Error ec,
+    void _handleAcquireViolation(int msgId,
                                  StringData message,
                                  const latch_detail::Identity& identity,
                                  Client* client) noexcept;
-    void _handleReleaseViolation(ErrorCodes::Error ec,
+    void _handleReleaseViolation(int msgId,
                                  StringData message,
                                  const latch_detail::Identity& identity,
                                  Client* client) noexcept;

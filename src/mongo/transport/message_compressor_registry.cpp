@@ -64,7 +64,7 @@ StringData getMessageCompressorName(MessageCompressor id) {
         case MessageCompressor::kZstd:
             return "zstd"_sd;
         default:
-            fassert(40269, "Invalid message compressor ID");
+            fasserted(40269);  // Invalid message compressor ID
     }
     MONGO_UNREACHABLE;
 }

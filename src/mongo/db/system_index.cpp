@@ -161,7 +161,7 @@ Status verifySystemIndexes(OperationContext* opCtx, BSONObjBuilder* startupTimeE
                 opCtx, v1SystemUsersKeyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
 
             if (!indexes.empty()) {
-                fassert(ErrorCodes::AmbiguousIndexKeyPattern, indexes.size() == 1);
+                fassert(9097915, indexes.size() == 1);
                 return Status(ErrorCodes::AuthSchemaIncompatible,
                               "Old 2.4 style user index identified. "
                               "The authentication schema needs to be updated by "

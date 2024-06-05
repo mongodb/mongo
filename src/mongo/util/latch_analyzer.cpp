@@ -191,7 +191,7 @@ void LatchAnalyzer::onContention(const latch_detail::Identity&) {
     // Nothing at the moment
 }
 
-void LatchAnalyzer::_handleAcquireViolation(ErrorCodes::Error ec,
+void LatchAnalyzer::_handleAcquireViolation(int msgId,
                                             StringData message,
                                             const latch_detail::Identity& identity,
                                             Client* client) noexcept {
@@ -203,10 +203,10 @@ void LatchAnalyzer::_handleAcquireViolation(ErrorCodes::Error ec,
         ++violation.onAcquire;
     }
 
-    _handleViolation(ec, message, identity, client);
+    _handleViolation(msgId, message, identity, client);
 }
 
-void LatchAnalyzer::_handleReleaseViolation(ErrorCodes::Error ec,
+void LatchAnalyzer::_handleReleaseViolation(int msgId,
                                             StringData message,
                                             const latch_detail::Identity& identity,
                                             Client* client) noexcept {
@@ -218,10 +218,10 @@ void LatchAnalyzer::_handleReleaseViolation(ErrorCodes::Error ec,
         ++violation.onRelease;
     }
 
-    _handleViolation(ec, message, identity, client);
+    _handleViolation(msgId, message, identity, client);
 }
 
-void LatchAnalyzer::_handleViolation(ErrorCodes::Error ec,
+void LatchAnalyzer::_handleViolation(int msgId,
                                      StringData message,
                                      const latch_detail::Identity& identity,
                                      Client* client) noexcept {
@@ -240,14 +240,14 @@ void LatchAnalyzer::_handleViolation(ErrorCodes::Error ec,
         auto begin = boost::make_transform_iterator(identities.begin(), derefIdentity);
         auto end = boost::make_transform_iterator(identities.end(), derefIdentity);
 
-        LOGV2_FATAL_OPTIONS(ec,
+        LOGV2_FATAL_OPTIONS(msgId,
                             {logv2::LogTruncation::Disabled},
                             "Theoretical deadlock found on use of latch",
                             "reason"_attr = message,
                             "latch"_attr = identity,
                             "latchesHeld"_attr = logv2::seqLog(begin, end));
     } else {
-        LOGV2_WARNING(ec,
+        LOGV2_WARNING(msgId,
                       "Theoretical deadlock found on use of latch",
                       "reason"_attr = message,
                       "latch"_attr = identity);
@@ -287,16 +287,12 @@ void LatchAnalyzer::onAcquire(const latch_detail::Identity& identity) {
             // The good result. Nothing to do.
         } break;
         case HierarchicalAcquisitionSet::AddResult::kInvalidWasAbsent: {
-            _handleAcquireViolation(ErrorCodes::Error{5106800},
-                                    "Latch acquired after other latch of lower level"_sd,
-                                    identity,
-                                    client);
+            _handleAcquireViolation(
+                5106800, "Latch acquired after other latch of lower level"_sd, identity, client);
         } break;
         case HierarchicalAcquisitionSet::AddResult::kInvalidWasPresent: {
-            _handleAcquireViolation(ErrorCodes::Error{5106801},
-                                    "Latch acquired after other latch of same level"_sd,
-                                    identity,
-                                    client);
+            _handleAcquireViolation(
+                5106801, "Latch acquired after other latch of same level"_sd, identity, client);
         } break;
     };
 
@@ -339,16 +335,14 @@ void LatchAnalyzer::onRelease(const latch_detail::Identity& identity) {
         } break;
         case HierarchicalAcquisitionSet::RemoveResult::kInvalidWasAbsent: {
             _handleReleaseViolation(
-                ErrorCodes::Error{5106802},
+                5106802,
                 "Latch released after other latch of same level (usually the same latch twice)"_sd,
                 identity,
                 client);
         } break;
         case HierarchicalAcquisitionSet::RemoveResult::kInvalidWasPresent: {
-            _handleReleaseViolation(ErrorCodes::Error{5106803},
-                                    "Latch released before other latch of lower level"_sd,
-                                    identity,
-                                    client);
+            _handleReleaseViolation(
+                5106803, "Latch released before other latch of lower level"_sd, identity, client);
         } break;
     };
 
