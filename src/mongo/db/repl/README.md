@@ -2121,38 +2121,6 @@ the first stable checkpoint, it can safely recover from the last unstable checkp
 appliedThrough value. Otherwise, if this node crashes after the first stable checkpoint is taken,
 it can safely recover from a stable checkpoint (with a cleared "appliedThrough").
 
-# Dropping Collections and Databases
-
-In 3.6, the Two Phase Drop Algorithm was added in the replication layer for supporting collection
-and database drops. It made it easy to support rollbacks for drop operations. In 4.2, the
-implementation for collection drops was moved to the storage engine. This section will cover the
-behavior for the implementation in the replication layer, which currently runs on nodes where
-[`enableMajorityReadConcern=false`](#enableMajorityReadConcern-flag).
-
-## Dropping Collections
-
-Dropping an unreplicated collection happens immediately. However, the process for dropping a
-replicated collection requires two phases.
-
-In the first phase, if the node is the primary, it will write a "dropCollection" oplog entry. The
-collection will be flagged as dropped by being added to a list in the `DropPendingCollectionReaper`
-(along with its OpTime), but the storage engine won't delete the collection data yet. Every time the
-`ReplicationCoordinator` advances the commit point, the node will check to see if any drop's OpTime
-is before or at the majority commit point. If any are, those drops will then move to phase 2 and
-the `DropPendingCollectionReaper` will tell the storage engine to drop the collection.
-
-By waiting until the "dropCollection" oplog entry is majority committed to drop the collection, it
-guarantees that only drops in phase 1 can be rolled back. This means that the storage engine will
-still have the collection's data and in the case of a rollback, it can then easily restore the
-collection.
-
-## Dropping Databases
-
-When a node receives a `dropDatabase` command, it will initiate a Two Phase Drop as described above
-for each collection in the relevant database. Once all collection drops are replicated to a majority
-of nodes, the node will drop the now empty database and a `dropDatabase` command oplog entry is
-written to the oplog.
-
 # Feature Compatibility Version
 
 See the [FCV and Feature Flag README](FCV_AND_FEATURE_FLAG_README.md).

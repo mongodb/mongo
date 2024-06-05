@@ -379,8 +379,7 @@ int FlowControl::getNumTickets(Date_t now) {
     const double locksPerOp = _getLocksPerOp();
     const std::int64_t locksUsedLastPeriod = _getLocksUsedLastPeriod();
 
-    if (serverGlobalParams.enableMajorityReadConcern == false ||
-        gFlowControlEnabled.load() == false || canAcceptWrites == false || locksPerOp < 0.0) {
+    if (gFlowControlEnabled.load() == false || canAcceptWrites == false || locksPerOp < 0.0) {
         _trimSamples(std::min(lastCommitted.opTime.getTimestamp(),
                               getMedianAppliedTimestamp(_prevMemberData)));
         return kMaxTickets;
@@ -495,10 +494,6 @@ std::int64_t FlowControl::_approximateOpsBetween(Timestamp prevTs, Timestamp cur
 }
 
 void FlowControl::sample(Timestamp timestamp, std::uint64_t opsApplied) {
-    if (serverGlobalParams.enableMajorityReadConcern == false) {
-        return;
-    }
-
     stdx::lock_guard<Latch> lk(_sampledOpsMutex);
     _numOpsSinceStartup += opsApplied;
     if (_numOpsSinceStartup - _lastSample <

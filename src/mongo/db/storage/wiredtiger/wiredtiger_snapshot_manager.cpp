@@ -80,10 +80,6 @@ void WiredTigerSnapshotManager::clearCommittedSnapshot() {
 }
 
 boost::optional<Timestamp> WiredTigerSnapshotManager::getMinSnapshotForNextCommittedRead() const {
-    if (!serverGlobalParams.enableMajorityReadConcern) {
-        return boost::none;
-    }
-
     stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
     return _committedSnapshot;
 }

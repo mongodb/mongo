@@ -123,13 +123,6 @@ public:
                 ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             }
 
-            // If a node has majority read concern disabled, replication must use the legacy
-            // 'rollbackViaRefetch' algortithm, which does not support prepareTransaction oplog
-            // entries
-            uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
-                    "'prepareTransaction' is not supported with 'enableMajorityReadConcern=false'",
-                    serverGlobalParams.enableMajorityReadConcern);
-
             // Replica sets with arbiters are able to continually accept majority writes without
             // actually being able to commit them (e.g. PSA with a downed secondary), which in turn
             // will impact the liveness of 2PC transactions

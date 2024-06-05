@@ -813,23 +813,9 @@ void WiredTigerKVEngine::cleanShutdown() {
         closeConfig = "leak_memory=true,";
     }
 
-    const Timestamp stableTimestamp = getStableTimestamp();
     const Timestamp initialDataTimestamp = getInitialDataTimestamp();
     if (gTakeUnstableCheckpointOnShutdown || initialDataTimestamp.asULL() <= 1) {
         closeConfig += "use_timestamp=false,";
-    } else if (!serverGlobalParams.enableMajorityReadConcern &&
-               stableTimestamp < initialDataTimestamp) {
-        // After a rollback via refetch, WT update chains for _id index keys can be logically
-        // corrupt for read timestamps earlier than the `_initialDataTimestamp`. Because the stable
-        // timestamp is really a read timestamp, we must avoid taking a stable checkpoint.
-        //
-        // If a stable timestamp is not set, there's no risk of reading corrupt history.
-        LOGV2(22326,
-              "Skipping checkpoint during clean shutdown because stableTimestamp is less than the "
-              "initialDataTimestamp and enableMajorityReadConcern is false",
-              "stableTimestamp"_attr = stableTimestamp,
-              "initialDataTimestamp"_attr = initialDataTimestamp);
-        quickExit(ExitCode::clean);
     }
 
     if (_fileVersion.shouldDowngrade(!_recoveryTimestamp.isNull())) {

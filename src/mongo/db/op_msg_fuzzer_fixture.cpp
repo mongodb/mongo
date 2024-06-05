@@ -118,7 +118,6 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     storageGlobalParams.engine = "wiredTiger";
     storageGlobalParams.engineSetByUser = true;
     storageGlobalParams.repair = false;
-    serverGlobalParams.enableMajorityReadConcern = false;
     // (Generic FCV reference): Initialize FCV.
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 

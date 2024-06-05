@@ -317,8 +317,6 @@ struct ServerGlobalParams {
     AtomicWord<bool> validateFeaturesAsPrimary{true};
 
     std::vector<std::string> disabledSecureAllocatorDomains;
-
-    bool enableMajorityReadConcern = true;
 };
 
 extern ServerGlobalParams serverGlobalParams;

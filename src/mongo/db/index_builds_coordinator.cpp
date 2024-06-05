@@ -479,12 +479,6 @@ bool isIndexBuildResumable(OperationContext* opCtx,
         return false;
     }
 
-    // This check may be unnecessary due to current criteria for resumable index build support in
-    // storage engine.
-    if (!serverGlobalParams.enableMajorityReadConcern) {
-        return false;
-    }
-
     // The last optime could be null if the node is in initial sync while building the index.
     // This check may be redundant with the 'applicationMode' check and the replication requirement
     // for two phase index builds.

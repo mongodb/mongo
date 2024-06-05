@@ -1564,16 +1564,6 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
         }
     }
 
-    // If this command invocation asked for 'majority' read concern, supports blocking majority
-    // reads, and storage engine support for majority reads is disabled, then we set the majority
-    // read mechanism appropriately i.e. we utilize "speculative" read behavior.
-    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern &&
-        _invocation->allowsSpeculativeMajorityReads() &&
-        !serverGlobalParams.enableMajorityReadConcern) {
-        readConcernArgs.setMajorityReadMechanism(
-            repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative);
-    }
-
     return readConcernArgs;
 }
 

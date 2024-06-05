@@ -634,26 +634,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         }
     }
 
-    serverGlobalParams.enableMajorityReadConcern = true;
-
-    if (storageGlobalParams.engineSetByUser && (storageGlobalParams.engine == "devnull")) {
-        LOGV2(5324701,
-              "Test storage engine does not support enableMajorityReadConcern=true, forcibly "
-              "setting to false",
-              "storageEngine"_attr = storageGlobalParams.engine);
-        serverGlobalParams.enableMajorityReadConcern = false;
-    }
-
-    if (!serverGlobalParams.enableMajorityReadConcern) {
-        // Lock-free reads is not supported with enableMajorityReadConcern=false, so we disable it.
-        if (!storageGlobalParams.disableLockFreeReads) {
-            LOGV2_WARNING(4788401,
-                          "Lock-free reads is not compatible with "
-                          "enableMajorityReadConcern=false: disabling lock-free reads.");
-            storageGlobalParams.disableLockFreeReads = true;
-        }
-    }
-
     if (params.count("storage.oplogMinRetentionHours")) {
         storageGlobalParams.oplogMinRetentionHours.store(
             params["storage.oplogMinRetentionHours"].as<double>());
@@ -685,11 +665,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         }
         if (clusterRoleParam == "configsvr") {
             serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
-            // Config server requires majority read concern.
-            uassert(5324702,
-                    str::stream() << "Cannot initialize config server with "
-                                  << "enableMajorityReadConcern=false",
-                    serverGlobalParams.enableMajorityReadConcern);
 
             if (!params.count("storage.dbPath")) {
                 storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;

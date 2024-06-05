@@ -362,11 +362,6 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
             return {ErrorCodes::NotAReplicaSet,
                     "node needs to be a replica set member to use readConcern: snapshot"};
         }
-        if (!opCtx->inMultiDocumentTransaction() && !serverGlobalParams.enableMajorityReadConcern) {
-            return {ErrorCodes::ReadConcernMajorityNotEnabled,
-                    "read concern level snapshot is not supported when "
-                    "enableMajorityReadConcern=false"};
-        }
     }
 
     auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();

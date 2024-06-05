@@ -2007,19 +2007,9 @@ void WiredTigerRecordStore::doCappedTruncateAfter(
         // transactions from appearing.
         Timestamp truncTs(lastKeptId.getLong());
 
-        if (!serverGlobalParams.enableMajorityReadConcern &&
-            _kvEngine->getOldestTimestamp() > truncTs) {
-            // If majority read concern is disabled, the oldest timestamp can be ahead of 'truncTs'.
-            // In that case, we must set the oldest timestamp along with the commit timestamp.
-            // Otherwise, the commit timestamp will be set behind the oldest timestamp, which is
-            // illegal.
-            const bool force = true;
-            _kvEngine->setOldestTimestamp(truncTs, force);
-        } else {
-            auto conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
-            auto durableTSConfigString = "durable_timestamp={:x}"_format(truncTs.asULL());
-            invariantWTOK(conn->set_timestamp(conn, durableTSConfigString.c_str()), session);
-        }
+        auto conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
+        auto durableTSConfigString = "durable_timestamp={:x}"_format(truncTs.asULL());
+        invariantWTOK(conn->set_timestamp(conn, durableTSConfigString.c_str()), session);
 
         _kvEngine->getOplogManager()->setOplogReadTimestamp(truncTs);
         LOGV2_DEBUG(22405, 1, "truncation new read timestamp: {truncTs}", "truncTs"_attr = truncTs);

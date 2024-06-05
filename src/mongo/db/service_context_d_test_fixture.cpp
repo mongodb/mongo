@@ -95,15 +95,6 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
         std::exchange(storageGlobalParams.engineSetByUser, true);
     _stashedStorageParams.repair =
         std::exchange(storageGlobalParams.repair, (options._repair == RepairAction::kRepair));
-    _stashedServerParams.enableMajorityReadConcern = serverGlobalParams.enableMajorityReadConcern;
-
-    if (storageGlobalParams.engine == "devnull") {
-        // The devnull storage engine does not support majority read concern.
-        LOGV2(4939201,
-              "Disabling majority read concern as it isn't supported by the storage engine",
-              "storageEngine"_attr = storageGlobalParams.engine);
-        serverGlobalParams.enableMajorityReadConcern = false;
-    }
 
     auto const serviceContext = getServiceContext();
 
@@ -209,8 +200,6 @@ ServiceContextMongoDTest::~ServiceContextMongoDTest() {
     std::swap(storageGlobalParams.engine, _stashedStorageParams.engine);
     std::swap(storageGlobalParams.engineSetByUser, _stashedStorageParams.engineSetByUser);
     std::swap(storageGlobalParams.repair, _stashedStorageParams.repair);
-    std::swap(serverGlobalParams.enableMajorityReadConcern,
-              _stashedServerParams.enableMajorityReadConcern);
 
     storageGlobalParams.reset();
 }

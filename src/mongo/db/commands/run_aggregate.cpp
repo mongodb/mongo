@@ -706,13 +706,6 @@ void _adjustChangeStreamReadConcern(OperationContext* opCtx) {
         // context as it may be concurrently read by CurrentOp.
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-
-        // Change streams are allowed to use the speculative majority read mechanism, if
-        // the storage engine doesn't support majority reads directly.
-        if (!serverGlobalParams.enableMajorityReadConcern) {
-            readConcernArgs.setMajorityReadMechanism(
-                repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative);
-        }
     }
 
     // Wait for read concern again since we changed the original read concern.
