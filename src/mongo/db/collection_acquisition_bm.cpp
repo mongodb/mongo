@@ -28,19 +28,28 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <fmt/format.h>
 
+#include "mongo/base/init.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain_global.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/unittest/join_thread.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/future.h"
 
-namespace mongo {
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest;
+
+namespace mongo::repl {
 namespace {
-using namespace mongo::repl;
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store, (), ())
-(InitializerContext* context) {
-    // Dummy initializer to fill in the initializer graph
-}
+
+using namespace fmt::literals;
+
+// Dummy initializer to fill in the initializer graph
+MONGO_INITIALIZER_GENERAL(CoreOptions_Store, (), ())(InitializerContext*) {}
 
 MONGO_INITIALIZER_GENERAL(DisableLogging, (), ())
 (InitializerContext*) {
@@ -50,41 +59,135 @@ MONGO_INITIALIZER_GENERAL(DisableLogging, (), ())
     uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
 }
 
+constexpr bool superVerbose = false;
 
-class CollectionAcquisitionBenchmark : public ServiceContextMongoDTest {
+/**
+ * Multithreaded benchmarks are tricky.
+ * Several instances will spawn. They synchronize on the state.KeepRunning()
+ * evaluation. The first eval blocks until all instances (threads) reach it.
+ * Then when it is about to return false, it blocks to wait for all threads
+ * to be finished.
+ *
+ * Global init is accomplished by managing a singleton shared by all
+ * instances.
+ */
+class CollectionAcquisitionBenchmark {
 public:
-    CollectionAcquisitionBenchmark() : ServiceContextMongoDTest() {
-        setUp();
+    explicit CollectionAcquisitionBenchmark(benchmark::State& state) : _state{state} {
+        if constexpr (superVerbose)
+            std::cout << "CollectionAcquisitionBenchmark ctor: thread=[{}/{}]\n"_format(
+                _state.thread_index, _state.threads);
+    }
+    ~CollectionAcquisitionBenchmark() {
+        if constexpr (superVerbose)
+            std::cout << "CollectionAcquisitionBenchmark dtor: thread=[{}/{}]\n"_format(
+                _state.thread_index, _state.threads);
+    }
+
+    template <typename F>
+    void operator()(F threadBody) {
+        _fixture = _ensureTestEnv();
+        threadBody(_state, *this);
     }
 
     OperationContext* getOperationContext() {
-        return _opCtx.get();
-    }
-
-    ~CollectionAcquisitionBenchmark() override {
-        tearDown();
+        if constexpr (superVerbose)
+            std::cout << "getOperationContext (thread=[{}/{}])\n"_format(_state.thread_index,
+                                                                         _state.threads);
+        return _uniqueOpCtx.get();
     }
 
 private:
-    void _doTest() override{};
+    /**
+     * The care and feeding of the Test fixture.
+     * It must run in a separate thread from the benchmark tasks,
+     * because whichever thread creates it, creates a thread local Client,
+     * and would be inappropriate for use as a benchmark task thread.
+     */
+    class TestEnv {
+    public:
+        TestEnv() {
+            if constexpr (superVerbose)
+                std::cout << "Creating TestEnv @{}\n"_format((void*)this);
+            _thread = unittest::JoinThread([this] {
+                auto uniqueTest = std::make_unique<Test>();
+                _test = uniqueTest.get();
+                _test->setUp();
+                _running.promise.emplaceValue();
+                _stopRequest.future.get();
+                _test->tearDown();
+            });
+            _running.future.get();
+        }
 
-    void setUp() override {
-        ServiceContextMongoDTest::setUp();
-        _opCtx = cc().makeOperationContext();
-        auto replCoord = std::make_unique<ReplicationCoordinatorMock>(getServiceContext());
-        ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
+        ~TestEnv() {
+            if constexpr (superVerbose)
+                std::cout << "Destroying TestEnv\n";
+            _stopRequest.promise.emplaceValue();
+        }
+
+        Service* getService() const {
+            return _test->getService();
+        }
+
+        ServiceContext::UniqueOperationContext makeOperationContext() {
+            return _test->makeOperationContext();
+        }
+
+    private:
+        /** A `unittest::Test` fixture being overloaded as a benchmark harness. */
+        class Test : public ServiceContextMongoDTest {
+        public:
+            void _doTest() override {}
+
+            void setUp() override {
+                ServiceContextMongoDTest::setUp();
+
+                auto sc = getServiceContext();
+                ReplicationCoordinator::set(sc, std::make_unique<ReplicationCoordinatorMock>(sc));
+            }
+
+            using ServiceContextMongoDTest::tearDown;  // Widen visibility from protected to public
+        };
+
+        unittest::JoinThread _thread;
+        PromiseAndFuture<void> _running;
+        PromiseAndFuture<void> _stopRequest;
+        Test* _test;
+    };
+
+    std::shared_ptr<TestEnv> _ensureTestEnv() {
+        std::unique_lock lk{_mu};
+        auto sp = _fixtureWeak.lock();
+        if (!sp) {
+            if constexpr (superVerbose)
+                std::cout << "Need to create fixture\n";
+            _fixtureWeak = sp = std::make_shared<TestEnv>();
+            if constexpr (superVerbose)
+                std::cout << "Created fixture\n";
+        } else {
+            if constexpr (superVerbose)
+                std::cout << "Sharing fixture\n";
+        }
+        if constexpr (superVerbose)
+            std::cout << "Got fixture @{}\n"_format((void*)sp.get());
+
+        _threadClient.emplace(sp->getService());
+        _uniqueOpCtx = sp->makeOperationContext();
+        return sp;
     }
 
-    void tearDown() override {
-        _opCtx.reset(nullptr);
-        ServiceContextMongoDTest::tearDown();
-    }
+    static inline Mutex _mu;
+    static inline std::weak_ptr<TestEnv> _fixtureWeak;
 
-    ServiceContext::UniqueOperationContext _opCtx;
+    benchmark::State& _state;
+    std::shared_ptr<TestEnv> _fixture;
+    boost::optional<ThreadClient> _threadClient;
+    ServiceContext::UniqueOperationContext _uniqueOpCtx;
 };
 
-void BM_acquireCollectionLockFree(benchmark::State& state) {
-    CollectionAcquisitionBenchmark fixture;
+void BM_acquireCollectionLockFreeFunc(benchmark::State& state,
+                                      CollectionAcquisitionBenchmark& fixture) {
     auto opCtx = fixture.getOperationContext();
 
     const auto nss = NamespaceString::createNamespaceString_forTest("test.test");
@@ -101,9 +204,11 @@ void BM_acquireCollectionLockFree(benchmark::State& state) {
         benchmark::DoNotOptimize(acquisition);
     }
 }
+void BM_acquireCollectionLockFree(benchmark::State& state) {
+    CollectionAcquisitionBenchmark{state}(BM_acquireCollectionLockFreeFunc);
+}
 
-void BM_acquireCollection(benchmark::State& state) {
-    CollectionAcquisitionBenchmark fixture;
+void BM_acquireCollectionFunc(benchmark::State& state, CollectionAcquisitionBenchmark& fixture) {
     auto opCtx = fixture.getOperationContext();
 
     const auto nss = NamespaceString::createNamespaceString_forTest("test.test");
@@ -120,9 +225,12 @@ void BM_acquireCollection(benchmark::State& state) {
         benchmark::DoNotOptimize(acquisition);
     }
 }
+void BM_acquireCollection(benchmark::State& state) {
+    CollectionAcquisitionBenchmark{state}(BM_acquireCollectionFunc);
+}
 
-void BM_acquireMultiCollection(benchmark::State& state) {
-    CollectionAcquisitionBenchmark fixture;
+void BM_acquireMultiCollectionFunc(benchmark::State& state,
+                                   CollectionAcquisitionBenchmark& fixture) {
     auto opCtx = fixture.getOperationContext();
 
     const auto nss1 = NamespaceString::createNamespaceString_forTest("test.test1");
@@ -144,9 +252,12 @@ void BM_acquireMultiCollection(benchmark::State& state) {
         benchmark::DoNotOptimize(acquisitions);
     }
 }
+void BM_acquireMultiCollection(benchmark::State& state) {
+    CollectionAcquisitionBenchmark{state}(BM_acquireMultiCollectionFunc);
+}
 
-BENCHMARK(BM_acquireCollectionLockFree);
-BENCHMARK(BM_acquireCollection);
-BENCHMARK(BM_acquireMultiCollection);
+BENCHMARK(BM_acquireCollectionLockFree)->ThreadRange(1, 16);
+BENCHMARK(BM_acquireCollection)->ThreadRange(1, 16);
+BENCHMARK(BM_acquireMultiCollection)->ThreadRange(1, 16);
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::repl
