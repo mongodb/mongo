@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
@@ -105,6 +106,9 @@ public:
 protected:
     void saveChildrenState(bool relinquishCursor, bool disableSlotAccess) final;
 
+    void doSaveState(bool relinquishCursor) override;
+    void doRestoreState(bool relinquishCursor) override;
+
 private:
     using HashTableType = std::unordered_map<value::MaterializedRow,  // NOLINT
                                              std::vector<size_t>,
@@ -123,23 +127,23 @@ private:
     // Spilling helpers.
     void addHashTableEntry(value::SlotAccessor* keyAccessor, size_t valueIndex);
     void spillBufferedValueToDisk(OperationContext* opCtx,
-                                  RecordStore* rs,
+                                  SpillingStore* rs,
                                   size_t bufferIdx,
                                   const value::MaterializedRow&);
     size_t bufferValueOrSpill(value::MaterializedRow& value);
     void setInnerProjectSwitchAccessor(int idx);
 
-    boost::optional<std::vector<size_t>> readIndicesFromRecordStore(RecordStore* rs,
+    boost::optional<std::vector<size_t>> readIndicesFromRecordStore(SpillingStore* rs,
                                                                     value::TypeTags tagKey,
                                                                     value::Value valKey);
 
-    void writeIndicesToRecordStore(RecordStore* rs,
+    void writeIndicesToRecordStore(SpillingStore* rs,
                                    value::TypeTags tagKey,
                                    value::Value valKey,
                                    const std::vector<size_t>& value,
                                    bool update);
 
-    void spillIndicesToRecordStore(RecordStore* rs,
+    void spillIndicesToRecordStore(SpillingStore* rs,
                                    value::TypeTags tagKey,
                                    value::Value valKey,
                                    const std::vector<size_t>& value);
@@ -233,8 +237,8 @@ private:
     // rows in '_buffer'.
     long long _computedTotalMemUsage = 0;
 
-    std::unique_ptr<TemporaryRecordStore> _recordStoreHt;
-    std::unique_ptr<TemporaryRecordStore> _recordStoreBuf;
+    std::unique_ptr<SpillingStore> _recordStoreHt;
+    std::unique_ptr<SpillingStore> _recordStoreBuf;
 
     HashLookupStats _specificStats;
 };

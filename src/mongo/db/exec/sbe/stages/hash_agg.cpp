@@ -116,18 +116,26 @@ HashAggStage::~HashAggStage() {
 void HashAggStage::doSaveState(bool relinquishCursor) {
     if (relinquishCursor) {
         if (_rsCursor) {
-            _rsCursor->save();
+            _recordStore->saveCursor(_opCtx, _rsCursor);
         }
     }
     if (_rsCursor) {
         _rsCursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
     }
+
+    if (_recordStore) {
+        _recordStore->saveState();
+    }
 }
 
 void HashAggStage::doRestoreState(bool relinquishCursor) {
     invariant(_opCtx);
+    if (_recordStore) {
+        _recordStore->restoreState();
+    }
+
     if (_rsCursor && relinquishCursor) {
-        auto couldRestore = _rsCursor->restore();
+        auto couldRestore = _recordStore->restoreCursor(_opCtx, _rsCursor);
         uassert(6196500, "HashAggStage could not restore cursor", couldRestore);
     }
 }
@@ -279,8 +287,7 @@ void HashAggStage::makeTemporaryRecordStore() {
             "No storage engine so HashAggStage cannot spill to disk",
             _opCtx->getServiceContext()->getStorageEngine());
     assertIgnorePrepareConflictsBehavior(_opCtx);
-    _recordStore = _opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-        _opCtx, KeyFormat::String);
+    _recordStore = std::make_unique<SpillingStore>(_opCtx);
 
     _specificStats.usedDisk = true;
 }
@@ -308,10 +315,10 @@ void HashAggStage::spillRowToDisk(const value::MaterializedRow& key,
     if (collator) {
         // The keystring cannot always be deserialized back to the original keys when a collation is
         // in use, so we also store the unmodified key in the data part of the spilled record.
-        upsertToRecordStore(_opCtx, _recordStore->rs(), rid, key, val, false /*update*/);
+        _recordStore->upsertToRecordStore(_opCtx, rid, key, val, false /*update*/);
     } else {
         auto typeBits = kb.getTypeBits();
-        upsertToRecordStore(_opCtx, _recordStore->rs(), rid, val, typeBits, false /*update*/);
+        _recordStore->upsertToRecordStore(_opCtx, rid, val, typeBits, false /*update*/);
     }
 
     _specificStats.spilledRecords++;
@@ -431,7 +438,9 @@ void HashAggStage::open(bool reOpen) {
         for (auto&& accessor : _outAggAccessors) {
             accessor->setIndex(0);
         }
-        _rsCursor.reset();
+        if (_recordStore) {
+            _recordStore->resetCursor(_opCtx, _rsCursor);
+        }
         _recordStore.reset();
         _outKeyRowRecordStore = {0};
         _outAggRowRecordStore = {0};
@@ -515,7 +524,7 @@ void HashAggStage::open(bool reOpen) {
             _specificStats.spilledDataStorageSize = _recordStore->rs()->storageSize(_opCtx);
 
             // Establish a cursor, positioned at the beginning of the record store.
-            _rsCursor = _recordStore->rs()->getCursor(_opCtx);
+            _rsCursor = _recordStore->getCursor(_opCtx);
 
             // Callers will be obtaining the results from the spill table, so set the
             // 'SwitchAccessors' so that they refer to the rows recovered from the record store
@@ -710,6 +719,9 @@ void HashAggStage::close() {
 
     trackClose();
     _ht = boost::none;
+    if (_recordStore && _opCtx) {
+        _recordStore->resetCursor(_opCtx, _rsCursor);
+    }
     _rsCursor.reset();
     _recordStore.reset();
     _outKeyRowRecordStore = {0};

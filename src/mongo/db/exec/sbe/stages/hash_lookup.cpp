@@ -191,6 +191,22 @@ value::SlotAccessor* HashLookupStage::getAccessor(CompileCtx& ctx, value::SlotId
         return outerChild()->getAccessor(ctx, slot);
     }
 }
+void HashLookupStage::doSaveState(bool relinquishCursor) {
+    if (_recordStoreHt) {
+        _recordStoreHt->saveState();
+    }
+    if (_recordStoreBuf) {
+        _recordStoreBuf->saveState();
+    }
+}
+void HashLookupStage::doRestoreState(bool relinquishCursor) {
+    if (_recordStoreHt) {
+        _recordStoreHt->restoreState();
+    }
+    if (_recordStoreBuf) {
+        _recordStoreBuf->restoreState();
+    }
+}
 
 void HashLookupStage::reset() {
     _ht = boost::none;
@@ -263,7 +279,7 @@ void HashLookupStage::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
 
             auto val = std::vector<size_t>{valueIndex};
             auto [tagKey, valKey] = keyAccessor->getViewOfValue();
-            spillIndicesToRecordStore(_recordStoreHt->rs(), tagKey, valKey, val);
+            spillIndicesToRecordStore(_recordStoreHt.get(), tagKey, valKey, val);
         }
     } else {
         // The key is already present in '_ht' so the memory will only grow by one size_t. If we
@@ -285,7 +301,7 @@ void HashLookupStage::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
             // Evict the hash table value.
             _computedTotalMemUsage -= htIt->second.size() * sizeof(size_t);
             htIt->second.push_back(valueIndex);
-            spillIndicesToRecordStore(_recordStoreHt->rs(), tagKeyView, valKeyView, htIt->second);
+            spillIndicesToRecordStore(_recordStoreHt.get(), tagKeyView, valKeyView, htIt->second);
             _ht->erase(htIt);
         }
     }
@@ -301,17 +317,15 @@ void HashLookupStage::makeTemporaryRecordStore() {
             _opCtx->getServiceContext()->getStorageEngine());
     assertIgnorePrepareConflictsBehavior(_opCtx);
 
-    _recordStoreBuf = _opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-        _opCtx, KeyFormat::Long);
+    _recordStoreBuf = std::make_unique<SpillingStore>(_opCtx, KeyFormat::Long);
 
-    _recordStoreHt = _opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-        _opCtx, KeyFormat::String);
+    _recordStoreHt = std::make_unique<SpillingStore>(_opCtx, KeyFormat::String);
 
     _specificStats.usedDisk = true;
 }
 
 void HashLookupStage::spillBufferedValueToDisk(OperationContext* opCtx,
-                                               RecordStore* rs,
+                                               SpillingStore* rs,
                                                size_t bufferIdx,
                                                const value::MaterializedRow& val) {
     CurOp::get(_opCtx)->debug().hashLookupSpillToDisk += 1;
@@ -321,15 +335,7 @@ void HashLookupStage::spillBufferedValueToDisk(OperationContext* opCtx,
     BufBuilder buf;
     val.serializeForSorter(buf);
 
-    assertIgnorePrepareConflictsBehavior(opCtx);
-    WriteUnitOfWork wuow(opCtx);
-
-    auto status = rs->insertRecord(opCtx, rid, buf.buf(), buf.len(), Timestamp{});
-    wuow.commit();
-
-    tassert(6373906,
-            str::stream() << "Failed to write to disk because " << status.getStatus().reason(),
-            status.isOK());
+    rs->upsertToRecordStore(opCtx, rid, buf, false);
 
     _specificStats.spilledBuffRecords++;
     // Add size of record ID + size of buffer.
@@ -347,7 +353,7 @@ size_t HashLookupStage::bufferValueOrSpill(value::MaterializedRow& value) {
         if (!hasSpilledBufToDisk()) {
             makeTemporaryRecordStore();
         }
-        spillBufferedValueToDisk(_opCtx, _recordStoreBuf->rs(), bufferIndex, value);
+        spillBufferedValueToDisk(_opCtx, _recordStoreBuf.get(), bufferIndex, value);
     }
     _valueId++;
     return bufferIndex;
@@ -433,7 +439,7 @@ void HashLookupStage::accumulateFromValueIndices(const C& bufferIndices) {
             // We must shift the '_bufferIt' index by one when using it as a RecordId because a
             // RecordId of 0 is invalid.
             auto rid = getValueRecordId(_bufferIt);
-            auto rsValue = readFromRecordStore(_opCtx, _recordStoreBuf->rs(), rid);
+            auto rsValue = _recordStoreBuf->readFromRecordStore(_opCtx, rid);
             if (!rsValue) {
                 tasserted(6373900, "bufferIdx not found in record store");
             }
@@ -449,7 +455,7 @@ void HashLookupStage::accumulateFromValueIndices(const C& bufferIndices) {
     }
 }
 
-void HashLookupStage::writeIndicesToRecordStore(RecordStore* rs,
+void HashLookupStage::writeIndicesToRecordStore(SpillingStore* rs,
                                                 value::TypeTags tagKey,
                                                 value::Value valKey,
                                                 const std::vector<size_t>& value,
@@ -464,7 +470,7 @@ void HashLookupStage::writeIndicesToRecordStore(RecordStore* rs,
     key.reset(0, false, tagKey, valKey);
     auto [rid, typeBits] = serializeKeyForRecordStore(key);
 
-    upsertToRecordStore(_opCtx, rs, rid, buf, typeBits, update);
+    rs->upsertToRecordStore(_opCtx, rid, buf, typeBits, update);
     if (!update) {
         _specificStats.spilledHtRecords++;
         // Add the size of key (which comprises of the memory usage for the key + its type bits),
@@ -477,7 +483,7 @@ void HashLookupStage::writeIndicesToRecordStore(RecordStore* rs,
 }
 
 boost::optional<std::vector<size_t>> HashLookupStage::readIndicesFromRecordStore(
-    RecordStore* rs, value::TypeTags tagKey, value::Value valKey) {
+    SpillingStore* rs, value::TypeTags tagKey, value::Value valKey) {
     _probeKey.reset(0, false, tagKey, valKey);
 
     auto [rid, _] = serializeKeyForRecordStore(_probeKey);
@@ -496,7 +502,7 @@ boost::optional<std::vector<size_t>> HashLookupStage::readIndicesFromRecordStore
     return boost::none;
 }
 
-void HashLookupStage::spillIndicesToRecordStore(RecordStore* rs,
+void HashLookupStage::spillIndicesToRecordStore(SpillingStore* rs,
                                                 value::TypeTags tagKey,
                                                 value::Value valKey,
                                                 const std::vector<size_t>& value) {
@@ -553,7 +559,7 @@ PlanState HashLookupStage::getNext() {
                         normalizeStringIfCollator(tagElemView, valElemView);
 
                     auto indicesFromRS = readIndicesFromRecordStore(
-                        _recordStoreHt->rs(), tagElemCollView, valElemCollView);
+                        _recordStoreHt.get(), tagElemCollView, valElemCollView);
                     if (indicesFromRS) {
                         indices.insert(indicesFromRS->begin(), indicesFromRS->end());
                     }
@@ -575,7 +581,7 @@ PlanState HashLookupStage::getNext() {
                     normalizeStringIfCollator(tagKeyView, valKeyView);
 
                 auto indicesFromRS = readIndicesFromRecordStore(
-                    _recordStoreHt->rs(), tagKeyCollView, valKeyCollView);
+                    _recordStoreHt.get(), tagKeyCollView, valKeyCollView);
                 if (indicesFromRS) {
                     accumulateFromValueIndices(*indicesFromRS);
                 }
