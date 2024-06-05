@@ -323,15 +323,16 @@ namespace {
 // Ensures that index entries are in increasing or decreasing order.
 void _validateKeyOrder(OperationContext* opCtx,
                        const IndexCatalogEntry* index,
-                       const KeyString::Value& currKey,
-                       const KeyString::Value& prevKey,
+                       const KeyStringEntry& currKey,
+                       const KeyStringEntry& prevKey,
                        IndexValidateResults* results) {
     auto descriptor = index->descriptor();
     bool unique = descriptor->unique();
 
     // KeyStrings will be in strictly increasing order because all keys are sorted and they are in
     // the format (Key, RID), and all RecordIDs are unique.
-    if (currKey.compare(prevKey) <= 0 || MONGO_unlikely(failIndexKeyOrdering.shouldFail())) {
+    if (currKey.keyString.compare(prevKey.keyString) <= 0 ||
+        MONGO_unlikely(failIndexKeyOrdering.shouldFail())) {
         if (results && results->valid) {
             results->errors.push_back(str::stream()
                                       << "index '" << descriptor->indexName()
@@ -345,21 +346,20 @@ void _validateKeyOrder(OperationContext* opCtx,
 
     if (unique) {
         // Unique indexes must not have duplicate keys.
-        int cmp = currKey.compareWithoutRecordIdLong(prevKey);
+        int cmp = currKey.loc.isLong()
+            ? currKey.keyString.compareWithoutRecordIdLong(prevKey.keyString)
+            : currKey.keyString.compareWithoutRecordIdStr(prevKey.keyString);
         if (cmp != 0) {
             return;
         }
 
         if (results && results->valid) {
-            auto bsonKey = KeyString::toBson(currKey, Ordering::make(descriptor->keyPattern()));
-            auto firstRecordId =
-                KeyString::decodeRecordIdLongAtEnd(prevKey.getBuffer(), prevKey.getSize());
-            auto secondRecordId =
-                KeyString::decodeRecordIdLongAtEnd(currKey.getBuffer(), currKey.getSize());
+            auto bsonKey =
+                KeyString::toBson(currKey.keyString, Ordering::make(descriptor->keyPattern()));
             results->errors.push_back(str::stream() << "Unique index '" << descriptor->indexName()
                                                     << "' has duplicate key: " << bsonKey
-                                                    << ", first record: " << firstRecordId
-                                                    << ", second record: " << secondRecordId);
+                                                    << ", first record: " << prevKey.loc
+                                                    << ", second record: " << currKey.loc);
         }
         if (results) {
             results->valid = false;
@@ -378,8 +378,6 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     IndexInfo& indexInfo = _indexConsistency->getIndexInfo(indexName);
     int64_t numKeys = 0;
 
-    bool isFirstEntry = true;
-
     // The progress meter will be inactive after traversing the record store to allow the message
     // and the total to be set to different values.
     if (!_progress->isActive()) {
@@ -394,7 +392,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     KeyString::Builder firstKeyStringBuilder(
         version, BSONObj(), indexInfo.ord, KeyString::Discriminator::kExclusiveBefore);
     KeyString::Value firstKeyString = firstKeyStringBuilder.getValueCopy();
-    KeyString::Value prevIndexKeyStringValue;
+    boost::optional<KeyStringEntry> prevIndexKeyStringEntry;
 
     // Ensure that this index has an open index cursor.
     const auto indexCursorIt = _validateState->getIndexCursors().find(indexName);
@@ -425,9 +423,8 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     bool foundOldUniqueIndexKeys = false;
 
     while (indexEntry) {
-        if (!isFirstEntry) {
-            _validateKeyOrder(
-                opCtx, index, indexEntry->keyString, prevIndexKeyStringValue, &indexResults);
+        if (prevIndexKeyStringEntry) {
+            _validateKeyOrder(opCtx, index, *indexEntry, *prevIndexKeyStringEntry, &indexResults);
         }
 
         if (!foundOldUniqueIndexKeys && !descriptor->isIdIndex() && descriptor->unique() &&
@@ -458,8 +455,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
 
         _progress->hit();
         numKeys++;
-        isFirstEntry = false;
-        prevIndexKeyStringValue = indexEntry->keyString;
+        prevIndexKeyStringEntry = indexEntry;
 
         if (numKeys % kInterruptIntervalNumRecords == 0) {
             // Periodically checks for interrupts and yields.
@@ -475,7 +471,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
                             "Error advancing index cursor",
                             "error"_attr = ex.toString(),
                             "index"_attr = indexName,
-                            "prevKey"_attr = prevIndexKeyStringValue.toString());
+                            "prevKey"_attr = prevIndexKeyStringEntry->keyString.toString());
             }
             throw;
         }
