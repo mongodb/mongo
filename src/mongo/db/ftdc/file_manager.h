@@ -90,7 +90,10 @@ public:
      *
      * Rotates files as needed.
      */
-    Status writeSampleAndRotateIfNeeded(Client* client, const BSONObj& sample, Date_t date);
+    Status writeSampleAndRotateIfNeeded(Client* client,
+                                        const BSONObj& sample,
+                                        Date_t date,
+                                        bool triggerRotate = false);
 
     Status writePeriodicMetadataSampleAndRotateIfNeeded(Client* client,
                                                         const BSONObj& sample,

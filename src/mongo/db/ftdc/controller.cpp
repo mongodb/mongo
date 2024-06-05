@@ -157,6 +157,10 @@ BSONObj FTDCController::getMostRecentPeriodicDocument() {
     }
 }
 
+void FTDCController::triggerRotate() {
+    _triggerRotate.store(true);
+}
+
 void FTDCController::start(Service* service) {
     LOGV2(20625,
           "Initializing full-time diagnostic data capture",
@@ -209,7 +213,7 @@ void FTDCController::stop() {
     }
 }
 
-void FTDCController::doLoop(Service* service) noexcept {
+void FTDCController::doLoop(Service* service) {
     // Note: All exceptions thrown in this loop are considered process fatal. The default terminate
     // is used to provide a good stack trace of the issue.
     Client::initThread(kFTDCThreadName, service);
@@ -281,8 +285,12 @@ void FTDCController::doLoop(Service* service) noexcept {
 
             auto collectSample = _periodicCollectors.collect(client, _multiServiceSchema);
 
+            bool triggerRequested = true;
             Status s = _mgr->writeSampleAndRotateIfNeeded(
-                client, std::get<0>(collectSample), std::get<1>(collectSample));
+                client,
+                std::get<0>(collectSample),
+                std::get<1>(collectSample),
+                _triggerRotate.compareAndSwap(&triggerRequested, false));
 
             uassertStatusOK(s);
 

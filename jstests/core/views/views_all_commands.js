@@ -673,6 +673,7 @@ let viewsCommandTests = {
     },
     rolesInfo: {skip: isUnrelated},
     rotateCertificates: {skip: isUnrelated},
+    rotateFTDC: {skip: isUnrelated},
     saslContinue: {skip: isUnrelated},
     saslStart: {skip: isUnrelated},
     sbe: {skip: isAnInternalCommand},

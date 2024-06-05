@@ -106,7 +106,6 @@ public:
         return _size + _sizeInterim;
     }
 
-public:
     /**
      * Test hook that closes the files without moving interim results to the archive log.
      * Note: OS Buffers are still flushes correctly though.
@@ -129,7 +128,6 @@ private:
      */
     Status writeArchiveFileBuffer(ConstDataRange buf);
 
-private:
     // Config
     const FTDCConfig* const _config;
 

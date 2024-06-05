@@ -67,36 +67,61 @@ BSONObj filteredFTDCCopy(const BSONObj& obj) {
     return builder.obj();
 }
 
-template <class T>
-using FTDCReadResultToListMapper =
-    std::function<T(const std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t>&)>;
+using ReaderResult = decltype(std::declval<FTDCFileReader>().next());
 
-template <class T>
-std::vector<T> loadFTDCAsList(const boost::filesystem::path& p,
-                              FTDCReadResultToListMapper<T>&& mapper) {
-    FTDCFileReader reader;
-
-    ASSERT_OK(reader.open(p));
-
-    std::vector<T> list;
-    auto sw = reader.hasNext();
-    while (sw.isOK() && sw.getValue()) {
-        list.emplace_back(mapper(reader.next()));
-        sw = reader.hasNext();
+template <typename T, typename Func>
+void readFile(FTDCFileReader&& reader,
+              const boost::filesystem::path& path,
+              const Func& mapper,
+              std::vector<T>& docs) {
+    auto readerHasNext = [&] {
+        auto sw = reader.hasNext();
+        ASSERT_OK(sw) << "corrupt FTDC file: " << path;
+        return sw.getValue();
+    };
+    while (readerHasNext()) {
+        docs.push_back(mapper(reader.next()));
     }
-
-    ASSERT_OK(sw);
-    return list;
 }
 
-std::vector<BSONObj> loadFTDCAsDocumentList(const boost::filesystem::path& p) {
-    return loadFTDCAsList<BSONObj>(p, [](auto& result) { return std::get<1>(result).getOwned(); });
+template <typename T, typename Func>
+std::vector<T> loadFTDCAsVector(const boost::filesystem::path& path, const Func& mapper) {
+    FTDCFileReader reader;
+    ASSERT_OK(reader.open(path));
+
+    std::vector<T> docs;
+    readFile(std::move(reader), path, mapper, docs);
+
+    return docs;
 }
 
-std::vector<std::pair<FTDCBSONUtil::FTDCType, BSONObj>> loadFTDCAsDocumentListWithType(
-    const boost::filesystem::path& p) {
-    return loadFTDCAsList<std::pair<FTDCBSONUtil::FTDCType, BSONObj>>(p, [](auto& result) {
-        return std::make_pair(std::get<0>(result), std::get<1>(result).getOwned());
+template <typename Func, typename T = std::invoke_result_t<Func, ReaderResult>>
+std::vector<T> loadFTDCAsVector(const std::vector<boost::filesystem::path>& paths,
+                                const Func& mapper) {
+    std::vector<T> docs;
+    for (const auto& path : paths) {
+        FTDCFileReader reader;
+        ASSERT_OK(reader.open(path));
+
+        readFile(std::move(reader), path, mapper, docs);
+    }
+    return docs;
+}
+
+std::vector<BSONObj> loadFTDCAsDocumentVector(const boost::filesystem::path& path) {
+    return loadFTDCAsVector<BSONObj>(path, [](const ReaderResult& result) {
+        auto&& [type, doc, date] = result;
+        return doc.getOwned();
+    });
+}
+
+using TypeAndDocument = std::pair<FTDCBSONUtil::FTDCType, BSONObj>;
+
+std::vector<TypeAndDocument> loadFTDCAsTypeAndDocumentVector(
+    const std::vector<boost::filesystem::path>& paths) {
+    return loadFTDCAsVector(paths, [](const ReaderResult& result) {
+        auto&& [type, doc, date] = result;
+        return TypeAndDocument{type, doc.getOwned()};
     });
 }
 
@@ -160,20 +185,20 @@ void ValidateDocumentListByType(const std::vector<std::pair<FTDCBSONUtil::FTDCTy
 
 }  // namespace
 
-void ValidateDocumentListByType(const boost::filesystem::path& p,
+void ValidateDocumentListByType(const std::vector<boost::filesystem::path>& paths,
                                 const std::vector<BSONObj>& expectedOnRotateMetadata,
                                 const std::vector<BSONObj>& expectedMetrics,
                                 const std::vector<BSONObj>& expectedPeriodicMetadata,
                                 FTDCValidationMode mode) {
-    auto list = loadFTDCAsDocumentListWithType(p);
+    auto list = loadFTDCAsTypeAndDocumentVector(paths);
     ValidateDocumentListByType(
         list, expectedOnRotateMetadata, expectedMetrics, expectedPeriodicMetadata, mode);
 }
 
-void ValidateDocumentList(const boost::filesystem::path& p,
+void ValidateDocumentList(const boost::filesystem::path& path,
                           const std::vector<BSONObj>& docs,
                           FTDCValidationMode mode) {
-    auto list = loadFTDCAsDocumentList(p);
+    auto list = loadFTDCAsDocumentVector(path);
     ValidateDocumentList(list, docs, mode);
 }
 

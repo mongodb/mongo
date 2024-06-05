@@ -6572,6 +6572,27 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "rotateFTDC",
+          command: {rotateFTDC: 1},
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_monitoring,
+                privileges: [
+                    {resource: {cluster: true}, actions: ["serverStatus"]},
+                    {resource: {cluster: true}, actions: ["replSetGetStatus"]},
+                    {resource: {db: "local", collection: "oplog.rs"}, actions: ["collStats"]},
+                    {
+                      resource: {cluster: true},
+                      actions: ["connPoolStats"]
+                    },  // Only needed against mongos
+                ]
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "serverStatus",
           command: {serverStatus: 1},
           testcases: [

@@ -63,7 +63,7 @@ enum class FTDCValidationMode {
  *
  * Unit Test ASSERTs if there is mismatch.
  */
-void ValidateDocumentList(const boost::filesystem::path& p,
+void ValidateDocumentList(const boost::filesystem::path& path,
                           const std::vector<BSONObj>& docs,
                           FTDCValidationMode mode);
 
@@ -82,7 +82,7 @@ void ValidateDocumentList(const std::vector<BSONObj>& docs1,
  *
  * Unit Test ASSERTs if there is mismatch.
  */
-void ValidateDocumentListByType(const boost::filesystem::path& p,
+void ValidateDocumentListByType(const std::vector<boost::filesystem::path>& paths,
                                 const std::vector<BSONObj>& expectedOnRotateMetadata,
                                 const std::vector<BSONObj>& expectedMetrics,
                                 const std::vector<BSONObj>& expectedPeriodicMetadata,

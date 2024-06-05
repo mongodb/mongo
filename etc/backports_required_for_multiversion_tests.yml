@@ -663,6 +663,8 @@ last-continuous:
     ticket: SERVER-90833
   - test_file: jstests/core/timeseries/timeseries_ixscan_clusteredidxscan_union.js
     ticket: SERVER-90818
+  - test_file: jstests/sharding/database_versioning_all_commands.js
+    ticket: SERVER-90092
   suites: null
 last-lts:
   all:
@@ -1382,4 +1384,6 @@ last-lts:
     ticket: SERVER-90833
   - test_file: jstests/core/timeseries/timeseries_ixscan_clusteredidxscan_union.js
     ticket: SERVER-90818
+  - test_file: jstests/sharding/database_versioning_all_commands.js
+    ticket: SERVER-90092
   suites: null

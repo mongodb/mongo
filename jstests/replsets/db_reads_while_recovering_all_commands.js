@@ -403,6 +403,7 @@ const allCommands = {
     revokeRolesFromUser: {skip: isPrimaryOnly},
     rolesInfo: {skip: isPrimaryOnly},
     rotateCertificates: {skip: isNotAUserDataRead},
+    rotateFTDC: {skip: isNotAUserDataRead},
     saslContinue: {skip: isPrimaryOnly},
     saslStart: {skip: isPrimaryOnly},
     serverStatus: {skip: isNotAUserDataRead},

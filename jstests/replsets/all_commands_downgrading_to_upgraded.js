@@ -1405,6 +1405,7 @@ const allCommands = {
         }
     },
     rotateCertificates: {skip: "requires additional authentication setup"},
+    rotateFTDC: {isAdminCommand: true, command: {rotateFTDC: 1}},
     saslContinue: {skip: "requires additional authentication setup"},
     saslStart: {skip: "requires additional authentication setup"},
     serverStatus: {

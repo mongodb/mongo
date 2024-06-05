@@ -1193,6 +1193,10 @@ export let MongosAPIParametersUtil = (function() {
             skip: "executes locally on mongos (not sent to any remote node)"
         },
         {
+            commandName: "rotateFTDC",
+            skip: "executes locally on mongos (not sent to any remote node)"
+        },
+        {
             commandName: "saslContinue",
             skip: "executes locally on mongos (not sent to any remote node)"
         },
