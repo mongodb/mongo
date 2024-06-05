@@ -55,6 +55,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -875,6 +876,41 @@ TEST(RecordStoreTestHarness, ClusteredRecordMismatchedKeyFormat) {
     }
 
     ASSERT_EQ(failAsExpected, true);
+}
+
+// Verify that a failed restore leaves the _hasRestored flag unset.
+DEATH_TEST_REGEX(RecordStoreTestHarness,
+                 FailedRestoreDoesNotSetFlag,
+                 "Invariant failure.*_hasRestored") {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    auto rs(harnessHelper->newRecordStore());
+    {
+        auto opCtx(harnessHelper->newOperationContext());
+        char data[] = "data";
+        WriteUnitOfWork uow(opCtx.get());
+        ASSERT_OK(rs->insertRecord(opCtx.get(), data, strlen(data) + 1, Timestamp()));
+        uow.commit();
+
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
+        auto cursor = rs->getCursor(opCtx.get());
+        // Positions cursor at first record for save()
+        ASSERT(cursor->next());
+        // Clears _hasRestored
+        cursor->save();
+        auto restoreFailed = [&cursor]() {
+            try {
+                FailPointEnableBlock failPoint("WTWriteConflictExceptionForReads");
+                // Should not set _hasRestored
+                cursor->restore();
+                return false;
+            } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
+                return true;
+            }
+        }();
+        ASSERT(restoreFailed);
+        // Calling next() should fail the invariant(_hasRestored)
+        cursor->next();
+    }
 }
 
 }  // namespace
