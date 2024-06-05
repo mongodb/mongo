@@ -135,6 +135,28 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
 auto getCommandInvocationHooks =
     ServiceContext::declareDecoration<std::unique_ptr<CommandInvocationHooks>>();
 
+class CommandNameAtomRegistry {
+public:
+    size_t lookup(StringData s);
+
+private:
+    StringMap<size_t> _atoms;
+    Mutex _mutex;
+};
+
+size_t CommandNameAtomRegistry::lookup(StringData s) {
+    stdx::lock_guard lock(_mutex);
+
+    auto itr = _atoms.find(s);
+    if (itr != _atoms.end()) {
+        return itr->second;
+    }
+
+    size_t nextIdx = _atoms.size();
+    _atoms[s] = nextIdx;
+    return nextIdx;
+}
+
 }  // namespace
 
 void CommandInvocationHooks::set(ServiceContext* serviceContext,
@@ -570,23 +592,21 @@ void CommandHelpers::uassertCommandRunWithMajority(StringData commandName,
             writeConcern.isMajority());
 }
 
-void CommandHelpers::canUseTransactions(Service* service,
-                                        const std::vector<NamespaceString>& namespaces,
-                                        StringData cmdName,
+namespace {
+const CommandNameAtom countAtom("count"_sd);
+}  // namespace
+
+void CommandHelpers::canUseTransactions(const std::vector<NamespaceString>& namespaces,
+                                        Command* command,
                                         bool allowTransactionsOnConfigDatabase) {
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "Cannot run 'count' in a multi-document transaction. Please see "
             "http://dochub.mongodb.org/core/transaction-count for a recommended alternative.",
-            cmdName != "count"_sd);
-
-    auto command = findCommand(service, cmdName);
-    uassert(ErrorCodes::CommandNotFound,
-            str::stream() << "Encountered unknown command during check if can run in transactions: "
-                          << cmdName,
-            command);
+            command->getNameAtom() != countAtom);
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
+            str::stream() << "Cannot run '" << command->getName()
+                          << "' in a multi-document transaction.",
             command->allowedInTransactions());
 
     for (auto& nss : namespaces) {
@@ -1016,6 +1036,11 @@ private:
     const OpMsgRequest _request;
     const DatabaseName _dbName;
 };
+
+CommandNameAtom::CommandNameAtom(StringData s) {
+    static StaticImmortal<CommandNameAtomRegistry> registry;
+    _atom = registry->lookup(s);
+}
 
 Command::~Command() = default;
 
