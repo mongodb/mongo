@@ -227,7 +227,7 @@ void SessionsCollection::_doRemove(const NamespaceString& ns,
     };
 
     auto add = [](BSONArrayBuilder* builder, const LogicalSessionId& lsid) {
-        builder->append(BSON("q" << lsidQuery(lsid) << "limit" << 0));
+        builder->append(BSON("q" << lsidQuery(lsid) << "limit" << 1));
     };
 
     runBulkCmd("deletes", init, add, send, sessions);

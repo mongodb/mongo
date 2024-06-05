@@ -120,6 +120,10 @@ export var TransactionsUtil = (function() {
                     v = deepCopyObject({}, v);
                 } else if (Array.isArray(v)) {
                     v = deepCopyObject([], v);
+                } else if (v instanceof Set) {
+                    v = new Set(v);
+                } else if (v instanceof Map) {
+                    v = new Map(v);
                 }
             }
             var desc = Object.getOwnPropertyDescriptor(src, k);
