@@ -5,7 +5,6 @@
 - name: excluded_files
   value:
     exclude_files:
-      # TODO: SERVER-87011 Revisist all the tests excluded here.
       # due to error: 'timeseries' is not allowed with 'recordIdsReplicated'
       - jstests/core/timeseries/*.*
       - jstests/core/txns/timeseries/*.*
@@ -29,8 +28,9 @@
       - jstests/core/loadserverscripts.js
       - jstests/core/shell/shellstartparallel.js
       # due to error: "Transaction with { txnNumber: 0 } has been aborted."
-      # TODO: Revisit them when working on SERVER-87012 Handle renameCollection / creating collections in txns
-      #       for recordIdsReplicated:true passthroughs
+      # The overrides don't work with renaming collections in general.
+      # And the overrides don't work with creating collections in txns, because the override doesn't handle
+      # the case of a transaction aborting.
       - jstests/core/txns/*.*
       # due to error: "enableLatchAnalysis not found"
       - jstests/core/latch_analyzer.js
