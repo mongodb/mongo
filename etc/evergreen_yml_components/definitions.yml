@@ -5537,7 +5537,14 @@ tasks:
 
 - <<: *gen_task_template
   name: noPassthrough_gen
-  tags: ["misc_js", "no_debug_mode"]
+  tags:
+    [
+      "incompatible_mac",
+      "incompatible_ppc",
+      "incompatible_s390x",
+      "misc_js",
+      "no_debug_mode"
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
