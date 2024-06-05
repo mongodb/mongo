@@ -801,6 +801,13 @@ error_codes:
       name: StreamProcessorKafkaConnectionError,
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
+  # The stream processor pipeline was invalid, or some other user specified option
+  # was invalid.
+  - {
+      code: 420,
+      name: StreamProcessorInvalidOptions,
+      categories: [StreamProcessorUserError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
