@@ -101,10 +101,6 @@ enum class FieldAvailability {
     // can happen when the field is a hashed field in an index.
     kHashedValueProvided,
 
-    // The field is available as ICU encoded string and can be used to do sorting but it does not
-    // provide the actual value.
-    kCollatedProvided,
-
     // The field is completely provided.
     kFullyProvided,
 };
@@ -920,11 +916,6 @@ struct IndexScanNode : public QuerySolutionNodeWithSortSet {
     bool fetched() const override {
         return false;
     }
-    /**
-     * This function checks if the given field has string bounds. This is needed to check if we need
-     * to do some special handling in the case of collations.
-     */
-    bool hasStringBounds(const std::string& field) const;
     FieldAvailability getFieldAvailability(const std::string& field) const override;
     bool sortedByDiskLoc() const override;
 

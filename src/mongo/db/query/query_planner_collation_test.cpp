@@ -755,24 +755,26 @@ TEST_F(QueryPlannerTest,
 }
 
 /**
- * This test confirms that we place a fetch stage after the IDXScan in the case where both query
+ * This test confirms that we place a fetch stage before sort in the case where both query
  * and index have the same non-simple collation. To handle this scenario without this fetch would
  * require a mechanism to ensure we don't attempt to encode for collation an already encoded index
  * key entry when generating the sort key.
  */
-TEST_F(QueryPlannerTest, MustFetchAfterIDXScanWhenQueryHasSameNonSimpleCollationAsIndex) {
+TEST_F(QueryPlannerTest, MustFetchBeforeSortWhenQueryHasSameNonSimpleCollationAsIndex) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     addIndex(fromjson("{a: 1, b: 1}"), &collator);
 
     runQueryAsCommand(
-        fromjson("{find: 'testns', filter: {a: {$gt: 0}}, projection: {a: 1, b: 1, _id: 0}, "
-                 "collation: {locale: 'reverse'}, sort: {a: 1, b: 1}}"));
+        fromjson("{find: 'testns', filter: {a: {$gt: 0}}, projection: {a: 1, b:1, _id: 0}, "
+                 "collation: {locale: 'reverse'}, sort: {b: 1, a: 1}}"));
 
+    assertNumSolutions(1U);
     assertSolutionExists(
+        "{sort: {pattern: {b: 1, a: 1}, limit: 0, type: 'simple', node: "
         "{proj: {spec: {a: 1, b: 1, _id: 0}, node:"
-        "{fetch: {filter: null, node:"
-        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}");
+        "{fetch: {filter: null, collation: {locale: 'reverse'}, node:"
+        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NoSortStageWhenMinMaxIndexCollationDoesNotMatchButBoundsContainNoStrings) {
