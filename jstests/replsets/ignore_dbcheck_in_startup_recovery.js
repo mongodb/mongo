@@ -22,7 +22,11 @@ TestData.skipCheckDBHashes = true;
 const dbName = "ignore_dbcheck_in_startup_recovery";
 const collName = "ignore_dbcheck_in_startup_recovery-collection";
 
-const replSet = new ReplSetTest({name: jsTestName(), nodes: 2});
+const replSet = new ReplSetTest({
+    name: jsTestName(),
+    nodes: 2,
+    nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}}
+});
 replSet.startSet();
 replSet.initiateWithHighElectionTimeout();
 
@@ -58,9 +62,12 @@ runDbCheck(replSet,
                validateMode: "extraIndexKeysCheck",
                secondaryIndex: "a_1",
                maxDocsPerBatch: 20,
-               batchWriteConcern: {w: 1}
+               batchWriteConcern: {w: 2}
            },
            true /*awaitCompletion*/);
+
+// Wait to make sure that the secondary applied the stop entry before the ungraceful shutdown.
+replSet.awaitNodesAgreeOnAppliedOpTime();
 
 // Perform ungraceful shutdown of the secondary node and do not clean the db path directory.
 replSet.stop(
