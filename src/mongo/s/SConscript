@@ -43,6 +43,7 @@ env.Library(
         "write_ops/batch_write_op.cpp",
         "write_ops/bulk_write_exec.cpp",
         "write_ops/coordinate_multi_update_util.cpp",
+        "write_ops/pause_migrations_during_multi_updates_enablement.cpp",
         "write_ops/write_op.cpp",
         "write_ops/write_without_shard_key_util.cpp",
     ],

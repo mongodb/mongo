@@ -61,7 +61,6 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/collection_uuid_mismatch.h"
-#include "mongo/s/migration_blocking_operation/migration_blocking_operation_cluster_parameters_gen.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
@@ -243,20 +242,33 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
     }
 }
 
-bool shouldCoordinateMultiUpdate(OperationContext* opCtx, bool isMultiWrite, bool isUpsert) {
-    if (opCtx->isCommandForwardedFromRouter() || !isMultiWrite || isUpsert) {
+bool shouldCoordinateMultiUpdate(OperationContext* opCtx,
+                                 PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations,
+                                 bool isMultiWrite,
+                                 bool isUpsert) {
+    if (!isMultiWrite || !pauseMigrations.isEnabled()) {
+        // If this is not a multi write or if the cluster parameter is off, the op is not relevant.
         return false;
     }
 
-    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-    auto* clusterPauseMigrationsParam = clusterParameters->get<ClusterParameterWithStorage<
-        migration_blocking_operation::PauseMigrationsDuringMultiUpdatesParam>>(
-        "pauseMigrationsDuringMultiUpdates");
-    if (!clusterPauseMigrationsParam->getValue(boost::none).getEnabled()) {
+    if (isUpsert) {
+        // The full shard key must be specified for an upsert, so we will only ever target a single
+        // shard. This prevents chunk migrations from being a problem, since the whole operation
+        // will execute either before or after the migration occurs.
         return false;
-    };
+    }
+
+    if (opCtx->isCommandForwardedFromRouter()) {
+        // Coordinating a multi update involves running the update on a mongod (the db primary
+        // shard), but it uses the same codepath as mongos. This flag is set to prevent the mongod
+        // from repeatedly coordinating the update and forwarding it to itself.
+        return false;
+    }
 
     if (TransactionRouter::get(opCtx)) {
+        // Similar to the upsert case, if we are in a transaction then the whole of the operation
+        // will execute either before or after any conflicting chunk migrations, so the problem is
+        // avoided.
         return false;
     }
 
@@ -271,6 +283,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                                      std::vector<WriteOp>& writeOps,
                                      bool ordered,
                                      bool recordTargetErrors,
+                                     PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations,
                                      GetTargeterFn getTargeterFn,
                                      GetWriteSizeFn getWriteSizeFn,
                                      int baseCommandSizeBytes,
@@ -457,7 +470,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                 }
             }();
 
-            if (shouldCoordinateMultiUpdate(opCtx, isMultiWrite, isUpsert)) {
+            if (shouldCoordinateMultiUpdate(opCtx, pauseMigrations, isMultiWrite, isUpsert)) {
                 // Multi writes blocking migrations should be in their own batch.
                 if (!batchMap.empty()) {
                     writeOp.resetWriteToReady();
@@ -549,6 +562,7 @@ StatusWith<WriteType> BatchWriteOp::targetBatch(const NSTargeter& targeter,
         _writeOps,
         ordered,
         recordTargetErrors,
+        _pauseMigrationsDuringMultiUpdatesParameter,
         // getTargeterFn:
         [&](const WriteOp& writeOp) -> const NSTargeter& { return targeter; },
         // assignWriteSizeFn:

@@ -174,6 +174,8 @@ BulkWriteCommandReply parseBulkResponse(const BSONObj& response) {
 int getWriteOpIndex(const TargetedBatchMap& childBatches) {
     // There can be multiple entries in childBatches if the multi write targets multiple shards, but
     // each of these entries is the same write.
+    invariant(!childBatches.empty());
+    invariant(childBatches.begin()->second);
     const auto& writes = childBatches.begin()->second->getWrites();
     invariant(writes.size() == 1);
     return writes.front()->writeOpRef.first;

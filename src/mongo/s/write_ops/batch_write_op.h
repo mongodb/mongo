@@ -49,6 +49,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
+#include "mongo/s/write_ops/pause_migrations_during_multi_updates_enablement.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -280,6 +281,8 @@ private:
     const bool _isRetryableWrite{false};
 
     boost::optional<int> _nShardsOwningChunks;
+
+    PauseMigrationsDuringMultiUpdatesEnablement _pauseMigrationsDuringMultiUpdatesParameter;
 };
 
 /**
@@ -323,6 +326,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                                      std::vector<WriteOp>& writeOps,
                                      bool ordered,
                                      bool recordTargetErrors,
+                                     PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations,
                                      GetTargeterFn getTargeterFn,
                                      GetWriteSizeFn getWriteSizeFn,
                                      int baseCommandSizeBytes,

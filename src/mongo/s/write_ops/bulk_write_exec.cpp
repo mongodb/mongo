@@ -925,6 +925,7 @@ StatusWith<WriteType> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTa
         _writeOps,
         ordered,
         recordTargetErrors,
+        _pauseMigrationsDuringMultiUpdatesParameter,
         // getTargeterFn:
         [&](const WriteOp& writeOp) -> const NSTargeter& {
             const auto opIdx = writeOp.getWriteItem().getItemIndex();

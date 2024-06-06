@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_ops/batch_write_op.h"
-#include "mongo/s/write_ops/bulk_write_exec.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace coordinate_multi_update_util {
 
 class PauseMigrationsDuringMultiUpdatesEnablement {
 public:
@@ -41,16 +39,4 @@ private:
     boost::optional<bool> _enabled;
 };
 
-int getWriteOpIndex(const TargetedBatchMap& childBatches);
-
-BatchedCommandResponse executeCoordinateMultiUpdate(OperationContext* opCtx,
-                                                    BatchWriteOp& batchOp,
-                                                    const TargetedBatchMap& childBatches,
-                                                    const BatchedCommandRequest& clientRequest);
-
-BulkWriteCommandReply executeCoordinateMultiUpdate(OperationContext* opCtx,
-                                                   TargetedBatchMap& childBatches,
-                                                   bulk_write_exec::BulkWriteOp& bulkWriteOp);
-
-}  // namespace coordinate_multi_update_util
 }  // namespace mongo
