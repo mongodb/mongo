@@ -57,8 +57,8 @@ void BM_CPUTimerStartStop(benchmark::State& state) {
     auto opCtx = fixture.makeOpCtx();
     auto timer = OperationCPUTimers::get(opCtx.get())->makeTimer();
     for (auto _ : state) {
-        timer->start();
-        timer->stop();
+        timer.start();
+        timer.stop();
     }
 }
 
@@ -67,8 +67,8 @@ void BM_CPUTimerLifetime(benchmark::State& state) {
     for (auto _ : state) {
         auto opCtx = fixture.makeOpCtx();
         auto timer = OperationCPUTimers::get(opCtx.get())->makeTimer();
-        timer->start();
-        timer->stop();
+        timer.start();
+        timer.stop();
 
         // Don't account for destruction since that is not accounted for in our command path.
         state.PauseTiming();
@@ -83,8 +83,8 @@ void BM_MultipleCPUTimer(benchmark::State& state) {
         auto opCtx = fixture.makeOpCtx();
         for (auto i = 0; i < 4; i++) {
             auto timer = OperationCPUTimers::get(opCtx.get())->makeTimer();
-            timer->start();
-            timer->stop();
+            timer.start();
+            timer.stop();
         }
     }
 }

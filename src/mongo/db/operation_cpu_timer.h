@@ -45,9 +45,11 @@ class OperationCPUTimer;
 /**
  * Allocates and tracks CPU timers for an OperationContext.
  */
-class OperationCPUTimers : public std::enable_shared_from_this<OperationCPUTimers> {
-public:
+class OperationCPUTimers {
     friend class OperationCPUTimer;
+
+public:
+    virtual ~OperationCPUTimers() = default;
 
     /**
      * Returns `nullptr` if the platform does not support tracking of CPU consumption.
@@ -59,21 +61,36 @@ public:
      * created from this function may safely outlive the OperationCPUTimers container and the
      * OperationContext, but only to simplify destruction ordering problems.
      */
-    std::unique_ptr<OperationCPUTimer> makeTimer();
+    virtual OperationCPUTimer makeTimer() = 0;
 
-    void onThreadAttach();
-    void onThreadDetach();
+    /**
+     * Attaches the current thread.
+     * Must be called when no thread is attached.
+     */
+    virtual void onThreadAttach() = 0;
 
-    size_t count() const;
+    /**
+     * Detaches the current thread.
+     * Must be called from the thread that is currently attached.
+     */
+    virtual void onThreadDetach() = 0;
 
-private:
-    using Iterator = std::list<mongo::OperationCPUTimer*>::iterator;
-    Iterator _add(OperationCPUTimer* timer);
-    void _remove(Iterator it);
+    /**
+     * Returns the number of running timers.
+     */
+    virtual size_t runningCount() const = 0;
 
-    // List of active timers on this OperationContext. When an OperationCPUTimer is constructed, it
-    // will add itself to this list and remove itself on destruction.
-    inline_memory::List<OperationCPUTimer*, 1> _timers;
+protected:
+    /**
+     * Returns the cpu thread time accumulated so far for this thread. Excludes the time when the
+     * thread is detached.
+     * Must be called from the thread that is currently attached.
+     */
+    virtual Nanoseconds _getOperationThreadTime() const = 0;
+
+    virtual void _onTimerStart() = 0;
+
+    virtual void _onTimerStop() = 0;
 };
 
 /**
@@ -95,28 +112,33 @@ private:
  */
 class OperationCPUTimer {
 public:
-    OperationCPUTimer(const std::shared_ptr<OperationCPUTimers>& timers);
-    virtual ~OperationCPUTimer();
+    explicit OperationCPUTimer(OperationCPUTimers** timers);
+    ~OperationCPUTimer();
 
-    virtual Nanoseconds getElapsed() const = 0;
+    Nanoseconds getElapsed() const;
 
-    virtual void start() = 0;
-    virtual void stop() = 0;
-
-    virtual void onThreadAttach() = 0;
-    virtual void onThreadDetach() = 0;
-
-    // Called by owning operation to indicate that the operation has ended and any pointers to the
-    // OperationCPUTimers are no longer valid. The timer will continue to function correctly.
-    void onOperationEnded();
+    void start();
+    void stop();
 
 private:
+    OperationCPUTimers* getTimers() {
+        return *_timers;
+    }
+
+    const OperationCPUTimers* getTimers() const {
+        return *_timers;
+    }
+
     // Weak reference to OperationContext-owned tracked list of timers. The Timers container can be
     // destructed before this Timer.
-    std::weak_ptr<OperationCPUTimers> _timers;
+    OperationCPUTimers** _timers;
 
-    // Iterator position to speed up deletion from the list of timers for this operation.
-    OperationCPUTimers::Iterator _it;
+    // Whether the timer is running.
+    bool _timerIsRunning;
+
+    // Total time adjustment accrued so far. Includes the time when timer was started (as negative)
+    // and time when timer was stopped (as positive).
+    Nanoseconds _elapsedAdjustment;
 };
 
 }  // namespace mongo
