@@ -54,7 +54,7 @@ Sometimes the workload generates enough new data that eviction is unable to redu
 and more new content is put into cache that can be removed by eviction. In such a case application
 threads are also forced to do the work of eviction workers threads, before they can read or write more data.
 
-Eviction triggers and targets
+@section eviction_triggers Eviction triggers and targets
 
 WiredTiger provides several configuration options for tuning how pages are evicted from
 the cache.
@@ -85,5 +85,30 @@ cache contains at least this many bytes of updates.
 
 It is worth noting that for all eviction target and trigger sizes, the target size must be lower
 than its trigger size counterpart.
+
+@section eviction_locking Locking
+
+Internally eviction uses the following locks:
+
+- \c cache->evict_pass_lock - Guarantees that only one eviction server is running at most.
+- \c cache->evict_walk_lock - Locked when eviction walks a tree.
+- \c cache->evict_queue_lock - Access to cache->evict_queues.
+- \c queue->evict_lock - Access to a specific eviction queue.
+
+Locking order:
+
+- Eviction server:
+  - lock \c cache->evict_pass_lock
+    - trylock \c cache->evict_walk_lock
+      - lock \c cache->evict_queue_lock
+        - lock \c queue->evict_lock
+- Non-eviction server threads:
+  - lock \c cache->evict_walk_lock
+    - lock \c cache->evict_pass_lock
+      - lock \c cache->evict_queue_lock
+        - lock \c queue->evict_lock
+- Eviction queue access:
+  - lock \c cache->evict_queue_lock
+    - lock \c queue->evict_lock
 
 */

@@ -27,9 +27,9 @@ evicted.
 
 There are three types of eviction in WiredTiger:
 
-1) Clean eviction
-2) History store eviction
-3) Update restore eviction
+1. Clean eviction
+2. History store eviction
+3. Update restore eviction
 
 @section clean_eviction Clean eviction
 

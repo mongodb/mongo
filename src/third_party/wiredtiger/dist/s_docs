@@ -13,12 +13,6 @@ export LC_ALL
 # Skip this when building release packages: docs are built separately
 test -n "$WT_RELEASE_BUILD" && exit 0
 
-# We require doxygen which may not be installed.
-type doxygen > /dev/null 2>&1 || {
-    echo "$0 skipped: doxygen not found"
-    exit 0
-}
-
 [[ -z "$( {
         echo ../bench/wtperf/wtperf_opt_inline.h
         find ../src/docs/
@@ -107,7 +101,7 @@ structurechk()
 spellchk()
 {
     # If aspell has been installed, run a spell check.
-    type aspell > /dev/null 2>&1 || (echo "Cannot find aspell!"; exit 1)
+    type aspell > /dev/null 2>&1 || { echo "$0 skipped: aspell not found"; return 0; }
 
     # Make sure custom spellings are sorted.
     custom_spellings=../src/docs/spell.ok
@@ -192,6 +186,23 @@ check_docs_data()
 
 build()
 {
+    # We require doxygen which may not be installed.
+    type doxygen > /dev/null 2>&1 || {
+        echo "$0 skipped: doxygen not found"
+        exit 0
+    }
+
+    # Do not build the documentation if doxygen version is not compatible.
+    v=$(doxygen --version)
+    case "$v" in
+        1.8.17) doxyfile="Doxyfile";;
+        1.9.1) doxyfile="Doxyfile.9";;
+        1.9.3) doxyfile="Doxyfile.9";;
+        *)
+            echo "$0 skipped: unsupported version of doxygen: $v, not 1.8.17, 1.9.1, or 1.9.3"
+            exit 0
+    esac
+
     # Build from scratch on demand.
     [ "$1" -eq 0 ] || (cd .. && rm -rf docs && mkdir docs)
 
@@ -243,17 +254,6 @@ EOF
         rm -f "${doxy_logfile}"
     fi
 }
-
-# Do not build the documentation if doxygen version is not compatible.
-v=$(doxygen --version)
-case "$v" in
-    1.8.17) doxyfile="Doxyfile";;
-    1.9.1) doxyfile="Doxyfile.9";;
-    1.9.3) doxyfile="Doxyfile.9";;
-    *)
-        echo "$0 skipped: unsupported version of doxygen: $v, not 1.8.17, 1.9.1, or 1.9.3"
-        exit 0
-esac
 
 clean=0
 additional_languages=1
