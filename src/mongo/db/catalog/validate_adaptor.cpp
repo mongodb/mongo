@@ -149,8 +149,9 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        const RecordId& recordId,
                                        const RecordData& record,
                                        size_t* dataSize,
-                                       ValidateResults* results) {
-    const Status status = validateBSON(record.data(), record.size());
+                                       ValidateResults* results,
+                                       ValidationVersion validationVersion) {
+    const Status status = validateBSON(record.data(), record.size(), validationVersion);
     if (!status.isOK())
         return status;
 
@@ -557,7 +558,8 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
 
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           ValidateResults* results,
-                                          BSONObjBuilder* output) {
+                                          BSONObjBuilder* output,
+                                          ValidationVersion validationVersion) {
     _numRecords = 0;  // need to reset it because this function can be called more than once.
     long long dataSizeTotal = 0;
     long long interruptIntervalNumBytes = 0;
@@ -607,7 +609,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         interruptIntervalNumBytes += dataSize;
         dataSizeTotal += dataSize;
         size_t validatedSize = 0;
-        Status status = validateRecord(opCtx, record->id, record->data, &validatedSize, results);
+        Status status = validateRecord(
+            opCtx, record->id, record->data, &validatedSize, results, validationVersion);
 
         // Log the out-of-order entries as errors.
         //

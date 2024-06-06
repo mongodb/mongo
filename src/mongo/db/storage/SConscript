@@ -90,6 +90,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/bson_validate',
     ],
 )
 
@@ -389,6 +390,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/bson_validate',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/server_options_core',
     ],
@@ -645,6 +647,7 @@ env.CppLibfuzzerTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/bson_validate',
         'key_string',
     ],
 )

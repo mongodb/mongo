@@ -40,6 +40,7 @@ protoEnv.Library(
         '$BUILD_DIR/mongo/db/wire_version',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/bson/bson_validate',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
@@ -64,6 +65,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/bson_validate',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/stats/counters',

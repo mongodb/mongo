@@ -57,7 +57,8 @@ public:
                                   const RecordId& recordId,
                                   const RecordData& record,
                                   size_t* dataSize,
-                                  ValidateResults* results);
+                                  ValidateResults* results,
+                                  ValidationVersion validationVersion = currentValidationVersion);
 
     /**
      * Traverses the index getting index entries to validate them and keep track of the index keys
@@ -74,7 +75,8 @@ public:
      */
     void traverseRecordStore(OperationContext* opCtx,
                              ValidateResults* results,
-                             BSONObjBuilder* output);
+                             BSONObjBuilder* output,
+                             ValidationVersion validationVersion);
 
     /**
      * Validates that the number of document keys matches the number of index keys previously

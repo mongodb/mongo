@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/namespace_string.h"
 
@@ -89,7 +92,9 @@ enum class RepairMode {
 /**
  * Additional validation options that can run in any mode.
  */
-struct AdditionalOptions {};
+struct AdditionalOptions {
+    ValidationVersion validationVersion = currentValidationVersion;
+};
 
 /**
  * Expects the caller to hold no locks.

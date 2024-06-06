@@ -58,10 +58,10 @@ void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
 
 TEST(BSONValidate, Basic) {
     BSONObj x;
-    ASSERT_TRUE(x.valid());
+    ASSERT_TRUE(validateBSON(x).isOK());
 
     x = BSON("x" << 1);
-    ASSERT_TRUE(x.valid());
+    ASSERT_TRUE(validateBSON(x).isOK());
 }
 
 TEST(BSONValidate, RandomData) {
@@ -87,7 +87,7 @@ TEST(BSONValidate, RandomData) {
 
         ASSERT_EQUALS(size, o.objsize());
 
-        if (o.valid()) {
+        if (validateBSON(o).isOK()) {
             numValid++;
             jsonSize += o.jsonString().size();
             ASSERT_OK(validateBSON(o.objdata(), o.objsize()));
@@ -138,7 +138,7 @@ TEST(BSONValidate, MuckingData1) {
         data[i] = 0xc8U;
 
         numToRun++;
-        if (mine.valid()) {
+        if (validateBSON(mine).isOK()) {
             numValid++;
             jsonSize += mine.jsonString().size();
             ASSERT_OK(validateBSON(mine.objdata(), mine.objsize()));
@@ -483,6 +483,7 @@ TEST_F(BSONValidateColumn, BSONColumnInBSON) {
 
 TEST_F(BSONValidateColumn, BSONColumnMissingEOO) {
     BSONColumnBuilder cb("");
+
     cb.append(BSON("a"
                    << "deadbeef")
                   .getField("a"));

@@ -83,12 +83,15 @@ constexpr ErrorCodes::Error InvalidBSON = ErrorCodes::InvalidBSON;
 constexpr ErrorCodes::Error NonConformantBSON = ErrorCodes::NonConformantBSON;
 
 template <bool precise>
-Status _doValidateColumn(const char* originalBuffer, uint64_t maxLength);
+Status _doValidateColumn(const char* originalBuffer,
+                         uint64_t maxLength,
+                         ValidationVersion validationVersion);
 
 template <bool precise>
 class ValidateBuffer {
 public:
-    ValidateBuffer(const char* data, uint64_t maxLength) : _data(data), _maxLength(maxLength) {
+    ValidateBuffer(const char* data, uint64_t maxLength, ValidationVersion validationVersion)
+        : _data(data), _maxLength(maxLength), _validationVersion(validationVersion) {
         if constexpr (precise)
             _frames.resize(BSONDepth::getMaxAllowableDepth() + 1);
     }
@@ -233,18 +236,19 @@ private:
         return true;
     }
 
-    static const char* _validateSpecial(Cursor cursor, uint8_t type) {
+    const char* _validateSpecial(Cursor cursor, uint8_t type) {
         switch (type) {
             case BSONType::BinData: {
                 auto count = cursor.template read<uint32_t>();
                 auto subtype = cursor.template read<uint8_t>();
                 const char* columnStart = cursor.ptr;
                 cursor.skip(count);
-                if (subtype == BinDataType::Column) {
+                if (subtype == BinDataType::Column && _validationVersion >= V2_Column) {
                     /* do not pass down cursor; we want to reset the nesting depth */
-                    uassert(NonConformantBSON,
-                            "Invalid BSON column",
-                            _doValidateColumn<precise>(columnStart, count).isOK());
+                    uassert(
+                        NonConformantBSON,
+                        "Invalid BSON column",
+                        _doValidateColumn<precise>(columnStart, count, _validationVersion).isOK());
                 }
                 break;
             }
@@ -373,12 +377,15 @@ private:
     typename Frames::iterator _currFrame;  // Frame currently being validated.
     Frames _frames;  // Has end pointers to check and the containing element for precise mode.
     bool _firstFrameUpdated = false;  // Has the first frame received nested while measuring an elem
+    ValidationVersion _validationVersion;
 };
 
 template <bool precise>
 class ColumnValidator {
 public:
-    static Status doValidateBSONColumn(const char* originalBuffer, int maxLength) noexcept {
+    static Status doValidateBSONColumn(const char* originalBuffer,
+                                       int maxLength,
+                                       ValidationVersion validationVersion) noexcept {
         // run control pointer through to end of buffer
         // run over literal data as directed by lengths from control
         // check formatting of Simple8B blocks
@@ -411,7 +418,8 @@ public:
                         return Status::OK();
                     }
                 } else if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
-                    ptr += ValidateBuffer<precise>(ptr, end - ptr).validateAndMeasureElem();
+                    ptr += ValidateBuffer<precise>(ptr, end - ptr, validationVersion)
+                               .validateAndMeasureElem();
                 } else if (bsoncolumn::isInterleavedStartControlByte(control)) {
                     // interleaved objects begin with a reference object, and then a series
                     // of diff blocks for followup objects, ending with an EOO. Nesting interleaved
@@ -445,34 +453,48 @@ public:
 };
 
 template <bool precise>
-Status _doValidateColumn(const char* originalBuffer, uint64_t maxLength) {
+Status _doValidateColumn(const char* originalBuffer,
+                         uint64_t maxLength,
+                         ValidationVersion validationVersion) {
     if constexpr (precise) {
         // First try validating using the fast but less precise version. That version will return
         // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases
         // and actual failures will rerun the precise version that gives a detailed error context.
-        if (MONGO_likely(
-                ColumnValidator<false>::doValidateBSONColumn(originalBuffer, maxLength).isOK()))
+        if (MONGO_likely(ColumnValidator<false>::doValidateBSONColumn(
+                             originalBuffer, maxLength, validationVersion)
+                             .isOK()))
             return Status::OK();
 
-        return ColumnValidator<true>::doValidateBSONColumn(originalBuffer, maxLength);
+        return ColumnValidator<true>::doValidateBSONColumn(
+            originalBuffer, maxLength, validationVersion);
     } else {
-        return ColumnValidator<false>::doValidateBSONColumn(originalBuffer, maxLength);
+        return ColumnValidator<false>::doValidateBSONColumn(
+            originalBuffer, maxLength, validationVersion);
     }
 }
 }  // namespace
 
-Status validateBSON(const char* originalBuffer, uint64_t maxLength) noexcept {
+Status validateBSON(const char* originalBuffer,
+                    uint64_t maxLength,
+                    ValidationVersion validationVersion) noexcept {
     // First try validating using the fast but less precise version. That version will return
     // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases and
     // actual failures will rerun the precise version that gives a detailed error context.
-    if (MONGO_likely(ValidateBuffer<false>(originalBuffer, maxLength).validate().isOK()))
+    if (MONGO_likely(
+            ValidateBuffer<false>(originalBuffer, maxLength, validationVersion).validate().isOK()))
         return Status::OK();
 
-    return ValidateBuffer<true>(originalBuffer, maxLength).validate();
+    return ValidateBuffer<true>(originalBuffer, maxLength, validationVersion).validate();
 }
 
-Status validateBSONColumn(const char* originalBuffer, int maxLength) noexcept {
-    return _doValidateColumn<true>(originalBuffer, maxLength);
+Status validateBSON(const BSONObj& obj, ValidationVersion validationVersion) noexcept {
+    return validateBSON(obj.objdata(), obj.objsize(), validationVersion);
+}
+
+Status validateBSONColumn(const char* originalBuffer,
+                          int maxLength,
+                          ValidationVersion validationVersion) noexcept {
+    return _doValidateColumn<true>(originalBuffer, maxLength, validationVersion);
 }
 
 }  // namespace mongo

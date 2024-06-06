@@ -31,10 +31,22 @@
 
 #include "mongo/platform/basic.h"
 
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_validate_gen.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/record_store.h"
@@ -331,6 +343,10 @@ public:
         }
 
         CollectionValidation::AdditionalOptions additionalOptions;
+        additionalOptions.validationVersion = getTestCommandsEnabled()
+            ? (ValidationVersion)bsonTestValidationVersion
+            : currentValidationVersion;
+
         ValidateResults validateResults;
         Status status = CollectionValidation::validate(opCtx,
                                                        nss,

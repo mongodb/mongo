@@ -89,6 +89,8 @@ ValidateState::ValidateState(OperationContext* opCtx,
                   str::stream() << "Collection '" << _nss << "' does not exist to validate.");
     }
 
+    _validationVersion = additionalOptions.validationVersion;
+
     // RepairMode is incompatible with the ValidateModes kBackground and
     // kForegroundFullEnforceFastCount.
     if (fixErrors()) {

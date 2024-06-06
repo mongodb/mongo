@@ -35,6 +35,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include "mongo/base/initializer.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/json.h"
@@ -194,7 +195,7 @@ protected:
 
         // convert the message into an OpMessage to examine its BSON
         auto outputOpMsg = mongo::OpMsg::parseOwned(outputMessage);
-        ASSERT(outputOpMsg.body.valid());
+        ASSERT_OK(mongo::validateBSON(outputOpMsg.body));
         return outputOpMsg.body;
     }
 
@@ -407,7 +408,7 @@ TEST_F(MongodbCAPITest, ReadDB) {
     auto outputBSON = performRpc(client, findMsg);
 
 
-    ASSERT(outputBSON.valid());
+    ASSERT_OK(mongo::validateBSON(outputBSON));
     ASSERT(outputBSON.hasField("cursor"));
     ASSERT(outputBSON.getField("cursor").embeddedObject().hasField("firstBatch"));
     mongo::BSONObj arrObj =
@@ -432,7 +433,7 @@ TEST_F(MongodbCAPITest, InsertAndRead) {
         "{insert: 'collection_name', documents: [{firstName: 'Mongo', lastName: 'DB', age: 10}]}");
     auto insertOpMsg = mongo::OpMsgRequest::fromDBAndBody("db_name", insertObj);
     auto outputBSON1 = performRpc(client, insertOpMsg);
-    ASSERT(outputBSON1.valid());
+    ASSERT_OK(mongo::validateBSON(outputBSON1));
     ASSERT(outputBSON1.hasField("n"));
     ASSERT(outputBSON1.getIntField("n") == 1);
     ASSERT(outputBSON1.hasField("ok"));
@@ -441,7 +442,7 @@ TEST_F(MongodbCAPITest, InsertAndRead) {
     mongo::BSONObj findObj = mongo::fromjson("{find: 'collection_name', limit: 1}");
     auto findMsg = mongo::OpMsgRequest::fromDBAndBody("db_name", findObj);
     auto outputBSON2 = performRpc(client, findMsg);
-    ASSERT(outputBSON2.valid());
+    ASSERT_OK(mongo::validateBSON(outputBSON2));
     ASSERT(outputBSON2.hasField("cursor"));
     ASSERT(outputBSON2.getField("cursor").embeddedObject().hasField("firstBatch"));
     mongo::BSONObj arrObj =
@@ -467,7 +468,7 @@ TEST_F(MongodbCAPITest, InsertAndReadDifferentClients) {
         "{insert: 'collection_name', documents: [{firstName: 'Mongo', lastName: 'DB', age: 10}]}");
     auto insertOpMsg = mongo::OpMsgRequest::fromDBAndBody("db_name", insertObj);
     auto outputBSON1 = performRpc(client1, insertOpMsg);
-    ASSERT(outputBSON1.valid());
+    ASSERT_OK(mongo::validateBSON(outputBSON1));
     ASSERT(outputBSON1.hasField("n"));
     ASSERT(outputBSON1.getIntField("n") == 1);
     ASSERT(outputBSON1.hasField("ok"));
@@ -476,7 +477,7 @@ TEST_F(MongodbCAPITest, InsertAndReadDifferentClients) {
     mongo::BSONObj findObj = mongo::fromjson("{find: 'collection_name', limit: 1}");
     auto findMsg = mongo::OpMsgRequest::fromDBAndBody("db_name", findObj);
     auto outputBSON2 = performRpc(client2, findMsg);
-    ASSERT(outputBSON2.valid());
+    ASSERT_OK(mongo::validateBSON(outputBSON2));
     ASSERT(outputBSON2.hasField("cursor"));
     ASSERT(outputBSON2.getField("cursor").embeddedObject().hasField("firstBatch"));
     mongo::BSONObj arrObj =
@@ -501,7 +502,7 @@ TEST_F(MongodbCAPITest, InsertAndDelete) {
         "age: 10}]}");
     auto insertOpMsg = mongo::OpMsgRequest::fromDBAndBody("db_name", insertObj);
     auto outputBSON1 = performRpc(client, insertOpMsg);
-    ASSERT(outputBSON1.valid());
+    ASSERT_OK(mongo::validateBSON(outputBSON1));
     ASSERT(outputBSON1.hasField("n"));
     ASSERT(outputBSON1.getIntField("n") == 1);
     ASSERT(outputBSON1.hasField("ok"));
@@ -514,7 +515,7 @@ TEST_F(MongodbCAPITest, InsertAndDelete) {
         "1}]}");
     auto deleteOpMsg = mongo::OpMsgRequest::fromDBAndBody("db_name", deleteObj);
     auto outputBSON2 = performRpc(client, deleteOpMsg);
-    ASSERT(outputBSON2.valid());
+    ASSERT_OK(mongo::validateBSON(outputBSON2));
     ASSERT(outputBSON2.hasField("n"));
     ASSERT(outputBSON2.getIntField("n") == 1);
     ASSERT(outputBSON2.hasField("ok"));
@@ -530,7 +531,7 @@ TEST_F(MongodbCAPITest, InsertAndUpdate) {
         "age: 10}]}");
     auto insertOpMsg = mongo::OpMsgRequest::fromDBAndBody("db_name", insertObj);
     auto outputBSON1 = performRpc(client, insertOpMsg);
-    ASSERT(outputBSON1.valid());
+    ASSERT_OK(mongo::validateBSON(outputBSON1));
     ASSERT(outputBSON1.hasField("n"));
     ASSERT(outputBSON1.getIntField("n") == 1);
     ASSERT(outputBSON1.hasField("ok"));
@@ -543,7 +544,7 @@ TEST_F(MongodbCAPITest, InsertAndUpdate) {
         "{age: 5}}}]}");
     auto updateOpMsg = mongo::OpMsgRequest::fromDBAndBody("db_name", updateObj);
     auto outputBSON2 = performRpc(client, updateOpMsg);
-    ASSERT(outputBSON2.valid());
+    ASSERT_OK(mongo::validateBSON(outputBSON2));
     ASSERT(outputBSON2.hasField("ok"));
     ASSERT(outputBSON2.getField("ok").numberDouble() == 1.0);
     ASSERT(outputBSON2.hasField("nModified"));

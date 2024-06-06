@@ -168,6 +168,10 @@ public:
         return _logDiagnostics;
     }
 
+    ValidationVersion validationVersion() const {
+        return _validationVersion;
+    }
+
     boost::optional<Timestamp> getValidateTimestamp() {
         return _validateTs;
     }
@@ -210,6 +214,7 @@ private:
     ValidateMode _mode;
     RepairMode _repairMode;
     bool _collectionSchemaViolated = false;
+    ValidationVersion _validationVersion = currentValidationVersion;
 
     boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;
     boost::optional<Lock::GlobalLock> _globalLock;

@@ -328,10 +328,6 @@ BSONObj BSONObj::jsonStringBuffer(JsonStringFormat format,
     }
 }
 
-bool BSONObj::valid() const {
-    return validateBSON(objdata(), objsize()).isOK();
-}
-
 int BSONObj::woCompare(const BSONObj& r,
                        const Ordering& o,
                        ComparisonRulesSet rules,
