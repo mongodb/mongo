@@ -87,7 +87,9 @@ using namespace mongo;
  */
 class OpObserverMock : public OpObserverNoop {
 public:
-    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override;
+    void onDropDatabase(OperationContext* opCtx,
+                        const DatabaseName& dbName,
+                        bool markFromMigrate) override;
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
@@ -103,9 +105,11 @@ public:
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
-void OpObserverMock::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
+void OpObserverMock::onDropDatabase(OperationContext* opCtx,
+                                    const DatabaseName& dbName,
+                                    bool markFromMigrate) {
     ASSERT_TRUE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    OpObserverNoop::onDropDatabase(opCtx, dbName);
+    OpObserverNoop::onDropDatabase(opCtx, dbName, markFromMigrate);
     // Do not update 'droppedDatabaseNames' if OpObserverNoop::onDropDatabase() throws.
     droppedDatabaseNames.insert(dbName);
 }

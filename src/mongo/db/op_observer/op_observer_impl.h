@@ -176,7 +176,9 @@ public:
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo) final;
-    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;
+    void onDropDatabase(OperationContext* opCtx,
+                        const DatabaseName& dbName,
+                        bool markFromMigrate) final;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,

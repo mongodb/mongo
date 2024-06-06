@@ -217,6 +217,10 @@ NSS_CONSTANT(kShardCollectionCatalogNamespace, DatabaseName::kConfig, "shard.col
 // Namespace used for storing NamespacePlacementType docs on the CSRS.
 NSS_CONSTANT(kConfigsvrPlacementHistoryNamespace, DatabaseName::kConfig, "placementHistory"_sd)
 
+// Namespace used for storing a single document with the timestamp of the latest removeShard
+// committed on the CSRS.
+NSS_CONSTANT(kConfigsvrShardRemovalLogNamespace, DatabaseName::kConfig, "shardRemovalLog"_sd)
+
 // Namespace used to store the state document of 'SetChangeStreamStateCoordinator'.
 NSS_CONSTANT(kSetChangeStreamStateCoordinatorNamespace,
              DatabaseName::kConfig,
