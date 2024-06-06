@@ -32,7 +32,6 @@
 #include <absl/functional/bind_front.h>
 
 #include "mongo/db/query/plan_executor_factory.h"
-#include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/logv2/log.h"
@@ -124,6 +123,7 @@ bool MultiPlanner::_shouldUseEofOptimization() const {
 
 void MultiPlanner::_buildSbePlanAndMaybeCache(
     const CanonicalQuery& queryToCache,
+    MultiPlanStage& mps,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
     std::vector<plan_ranker::CandidatePlan>& candidates) {
     invariant(queryToCache.isSbeCompatible());
@@ -134,14 +134,8 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
 
     boost::optional<NumReads> numReads;
     if (_shouldWriteToPlanCache) {
-        // Compute 'numReads'.
         auto stats = _multiPlanStage->getStats();
-        auto winnerIdx = ranking->candidateOrder[0];
-        auto summary = collectExecutionStatsSummary(stats.get(), winnerIdx);
-        tassert(8523807,
-                "Expected StatsDetails in classic runtime planner ranking decision.",
-                std::holds_alternative<plan_ranker::StatsDetails>(ranking->stats));
-        numReads = NumReads{summary.totalKeysExamined + summary.totalDocsExamined};
+        numReads = plan_cache_util::computeNumReadsFromWorks(*stats, *ranking);
     }
 
     // If classic plan cache is enabled, write to it. We need to do this before we extend the QSN

@@ -256,4 +256,110 @@ for (let pipe of [subQuery1, subQuery2]) {
     });
 }
 
+jsTestLog("Running test which forces SubPlanner to plan the entire query");
+
+// Now we run a query where the planner attempts to use subplanning, but ends up planning the whole
+// query as one.
+{
+    coll.dropIndexes()
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(coll.createIndex({b: 1}));
+    assert.commandWorked(coll.createIndex({x: 1}));
+
+    function checkProfilerAndCache({isActive, isPinned, fromPlanCache, worksType}) {
+        const profileObj =
+            getLatestProfilerEntry(db, {op: {$in: ["command", "query"]}, ns: coll.getFullName()});
+
+        if (fromPlanCache) {
+            assert.eq(profileObj.fromPlanCache, true, profileObj);
+        } else {
+            // x:1 index was used.
+            assert.eq(/x: 1/g.test(profileObj.planSummary), true);
+            assert(!("fromPlanCache" in profileObj));
+        }
+
+        const engineUsed = profileObj.queryFramework;
+
+        const cacheEntries =
+            coll.aggregate([{$planCacheStats: {}}, {$match: {queryHash: profileObj.queryHash}}])
+                .toArray();
+        assert.eq(cacheEntries.length, 1);
+        const cacheEntry = cacheEntries[0];
+
+        if (engineUsed == "sbe") {
+            assert.eq(cacheEntry.queryHash, profileObj.queryHash);
+            assert.eq(cacheEntry.planCacheKey, profileObj.planCacheKey);
+            assert.eq(cacheEntry.isActive, isActive);
+
+            // It must be tracking reads if the query ran in SBE.
+            if (isPinned) {
+                assert(!("worksType" in cacheEntry));
+            } else {
+                assert.eq(cacheEntry.worksType, "reads");
+            }
+
+            if (sbePlanCacheEnabled) {
+                assert.eq(cacheEntry.version, "2");
+            } else {
+                assert.eq(cacheEntry.version, "1");
+            }
+        } else {
+            // There should be a cache entry tracking 'works'.
+            assert.eq(cacheEntry.version, "1");
+            assert.eq(cacheEntry.worksType, "works");
+        }
+    }
+
+    const kFilter = {$or: [{a: 1}, {b: 1}]};
+
+    // First run the query as a simple find command.
+    {
+        // First run.
+        assert.eq(coll.find(kFilter).sort({x: 1}).itcount(), 100);
+        checkProfilerAndCache({
+            // When the SBE plan cache is used, the entry will be pinned and enabled immediately.
+            isActive: sbePlanCacheEnabled,
+            isPinned: sbePlanCacheEnabled,
+            fromPlanCache: false
+        });
+
+        // Second run.
+        assert.eq(coll.find(kFilter).sort({x: 1}).itcount(), 100);
+        checkProfilerAndCache(
+            {isActive: true, isPinned: sbePlanCacheEnabled, fromPlanCache: sbePlanCacheEnabled});
+
+        // Third run.
+        assert.eq(coll.find(kFilter).sort({x: 1}).itcount(), 100);
+        checkProfilerAndCache({isActive: true, isPinned: sbePlanCacheEnabled, fromPlanCache: true});
+    }
+
+    coll.getPlanCache().clear();
+
+    // Now run the same series of tests, but using an SBE-eligible aggregation pipeline.
+    {
+        const pipe = [
+            {$match: kFilter},
+            {$sort: {x: 1}},
+            // We use an order-sensitive accumulator so that the $sort cannot be removed.
+            {$group: {_id: "$b", max: {$push: "$unknownField"}}}
+        ];
+
+        // First run.
+        assert.eq(coll.aggregate(pipe).itcount(), 100);
+        checkProfilerAndCache({
+            // When the SBE plan cache is used, the entry will be pinned and enabled immediately.
+            isActive: sbePlanCacheEnabled,
+            isPinned: sbePlanCacheEnabled,
+            fromPlanCache: false
+        });
+
+        assert.eq(coll.aggregate(pipe).itcount(), 100);
+        checkProfilerAndCache(
+            {isActive: true, isPinned: sbePlanCacheEnabled, fromPlanCache: sbePlanCacheEnabled});
+
+        assert.eq(coll.aggregate(pipe).itcount(), 100);
+        checkProfilerAndCache({isActive: true, isPinned: sbePlanCacheEnabled, fromPlanCache: true});
+    }
+}
+
 MongoRunner.stopMongod(conn);

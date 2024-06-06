@@ -307,7 +307,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     // Invoke the callback provided on construction, passing 'ranking' and '_candidates' to describe
     // the results of plan selection.
-    _onPickBestPlan(*_query, std::move(ranking), _candidates);
+    _onPickBestPlan(*_query, *this, std::move(ranking), _candidates);
 
     removeRejectedPlans();
 

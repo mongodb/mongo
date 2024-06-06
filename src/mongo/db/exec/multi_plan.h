@@ -76,6 +76,7 @@ public:
      * vector of candidate plans describe the outcome of multi-planning.
      */
     using OnPickBestPlan = std::function<void(const CanonicalQuery&,
+                                              MultiPlanStage& mps,
                                               std::unique_ptr<plan_ranker::PlanRankingDecision>,
                                               std::vector<plan_ranker::CandidatePlan>&)>;
 

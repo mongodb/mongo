@@ -89,6 +89,7 @@ SubplanStage::PlanSelectionCallbacks SubPlanner::makeCallbacks() {
         return SubplanStage::PlanSelectionCallbacks{
             .onPickPlanForBranch =
                 [this](const CanonicalQuery&,
+                       MultiPlanStage& mps,
                        std::unique_ptr<plan_ranker::PlanRankingDecision>,
                        std::vector<plan_ranker::CandidatePlan>&) { ++_numPerBranchMultiplans; },
             .onPickPlanWholeQuery = plan_cache_util::NoopPlanCacheWriter{},
@@ -103,16 +104,22 @@ SubplanStage::PlanSelectionCallbacks SubPlanner::makeCallbacks() {
         plan_cache_util::ConditionalClassicPlanCacheWriter perBranchWriter{
             plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
             opCtx(),
-            collections().getMainCollectionPtrOrAcquisition()};
+            collections().getMainCollectionPtrOrAcquisition(),
+            false /* executeInSbe. We set this to false because the cache entry created by this
+                     callback is only used by the SubPlanner. It is not used for constructing a
+                     final execution plan.  This is marked by a special byte in the plan cache key
+                     which indicates that the entry is used for subplanning only.
+                   */};
 
         // Wrap the conditional classic plan cache writer function object so that we can count the
         // number of times that multi-planning gets invoked for an $or branch.
         auto perBranchCallback = [this, capturedPerBranchWriter = std::move(perBranchWriter)](
                                      const CanonicalQuery& cq,
+                                     MultiPlanStage& mps,
                                      std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
                                      std::vector<plan_ranker::CandidatePlan>& candidates) {
             ++_numPerBranchMultiplans;
-            capturedPerBranchWriter(cq, std::move(ranking), candidates);
+            capturedPerBranchWriter(cq, mps, std::move(ranking), candidates);
         };
 
         // The query will run in SBE but we are using the classic plan cache. Use callbacks to write
@@ -121,7 +128,9 @@ SubplanStage::PlanSelectionCallbacks SubPlanner::makeCallbacks() {
             .onPickPlanForBranch = std::move(perBranchCallback),
             .onPickPlanWholeQuery =
                 plan_cache_util::ClassicPlanCacheWriter{
-                    opCtx(), collections().getMainCollectionPtrOrAcquisition()},
+                    opCtx(),
+                    collections().getMainCollectionPtrOrAcquisition(),
+                    true /* executeInSbe */},
         };
     }
 }

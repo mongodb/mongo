@@ -134,11 +134,11 @@ public:
                     plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
                     opCtx(),
                     &coll,
+                    false /* executeInSbe */
                 },
             .onPickPlanWholeQuery =
                 plan_cache_util::ClassicPlanCacheWriter{
-                    opCtx(),
-                    &coll,
+                    opCtx(), &coll, false /* executeInSbe */
                 },
         };
 

@@ -38,8 +38,8 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
         cq()->getExpCtxRaw(),
         collections().getMainCollectionPtrOrAcquisition(),
         cq(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx(),
-                                                collections().getMainCollectionPtrOrAcquisition()});
+        plan_cache_util::ClassicPlanCacheWriter{
+            opCtx(), collections().getMainCollectionPtrOrAcquisition(), false /* executeInSbe */});
     _multiplanStage = stage.get();
     for (auto&& solution : solutions) {
         solution->indexFilterApplied = plannerParams().indexFiltersApplied;
