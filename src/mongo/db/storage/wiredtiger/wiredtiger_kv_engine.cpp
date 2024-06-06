@@ -2848,7 +2848,8 @@ Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx, const AutoCompac
 
     WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn()->getSession();
     int ret = s->compact(s, nullptr, config.str().c_str());
-    status = wtRCToStatus(ret, s, "WiredTigerKVEngine::autoCompact()");
+    status = wtRCToStatus(
+        ret, s, "Failed to configure auto compact, please double check it is not already enabled.");
     if (!status.isOK())
         LOGV2_ERROR(8704101,
                     "WiredTigerKVEngine::autoCompact() failed",
