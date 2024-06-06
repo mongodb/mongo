@@ -3,7 +3,5 @@
 base_suite: core
 overrides:
   - "minimum_batch_size.enable_override"
-eval:
-  - "minimum_batch_size.enable_eval"
 excludes:
   - "minimum_batch_size.excluded_files"

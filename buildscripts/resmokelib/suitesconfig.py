@@ -333,22 +333,23 @@ class MatrixSuiteConfig(SuiteConfigInterface):
 
         if eval_names:
             for eval_name in eval_names:
-                eval_dict = overrides[eval_name]
-                if len(eval_dict) != 1 or next(iter(eval_dict)) != "eval":
-                    raise ValueError("Root key but be 'eval' for the eval tag.")
+                if eval_name in overrides:
+                    eval_dict = overrides[eval_name]
+                    if len(eval_dict) != 1 or next(iter(eval_dict)) != "eval":
+                        raise ValueError("Root key but be 'eval' for the eval tag.")
 
-                value = eval_dict["eval"]
+                    value = eval_dict["eval"]
 
-                if not isinstance(value, str):
-                    raise ValueError("the eval field must be a list")
+                    if not isinstance(value, str):
+                        raise ValueError("the eval field must be a list")
 
-                path = ["executor", "config", "shell_options", "eval"]
-                base_value = get_dict_value(res, path)
+                    path = ["executor", "config", "shell_options", "eval"]
+                    base_value = get_dict_value(res, path)
 
-                if base_value:
-                    set_dict_value(res, path, base_value + "; " + value)
-                else:
-                    set_dict_value(res, path, value)
+                    if base_value:
+                        set_dict_value(res, path, base_value + "; " + value)
+                    else:
+                        set_dict_value(res, path, value)
 
         if extends_names:
             for extends_name in extends_names:

@@ -127,6 +127,14 @@ last-continuous:
       ticket: SERVER-90157
     - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_negative.js
       ticket: SERVER-90833
+    - test_file: jstests/core/query/find/finda.js
+      ticket: SERVER-87285
+    - test_file: jstests/core/query/find/find9.js
+      ticket: SERVER-87285
+    - test_file: jstests/core/query/find/find_getmore_cmd.js
+      ticket: SERVER-87285
+    - test_file: jstests/core/exhaust.js
+      ticket: SERVER-87285
   suites: null
 last-lts:
   all:
@@ -236,4 +244,12 @@ last-lts:
       ticket: SERVER-90157
     - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_negative.js
       ticket: SERVER-90833
+    - test_file: jstests/core/query/find/finda.js
+      ticket: SERVER-87285
+    - test_file: jstests/core/query/find/find9.js
+      ticket: SERVER-87285
+    - test_file: jstests/core/query/find/find_getmore_cmd.js
+      ticket: SERVER-87285
+    - test_file: jstests/core/exhaust.js
+      ticket: SERVER-87285
   suites: null

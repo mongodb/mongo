@@ -7,7 +7,10 @@
 let t = db.jstests_finda;
 t.drop();
 
+const findCommandBatchSize = assert.commandWorked(db.adminCommand(
+    {getParameter: 1, internalQueryFindCommandBatchSize: 1}))["internalQueryFindCommandBatchSize"];
 let numDocs = 200;
+const maxResultSize = Math.min(findCommandBatchSize, numDocs);
 
 function clearQueryPlanCache() {
     t.createIndex({c: 1});
@@ -54,11 +57,7 @@ function checkCursorWithBatchSizeProjection(
     query, projection, sort, batchSize, expectedLeftInBatch) {
     clearQueryPlanCache();
     let cursor = makeCursor(query, projection, sort, batchSize);
-    if (TestData.batchSize && batchSize == null) {
-        expectedLeftInBatch = Math.min(TestData.batchSize, expectedLeftInBatch);
-    }
 
-    // XXX: this
     assert.eq(expectedLeftInBatch, cursor.objsLeftInBatch());
     assertAllFound(cursor.toArray());
 }
@@ -101,11 +100,11 @@ function queryWithPlanTypes(withDups) {
     checkCursorWithBatchSize({a: {$gte: 0}}, null, 150, 150);
 
     // All plans out of order.
-    checkCursorWithBatchSize({a: {$gte: 0}}, {c: 1}, null, 101);
+    checkCursorWithBatchSize({a: {$gte: 0}}, {c: 1}, null, maxResultSize);
 
     // Some plans in order, some out of order.
     checkCursorWithBatchSize({a: {$gte: 0}, b: 0}, {a: 1}, 150, 150);
-    checkCursorWithBatchSize({a: {$gte: 0}, b: 0}, {a: 1}, null, 101);
+    checkCursorWithBatchSize({a: {$gte: 0}, b: 0}, {a: 1}, null, maxResultSize);
 }
 
 queryWithPlanTypes(false);

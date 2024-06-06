@@ -837,7 +837,7 @@ public:
             // size of 0 means we actually want an empty first batch, unlike in get_more. We
             // also don't pre-allocate space for results here.
             const auto batchSize =
-                originalFC.getBatchSize().get_value_or(query_request_helper::kDefaultBatchSize);
+                originalFC.getBatchSize().get_value_or(query_request_helper::getDefaultBatchSize());
 
             try {
                 numResults = batchedExecute(batchSize, exec.get(), firstBatch, docUnitsReturned);

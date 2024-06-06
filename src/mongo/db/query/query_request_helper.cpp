@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -315,6 +316,10 @@ bool hasInvalidNaturalParam(const BSONObj& obj) {
     }
 
     return true;
+}
+
+long long getDefaultBatchSize() {
+    return internalQueryFindCommandBatchSize.load();
 }
 
 }  // namespace query_request_helper

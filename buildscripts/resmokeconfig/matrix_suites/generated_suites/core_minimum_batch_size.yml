@@ -13,17 +13,14 @@ executor:
   config:
     shell_options:
       crashOnInvalidBSONError: ''
-      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");;
-        await import("jstests/libs/override_methods/find_batch_size.js");
-      global_vars:
-        TestData:
-          batchSize: 2
+      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
       objcheck: ''
   fixture:
     class: MongoDFixture
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryFindCommandBatchSize: 2
   hooks:
   - class: ValidateCollections
     shell_options:
@@ -42,6 +39,10 @@ selector:
   - jstests/core/**/profile2.js
   - jstests/core/**/find9.js
   - jstests/core/**/express.js
+  - jstests/core/computed_projections.js
+  - jstests/core/query/sort/sortk.js
+  - jstests/core/index/covered/covered_index_sort_no_fetch_optimization.js
+  - jstests/core/index/index_bounds_pipe.js
   roots:
   - jstests/core/**/*.js
   - jstests/core_standalone/**/*.js

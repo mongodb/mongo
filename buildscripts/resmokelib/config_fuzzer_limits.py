@@ -80,9 +80,11 @@ config_fuzzer_params = {
         "flowControlSamplePeriod": {"min": 1, "max": 1000 * 1000},
         "flowControlMinTicketsPerSecond": {"min": 1, "max": 10 * 1000},
         "enableFlowControl": {"choices": [True, False]},
+        "internalQueryFindCommandBatchSize": {"min": 1, "max": 500},
     },
     "mongos": {
         "initialServiceExecutorUseDedicatedThread": {"choices": [True, False]},
         "opportunisticSecondaryTargeting": {"choices": [True, False]},
+        "internalQueryFindCommandBatchSize": {"min": 1, "max": 500},
     },
 }

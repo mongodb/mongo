@@ -1664,6 +1664,17 @@ server_parameters:
     default: false
     redact: false
 
+  internalQueryFindCommandBatchSize:
+    description: "The batch size used for find commands as a default if none is specified."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryFindCommandBatchSize"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 101
+    validator:
+      gt: 0
+    redact: false
+
   internalQueryEnableAggressiveSpillsInGroup:
     description: "Enable spilling in $group every time there is a duplicate id to stress merge logic."
     set_at: [ startup ]

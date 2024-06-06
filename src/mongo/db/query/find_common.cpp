@@ -81,7 +81,7 @@ bool FindCommon::enoughForFirstBatch(const FindCommandRequest& findCommand, long
     auto batchSize = findCommand.getBatchSize();
     if (!batchSize) {
         // We enforce a default batch size for the initial find if no batch size is specified.
-        return numDocs >= query_request_helper::kDefaultBatchSize;
+        return numDocs >= query_request_helper::getDefaultBatchSize();
     }
 
     return numDocs >= batchSize.value();

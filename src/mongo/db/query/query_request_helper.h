@@ -133,8 +133,6 @@ static constexpr auto metaTextScore = "textScore";
 
 static constexpr auto kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
 
-static constexpr auto kDefaultBatchSize = 101ll;
-
 void setTailableMode(TailableModeEnum tailableMode, FindCommandRequest* findCommand);
 
 TailableModeEnum getTailableMode(const FindCommandRequest& findCommand);
@@ -157,6 +155,8 @@ void addShowRecordIdMetaProj(FindCommandRequest* findCommand);
  * not equal -1 or 1.
  */
 bool hasInvalidNaturalParam(const BSONObj& obj);
+
+long long getDefaultBatchSize();
 
 }  // namespace query_request_helper
 }  // namespace mongo

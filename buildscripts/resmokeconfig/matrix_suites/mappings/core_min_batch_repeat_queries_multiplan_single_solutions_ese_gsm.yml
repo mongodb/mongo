@@ -12,7 +12,6 @@ overrides:
   - "encryption.mongodfixture_gcm"
   - "multiplan_single_solutions.enable"
 eval:
-  - "repeat_queries.enable_eval"
   - "minimum_batch_size.enable_eval"
 excludes:
   - "encryption.excluded_files"

@@ -268,7 +268,7 @@ public:
                 if (cursorOpts && cursorOpts->getBatchSize()) {
                     return (long long)*cursorOpts->getBatchSize();
                 } else {
-                    return query_request_helper::kDefaultBatchSize;
+                    return query_request_helper::getDefaultBatchSize();
                 }
             }();
             FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;

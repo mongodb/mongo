@@ -33,7 +33,7 @@ function simpleQuery(extraFields, sort, hint) {
 }
 
 function simpleQueryWithLimit(limit) {
-    if (limit < 0 && TestData.batchSize) {
+    if (limit < 0 && TestData.setParameters.internalQueryFindCommandBatchSize) {
         // A negative limit means to return everything in one batch,
         // so an overridden batchSize will change the results if we're not careful.
         return simpleQuery().batchSize(-limit).limit(limit);
