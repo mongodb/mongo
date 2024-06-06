@@ -51,7 +51,7 @@ public:
     JWKSet fetch() override;
     bool quiesce() const override;
 
-private:
+protected:
     std::string _issuer;
     ClockSource* _clock;
     synchronized_value<Date_t> _lastSuccessfulFetch;

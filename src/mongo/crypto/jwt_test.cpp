@@ -36,7 +36,7 @@
 namespace mongo::crypto::test {
 namespace {
 
-BSONObj getTestJWKSet() {
+BSONObj getCompleteTestJWKSet() {
     BSONObjBuilder set;
     BSONArrayBuilder keys(set.subarrayStart("keys"_sd));
 
@@ -74,6 +74,29 @@ BSONObj getTestJWKSet() {
     return set.obj();
 }
 
+BSONObj getPartialTestJWKSet() {
+    BSONObjBuilder set;
+    BSONArrayBuilder keys(set.subarrayStart("keys"_sd));
+
+    {
+        BSONObjBuilder key(keys.subobjStart());
+        key.append("kty", "RSA");
+        key.append("kid", "custom-key-1");
+        key.append("e", "AQAB");
+        key.append(
+            "n",
+            "ALtUlNS31SzxwqMzMR9jKOJYDhHj8zZtLUYHi3s1en3wLdILp1Uy8O6Jy0Z66tPyM1u8lke0JK5gS-40yhJ-"
+            "bvqioW8CnwbLSLPmzGNmZKdfIJ08Si8aEtrRXMxpDyz4Is7JLnpjIIUZ4lmqC3MnoZHd6qhhJb1v1Qy-"
+            "QGlk4NJy1ZI0aPc_uNEUM7lWhPAJABZsWc6MN8flSWCnY8pJCdIk_cAktA0U17tuvVduuFX_"
+            "94763nWYikZIMJS_cTQMMVxYNMf1xcNNOVFlUSJHYHClk46QT9nT8FWeFlgvvWhlXfhsp9aNAi3pX-"
+            "KxIxqF2wABIAKnhlMa3CJW41323Js");
+        key.doneFast();
+    }
+
+    keys.doneFast();
+    return set.obj();
+}
+
 void assertCorrectKeys(JWKManager* manager, BSONObj data) {
     const auto& currentKeys = manager->getKeys();
     for (const auto& key : data["keys"_sd].Obj()) {
@@ -91,8 +114,8 @@ void assertCorrectKeys(JWKManager* manager, BSONObj data) {
 TEST_F(JWKManagerTest, parseJWKSetBasicFromSource) {
     RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
 
-    auto data = getTestJWKSet();
-    jwksFetcher()->setKeys(getTestJWKSet());
+    auto data = getCompleteTestJWKSet();
+    jwksFetcher()->setKeys(getCompleteTestJWKSet());
 
     // Initially, set the fetcher to fail. This should cause the JWKManager to contain no keys
     // even after loadKeys() is called.
@@ -127,20 +150,23 @@ TEST_F(JWKManagerTest, parseJWKSetBasicFromSource) {
 TEST_F(JWKManagerTest, JWKSFetcherQuiesce) {
     RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 5);
 
-    // Initially the fetcher will return no keys.
+    // Initially the fetcher will contain no keys.
     ASSERT_EQ(jwkManager()->size(), 0);
-    ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-1"_sd));
-    ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"_sd));
 
-    // Update keys and advance for a period less than the quiesce time.
-    // Fetcher will continue to refuse to update.
-    jwksFetcher()->setKeys(getTestJWKSet());
+    // Update keys at time < quiesce period. Fetcher will JIT update since it is the initial key
+    // load.
+    jwksFetcher()->setKeys(getPartialTestJWKSet());
     getClock()->advance(Seconds{3});
-    ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-1"_sd));
+    ASSERT_OK(jwkManager()->getValidator("custom-key-1"_sd));
     ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"_sd));
-    ASSERT_EQ(jwkManager()->size(), 0);
-    ASSERT_NOT_OK(jwkManager()->loadKeys());
-    ASSERT_EQ(jwkManager()->size(), 0);
+    ASSERT_EQ(jwkManager()->size(), 1);
+
+    // Add second key at time < quiesce period. Fetcher should not update.
+    jwksFetcher()->setKeys(getCompleteTestJWKSet());
+    getClock()->advance(Seconds{3});
+    ASSERT_OK(jwkManager()->getValidator("custom-key-1"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"_sd));
+    ASSERT_EQ(jwkManager()->size(), 1);
 
     // Advance clock further, keys will now be JIT loaded.
     getClock()->advance(Seconds{3});

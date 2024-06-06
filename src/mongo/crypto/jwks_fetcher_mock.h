@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/jwks_fetcher_impl.h"
+#include "mongo/util/clock_source.h"
 
 namespace mongo::crypto {
 
@@ -51,7 +52,10 @@ public:
             uasserted(ErrorCodes::NetworkTimeout,
                       "Mock JWKS fetcher configured to simulate timeout");
         }
-        return JWKSet::parse(IDLParserContext("JWKSet"), _keys);
+
+        auto jwkSet = JWKSet::parse(IDLParserContext("JWKSet"), _keys);
+        _lastSuccessfulFetch = _clock->now();
+        return jwkSet;
     }
 
     void setShouldFail(bool shouldFail) {
