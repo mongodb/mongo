@@ -493,9 +493,10 @@ static void serializeValueIntoKeyString(KeyString::Builder& buf,
             }
             break;
         }
+        case TypeTags::bsonObjectId:
         case TypeTags::ObjectId: {
             buf.appendBool(true);
-            buf.appendBytes(getObjectIdView(val), sizeof(ObjectIdType));
+            buf.appendOID(OID::from(getRawPointerView(val)));
             break;
         }
         case TypeTags::bsonObject: {
@@ -516,11 +517,6 @@ static void serializeValueIntoKeyString(KeyString::Builder& buf,
             } else {
                 buf.appendArray(BSONArray(BSONObj(bson)));
             }
-            break;
-        }
-        case TypeTags::bsonObjectId: {
-            buf.appendBool(true);
-            buf.appendOID(OID::from(getRawPointerView(val)));
             break;
         }
         case TypeTags::bsonBinData: {
