@@ -23,6 +23,7 @@ BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
 ETC_DIR = "etc"
 BACKPORTS_REQUIRED_FILE = "backports_required_for_multiversion_tests.yml"
 BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/10gen/mongo"
+BACKPORTS_REQUIRED_BASE_URL_BACKUP = "https://raw.githubusercontent.com/mongodb/mongo"
 
 
 def get_installation_access_token(app_id: int, private_key: str,
@@ -87,11 +88,16 @@ def get_old_yaml(commit_hash, expansions_file):
         expansions["app_id_10gen_mongo"], expansions["private_key_10gen_mongo"],
         expansions["installation_id_10gen_mongo"])
 
-    response = requests.get(
-        f'{BACKPORTS_REQUIRED_BASE_URL}/{commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}',
-        headers={
-            'Authorization': f'token {access_token_10gen_mongo}',
-        })
+    url = f'{BACKPORTS_REQUIRED_BASE_URL}/{commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}'
+    response = requests.get(url, headers={
+        'Authorization': f'token {access_token_10gen_mongo}',
+    })
+
+    if response.status_code != requests.codes["ok"]:
+        print(f"Request to {url} failed with status {response.status_code}")
+        url = f'{BACKPORTS_REQUIRED_BASE_URL_BACKUP}/{commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}'
+        print(f"Trying {url} instead.")
+        response = requests.get(url)
 
     # If the response was successful, no exception will be raised.
     response.raise_for_status()
