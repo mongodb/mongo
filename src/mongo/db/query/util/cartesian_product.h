@@ -45,10 +45,15 @@ inline auto cartesian_product() {
 
 using std::cbegin;
 
+// macOS builders do not currently use a new enough clang to have std::iter_value_t.
+// This is a trivial shim.
+template <class T>
+using iter_value_t = typename std::iterator_traits<std::remove_cvref_t<T>>::value_type;
+
 // Helper to find the (const) value type of a range - i.e., the result of dereferencing an iterator
-// from the range.
+// from the range. This is used as the <ranges> header is currently forbidden.
 template <class Range>
-using range_value_t = std::iter_value_t<decltype(cbegin(std::declval<Range>()))>;
+using range_value_t = iter_value_t<decltype(cbegin(std::declval<Range>()))>;
 
 template <class... Inputs>
 using tuple_of_results_t = std::tuple<range_value_t<Inputs>...>;
