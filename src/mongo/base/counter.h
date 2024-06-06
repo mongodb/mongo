@@ -63,6 +63,11 @@ public:
         _counter.fetchAndSubtractRelaxed(n);
     }
 
+    /** Atomically store the exact value 0. */
+    void setToZero() {
+        _counter.store(0);
+    }
+
     /** Return the current value */
     long long get() const {
         return _counter.load();

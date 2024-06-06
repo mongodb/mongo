@@ -42,6 +42,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/crypto/hash_block.h"
 #include "mongo/db/catalog/util/partitioned.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
@@ -68,6 +69,7 @@ namespace mongo::query_stats {
 
 Counter64& queryStatsStoreSizeEstimateBytesMetric =
     *MetricBuilder<Counter64>{"queryStats.queryStatsStoreSizeEstimateBytes"};
+Counter64& queryStatsStoreSizeMetric = *MetricBuilder<Counter64>{"queryStats.numEntries"};
 
 const Decorable<ServiceContext>::Decoration<std::unique_ptr<QueryStatsStoreManager>>
     QueryStatsStoreManager::get =
@@ -81,6 +83,8 @@ const Decorable<ServiceContext>::Decoration<std::unique_ptr<RateLimiting>>
 namespace {
 
 auto& queryStatsEvictedMetric = *MetricBuilder<Counter64>{"queryStats.numEvicted"};
+auto& queryStatsNumParitionsMetric = *MetricBuilder<Atomic64Metric>{"queryStats.numPartitions"};
+auto& queryStatsMaxSizeBytesMetric = *MetricBuilder<Atomic64Metric>{"queryStats.maxSizeBytes"};
 auto& queryStatsRateLimitedRequestsMetric =
     *MetricBuilder<Counter64>{"queryStats.numRateLimitedRequests"};
 auto& queryStatsStoreWriteErrorsMetric =
@@ -140,6 +144,9 @@ public:
         auto& queryStatsStoreManager = QueryStatsStoreManager::get(serviceCtx);
         size_t numEvicted = queryStatsStoreManager->resetSize(cappedSize);
         queryStatsEvictedMetric.increment(numEvicted);
+        queryStatsMaxSizeBytesMetric.set(requestedSize);
+        // Note this does not re-compute the number of partitions. Doing so would be quite
+        // challenging while there is concurrent traffic.
     }
 
     void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) override {
@@ -175,6 +182,8 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         if (numPartitions < numLogicalCores) {
             numPartitions = numLogicalCores;
         }
+        queryStatsMaxSizeBytesMetric.set(size);
+        queryStatsNumParitionsMetric.set(numPartitions);
 
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
