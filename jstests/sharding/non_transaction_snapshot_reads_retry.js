@@ -48,7 +48,8 @@ jsTestLog(`Inserted document at ${tojson(insertTS)}`);
 
 const fp = configureFailPoint(primary, "waitInFindBeforeMakingBatch", {nss: "test.test"});
 
-function read(insertTS, enableCausal) {
+function read(insertTS, enableCausal, retries) {
+    assert.lt(retries, 10);
     const readConcern = {level: "snapshot"};
     if (enableCausal) {
         readConcern.afterClusterTime = insertTS;
@@ -67,11 +68,22 @@ function read(insertTS, enableCausal) {
     }));
 
     jsTestLog(`find result for enableCausal=${enableCausal}: ${tojson(result)}`);
-    assert.gte(result.cursor.atClusterTime, insertTS);
+    let act = result.cursor.atClusterTime;
+    assert.gte(act, insertTS);
+
+    if (act < TestData.updateTS) {
+        let sleepMS = 1000;
+        jsTestLog(`atClusterTime=${act} has not caught up to updateTS=${
+            TestData.updateTS}. Will retry in ${sleepMS}ms.`);
+        sleep(sleepMS);
+        return read(insertTS, enableCausal, retries + 1);
+    }
+
     assert.eq(result.cursor.firstBatch[0], {_id: 0, x: "updatedValue"});
 }
-const waitForShell = startParallelShell(funWithArgs(read, insertTS, false), st.s.port);
-const waitForShellCausal = startParallelShell(funWithArgs(read, insertTS, true), st.s.port);
+
+const waitForShell = startParallelShell(funWithArgs(read, insertTS, false, 0), st.s.port);
+const waitForShellCausal = startParallelShell(funWithArgs(read, insertTS, true, 0), st.s.port);
 
 jsTestLog("Wait for shells to hit waitInFindBeforeMakingBatch failpoint");
 fp.wait(kDefaultWaitForFailPointTimeout, 2);
@@ -83,8 +95,9 @@ result = mongosDB.runCommand({
     writeConcern: {w: "majority"}
 });
 
-const updateTS = assert.commandWorked(result).operationTime;
-jsTestLog(`Updated document at updateTS ${tojson(updateTS)}`);
+TestData.updateTS = assert.commandWorked(result).operationTime;
+jsTestLog(`Updated document at updateTS ${tojson(TestData.updateTS)}`);
+assert.gt(TestData.updateTS, insertTS);
 
 jsTestLog("Sleep until updateTS is older than historyWindowSecs");
 const testMarginMS = 1000;
