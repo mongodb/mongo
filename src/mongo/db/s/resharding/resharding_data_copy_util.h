@@ -205,7 +205,8 @@ void updateSessionRecord(OperationContext* opCtx,
                          BSONObj o2Field,
                          std::vector<StmtId> stmtIds,
                          boost::optional<repl::OpTime> preImageOpTime,
-                         boost::optional<repl::OpTime> postImageOpTime);
+                         boost::optional<repl::OpTime> postImageOpTime,
+                         NamespaceString sourceNss);
 
 /**
  * Retrieves the resume data natural order scans for all donor shards.
