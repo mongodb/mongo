@@ -4,8 +4,11 @@
  * Each operation is tested on a single node, and (if supported) through mongos on both sharded and
  * unsharded collections. Mongos doesn't directly handle readConcern majority, but these tests
  * should ensure that it correctly propagates the setting to the shards when running commands.
+ * This test requires a persistent storage engine because the makeSnapshot test command accesses
+ * the oplog's record store.
  * @tags: [
  *   requires_majority_read_concern,
+ *   requires_persistence,
  *   requires_sharding,
  * ]
  */
