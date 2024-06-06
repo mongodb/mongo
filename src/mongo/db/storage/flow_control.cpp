@@ -176,7 +176,8 @@ FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* 
              FlowControlTicketholder::get(client->getServiceContext())->refreshTo(getNumTickets());
          },
          Seconds(1),
-         // TODO(SERVER-74657): Please revisit if this periodic job could be made killable.
+         // This job is primary/secondary agnostic and doesn't write to WT, stepdown won't and
+         // shouldn't interrupt it, so keep it as unkillable.
          false /*isKillableByStepdown*/});
     _jobAnchor.start();
 }

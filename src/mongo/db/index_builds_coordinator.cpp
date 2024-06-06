@@ -2728,7 +2728,8 @@ void runOnAlternateContext(OperationContext* opCtx, std::string name, Func func)
     auto newClient =
         opCtx->getServiceContext()->getService(ClusterRole::ShardServer)->makeClient(name);
 
-    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
+    // The cleanup doesn't involve WT operations, and notifies the primary with a networking
+    // message, it's safe and better to keep it unkillable.
     {
         stdx::lock_guard<Client> lk(*newClient.get());
         newClient.get()->setSystemOperationUnkillableByStepdown(lk);

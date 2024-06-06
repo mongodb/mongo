@@ -433,12 +433,6 @@ void FSyncLockThread::run() {
     stdx::lock_guard<SimpleMutex> applierLk(oplogApplierLockedFsync);
     stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
 
-    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
     invariant(fsyncCore.getLockCount_inLock() == 1);
 
     try {
@@ -524,6 +518,11 @@ void FSyncLockThread::run() {
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         LOGV2_ERROR(204740, "Fsync timed out with LockTimeout");
         fsyncCore.threadStatus = Status(ErrorCodes::Error::LockTimeout, "Fsync lock timed out");
+        fsyncCore.acquireFsyncLockSyncCV.notify_one();
+        return;
+    } catch (ExceptionForCat<ErrorCategory::Interruption>& ex) {
+        LOGV2_ERROR(204741, "Fsync interrupted", "{reason}"_attr = ex.reason());
+        fsyncCore.threadStatus = ex.toStatus();
         fsyncCore.acquireFsyncLockSyncCV.notify_one();
         return;
     } catch (const std::exception& e) {

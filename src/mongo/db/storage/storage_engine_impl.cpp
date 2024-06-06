@@ -1360,6 +1360,10 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
             } catch (const ExceptionFor<ErrorCodes::Interrupted>&) {
                 LOGV2(6183600, "Timestamp monitor got interrupted, retrying");
                 return;
+            } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
+                LOGV2(6183601,
+                      "Timestamp monitor got interrupted due to repl state change, retrying");
+                return;
             } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>& ex) {
                 if (_shuttingDown) {
                     return;
@@ -1375,8 +1379,7 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
             }
         },
         Seconds(1),
-        // TODO(SERVER-74657): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        true /*isKillableByStepdown*/);
 
     _job = _periodicRunner->makeJob(std::move(job));
     _job.start();

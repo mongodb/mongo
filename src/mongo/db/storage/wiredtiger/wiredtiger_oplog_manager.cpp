@@ -216,7 +216,8 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
     Client::initThread("OplogVisibilityThread",
                        getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
-    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
+    // This job is primary/secondary agnostic and doesn't write to WT, stepdown won't and
+    // shouldn't interrupt it, so keep it as unkillable.
     {
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);

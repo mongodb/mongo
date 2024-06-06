@@ -130,7 +130,8 @@ void profile(OperationContext* opCtx, NetworkOp op) {
                              ->makeClient("profiling");
         auto newCtx = newClient->makeOperationContext();
 
-        // TODO(SERVER-74657): Please revisit if this thread could be made killable.
+        // This job is primary/secondary agnostic and doesn't write to WT, stepdown won't and
+        // shouldn't interrupt it, so keep it as unkillable.
         {
             stdx::lock_guard<Client> lk(*newClient.get());
             newClient.get()->setSystemOperationUnkillableByStepdown(lk);
