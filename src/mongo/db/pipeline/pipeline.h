@@ -594,17 +594,5 @@ private:
     bool _dismissed = false;
 };
 
-/**
- * A 'ServiceContext' decorator that by default does nothing but can be set to generate a
- * complimentary, metadata pipeline to the one passed in.
- */
-extern ServiceContext::Decoration<std::unique_ptr<Pipeline, PipelineDeleter> (*)(
-    OperationContext* opCtx,
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const AggregateCommandRequest& request,
-    Pipeline* origPipeline,
-    boost::optional<UUID> uuid)>
-    generateMetadataPipelineFunc;
-
 using PipelinePtr = std::unique_ptr<Pipeline, PipelineDeleter>;
 }  // namespace mongo
