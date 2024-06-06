@@ -57,12 +57,15 @@ runDbCheck(replSet,
            collName,
            {
                maxDocsPerBatch: 20,
-               batchWriteConcern: {w: 1},
+               batchWriteConcern: {w: 2},
                // minKey: {a: "0"},
                // maxKey: {a: "199"},
                // , validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1"
            },
            true /*awaitCompletion*/);
+
+// Wait to make sure that the secondary applied the stop entry before the ungraceful shutdown.
+replSet.awaitNodesAgreeOnAppliedOpTime();
 
 // Perform ungraceful shutdown of the secondary node and do not clean the db path directory.
 replSet.stop(
