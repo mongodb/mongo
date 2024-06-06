@@ -224,8 +224,13 @@ void ByteCode::allocStackImpl(size_t newSizeDelta) noexcept {
     auto oldSize = _argStackEnd - _argStack;
     auto oldTop = _argStackTop - _argStack;
 
-    _argStack = reinterpret_cast<uint8_t*>(mongoRealloc(_argStack, oldSize + newSizeDelta));
-    _argStackEnd = _argStack + oldSize + newSizeDelta;
+    auto newSize = oldSize + newSizeDelta;
+    uint8_t* newArgStack = static_cast<uint8_t*>(::operator new(newSize));
+    memcpy(newArgStack, _argStack, oldSize);
+    ::operator delete(_argStack, oldSize);
+
+    _argStack = newArgStack;
+    _argStackEnd = _argStack + newSize;
     _argStackTop = _argStack + oldTop;
 }
 

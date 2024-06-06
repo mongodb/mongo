@@ -271,29 +271,31 @@ public:
 
     void malloc(size_t sz) {
         if (sz > SZ) {
-            _ptr = mongoMalloc(sz);
+            _ptr = ::operator new(sz);
             _capacity = sz;
         }
     }
 
     void realloc(size_t sz) {
-        if (_ptr == _buf) {
-            if (sz > SZ) {
-                _ptr = mongoMalloc(sz);
-                memcpy(_ptr, _buf, SZ);
-                _capacity = sz;
-            } else {
-                _capacity = SZ;
-            }
-        } else {
-            _ptr = mongoRealloc(_ptr, sz);
-            _capacity = sz;
+        if (_ptr == _buf && sz <= SZ) {
+            _capacity = SZ;
+            return;
+        }
+
+        auto oldCap = _capacity;
+        auto oldPtr = _ptr;
+        _ptr = ::operator new(sz);
+        _capacity = sz;
+        std::memcpy(_ptr, oldPtr, std::min(oldCap, sz));
+
+        if (oldPtr != _buf) {
+            ::operator delete(oldPtr, oldCap);
         }
     }
 
     void free() {
         if (_ptr != _buf)
-            ::free(_ptr);
+            ::operator delete(_ptr, _capacity);
         _ptr = _buf;
         _capacity = SZ;
     }

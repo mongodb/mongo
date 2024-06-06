@@ -305,9 +305,10 @@ void DocumentStorage::addFieldToHashTable(T field, Position pos) {
 }
 
 void DocumentStorage::alloc(unsigned newSize) {
+    const auto oldCapacity = allocatedBytes();
     const bool firstAlloc = !_cache;
     const bool doingRehash = needRehash();
-    const size_t oldCapacity = _cacheEnd - _cache;
+    const size_t oldSize = _cacheEnd - _cache;
 
     // make new bucket count big enough
     while (needRehash() || hashTabBuckets() < HASH_TAB_INIT_SIZE)
@@ -320,13 +321,18 @@ void DocumentStorage::alloc(unsigned newSize) {
 
     uassert(16490, "Tried to make oversized document", capacity <= size_t(BufferMaxSize));
 
-    std::unique_ptr<char[]> oldBuf(_cache);
-    _cache = new char[capacity];
+    auto oldCache = _cache;
+    ScopeGuard deleteOldCache([oldCache, oldCapacity] {
+        if (oldCache) {
+            ::operator delete(oldCache, oldCapacity);
+        }
+    });
+    _cache = static_cast<char*>(::operator new(capacity));
     _cacheEnd = _cache + capacity - hashTabBytes();
 
     if (!firstAlloc) {
         // This just copies the elements
-        memcpy(_cache, oldBuf.get(), _usedBytes);
+        memcpy(_cache, oldCache, _usedBytes);
 
         if (_numFields >= HASH_TAB_MIN) {
             // if we were hashing, deal with the hash table
@@ -334,7 +340,7 @@ void DocumentStorage::alloc(unsigned newSize) {
                 rehash();
             } else {
                 // no rehash needed so just slide table down to new position
-                memcpy(_hashTab, oldBuf.get() + oldCapacity, hashTabBytes());
+                memcpy(_hashTab, oldCache + oldSize, hashTabBytes());
             }
         }
     }
@@ -353,7 +359,7 @@ void DocumentStorage::reserveFields(size_t expectedFields) {
 
     uassert(16491, "Tried to make oversized document", newSize <= size_t(BufferMaxSize));
 
-    _cache = new char[newSize + hashTabBytes()];
+    _cache = static_cast<char*>(::operator new(newSize + hashTabBytes()));
     _cacheEnd = _cache + newSize;
 }
 
@@ -365,7 +371,7 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
         // Make a copy of the buffer with the fields.
         // It is very important that the positions of each field are the same after cloning.
         const size_t bufferBytes = allocatedBytes();
-        out->_cache = new char[bufferBytes];
+        out->_cache = static_cast<char*>(::operator new(bufferBytes));
         out->_cacheEnd = out->_cache + (_cacheEnd - _cache);
         memcpy(out->_cache, _cache, bufferBytes);
 
@@ -398,10 +404,11 @@ size_t DocumentStorage::getMetadataApproximateSize() const {
 }
 
 DocumentStorage::~DocumentStorage() {
-    std::unique_ptr<char[]> deleteBufferAtScopeEnd(_cache);
-
     for (auto it = iteratorCacheOnly(); !it.atEnd(); it.advance()) {
         it->val.~Value();  // explicit destructor call
+    }
+    if (_cache) {
+        ::operator delete(_cache, allocatedBytes());
     }
 }
 
@@ -417,7 +424,10 @@ void DocumentStorage::reset(const BSONObj& bson, bool bsonHasMetadata) {
         it->val.~Value();  // explicit destructor call
     }
 
-    _cacheEnd = _cache;
+    if (_cache) {
+        ::operator delete(_cache, allocatedBytes());
+    }
+    _cacheEnd = _cache = nullptr;
     _usedBytes = 0;
     _numFields = 0;
     _hashTabMask = 0;

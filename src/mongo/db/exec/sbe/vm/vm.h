@@ -1323,13 +1323,13 @@ public:
     class TopBottomArgsFromBlocks;
 
     ByteCode() {
-        _argStack = reinterpret_cast<uint8_t*>(mongoMalloc(sizeOfElement * 4));
+        _argStack = static_cast<uint8_t*>(::operator new(sizeOfElement * 4));
         _argStackEnd = _argStack + sizeOfElement * 4;
         _argStackTop = _argStack - sizeOfElement;
     }
 
     ~ByteCode() {
-        std::free(_argStack);
+        ::operator delete(_argStack, _argStackEnd - _argStack);
     }
 
     ByteCode(const ByteCode&) = delete;
