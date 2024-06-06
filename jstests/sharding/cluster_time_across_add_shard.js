@@ -128,7 +128,16 @@ for (let session of sessions) {
 
     // Verify that the application is able to use a signed cluster time although the addShard
     // or transitionFromDedicatedConfigServer command has not been run.
-    assert.commandWorked(session.getDatabase("admin").runCommand("hello"));
+    assert.soon(() => {
+        const res = session.getDatabase("admin").runCommand("hello");
+        // TODO (SERVER-78909): KeysCollectionManager::getKeysForValidation() should retry
+        // refreshing if the refresh failed with ReadConcernMajorityNotAvailableYet
+        if (res.code == ErrorCodes.KeyNotFound) {
+            return false;
+        }
+        assert.commandWorked(res);
+        return true;
+    });
     assert.eq(session.getClusterTime().signature.keyId, lastClusterTime.signature.keyId);
 }
 
