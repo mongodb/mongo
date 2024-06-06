@@ -66,6 +66,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -91,6 +92,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
@@ -126,6 +128,11 @@ std::size_t omitTransientWarningsFromCount(const ValidateResults& results) {
         });
 }
 
+Timestamp timestampToUse = Timestamp(1, 1);
+void advanceTimestamp() {
+    timestampToUse = Timestamp(timestampToUse.getSecs() + 1, timestampToUse.getInc() + 1);
+}
+
 }  // namespace
 
 static const char* const _ns = "unittests.validate_tests";
@@ -144,10 +151,16 @@ public:
           _autoDb(nullptr),
           _db(nullptr) {
 
+        // Disable table logging. When table logging is enabled, timestamps are discarded by the
+        // storage engine.
+        storageGlobalParams.forceDisableTableLogging = true;
+
         CollectionOptions options;
         if (clustered) {
             options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
         }
+
+        _opCtx.getServiceContext()->getStorageEngine()->setInitialDataTimestamp(timestampToUse);
 
         const bool createIdIndex = !clustered;
 
@@ -155,13 +168,10 @@ public:
         auto db = autoColl.ensureDbExists(&_opCtx);
         ASSERT_TRUE(db) << _nss.toStringForErrorMsg();
 
-        WriteUnitOfWork wuow(&_opCtx);
+        beginTransaction();
         auto coll = db->createCollection(&_opCtx, _nss, options, createIdIndex);
         ASSERT_TRUE(coll) << _nss.toStringForErrorMsg();
-        wuow.commit();
-
-        _engineSupportsCheckpoints =
-            _opCtx.getServiceContext()->getStorageEngine()->supportsCheckpoints();
+        commitTransaction();
     }
 
     explicit ValidateBase(bool full, bool background)
@@ -172,9 +182,9 @@ public:
         auto db = autoDb.getDb();
         ASSERT_TRUE(db);
 
-        WriteUnitOfWork wuow(&_opCtx);
+        beginTransaction();
         ASSERT_OK(db->dropCollection(&_opCtx, _nss));
-        wuow.commit();
+        commitTransaction();
 
         getGlobalServiceContext()->unsetKillAllOperations();
     }
@@ -292,6 +302,82 @@ protected:
         _db = _autoDb.get()->getDb();
     }
 
+    void beginTransaction() {
+        advanceTimestamp();
+        _wuow = std::make_unique<WriteUnitOfWork>(&_opCtx);
+        ASSERT_OK(shard_role_details::getRecoveryUnit(&_opCtx)->setTimestamp(timestampToUse));
+    }
+
+    void commitTransaction() {
+        _wuow->commit();
+        _opCtx.getServiceContext()->getStorageEngine()->setStableTimestamp(timestampToUse);
+    }
+
+    void abortTransaction() {
+        _wuow.reset();
+    }
+
+    Status createIndexFromSpec(const BSONObj& spec) {
+        AutoGetDb autoDb(&_opCtx, _nss.dbName(), MODE_IX);
+        MultiIndexBlock indexer;
+        ScopeGuard abortOnExit([&] {
+            Lock::CollectionLock collLock(&_opCtx, _nss, MODE_X);
+            CollectionWriter collection(&_opCtx, _nss);
+            beginTransaction();
+            indexer.abortIndexBuild(&_opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+            commitTransaction();
+        });
+        auto status = Status::OK();
+        {
+            Lock::CollectionLock collLock(&_opCtx, _nss, MODE_X);
+            CollectionWriter collection(&_opCtx, _nss);
+            beginTransaction();
+            status =
+                indexer
+                    .init(&_opCtx,
+                          collection,
+                          spec,
+                          [](const std::vector<BSONObj>& specs) -> Status { return Status::OK(); })
+                    .getStatus();
+            commitTransaction();
+            if (status == ErrorCodes::IndexAlreadyExists) {
+                return Status::OK();
+            }
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+        {
+            Lock::CollectionLock collLock(&_opCtx, _nss, MODE_IX);
+            CollectionWriter collection(&_opCtx, _nss);
+            status = indexer.insertAllDocumentsInCollection(&_opCtx, collection.get());
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+        {
+            Lock::CollectionLock collLock(&_opCtx, _nss, MODE_X);
+            CollectionWriter collection(&_opCtx, _nss);
+            status = indexer.retrySkippedRecords(&_opCtx, collection.get());
+            if (!status.isOK()) {
+                return status;
+            }
+
+            status = indexer.checkConstraints(&_opCtx, collection.get());
+            if (!status.isOK()) {
+                return status;
+            }
+            beginTransaction();
+            ASSERT_OK(indexer.commit(&_opCtx,
+                                     collection.getWritableCollection(&_opCtx),
+                                     MultiIndexBlock::kNoopOnCreateEachFn,
+                                     MultiIndexBlock::kNoopOnCommitFn));
+            commitTransaction();
+        }
+        abortOnExit.dismiss();
+        return Status::OK();
+    }
+
     void releaseDb() {
         _autoDb.reset();
         _db = nullptr;
@@ -306,7 +392,7 @@ protected:
     const NamespaceString _nss;
     std::unique_ptr<AutoGetDb> _autoDb;
     Database* _db;
-    bool _engineSupportsCheckpoints;
+    std::unique_ptr<WriteUnitOfWork> _wuow;
 };
 
 template <bool full, bool background>
@@ -315,19 +401,13 @@ public:
     ValidateIdIndexCount() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection, insert records {_id: 1} and {_id: 2} and check it's valid.
         lockDb(MODE_X);
 
         RecordId id1;
         {
             OpDebug* const nullOpDebug = nullptr;
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
@@ -336,7 +416,7 @@ public:
             id1 = coll()->getCursor(&_opCtx)->next()->id;
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 2)), nullOpDebug, true));
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -346,9 +426,9 @@ public:
 
         // Remove {_id: 1} from the record store, so we get more _id entries than records.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             rs->deleteRecord(&_opCtx, id1);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -358,12 +438,12 @@ public:
         // Insert records {_id: 0} and {_id: 1} , so we get too few _id entries, and verify
         // validate fails.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             for (int j = 0; j < 2; j++) {
                 auto doc = BSON("_id" << j);
-                ASSERT_OK(rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), Timestamp()));
+                ASSERT_OK(rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), timestampToUse));
             }
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -375,18 +455,12 @@ class ValidateSecondaryIndexCount : public ValidateBase {
 public:
     ValidateSecondaryIndexCount() : ValidateBase(full, background) {}
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection, insert two documents.
         lockDb(MODE_X);
         RecordId id1;
         {
             OpDebug* const nullOpDebug = nullptr;
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(collection_internal::insertDocument(
@@ -394,15 +468,13 @@ public:
             id1 = coll()->getCursor(&_opCtx)->next()->id;
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            wunit.commit();
+            commitTransaction();
         }
 
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns_forTest(),
-                                                   BSON("name"
-                                                        << "a"
-                                                        << "key" << BSON("a" << 1) << "v"
-                                                        << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name"
+                                               << "a"
+                                               << "key" << BSON("a" << 1) << "v"
+                                               << static_cast<int>(kIndexVersion)));
 
         ASSERT_OK(status);
         releaseDb();
@@ -413,9 +485,9 @@ public:
 
         // Remove a record, so we get more _id entries than records, and verify validate fails.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             rs->deleteRecord(&_opCtx, id1);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -425,12 +497,12 @@ public:
         // Insert two more records, so we get too few entries for a non-sparse index, and
         // verify validate fails.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             for (int j = 0; j < 2; j++) {
                 auto doc = BSON("_id" << j);
-                ASSERT_OK(rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), Timestamp()));
+                ASSERT_OK(rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), timestampToUse));
             }
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -442,18 +514,12 @@ class ValidateSecondaryIndex : public ValidateBase {
 public:
     ValidateSecondaryIndex() : ValidateBase(full, background) {}
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection, insert three records.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         RecordId id1;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(collection_internal::insertDocument(
@@ -463,15 +529,13 @@ public:
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "b" << 3)), nullOpDebug, true));
-            wunit.commit();
+            commitTransaction();
         }
 
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns_forTest(),
-                                                   BSON("name"
-                                                        << "a"
-                                                        << "key" << BSON("a" << 1) << "v"
-                                                        << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name"
+                                               << "a"
+                                               << "key" << BSON("a" << 1) << "v"
+                                               << static_cast<int>(kIndexVersion)));
 
         ASSERT_OK(status);
         releaseDb();
@@ -483,12 +547,12 @@ public:
         // Update {a: 1} to {a: 9} without updating the index, so we get inconsistent values
         // between the index and the document. Verify validate fails.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("_id" << 1 << "a" << 9);
             auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
 
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -501,18 +565,12 @@ public:
     ValidateIdIndex() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection, insert records {_id: 1} and {_id: 2} and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         RecordId id1;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
@@ -521,7 +579,7 @@ public:
             id1 = coll()->getCursor(&_opCtx)->next()->id;
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 2)), nullOpDebug, true));
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -532,11 +590,11 @@ public:
         // Update {_id: 1} to {_id: 9} without updating the index, so we get inconsistent values
         // between the index and the document. Verify validate fails.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("_id" << 9);
             auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -545,11 +603,11 @@ public:
 
         // Revert {_id: 9} to {_id: 1} and verify that validate succeeds.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("_id" << 1);
             auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -560,12 +618,12 @@ public:
         // will still be the same number of index entries and documents, but one document will not
         // have an index entry.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             rs->deleteRecord(&_opCtx, id1);
             auto doc = BSON("_id" << 3);
-            ASSERT_OK(
-                rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), Timestamp()).getStatus());
-            wunit.commit();
+            ASSERT_OK(rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), timestampToUse)
+                          .getStatus());
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -578,12 +636,6 @@ public:
     ValidateMultiKeyIndex() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
@@ -598,7 +650,7 @@ public:
         // {a: [c: 1]}
         auto doc3 = BSON("_id" << 3 << "a" << BSON_ARRAY(BSON("c" << 1)));
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
@@ -610,7 +662,7 @@ public:
                 &_opCtx, coll(), InsertStatement(doc2), nullOpDebug, true));
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(doc3), nullOpDebug, true));
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -618,12 +670,10 @@ public:
         lockDb(MODE_X);
 
         // Create multi-key index.
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns_forTest(),
-                                                   BSON("name"
-                                                        << "multikey_index"
-                                                        << "key" << BSON("a.b" << 1) << "v"
-                                                        << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name"
+                                               << "multikey_index"
+                                               << "key" << BSON("a.b" << 1) << "v"
+                                               << static_cast<int>(kIndexVersion)));
 
         ASSERT_OK(status);
         releaseDb();
@@ -634,10 +684,10 @@ public:
 
         // Update a document's indexed field without updating the index.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto updateStatus = rs->updateRecord(&_opCtx, id1, doc1_b.objdata(), doc1_b.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -647,10 +697,10 @@ public:
         // Update a document's non-indexed field without updating the index.
         // Index validation should still be valid.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto updateStatus = rs->updateRecord(&_opCtx, id1, doc1_c.objdata(), doc1_c.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -663,18 +713,12 @@ public:
     ValidateSparseIndex() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         RecordId id1;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
@@ -685,18 +729,15 @@ public:
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "b" << 1)), nullOpDebug, true));
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create a sparse index.
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name"
-                                              << "sparse_index"
-                                              << "key" << BSON("a" << 1) << "v"
-                                              << static_cast<int>(kIndexVersion) << "background"
-                                              << false << "sparse" << true));
+        auto status = createIndexFromSpec(BSON("name"
+                                               << "sparse_index"
+                                               << "key" << BSON("a" << 1) << "v"
+                                               << static_cast<int>(kIndexVersion) << "background"
+                                               << false << "sparse" << true));
 
         ASSERT_OK(status);
         releaseDb();
@@ -707,11 +748,11 @@ public:
 
         // Update a document's indexed field without updating the index.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("_id" << 2 << "a" << 3);
             auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -724,18 +765,12 @@ public:
     ValidatePartialIndex() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         RecordId id1;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
@@ -752,19 +787,16 @@ public:
                 InsertStatement(BSON("_id" << 3 << "a" << BSON_ARRAY(-1 << -2 << -3))),
                 nullOpDebug,
                 true));
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create a partial index.
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name"
-                                              << "partial_index"
-                                              << "key" << BSON("a" << 1) << "v"
-                                              << static_cast<int>(kIndexVersion) << "background"
-                                              << false << "partialFilterExpression"
-                                              << BSON("a" << BSON("$gt" << 1))));
+        auto status = createIndexFromSpec(BSON("name"
+                                               << "partial_index"
+                                               << "key" << BSON("a" << 1) << "v"
+                                               << static_cast<int>(kIndexVersion) << "background"
+                                               << false << "partialFilterExpression"
+                                               << BSON("a" << BSON("$gt" << 1))));
 
         ASSERT_OK(status);
         releaseDb();
@@ -775,11 +807,11 @@ public:
 
         // Update an unindexed document without updating the index.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("_id" << 1);
             auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -792,12 +824,6 @@ public:
     ValidatePartialIndexOnCollectionWithNonIndexableFields() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection and insert a record that has a non-indexable value on the indexed
         // field.
         lockDb(MODE_X);
@@ -805,7 +831,7 @@ public:
 
         RecordId id1;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(collection_internal::insertDocument(
@@ -814,32 +840,28 @@ public:
                 InsertStatement(BSON("_id" << 1 << "x" << 1 << "a" << 2)),
                 nullOpDebug,
                 true));
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create a partial geo index that indexes the document. This should return an error.
-        ASSERT_NOT_OK(dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns_forTest(),
-                                                   BSON("name"
-                                                        << "partial_index"
-                                                        << "key"
-                                                        << BSON("x"
-                                                                << "2dsphere")
-                                                        << "v" << static_cast<int>(kIndexVersion)
-                                                        << "partialFilterExpression"
-                                                        << BSON("a" << BSON("$eq" << 2)))));
+        ASSERT_NOT_OK(createIndexFromSpec(BSON("name"
+                                               << "partial_index"
+                                               << "key"
+                                               << BSON("x"
+                                                       << "2dsphere")
+                                               << "v" << static_cast<int>(kIndexVersion)
+                                               << "partialFilterExpression"
+                                               << BSON("a" << BSON("$eq" << 2)))));
 
         // Create a partial geo index that does not index the document.
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns_forTest(),
-                                                   BSON("name"
-                                                        << "partial_index"
-                                                        << "key"
-                                                        << BSON("x"
-                                                                << "2dsphere")
-                                                        << "v" << static_cast<int>(kIndexVersion)
-                                                        << "partialFilterExpression"
-                                                        << BSON("a" << BSON("$eq" << 1))));
+        auto status = createIndexFromSpec(BSON("name"
+                                               << "partial_index"
+                                               << "key"
+                                               << BSON("x"
+                                                       << "2dsphere")
+                                               << "v" << static_cast<int>(kIndexVersion)
+                                               << "partialFilterExpression"
+                                               << BSON("a" << BSON("$eq" << 1))));
         ASSERT_OK(status);
         releaseDb();
         ensureValidateWorked();
@@ -852,19 +874,13 @@ public:
     ValidateCompoundIndex() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection, insert five records and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
 
         RecordId id1;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
@@ -887,25 +903,21 @@ public:
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 4 << "b" << 6)), nullOpDebug, true));
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 5 << "c" << 7)), nullOpDebug, true));
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create two compound indexes, one forward and one reverse, to test
         // validate()'s index direction parsing.
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns_forTest(),
-                                                   BSON("name"
-                                                        << "compound_index_1"
-                                                        << "key" << BSON("a" << 1 << "b" << -1)
-                                                        << "v" << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name"
+                                               << "compound_index_1"
+                                               << "key" << BSON("a" << 1 << "b" << -1) << "v"
+                                               << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
-        status = dbtests::createIndexFromSpec(&_opCtx,
-                                              coll()->ns().ns_forTest(),
-                                              BSON("name"
-                                                   << "compound_index_2"
-                                                   << "key" << BSON("a" << -1 << "b" << 1) << "v"
-                                                   << static_cast<int>(kIndexVersion)));
+        status = createIndexFromSpec(BSON("name"
+                                          << "compound_index_2"
+                                          << "key" << BSON("a" << -1 << "b" << 1) << "v"
+                                          << static_cast<int>(kIndexVersion)));
 
         ASSERT_OK(status);
         releaseDb();
@@ -916,11 +928,11 @@ public:
 
         // Update a document's indexed field without updating the index.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("_id" << 1 << "a" << 1 << "b" << 3);
             auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -933,12 +945,6 @@ public:
     ValidateIndexEntry() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         SharedBufferFragmentBuilder pooledBuilder(
             key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
@@ -948,7 +954,7 @@ public:
 
         RecordId id1;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
@@ -959,15 +965,12 @@ public:
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "b" << 1)), nullOpDebug, true));
-            wunit.commit();
+            commitTransaction();
         }
 
         const std::string indexName = "bad_index";
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                                      << static_cast<int>(kIndexVersion)));
 
         ASSERT_OK(status);
         releaseDb();
@@ -981,7 +984,7 @@ public:
         auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             int64_t numDeleted = 0;
             int64_t numInserted = 0;
             const BSONObj actualKey = BSON("a" << 1);
@@ -1009,7 +1012,7 @@ public:
                                             pooledBuilder,
                                             coll(),
                                             descriptor->getEntry(),
-                                            {{id1, Timestamp(), &badKey}},
+                                            {{id1, timestampToUse, &badKey}},
                                             options,
                                             &numInserted);
 
@@ -1017,7 +1020,7 @@ public:
             ASSERT_OK(insertStatus);
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_EQUALS(numInserted, 1);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -1036,12 +1039,9 @@ public:
         lockDb(MODE_X);
 
         const std::string indexName = "bad_specs_index";
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
-                                                     << static_cast<int>(kIndexVersion) << "sparse"
-                                                     << "false"));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                                      << static_cast<int>(kIndexVersion) << "sparse"
+                                                      << "false"));
 
         ASSERT_OK(status);
         releaseDb();
@@ -1055,37 +1055,28 @@ public:
     ValidateWildCardIndex() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection.
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create a $** index.
         const auto indexName = "wildcardIndex";
         const auto indexKey = BSON("$**" << 1);
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << indexKey << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         // Insert non-multikey documents.
         OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx,
                 coll(),
@@ -1098,7 +1089,7 @@ public:
                 InsertStatement(BSON("_id" << 2 << "b" << BSON("0" << 1))),
                 nullOpDebug,
                 true));
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -1106,7 +1097,7 @@ public:
         // Insert multikey documents.
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx,
                 coll(),
@@ -1119,7 +1110,7 @@ public:
                 InsertStatement(BSON("_id" << 4 << "mk_2" << BSON_ARRAY(BSON("e" << 1)))),
                 nullOpDebug,
                 true));
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -1133,7 +1124,7 @@ public:
         auto accessMethod = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
         auto sortedDataInterface = accessMethod->getSortedDataInterface();
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             const key_string::Value indexKey =
                 key_string::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
                                         BSON("" << 1 << ""
@@ -1144,7 +1135,7 @@ public:
             auto insertStatus =
                 sortedDataInterface->insert(&_opCtx, indexKey, true /* dupsAllowed */);
             ASSERT_OK(insertStatus);
-            wunit.commit();
+            commitTransaction();
         }
 
         // An index whose set of multikey metadata paths is a superset of collection multikey
@@ -1156,7 +1147,7 @@ public:
         // collection.
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             const key_string::Value indexKey =
                 key_string::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
                                         BSON("" << 1 << ""
@@ -1165,7 +1156,7 @@ public:
                                         recordId)
                     .release();
             sortedDataInterface->unindex(&_opCtx, indexKey, true /* dupsAllowed */);
-            wunit.commit();
+            commitTransaction();
         }
 
         // An index that is missing one or more multikey metadata fields that exist in the
@@ -1181,37 +1172,28 @@ public:
     ValidateWildCardIndexWithProjection() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection.
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create a $** index with a projection on "a".
         const auto indexName = "wildcardIndex";
         const auto indexKey = BSON("a.$**" << 1);
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << indexKey << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         // Insert documents with indexed and not-indexed paths.
         OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx,
                 coll(),
@@ -1244,7 +1226,7 @@ public:
                 InsertStatement(BSON("_id" << 6 << "b" << BSON_ARRAY("z" << 1))),
                 nullOpDebug,
                 true));
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -1259,7 +1241,7 @@ public:
         // to fail.
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             RecordId recordId(record_id_helpers::reservedIdFor(
                 record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
             const key_string::Value indexKey =
@@ -1270,7 +1252,7 @@ public:
                                         recordId)
                     .release();
             sortedDataInterface->unindex(&_opCtx, indexKey, true /* dupsAllowed */);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateFailed();
@@ -1283,30 +1265,21 @@ public:
     ValidateMissingAndExtraIndexEntryResults() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection.
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create an index.
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << indexKey << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         // Insert documents.
@@ -1314,7 +1287,7 @@ public:
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             ASSERT_OK(collection_internal::insertDocument(
@@ -1322,7 +1295,7 @@ public:
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
             rid = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -1333,11 +1306,11 @@ public:
         // index entry and an extra index entry.
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("_id" << 1 << "a" << 5);
             auto updateStatus = rs->updateRecord(&_opCtx, rid, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
 
@@ -1377,12 +1350,6 @@ public:
     ValidateMissingIndexEntryResults() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         SharedBufferFragmentBuilder pooledBuilder(
             key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
@@ -1390,20 +1357,17 @@ public:
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create an index.
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << indexKey << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         // Insert documents.
@@ -1411,7 +1375,7 @@ public:
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             ASSERT_OK(collection_internal::insertDocument(
@@ -1419,7 +1383,7 @@ public:
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
             rid = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -1433,7 +1397,7 @@ public:
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             int64_t numDeleted;
             const BSONObj actualKey = BSON("a" << 1);
             InsertDeleteOptions options;
@@ -1457,7 +1421,7 @@ public:
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
-            wunit.commit();
+            commitTransaction();
 
             releaseDb();
         }
@@ -1498,30 +1462,21 @@ public:
     ValidateExtraIndexEntryResults() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection.
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create an index.
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << indexKey << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         // Insert documents.
@@ -1529,7 +1484,7 @@ public:
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             ASSERT_OK(collection_internal::insertDocument(
@@ -1537,7 +1492,7 @@ public:
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
             rid = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -1548,9 +1503,9 @@ public:
             lockDb(MODE_X);
             RecordStore* rs = coll()->getRecordStore();
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             rs->deleteRecord(&_opCtx, rid);
-            wunit.commit();
+            commitTransaction();
             releaseDb();
         }
 
@@ -1596,36 +1551,29 @@ public:
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create index "a".
         const auto indexNameA = "a";
         const auto indexKeyA = BSON("a" << 1);
-        ASSERT_OK(
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexNameA << "key" << indexKeyA << "v"
-                                                     << static_cast<int>(kIndexVersion))));
+        ASSERT_OK(createIndexFromSpec(BSON("name" << indexNameA << "key" << indexKeyA << "v"
+                                                  << static_cast<int>(kIndexVersion))));
 
         // Create index "b".
         const auto indexNameB = "b";
         const auto indexKeyB = BSON("b" << 1);
-        ASSERT_OK(
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexNameB << "key" << indexKeyB << "v"
-                                                     << static_cast<int>(kIndexVersion))));
+        ASSERT_OK(createIndexFromSpec(BSON("name" << indexNameB << "key" << indexKeyB << "v"
+                                                  << static_cast<int>(kIndexVersion))));
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        ;
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx,
                 coll(),
@@ -1644,7 +1592,7 @@ public:
                 InsertStatement(BSON("_id" << 3 << "a" << 6 << "b" << 6)),
                 nullOpDebug,
                 true));
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -1655,7 +1603,7 @@ public:
         // extra index entries.
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc1 = BSON("_id" << 1 << "a" << 8 << "b" << 8);
             auto doc2 = BSON("_id" << 2 << "a" << 3 << "b" << 7);
             std::unique_ptr<SeekableRecordCursor> cursor = coll()->getCursor(&_opCtx);
@@ -1665,7 +1613,7 @@ public:
             record = cursor->next();
             rid = record->id;
             ASSERT_OK(rs->updateRecord(&_opCtx, rid, doc2.objdata(), doc2.objsize()));
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
 
@@ -1704,6 +1652,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -1741,6 +1692,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -1784,20 +1738,17 @@ public:
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create an index.
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << indexKey << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         // Insert documents.
@@ -1805,7 +1756,7 @@ public:
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             ASSERT_OK(collection_internal::insertDocument(
@@ -1813,7 +1764,7 @@ public:
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
             rid = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -1827,7 +1778,7 @@ public:
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             int64_t numDeleted;
             const BSONObj actualKey = BSON("a" << 1);
             InsertDeleteOptions options;
@@ -1851,7 +1802,7 @@ public:
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
-            wunit.commit();
+            commitTransaction();
 
             releaseDb();
         }
@@ -1893,6 +1844,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -1966,20 +1920,17 @@ public:
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create an index.
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << indexKey << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         // Insert documents.
@@ -1987,7 +1938,7 @@ public:
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             ASSERT_OK(collection_internal::insertDocument(
@@ -1995,7 +1946,7 @@ public:
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
             rid = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -2006,9 +1957,9 @@ public:
             lockDb(MODE_X);
             RecordStore* rs = coll()->getRecordStore();
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             rs->deleteRecord(&_opCtx, rid);
-            wunit.commit();
+            commitTransaction();
             releaseDb();
         }
 
@@ -2049,6 +2000,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -2126,23 +2080,21 @@ public:
 
         OpDebug* const nullOpDebug = nullptr;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create a unique index.
         const auto indexName = "a";
         {
             const auto indexKey = BSON("a" << 1);
-            auto status = dbtests::createIndexFromSpec(
-                &_opCtx,
-                coll()->ns().ns_forTest(),
-                BSON("name" << indexName << "key" << indexKey << "v"
-                            << static_cast<int>(kIndexVersion) << "unique" << true));
+            auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                          << static_cast<int>(kIndexVersion)
+                                                          << "unique" << true));
             ASSERT_OK(status);
         }
 
@@ -2150,9 +2102,10 @@ public:
         // uniqueness constraint.
         BSONObj dupObj = BSON("_id" << 2 << "a" << 1);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_NOT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(dupObj), nullOpDebug, true));
+            abortTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -2167,18 +2120,18 @@ public:
             InsertDeleteOptions options;
             options.dupsAllowed = true;
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
 
             // Insert a record and its keys separately. We do this to bypass duplicate constraint
             // checking. Inserting a record and its keys ensures that validation fails
             // because there are duplicate keys, and not just because there are keys without
             // corresponding records.
             auto swRecordId = coll()->getRecordStore()->insertRecord(
-                &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
+                &_opCtx, dupObj.objdata(), dupObj.objsize(), timestampToUse);
             ASSERT_OK(swRecordId);
             rid = swRecordId.getValue();
 
-            wunit.commit();
+            commitTransaction();
 
             // Insert the key on _id.
             {
@@ -2202,7 +2155,7 @@ public:
                 ASSERT_EQ(1, keys.size());
 
                 {
-                    WriteUnitOfWork wunit(&_opCtx);
+                    beginTransaction();
 
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
@@ -2221,7 +2174,7 @@ public:
                     ASSERT_EQUALS(numInserted, 1);
                     ASSERT_OK(insertStatus);
 
-                    wunit.commit();
+                    commitTransaction();
                 }
 
                 ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
@@ -2266,6 +2219,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -2368,7 +2324,7 @@ public:
 
         OpDebug* const nullOpDebug = nullptr;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(collection_internal::insertDocument(
@@ -2377,29 +2333,25 @@ public:
                 InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
                 nullOpDebug,
                 true));
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create unique indexes.
         const auto indexNameA = "a";
         {
             const auto indexKeyA = BSON("a" << 1);
-            auto status = dbtests::createIndexFromSpec(
-                &_opCtx,
-                coll()->ns().ns_forTest(),
-                BSON("name" << indexNameA << "key" << indexKeyA << "v"
-                            << static_cast<int>(kIndexVersion) << "unique" << true));
+            auto status = createIndexFromSpec(BSON("name" << indexNameA << "key" << indexKeyA << "v"
+                                                          << static_cast<int>(kIndexVersion)
+                                                          << "unique" << true));
             ASSERT_OK(status);
         }
 
         const auto indexNameB = "b";
         {
             const auto indexKeyB = BSON("b" << 1);
-            auto status = dbtests::createIndexFromSpec(
-                &_opCtx,
-                coll()->ns().ns_forTest(),
-                BSON("name" << indexNameB << "key" << indexKeyB << "v"
-                            << static_cast<int>(kIndexVersion) << "unique" << true));
+            auto status = createIndexFromSpec(BSON("name" << indexNameB << "key" << indexKeyB << "v"
+                                                          << static_cast<int>(kIndexVersion)
+                                                          << "unique" << true));
             ASSERT_OK(status);
         }
 
@@ -2408,9 +2360,10 @@ public:
         // the uniqueness constraint.
         BSONObj dupObj = BSON("_id" << 2 << "a" << 1 << "b" << 1);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_NOT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(dupObj), nullOpDebug, true));
+            abortTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -2427,17 +2380,17 @@ public:
             InsertDeleteOptions options;
             options.dupsAllowed = true;
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
 
             // Insert a record and its keys separately. We do this to bypass duplicate constraint
             // checking. Inserting a record without inserting keys results in the duplicate record
             // to be missing from both unique indexes.
             auto swRecordId = coll()->getRecordStore()->insertRecord(
-                &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
+                &_opCtx, dupObj.objdata(), dupObj.objsize(), timestampToUse);
             ASSERT_OK(swRecordId);
             rid = swRecordId.getValue();
 
-            wunit.commit();
+            commitTransaction();
 
             // Insert the key on _id.
             {
@@ -2461,7 +2414,7 @@ public:
                 ASSERT_EQ(1, keys.size());
 
                 {
-                    WriteUnitOfWork wunit(&_opCtx);
+                    beginTransaction();
 
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
@@ -2480,7 +2433,7 @@ public:
                     ASSERT_EQUALS(numInserted, 1);
                     ASSERT_OK(insertStatus);
 
-                    wunit.commit();
+                    commitTransaction();
                 }
 
                 ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
@@ -2528,6 +2481,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -2634,7 +2590,7 @@ public:
         OpDebug* const nullOpDebug = nullptr;
         RecordId rid1 = RecordId::minLong();
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(collection_internal::insertDocument(
@@ -2644,29 +2600,25 @@ public:
                 nullOpDebug,
                 true));
             rid1 = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create unique indexes.
         const auto indexNameA = "a";
         {
             const auto indexKeyA = BSON("a" << 1);
-            auto status = dbtests::createIndexFromSpec(
-                &_opCtx,
-                coll()->ns().ns_forTest(),
-                BSON("name" << indexNameA << "key" << indexKeyA << "v"
-                            << static_cast<int>(kIndexVersion) << "unique" << true));
+            auto status = createIndexFromSpec(BSON("name" << indexNameA << "key" << indexKeyA << "v"
+                                                          << static_cast<int>(kIndexVersion)
+                                                          << "unique" << true));
             ASSERT_OK(status);
         }
 
         const auto indexNameB = "b";
         {
             const auto indexKeyB = BSON("b" << 1);
-            auto status = dbtests::createIndexFromSpec(
-                &_opCtx,
-                coll()->ns().ns_forTest(),
-                BSON("name" << indexNameB << "key" << indexKeyB << "v"
-                            << static_cast<int>(kIndexVersion) << "unique" << true));
+            auto status = createIndexFromSpec(BSON("name" << indexNameB << "key" << indexKeyB << "v"
+                                                          << static_cast<int>(kIndexVersion)
+                                                          << "unique" << true));
             ASSERT_OK(status);
         }
 
@@ -2675,9 +2627,10 @@ public:
         // the uniqueness constraint.
         BSONObj dupObj = BSON("_id" << 2 << "a" << 1 << "b" << 1);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_NOT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(dupObj), nullOpDebug, true));
+            abortTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -2695,7 +2648,7 @@ public:
                 auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexNameB);
                 auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
-                WriteUnitOfWork wunit(&_opCtx);
+                beginTransaction();
                 int64_t numDeleted;
                 const BSONObj actualKey = BSON("b" << 1);
 
@@ -2720,7 +2673,7 @@ public:
 
                 ASSERT_EQUALS(numDeleted, 1);
                 ASSERT_OK(removeStatus);
-                wunit.commit();
+                commitTransaction();
             }
 
             releaseDb();
@@ -2736,18 +2689,18 @@ public:
             InsertDeleteOptions options;
             options.dupsAllowed = true;
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
 
             // Insert a record and its keys separately. We do this to bypass duplicate constraint
             // checking. Inserting a record and all of its keys ensures that validation fails
             // because there are duplicate keys, and not just because there are keys without
             // corresponding records.
             auto swRecordId = coll()->getRecordStore()->insertRecord(
-                &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
+                &_opCtx, dupObj.objdata(), dupObj.objsize(), timestampToUse);
             ASSERT_OK(swRecordId);
             rid2 = swRecordId.getValue();
 
-            wunit.commit();
+            commitTransaction();
 
             // Insert the key on _id.
             {
@@ -2771,7 +2724,7 @@ public:
                 ASSERT_EQ(1, keys.size());
 
                 {
-                    WriteUnitOfWork wunit(&_opCtx);
+                    beginTransaction();
 
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
@@ -2790,7 +2743,7 @@ public:
                     ASSERT_EQUALS(numInserted, 1);
                     ASSERT_OK(insertStatus);
 
-                    wunit.commit();
+                    commitTransaction();
                 }
 
                 ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
@@ -2818,7 +2771,7 @@ public:
                 ASSERT_EQ(1, keys.size());
 
                 {
-                    WriteUnitOfWork wunit(&_opCtx);
+                    beginTransaction();
 
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
@@ -2837,7 +2790,7 @@ public:
                     ASSERT_EQUALS(numInserted, 1);
                     ASSERT_OK(insertStatus);
 
-                    wunit.commit();
+                    commitTransaction();
                 }
 
                 ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
@@ -2882,6 +2835,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -2989,23 +2945,20 @@ public:
         BSONObj doc = BSON("_id" << 1 << "a" << 1);
         {
             OpDebug* const nullOpDebug = nullptr;
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(doc), nullOpDebug, true));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create non-multikey index.
         const auto indexName = "non_mk_index";
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         releaseDb();
@@ -3022,7 +2975,7 @@ public:
 
             // Remove non-multikey index entry.
             {
-                WriteUnitOfWork wunit(&_opCtx);
+                beginTransaction();
                 KeyStringSet keys;
                 iam->getKeys(
                     &_opCtx,
@@ -3046,17 +2999,17 @@ public:
                                                     &numDeleted);
                 ASSERT_OK(removeStatus);
                 ASSERT_EQUALS(numDeleted, 1);
-                wunit.commit();
+                commitTransaction();
             }
 
             // Update non-multikey document with multikey document.   {a: 1}   ->   {a: [2, 3]}
             BSONObj mkDoc = BSON("_id" << 1 << "a" << BSON_ARRAY(2 << 3));
             {
-                WriteUnitOfWork wunit(&_opCtx);
+                beginTransaction();
                 auto updateStatus = coll()->getRecordStore()->updateRecord(
                     &_opCtx, id1, mkDoc.objdata(), mkDoc.objsize());
                 ASSERT_OK(updateStatus);
-                wunit.commit();
+                commitTransaction();
             }
 
             // Not inserting keys into index should create missing multikey entries.
@@ -3099,6 +3052,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -3132,6 +3088,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -3173,32 +3132,26 @@ public:
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create two identical indexes only differing by key pattern and name.
         {
             const auto indexName = "a";
             const auto indexKey = BSON("a" << 1);
-            auto status =
-                dbtests::createIndexFromSpec(&_opCtx,
-                                             coll()->ns().ns_forTest(),
-                                             BSON("name" << indexName << "key" << indexKey << "v"
-                                                         << static_cast<int>(kIndexVersion)));
+            auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                          << static_cast<int>(kIndexVersion)));
             ASSERT_OK(status);
         }
 
         {
             const auto indexName = "b";
             const auto indexKey = BSON("b" << 1);
-            auto status =
-                dbtests::createIndexFromSpec(&_opCtx,
-                                             coll()->ns().ns_forTest(),
-                                             BSON("name" << indexName << "key" << indexKey << "v"
-                                                         << static_cast<int>(kIndexVersion)));
+            auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                          << static_cast<int>(kIndexVersion)));
             ASSERT_OK(status);
         }
 
@@ -3207,7 +3160,7 @@ public:
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx,
                 coll(),
@@ -3215,7 +3168,7 @@ public:
                 nullOpDebug,
                 true));
             rid = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -3229,7 +3182,7 @@ public:
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             int64_t numDeleted;
             const BSONObj actualKey = BSON("a" << 1);
             InsertDeleteOptions options;
@@ -3253,7 +3206,7 @@ public:
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
-            wunit.commit();
+            commitTransaction();
 
             releaseDb();
         }
@@ -3267,7 +3220,7 @@ public:
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             int64_t numDeleted;
             const BSONObj actualKey = BSON("b" << 1);
             InsertDeleteOptions options;
@@ -3291,7 +3244,7 @@ public:
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
-            wunit.commit();
+            commitTransaction();
 
             releaseDb();
         }
@@ -3310,12 +3263,6 @@ public:
     ValidateDuplicateKeysUniqueIndex() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         SharedBufferFragmentBuilder pooledBuilder(
             key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
@@ -3323,21 +3270,19 @@ public:
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create a unique index.
         const auto indexName = "a";
         {
             const auto indexKey = BSON("a" << 1);
-            auto status = dbtests::createIndexFromSpec(
-                &_opCtx,
-                coll()->ns().ns_forTest(),
-                BSON("name" << indexName << "key" << indexKey << "v"
-                            << static_cast<int>(kIndexVersion) << "unique" << true));
+            auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                          << static_cast<int>(kIndexVersion)
+                                                          << "unique" << true));
             ASSERT_OK(status);
         }
 
@@ -3345,19 +3290,20 @@ public:
         OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            wunit.commit();
+            commitTransaction();
         }
 
         // Confirm that inserting a document with the same value for "a" fails, verifying the
         // uniqueness constraint.
         BSONObj dupObj = BSON("_id" << 2 << "a" << 1);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_NOT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(dupObj), nullOpDebug, true));
+            abortTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -3371,17 +3317,17 @@ public:
             InsertDeleteOptions options;
             options.dupsAllowed = true;
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
 
             // Insert a record and its keys separately. We do this to bypass duplicate constraint
             // checking. Inserting a record and all of its keys ensures that validation fails
             // because there are duplicate keys, and not just because there are keys without
             // corresponding records.
             auto swRecordId = coll()->getRecordStore()->insertRecord(
-                &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
+                &_opCtx, dupObj.objdata(), dupObj.objsize(), timestampToUse);
             ASSERT_OK(swRecordId);
 
-            wunit.commit();
+            commitTransaction();
 
             // Insert the key on _id.
             {
@@ -3405,7 +3351,7 @@ public:
                 ASSERT_EQ(1, keys.size());
 
                 {
-                    WriteUnitOfWork wunit(&_opCtx);
+                    beginTransaction();
 
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
@@ -3424,7 +3370,7 @@ public:
                     ASSERT_EQUALS(numInserted, 1);
                     ASSERT_OK(insertStatus);
 
-                    wunit.commit();
+                    commitTransaction();
                 }
 
                 ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
@@ -3452,7 +3398,7 @@ public:
                 ASSERT_EQ(1, keys.size());
 
                 {
-                    WriteUnitOfWork wunit(&_opCtx);
+                    beginTransaction();
 
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
@@ -3471,7 +3417,7 @@ public:
                     ASSERT_EQUALS(numInserted, 1);
                     ASSERT_OK(insertStatus);
 
-                    wunit.commit();
+                    commitTransaction();
                 }
 
                 ASSERT_NOT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
@@ -3503,20 +3449,14 @@ public:
     ValidateInvalidBSONResults() : ValidateBase(full, background) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         // Create a new collection.
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Encode an invalid BSON Object with an invalid type, x90 and insert record
@@ -3526,11 +3466,12 @@ public:
         RecordStore* rs = coll()->getRecordStore();
         RecordId rid;
         {
-            WriteUnitOfWork wunit(&_opCtx);
-            auto swRecordId = rs->insertRecord(&_opCtx, obj.objdata(), obj.objsize(), Timestamp());
+            beginTransaction();
+            auto swRecordId =
+                rs->insertRecord(&_opCtx, obj.objdata(), obj.objsize(), timestampToUse);
             ASSERT_OK(swRecordId);
             rid = swRecordId.getValue();
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
 
@@ -3589,10 +3530,10 @@ public:
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Encode BSON Objects with invalid type x90, size less than 5 bytes, and BSON length and
@@ -3606,11 +3547,11 @@ public:
         lockDb(MODE_X);
         RecordStore* rs = coll()->getRecordStore();
         {
-            WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(rs->insertRecord(&_opCtx, obj1.objdata(), 12ULL, Timestamp()));
-            ASSERT_OK(rs->insertRecord(&_opCtx, obj2.objdata(), 12ULL, Timestamp()));
-            ASSERT_OK(rs->insertRecord(&_opCtx, obj3.objdata(), 12ULL, Timestamp()));
-            wunit.commit();
+            beginTransaction();
+            ASSERT_OK(rs->insertRecord(&_opCtx, obj1.objdata(), 12ULL, timestampToUse));
+            ASSERT_OK(rs->insertRecord(&_opCtx, obj2.objdata(), 12ULL, timestampToUse));
+            ASSERT_OK(rs->insertRecord(&_opCtx, obj3.objdata(), 12ULL, timestampToUse));
+            commitTransaction();
         }
         releaseDb();
 
@@ -3652,6 +3593,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -3688,6 +3632,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -3766,23 +3713,20 @@ public:
         BSONObj doc = BSON("_id" << 1 << "a" << 1);
         {
             OpDebug* const nullOpDebug = nullptr;
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(doc), nullOpDebug, true));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create non-multikey index.
         const auto indexName = "non_mk_index";
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         releaseDb();
@@ -3799,7 +3743,7 @@ public:
 
             // Remove non-multikey index entry.
             {
-                WriteUnitOfWork wunit(&_opCtx);
+                beginTransaction();
                 KeyStringSet keys;
                 iam->getKeys(
                     &_opCtx,
@@ -3823,22 +3767,22 @@ public:
                                                     &numDeleted);
                 ASSERT_OK(removeStatus);
                 ASSERT_EQUALS(numDeleted, 1);
-                wunit.commit();
+                commitTransaction();
             }
 
             // Update non-multikey document with multikey document.   {a: 1}   ->   {a: [2, 3]}
             BSONObj mkDoc = BSON("_id" << 1 << "a" << BSON_ARRAY(2 << 3));
             {
-                WriteUnitOfWork wunit(&_opCtx);
+                beginTransaction();
                 auto updateStatus = coll()->getRecordStore()->updateRecord(
                     &_opCtx, id1, mkDoc.objdata(), mkDoc.objsize());
                 ASSERT_OK(updateStatus);
-                wunit.commit();
+                commitTransaction();
             }
 
             // Insert index entries which satisfy the new multikey document.
             {
-                WriteUnitOfWork wunit(&_opCtx);
+                beginTransaction();
                 KeyStringSet keys;
                 MultikeyPaths multikeyPaths;
                 iam->getKeys(
@@ -3885,7 +3829,7 @@ public:
                                                                      &numInserted);
                 ASSERT_EQUALS(numInserted, 1);
                 ASSERT_OK(insertStatus);
-                wunit.commit();
+                commitTransaction();
             }
             releaseDb();
         }
@@ -3924,6 +3868,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -3955,6 +3902,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -4000,23 +3950,21 @@ public:
         {
             OpDebug* const nullOpDebug = nullptr;
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(doc1), nullOpDebug, true));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
 
         // Create a multikey index.
         const auto indexName = "mk_index";
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns_forTest(),
-                                                   BSON("name" << indexName << "key"
-                                                               << BSON("a" << 1 << "b" << 1) << "v"
-                                                               << static_cast<int>(kIndexVersion)));
+        auto status =
+            createIndexFromSpec(BSON("name" << indexName << "key" << BSON("a" << 1 << "b" << 1)
+                                            << "v" << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         releaseDb();
@@ -4035,7 +3983,7 @@ public:
             // Remove index keys for original document.
             MultikeyPaths oldMultikeyPaths;
             {
-                WriteUnitOfWork wunit(&_opCtx);
+                beginTransaction();
                 KeyStringSet keys;
                 iam->getKeys(
                     &_opCtx,
@@ -4059,24 +4007,24 @@ public:
                                                     &numDeleted);
                 ASSERT_OK(removeStatus);
                 ASSERT_EQ(numDeleted, 2);
-                wunit.commit();
+                commitTransaction();
             }
 
             // Update multikey document with a different multikey documents (not covered by multikey
             // paths).   {a: [1, 2], b: 1}   ->   {a: 1, b: [4, 5]}
             BSONObj doc2 = BSON("_id" << 1 << "a" << 1 << "b" << BSON_ARRAY(4 << 5));
             {
-                WriteUnitOfWork wunit(&_opCtx);
+                beginTransaction();
                 auto updateStatus = coll()->getRecordStore()->updateRecord(
                     &_opCtx, id1, doc2.objdata(), doc2.objsize());
                 ASSERT_OK(updateStatus);
-                wunit.commit();
+                commitTransaction();
             }
 
             // We are using the multikeyPaths of the old document and passing them to this insert
             // call (to avoid changing the multikey state).
             {
-                WriteUnitOfWork wunit(&_opCtx);
+                beginTransaction();
                 KeyStringSet keys;
                 iam->getKeys(
                     &_opCtx,
@@ -4105,7 +4053,7 @@ public:
 
                 ASSERT_EQUALS(numInserted, 2);
                 ASSERT_OK(insertStatus);
-                wunit.commit();
+                commitTransaction();
             }
             releaseDb();
         }
@@ -4145,6 +4093,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -4215,25 +4166,23 @@ public:
         lockDb(MODE_X);
 
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            wunit.commit();
+            commitTransaction();
         }
         CollectionWriter writer(&_opCtx, coll()->ns());
 
         const auto indexName = "mk_index";
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns_forTest(),
-                                                   BSON("name" << indexName << "key"
-                                                               << BSON("a" << 1 << "b" << 1) << "v"
-                                                               << static_cast<int>(kIndexVersion)));
+        auto status =
+            createIndexFromSpec(BSON("name" << indexName << "key" << BSON("a" << 1 << "b" << 1)
+                                            << "v" << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         // Remove the multikeyPaths from the index catalog entry. This simulates the catalog state
         // of a pre-3.4 index.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto collMetadata = DurableCatalog::get(&_opCtx)
                                     ->getParsedCatalogEntry(&_opCtx, coll()->getCatalogId())
                                     ->metadata;
@@ -4244,20 +4193,20 @@ public:
             indexMetadata.multikeyPaths = {};
             writer.getWritableCollection(&_opCtx)->replaceMetadata(&_opCtx,
                                                                    std::move(collMetadata));
-            wunit.commit();
+            commitTransaction();
         }
 
         // Reload the index from the modified catalog.
         const IndexDescriptor* descriptor = nullptr;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto writableCatalog = writer.getWritableCollection(&_opCtx)->getIndexCatalog();
             descriptor = writableCatalog->findIndexByName(&_opCtx, indexName);
             descriptor = writableCatalog->refreshEntry(&_opCtx,
                                                        writer.getWritableCollection(&_opCtx),
                                                        descriptor,
                                                        CreateIndexEntryFlags::kIsReady);
-            wunit.commit();
+            commitTransaction();
         }
 
         // Insert a multikey document. The multikeyPaths should not get updated in this old
@@ -4266,11 +4215,11 @@ public:
         BSONObj doc1 = BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << 1);
         OpDebug* const nullOpDebug = nullptr;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(doc1), nullOpDebug, true));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
 
         auto catalogEntry = coll()->getIndexCatalog()->getEntry(descriptor);
@@ -4286,6 +4235,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -4320,6 +4272,9 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
@@ -4357,12 +4312,6 @@ public:
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         lockDb(MODE_X);
         ASSERT(coll());
 
@@ -4373,9 +4322,9 @@ public:
         RecordStore* rs = coll()->getRecordStore();
         RecordId rid(OID::gen().view().view(), OID::kOIDSize);
         {
-            WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(rs->insertRecord(&_opCtx, rid, obj.objdata(), obj.objsize(), Timestamp()));
-            wunit.commit();
+            beginTransaction();
+            ASSERT_OK(rs->insertRecord(&_opCtx, rid, obj.objdata(), obj.objsize(), timestampToUse));
+            commitTransaction();
         }
         releaseDb();
 
@@ -4431,23 +4380,14 @@ public:
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         lockDb(MODE_X);
         ASSERT(coll());
 
         // Create an index.
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << indexKey << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         // Insert documents.
@@ -4457,7 +4397,7 @@ public:
 
         const OID firstRecordId = OID::gen();
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx,
                 coll(),
@@ -4477,7 +4417,7 @@ public:
                 nullOpDebug,
                 true));
             rid = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -4488,11 +4428,11 @@ public:
         // Updating a document without updating the index entry will cause validation to detect a
         // missing index entry and an extra index entry.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("_id" << firstRecordId << "a" << 5);
             auto updateStatus = rs->updateRecord(&_opCtx, rid, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
 
@@ -4591,12 +4531,6 @@ public:
         : ValidateBase(/*full=*/true, /*background=*/false, /*clustered=*/true) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         SharedBufferFragmentBuilder pooledBuilder(
             key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
@@ -4606,11 +4540,9 @@ public:
         // Create a unique index on {a: 1}
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
-        auto status = dbtests::createIndexFromSpec(
-            &_opCtx,
-            coll()->ns().ns_forTest(),
-            BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
-                        << "unique" << true));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                      << static_cast<int>(kIndexVersion) << "unique"
+                                                      << true));
         ASSERT_OK(status);
 
 
@@ -4632,14 +4564,14 @@ public:
         OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx, coll(), InsertStatement(firstDoc), nullOpDebug, true));
             if (falsePositiveCase) {
                 ASSERT_OK(collection_internal::insertDocument(
                     &_opCtx, coll(), InsertStatement(secondDoc), nullOpDebug, true));
             }
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -4653,7 +4585,7 @@ public:
             InsertDeleteOptions options;
             options.dupsAllowed = true;
 
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
 
             // Insert a record and its keys separately. We do this to bypass duplicate constraint
             // checking. Inserting a record and all of its keys ensures that validation fails
@@ -4664,9 +4596,9 @@ public:
                                                        record_id_helpers::keyForObj(secondDoc),
                                                        secondDoc.objdata(),
                                                        secondDoc.objsize(),
-                                                       Timestamp());
+                                                       timestampToUse);
             ASSERT_OK(swRecordId);
-            wunit.commit();
+            commitTransaction();
 
             // Insert the key on "a".
             {
@@ -4690,7 +4622,7 @@ public:
                 ASSERT_EQ(1, keys.size());
 
                 {
-                    WriteUnitOfWork wunit(&_opCtx);
+                    beginTransaction();
 
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
@@ -4709,7 +4641,7 @@ public:
                     ASSERT_EQUALS(numInserted, 1);
                     ASSERT_OK(insertStatus);
 
-                    wunit.commit();
+                    commitTransaction();
                 }
 
                 ASSERT_NOT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
@@ -4746,23 +4678,14 @@ public:
         : ValidateBase(/*full=*/false, /*background=*/false, /*clustered=*/true) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         lockDb(MODE_X);
         ASSERT(coll());
 
         // Create an index.
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
-        auto status =
-            dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns_forTest(),
-                                         BSON("name" << indexName << "key" << indexKey << "v"
-                                                     << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
         // Insert documents.
@@ -4772,7 +4695,7 @@ public:
 
         const OID firstRecordId = OID::gen();
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx,
                 coll(),
@@ -4792,7 +4715,7 @@ public:
                 nullOpDebug,
                 true));
             rid = coll()->getCursor(&_opCtx)->next()->id;
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -4803,11 +4726,11 @@ public:
         // Updating a document without updating the index entry will cause validation to detect a
         // missing index entry and an extra index entry.
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("_id" << firstRecordId << "a" << 5);
             auto updateStatus = rs->updateRecord(&_opCtx, rid, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
 
@@ -4872,6 +4795,9 @@ public:
                     originalReadSource);
             });
             forceCheckpoint(_background);
+            // Validate in repair mode can only be used in standalone mode, so ignore timestamp
+            // assertions.
+            shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(CollectionValidation::validate(&_opCtx,
                                                      _nss,
                                                      mode,
@@ -4914,12 +4840,6 @@ public:
           _withSecondaryIndex(withSecondaryIndex) {}
 
     void run() {
-        // Cannot run validate with {background:true} if the storage engine does not support
-        // checkpoints.
-        if (_background && !_engineSupportsCheckpoints) {
-            return;
-        }
-
         lockDb(MODE_X);
         ASSERT(coll());
 
@@ -4927,11 +4847,8 @@ public:
             // Create index on {a: 1}
             const auto indexName = "a";
             const auto indexKey = BSON("a" << 1);
-            auto status =
-                dbtests::createIndexFromSpec(&_opCtx,
-                                             coll()->ns().ns_forTest(),
-                                             BSON("name" << indexName << "key" << indexKey << "v"
-                                                         << static_cast<int>(kIndexVersion)));
+            auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
+                                                          << static_cast<int>(kIndexVersion)));
             ASSERT_OK(status);
         }
 
@@ -4941,7 +4858,7 @@ public:
 
         const OID firstRecordId = OID::gen();
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             ASSERT_OK(collection_internal::insertDocument(
                 &_opCtx,
                 coll(),
@@ -4960,7 +4877,7 @@ public:
                 InsertStatement(BSON("_id" << OID::gen() << "a" << 3)),
                 nullOpDebug,
                 true));
-            wunit.commit();
+            commitTransaction();
         }
         releaseDb();
         ensureValidateWorked();
@@ -4974,21 +4891,21 @@ public:
         auto cursor = coll()->getCursor(&_opCtx);
         const auto ridMissingId = cursor->next()->id;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("a" << 1);
             auto updateStatus =
                 rs->updateRecord(&_opCtx, ridMissingId, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         const auto ridMismatchedId = cursor->next()->id;
         {
-            WriteUnitOfWork wunit(&_opCtx);
+            beginTransaction();
             auto doc = BSON("_id" << OID::gen() << "a" << 2);
             auto updateStatus =
                 rs->updateRecord(&_opCtx, ridMismatchedId, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
-            wunit.commit();
+            commitTransaction();
         }
         cursor.reset();
 
@@ -5036,42 +4953,40 @@ public:
     ValidateTests() : OldStyleSuiteSpecification("validate_tests") {}
 
     void setupTests() override {
-        // TODO SERVER-83593: re-enable background validation tests.
-
         add<ValidateDuplicateKeyOnClusteredCollection<true /*falsePositiveCase*/>>();
         add<ValidateDuplicateKeyOnClusteredCollection<false /*falsePositiveCase*/>>();
 
         // Add tests for both full validate and non-full validate.
         add<ValidateIdIndexCount<true, false>>();
         add<ValidateIdIndexCount<false, false>>();
-        // add<ValidateIdIndexCount<false, true>>();
+        add<ValidateIdIndexCount<false, true>>();
         add<ValidateSecondaryIndexCount<true, false>>();
         add<ValidateSecondaryIndexCount<false, false>>();
-        // add<ValidateSecondaryIndexCount<false, true>>();
+        add<ValidateSecondaryIndexCount<false, true>>();
 
         // These tests are only needed for non-full validate.
         add<ValidateIdIndex<false, false>>();
-        // add<ValidateIdIndex<false, true>>();
+        add<ValidateIdIndex<false, true>>();
         add<ValidateSecondaryIndex<false, false>>();
-        // add<ValidateSecondaryIndex<false, true>>();
+        add<ValidateSecondaryIndex<false, true>>();
         add<ValidateMultiKeyIndex<false, false>>();
-        // add<ValidateMultiKeyIndex<false, true>>();
+        add<ValidateMultiKeyIndex<false, true>>();
         add<ValidateSparseIndex<false, false>>();
-        // add<ValidateSparseIndex<false, true>>();
+        add<ValidateSparseIndex<false, true>>();
         add<ValidateCompoundIndex<false, false>>();
-        // add<ValidateCompoundIndex<false, true>>();
+        add<ValidateCompoundIndex<false, true>>();
         add<ValidatePartialIndex<false, false>>();
-        // add<ValidatePartialIndex<false, true>>();
+        add<ValidatePartialIndex<false, true>>();
         add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, false>>();
-        // add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, true>>();
+        add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, true>>();
         add<ValidateWildCardIndex<false, false>>();
-        // add<ValidateWildCardIndex<false, true>>();
+        add<ValidateWildCardIndex<false, true>>();
         add<ValidateWildCardIndexWithProjection<false, false>>();
-        // add<ValidateWildCardIndexWithProjection<false, true>>();
+        add<ValidateWildCardIndexWithProjection<false, true>>();
 
         // Tests for index validation.
         add<ValidateIndexEntry<false, false>>();
-        // add<ValidateIndexEntry<false, true>>();
+        add<ValidateIndexEntry<false, true>>();
         add<ValidateIndexMetadata>();
 
         // Tests that the 'missingIndexEntries' and 'extraIndexEntries' field are populated
@@ -5091,10 +5006,10 @@ public:
         add<ValidateDuplicateDocumentIndexKeySet>();
 
         add<ValidateDuplicateKeysUniqueIndex<false, false>>();
-        // add<ValidateDuplicateKeysUniqueIndex<false, true>>();
+        add<ValidateDuplicateKeysUniqueIndex<false, true>>();
 
         add<ValidateInvalidBSONResults<false, false>>();
-        // add<ValidateInvalidBSONResults<false, true>>();
+        add<ValidateInvalidBSONResults<false, true>>();
         add<ValidateInvalidBSONRepair>();
 
         add<ValidateIndexWithMultikeyDocRepair>();
@@ -5104,15 +5019,15 @@ public:
 
         // Tests that validation works on clustered collections.
         add<ValidateInvalidBSONOnClusteredCollection<false>>();
-        // add<ValidateInvalidBSONOnClusteredCollection<true>>();
+        add<ValidateInvalidBSONOnClusteredCollection<true>>();
         add<ValidateReportInfoOnClusteredCollection<false>>();
-        // add<ValidateReportInfoOnClusteredCollection<true>>();
+        add<ValidateReportInfoOnClusteredCollection<true>>();
         add<ValidateRepairOnClusteredCollection>();
 
         add<ValidateInvalidRecordIdOnClusteredCollection<false>>(false /*withSecondaryIndex*/);
         add<ValidateInvalidRecordIdOnClusteredCollection<false>>(true /*withSecondaryIndex*/);
-        // add<ValidateInvalidRecordIdOnClusteredCollection<true>>(false /*withSecondaryIndex*/);
-        // add<ValidateInvalidRecordIdOnClusteredCollection<true>>(true /*withSecondaryIndex*/);
+        add<ValidateInvalidRecordIdOnClusteredCollection<true>>(false /*withSecondaryIndex*/);
+        add<ValidateInvalidRecordIdOnClusteredCollection<true>>(true /*withSecondaryIndex*/);
     }
 };
 
