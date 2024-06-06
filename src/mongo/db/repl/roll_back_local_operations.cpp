@@ -51,17 +51,6 @@
 namespace mongo {
 namespace repl {
 
-// After the release of MongoDB 3.8, these fail point declarations can
-// be moved into the rs_rollback.cpp file, as we no longer need to maintain
-// functionality for rs_rollback_no_uuid.cpp. See SERVER-29766.
-
-// Failpoint which causes rollback to hang before finishing.
-MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeFinish);
-
-// Failpoint which causes rollback to hang and then fail after minValid is written.
-MONGO_FAIL_POINT_DEFINE(rollbackHangThenFailAfterWritingMinValid);
-
-
 namespace {
 
 constexpr int kMaxConnectionAttempts = 3;

@@ -95,13 +95,8 @@ assert.commandWorked(syncSource.getDB(dbName).getCollection(collName).insert(
 // commit point, which triggers an invariant. This failpoint is used to verify the invariant
 // will be hit without having to search the logs.
 let rollbackCommittedWritesFailPoint;
-if (storageEngineIsWiredTigerOrInMemory()) {
-    rollbackCommittedWritesFailPoint =
-        configureFailPoint(rollbackNode, "rollbackToTimestampHangCommonPointBeforeReplCommitPoint");
-} else {
-    rollbackCommittedWritesFailPoint =
-        configureFailPoint(rollbackNode, "rollbackViaRefetchHangCommonPointBeforeReplCommitPoint");
-}
+rollbackCommittedWritesFailPoint =
+    configureFailPoint(rollbackNode, "rollbackToTimestampHangCommonPointBeforeReplCommitPoint");
 
 // Node 1 will have to roll back to rejoin the set. It will crash as it will refuse to roll back
 // majority committed data.

@@ -1581,8 +1581,7 @@ supersede.
 # Rollback: Recover To A Timestamp (RTT)
 
 Rollback is the process whereby a node that diverges from its sync source gets back to a consistent
-point in time on the sync source's branch of history. We currently support two rollback algorithms,
-Recover To A Timestamp (RTT) and [Rollback via Refetch](#rollbackviarefetch). This section will cover the RTT method.
+point in time on the sync source's branch of history. 
 
 Situations that require rollback can occur due to network partitions. Consider a scenario where a
 secondary can no longer hear from the primary and subsequently runs for an election. We now have
@@ -2284,7 +2283,6 @@ committed. However, this is safe because we do not allow rollbacks before the
 - **`[4]`**: Too stale or manual replSetMaintenance
 - **`[5]`**: When stepping down with [\_hasOnlyAuthErrorUpHeartbeats(...) returning true](https://github.com/10gen/mongo/blob/v8.0/src/mongo/db/repl/topology_coordinator.cpp#L2737-L2739)
 - **`[6]`**: [Code in ReplicationCoordinatorImpl::\_startDataReplication](https://github.com/10gen/mongo/blob/v8.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L899-L900) allows it
-- **`[7]`**: For Rollback via Refetch (which is not used starting in 5.0), [here](https://github.com/10gen/mongo/blob/v8.0/src/mongo/db/repl/rs_rollback.cpp#L2026)
 
 # Non-replication subsystems dependent on replication state transitions.
 

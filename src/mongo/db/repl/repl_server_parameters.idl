@@ -155,17 +155,6 @@ server_parameters:
         default: 2000
         redact: false
 
-    forceRollbackViaRefetch:
-        description: >-
-            If 'forceRollbackViaRefetch' is true, always perform rollbacks via the
-            refetch algorithm, even if the storage engine supports rollback via recover
-            to timestamp.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: forceRollbackViaRefetch
-        default: false
-        redact: false
-
     # From noop_writer.cpp
     writePeriodicNoops:
         description: Sets whether to write periodic noops or not

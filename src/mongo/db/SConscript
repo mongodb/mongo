@@ -2571,7 +2571,6 @@ env.Library(
         "repl/repl_set_commands",
         "repl/repl_settings",
         "repl/replica_set_aware_service",
-        "repl/rs_rollback",
         "repl/serveronly_repl",
         "repl/storage_interface_impl",
         "repl/topology_coordinator",
