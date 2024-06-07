@@ -7,6 +7,12 @@
  *   featureFlagReshardingForTimeseries,
  *   does_not_support_transactions,
  *   assumes_balancer_off,
+ *   requires_fcv_80,
+ *   # Some in memory variants will error because this test uses too much memory. As such, we do not
+ *   # run this test on in-memory variants.
+ *   requires_persistence,
+ *   # TODO (SERVER-91251): Run this with stepdowns on TSAN.
+ *   tsan_incompatible,
  * ]
  */
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";

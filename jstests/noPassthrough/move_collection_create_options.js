@@ -396,7 +396,6 @@ const testCases = [
     },
     {
         name: "timeseries",
-        // TODO (SERVER-80690): gFeatureFlagReshardingForTimeseries.
         shouldSkip: (conn) => !FeatureFlagUtil.isEnabled(conn, "ReshardingForTimeseries"),
         createCollection: (conn, dbName, collName) => {
             assert.commandWorked(conn.getDB(dbName).runCommand(

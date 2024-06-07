@@ -4,6 +4,7 @@
  * - the resharded collection after resharding is complete.
  * @tags: [
  *    featureFlagReshardingForTimeseries,
+ *    requires_fcv_80,
  * ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";

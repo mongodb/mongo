@@ -92,13 +92,6 @@ selector:
     # Denylists from this suite.
     ##
 
-    # Time series collections can be tracked by the config server, but cannot be moved by
-    # moveCollection yet, and this test creates an unsplittable time series collection that if
-    # placed on the config shard, can't be moved off it, timing out the transition hook.
-    #
-    # TODO SERVER-80690: Remove when tracked time series collections can be moved.
-    - jstests/concurrency/fsm_workloads/timeseries_deletes_and_inserts.js
-
     # TODO SERVER-90609: Enable these tests.
     - jstests/concurrency/fsm_workloads/create_index_background_unique.js
     - jstests/concurrency/fsm_workloads/create_index_background_unique_capped.js

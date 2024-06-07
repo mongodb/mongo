@@ -3,6 +3,7 @@
  *
  * @tags: [
  *  featureFlagReshardingForTimeseries,
+ *  requires_fcv_80,
  * ]
  */
 
