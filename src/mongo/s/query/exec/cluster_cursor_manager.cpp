@@ -644,7 +644,6 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& 
 
     // For a change stream query that never ends, we want to collect query stats on the initial
     // query and each getMore. Here we record the initial query.
-    // TODO SERVER-89058 Modify comment to include tailable cursors.
     if (cursor->getQueryStatsWillNeverExhaust()) {
         auto& opDebug = CurOp::get(opCtx)->debug();
 
@@ -669,7 +668,6 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::Pinn
 
     // For a change stream query that never ends, we want to update query stats for every getMore on
     // the cursor.
-    // TODO SERVER-89058 Modify comment to include tailable cursors.
     if (cursor->getQueryStatsWillNeverExhaust()) {
         auto& opDebug = CurOp::get(opCtx)->debug();
 

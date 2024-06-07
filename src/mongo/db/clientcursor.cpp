@@ -464,7 +464,6 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
 
     // For a change stream query, we want to collect and update query stats on the initial query and
     // for every getMore.
-    // TODO SERVER-89058 Modify comment to include tailable cursors.
     if (pinnedCursor->getQueryStatsWillNeverExhaust()) {
         auto& opDebug = CurOp::get(opCtx)->debug();
 

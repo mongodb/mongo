@@ -410,7 +410,6 @@ void writeQueryStats(OperationContext* opCtx,
     // Generally we expect a 'key' to write query stats. However, for a change stream query, we
     // expect it has no 'key' after its first writeQueryStats(), but it must have a
     // 'queryStatsKeyHash' for its entry to be updated.
-    // TODO SERVER-89058 Modify comment to include tailable cursors.
     if (!key && !(willNeverExhaust && queryStatsKeyHash)) {
         return;
     }
