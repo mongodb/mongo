@@ -19,13 +19,16 @@ import {
     ClusteredCollectionUtil
 } from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
-import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
+import {
+    getLatestProfilerEntry,
+    profilerHasZeroMatchingEntriesOrThrow
+} from "jstests/libs/profiler.js";
 
 // Setup test db and collection.
-var testDB = db.getSiblingDB("profile_delete");
+const testDB = db.getSiblingDB("profile_delete");
 assert.commandWorked(testDB.dropDatabase());
 const collName = jsTestName();
-var coll = testDB.getCollection(collName);
+const coll = testDB.getCollection(collName);
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
@@ -35,16 +38,21 @@ assert.commandWorked(testDB.setProfilingLevel(
 //
 // Confirm metrics for single document delete.
 //
-var i;
-for (i = 0; i < 10; ++i) {
-    assert.commandWorked(coll.insert({a: i, b: i}));
+let docs = [];
+for (let i = 0; i < 10; ++i) {
+    docs.push({a: i, b: i});
 }
+assert.commandWorked(coll.insert(docs));
 assert.commandWorked(coll.createIndex({a: 1}));
 
-assert.commandWorked(
-    coll.remove({a: {$gte: 2}, b: {$gte: 2}}, {justOne: true, collation: {locale: "fr"}}));
+let testComment = "test1"
+assert.commandWorked(testDB.runCommand({
+    delete: collName,
+    deletes: [{q: {a: {$gte: 2}, b: {$gte: 2}}, limit: 1, collation: {locale: "fr"}}],
+    comment: testComment
+}));
 
-var profileObj = getLatestProfilerEntry(testDB);
+let profileObj = getLatestProfilerEntry(testDB, {"command.comment": testComment});
 
 const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 // A clustered collection has no actual index on _id.
@@ -70,13 +78,18 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 // Confirm metrics for multiple document delete.
 //
-coll.drop();
-for (i = 0; i < 10; ++i) {
-    assert.commandWorked(coll.insert({a: i}));
+assert(coll.drop());
+docs = [];
+for (let i = 0; i < 10; ++i) {
+    docs.push({a: i});
 }
+assert.commandWorked(coll.insert(docs));
 
-assert.commandWorked(coll.remove({a: {$gte: 2}}));
-profileObj = getLatestProfilerEntry(testDB);
+testComment = "test2";
+assert.commandWorked(testDB.runCommand(
+    {delete: collName, deletes: [{q: {a: {$gte: 2}}, limit: 0}], comment: testComment}));
+
+profileObj = getLatestProfilerEntry(testDB, {"command.comment": testComment});
 
 // A clustered collection has no actual index on _id.
 expectedKeysDeleted = collectionIsClustered ? 0 : 8;
@@ -87,15 +100,20 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 // Confirm "fromMultiPlanner" metric.
 //
-coll.drop();
+assert(coll.drop());
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
-for (i = 0; i < 5; ++i) {
-    assert.commandWorked(coll.insert({a: i, b: i}));
+docs = [];
+for (let i = 0; i < 5; ++i) {
+    docs.push({a: i, b: i});
 }
+assert.commandWorked(coll.insert(docs));
 
-assert.commandWorked(coll.remove({a: 3, b: 3}));
-profileObj = getLatestProfilerEntry(testDB);
+testComment = "test3";
+assert.commandWorked(testDB.runCommand(
+    {delete: collName, deletes: [{q: {a: 3, b: 3}, limit: 0}], comment: testComment}));
+
+profileObj = getLatestProfilerEntry(testDB, {"command.comment": testComment});
 
 assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
@@ -105,20 +123,25 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 assert(coll.drop());
 
+docs = [];
 for (let i = 0; i < 100; ++i) {
-    assert.commandWorked(coll.insert({a: 1}));
+    docs.push({a: 1});
 }
+assert.commandWorked(coll.insert(docs));
 
+testComment = "test4";
 const deleteResult = testDB.runCommand({
     delete: coll.getName(),
     deletes: [{q: {$where: "sleep(1000);return true", a: 1}, limit: 0}],
-    maxTimeMS: 1
+    maxTimeMS: 1,
+    comment: testComment
 });
 
 // This command will time out before completing.
 assert.commandFailedWithCode(deleteResult, ErrorCodes.MaxTimeMSExpired);
 
-profileObj = getLatestProfilerEntry(testDB);
-
-// 'ndeleted' should not be defined.
-assert(!profileObj.hasOwnProperty("ndeleted"), profileObj);
+// Depending on where in the command path the maxTimeMS timeout occurs we will either forego writing
+// a document to the system.profile collection or we will write the delete command entry that
+// reflects failed command execution.
+profilerHasZeroMatchingEntriesOrThrow(
+    {profileDB: testDB, filter: {"command.comment": testComment, "ok": 1}});
