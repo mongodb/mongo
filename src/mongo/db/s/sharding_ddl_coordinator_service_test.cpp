@@ -40,6 +40,9 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/s/ddl_lock_manager.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator_external_state_for_test.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -63,8 +66,15 @@ namespace mongo {
 
 class ShardingDDLCoordinatorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
+    ShardingDDLCoordinatorServiceTest() {
+        _externalState = std::make_shared<ShardingDDLCoordinatorExternalStateForTest>();
+        _externalStateFactory =
+            std::make_unique<ShardingDDLCoordinatorExternalStateFactoryForTest>(_externalState);
+    }
+
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
-        return std::make_unique<ShardingDDLCoordinatorService>(serviceContext);
+        return std::make_unique<ShardingDDLCoordinatorService>(serviceContext,
+                                                               std::move(_externalStateFactory));
     }
 
     void setUp() override {
@@ -171,7 +181,21 @@ protected:
             opCtx, ns, reason, mode, timeoutMillisecs, false /*waitForRecovery*/);
     }
 
+    MigrationBlockingOperationCoordinatorDocument createMBOCDoc(OperationContext* opCtx) {
+        const auto coordinatorId = ShardingDDLCoordinatorId{
+            NamespaceString::createNamespaceString_forTest("testDb", "coll"),
+            DDLCoordinatorTypeEnum::kMigrationBlockingOperation};
+        ShardingDDLCoordinatorMetadata metadata(coordinatorId);
+        metadata.setForwardableOpMetadata(ForwardableOperationMetadata(opCtx));
+        metadata.setDatabaseVersion(DatabaseVersion{UUID::gen(), Timestamp(1, 0)});
+        MigrationBlockingOperationCoordinatorDocument doc;
+        doc.setShardingDDLCoordinatorMetadata(metadata);
+        return doc;
+    }
+
     std::shared_ptr<executor::TaskExecutor> _testExecutor;
+    std::unique_ptr<ShardingDDLCoordinatorExternalStateFactoryForTest> _externalStateFactory;
+    std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> _externalState;
 };
 
 TEST_F(ShardingDDLCoordinatorServiceTest, StateTransitions) {
@@ -322,6 +346,48 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StepdownDuringServiceRebuilding) {
 
     // Reaching a steady state to start the test
     ddlService()->waitForRecoveryCompletion(opCtx.get());
+}
+
+TEST_F(ShardingDDLCoordinatorServiceTest, StepdownStepupWhileCreatingCoordinator) {
+    auto opCtx = makeOperationContext();
+
+    MigrationBlockingOperationCoordinator::getOrCreate(
+        opCtx.get(), ddlService(), createMBOCDoc(opCtx.get()).toBSON());
+
+    for (size_t i = 0u; i < 10u; ++i) {
+        stepDown();
+        stepUp(opCtx.get());
+    }
+
+    ddlService()->waitForRecoveryCompletion(opCtx.get());
+}
+
+TEST_F(ShardingDDLCoordinatorServiceTest, StepdownWhileRunningCoordinator) {
+    auto opCtx = makeOperationContext();
+
+    MigrationBlockingOperationCoordinator::getOrCreate(
+        opCtx.get(), ddlService(), createMBOCDoc(opCtx.get()).toBSON());
+
+    Atomic<bool> coordinatorCompleted{false};
+
+    auto waiterThread = stdx::thread([&]() {
+        try {
+            ddlService()->waitForCoordinatorsOfGivenTypeToComplete(
+                opCtx.get(), DDLCoordinatorTypeEnum::kMigrationBlockingOperation);
+            coordinatorCompleted.store(true);
+        } catch (ExceptionFor<ErrorCodes::Interrupted>&) {
+        }
+    });
+
+    for (size_t i = 0u; i < 10u; ++i) {
+        stepDown();
+        stepUp(opCtx.get());
+        ASSERT_FALSE(coordinatorCompleted.load());
+    }
+
+    opCtx->markKilled();
+
+    waiterThread.join();
 }
 
 
