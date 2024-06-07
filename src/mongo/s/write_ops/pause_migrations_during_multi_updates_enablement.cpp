@@ -27,30 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_ops/batch_write_op.h"
-#include "mongo/s/write_ops/bulk_write_exec.h"
+#include <random>
+
+#include "mongo/db/server_parameter.h"
+#include "mongo/s/migration_blocking_operation/migration_blocking_operation_cluster_parameters_gen.h"
+#include "mongo/s/write_ops/pause_migrations_during_multi_updates_enablement.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
-namespace coordinate_multi_update_util {
 
-class PauseMigrationsDuringMultiUpdatesEnablement {
-public:
-    bool isEnabled();
+namespace {
+MONGO_FAIL_POINT_DEFINE(returnRandomPauseMigrationsDuringMultiUpdatesParameter);
 
-private:
-    boost::optional<bool> _enabled;
-};
+bool readPauseMigrationsEnablement() {
+    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+    auto* clusterPauseMigrationsParam = clusterParameters->get<ClusterParameterWithStorage<
+        migration_blocking_operation::PauseMigrationsDuringMultiUpdatesParam>>(
+        "pauseMigrationsDuringMultiUpdates");
+    auto clusterParameterEnabled = clusterPauseMigrationsParam->getValue(boost::none).getEnabled();
 
-int getWriteOpIndex(const TargetedBatchMap& childBatches);
+    returnRandomPauseMigrationsDuringMultiUpdatesParameter.execute([&](const auto& data) {
+        std::mt19937 gen(time(nullptr));
+        std::uniform_int_distribution<int> dist(0, 1);
+        clusterParameterEnabled = (dist(gen) == 1);
+    });
 
-BatchedCommandResponse executeCoordinateMultiUpdate(OperationContext* opCtx,
-                                                    BatchWriteOp& batchOp,
-                                                    const TargetedBatchMap& childBatches,
-                                                    const BatchedCommandRequest& clientRequest);
+    return clusterParameterEnabled;
+}
+}  // namespace
 
-BulkWriteCommandReply executeCoordinateMultiUpdate(OperationContext* opCtx,
-                                                   TargetedBatchMap& childBatches,
-                                                   bulk_write_exec::BulkWriteOp& bulkWriteOp);
+bool PauseMigrationsDuringMultiUpdatesEnablement::isEnabled() {
+    if (!_enabled.has_value()) {
+        _enabled = readPauseMigrationsEnablement();
+    }
+    return _enabled.value();
+}
 
-}  // namespace coordinate_multi_update_util
 }  // namespace mongo

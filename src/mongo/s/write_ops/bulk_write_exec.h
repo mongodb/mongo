@@ -430,6 +430,8 @@ private:
     const bool _inTransaction{false};
     const bool _isRetryableWrite{false};
 
+    PauseMigrationsDuringMultiUpdatesEnablement _pauseMigrationsDuringMultiUpdatesParameter;
+
     // Set to true if we encountered an error that prevents us from executing the rest of the
     // bulkWrite. Note this does *not* include cases where we saw an error for an individual
     // statement in an ordered bulkWrite, but instead covers these cases:
