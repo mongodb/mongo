@@ -499,10 +499,6 @@ bool isIndexBuildResumable(OperationContext* opCtx,
         return false;
     }
 
-    if (!opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds()) {
-        return false;
-    }
-
     // Only index builds with the default "all-voters" commit quorum running on voting nodes should
     // be resumable. A node that cannot contribute to the commit quorum should not be waiting for
     // the majority commit point when trying to commit the index build.

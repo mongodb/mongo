@@ -2707,10 +2707,6 @@ bool WiredTigerKVEngine::supportsReadConcernSnapshot() const {
     return true;
 }
 
-bool WiredTigerKVEngine::supportsReadConcernMajority() const {
-    return true;
-}
-
 bool WiredTigerKVEngine::supportsOplogTruncateMarkers() const {
     return true;
 }

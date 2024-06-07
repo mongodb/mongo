@@ -425,10 +425,6 @@ public:
         return false;
     }
 
-    virtual bool supportsReadConcernMajority() const {
-        return false;
-    }
-
     /**
      * See `StorageEngine::supportsOplogTruncateMarkers`
      */

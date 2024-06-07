@@ -117,16 +117,7 @@ public:
     bool supportsReadConcernSnapshot() const final {
         return false;
     }
-    bool supportsReadConcernMajority() const final {
-        return false;
-    }
     bool supportsOplogTruncateMarkers() const final {
-        return false;
-    }
-    bool supportsResumableIndexBuilds() const final {
-        return false;
-    }
-    bool supportsPendingDrops() const final {
         return false;
     }
     void clearDropPendingState(OperationContext* opCtx) final {}

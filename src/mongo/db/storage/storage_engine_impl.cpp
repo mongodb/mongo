@@ -552,7 +552,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
 
     // When starting up after an unclean shutdown, we do not attempt to recover any state from the
     // internal idents. Thus, we drop them in this case.
-    if (lastShutdownState == LastShutdownState::kUnclean || !supportsResumableIndexBuilds()) {
+    if (lastShutdownState == LastShutdownState::kUnclean) {
         internalIdentsToDrop->insert(ident);
         return true;
     }
@@ -982,10 +982,7 @@ Status StorageEngineImpl::_dropCollections(OperationContext* opCtx,
                 }
             }
 
-            CollectionCatalog::get(opCtx)->dropCollection(
-                opCtx,
-                coll,
-                opCtx->getServiceContext()->getStorageEngine()->supportsPendingDrops());
+            CollectionCatalog::get(opCtx)->dropCollection(opCtx, coll, true /*isDropPending*/);
         }
     }
 
@@ -1181,21 +1178,8 @@ bool StorageEngineImpl::supportsReadConcernSnapshot() const {
     return _engine->supportsReadConcernSnapshot();
 }
 
-bool StorageEngineImpl::supportsReadConcernMajority() const {
-    return _engine->supportsReadConcernMajority();
-}
-
 bool StorageEngineImpl::supportsOplogTruncateMarkers() const {
     return _engine->supportsOplogTruncateMarkers();
-}
-
-bool StorageEngineImpl::supportsResumableIndexBuilds() const {
-    return supportsReadConcernMajority() && !isEphemeral() &&
-        !repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
-}
-
-bool StorageEngineImpl::supportsPendingDrops() const {
-    return supportsReadConcernMajority();
 }
 
 void StorageEngineImpl::clearDropPendingState(OperationContext* opCtx) {

@@ -396,8 +396,6 @@ public:
 
     bool supportsOplogTruncateMarkers() const final;
 
-    bool supportsReadConcernMajority() const final;
-
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
     // held by this class

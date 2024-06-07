@@ -82,8 +82,7 @@ protected:
         _catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
 
-        _directClient = std::make_unique<KeysCollectionClientDirect>(
-            !getServiceContext()->getStorageEngine()->supportsReadConcernMajority());
+        _directClient = std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/);
     }
 
     KeysCollectionClient* catalogClient() const {

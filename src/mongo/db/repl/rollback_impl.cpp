@@ -847,7 +847,6 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
 
 Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
     auto catalog = CollectionCatalog::get(opCtx);
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
     LOGV2(21604, "Finding record store counts");
     for (const auto& uiCount : _countDiffs) {
@@ -861,11 +860,8 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
         StorageInterface::CollectionCount oldCount = 0;
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
-        // managed by the storage engine. See StorageEngine::supportsPendingDrops().
+        // managed by the storage engine.
         if (!nss) {
-            invariant(storageEngine->supportsPendingDrops(),
-                      str::stream() << "The collection with UUID " << uuid
-                                    << " is unexpectedly missing in the CollectionCatalog");
             auto it = _pendingDrops.find(uuid);
             if (it == _pendingDrops.end()) {
                 _newCounts[uuid] = kCollectionScanRequired;
@@ -1321,14 +1317,13 @@ boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx
 
 Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {
     auto catalog = CollectionCatalog::get(opCtx);
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     for (auto&& entry : _observerInfo.rollbackDeletedIdsMap) {
         const auto& uuid = entry.first;
         const auto nss = catalog->lookupNSSByUUID(opCtx, uuid);
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
-        // managed by the storage engine. See StorageEngine::supportsPendingDrops().
-        if (!nss && storageEngine->supportsPendingDrops()) {
+        // managed by the storage engine.
+        if (!nss) {
             LOGV2(21608,
                   "Collection is missing in the CollectionCatalog. This could be due to a dropped "
                   "collection. Not writing rollback file for uuid",

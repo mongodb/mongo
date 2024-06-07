@@ -419,8 +419,7 @@ protected:
 
         _keyManager = std::make_unique<KeysCollectionManager>(
             "dummy",
-            std::make_unique<KeysCollectionClientDirect>(
-                !getServiceContext()->getStorageEngine()->supportsReadConcernMajority()),
+            std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/),
             Seconds(1));
     }
 

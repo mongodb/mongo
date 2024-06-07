@@ -392,11 +392,9 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
     auto initKeysClient =
         [service](ShardingCatalogClient* catalogClient) -> std::unique_ptr<KeysCollectionClient> {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-            // The direct keys client must use local read concern if the storage engine can't
-            // support majority read concern.
-            bool keysClientMustUseLocalReads =
-                !service->getStorageEngine()->supportsReadConcernMajority();
-            return std::make_unique<KeysCollectionClientDirect>(keysClientMustUseLocalReads);
+            // The direct keys client does not use local read concern since the storage engine
+            // supports majority read concern.
+            return std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/);
         }
         return std::make_unique<KeysCollectionClientSharded>(catalogClient);
     };

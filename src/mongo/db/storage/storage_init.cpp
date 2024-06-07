@@ -65,12 +65,12 @@ public:
 
         BSONObjBuilder bob;
         bob.append("name", storageGlobalParams.engine);
-        bob.append("supportsCommittedReads", engine->supportsReadConcernMajority());
+        bob.append("supportsCommittedReads", true);
         bob.append("oldestRequiredTimestampForCrashRecovery",
                    oldestRequiredTimestampForCrashRecovery
                        ? *oldestRequiredTimestampForCrashRecovery
                        : Timestamp());
-        bob.append("supportsPendingDrops", engine->supportsPendingDrops());
+        bob.append("supportsPendingDrops", true);
         bob.append("dropPendingIdents", static_cast<long long>(engine->getNumDropPendingIdents()));
         bob.append("supportsSnapshotReadConcern", engine->supportsReadConcernSnapshot());
         bob.append("readOnly", !opCtx->getServiceContext()->userWritesAllowed());

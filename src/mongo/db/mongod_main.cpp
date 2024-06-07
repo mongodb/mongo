@@ -950,8 +950,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 serviceContext->getFastClockSource(),
                 "Start up cluster time keys manager with a local/direct keys client",
                 &startupTimeElapsedBuilder);
-            auto keysClientMustUseLocalReads =
-                !serviceContext->getStorageEngine()->supportsReadConcernMajority();
+            auto keysClientMustUseLocalReads = false;
             auto keysCollectionClient =
                 std::make_unique<KeysCollectionClientDirect>(keysClientMustUseLocalReads);
             auto keyManager = std::make_shared<KeysCollectionManager>(

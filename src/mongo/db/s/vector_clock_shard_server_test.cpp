@@ -72,8 +72,8 @@ protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
 
-        auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>(
-            !getServiceContext()->getStorageEngine()->supportsReadConcernMajority());
+        auto keysCollectionClient =
+            std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/);
 
         VectorClockMutable::get(getServiceContext())
             ->tickClusterTimeTo(LogicalTime(Timestamp(1, 0)));

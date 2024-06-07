@@ -436,23 +436,12 @@ public:
      */
     virtual bool supportsReadConcernSnapshot() const = 0;
 
-    virtual bool supportsReadConcernMajority() const = 0;
-
     /**
      * Returns true if the storage engine uses oplog truncate markers to more finely control
      * deletion of oplog history, instead of the standard capped collection controls on
      * the oplog collection size.
      */
     virtual bool supportsOplogTruncateMarkers() const = 0;
-
-    virtual bool supportsResumableIndexBuilds() const = 0;
-
-    /**
-     * Returns true if the storage engine supports deferring collection drops until the the storage
-     * engine determines that the storage layer artifacts for the pending drops are no longer needed
-     * based on the stable and oldest timestamps.
-     */
-    virtual bool supportsPendingDrops() const = 0;
 
     /**
      * Returns a set of drop pending idents inside the storage engine.

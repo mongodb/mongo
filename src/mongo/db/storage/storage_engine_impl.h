@@ -175,13 +175,7 @@ public:
 
     bool supportsReadConcernSnapshot() const final;
 
-    bool supportsReadConcernMajority() const final;
-
     bool supportsOplogTruncateMarkers() const final;
-
-    bool supportsResumableIndexBuilds() const final;
-
-    bool supportsPendingDrops() const final;
 
     void clearDropPendingState(OperationContext* opCtx) final;
 
