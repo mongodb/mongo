@@ -113,12 +113,6 @@ export const $config = (function() {
                 this.allowDiskUse = false;
             }
         }
-
-        // Advance each router's cluster time to be >= the time of the writes, so the first
-        // global snapshots chosen by each is guaranteed to include the inserted documents.
-        if (cluster.isSharded()) {
-            cluster.synchronizeMongosClusterTimes();
-        }
     }
 
     function teardown(db, collName) {

@@ -348,12 +348,6 @@ export const $config = (function() {
             assert.commandWorked(res);
             assert.eq(this.numDocs, res.nInserted);
         }
-
-        if (cluster.isSharded()) {
-            // Advance each router's cluster time to be >= the time of the writes, so the first
-            // global snapshots chosen by each is guaranteed to include the inserted documents.
-            cluster.synchronizeMongosClusterTimes();
-        }
     }
 
     function teardown(db, collName, cluster) {
