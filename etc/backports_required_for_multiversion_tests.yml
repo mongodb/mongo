@@ -41,7 +41,7 @@ last-continuous:
     ticket: SERVER-51943
   - test_file: jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
     ticket: SERVER-53335
-  - test_file: jstests/core/index/elemmatch_index.js
+  - test_file: jstests/core/elemmatch_index.js
     ticket: SERVER-90747
   - test_file: jstests/sharding/cwwc_conflict_add_shard.js
     ticket: SERVER-56800
@@ -452,7 +452,7 @@ last-lts:
     ticket: SERVER-56518
   - test_file: jstests/concurrency/fsm_workloads/collmod_writeconflict.js
     ticket: SERVER-56772
-  - test_file: jstests/core/index/elemmatch_index.js
+  - test_file: jstests/core/elemmatch_index.js
     ticket: SERVER-90747
   - test_file: jstests/sharding/cwwc_conflict_add_shard.js
     ticket: SERVER-56800
