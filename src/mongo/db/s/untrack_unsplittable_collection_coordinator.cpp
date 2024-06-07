@@ -30,6 +30,7 @@
 #include "mongo/db/s/untrack_unsplittable_collection_coordinator.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_util.h"
@@ -155,20 +156,20 @@ void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(
         csr->clearFilteringMetadata(opCtx);
     }
 
+    // Note also that this code is indirectly used to notify to secondary nodes to clear their
+    // filtering information.
+    forceShardFilteringMetadataRefresh(opCtx, nss());
+    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss());
+
+    // Ensures the refresh of the catalog cache will be waited majority at the end of the
+    // command
+    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
     auto service = ShardingRecoveryService::get(opCtx);
     service->releaseRecoverableCriticalSection(
         opCtx, nss(), _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "untrackCollection.end", nss());
-}
-
-void UntrackUnsplittableCollectionCoordinator::_fireAndForgetRefresh() {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-    // Fire and forget refresh.
-    sharding_util::triggerFireAndForgetShardRefreshes(
-        opCtx, {ShardingState::get(opCtx)->shardId()}, nss());
 }
 
 ExecutorFuture<void> UntrackUnsplittableCollectionCoordinator::_runImpl(
@@ -192,7 +193,6 @@ ExecutorFuture<void> UntrackUnsplittableCollectionCoordinator::_runImpl(
                                  [this, token, executor = executor, anchor = shared_from_this()] {
                                      _exitCriticalSection(executor, token);
                                  }))
-        .then([this, executor = executor, anchor = shared_from_this()] { _fireAndForgetRefresh(); })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (status == ErrorCodes::RequestAlreadyFulfilled) {
                 return Status::OK();
