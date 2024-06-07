@@ -135,6 +135,8 @@ last-continuous:
       ticket: SERVER-87285
     - test_file: jstests/core/exhaust.js
       ticket: SERVER-87285
+    - test_file: jstests/core/sparse_index_supports_ne_null.js
+      ticket: SERVER-37164
   suites: null
 last-lts:
   all:
@@ -252,4 +254,6 @@ last-lts:
       ticket: SERVER-87285
     - test_file: jstests/core/exhaust.js
       ticket: SERVER-87285
+    - test_file: jstests/core/sparse_index_supports_ne_null.js
+      ticket: SERVER-37164
   suites: null
