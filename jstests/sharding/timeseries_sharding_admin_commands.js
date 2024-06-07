@@ -146,6 +146,10 @@ function assertRangeMatch(savedRange, paramRange) {
 (function checkShardingStateCommand() {
     createTimeSeriesColl(
         {index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1, [timeField]: 1}});
+    assert.commandWorked(
+        mongo.getPrimaryShard(dbName).adminCommand({_flushRoutingTableCacheUpdates: viewNss}));
+    assert.commandWorked(
+        mongo.getPrimaryShard(dbName).adminCommand({_flushRoutingTableCacheUpdates: bucketNss}));
     const shardingStateRes = mongo.getPrimaryShard(dbName).adminCommand({shardingState: 1});
     const shardingStateColls = shardingStateRes.versions;
     const bucketNssIsSharded =
