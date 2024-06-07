@@ -259,8 +259,6 @@ public:
         const Timestamp& atClusterTime,
         const boost::optional<NamespaceString>& nss) override;
 
-    bool anyShardRemovedSince(OperationContext* opCtx, const Timestamp& clusterTime) override;
-
 private:
     /**
      * Updates a single document (if useMultiUpdate is false) or multiple documents (if

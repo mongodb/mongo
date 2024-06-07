@@ -57,9 +57,7 @@ struct TestObserver : public OpObserverNoop {
     int drops = 0;
     repl::OpTime opTime;
 
-    void onDropDatabase(OperationContext* opCtx,
-                        const DatabaseName& dbName,
-                        bool markFromMigrate) override {
+    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override {
         drops++;
     }
     repl::OpTime onDropCollection(OperationContext* opCtx,
@@ -111,9 +109,7 @@ struct TestObserver : public OpObserverNoop {
 };
 
 struct ThrowingObserver : public TestObserver {
-    void onDropDatabase(OperationContext* opCtx,
-                        const DatabaseName& dbName,
-                        bool markFromMigrate) override {
+    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override {
         drops++;
         uasserted(ErrorCodes::InternalError, "throwing observer");
     }
@@ -158,18 +154,14 @@ struct OpObserverRegistryTest : public ServiceContextTest {
 
 TEST_F(OpObserverRegistryTest, NoObservers) {
     // Check that it's OK to call observer methods with no observers registered.
-    registry.onDropDatabase(opCtx,
-                            DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                            false /*markFromMigrate*/);
+    registry.onDropDatabase(opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "test"));
 }
 
 TEST_F(OpObserverRegistryTest, TwoObservers) {
     ASSERT_EQUALS(testObservers, 2);
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
-    registry.onDropDatabase(opCtx,
-                            DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                            false /*markFromMigrate*/);
+    registry.onDropDatabase(opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "test"));
     ASSERT_EQUALS(observer1->drops, 1);
     ASSERT_EQUALS(observer2->drops, 1);
 }
@@ -179,11 +171,9 @@ TEST_F(OpObserverRegistryTest, ThrowingObserver1) {
     observer1 = unique1.get();
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
-    ASSERT_THROWS(
-        registry.onDropDatabase(opCtx,
-                                DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                false /*markFromMigrate*/),
-        AssertionException);
+    ASSERT_THROWS(registry.onDropDatabase(
+                      opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "test")),
+                  AssertionException);
     ASSERT_EQUALS(observer1->drops, 1);
     ASSERT_EQUALS(observer2->drops, 0);
 }
@@ -193,11 +183,9 @@ TEST_F(OpObserverRegistryTest, ThrowingObserver2) {
     observer2 = unique1.get();
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
-    ASSERT_THROWS(
-        registry.onDropDatabase(opCtx,
-                                DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                false /*markFromMigrate*/),
-        AssertionException);
+    ASSERT_THROWS(registry.onDropDatabase(
+                      opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "test")),
+                  AssertionException);
     ASSERT_EQUALS(observer1->drops, 1);
     ASSERT_EQUALS(observer2->drops, 1);
 }

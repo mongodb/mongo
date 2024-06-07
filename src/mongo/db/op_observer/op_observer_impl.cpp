@@ -1337,9 +1337,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
     invariant(coll->uuid() == uuid);
 }
 
-void OpObserverImpl::onDropDatabase(OperationContext* opCtx,
-                                    const DatabaseName& dbName,
-                                    bool markFromMigrate) {
+void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     const auto nss = NamespaceString::makeCommandNamespace(dbName);
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
@@ -1350,7 +1348,6 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx,
 
     oplogEntry.setTid(dbName.tenantId());
     oplogEntry.setNss(nss);
-    oplogEntry.setFromMigrate(markFromMigrate);
     oplogEntry.setObject(BSON("dropDatabase" << 1));
     auto opTime =
         logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());

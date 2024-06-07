@@ -156,9 +156,7 @@ public:
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo) override {}
 
-    void onDropDatabase(OperationContext* opCtx,
-                        const DatabaseName& dbName,
-                        bool markFromMigrate) override {}
+    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override {}
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,

@@ -121,8 +121,7 @@ void _finishDropDatabase(OperationContext* opCtx,
                          const DatabaseName& dbName,
                          Database* db,
                          std::size_t numCollections,
-                         bool abortIndexBuilds,
-                         bool fromMigrate) {
+                         bool abortIndexBuilds) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_X));
 
     // If DatabaseHolder::dropDb() fails, we should reset the drop-pending state on Database.
@@ -144,7 +143,7 @@ void _finishDropDatabase(OperationContext* opCtx,
         // same transaction. This is to prevent stepdown from interrupting between these two
         // operations and leaving this node in an inconsistent state.
         WriteUnitOfWork wunit(opCtx);
-        opCtx->getServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName, fromMigrate);
+        opCtx->getServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
 
         auto databaseHolder = DatabaseHolder::get(opCtx);
         databaseHolder->dropDb(opCtx, db);
@@ -161,10 +160,7 @@ void _finishDropDatabase(OperationContext* opCtx,
     LOGV2(20336, "dropDatabase", logAttrs(dbName), "numCollectionsDropped"_attr = numCollections);
 }
 
-Status _dropDatabase(OperationContext* opCtx,
-                     const DatabaseName& dbName,
-                     bool abortIndexBuilds,
-                     bool markFromMigrate) {
+Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool abortIndexBuilds) {
     // As this code can potentially require replication we disallow holding locks entirely. Holding
     // of any locks is disallowed while awaiting replication because this can potentially block for
     // long time while doing network activity.
@@ -296,7 +292,7 @@ Status _dropDatabase(OperationContext* opCtx,
 
             writeConflictRetry(opCtx, "dropDatabase_views_collection", nss, [&] {
                 WriteUnitOfWork wunit(opCtx);
-                fassert(7193701, db->dropCollectionEvenIfSystem(opCtx, nss, {}, markFromMigrate));
+                fassert(7193701, db->dropCollectionEvenIfSystem(opCtx, nss));
                 wunit.commit();
             });
         }
@@ -329,7 +325,7 @@ Status _dropDatabase(OperationContext* opCtx,
             invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
             writeConflictRetry(opCtx, "dropDatabase_system.profile_collection", nss, [&] {
                 WriteUnitOfWork wunit(opCtx);
-                fassert(7574001, db->dropCollectionEvenIfSystem(opCtx, nss, {}, markFromMigrate));
+                fassert(7574001, db->dropCollectionEvenIfSystem(opCtx, nss));
                 wunit.commit();
             });
         }
@@ -389,7 +385,7 @@ Status _dropDatabase(OperationContext* opCtx,
                 // A primary processing this will assign a timestamp when the operation is written
                 // to the oplog. As stated above, a secondary processing must only observe
                 // non-replicated collections, thus this should not be timestamped.
-                fassert(40476, db->dropCollectionEvenIfSystem(opCtx, nss, {}, markFromMigrate));
+                fassert(40476, db->dropCollectionEvenIfSystem(opCtx, nss));
                 wunit.commit();
             });
         }
@@ -400,8 +396,7 @@ Status _dropDatabase(OperationContext* opCtx,
 
         // If there are no collection drops to wait for, we complete the drop database operation.
         if (numCollectionsToDrop == 0U && latestDropPendingOpTime.isNull()) {
-            _finishDropDatabase(
-                opCtx, dbName, db, numCollections, abortIndexBuilds, markFromMigrate);
+            _finishDropDatabase(opCtx, dbName, db, numCollections, abortIndexBuilds);
             return Status::OK();
         }
     }
@@ -512,23 +507,21 @@ Status _dropDatabase(OperationContext* opCtx,
     // _finishDropDatabase creates its own scope guard to ensure drop-pending is unset.
     dropPendingGuardWhileUnlocked.dismiss();
 
-    _finishDropDatabase(opCtx, dbName, db, numCollections, abortIndexBuilds, markFromMigrate);
+    _finishDropDatabase(opCtx, dbName, db, numCollections, abortIndexBuilds);
 
     return Status::OK();
 }
 
 }  // namespace
 
-Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool markFromMigrate) {
+Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     const bool abortIndexBuilds = true;
-    return _dropDatabase(opCtx, dbName, abortIndexBuilds, markFromMigrate);
+    return _dropDatabase(opCtx, dbName, abortIndexBuilds);
 }
 
-Status dropDatabaseForApplyOps(OperationContext* opCtx,
-                               const DatabaseName& dbName,
-                               bool markFromMigrate) {
+Status dropDatabaseForApplyOps(OperationContext* opCtx, const DatabaseName& dbName) {
     const bool abortIndexBuilds = false;
-    return _dropDatabase(opCtx, dbName, abortIndexBuilds, markFromMigrate);
+    return _dropDatabase(opCtx, dbName, abortIndexBuilds);
 }
 
 }  // namespace mongo

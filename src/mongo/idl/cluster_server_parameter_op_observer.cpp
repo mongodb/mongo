@@ -129,8 +129,7 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
 }
 
 void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
-                                                      const DatabaseName& dbName,
-                                                      bool markFromMigrate) {
+                                                      const DatabaseName& dbName) {
     if (dbName.isConfigDB()) {
         // Entire config DB deleted, reset to default state.
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(

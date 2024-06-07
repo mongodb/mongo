@@ -235,7 +235,6 @@ public:
         const Timestamp& atClusterTime,
         const boost::optional<NamespaceString>& nss) override;
 
-    bool anyShardRemovedSince(OperationContext* opCtx, const Timestamp& clusterTime) override;
 
 private:
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(

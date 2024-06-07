@@ -288,9 +288,4 @@ HistoricalPlacement ShardingCatalogClientMock::getHistoricalPlacement(
     const boost::optional<NamespaceString>& nss) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
-
-bool ShardingCatalogClientMock::anyShardRemovedSince(OperationContext* opCtx,
-                                                     const Timestamp& clusterTime) {
-    return false;
-}
 }  // namespace mongo
