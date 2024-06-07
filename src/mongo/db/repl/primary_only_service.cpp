@@ -685,6 +685,10 @@ std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::g
     return instances;
 }
 
+std::shared_ptr<executor::ScopedTaskExecutor> PrimaryOnlyService::getInstanceExecutor() const {
+    return _scopedExecutor;
+}
+
 void PrimaryOnlyService::releaseInstance(const InstanceID& id, Status status) {
     auto savedInstanceNodeHandle = [&]() {
         stdx::lock_guard lk(_mutex);
