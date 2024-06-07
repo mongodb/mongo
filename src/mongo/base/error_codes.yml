@@ -888,4 +888,3 @@ error_codes:
       name: IDLUnknownFieldPossibleMongocryptd,
       categories: [IDLParseError],
     }
-  - {code: 6627201, name: ConfigTypeLsmNotSupported}
