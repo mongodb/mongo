@@ -5,9 +5,7 @@
 // Note: Enabling new feature flags which aren't yet default-enabled will break this test,
 // because such feature flags do not have a minimum FCV set and therefore will not be
 // disabled when lowering the FCV, causing an incompatibility.
-// Temporarily disabled; TODO SERVER-90735 Re-enable this test
 // @tags: [
-//    __TEMPORARILY_DISABLED__,
 //    all_feature_flags_incompatible
 // ]
 
