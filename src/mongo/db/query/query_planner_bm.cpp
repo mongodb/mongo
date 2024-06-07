@@ -45,13 +45,11 @@ struct Query {
     BSONObj hint;
 };
 
-std::unique_ptr<CanonicalQuery> getCanonicalQuery(Query query) {
+std::unique_ptr<CanonicalQuery> getCanonicalQuery(OperationContext* opCtx, Query query) {
     auto findCommand = query_request_helper::makeFromFindCommandForTests(
         BSON("find" << kCollName << "$db" << kDbName << "filter" << query.filter << "projection"
                     << query.proj << "sort" << query.sort << "hint" << query.hint));
-    QueryTestServiceContext testServiceContext;
-    auto opCtx = testServiceContext.makeOperationContext();
-    auto expCtx = makeExpressionContext(opCtx.get(), *findCommand);
+    auto expCtx = makeExpressionContext(opCtx, *findCommand);
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = expCtx,
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)},
@@ -76,7 +74,9 @@ IndexEntry createIndexEntry(BSONObj keyPattern) {
 
 void BM_NoIndexes(benchmark::State& state) {
     auto filter = BSON("a" << 1);
-    auto cq = getCanonicalQuery({.filter = filter});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
@@ -85,7 +85,9 @@ void BM_NoIndexes(benchmark::State& state) {
 
 void BM_SingleIndex(benchmark::State& state) {
     auto filter = BSON("a" << 1);
-    auto cq = getCanonicalQuery({.filter = filter});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1))};
     for (auto _ : state) {
@@ -95,7 +97,9 @@ void BM_SingleIndex(benchmark::State& state) {
 
 void BM_MultipleIndexes(benchmark::State& state) {
     auto filter = BSON("a" << 1 << "b" << 1);
-    auto cq = getCanonicalQuery({.filter = filter});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1)),
                                                 createIndexEntry(BSON("a" << 1 << "b" << 1))};
@@ -120,7 +124,9 @@ void BM_LargeIn(benchmark::State& state) {
     BSONObjBuilder subB(bob.subobjStart("b"));
     populateIn(subB);
     auto filter = bob.obj();
-    auto cq = getCanonicalQuery({.filter = filter});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1 << "b" << 1)),
                                                 createIndexEntry(BSON("a" << 1))};
@@ -142,7 +148,10 @@ void BM_LargeEq(benchmark::State& state) {
     subA.done();
 
     auto filter = bob.obj();
-    auto cq = getCanonicalQuery({.filter = filter});
+
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1))};
     for (auto _ : state) {
@@ -161,7 +170,9 @@ void BM_IndexedContainedOrFilter(benchmark::State& state) {
                                          << BSON("b" << 2 << "c" << 2) << BSON("b" << 3 << "c" << 3)
                                          << BSON("b" << 4 << "c" << 4) << BSON("b" << 5 << "c" << 5)
                                          << BSON("b" << 6 << "c" << 6)));
-    auto cq = getCanonicalQuery({.filter = filter});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1 << "b" << 1)),
                                                 createIndexEntry(BSON("a" << 1 << "c" << 1))};
@@ -177,7 +188,9 @@ void BM_IndexIntersection(benchmark::State& state) {
     internalQueryEnumerationMaxIntersectPerAnd.store(64);
     // {a: 1, b: 1, c: 1, d: 1, e: 1, f: 1}
     auto filter = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1 << "f" << 1);
-    auto cq = getCanonicalQuery({.filter = filter});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     plannerParams.mainCollectionInfo.options = QueryPlannerParams::Options::INDEX_INTERSECTION;
     plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1)),
@@ -204,7 +217,9 @@ void BM_IndexDedupping(benchmark::State& state) {
     // Stress index dedupping logic introduced in SERVER-82677
     // {foo: 1}
     auto filter = BSON("foo" << 1);
-    auto cq = getCanonicalQuery({.filter = filter});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     // 64 indexes each prefixed with 'foo' field.
     plannerParams.mainCollectionInfo.indexes = create64FooPrefixedIndexes();
@@ -218,7 +233,9 @@ void BM_ManyIndexes(benchmark::State& state) {
     internalQueryPlannerEnableIndexPruning.store(false);
     // {foo: 1}
     auto filter = BSON("foo" << 1);
-    auto cq = getCanonicalQuery({.filter = filter});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     // 64 indexes each prefixed with 'foo' field.
     plannerParams.mainCollectionInfo.indexes = create64FooPrefixedIndexes();
@@ -231,7 +248,9 @@ void BM_IndexSatisfiesSort(benchmark::State& state) {
     // find({a: 1}).sort({b: 1})
     auto filter = BSON("a" << 1);
     auto sort = BSON("b" << 1);
-    auto cq = getCanonicalQuery({.filter = filter, .sort = sort});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter, .sort = sort});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     // Several indexes which can satisfy the sort
     plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("b" << 1)),
@@ -247,7 +266,9 @@ void BM_IndexSatisfiesSort(benchmark::State& state) {
 void BM_ShardFilter(benchmark::State& state) {
     // find({a: 1}) with shard key {b: 1}
     auto filter = BSON("a" << 1);
-    auto cq = getCanonicalQuery({.filter = filter});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     plannerParams.mainCollectionInfo.options = QueryPlannerParams::Options::INCLUDE_SHARD_FILTER;
     plannerParams.shardKey = BSON("b" << 1);
@@ -262,7 +283,9 @@ void BM_CoveredPlan(benchmark::State& state) {
     // find({a: 1}, {_id: 0, b: 1})
     auto filter = BSON("a" << 1);
     auto proj = BSON("_id" << 0 << "b" << 1);
-    auto cq = getCanonicalQuery({.filter = filter, .proj = proj});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter, .proj = proj});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1 << "b" << 1)),
                                                 createIndexEntry(BSON("a" << 1))};
@@ -275,7 +298,9 @@ void BM_HintedPlan(benchmark::State& state) {
     // find({a: {$gt: 5}, b: {$gt: 5}}).hint({a: 1})
     auto filter = BSON("a" << BSON("$gt" << 5) << "b" << BSON("$gt" << 5));
     auto hint = BSON("a" << 1);
-    auto cq = getCanonicalQuery({.filter = filter, .hint = hint});
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    auto cq = getCanonicalQuery(opCtx.get(), {.filter = filter, .hint = hint});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1)),
                                                 createIndexEntry(BSON("b" << 1))};
