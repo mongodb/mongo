@@ -85,7 +85,10 @@ Status AddToSetNode::init(BSONElement modExpr,
                               str::stream() << "Found unexpected fields after $each in $addToSet: "
                                             << modExpr.Obj());
             }
-            _elements = firstElement.Array();
+
+            // We call 'ArrayVerifyIndexes' to uassert in the event that 'firstElement' is a
+            // BSONArray with invalid indexes.
+            _elements = firstElement.ArrayVerifyIndexes();
         }
     }
 
