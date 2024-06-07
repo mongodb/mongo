@@ -571,4 +571,3 @@ error_codes:
     - {code: 57986,name: RetryableInternalTransactionNotSupported}
     - {code: 640570,name: IllegalChangeToExpectedShardVersion}
     - {code: 640571,name: IllegalChangeToExpectedDatabaseVersion}
-    - {code: 6627201, name: ConfigTypeLsmNotSupported}
