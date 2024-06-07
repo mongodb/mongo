@@ -2300,11 +2300,10 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
-        "default",
-        "requires_all_feature_flags",
+        "non_deterministic",
+        "resharding_fuzzer",
         "require_npm",
         "random_name",
-        "feature_flag_guarded",
       ]
     commands:
       - func: "generate resmoke tasks"
