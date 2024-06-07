@@ -45,11 +45,11 @@ class ProjSpecBuilder;
  * Also like FieldAction it does not distinguish between Keep and Drop, so you also need to know
  * a FieldListScope to disambiguate.
  *
- * However, in the case of LambdaArg and ValueArg, it does not track the index of the argument it
+ * However, in the case of LambdaArg and SetArg, it does not track the index of the argument it
  * points to, but rather it may keep a pointer to a node in the ABT tree used to generate it. This
  * allows us to avoid materializing and lowering the arguments we will need for the final "makeObj"
  * primitive until we have completely constructed the MakeObjSpec. This is useful if, for example,
- * we can eliminate some ValueArgs on different sides of a composition. It also allows us to defer
+ * we can eliminate some SetArgs on different sides of a composition. It also allows us to defer
  * lowering any part of the tree until we know exactly which subtrees need to be lowered (if any).
  */
 class FieldActionBuilder {
@@ -58,7 +58,7 @@ public:
     FieldActionBuilder(std::unique_ptr<ProjSpecBuilder> builder)
         : _innerBuilder(std::move(builder)) {}
 
-    // ValueArg/LambdaArg constructor.
+    // SetArg/LambdaArg constructor.
     FieldActionBuilder(const ABT* path, bool isLambda) : _isLambda(isLambda), _path(path) {}
 
     // KeepDrop constructor.
@@ -87,7 +87,7 @@ public:
         return !_path && !_innerBuilder;
     }
 
-    bool isValueArg() const {
+    bool isSetArg() const {
         return _path && !_innerBuilder && !_isLambda;
     }
 

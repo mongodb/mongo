@@ -5615,14 +5615,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(
     int numInputFields = hasInputFields && spec->numInputFields ? *spec->numInputFields : 0;
     const int fieldsStackOff = 3;
     const int argsStackOff = fieldsStackOff + numInputFields;
-    const auto stackOffsets = MakeObjStackOffsets{fieldsStackOff, argsStackOff};
+    const auto ctx = ProduceObjContext{fieldsStackOff, argsStackOff, code};
 
     UniqueBSONObjBuilder bob;
 
     if (!hasInputFields) {
-        produceBsonObject(spec, stackOffsets, code, bob, objTag, objVal);
+        produceBsonObject(ctx, spec, bob, objTag, objVal);
     } else {
-        produceBsonObjectWithInputFields(spec, stackOffsets, code, bob, objTag, objVal);
+        produceBsonObjectWithInputFields(ctx, spec, bob, objTag, objVal);
     }
 
     bob.doneFast();

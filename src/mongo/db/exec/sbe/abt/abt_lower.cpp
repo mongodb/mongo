@@ -313,7 +313,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
     size_t argIdx = 0;
     for (auto& i : shardKeyPaths) {
         fields.emplace_back(PathStringify::stringify(i._path));
-        fieldActions.emplace_back(argIdx);
+        fieldActions.emplace_back(sbe::MakeObjSpec::AddArg{argIdx});
         ++argIdx;
     }
 

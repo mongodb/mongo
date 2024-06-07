@@ -40,7 +40,8 @@ StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
     const bool isClosed = fieldsScopeIsClosed();
 
     if (actions.empty()) {
-        actions.resize(numFieldsOfInterest);
+        actions.resize(names.size());
+
         if (isClosed) {
             for (size_t i = 0; i < actions.size(); ++i) {
                 actions[i] = Keep{};
@@ -50,10 +51,6 @@ StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
                 actions[i] = Drop{};
             }
         }
-
-        numFieldsOfInterest = actions.size();
-        numValueArgs = 0;
-        totalNumArgs = 0;
     } else {
         tassert(7103500,
                 "Expected 'names' and 'fieldsInfos' to be the same size",
@@ -65,8 +62,6 @@ StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
                 mandatoryFields.push_back(i);
             }
         }
-
-        initCounters();
     }
 
     return StringListSet(std::move(names));
@@ -136,8 +131,9 @@ StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names,
     // fields with "default behavior").
     absl::flat_hash_set<size_t> displayOrderSet;
 
-    for (size_t i = 0; i < names.size(); ++i) {
-        size_t pos = fieldDict.findPos(names[i]);
+    for (const auto& name : names) {
+        size_t pos = fieldDict.findPos(name);
+
         if (pos != StringListSet::npos) {
             auto& action = actions[pos];
 
@@ -158,33 +154,31 @@ StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names,
         }
     }
 
-    initCounters();
-
     return fieldDict;
 }
 
-void MakeObjSpec::initCounters() {
+void MakeObjSpec::init() {
+    // Initialize 'numFieldsToSearchFor' and 'totalNumArgs'.
     const bool isClosed = fieldsScopeIsClosed();
 
-    numFieldsOfInterest = 0;
-    numValueArgs = 0;
     totalNumArgs = 0;
+    numFieldsToSearchFor = 0;
 
-    for (size_t i = 0; i < actions.size(); ++i) {
-        if (actions[i].isKeep() || actions[i].isDrop()) {
-            numFieldsOfInterest += static_cast<uint8_t>(isClosed == actions[i].isKeep());
-            continue;
+    for (const auto& action : actions) {
+        // Increment 'totalNumArgs'.
+        if (action.isSetArg() || action.isAddArg() || action.isLambdaArg()) {
+            ++totalNumArgs;
+        } else if (action.isMakeObj()) {
+            totalNumArgs += action.getMakeObjSpec()->totalNumArgs;
         }
 
-        ++numFieldsOfInterest;
-
-        if (actions[i].isValueArg()) {
-            ++numValueArgs;
-            ++totalNumArgs;
-        } else if (actions[i].isLambdaArg()) {
-            ++totalNumArgs;
-        } else if (actions[i].isMakeObj()) {
-            totalNumArgs += actions[i].getMakeObjSpec()->totalNumArgs;
+        // Increment 'numFieldsToSearchFor'.
+        if (action.isKeep()) {
+            numFieldsToSearchFor += static_cast<uint8_t>(isClosed);
+        } else if (action.isDrop() || action.isAddArg()) {
+            numFieldsToSearchFor += static_cast<uint8_t>(!isClosed);
+        } else {
+            ++numFieldsToSearchFor;
         }
     }
 }
@@ -218,15 +212,19 @@ std::string MakeObjSpec::toString() const {
         builder << name;
 
         if (!action.isKeep() && !action.isDrop()) {
-            if (action.isValueArg()) {
-                builder << " = Arg(" << action.getValueArgIdx() << ")";
+            builder << " = ";
+
+            if (action.isSetArg()) {
+                builder << "Set(" << action.getSetArgIdx() << ")";
+            } else if (action.isAddArg()) {
+                builder << "Add(" << action.getAddArgIdx() << ")";
             } else if (action.isLambdaArg()) {
                 const auto& lambdaArg = action.getLambdaArg();
-                builder << " = LambdaArg(" << lambdaArg.argIdx
+                builder << "Lambda(" << lambdaArg.argIdx
                         << (lambdaArg.returnsNothingOnMissingInput ? "" : ", false") << ")";
             } else if (action.isMakeObj()) {
                 auto spec = action.getMakeObjSpec();
-                builder << " = MakeObj(" << spec->toString() << ")";
+                builder << "MakeObj(" << spec->toString() << ")";
             }
         }
     }
@@ -276,9 +274,9 @@ size_t MakeObjSpec::getApproximateSize() const {
 
     size += size_estimator::estimateContainerOnly(actions);
 
-    for (size_t i = 0; i < actions.size(); ++i) {
-        if (actions[i].isMakeObj()) {
-            size += actions[i].getMakeObjSpec()->getApproximateSize();
+    for (const auto& action : actions) {
+        if (action.isMakeObj()) {
+            size += action.getMakeObjSpec()->getApproximateSize();
         }
     }
 
@@ -288,7 +286,8 @@ size_t MakeObjSpec::getApproximateSize() const {
 MakeObjSpec::FieldAction MakeObjSpec::FieldAction::clone() const {
     return visit(OverloadedVisitor{[](Keep k) -> FieldAction { return k; },
                                    [](Drop d) -> FieldAction { return d; },
-                                   [](ValueArg va) -> FieldAction { return va; },
+                                   [](SetArg sa) -> FieldAction { return sa; },
+                                   [](AddArg aa) -> FieldAction { return aa; },
                                    [](LambdaArg la) -> FieldAction { return la; },
                                    [](const MakeObj& makeObj) -> FieldAction {
                                        return MakeObj{makeObj.spec->clone()};

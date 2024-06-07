@@ -67,8 +67,11 @@ enum class EvalMode {
     kKeep,
     // Exclude field from output object.
     kDrop,
-    // Set field value with an SbExpr.
-    kValueArg,
+    // Set field to a given value, preserving the field's original position if it already existed.
+    kSetArg,
+    // Drop any existing field with the same name and add a new field at the end of the object with
+    // a given value.
+    kAddArg,
     // Invoke a lambda passing in the field, then set field to the lambda's return value.
     kLambdaArg,
     // Call makeBsonObj() passing in the field, then set field to makeBsonObj()'s return value.
@@ -105,12 +108,12 @@ struct ProjectionVisitorContext {
     struct NestedLevel {
         NestedLevel() = default;
 
-        // Vector containing operations for the current level. There are 5 types of operations
+        // Vector containing operations for the current level. There are 6 types of operations
         // (see EvalMode enum for details).
         std::vector<ProjectEval> evals;
 
-        // Whether or not any subtree of this level has a computed field.
-        bool hasValueArgs = false;
+        // Whether or not any subtree of this level has expressions.
+        bool hasExpressions = false;
     };
 
     ProjectionVisitorContext(StageBuilderState& state,
@@ -132,34 +135,39 @@ struct ProjectionVisitorContext {
         return levels.empty();
     }
 
-    auto& topLevel() {
+    NestedLevel& topLevel() {
         tassert(7580707, "Expected 'levels' to not be empty", !levels.empty());
         return levels.top();
     }
 
-    bool getHasValueArgs() {
-        return !levels.empty() ? topLevel().hasValueArgs : hasValueArgs;
+    bool getHasExpressions() {
+        return !levels.empty() ? topLevel().hasExpressions : hasExpressions;
     }
 
-    void setHasValueArgs(bool val) {
+    void setHasExpressions(bool val) {
         if (!levels.empty()) {
-            topLevel().hasValueArgs = val;
+            topLevel().hasExpressions = val;
         } else {
-            hasValueArgs = val;
+            hasExpressions = val;
         }
     }
 
-    auto& evals() {
+    std::vector<ProjectEval>& evals() {
         return topLevel().evals;
     }
 
     void pushKeepOrDrop(bool keep) {
         evals().emplace_back(keep ? EvalMode::kKeep : EvalMode::kDrop);
     }
-    void pushValueArg(SbExpr expr) {
+    void pushSetArg(SbExpr expr) {
         std::vector<SbExpr> exprs;
         exprs.emplace_back(std::move(expr));
-        evals().emplace_back(ProjectEval(EvalMode::kValueArg, {}, std::move(exprs)));
+        evals().emplace_back(ProjectEval(EvalMode::kSetArg, {}, std::move(exprs)));
+    }
+    void pushAddArg(SbExpr expr) {
+        std::vector<SbExpr> exprs;
+        exprs.emplace_back(std::move(expr));
+        evals().emplace_back(ProjectEval(EvalMode::kAddArg, {}, std::move(exprs)));
     }
     void pushLambdaArg(SbExpr lambdaExpr, bool returnsNothingOnMissingInput = true) {
         std::vector<SbExpr> exprs;
@@ -196,7 +204,7 @@ struct ProjectionVisitorContext {
     SbExpr resultExpr;
     const PlanStageSlots* slots;
 
-    bool hasValueArgs{false};
+    bool hasExpressions{false};
     size_t nextArgIdx{0};
 
     std::stack<NestedLevel> levels;
@@ -223,7 +231,7 @@ auto prepareFieldEvals(const std::vector<std::string>& fieldNames,
 
     std::vector<std::string> fields;
     std::vector<sbe::MakeObjSpec::FieldAction> actions;
-    std::vector<SbExpr> valueAndLambdaArgs;
+    std::vector<SbExpr> setAddAndLambdaArgs;
     std::vector<SbExpr> args;
 
     for (size_t i = 0; i < fieldNames.size(); i++) {
@@ -246,17 +254,23 @@ auto prepareFieldEvals(const std::vector<std::string>& fieldNames,
                     actions.emplace_back(sbe::MakeObjSpec::Drop{});
                 }
                 break;
-            case EvalMode::kValueArg:
+            case EvalMode::kSetArg:
                 fields.emplace_back(fieldName);
-                actions.emplace_back(*nextArgIdx);
-                valueAndLambdaArgs.emplace_back(std::move(exprs[0]));
+                actions.emplace_back(sbe::MakeObjSpec::SetArg{*nextArgIdx});
+                setAddAndLambdaArgs.emplace_back(std::move(exprs[0]));
+                ++(*nextArgIdx);
+                break;
+            case EvalMode::kAddArg:
+                fields.emplace_back(fieldName);
+                actions.emplace_back(sbe::MakeObjSpec::AddArg{*nextArgIdx});
+                setAddAndLambdaArgs.emplace_back(std::move(exprs[0]));
                 ++(*nextArgIdx);
                 break;
             case EvalMode::kLambdaArg:
                 fields.emplace_back(fieldName);
                 actions.emplace_back(
                     sbe::MakeObjSpec::LambdaArg{*nextArgIdx, returnsNothingOnMissingInput});
-                valueAndLambdaArgs.emplace_back(std::move(exprs[0]));
+                setAddAndLambdaArgs.emplace_back(std::move(exprs[0]));
                 ++(*nextArgIdx);
                 break;
             case EvalMode::kMakeObj:
@@ -269,7 +283,7 @@ auto prepareFieldEvals(const std::vector<std::string>& fieldNames,
         }
     }
 
-    std::move(valueAndLambdaArgs.begin(), valueAndLambdaArgs.end(), std::back_inserter(args));
+    std::move(setAddAndLambdaArgs.begin(), setAddAndLambdaArgs.end(), std::back_inserter(args));
 
     return std::make_tuple(std::move(fields), std::move(actions), std::move(args));
 }
@@ -278,7 +292,7 @@ void preVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
                     ProjectionVisitorContext& ctx) {
     if (node->value) {
         if (node->value->isExpr() || node->value->isSbExpr()) {
-            ctx.setHasValueArgs(true);
+            ctx.setHasExpressions(true);
         }
         return;
     }
@@ -302,10 +316,11 @@ void preVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
  * If this subtree doesn't contain any value args and we're performing an exclusion projection,
  * then anything that's not an object should be preserved as-is.
  */
-sbe::MakeObjSpec::NonObjInputBehavior getNonObjInputBehavior(bool hasValueArgs, bool isInclusion) {
+sbe::MakeObjSpec::NonObjInputBehavior getNonObjInputBehavior(bool hasExpressions,
+                                                             bool isInclusion) {
     using NonObjInputBehavior = sbe::MakeObjSpec::NonObjInputBehavior;
 
-    return hasValueArgs
+    return hasExpressions
         ? NonObjInputBehavior::kNewObj
         : (isInclusion ? NonObjInputBehavior::kReturnNothing : NonObjInputBehavior::kReturnInput);
 }
@@ -327,13 +342,13 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
     auto [fields, actions, args] =
         prepareFieldEvals(childNames, ctx.evals(), isInclusion, &ctx.nextArgIdx);
 
-    const bool hasValueArgs = ctx.getHasValueArgs();
+    const bool hasExpressions = ctx.getHasExpressions();
 
     // We've finished extracting what we need from the child level, so pop if off the stack.
     ctx.popLevel();
 
-    // If the child's 'hasValueArgs' flag was set, then propagate it to the parent level.
-    ctx.setHasValueArgs(ctx.getHasValueArgs() || hasValueArgs);
+    // If the child's 'hasExpressions' flag was set, then propagate it to the parent level.
+    ctx.setHasExpressions(ctx.getHasExpressions() || hasExpressions);
 
     // If 'isInclusion' is false and 'fields' is empty for the current sub-tree, check if we
     // can simply return the input.
@@ -359,7 +374,7 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
     }
 
     auto fieldsScope = isInclusion ? FieldListScope::kClosed : FieldListScope::kOpen;
-    auto noiBehavior = getNonObjInputBehavior(hasValueArgs, isInclusion);
+    auto noiBehavior = getNonObjInputBehavior(hasExpressions, isInclusion);
 
     // Generate a MakeObjSpec for the current nested level.
     auto specPtr = ctx.levelsEmpty() && ctx.inputPlan != nullptr
@@ -402,8 +417,8 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
 
                 tassert(8900500,
                         "Expected slot to be defined",
-                        spec->actions[i].isDrop() || spec->actions[i].isValueArg() ||
-                            slot.has_value());
+                        spec->actions[i].isDrop() || spec->actions[i].isSetArg() ||
+                            spec->actions[i].isAddArg() || slot.has_value());
 
                 // If this field is a top-level drop, then we pass Nothing for the input field.
                 bool useSlot = slot.has_value() && !spec->actions[i].isDrop();
@@ -441,13 +456,23 @@ SbExpr evaluateProjection(StageBuilderState& state,
 
     auto postVisit = [&](Node* node) {
         if (node->value) {
+            const bool isInclusion = type == projection_ast::ProjectType::kInclusion;
+
             if (node->value->isBool()) {
                 context.pushKeepOrDrop(node->value->getBool());
-            } else if (node->value->isExpr()) {
-                context.pushValueArg(
-                    generateExpression(state, node->value->getExpr(), rootSlot, *context.slots));
-            } else if (node->value->isSbExpr()) {
-                context.pushValueArg(node->value->extractSbExpr());
+            } else if (node->value->isExpr() || node->value->isSbExpr()) {
+                // Get the expression.
+                auto e = node->value->isExpr()
+                    ? generateExpression(state, node->value->getExpr(), rootSlot, *context.slots)
+                    : node->value->extractSbExpr();
+                // For expressions in inclusion projections, we use AddArg. For expressions in
+                // $addFields operations, we use SetArg. We assume that exclusion projections do
+                // not have expressions.
+                if (isInclusion) {
+                    context.pushAddArg(std::move(e));
+                } else {
+                    context.pushSetArg(std::move(e));
+                }
             } else if (node->value->isSlice()) {
                 // We should not encounter 'Slice' here. If the original projection contained
                 // one or more $slice ops, the caller should have detected this and replaced
