@@ -97,6 +97,14 @@ public:
                         int64_t bytesInserted,
                         int64_t numRecords = 1);
 
+    UUID getPreImagesCollectionUUID() {
+        return _preImagesCollectionUUID;
+    }
+
+    boost::optional<TenantId> getTenantId() {
+        return _tenantId;
+    }
+
 private:
     friend class PreImagesTruncateManagerTest;
 
