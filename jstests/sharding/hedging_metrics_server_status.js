@@ -122,11 +122,8 @@ jsTestLog("Run commands with hedging enabled, and verify the metrics are as expe
 // hedged read.
 try {
     setCommandDelay(sortedNodes[0], "count", 5000, ns);
-    assert.commandWorked(testDB.runCommand({
-        count: collName,
-        query: {x: {$gte: 0}},
-        $readPreference: {mode: "nearest", hedge: {enabled: true}}
-    }));
+    assert.commandWorked(testDB.runCommand(
+        {count: collName, query: {x: {$gte: 0}}, $readPreference: {mode: "nearest"}}));
 } finally {
     clearCommandDelay(sortedNodes[0]);
 }
@@ -143,11 +140,8 @@ try {
     setCommandDelay(sortedNodes[0], "count", 100, ns);
     setCommandDelay(sortedNodes[1], "count", 1000, ns);
 
-    assert.commandWorked(testDB.runCommand({
-        count: collName,
-        query: {x: {$gte: 0}},
-        $readPreference: {mode: "nearest", hedge: {enabled: true}}
-    }));
+    assert.commandWorked(testDB.runCommand(
+        {count: collName, query: {x: {$gte: 0}}, $readPreference: {mode: "nearest"}}));
 } finally {
     clearCommandDelay(sortedNodes[0]);
     clearCommandDelay(sortedNodes[1]);
@@ -155,13 +149,6 @@ try {
 
 expectedHedgingMetrics.numTotalOperations += 1;
 expectedHedgingMetrics.numTotalHedgedOperations += 1;
-
-// Run command but without hedge : {enabled: true}.
-// Setting $readPreference to {mode: "nearest"} doesn't implicitly set hedge reads
-// so with no hedge reads enabled, expectedHedgingMetrics should not be incremented.
-assert.commandWorked(testDB.runCommand(
-    {count: collName, query: {x: {$gte: 0}}, $readPreference: {mode: "nearest"}}));
-
 checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
 
 st.stop();
