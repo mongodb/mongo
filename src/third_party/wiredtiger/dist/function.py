@@ -2,7 +2,7 @@
 
 # Check the style of WiredTiger C code.
 import os, re, sys
-from dist import all_c_files, compare_srcfile
+from dist import all_c_files, all_cpp_files, all_h_files, compare_srcfile, source_files
 from common_functions import filter_if_fast
 
 # Complain if a function comment is missing.
@@ -189,8 +189,174 @@ def function_declaration():
             tfile.close()
             compare_srcfile(tmp_file, name)
 
+# A function definition.
+class FunctionDefinition:
+    def __init__(self, name, module, source):
+        self.name = name
+        self.module = module
+        self.source = source
+        self.used_outside_of_file = False
+        self.used_outside_of_module = False
+        self.visibility_global = name.startswith('__wt_')
+        self.visibility_module = name.startswith('__wti_')
+
+# Check if the file is auto-generated based on its contents (either a string or a list of lines).
+def is_auto_generated(file_contents):
+    skip_re = re.compile(r'DO NOT EDIT: automatically built')
+    if type(file_contents) is not list:
+        file_contents = [file_contents]
+    for s in file_contents:
+        if skip_re.search(s):
+            return True
+    return False
+
+# Check whether functions are used in their expected scopes:
+#   * "__wti" functions are only used or called by other files within that directory.
+#   * "__wti" functions are used in at least two files (otherwise they could be made static).
+#   * "__wt" functions are used outside of their directory (otherwise they could be made "__wti").
+#
+# It uses the same exceptions list as "s_funcs" (i.e., s_funcs.list), which ensures that all extern
+# functions are used.
+def function_scoping():
+    func_def_re = re.compile(r'\n\w[\w \*]+\n(\w+)\(', re.DOTALL)
+    func_use_re = re.compile(r'[^\n](\w+)', re.DOTALL)
+    failed = False
+
+    # Infer the module name from the file path.
+    def infer_module(path):
+        parts = path.split('/')
+        if len(parts) < 3 or parts[0] != '..':
+            print(f'{path}: Unexpected path')
+            sys.exit(1)
+
+        # If the path is in src, the module is the subdirectory under src; otherwise it is the
+        # top-level directory, such as "test."
+        if parts[1] == 'src':
+            module = parts[2]
+        else:
+            module = parts[1]
+
+        # Make "os_posix" and "os_win" one module because they declare the same "__wt" functions.
+        if module == 'os_posix' or module == 'os_win':
+            return 'os_posix/os_win'
+        return module
+
+    # Find all "__wt" and "__wti" function definitions.
+    fn_defs = dict()
+    for source_file in source_files():
+        if not source_file.startswith('../src/'):
+            continue
+        module = infer_module(source_file)
+
+        # Skip auto-generated files.
+        file_contents = open(source_file, 'r').read()
+        if is_auto_generated(file_contents):
+            continue
+
+        # Now actually find all definitions.
+        for m in func_def_re.finditer(file_contents):
+            fn_name = m.group(1)
+            if not fn_name.startswith('__wt_') and not fn_name.startswith('__wti_'):
+                continue
+            if fn_name in fn_defs and fn_defs[fn_name].module != module:
+                print(f'{source_file}: {fn_name} is already defined in ' +
+                      f'module "{fn_defs[fn_name].module})"')
+                sys.exit(1)
+            fn_defs[fn_name] = FunctionDefinition(fn_name, module, source_file)
+
+    # Find and check all "__wt" and "__wti" function uses.
+    files = []
+    files.extend(all_c_files())
+    files.extend(all_cpp_files())
+    files.extend(all_h_files())
+    for source_file in files:
+        if source_file.startswith('../src/include/extern'):
+            continue
+        module = infer_module(source_file)
+
+        # Skip auto-generated files.
+        file_lines = open(source_file, 'r').readlines()
+        if is_auto_generated(file_lines):
+            continue
+
+        # Find all uses. Check the use of "__wti" functions.
+        in_block_comment = False
+        line_no = 0
+        for line in file_lines:
+            line_no += 1
+
+            # Skip block and line comments.
+            s = line.strip()
+            if s.startswith('//') or (s.startswith('/*') and s.endswith('*/')):
+                continue
+            if s == '/*':
+                in_block_comment = True
+                continue
+            if in_block_comment:
+                if s.endswith('*/'):
+                    in_block_comment = False
+                continue
+
+            # Find all function uses in each line.
+            for m in func_use_re.finditer(line):
+                fn_name = m.group(1)
+                if not fn_name.startswith('__wt_') and not fn_name.startswith('__wti_'):
+                    continue
+                # Undefined functions are either macros or test functions; just skip them.
+                if fn_name not in fn_defs:
+                    continue
+
+                # Remember whether the function was used outside of its module and of its file.
+                fn = fn_defs[fn_name]
+                if module != fn.module:
+                    fn.used_outside_of_module = True
+                if source_file != fn.source:
+                    fn.used_outside_of_file = True
+
+                # Check whether a "__wti" function is used outside of its module.
+                if fn.visibility_module and module != fn.module:
+                    print(f'{source_file}:{line_no}: {fn_name} is used outside of its module ' +
+                          f'"{fn.module}"')
+                    failed = True
+
+    # Load the list of functions whose scope is not enforced.
+    exceptions = set(l.strip() for l in open('s_funcs.list', 'r').readlines())
+
+    # Check whether any "__wt" functions are used only within the same module (and could be thus
+    # turned into "__wti" functions). Functions in "include" are implicitly used in more than one
+    # module.
+    for fn_name, d in fn_defs.items():
+        if not d.visibility_global:
+            continue
+        if fn_name in exceptions:
+            continue
+        if d.module == 'include':
+            continue
+        if not d.used_outside_of_module:
+            print(f'{d.source}: {fn_name} is NOT used outside of its module "{d.module}"')
+            failed = True
+
+    # Check whether any "__wti" functions are used only within the same file. Skip functions in
+    # "include", because they are implicitly used in more than one file.
+    for fn_name, d in fn_defs.items():
+        if not d.visibility_module:
+            continue
+        if fn_name in exceptions:
+            continue
+        if d.module == 'include':
+            continue
+        if not d.used_outside_of_file:
+            print(f'{d.source}: {fn_name} is NOT used outside of its source file')
+            failed = True
+
+    if failed:
+        sys.exit(1)
+
 # Report missing function comments.
 missing_comment()
 
 # Update function argument declarations.
 function_declaration()
+
+# Report functions that are used outside of their intended scope.
+function_scoping()

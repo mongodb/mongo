@@ -1,3 +1,27 @@
+@media (prefers-color-scheme: dark) {
+  body, table, div, p, dl {
+       color: #CCC;
+  }
+  a {
+       color: #88F;
+  }
+  .contents a:visited {
+       color: #BBF;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  body, table, div, p, dl {
+       color: #373737;
+  }
+  a {
+       color: #3D578C;
+  }
+  .contents a:visited {
+       color: #4665A2;
+  }
+}
+
 /* WiredTiger-specific styling. */ 
 html {
     font-size: small;
@@ -10,7 +34,6 @@ div.contents {
 
 body, table, div, p, dl {
 	font-family: "Calibri","Helvetica Neue", Helvetica, Arial, sans-serif;
-	color: #373737;
 	line-height: 1.5;
 }
 
@@ -53,10 +76,6 @@ div.arch_toc h1 {
 
 /* @group Link Styling */
 
-a {
-	color: #3D578C;
-}
-
 img {
 	display: block;
 	max-width: 100%;
@@ -79,6 +98,7 @@ img[src="wt_diagram.png"] {
 }
 
 .arch_head table {
+    color: #000;
     background-color: #FFDDAA;
     border-color: #624D32;
     /*border: solid 1px;*/
@@ -115,10 +135,6 @@ img[src="wt_diagram.png"] {
 
 .tablist a[href="pages.html"] {
 	display: none;
-}
-
-.contents a:visited {
-	color: #4665A2;
 }
 
 #projectlogo {

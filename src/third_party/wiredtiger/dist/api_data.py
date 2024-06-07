@@ -1695,7 +1695,8 @@ methods = {
 'WT_SESSION.verify' : Method([
     Config('do_not_clear_txn_id', 'false', r'''
         Turn off transaction id clearing, intended for debugging and better diagnosis of crashes
-        or failures.''',
+        or failures. Note: History store validation is disabled when the configuration is set as 
+        visibility rules may not work correctly because the transaction ids are not cleared.''',
         type='boolean'),
     Config('dump_address', 'false', r'''
         Display page addresses, time windows, and page types as pages are verified, using the

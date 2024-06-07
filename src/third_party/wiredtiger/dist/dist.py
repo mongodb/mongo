@@ -19,7 +19,6 @@ def source_files():
 # all_c_files --
 #       Return list of all WiredTiger C source file names.
 def all_c_files():
-    file_re = re.compile(r'^\w')
     for line in glob.iglob('../src/*/*.c'):
         yield line
     for line in glob.iglob('../src/*/*_inline.h'):
@@ -33,10 +32,19 @@ def all_c_files():
         if fnmatch.fnmatch(file, '*_inline.h'):
             yield file
 
+# all_cpp_files --
+#       Return list of all WiredTiger CPP source file names.
+def all_cpp_files():
+    files = list()
+    for (dirpath, dirnames, filenames) in os.walk('../test'):
+        files += [os.path.join(dirpath, file) for file in filenames]
+    for file in files:
+        if fnmatch.fnmatch(file, '*.cpp'):
+            yield file
+
 # all_h_files --
 #       Return list of all WiredTiger C include file names.
 def all_h_files():
-    file_re = re.compile(r'^\w')
     for line in glob.iglob('../src/*/*.h'):
         yield line
     yield "../src/include/wiredtiger.in"

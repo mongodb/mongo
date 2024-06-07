@@ -147,7 +147,7 @@ spellchk()
 valid_build()
 {
     # Complain if there are pages we don't reference directly.
-    sed -n '/<table.*directory/,/\/table/p' < ../docs/pages.html | \
+    [[ -e ../docs/pages.html ]] && sed -n '/<table.*directory/,/\/table/p' < ../docs/pages.html | \
         grep href > /dev/null && {
         echo 'Unreferenced page: see docs/pages.html for the list.'
         e=1
@@ -198,8 +198,9 @@ build()
         1.8.17) doxyfile="Doxyfile";;
         1.9.1) doxyfile="Doxyfile.9";;
         1.9.3) doxyfile="Doxyfile.9";;
+        1.11.*) doxyfile="Doxyfile.9";;
         *)
-            echo "$0 skipped: unsupported version of doxygen: $v, not 1.8.17, 1.9.1, or 1.9.3"
+            echo "$0 skipped: unsupported version of doxygen: $v, not 1.8.17, 1.9.1, 1.9.3 or 1.11.*"
             exit 0
     esac
 

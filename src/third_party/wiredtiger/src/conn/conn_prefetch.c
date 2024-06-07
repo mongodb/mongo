@@ -38,7 +38,7 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     F_SET(session, WT_SESSION_PREFETCH_THREAD);
 
     if (F_ISSET(conn, WT_CONN_PREFETCH_RUN))
-        __wt_cond_wait(session, conn->prefetch_threads.wait_cond, 10 * WT_THOUSAND, NULL);
+        __wt_cond_wait(session, conn->prefetch_threads.wait_cond, WT_THOUSAND * WT_THOUSAND, NULL);
 
     while (!TAILQ_EMPTY(&conn->pfqh)) {
         /* Encourage races. */

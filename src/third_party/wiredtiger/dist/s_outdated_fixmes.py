@@ -36,7 +36,7 @@ def find_fixme_tickets():
         try:
             with open(filepath, 'r') as file:
                 for match in match_re.finditer(file.read()):
-                    fixme_tickets.add(match[1])
+                    fixme_tickets.add((match[1], filepath))
         except Exception as e:
             # There are files like *.png which cannot be read. In this case skip them silently.
             pass
@@ -49,12 +49,12 @@ def main():
     """
     closed_ticket_found=False
     STATUS_CATEGORY_DONE='rest/api/2/statuscategory/3'
-    for ticket in sorted(find_fixme_tickets()):
+    for (ticket, file) in sorted(find_fixme_tickets()):
         rest_query = \
             f"curl -s -X GET https://jira.mongodb.org/rest/api/2/issue/{ticket}?fields=status"
         query_result = subprocess.run(rest_query, shell=True, capture_output=True, text=True).stdout
         if STATUS_CATEGORY_DONE in query_result:
-            print(f"{ticket} has a FIXME comment in the codebase but the ticket is closed.")
+            print(f"{ticket} is a closed ticket that has a FIXME comment in {file}.")
             closed_ticket_found=True
 
     if closed_ticket_found:
