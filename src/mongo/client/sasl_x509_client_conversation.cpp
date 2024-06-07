@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,17 +27,30 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/client/sasl_x509_client_conversation.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/service_context.h"
+#include "mongo/base/status_with.h"
+#include "mongo/client/sasl_client_session.h"
+#include "mongo/db/auth/x509_protocol_gen.h"
 
 namespace mongo {
 
-void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj helloCmd, BSONObjBuilder* result);
+SaslX509ClientConversation::SaslX509ClientConversation(SaslClientSession* saslClientSession)
+    : SaslClientConversation(saslClientSession) {}
+
+StatusWith<bool> SaslX509ClientConversation::step(StringData inputData, std::string* outputData) {
+    // Create an X509 message in the form of BSON("username": user)
+
+    auth::X509MechanismClientStep1 step;
+    if (auto principal = _saslClientSession->getParameter(SaslClientSession::parameterUser);
+        !principal.empty()) {
+        step.setPrincipalName(principal);
+    }
+    auto stepBSON = step.toBSON();
+
+    *outputData = StringData(stepBSON.objdata(), stepBSON.objsize()).toString();
+
+    return StatusWith<bool>(true);
+}
 
 }  // namespace mongo

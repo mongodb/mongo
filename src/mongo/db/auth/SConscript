@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env")
+Import("env", "get_option")
 
 env = env.Clone()
 
@@ -33,7 +33,6 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base/secure_allocator",
         "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/db/commands/authentication_commands",
         "$BUILD_DIR/mongo/db/common",
         "$BUILD_DIR/mongo/db/global_settings",
         "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
@@ -44,6 +43,7 @@ env.Library(
         "$BUILD_DIR/mongo/util/net/ssl_types",
         "address_restriction",
         "auth",
+        "authentication_session",
         "authorization_manager_global",
         "authprivilege",
         "builtin_roles",
@@ -273,11 +273,27 @@ env.Library(
 )
 
 env.Library(
+    target="sasl_mechanism_protocol",
+    source=[
+        "oauth_authorization_server_metadata_gen.cpp",
+        "oauth_discovery_factory.cpp",
+        "oidc_protocol_gen.cpp",
+        "x509_protocol_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/idl/idl_parser",
+        "$BUILD_DIR/mongo/util/net/http_client",
+    ],
+)
+
+env.Library(
     target="saslauth",
     source=[
         "sasl_mechanism_registry.cpp",
         "sasl_plain_server_conversation.cpp",
         "sasl_scram_server_conversation.cpp",
+        "sasl_x509_server_conversation.cpp" if get_option("ssl") == "on" else [],
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base/secure_allocator",
@@ -287,7 +303,10 @@ env.Library(
         "$BUILD_DIR/mongo/util/md5",
         "$BUILD_DIR/mongo/util/net/network",
         "auth",
+        "auth_options",
+        "authorization_manager_global",
         "authprivilege",
+        "sasl_mechanism_protocol",
         "sasl_options",
         "user",
     ],
@@ -295,6 +314,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/connection_health_metrics_parameter",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/util/net/ssl_manager",
         "cluster_auth_mode",
     ],
 )
@@ -350,6 +370,7 @@ env.CppUnitTest(
         "sasl_authentication_session_test.cpp",
         "sasl_mechanism_registry_test.cpp",
         "sasl_scram_test.cpp",
+        "sasl_x509_test.cpp" if get_option("ssl") == "on" else [],
         "security_key_test.cpp",
         "user_acquisition_stats_test.cpp",
         "user_document_parser_test.cpp",
@@ -372,7 +393,8 @@ env.CppUnitTest(
         "auth_op_observer",
         "authentication_session",
         "authorization_session_test_fixture",
-        "oidc_protocol",
+        "cluster_auth_mode",
+        "sasl_mechanism_protocol",
         "saslauth",
         "security_file",
         "security_key",

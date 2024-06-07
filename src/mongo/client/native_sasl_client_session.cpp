@@ -43,6 +43,7 @@
 #include "mongo/client/sasl_oidc_client_conversation.h"
 #include "mongo/client/sasl_plain_client_conversation.h"
 #include "mongo/client/sasl_scram_client_conversation.h"
+#include "mongo/client/sasl_x509_client_conversation.h"
 #include "mongo/client/scram_client_cache.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/sha1_block.h"
@@ -128,6 +129,8 @@ Status NativeSaslClientSession::initialize() {
         // AWS depends on kms-message which depends on ssl libraries
     } else if (mechanism == auth::kMechanismMongoAWS) {
         _saslConversation.reset(new SaslAWSClientConversation(this));
+    } else if (mechanism == auth::kMechanismMongoX509) {
+        _saslConversation.reset(new SaslX509ClientConversation(this));
 #endif
     } else if (mechanism == auth::kMechanismMongoOIDC) {
         auto userName = hasParameter(SaslClientSession::parameterUser)

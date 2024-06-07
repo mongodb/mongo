@@ -184,13 +184,14 @@ env.Library(
         "authentication_commands.cpp",
         "authentication_commands_gen.cpp",
     ],
-    LIBDEPS_PRIVATE=[
+    LIBDEPS_PRIVATE=[  # TODO SERVER-72648 - remove dependencies
         "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
         "$BUILD_DIR/mongo/db/auth/auth",
         "$BUILD_DIR/mongo/db/auth/auth_options",
         "$BUILD_DIR/mongo/db/auth/authentication_session",
         "$BUILD_DIR/mongo/db/auth/authorization_manager_global",
         "$BUILD_DIR/mongo/db/auth/cluster_auth_mode",
+        "$BUILD_DIR/mongo/db/auth/sasl_commands",
         "$BUILD_DIR/mongo/db/commands",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/rpc/client_metadata",

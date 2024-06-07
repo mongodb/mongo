@@ -92,6 +92,10 @@ public:
     }
 
 #ifdef MONGO_CONFIG_SSL
+    void setSSLManager(std::shared_ptr<SSLManagerInterface> interface) {
+        _sslManager = std::move(interface);
+    }
+
     const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override {
         return _sslManager;
     }

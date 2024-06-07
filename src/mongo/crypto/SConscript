@@ -149,7 +149,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/client/native_sasl_client",
-        "$BUILD_DIR/mongo/db/auth/oidc_protocol",
+        "$BUILD_DIR/mongo/db/auth/sasl_mechanism_protocol",
         "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
         "$BUILD_DIR/mongo/util/net/http_client_impl",
     ],

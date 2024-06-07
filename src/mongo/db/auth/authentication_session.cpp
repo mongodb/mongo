@@ -259,7 +259,9 @@ AuthenticationSession* AuthenticationSession::get(Client* client) {
 void AuthenticationSession::setMechanismName(StringData mechanismName) {
     LOGV2_DEBUG(
         5286200, kDiagnosticLogLevel, "Setting mechanism name", "mechanism"_attr = mechanismName);
-    tassert(5286201, "Attempt to change the mechanism name", _mechName.empty());
+    tassert(5286201,
+            "Attempt to change the mechanism name",
+            _mechName.empty() || _mechName == mechanismName);
 
     _mechName = mechanismName.toString();
     _mechCounter = authCounter.getMechanismCounter(_mechName);
@@ -337,7 +339,7 @@ void AuthenticationSession::_finish() {
     if (_mech) {
         // Since both isClusterMember() and getPrincipalName() can return differently over the
         // course of authentication, only get the values when we finish.
-        if (_mech->isClusterMember()) {
+        if (_mech->isClusterMember(_client)) {
             setAsClusterMember();
         }
         updateUserName({_mech->getPrincipalName(), _mech->getAuthenticationDatabase()},

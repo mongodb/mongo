@@ -53,6 +53,8 @@
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/auth_types_gen.h"
+#include "mongo/db/auth/authentication_session.h"
+#include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
@@ -242,6 +244,46 @@ void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandl
     }
 }
 
+// TODO SERVER-83488 - move user request generation to SASL mechanism.
+UserRequest getX509UserRequest(OperationContext* opCtx, UserRequest request) {
+#ifdef MONGO_CONFIG_SSL
+    if (request.roles) {
+        // Roles explicitly provided earlier in the process,
+        // do not override these with implicit X.509 roles.
+        return request;
+    }
+
+    if (!allowRolesFromX509Certificates) {
+        // Server configuration forbids using roles from certificates.
+        return request;
+    }
+
+    std::shared_ptr<transport::Session> session;
+    if (opCtx && opCtx->getClient()) {
+        session = opCtx->getClient()->session();
+    }
+
+    if (!session || !session->getSSLManager()) {
+        // No TLS envelope available to extract a certificate from.
+        return request;
+    }
+
+    const auto& sslPeerInfo = SSLPeerInfo::forSession(session);
+
+    auto&& peerRoles = sslPeerInfo.roles();
+    if (peerRoles.empty() || (sslPeerInfo.subjectName().toString() != request.name.getUser())) {
+        // X.509 certificate contains no roles,
+        // or contains roles for a different user.
+        return request;
+    }
+
+    // In order to be hashable, the role names must be converted from unordered_set to a set.
+    request.roles = std::set<RoleName>();
+    std::copy(
+        peerRoles.begin(), peerRoles.end(), std::inserter(*request.roles, request.roles->begin()));
+#endif
+    return request;
+}
 
 }  // namespace
 
@@ -408,25 +450,23 @@ MONGO_FAIL_POINT_DEFINE(authUserCacheSleep);
 
 StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,
                                                              const UserRequest& request) try {
-    const auto& userName = request.name;
+    UserRequest userRequest(request);
 
+    // X.509 will give us our roles for initial acquire, but we have to lose them during
+    // reacquire (for now) so reparse those roles into the request if not already present.
+    if (request.roles == boost::none && request.mechanismData.empty() &&
+        request.name.getDatabaseName().isExternalDB()) {
+        userRequest = getX509UserRequest(opCtx, std::move(userRequest));
+    }
+
+    const auto& userName = userRequest.name;
     auto systemUser = internalSecurity.getUser();
     if (userName == (*systemUser)->getName()) {
         uassert(ErrorCodes::OperationFailed,
                 "Attempted to acquire system user with predefined roles",
-                request.roles == boost::none);
+                userRequest.roles == boost::none);
         return *systemUser;
     }
-
-    UserRequest userRequest(request);
-#ifdef MONGO_CONFIG_SSL
-    // X.509 will give us our roles for initial acquire, but we have to lose them during
-    // reacquire (for now) so reparse those roles into the request if not already present.
-    if ((request.roles == boost::none) && request.mechanismData.empty() &&
-        (userName.getDatabaseName().isExternalDB())) {
-        userRequest = getX509UserRequest(opCtx, std::move(userRequest));
-    }
-#endif
 
     auto userAcquisitionStats = CurOp::get(opCtx)->getUserAcquisitionStats();
     if (authUserCacheBypass.shouldFail()) {

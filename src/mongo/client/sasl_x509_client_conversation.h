@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,15 +29,28 @@
 
 #pragma once
 
+#include <string>
+
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/service_context.h"
+#include "mongo/client/sasl_client_conversation.h"
 
 namespace mongo {
+/**
+ *  Client side authentication session for SASL X509.
+ */
+class SaslX509ClientConversation : public SaslClientConversation {
+    SaslX509ClientConversation(const SaslX509ClientConversation&) = delete;
+    SaslX509ClientConversation& operator=(const SaslX509ClientConversation&) = delete;
 
-void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj helloCmd, BSONObjBuilder* result);
+public:
+    /**
+     * Implements the client side of a SASL X509 mechanism session.
+     *
+     **/
+    explicit SaslX509ClientConversation(SaslClientSession* saslClientSession);
+
+    StatusWith<bool> step(StringData inputData, std::string* outputData) override;
+};
 
 }  // namespace mongo

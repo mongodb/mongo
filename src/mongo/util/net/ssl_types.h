@@ -40,6 +40,11 @@
 namespace mongo {
 
 constexpr StringData kOID_CommonName = "2.5.4.3"_sd;
+constexpr StringData kOID_CountryName = "2.5.4.6"_sd;
+constexpr StringData kOID_LocalityName = "2.5.4.7"_sd;
+constexpr StringData kOID_StateName = "2.5.4.8"_sd;
+constexpr StringData kOID_OName = "2.5.4.10"_sd;
+constexpr StringData kOID_OUName = "2.5.4.11"_sd;
 
 /**
  * Represents a structed X509 certificate subject name.

@@ -31,9 +31,19 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/authentication_session.h"
+#include "mongo/db/auth/sasl_commands_gen.h"
 
 namespace mongo {
 class OperationContext;
+
+namespace auth {
+SaslReply runSaslStart(OperationContext* opCtx,
+                       AuthenticationSession* session,
+                       const SaslStartCommand& request);
+
+
+}  // namespace auth
 
 /**
  * Handle hello: { speculativeAuthenticate: {...} }

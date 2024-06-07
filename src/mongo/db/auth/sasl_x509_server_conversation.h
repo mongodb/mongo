@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,15 +29,47 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/auth/sasl_mechanism_policies.h"
+#include "mongo/db/auth/sasl_mechanism_registry.h"
 
-namespace mongo {
+namespace mongo::auth {
 
-void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj helloCmd, BSONObjBuilder* result);
+class SaslX509ServerMechanism final : public MakeServerMechanism<X509Policy> {
+public:
+    explicit SaslX509ServerMechanism(std::string authenticationDatabase)
+        : MakeServerMechanism<X509Policy>(std::move(authenticationDatabase)) {}
 
-}  // namespace mongo
+    ~SaslX509ServerMechanism() override = default;
+
+    StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
+                                                       StringData inputData) override;
+
+    boost::optional<unsigned int> currentStep() const override {
+        return _step;
+    }
+
+    boost::optional<unsigned int> totalSteps() const override {
+        return kMaxStep;
+    }
+
+    bool isClusterMember(Client* client) const override;
+
+    UserRequest getUserRequest() const override;
+
+private:
+    static constexpr unsigned int kMaxStep = 1;
+
+    unsigned int _step{0};
+};
+
+class X509ServerFactory : public MakeServerFactory<SaslX509ServerMechanism> {
+public:
+    using MakeServerFactory<SaslX509ServerMechanism>::MakeServerFactory;
+    static constexpr bool isInternal = false;
+    bool canMakeMechanismForUser(const User* user) const final {
+        auto credentials = user->getCredentials();
+        return credentials.isExternal;
+    }
+};
+
+}  // namespace mongo::auth

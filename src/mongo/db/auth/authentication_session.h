@@ -173,8 +173,8 @@ public:
      *
      * The database will be validated against the current database for this session.
      */
-    void updateDatabase(StringData database) {
-        updateUserName(UserName("", database.toString()), false /* isMechX509 */);
+    void updateDatabase(StringData database, bool isMechX509) {
+        updateUserName(UserName("", database.toString()), isMechX509);
     }
 
     /**

@@ -199,7 +199,7 @@ public:
      * Provides logic for determining if a user is a cluster member or an actual client for SASL
      * authentication mechanisms
      */
-    bool isClusterMember() const {
+    virtual bool isClusterMember(Client* client) const {
         auto systemUser = internalSecurity.getUser();
         return _principalName == (*systemUser)->getName().getUser() &&
             getAuthenticationDatabase() == (*systemUser)->getName().getDB();

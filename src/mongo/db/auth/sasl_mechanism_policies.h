@@ -114,5 +114,22 @@ struct GSSAPIPolicy {
     }
 };
 
+struct X509Policy {
+    static constexpr StringData getName() {
+        return "MONGODB-X509"_sd;
+    }
+
+    static SecurityPropertySet getProperties() {
+        return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
+    }
+
+    static int securityLevel() {
+        return 3;
+    }
+
+    static constexpr bool isInternalAuthMech() {
+        return true;
+    }
+};
 
 }  // namespace mongo

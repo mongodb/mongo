@@ -407,3 +407,11 @@ mongo_cc_library(
         "//src/mongo/bson/util:bson_extract",
     ],
 )
+
+idl_generator(
+    name = "x509_protocol_gen",
+    src = "x509_protocol.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

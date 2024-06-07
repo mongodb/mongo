@@ -18,7 +18,7 @@ def shouldBuildGRPC(myEnv):
 
 
 # Contains only the core ConnectionString functionality, *not* the ability to call connect() and
-# return a DBClientBase* back. For that you need to link against the 'clientdriver_network' library.
+# return a DBClientBase* back. For that you need to link against the "clientdriver_network" library.
 env.Library(
     target="connection_string",
     source=[
@@ -48,6 +48,7 @@ nativeSaslClientSource = [
     "sasl_oidc_client_types_gen.cpp",
     "sasl_plain_client_conversation.cpp",
     "sasl_scram_client_conversation.cpp",
+    "sasl_x509_client_conversation.cpp" if get_option("ssl") == "on" else [],
 ]
 
 if get_option("ssl") == "on":
@@ -74,7 +75,7 @@ nativeSaslClientEnv.Library(
         "sasl_aws_client" if get_option("ssl") == "on" else "",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/oidc_protocol",
+        "$BUILD_DIR/mongo/db/auth/sasl_mechanism_protocol",
         "$BUILD_DIR/mongo/db/commands/server_status_core",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/shell/program_runner",

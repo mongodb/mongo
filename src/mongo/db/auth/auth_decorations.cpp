@@ -85,12 +85,6 @@ public:
     void onDestroyOperationContext(OperationContext* opCtx) override {}
 };
 
-auto disableAuthMechanismsRegisterer = Service::ConstructorActionRegisterer{
-    "DisableAuthMechanisms", [](Service* service) {
-        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, kX509AuthMechanism)) {
-            disableX509Auth(service);
-        }
-    }};
 
 ServiceContext::ConstructorActionRegisterer authzClientObserverRegisterer{
     "AuthzClientObserver", [](ServiceContext* svCtx) {
@@ -149,14 +143,6 @@ ClusterAuthMode ClusterAuthMode::set(ServiceContext* svcCtx, const ClusterAuthMo
                 current.canTransitionTo(newMode));
     } while (!authMode.compareAndSwap(&current, newMode));
     return current;
-}
-
-void disableX509Auth(Service* service) {
-    getDisabledAuthMechanisms(service).x509 = true;
-}
-
-bool isX509AuthDisabled(Service* service) {
-    return getDisabledAuthMechanisms(service).x509;
 }
 
 }  // namespace mongo
