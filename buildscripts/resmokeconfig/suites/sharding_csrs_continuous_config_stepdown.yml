@@ -254,6 +254,8 @@ selector:
     # dedicated config server.
     - jstests/sharding/change_streams_with_config_transitions.js
     - jstests/sharding/fsync_lock_unlock.js
+    - jstests/sharding/fsync_with_prepared_transaction.js
+    - jstests/sharding/fsync_lock_fails_with_in_progress_ddl_op.js
 
     # Expect the configureQueryAnalyzer command to execute without config server stepdown.
     - jstests/sharding/analyze_shard_key/configure_query_analyzer_persistence.js
