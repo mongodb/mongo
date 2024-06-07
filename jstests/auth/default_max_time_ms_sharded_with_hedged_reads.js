@@ -83,7 +83,7 @@ const regularUserDB =
 const slowCommand = {
     count: collName,
     query: {$where: "sleep(1000); return true;", a: 1},
-    $readPreference: {mode: "nearest"}
+    $readPreference: {mode: "nearest", hedge: {enabled: true}}
 };
 
 const expectedErrorsDueToMaxTimeMS = [ErrorCodes.MaxTimeMSExpired];

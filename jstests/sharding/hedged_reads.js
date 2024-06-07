@@ -81,11 +81,14 @@ function verifyCommandWorksWhenHedgeOperationsFailWithNetworkTimeout(
         errorCode: NumberInt(ErrorCodes.NetworkInterfaceExceededTimeLimit),
     });
 
-    const ps = startParallelShell(funWithArgs(function(dbName, collName) {
-                                      const testDB = db.getSiblingDB(dbName);
-                                      assert.commandWorked(testDB.runCommand(
-                                          {count: collName, $readPreference: {mode: "nearest"}}));
-                                  }, dbName, collName), port);
+    assert.commandWorked(st.s0.adminCommand({clearLog: 'global'}));
+
+    const ps = startParallelShell(
+        funWithArgs(function(dbName, collName) {
+            const testDB = db.getSiblingDB(dbName);
+            assert.commandWorked(testDB.runCommand(
+                {count: collName, $readPreference: {mode: "nearest", hedge: {enabled: true}}}));
+        }, dbName, collName), port);
 
     fp2.wait();
     fp2.off();
@@ -94,6 +97,8 @@ function verifyCommandWorksWhenHedgeOperationsFailWithNetworkTimeout(
     fp1.off();
 
     ps();
+
+    checkLog.contains(st.s0, "Hedged reads have been deprecated");
 }
 
 const st = new ShardingTest({
@@ -129,7 +134,7 @@ jsTest.log(
 assert.commandWorked(testDB.runCommand({
     count: collName,
     query: {$where: "sleep(100); return true;", x: {$gte: 0}},
-    $readPreference: {mode: "nearest"}
+    $readPreference: {mode: "nearest", hedge: {enabled: true}}
 }));
 
 let sortedNodes = [...st.rs0.nodes].sort((node1, node2) => node1.host.localeCompare(node2.host));
@@ -151,7 +156,7 @@ try {
     assert.commandWorked(testDB.runCommand({
         count: collName,
         query: {x: {$gte: 0}},
-        $readPreference: {mode: "nearest"},
+        $readPreference: {mode: "nearest", hedge: {enabled: true}},
         comment: comment
     }));
 
