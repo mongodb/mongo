@@ -96,18 +96,25 @@ const runTest = (parameters) => {
 };
 
 const dbCheckParameters = [
-    {validateMode: "dataConsistency", maxDocsPerBatch: 1, maxBatchTimeMillis: 1000},
+    {
+        validateMode: "dataConsistency",
+        maxDocsPerBatch: 1,
+        maxBatchTimeMillis: 1000,
+        batchWriteConcern: {w: 1}
+    },
     {
         validateMode: "dataConsistencyAndMissingIndexKeysCheck",
         maxDocsPerBatch: 1,
         bsonValidateMode: "kFull",
-        maxBatchTimeMillis: 1000
+        maxBatchTimeMillis: 1000,
+        batchWriteConcern: {w: 1}
     },
     {
         validateMode: "extraIndexKeysCheck",
         maxDocsPerBatch: 1,
         secondaryIndex: "a_1",
-        maxBatchTimeMillis: 1000
+        maxBatchTimeMillis: 1000,
+        batchWriteConcern: {w: 1}
     },
 ];
 // Execute the test multiple times to assess the randomization of when stepdown occurs while dbcheck
