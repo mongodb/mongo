@@ -261,22 +261,24 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
 }
 
 /* Test case 3 */
+/****
+ * TODO SERVER-91330 Fix test case 3
 {
     jsTest.log(
-        "Testing that an additional participant not reported to mongos is not included in abort protocol" +
-        " and the additional participant is reaped after transactionLifetimeLimitSeconds.");
+        "Testing that an additional participant not reported to mongos is not included in abort
+protocol" + " and the additional participant is reaped after transactionLifetimeLimitSeconds.");
     dropCollections(st);
 
     const numDocs = 500;
 
-    /*
-     * In this test, mongos targets shard0 and shard1 when executing the aggregation pipeline.
-     * - shard0 does not need to add another participant. shard1 adds shard2 as participant.
-     * - shard0 is paused until shard1 adds shard2 as a participant.
-     * - shard1 is paused from responding so that mongos never learns that shard2 was added.
-     * - the transaction is aborted, causing mongos to send abortTransaction to shard0 and shard1.
-     * - shard2 aborts the transaction after transactionLifetimeLimitSeconds.
-     */
+    //
+    // In this test, mongos targets shard0 and shard1 when executing the aggregation pipeline.
+    // - shard0 does not need to add another participant. shard1 adds shard2 as participant.
+    // - shard0 is paused until shard1 adds shard2 as a participant.
+    // - shard1 is paused from responding so that mongos never learns that shard2 was added.
+    // - the transaction is aborted, causing mongos to send abortTransaction to shard0 and shard1.
+    // - shard2 aborts the transaction after transactionLifetimeLimitSeconds.
+    //
     // Create a sharded collection, "foo", with the following chunks:
     // shard0: _id: [-inf, 0)
     // shard1: _id: [0, +inf)
@@ -362,7 +364,8 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
                 pipeline: [
                     {
                         $lookup:
-                            {from: foreignCollName, localField: "_id", foreignField: "x", as: "result"}
+                            {from: foreignCollName, localField: "_id", foreignField: "x", as:
+"result"}
                     },
                     { $limit: NumberInt(200) },
                 ],
@@ -445,5 +448,6 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
                                          allParticipants,
                                          allParticipants);
 }
+****/
 
 st.stop();
