@@ -1839,6 +1839,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("locks", [](auto field, auto args, auto& b) {
         auto lockerInfo =
             shard_role_details::getLocker(args.opCtx)->getLockerInfo(args.curop.getLockStatsBase());
+        // TODO SERVER-88195: Account for _lockStatsOnceStashed
         BSONObjBuilder locks(b.subobjStart(field));
         lockerInfo.stats.report(&locks);
     });
