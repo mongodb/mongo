@@ -3213,7 +3213,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.ServerParameter) -> None
         """Generate a specialized ServerParameter."""
         self._writer.write_line(
-            "auto sp = makeServerParameter<%s>(%s, %s);"
+            "auto sp = std::make_unique<%s>(%s, %s);"
             % (param.cpp_class.name, _encaps(param.name), param.set_at)
         )
         if param.redact:
@@ -3222,7 +3222,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if param.omit_in_ftdc:
             self._writer.write_line("sp->setOmitInFTDC();")
 
-        self._writer.write_line("return sp;")
+        self._writer.write_line("return std::move(sp);")
 
     def _gen_server_parameter_class_definitions(self, param):
         # type: (ast.ServerParameter) -> None
@@ -3266,15 +3266,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if param.feature_flag:
             self._writer.write_line(
                 common.template_args(
-                    "auto* ret = makeFeatureFlagServerParameter(${name}, ${storage});",
+                    "auto ret = std::make_unique<FeatureFlagServerParameter>(${name}, ${storage});",
                     storage=param.cpp_varname,
                     name=_encaps(param.name),
                 )
             )
         else:
+            # Explicitly specify the storage type to keep MSVC happy.
             self._writer.write_line(
                 common.template_args(
-                    "auto* ret = makeIDLServerParameterWithStorage<${spt}>(${name}, ${storage});",
+                    "auto ret = std::make_unique<IDLServerParameterWithStorage<${spt},decltype(${storage})>>(${name}, ${storage});",
                     storage=param.cpp_varname,
                     spt=param.set_at,
                     name=_encaps(param.name),
@@ -3307,7 +3308,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 "uassertStatusOK(ret->setDefault(%s));" % (_get_expression(param.default))
             )
 
-        self._writer.write_line("return ret;")
+        self._writer.write_line("return std::move(ret);")
 
     def _gen_server_parameter(self, param):
         # type: (ast.ServerParameter) -> None
@@ -3319,16 +3320,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def _gen_server_parameter_deprecated_aliases(self, param_no, param):
         # type: (int, ast.ServerParameter) -> None
-        """Generate IDLServerParamterDeprecatedAlias instance."""
+        """Generate IDLServerParameterDeprecatedAlias instance."""
 
         for alias_no, alias in enumerate(param.deprecated_name):
             self._writer.write_line(
                 common.template_args(
-                    "${unused} auto* ${alias_var} = makeIDLServerParameterDeprecatedAlias(${name}, ${param_var});",
-                    unused="[[maybe_unused]]",
-                    alias_var="scp_%d_%d" % (param_no, alias_no),
+                    "registerServerParameter(std::make_unique<IDLServerParameterDeprecatedAlias>(${name}, ${param_var}));",
                     name=_encaps(alias),
-                    param_var="scp_%d" % (param_no),
+                    param_var="scp_%d.get()" % (param_no),
                 )
             )
 
@@ -3359,7 +3358,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 with self._condition(param.condition):
                     unused = not (param.test_only or param.deprecated_name)
                     with self.get_initializer_lambda(
-                        "auto* scp_%d" % (param_no), unused=unused, return_type="ServerParameter*"
+                        "auto scp_%d" % (param_no),
+                        unused=unused,
+                        return_type="std::unique_ptr<ServerParameter>",
                     ):
                         self._gen_server_parameter(param)
 
@@ -3379,6 +3380,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             )
 
                     self._gen_server_parameter_deprecated_aliases(param_no, param)
+                    self._writer.write_line(
+                        "registerServerParameter(std::move(scp_%d));" % (param_no)
+                    )
                 self.write_empty_line()
 
     def gen_config_option(self, opt, section):

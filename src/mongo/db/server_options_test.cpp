@@ -1249,11 +1249,15 @@ public:
 };
 
 TEST_F(SetParameterOptionTest, ApplySetParameters) {
-    TestServerParameter p1{"p1", ServerParameterType::kStartupOnly, 123};
-    TestServerParameter p2{"p2", ServerParameterType::kStartupOnly, 234};
+    auto param1 =
+        std::make_unique<TestServerParameter>("p1", ServerParameterType::kStartupOnly, 123);
+    auto param2 =
+        std::make_unique<TestServerParameter>("p2", ServerParameterType::kStartupOnly, 234);
+    auto p1 = param1.get();
+    auto p2 = param2.get();
     ServerParameterSet paramSet;
-    paramSet.add(&p1);
-    paramSet.add(&p2);
+    paramSet.add(std::move(param1));
+    paramSet.add(std::move(param2));
 
     auto swObj =
         server_options_detail::applySetParameterOptions({{"p1", "555"}, {"p2", "666"}}, paramSet);
@@ -1261,8 +1265,8 @@ TEST_F(SetParameterOptionTest, ApplySetParameters) {
     ASSERT_BSONOBJ_EQ(swObj.getValue(),
                       BSON("p1" << BSON("default" << 123 << "value" << 555) << "p2"
                                 << BSON("default" << 234 << "value" << 666)));
-    ASSERT_EQ(p1.val, 555);
-    ASSERT_EQ(p2.val, 666);
+    ASSERT_EQ(p1->val, 555);
+    ASSERT_EQ(p2->val, 666);
 }
 
 }  // namespace

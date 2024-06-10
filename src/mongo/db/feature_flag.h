@@ -178,11 +178,4 @@ private:
     FeatureFlag& _storage;
 };
 
-inline FeatureFlagServerParameter* makeFeatureFlagServerParameter(StringData name,
-                                                                  FeatureFlag& storage) {
-    auto p = std::make_unique<FeatureFlagServerParameter>(name, storage);
-    registerServerParameter(&*p);
-    return p.release();
-}
-
 }  // namespace mongo

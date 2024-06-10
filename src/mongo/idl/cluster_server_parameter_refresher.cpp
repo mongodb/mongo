@@ -307,7 +307,7 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
     for (const auto& [tenantId, tenantParamDocs] : clusterParameterDocs) {
         std::vector<BSONObj> updatedParameters;
         updatedParameters.reserve(tenantParamDocs.size());
-        for (auto [name, sp] : clusterParameterCache->getMap()) {
+        for (const auto& [name, sp] : clusterParameterCache->getMap()) {
             if (fcvChanged) {
                 // Use canBeEnabled because if we previously temporarily disabled the parameter,
                 // isEnabled will be false

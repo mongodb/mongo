@@ -621,9 +621,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     }
 
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri);
-    _runTimeConfigParam.reset(makeServerParameter<WiredTigerEngineRuntimeConfigParameter>(
-        "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly));
-    _runTimeConfigParam->_data.second = this;
+    auto param = std::make_unique<WiredTigerEngineRuntimeConfigParameter>(
+        "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly);
+    param->_data.second = this;
+    registerServerParameter(std::move(param));
 }
 
 WiredTigerKVEngine::~WiredTigerKVEngine() {

@@ -41,7 +41,7 @@ using ParameterStorage = TenantIdMap<ClusterServerParameterTest>;
 
 struct StorageAndParameter {
     StorageAndParameter(StringData name, LogicalTime time, int intValue, StringData stringValue)
-        : parameter{name, storage} {
+        : parameter(std::make_unique<TestParameter>(name, storage)) {
         ClusterServerParameter base;
         base.set_id(name);
         base.setClusterParameterTime(time);
@@ -51,8 +51,9 @@ struct StorageAndParameter {
         values.setStrValue(stringValue);
         storage[boost::none] = values;
     }
+
     ParameterStorage storage;
-    TestParameter parameter;
+    std::unique_ptr<TestParameter> parameter;
 };
 
 class ClusterParameterServerStatusTest : public ServiceContextTest {
@@ -97,8 +98,9 @@ TEST_F(ClusterParameterServerStatusTest, ReportEmpty) {
 }
 
 TEST_F(ClusterParameterServerStatusTest, ReportsOneParameter) {
-    auto parameter = std::addressof(_testParameters[0]->parameter);
-    _parameterSet.add(parameter);
+    auto& parameterOwnership = _testParameters[0]->parameter;
+    auto parameter = parameterOwnership.get();
+    _parameterSet.add(std::move(parameterOwnership));
 
     ASSERT_BSONOBJ_EQ(getReport(),
                       BSON(ClusterServerParameterServerStatus::kClusterParameterFieldName
@@ -109,10 +111,10 @@ TEST_F(ClusterParameterServerStatusTest, ReportsMultipleParameters) {
     BSONObjBuilder expected;
     BSONObjBuilder section =
         expected.subobjStart(ClusterServerParameterServerStatus::kClusterParameterFieldName);
-    for (const auto& storageAndParameter : _testParameters) {
-        auto parameter = std::addressof(storageAndParameter->parameter);
-        _parameterSet.add(parameter);
-        section.append(parameter->name(), serializeParameter(parameter));
+    for (auto& storageAndParameter : _testParameters) {
+        auto& parameter = storageAndParameter->parameter;
+        section.append(parameter->name(), serializeParameter(parameter.get()));
+        _parameterSet.add(std::move(parameter));
     }
     section.done();
 
@@ -122,22 +124,22 @@ TEST_F(ClusterParameterServerStatusTest, ReportsMultipleParameters) {
 TEST_F(ClusterParameterServerStatusTest, DoNotReportParametersNotInReportSet) {
     _serverStatus = std::make_unique<ClusterServerParameterServerStatus>(&_parameterSet,
                                                                          std::set<std::string>{});
-    auto parameter = std::addressof(_testParameters[0]->parameter);
-    _parameterSet.add(parameter);
+    _parameterSet.add(std::move(_testParameters[0]->parameter));
+
     ASSERT_BSONOBJ_EQ(getReport(), BSONObj::kEmptyObject);
 }
 
 TEST_F(ClusterParameterServerStatusTest, DoNotReportDisabledParameters) {
-    auto parameter = std::addressof(_testParameters[0]->parameter);
+    auto& parameter = _testParameters[0]->parameter;
     parameter->disable(false);
-    _parameterSet.add(parameter);
+    _parameterSet.add(std::move(parameter));
     ASSERT_BSONOBJ_EQ(getReport(), BSONObj::kEmptyObject);
 }
 
 TEST_F(ClusterParameterServerStatusTest, DoNotReportUnsetParameters) {
-    auto parameter = std::addressof(_testParameters[0]->parameter);
+    auto& parameter = _testParameters[0]->parameter;
     ASSERT_OK(parameter->reset(boost::none));
-    _parameterSet.add(parameter);
+    _parameterSet.add(std::move(parameter));
     ASSERT_BSONOBJ_EQ(getReport(), BSONObj::kEmptyObject);
 }
 

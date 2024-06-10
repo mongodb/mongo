@@ -415,22 +415,25 @@ TEST(SpecializedServerParameter, withScope) {
     ASSERT(nullptr != nodeSWO);
     ASSERT(nullptr == clusterSet->getIfExists(kSpecializedWithOptions));
 
-    auto* clusterSWO =
-        makeServerParameter<SpecializedWithOptions>(kSpecializedWithOptions, SPT::kClusterWide);
+    auto param =
+        std::make_unique<SpecializedWithOptions>(kSpecializedWithOptions, SPT::kClusterWide);
+    auto* clusterSWO = param.get();
+    registerServerParameter(std::move(param));
     ASSERT(clusterSWO != nodeSWO);
     ASSERT(clusterSWO == clusterSet->getIfExists(kSpecializedWithOptions));
 
     // Duplicate key
-    ASSERT_THROWS_CODE(
-        makeServerParameter<SpecializedWithOptions>(kSpecializedWithOptions, SPT::kClusterWide),
-        DBException,
-        23784);
+    ASSERT_THROWS_CODE(registerServerParameter(std::make_unique<SpecializedWithOptions>(
+                           kSpecializedWithOptions, SPT::kClusterWide)),
+                       DBException,
+                       23784);
 
     // Require runtime only.
     static constexpr auto kSpecializedRuntimeOnly = "specializedRuntimeOnly"_sd;
-    auto* clusterSRO =
-        makeServerParameter<SpecializedRuntimeOnly>(kSpecializedRuntimeOnly, SPT::kClusterWide);
-    ASSERT(nullptr != clusterSRO);
+    auto clusterSRO =
+        std::make_unique<SpecializedRuntimeOnly>(kSpecializedRuntimeOnly, SPT::kClusterWide);
+    ASSERT(clusterSRO);
+    registerServerParameter(std::move(clusterSRO));
     // Pointer now belongs to ServerParameterSet, no need to delete.
 }
 

@@ -345,7 +345,8 @@ void FailPointRegistry::freeze() {
 
 void FailPointRegistry::registerAllFailPointsAsServerParameters() {
     for (const auto& [name, ptr] : _fpMap) {
-        makeServerParameter<FailPointServerParameter>(name, ServerParameterType::kStartupOnly);
+        registerServerParameter(
+            std::make_unique<FailPointServerParameter>(name, ServerParameterType::kStartupOnly));
     }
 }
 

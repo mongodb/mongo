@@ -689,8 +689,6 @@ private:
 
     AtomicWord<std::uint64_t> _oplogNeededForCrashRecovery;
 
-    std::unique_ptr<WiredTigerEngineRuntimeConfigParameter> _runTimeConfigParam;
-
     mutable Mutex _oldestTimestampPinRequestsMutex =
         MONGO_MAKE_LATCH("WiredTigerKVEngine::_oldestTimestampPinRequestsMutex");
     std::map<std::string, Timestamp> _oldestTimestampPinRequests;

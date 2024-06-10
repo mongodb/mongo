@@ -75,11 +75,11 @@ Status ServerParameter::set(const BSONElement& newValueElement,
 ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
     static StaticImmortal obj = [] {
         ServerParameterSet sps;
-        sps.setValidate([](ServerParameter* sp) {
+        sps.setValidate([](const ServerParameter& sp) {
             uassert(6225102,
                     "Registering cluster-wide parameter '{}' as node-local server parameter"
-                    ""_format(sp->name()),
-                    sp->isNodeLocal());
+                    ""_format(sp.name()),
+                    sp.isNodeLocal());
         });
         return sps;
     }();
@@ -124,22 +124,25 @@ bool ServerParameter::featureFlagIsDisabledOnVersion(
 ServerParameterSet* ServerParameterSet::getClusterParameterSet() {
     static StaticImmortal obj = [] {
         ServerParameterSet sps;
-        sps.setValidate([](ServerParameter* sp) {
+        sps.setValidate([](const ServerParameter& sp) {
             uassert(6225103,
                     "Registering node-local parameter '{}' as cluster-wide server parameter"
-                    ""_format(sp->name()),
-                    sp->isClusterWide());
+                    ""_format(sp.name()),
+                    sp.isClusterWide());
         });
         return sps;
     }();
     return &*obj;
 }
 
-void ServerParameterSet::add(ServerParameter* sp) {
+void ServerParameterSet::add(std::unique_ptr<ServerParameter> sp) {
     if (_validate)
-        _validate(sp);
-    auto [it, ok] = _map.insert({sp->name(), sp});
-    uassert(23784, "Duplicate server parameter registration for '{}'"_format(sp->name()), ok);
+        _validate(*sp);
+    auto [it, ok] = _map.try_emplace(sp->name(), std::move(sp));
+    uassert(23784,
+            "Duplicate server parameter registration for '{}'"_format(
+                sp->name()),  // NOLINT(bugprone-use-after-move)
+            ok);
 }
 
 StatusWith<std::string> ServerParameter::_coerceToString(const BSONElement& element) {
@@ -225,16 +228,16 @@ Status IDLServerParameterDeprecatedAlias::setFromString(StringData str,
 }
 
 void ServerParameterSet::disableTestParameters() {
-    for (auto& spit : _map) {
-        auto*& sp = spit.second;
+    for (const auto& [name, sp] : _map) {
         if (sp->isTestOnly()) {
             sp->disable(true /* permanent */);
         }
     }
 }
 
-void registerServerParameter(ServerParameter* p) {
-    ServerParameterSet::getParameterSet(p->getServerParameterType())->add(p);
+void registerServerParameter(std::unique_ptr<ServerParameter> p) {
+    auto spt = p->getServerParameterType();
+    ServerParameterSet::getParameterSet(spt)->add(std::move(p));
 }
 
 }  // namespace mongo

@@ -547,14 +547,4 @@ template <typename Storage>
 using ClusterParameterWithStorage =
     IDLServerParameterWithStorage<ServerParameterType::kClusterWide, TenantIdMap<Storage>>;
 
-// MSVC has trouble resolving T=decltype(param) through the above class template.
-// Avoid that by using this proxy factory to infer storage type.
-template <ServerParameterType paramType, typename T>
-IDLServerParameterWithStorage<paramType, T>* makeIDLServerParameterWithStorage(StringData name,
-                                                                               T& storage) {
-    auto p = std::make_unique<IDLServerParameterWithStorage<paramType, T>>(name, storage);
-    registerServerParameter(&*p);
-    return p.release();
-}
-
 }  // namespace mongo

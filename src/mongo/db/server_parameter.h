@@ -116,7 +116,7 @@ using TenantIdMap = std::map<boost::optional<TenantId>, U>;
 
 class ServerParameter {
 public:
-    using Map = std::map<std::string, ServerParameter*>;
+    using Map = std::map<std::string, std::unique_ptr<ServerParameter>, std::less<>>;
 
     ServerParameter(StringData name, ServerParameterType spt);
     virtual ~ServerParameter() = default;
@@ -312,7 +312,7 @@ class ServerParameterSet {
 public:
     using Map = ServerParameter::Map;
 
-    void add(ServerParameter* sp);
+    void add(std::unique_ptr<ServerParameter> sp);
     void remove(const std::string& name);
 
     const Map& getMap() const {
@@ -322,16 +322,16 @@ public:
     void disableTestParameters();
 
     template <typename T = ServerParameter>
-    T* getIfExists(StringData name) {
-        const auto& it = _map.find(name.toString());
+    T* getIfExists(StringData name) const {
+        const auto& it = _map.find(name);
         if (it == _map.end()) {
             return nullptr;
         }
-        return checked_cast<T*>(it->second);
+        return checked_cast<T*>(it->second.get());
     }
 
     template <typename T = ServerParameter>
-    T* get(StringData name) {
+    T* get(StringData name) const {
         T* ret = getIfExists<T>(name);
         uassert(ErrorCodes::NoSuchKey, str::stream() << "Unknown server parameter: " << name, ret);
         return ret;
@@ -341,7 +341,7 @@ public:
     // added to it. `func` will be called whenever a `ServerParameter` is added
     // to this set. It will throw to reject that ServerParameter. This can be
     // because of ServerParameterType, or other criteria.
-    void setValidate(std::function<void(ServerParameter*)> func) {
+    void setValidate(std::function<void(const ServerParameter&)> func) {
         _validate = std::move(func);
     }
 
@@ -358,20 +358,11 @@ public:
     }
 
 private:
-    std::function<void(ServerParameter*)> _validate;
+    std::function<void(const ServerParameter&)> _validate;
     Map _map;
 };
 
-void registerServerParameter(ServerParameter* p);
-
-// Create an instance of Param, which must be derived from ServerParameter,
-// and register it with a ServerParameterSet.
-template <typename Param>
-Param* makeServerParameter(StringData name, ServerParameterType spt) {
-    auto p = std::make_unique<Param>(std::string{name}, spt);
-    registerServerParameter(&*p);
-    return p.release();
-}
+void registerServerParameter(std::unique_ptr<ServerParameter>);
 
 /**
  * Proxy instance for deprecated aliases of set parameters.
@@ -392,13 +383,6 @@ private:
     std::once_flag _warnOnce;
     ServerParameter* _sp;
 };
-
-inline IDLServerParameterDeprecatedAlias* makeIDLServerParameterDeprecatedAlias(
-    StringData name, ServerParameter* sp) {
-    auto p = std::make_unique<IDLServerParameterDeprecatedAlias>(name, sp);
-    registerServerParameter(p.get());
-    return p.release();
-}
 
 namespace idl_server_parameter_detail {
 

@@ -108,11 +108,11 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
     visit(OverloadedVisitor{[&](const std::string& strParameterName) {
                                 if (strParameterName == "*"_sd) {
                                     // Retrieve all cluster parameter values.
-                                    Map clusterParameterMap = clusterParameters->getMap();
+                                    const Map& clusterParameterMap = clusterParameters->getMap();
                                     parameterValues.reserve(clusterParameterMap.size());
                                     parameterNames.reserve(clusterParameterMap.size());
                                     for (const auto& param : clusterParameterMap) {
-                                        makeBSON(param.second, true);
+                                        makeBSON(param.second.get(), true);
                                     }
                                 } else {
                                     // Any other string must correspond to a single parameter name.

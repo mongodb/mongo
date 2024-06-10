@@ -211,7 +211,7 @@ void clearParameter(OperationContext* opCtx,
 void clearAllTenantParameters(OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
     const auto& params = ServerParameterSet::getClusterParameterSet()->getMap();
     for (const auto& it : params) {
-        clearParameter(opCtx, it.second, tenantId);
+        clearParameter(opCtx, it.second.get(), tenantId);
     }
 }
 
