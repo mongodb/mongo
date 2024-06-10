@@ -63,6 +63,12 @@
 
 namespace mongo {
 
+namespace cluster::unsplittable {
+const auto kUnsplittableCollectionShardKey = BSON("_id" << 1);
+const auto kUnsplittableCollectionMinKey = BSON("_id" << MINKEY);
+const auto kUnsplittableCollectionMaxKey = BSON("_id" << MAXKEY);
+}  // namespace cluster::unsplittable
+
 struct RawResponsesResult {
     bool responseOK;
     std::set<ShardId> shardsWithSuccessResponses;
