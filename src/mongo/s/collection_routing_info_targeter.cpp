@@ -873,7 +873,7 @@ void CollectionRoutingInfoTargeter::noteStaleShardResponse(OperationContext* opC
         Grid::get(opCtx)
             ->catalogCache()
             ->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                _nss, staleInfo.getVersionWanted(), endpoint.shardName);
+                _nss, boost::none, endpoint.shardName);
     }
 
     _lastError = LastErrorType::kStaleShardVersion;
