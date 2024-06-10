@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 Import("env")
+Import("get_option")
 Import("has_option")
 Import("debugBuild")
 Import("vendored_libunwind_needs_lzma")
@@ -23,6 +24,15 @@ env = env.Clone(
     DISALLOW_VISHIDDEN=True,
     NINJA_GENSOURCE_INDEPENDENT=True,
 )
+
+# Enabling the function sanitizer (part of ubsan) references symbols defined in a separate file when compiled with
+# dynamic linking in Clang. The C program definitions setup in SCons do not link this separate file.
+# Disable function sanitizer to avoid triggering symbol resolution errors when libraries defined in this
+# environment are used by C programs (in this case, wiredtiger).
+if get_option("link-model") == "dynamic" and 'undefined' in (get_option('sanitize')
+                                                             or '').split(','):
+    if env.AddToCCFLAGSIfSupported("-fno-sanitize=function"):
+        env.AppendUnique(LINKFLAGS=["-fno-sanitize=function"])
 
 unwind_root = env.Dir(".").srcnode()
 unwind_platform = unwind_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
