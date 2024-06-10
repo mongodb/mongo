@@ -1,5 +1,4 @@
 {
-  "#comment01": "SBOM for MDB server product; this file should comply with the format specified here: https://cyclonedx.org/docs/1.4/json/#components_items_publisher; This file is still in development; see https://jira.mongodb.org/browse/DEVPROD-2623 for details.",
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:6e50768b-f427-4b2f-b024-081b29d2d24f",
@@ -502,7 +501,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/snappy"
+            "location": "src/third_party/snappy-1.1.7"
           }
         ]
       },
@@ -897,10 +896,10 @@
       "evidence": {
         "occurrences": [
           {
-            "location": [
-              "src/mongo/shell/linenoise.h",
-              "src/mongo/shell/linenoise.cpp"
-            ]
+            "location": "src/mongo/shell/linenoise.h"
+          },
+          {
+            "location": "src/mongo/shell/linenoise.cpp"
           }
         ]
       },
@@ -964,6 +963,37 @@
         "occurrences": [
           {
             "location": "src/third_party/mozjs"
+          }
+        ]
+      },
+      "scope": "required"
+    },
+    {
+      "supplier": {
+        "name": "Organization: github"
+      },
+      "name": "mpark/variant",
+      "version": "v1.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSL-1.0"
+          }
+        }
+      ],
+      "purl": "pkg:github/mpark/variant@v1.4.0",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Service Architecture"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "e796b171-d8c3-48f6-9ade-e84e8efc2781",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/variant-1.4.0"
           }
         ]
       },
@@ -1381,6 +1411,37 @@
         ]
       },
       "scope": "excluded"
+    },
+    {
+      "supplier": {
+        "name": ""
+      },
+      "name": "unicode-data",
+      "version": "8.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Unicode-DFS-2016"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Query Execution"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "7b316747-8f8a-4238-ab29-d4ed5891d040",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/unicode-8.0.0"
+          }
+        ]
+      },
+      "scope": "required",
+      "purl": ""
     },
     {
       "supplier": {

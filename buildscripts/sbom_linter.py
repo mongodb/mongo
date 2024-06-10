@@ -124,6 +124,8 @@ def main() -> int:
     # the only files in this dir that are not third party libs
     third_party_libs.remove("SConscript")
     third_party_libs.remove("scripts")
+    # wiredtiger will not be included in the sbom since it is considered part of the server
+    third_party_libs.remove("wiredtiger")
 
     errors = lint_sbom(input_file, output_file, third_party_libs, should_format)
 
