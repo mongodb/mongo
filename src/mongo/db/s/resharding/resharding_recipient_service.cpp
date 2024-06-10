@@ -773,10 +773,8 @@ void ReshardingRecipientService::RecipientStateMachine::
                         _metadata.getTempReshardingNss(),
                         ShardKeyPattern(_metadata.getReshardingKey()));
 
-                    // Do not need to pass in time-series options because we cannot reshard a
-                    // time-series collection.
-                    // TODO SERVER-84741 pass in time-series options and ensure the shard key is
-                    // partially rewritten.
+                    // Only the resharding improvements code path above supports resharding
+                    // timeseries collections, so we do not pass in timeseries options here.
                     shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                         opCtx.get(),
                         _metadata.getTempReshardingNss(),
