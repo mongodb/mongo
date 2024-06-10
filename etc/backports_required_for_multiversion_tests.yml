@@ -143,6 +143,8 @@ last-continuous:
       ticket: SERVER-37164
     - test_file: jstests/sharding/move_collection_joins_existing_operation.js
       ticket: SERVER-90846
+    - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
+      ticket: SERVER-91114
   suites: null
 last-lts:
   all:
@@ -268,4 +270,6 @@ last-lts:
       ticket: SERVER-37164
     - test_file: jstests/sharding/move_collection_joins_existing_operation.js
       ticket: SERVER-90846
+    - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
+      ticket: SERVER-91114
   suites: null
