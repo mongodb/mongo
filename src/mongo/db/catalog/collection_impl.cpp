@@ -831,6 +831,16 @@ boost::optional<bool> CollectionImpl::getTimeseriesBucketsMayHaveMixedSchemaData
 }
 
 boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged() const {
+    if (!feature_flags::gTSBucketingParametersUnchanged.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // Pessimistically return true because v7.1+ versions may have missed cloning this catalog
+        // option upon chunk migrations, movePrimary, resharding, initial sync or backup/restore
+        // (SERVER-91193).
+        // TODO SERVER-91195: rely on timeseriesBucketingParametersHaveChanged once we are sure the
+        // value set in the durable catalog is correct.
+        return true;
+    }
+
     return _metadata->timeseriesBucketingParametersHaveChanged;
 }
 

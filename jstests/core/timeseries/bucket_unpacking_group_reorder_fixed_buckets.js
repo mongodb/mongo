@@ -20,6 +20,7 @@
  *     # when the mongos is fetching data from the shard using getMore(). Remove the tag the issue
  *     # is solved
  *     assumes_balancer_off,
+ *     featureFlagTSBucketingParametersUnchanged,
  * ]
  */
 

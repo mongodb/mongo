@@ -71,6 +71,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -394,7 +395,24 @@ TEST_F(CreateCollectionTest,
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
 }
 
+// TODO SERVER-91195 consider removing TimeseriesBucketingParametersChangedFlagAlwaysTrue
+TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagAlwaysTrue) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTSBucketingParametersUnchanged", false);
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
+
+    auto opCtx = makeOpCtx();
+    uassertStatusOK(createCollection(opCtx.get(), CreateCommand(curNss)));
+
+    ASSERT_TRUE(collectionExists(opCtx.get(), curNss));
+    AutoGetCollectionForRead collForRead(opCtx.get(), curNss);
+    ASSERT_TRUE(collForRead->timeseriesBucketingParametersHaveChanged());
+}
+
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTSBucketingParametersUnchanged", true);
+
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
     auto bucketsColl =
         NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
@@ -412,6 +430,9 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
 }
 
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagFalse) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTSBucketingParametersUnchanged", true);
+
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
 
     auto opCtx = makeOpCtx();
@@ -421,6 +442,7 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagFalse) {
     AutoGetCollectionForRead collForRead(opCtx.get(), curNss);
     ASSERT_FALSE(collForRead->timeseriesBucketingParametersHaveChanged());
 }
+
 
 TEST_F(CreateCollectionTest, ValidationOptions) {
     // Try a valid validator before trying invalid validators.
