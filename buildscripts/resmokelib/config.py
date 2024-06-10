@@ -101,7 +101,7 @@ DEFAULTS = {
     "stagger_jobs": None,
     "majority_read_concern": "on",
     "storage_engine": "wiredTiger",
-    "enable_enterprise_tests": None,
+    "enable_enterprise_tests": "on",
     "storage_engine_cache_size_gb": None,
     "suite_files": "with_server",
     "tag_files": [],
@@ -294,6 +294,9 @@ DBTEST_EXECUTABLE = None
 # If set to "tests", then resmoke.py will output the tests that would be run by each suite (without
 # actually running them).
 DRY_RUN = None
+
+# if set, enables enterprise jstest to automatically be included
+ENABLE_ENTERPRISE_TESTS = None
 
 # URL to connect to the Evergreen service.
 EVERGREEN_URL = None
