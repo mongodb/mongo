@@ -36,6 +36,8 @@ selector:
   # Enable when SERVER-43614 is backported.
   - jstests/sharding/query/unionWith_current_op.js
   - jstests/sharding/verify_sessions_expiration_sharded.js
+  # Disabled by SERVER-91320.
+  - jstests/sharding/move_chunk_deferred_lookup.js
 
   # This tag file can be created using ./buildscripts/evergreen_gen_multiversion_tests.py
   # or downloaded from the evergreen task.
