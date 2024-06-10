@@ -179,7 +179,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSearch::doOptimizeAt(
         if (limit.has_value()) {
             _spec.setLimit((int64_t)*limit);
         }
-        if (!_spec.getRequiresSearchSequenceToken().get_value_or(false)) {
+        if (!_spec.getRequiresSearchSequenceToken()) {
             _spec.setRequiresSearchSequenceToken(checkRequiresSearchSequenceToken(itr, container));
         }
     }

@@ -59,7 +59,7 @@ structs:
         type: long
       requiresSearchSequenceToken:
         description: "If true, mongot must return a searchSequenceToken with each document to allow the user to paginate results."
-        optional: true
+        default: false
         type: bool
       sortSpec:
         description: "The sort specification for this query."

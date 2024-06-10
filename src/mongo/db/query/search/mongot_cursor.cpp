@@ -300,20 +300,20 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     const auto& protocolVersion =
         expCtx->needsMerge ? spec.getMetadataMergeProtocolVersion() : boost::none;
 
-    return establishCursors(expCtx,
-                            getRemoteCommandRequestForSearchQuery(
-                                expCtx->opCtx,
-                                expCtx->ns,
-                                expCtx->uuid,
-                                expCtx->explain,
-                                query,
-                                protocolVersion,
-                                docsRequested,
-                                batchSize,
-                                spec.getRequiresSearchSequenceToken().value_or(false)),
-                            taskExecutor,
-                            std::move(getMoreStrategy),
-                            std::move(yieldPolicy));
+    return establishCursors(
+        expCtx,
+        getRemoteCommandRequestForSearchQuery(expCtx->opCtx,
+                                              expCtx->ns,
+                                              expCtx->uuid,
+                                              expCtx->explain,
+                                              query,
+                                              protocolVersion,
+                                              docsRequested,
+                                              batchSize,
+                                              spec.getRequiresSearchSequenceToken()),
+        taskExecutor,
+        std::move(getMoreStrategy),
+        std::move(yieldPolicy));
 }
 
 std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSearchMetaStage(

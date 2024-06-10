@@ -98,7 +98,7 @@ public:
     }
 
     bool getSearchPaginationFlag() {
-        return _spec.getRequiresSearchSequenceToken().get_value_or(false);
+        return _spec.getRequiresSearchSequenceToken();
     }
 
     boost::optional<int> getIntermediateResultsProtocolVersion() const {
