@@ -40,6 +40,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/time_support.h"
 
@@ -235,6 +236,53 @@ TEST_F(ExpressionContextTest, DontInitializeUnreferencedVariables) {
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kNowId));
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kClusterTimeId));
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kUserRolesId));
+}
+
+DEATH_TEST_F(ExpressionContextTest, TestSharedSearchContextGetLookupSuccessRate, "9074400") {
+    auto opCtx = makeOperationContext();
+    auto expCtx =
+        ExpressionContext{opCtx.get(),
+                          {},     // explain
+                          false,  // fromMongos
+                          false,  // needsMerge
+                          false,  // allowDiskUse
+                          false,  // bypassDocumentValidation
+                          false,  // isMapReduce
+                          NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+                          {},  // runtime constants
+                          {},  // collator
+                          std::make_shared<StubMongoProcessInterface>(),
+                          {},  // resolvedNamespaces
+                          {},  // collUUID
+                          {},  // let
+                          false};
+
+    // First, check that with zero documents seen that the success rate is 0
+    // (instead of throwing an exception).
+    ASSERT_EQUALS(double(0), expCtx.sharedSearchState.getDocsLookupByIdSuccessRate());
+
+    // Now, add some docs as seen.
+    for (int i = 0; i < 6; i++) {
+        expCtx.sharedSearchState.incrementDocsSeenByIdLookup();
+    }
+
+    // Ensure that the success rate remains 0.
+    ASSERT_EQUALS(double(0), expCtx.sharedSearchState.getDocsLookupByIdSuccessRate());
+
+    // Now, add some docs successfully found.
+    for (int i = 0; i < 3; i++) {
+        expCtx.sharedSearchState.incrementDocsReturnedByIdLookup();
+    }
+
+    // Now, ensure that the sucess rate is as expected.
+    ASSERT_EQUALS(double(0.5), expCtx.sharedSearchState.getDocsLookupByIdSuccessRate());
+
+    // Lastly, add more documents found than have been seen,
+    // and ensure the function trips an assertion.
+    for (int i = 0; i < 4; i++) {
+        expCtx.sharedSearchState.incrementDocsReturnedByIdLookup();
+    }
+    expCtx.sharedSearchState.getDocsLookupByIdSuccessRate();
 }
 
 }  // namespace
