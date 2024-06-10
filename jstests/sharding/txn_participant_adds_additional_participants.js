@@ -2,7 +2,8 @@
  * Tests that additional participants can be added to an existing transaction.
  * @tags: [
  *   requires_fcv_80,
- *   temp_disabled_embedded_router_metrics,
+ *    # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 

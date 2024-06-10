@@ -2,8 +2,9 @@
  * Test count commands against the config servers, including when some of them are down.
  * This test fails when run with authentication due to SERVER-6327
  * @tags: [
+ *   # TODO (SERVER-88123): Re-enable this test.
  *   # Test doesn't start enough mongods to have num_mongos routers
- *   temp_disabled_embedded_router_num_routers,
+ *   embedded_router_incompatible,
  * ]
  */
 

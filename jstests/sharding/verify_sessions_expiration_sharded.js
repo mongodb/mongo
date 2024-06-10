@@ -14,7 +14,8 @@
 //    replace it in the config.system.sessions collection.
 //
 // @tags: [
-//    temp_disabled_embedded_router_metrics,
+//    # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+//    embedded_router_incompatible,
 // ]
 
 // This test makes assertions about the number of logical session records.

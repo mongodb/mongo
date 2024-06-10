@@ -1,7 +1,8 @@
 // This test was designed to reproduce SERVER-31475. It issues sharded aggregations with an error
 // returned from one shard, and a delayed response from another shard.
 // @tags: [
-//   temp_disabled_embedded_router_mongo_bridge,
+//   # TODO (SERVER-88129): Re-enable this test or add an explanation why it is incompatible.
+//   embedded_router_incompatible,
 // ]
 const st = new ShardingTest({shards: 2, useBridge: true});
 

@@ -1,7 +1,8 @@
 // cursor1.js
 // checks that cursors survive a chunk's move
 // @tags: [
-//   temp_disabled_embedded_router_uncategorized,
+//   # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+//   embedded_router_incompatible,
 // ]
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 

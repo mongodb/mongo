@@ -1,7 +1,8 @@
 /**
  * @tags: [
  *   multiversion_incompatible,
- *   temp_disabled_embedded_router_health_monitor,
+ *   # TODO (SERVER-88126): Re-enable this test or add an explanation why it is incompatible.
+ *   embedded_router_incompatible,
  * ]
  */
 

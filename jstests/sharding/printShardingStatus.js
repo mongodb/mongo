@@ -2,8 +2,9 @@
 // contains important information that it should, like the major section
 // headings and the names of sharded collections and their shard keys.
 // @tags: [
+//   # TODO (SERVER-88123): Re-enable this test.
 //   # Test doesn't start enough mongods to have num_mongos routers
-//   temp_disabled_embedded_router_num_routers,
+//   embedded_router_incompatible,
 // ]
 
 const MONGOS_COUNT = 2;

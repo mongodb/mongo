@@ -2,7 +2,8 @@
  * Test that a mongos-only aggregation pipeline is explainable, and that the resulting explain plan
  * confirms that the pipeline ran entirely on mongoS.
  * @tags: [
- *   temp_disabled_embedded_router_uncategorized,
+ *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 const st = new ShardingTest({name: "mongos_comment_test", mongos: 1, shards: 1});

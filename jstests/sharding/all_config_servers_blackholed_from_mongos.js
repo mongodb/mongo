@@ -5,7 +5,8 @@
  * Checking UUID and index consistency involves talking to config servers through mongos, but mongos
  * is blackholed from the config servers in this test.
  * @tags: [
- *   temp_disabled_embedded_router_mongo_bridge,
+ *    # TODO (SERVER-88129): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 

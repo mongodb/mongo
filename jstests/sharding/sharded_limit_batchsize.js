@@ -2,7 +2,8 @@
 // of limit and batchSize with sort return the correct results, and do not issue
 // unnecessary getmores (see SERVER-14299).
 // @tags: [
-//   temp_disabled_embedded_router_metrics,
+//   # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+//   embedded_router_incompatible,
 // ]
 /**
  * Test the correctness of queries with sort and batchSize on a sharded cluster,

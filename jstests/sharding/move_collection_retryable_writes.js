@@ -10,7 +10,8 @@
  *  featureFlagMoveCollection,
  *  # TODO (SERVER-87812) Remove multiversion_incompatible tag
  *  multiversion_incompatible,
- *  temp_disabled_embedded_router_uncategorized,
+ *   # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *   embedded_router_incompatible,
  * ]
  */
 

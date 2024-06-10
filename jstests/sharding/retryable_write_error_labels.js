@@ -2,7 +2,8 @@
  * Test RetryableWriteError label in retryable writes and in transactions.
  *
  * @tags: [
- *   temp_disabled_embedded_router_uncategorized,
+ *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  *   uses_transactions,
  * ]
  */

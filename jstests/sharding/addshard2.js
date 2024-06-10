@@ -2,8 +2,9 @@
  * Tests adding standalones and replica sets as shards under a variety of configurations (setName,
  * valid and invalid hosts, shardName matching or not matching a setName, etc).
  * @tags: [
+ *   # TODO (SERVER-88123): Re-enable this test.
  *   # Test doesn't start enough mongods to have num_mongos routers
- *   temp_disabled_embedded_router_num_routers,
+ *   embedded_router_incompatible,
  * ]
  */
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";

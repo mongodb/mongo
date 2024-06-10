@@ -1,7 +1,8 @@
 /**
  * Test that mongos getShardVersion returns the correct version and chunks.
  * @tags: [
- *   temp_disabled_embedded_router_uncategorized,
+ *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 // If the server has been compiled with the code coverage flag, then the splitChunk command can take

@@ -3,7 +3,8 @@
  * participant to the transaction fails to unyield its resources.
  * @tags: [
  *   requires_fcv_80,
- *   temp_disabled_embedded_router_metrics,
+ *    # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 

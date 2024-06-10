@@ -4,7 +4,8 @@
  *
  * @tags: [
  *    config_shard_incompatible,
- *    temp_disabled_embedded_router_mongo_bridge,
+ *    # TODO (SERVER-88129): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 

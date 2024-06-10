@@ -10,7 +10,8 @@
  *   requires_profiling,
  *   # Needed to run createUnsplittableCollection
  *   featureFlagAuthoritativeShardCollection,
- *   temp_disabled_embedded_router_uncategorized,
+ *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  *   requires_fcv_80,
  *   # TODO (SERVER-89166) Remove the multiversion_incompatible once the bug is fixed
  *   # Old binary version nodes are started up with different parameters than the new binary nodes,

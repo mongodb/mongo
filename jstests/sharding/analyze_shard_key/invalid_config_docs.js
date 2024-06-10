@@ -4,7 +4,8 @@
  *
  * @tags: [
  *    requires_fcv_70,
- *    temp_disabled_embedded_router_known_issues
+ *    # TODO (SERVER-88122): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible
  * ]
  */
 

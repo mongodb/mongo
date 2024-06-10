@@ -20,7 +20,8 @@
  *   # SERVER-56565 avoid CS stepdowns, since  an election may trigger a  refresh of stale metadata
  *   # that form part of the test setup.
  *   does_not_support_stepdowns,
- *   temp_disabled_embedded_router_uncategorized,
+ *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 import {

@@ -16,7 +16,8 @@
  * @tags: [
  *   requires_fcv_70,
  *   requires_persistence,
- *   temp_disabled_embedded_router_metrics,
+ *    # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

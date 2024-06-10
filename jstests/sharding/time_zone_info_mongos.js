@@ -3,7 +3,8 @@
 // Requires FCV 5.3 since $mergeCursors was added to explain output in 5.3.
 // @tags: [
 //   requires_fcv_53,
-//   temp_disabled_embedded_router_metrics,
+//   # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+//   embedded_router_incompatible,
 // ]
 const tzGoodInfoFat = "jstests/libs/config_files/good_timezone_info_fat";
 const tzGoodInfoSlim = "jstests/libs/config_files/good_timezone_info_slim";

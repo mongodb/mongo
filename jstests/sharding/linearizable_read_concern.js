@@ -20,7 +20,8 @@
  * reasonable when executing linearizable reads in a sharded cluster, so as to
  * exercise possible (invalid) user behavior.
  * @tags: [
- *   temp_disabled_embedded_router_mongo_bridge,
+ *    # TODO (SERVER-88129): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 

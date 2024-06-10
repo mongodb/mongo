@@ -2,7 +2,11 @@
  * Tests that concurrent retryable updateOne operation with _id without shard key and chunk
  * migration for the chunk being updated doesn't cause zero updates.
  *
- * @tags: [requires_fcv_80, temp_disabled_embedded_router_mongo_bridge]
+ * @tags: [
+ *   requires_fcv_80,
+ *   # TODO (SERVER-88129): Re-enable this test or add an explanation why it is incompatible.
+ *   embedded_router_incompatible,
+ * ]
  */
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 

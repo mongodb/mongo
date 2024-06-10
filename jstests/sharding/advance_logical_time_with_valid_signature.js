@@ -2,7 +2,8 @@
  * Tests that the mongo shell can use a cluster time with a valid signature to advance a server's
  * cluster time.
  * @tags: [
- *   temp_disabled_embedded_router_mongo_bridge,
+ *    # TODO (SERVER-88129): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 // Setup 2 mongos processes with mongobridge.

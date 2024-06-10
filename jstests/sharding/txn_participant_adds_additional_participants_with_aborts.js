@@ -2,7 +2,8 @@
  * Tests that additional participants are handled correctly when a transaction is aborted.
  * @tags: [
  *   requires_fcv_80,
- *   temp_disabled_embedded_router_metrics,
+ *    # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  *   uses_multi_shard_transaction,
  *   uses_transactions]
  */

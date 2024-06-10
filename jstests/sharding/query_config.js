@@ -1,6 +1,7 @@
 // Tests user queries over the config servers.
 // @tags: [
-//    temp_disabled_embedded_router_known_issues,
+//    # TODO (SERVER-88122): Re-enable this test or add an explanation why it is incompatible.
+//    embedded_router_incompatible,
 // ]
 
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";

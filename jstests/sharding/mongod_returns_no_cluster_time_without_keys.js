@@ -6,7 +6,8 @@
  * This test restarts shard replica sets, so it requires a persistent storage engine.
  * @tags: [
  *   requires_persistence,
- *   temp_disabled_embedded_router_uncategorized,
+ *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 // This test uses authentication and runs commands without authenticating, which is not

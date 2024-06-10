@@ -5,7 +5,8 @@
  * @tags: [
  *    requires_fcv_60,
  *    uses_transactions,
- *    temp_disabled_embedded_router_known_issues,
+ *    # TODO (SERVER-88122): Re-enable this test or add an explanation why it is incompatible.
+ *    embedded_router_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
