@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -373,6 +374,12 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
     if (auto sfp = fpBalancerShouldReturnRandomMigrations->scoped();
         MONGO_unlikely(sfp.isActive())) {
         if (availableShards->size() < 2) {
+            return result;
+        }
+
+        // Don't issue moveCollection if reshardingMinimumOperationDuration is greater than 5
+        // seconds to prevent tests from taking too long.
+        if (resharding::gReshardingMinimumOperationDurationMillis.load() > 5000) {
             return result;
         }
 
