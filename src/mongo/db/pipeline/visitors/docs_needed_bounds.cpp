@@ -26,34 +26,39 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#pragma once
-
-#include <variant>
-
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
 
 namespace mongo {
 namespace docs_needed_bounds {
-static constexpr auto kNeedAllName = "NeedAll"_sd;
-static constexpr auto kUnknownName = "Unknown"_sd;
+Bounds parseDocsNeededBoundsFromBSON(const BSONElement& elem) {
+    if (elem.isNumber() &&
+        (elem.type() == BSONType::NumberInt || elem.type() == BSONType::NumberLong)) {
+        uassert(ErrorCodes::BadValue, "DocsNeededBounds cannot be NaN.", !elem.isNaN());
+        auto val = elem.safeNumberLong();
+        uassert(ErrorCodes::BadValue, "DocsNeededBounds number value must be >= 0.", val >= 0);
+        return val;
+    } else if (elem.type() == BSONType::String) {
+        if (elem.str() == kNeedAllName) {
+            return NeedAll();
+        } else if (elem.str() == kUnknownName) {
+            return Unknown();
+        }
+    }
+    uasserted(ErrorCodes::BadValue,
+              str::stream() << "DocsNeededBounds has to be either of the strings \"" << kNeedAllName
+                            << "\" or \"" << kUnknownName << "\", or a non-decimal number; "
+                            << "found: " << typeName(elem.type()));
+}
 
-struct NeedAll {
-    // Nothing
-};
-
-struct Unknown {
-    // Nothing
-};
-
-using Bounds = std::variant<long long, NeedAll, Unknown>;
-
-Bounds parseDocsNeededBoundsFromBSON(const BSONElement& elem);
-void serializeDocsNeededBounds(const Bounds& bounds, StringData fieldName, BSONObjBuilder* builder);
+void serializeDocsNeededBounds(const Bounds& bounds,
+                               StringData fieldName,
+                               BSONObjBuilder* builder) {
+    visit(OverloadedVisitor{
+              [&](long long val) { builder->append(fieldName, val); },
+              [&](NeedAll) { builder->append(fieldName, kNeedAllName); },
+              [&](Unknown) { builder->append(fieldName, kUnknownName); },
+          },
+          bounds);
+}
 }  // namespace docs_needed_bounds
-
-using DocsNeededBounds = docs_needed_bounds::Bounds;
 }  // namespace mongo

@@ -96,7 +96,7 @@ env.Library(
         "document_source_visitor_docs_needed_bounds.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/pipeline/docs_needed_bounds",
+        "$BUILD_DIR/mongo/db/pipeline/docs_needed_bounds_visitor",
         "router_exec_stage",
     ],
 )

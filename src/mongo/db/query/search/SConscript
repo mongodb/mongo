@@ -15,6 +15,7 @@ env.Library(
         "mongot_cursor_getmore_strategy.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/docs_needed_bounds",
         "$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers",
         "$BUILD_DIR/mongo/db/query/plan_yield_policy",
         "$BUILD_DIR/mongo/executor/task_executor_cursor",

@@ -282,9 +282,19 @@ env.Library(
 
 env.Library(
     target="docs_needed_bounds",
+    source=[
+        "visitors/docs_needed_bounds.cpp",
+        "visitors/docs_needed_bounds.idl",
+    ],
+    LIBDEPS=["$BUILD_DIR/mongo/base", "$BUILD_DIR/mongo/idl/idl_parser"],
+)
+
+env.Library(
+    target="docs_needed_bounds_visitor",
     source=["visitors/document_source_visitor_docs_needed_bounds.cpp"],
     LIBDEPS_PRIVATE=[
         "change_stream_pipeline",
+        "docs_needed_bounds",
         "document_source_internal_apply_oplog_update",
         "pipeline",
         "pipeline_visitor",
@@ -588,6 +598,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
         "$BUILD_DIR/mongo/idl/idl_parser",
         "$BUILD_DIR/mongo/s/common_s",
+        "docs_needed_bounds",
         "runtime_constants_idl",
         "value_idl",
     ],
@@ -779,6 +790,7 @@ env.CppUnitTest(
         "sharded_union_test.cpp",
         "skip_and_limit_test.cpp",
         "tee_buffer_test.cpp",
+        "visitors/docs_needed_bounds_test.cpp",
         "visitors/document_source_visitor_docs_needed_bounds_test.cpp",
         "visitors/document_source_walker_test.cpp",
         "window_function/partition_iterator_test.cpp",
@@ -837,7 +849,7 @@ env.CppUnitTest(
         "change_stream_pipeline",
         "change_stream_preimage",
         "change_stream_test_helpers",
-        "docs_needed_bounds",
+        "docs_needed_bounds_visitor",
         "document_source_internal_apply_oplog_update",
         "document_source_mock",
         "document_sources_idl",

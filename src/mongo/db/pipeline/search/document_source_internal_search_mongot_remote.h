@@ -177,8 +177,8 @@ public:
     }
 
     void setDocsNeededBounds(DocsNeededBounds minBounds, DocsNeededBounds maxBounds) {
-        _minDocsNeededBounds = minBounds;
-        _maxDocsNeededBounds = maxBounds;
+        _spec.setMinDocsNeededBounds(minBounds);
+        _spec.setMaxDocsNeededBounds(maxBounds);
     }
 
 protected:
@@ -254,9 +254,6 @@ private:
      * Sort key generator used to populate $sortKey. Has a value iff '_sortSpec' has a value.
      */
     boost::optional<SortKeyGenerator> _sortKeyGen;
-
-    boost::optional<DocsNeededBounds> _minDocsNeededBounds;
-    boost::optional<DocsNeededBounds> _maxDocsNeededBounds;
 };
 
 namespace search_meta {
