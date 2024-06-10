@@ -186,7 +186,9 @@ void FallbackOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
-void FallbackOpObserver::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
+void FallbackOpObserver::onDropDatabase(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        bool markFromMigrate) {
     if (dbName == NamespaceString::kSessionTransactionsTableNamespace.dbName()) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         mongoDSessionCatalog->invalidateAllSessions(opCtx);

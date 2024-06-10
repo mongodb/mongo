@@ -116,6 +116,10 @@ public:
     // Identifier for the "initialization metadata" documents of config.placementHistory
     static const NamespaceString kConfigPlacementHistoryInitializationMarker;
 
+    // Identifier of the config.shardRemovalLog document about the latest removeShard operation
+    // committed on the cluster.
+    static constexpr auto kLatestShardRemovalLogId = "latestShardRemovalLog"_sd;
+
     virtual ~ShardingCatalogClient() = default;
 
     virtual std::vector<BSONObj> runCatalogAggregation(
@@ -484,6 +488,12 @@ public:
         OperationContext* opCtx,
         const Timestamp& atClusterTime,
         const boost::optional<NamespaceString>& nss) = 0;
+
+    /**
+     * Provided a cluster time, returns whether there was a topology change caused by a removeShard
+     * committed on the commit server within the [clusterTime, +inf) time window.
+     */
+    virtual bool anyShardRemovedSince(OperationContext* opCtx, const Timestamp& clusterTime) = 0;
 
 protected:
     ShardingCatalogClient() = default;
