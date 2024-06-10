@@ -728,6 +728,13 @@ tasks:
           test_control: "linkbench2"
           additional_tfvars: "tags: {expire-on-delta: 12}"
 
+  - name: linkbench2.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "linkbench2.2024-05"
+
   - name: locust_bulk_insert
     priority: 5
     commands:
