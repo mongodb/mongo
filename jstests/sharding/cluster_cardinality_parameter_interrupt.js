@@ -92,43 +92,37 @@ jsTest.log("Ensure that data cannot be moved yet even though the second shard is
 assert.commandFailedWithCode(
     st.s.adminCommand({moveCollection: dbName + "." + unshardedCollName, toShard: shard1Rst.name}),
     ErrorCodes.IllegalOperation);
-
-// TODO (SERVER-90269) Enable these tests in multiversion once this has been backported to 8.0.
-const isMultiversion =
-    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
-if (!isMultiversion) {
-    assert.commandFailedWithCode(
-        st.s.adminCommand(
-            {moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}),
-        ErrorCodes.IllegalOperation);
-    assert.commandFailedWithCode(st.s.adminCommand({movePrimary: dbName, to: shard1Rst.name}),
-                                 ErrorCodes.IllegalOperation);
-    // The collection should be able to be resharded locally
-    assert.commandWorked(st.s.adminCommand({
-        reshardCollection: dbName + '.' + shardedCollName2,
-        key: {_id: 1},
-        forceRedistribution: true,
-        shardDistribution: [{shard: st.shard0.shardName, min: {_id: MinKey}, max: {_id: MaxKey}}]
-    }));
-    // Resharding to another shard should be disallowed
-    assert.commandFailedWithCode(st.s.adminCommand({
-        reshardCollection: dbName + '.' + shardedCollName2,
-        key: {_id: 1},
-        forceRedistribution: true,
-        shardDistribution: [{shard: shard1Rst.name, min: {_id: MinKey}, max: {_id: MaxKey}}]
-    }),
-                                 ErrorCodes.IllegalOperation);
-    // The collection should be able to be unsharded locally
-    assert.commandWorked(st.s.adminCommand(
-        {unshardCollection: dbName + '.' + shardedCollName3, toShard: st.shard0.shardName}));
-    assert.commandWorked(
-        st.s.adminCommand({shardCollection: dbName + '.' + shardedCollName3, key: {_id: 1}}));
-    // Unsharded to another shard should be disallowed
-    assert.commandFailedWithCode(
-        st.s.adminCommand(
-            {unshardCollection: dbName + '.' + shardedCollName3, toShard: shard1Rst.name}),
-        ErrorCodes.IllegalOperation);
-}
+assert.commandFailedWithCode(
+    st.s.adminCommand(
+        {moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}),
+    ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(st.s.adminCommand({movePrimary: dbName, to: shard1Rst.name}),
+                             ErrorCodes.IllegalOperation);
+// The collection should be able to be resharded locally
+assert.commandWorked(st.s.adminCommand({
+    reshardCollection: dbName + '.' + shardedCollName2,
+    key: {_id: 1},
+    forceRedistribution: true,
+    shardDistribution: [{shard: st.shard0.shardName, min: {_id: MinKey}, max: {_id: MaxKey}}]
+}));
+// Resharding to another shard should be disallowed
+assert.commandFailedWithCode(st.s.adminCommand({
+    reshardCollection: dbName + '.' + shardedCollName2,
+    key: {_id: 1},
+    forceRedistribution: true,
+    shardDistribution: [{shard: shard1Rst.name, min: {_id: MinKey}, max: {_id: MaxKey}}]
+}),
+                             ErrorCodes.IllegalOperation);
+// The collection should be able to be unsharded locally
+assert.commandWorked(st.s.adminCommand(
+    {unshardCollection: dbName + '.' + shardedCollName3, toShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: dbName + '.' + shardedCollName3, key: {_id: 1}}));
+// Unsharded to another shard should be disallowed
+assert.commandFailedWithCode(
+    st.s.adminCommand(
+        {unshardCollection: dbName + '.' + shardedCollName3, toShard: shard1Rst.name}),
+    ErrorCodes.IllegalOperation);
 
 jsTest.log("Retry the addShard command");
 assert.commandWorked(st.s.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
@@ -142,22 +136,21 @@ checkClusterParameter(shard1Rst, true);
 jsTest.log("Check that data movement is now allowed");
 assert.commandWorked(
     st.s.adminCommand({moveCollection: dbName + '.' + unshardedCollName, toShard: shard1Rst.name}));
-// TODO (BACKPORT-20468) Enable these tests in multiversion once this has been backported to 8.0.
-if (!isMultiversion) {
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}));
-    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: shard1Rst.name}));
-    assert.commandWorked(st.s.adminCommand({
-        reshardCollection: dbName + '.' + shardedCollName2,
-        key: {_id: 1},
-        forceRedistribution: true,
-        shardDistribution: [{shard: shard1Rst.name, min: {_id: MinKey}, max: {_id: MaxKey}}]
-    }));
-    assert.commandWorked(st.s.adminCommand(
-        {unshardCollection: dbName + '.' + shardedCollName3, toShard: shard1Rst.name}));
-}
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}));
+assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: shard1Rst.name}));
+assert.commandWorked(st.s.adminCommand({
+    reshardCollection: dbName + '.' + shardedCollName2,
+    key: {_id: 1},
+    forceRedistribution: true,
+    shardDistribution: [{shard: shard1Rst.name, min: {_id: MinKey}, max: {_id: MaxKey}}]
+}));
+assert.commandWorked(st.s.adminCommand(
+    {unshardCollection: dbName + '.' + shardedCollName3, toShard: shard1Rst.name}));
 
 // TODO (SERVER-91070) Enable these tests in multiversion once v9.0 become last-lts.
+const isMultiversion =
+    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
 if (!isMultiversion) {
     // Move the remaining data out of shard0 so it can be removed.
     assert.commandWorked(st.s.adminCommand({
