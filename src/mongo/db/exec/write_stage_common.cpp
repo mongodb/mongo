@@ -71,7 +71,7 @@ PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
           // Only the primary node of a shard that is a replica set should run this filter.
           const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
           return !replCoord->getSettings().isReplSet() ||
-              !replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
+              !replCoord->canAcceptWritesFor(opCtx, nss);
       }()) {}
 
 PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {

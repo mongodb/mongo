@@ -3142,13 +3142,16 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
     invariant(!_readWriteAbility->canAcceptNonLocalWrites(lk));
 
-    auto updateMemberState = [&] {
+    bool interruptedBeforeReacquireRSTL = false;
+
+    auto updateMemberState = [this, &lk](OperationContext* opCtx) {
         invariant(lk.owns_lock());
         invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
 
         // Make sure that we leave _canAcceptNonLocalWrites in the proper state.
         _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
         auto action = _updateMemberStateFromTopologyCoordinator(lk);
+
         lk.unlock();
 
         if (MONGO_unlikely(stepdownHangBeforePerformingPostMemberStateUpdateActions.shouldFail())) {
@@ -3171,8 +3174,40 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         _performPostMemberStateUpdateAction(action);
     };
     ScopeGuard onExitGuard([&] {
-        abortFn();
-        updateMemberState();
+        if (interruptedBeforeReacquireRSTL) {
+            // We should only enter this branch when we get interrupted during reacquiring RSTL, so
+            // we should not holding the RSTL and _mutex. We need to create a new client and opCtx
+            // for the cleanup since the cleanup is a must do.
+            invariant(!lk.owns_lock());
+            invariant(!shard_role_details::getLocker(opCtx)->isRSTLExclusive());
+            while (true) {
+                try {
+                    auto newClient = opCtx->getServiceContext()
+                                         ->getService(ClusterRole::ShardServer)
+                                         ->makeClient("StepdownCleaner");
+                    AlternativeClientRegion acr(newClient);
+                    auto newOpCtx = cc().makeOperationContext();
+                    // We wait RSTL at no timeout because we have to get it to update WriteAbility
+                    // and MemberState anyway. If it gets interrupted again, keep retrying.
+                    AutoGetRstlForStepUpStepDown arsdForCleanup(
+                        this,
+                        newOpCtx.get(),
+                        ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown,
+                        Date_t::max());
+                    lk.lock();
+                    abortFn();
+                    updateMemberState(newOpCtx.get());
+                    break;
+                } catch (const DBException& ex) {
+                    LOGV2(9080201,
+                          "Reacquiring RSTL on cleanup gets interrupted",
+                          "error"_attr = ex.toStatus());
+                }
+            }
+        } else {
+            abortFn();
+            updateMemberState(opCtx);
+        }
     });
 
     auto waitTimeout = std::min(waitTime, stepdownTime);
@@ -3187,37 +3222,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // yieldLocksForPreparedTransactions().
     while (!_topCoord->tryToStartStepDown(
         termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
-
         // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
         // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
         arsd.rstlRelease();
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-
-        // Make sure we re-acquire the RSTL before returning so that we're always holding the
-        // RSTL when the onExitGuard set up earlier runs.
-        ON_BLOCK_EXIT([&] {
-            // Need to release _mutex before re-acquiring the RSTL to preserve lock acquisition
-            // order rules.
-            lk.unlock();
-
-            // Need to re-acquire the RSTL before re-attempting stepdown. We use no timeout here
-            // even though that means the lock acquisition could take longer than the stepdown
-            // window. Since we'll need the RSTL no matter what to clean up a failed stepdown
-            // attempt, we might as well spend whatever time we need to acquire it now.  For
-            // the same reason, we also disable lock acquisition interruption, to guarantee that
-            // we get the lock eventually.
-            UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
-
-            // Since we have released the RSTL lock at this point, there can be some read
-            // operations sneaked in here, that might hold global lock in S mode or blocked on
-            // prepare conflict. We need to kill those operations to avoid 3-way deadlock
-            // between read, prepared transaction and step down thread. And, any write
-            // operations that gets sneaked in here will fail as we have updated
-            // _canAcceptNonLocalWrites to false after our first successful RSTL lock
-            // acquisition. So, we won't get into problems like SERVER-27534.
-            arsd.rstlReacquire();
-            lk.lock();
-        });
 
         auto lastAppliedOpTime = _getMyLastAppliedOpTime(lk);
         auto currentTerm = _topCoord->getTerm();
@@ -3232,23 +3240,42 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             _replicationWaiterList.add(lk, lastAppliedOpTime, waiterWriteConcern);
         lk.unlock();
 
-        auto status = futureGetNoThrowWithDeadline(
-            opCtx, future, std::min(stepDownUntil, waitUntil), ErrorCodes::ExceededTimeLimit);
+        // Operations that can be interrupted through opCtx should be executed inside this try/catch
+        // block in case that the operation get interrupted, the stepdown thread doesn't hold RSTL
+        // and _mutex so we can safely reacquire those locks in the onExitGuard to do the cleanup.
+        try {
+            auto status = futureGetNoThrowWithDeadline(
+                opCtx, future, std::min(stepDownUntil, waitUntil), ErrorCodes::ExceededTimeLimit);
 
-        // Mark the waiter given up if this waiter times out before the future is ready. This is so
-        // that unsatisfied but abandoned waiters can be cleaned up lazily in the next
-        // _wakeReadyWaiters pass.
-        if (!status.isOK() && !future.isReady()) {
-            invariant(!waiter->givenUp.swap(true));
-        }
+            // Mark the waiter given up if this waiter times out before the future is ready. This is
+            // so that unsatisfied but abandoned waiters can be cleaned up lazily in the next
+            // _wakeReadyWaiters pass.
+            if (!status.isOK() && !future.isReady()) {
+                invariant(!waiter->givenUp.swap(true));
+            }
+            // We ignore the case where runWithDeadline returns timeoutError because in that case
+            // coming back around the loop and calling tryToStartStepDown again will cause
+            // tryToStartStepDown to return ExceededTimeLimit with the proper error message.
+            if (!status.isOK() && status.code() != ErrorCodes::ExceededTimeLimit) {
+                opCtx->checkForInterrupt();
+            }
 
-        lk.lock();
-
-        // We ignore the case where runWithDeadline returns timeoutError because in that case
-        // coming back around the loop and calling tryToStartStepDown again will cause
-        // tryToStartStepDown to return ExceededTimeLimit with the proper error message.
-        if (!status.isOK() && status.code() != ErrorCodes::ExceededTimeLimit) {
-            opCtx->checkForInterrupt();
+            // Since we have released the RSTL lock at this point, there can be some read
+            // operations sneaked in here, that might hold global lock in S mode or blocked on
+            // prepare conflict. We need to kill those operations to avoid 3-way deadlock
+            // between read, prepared transaction and step down thread. And, any write
+            // operations that gets sneaked in here will fail as we have updated
+            // _canAcceptNonLocalWrites to false after our first successful RSTL lock
+            // acquisition. So, we won't get into problems like SERVER-27534.
+            arsd.rstlReacquire();
+            lk.lock();
+        } catch (const DBException& ex) {
+            // We can get interrupted when reacquiring the RSTL. If that happens, the
+            // onExitGuard will create a new client and opCtx to perform the WriteAbility and
+            // MemberState cleanup after failed stepdown.
+            LOGV2(9080200, "Reacquiring RSTL gets interrupted", "error"_attr = ex.toStatus());
+            interruptedBeforeReacquireRSTL = true;
+            throw;
         }
     }
 
@@ -3268,7 +3295,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     _topCoord->finishUnconditionalStepDown();
 
     onExitGuard.dismiss();
-    updateMemberState();
+    updateMemberState(opCtx);
 
     // Schedule work to (potentially) step back up once the stepdown period has ended.
     _scheduleWorkAt(stepDownUntil, [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {

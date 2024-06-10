@@ -593,6 +593,8 @@ public:
      */
     bool isOutTmpBucketsCollection() const;
 
+    bool isLastVoteCollection() const;
+
     /**
      * Returns the time-series buckets namespace for this view.
      */

@@ -361,24 +361,18 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
 
         // Use the OplogBuffer to populate a local OplogBatch. Note that the buffer may be empty.
         OplogApplierBatch ops;
+        // The only case we can get an interruption in this try/catch block is during shutdown since
+        // this thread is unkillable by stepdown. Since this OplogApplierBatcher has its own way to
+        // handle shutdown, we can just swallow the exception.
         try {
             auto opCtx = cc().makeOperationContext();
             ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
                 opCtx.get(), AdmissionContext::Priority::kExempt);
 
             // During storage change operations, we may shut down storage under a global lock
-            // and wait for any storage-using opCtxs to exit.  This results in a deadlock with
-            // uninterruptible global locks, so we will take the global lock here to block the
-            // storage change.  The rest of the batch acquisition remains uninterruptible.
+            // and wait for any storage-using opCtxs to exit, so we will take the global lock here
+            // to block the storage change.
             Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-
-            // This use of UninterruptibleLockGuard is intentional. It is undesirable to use an
-            // UninterruptibleLockGuard in client operations because stepdown requires the
-            // ability to interrupt client operations. However, it is acceptable to use an
-            // UninterruptibleLockGuard in batch application because the only cause of
-            // interruption would be shutdown, and the ReplBatcher thread has its own shutdown
-            // handling.
-            UninterruptibleLockGuard noInterrupt(opCtx.get());  // NOLINT.
 
             // Locks the oplog to check its max size, do this in the UninterruptibleLockGuard.
             batchLimits.bytes = getBatchLimitOplogBytes(opCtx.get(), storageInterface);
@@ -392,7 +386,7 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
                                  : oplogBatchDelayMillis);
             ops = fassertNoTrace(31004,
                                  getNextApplierBatch(opCtx.get(), batchLimits, waitToFillBatch));
-        } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {
+        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
             LOGV2_DEBUG(6133400,
                         1,
                         "Cancelled getting the global lock in Repl Batcher",

@@ -41,7 +41,9 @@ inline bool canCollectionSkipRSTLLockAcquisition(const NamespaceString& nss) {
     //
     // system.profile is an unreplicated local collection that doesn't need to acquire
     // the RSTL lock.
-    return nss.isSystemDotProfile();
+    // replset.election is an unreplicated local collection so we don't need to acquire the RSTL and
+    // avoid the writes getting interrupted by stepdown.
+    return nss.isSystemDotProfile() || nss.isLastVoteCollection();
 }
 }  // namespace repl
 }  // namespace mongo
