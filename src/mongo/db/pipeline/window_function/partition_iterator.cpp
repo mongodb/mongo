@@ -244,8 +244,6 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
 
     tassert(5429404, "Missing _sortExpr with range-based bounds", _sortExpr != boost::none);
 
-    auto lessThan = _expCtx->getValueComparator().getLessThan();
-
     Value base = (*_sortExpr)->evaluate(*(*this)[0], &_expCtx->variables);
     if (range.unit) {
         uassert(
@@ -279,6 +277,20 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
         } else {
             return v.numeric();
         }
+    };
+    auto lessThan = [&](const Value& docValue, const Value& thresholdValue) {
+        auto lessThanFunc = _expCtx->getValueComparator().getLessThan();
+
+        if (docValue.numeric() && thresholdValue.numeric()) {
+            // The threshold was computed using the decimalAdd method above. This method
+            // converts all arguments to Decimal128 before doing the addition. Converting a
+            // double to Decimal128 might result in loss in precisions. To make sure that the
+            // comparison of the document value is done under the same circumstances this method
+            // converts both arguments to Decimal128 before comparing them.
+            return lessThanFunc(Value{docValue.coerceToDecimal()},
+                                Value{thresholdValue.coerceToDecimal()});
+        }
+        return lessThanFunc(docValue, thresholdValue);
     };
 
     // 'lower' is the smallest offset in the partition that's within the lower bound of the window.

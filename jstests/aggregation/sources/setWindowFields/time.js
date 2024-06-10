@@ -193,3 +193,41 @@ error = assert.throws(() => {
     run([range('unbounded', 'unbounded')]);
 });
 assert.commandFailedWithCode(error, 5429513);
+
+// Test with small bound over large data values
+coll.drop();
+assert.commandWorked(coll.insert([
+    {_id: 0, time: new Date("2023-07-01T20:53:50.932Z"), "str": "ric"},
+    {_id: 1, time: new Date("2023-07-02T20:57:42.383Z"), "str": "alc"},
+    {_id: 2, time: new Date("2023-07-04T01:39:14.265Z"), "str": ""},
+    {_id: 3, time: new Date("2023-07-04T04:01:29.983Z"), "str": "ric"},
+    {_id: 4, time: new Date("2023-07-05T15:08:22.541Z"), "str": ""},
+    {_id: 5, time: new Date("2023-07-05T22:56:30.949Z"), "str": ""},
+]));
+
+const res = coll.aggregate([
+                    {
+                        $setWindowFields: {
+                            partitionBy: "$str",
+                            sortBy: {"any": -1},
+                            output: {"num": {$sum: {$pow: [9, 20]}}}
+                        }
+                    },
+                    {
+                        $setWindowFields: {
+                            sortBy: {"num": 1},
+                            output: {"res": {$max: "$num", window: {range: [-4, "current"]}}}
+                        }
+                    },
+                    {$project: {res: 1, _id: 0}},
+                ])
+                .toArray();
+
+assert.sameMembers(res, [
+    {"res": 12157665459056929000},
+    {"res": 24315330918113858000},
+    {"res": 24315330918113858000},
+    {"res": 36472996377170790000},
+    {"res": 36472996377170790000},
+    {"res": 36472996377170790000}
+]);
