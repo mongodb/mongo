@@ -308,6 +308,382 @@ tasks:
         vars:
           test_control: "ycsb_non_retryable_writes_rolling_restarts.2023-09"
 
+  # See DSI configurations/test_control/defaults.*.yml for an explanation of the available parameters.
+  # Definitions of terms:
+  #   OutOfCache: the data set is larger than the WiredTiger Cache. For these tests the record count
+  #     should result in a ~30GB database, which should be twice the configured WiredTiger Cache.
+  #   InCache: the data set is smaller than the WiredTiger Cache. For these tests the record count
+  #     should result in a ~6GB database, which is much smaller than the configured RAM.
+  #   OpenLoop: A test framework where new jobs arrive independently of job completions.
+  #   ClosedLoop: A test framework where new job arrivals are only triggered by job completions
+  #     (followed by think time).
+  #
+  # See https://www.usenix.org/legacy/event/nsdi06/tech/full_papers/schroeder/schroeder.pdf
+  #
+  # OutOfCache ClosedLoop
+
+  # These 30GB tests have the following features:
+  #    * the database does not fit in the WiredTiger Cache. It is 2x the available Wired Tiger Cache.
+  #    * the database files do not fit in the Linux FS Cache. They are 2x the available Linux FS Cache.
+  - name: ycsb_30GB.95read5update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.95read5update.2024-05"
+
+  - name: ycsb_30GB.100read.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100read.2024-05"
+          test_control_params: |
+            {ycsb:{
+               time: {maxWarmup: 360 }
+            }}
+
+  - name: ycsb_30GB.50read50update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.50read50update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               time: {maxWarmup: 360 }
+            }}
+
+  - name: ycsb_30GB.100update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               time: {maxWarmup: 1200 }
+            }}
+
+  # These 120GB tests have the following features:
+  #    * the database does not fit in the WiredTiger Cache. It is 8x the available Wired Tiger Cache.
+  #    * the database files do not fit in the Linux FS Cache. It is 8x the available Linux FS Cache.
+  - name: ycsb_120GB.95read5update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.95read5update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               count: {records: 112640000},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  - name: ycsb_120GB.100read.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100read.2024-05"
+          test_control_params: |
+            {ycsb:{
+               count: {records: 112640000},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  - name: ycsb_120GB.50read50update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.50read50update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               count: {records: 112640000},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  - name: ycsb_120GB.100update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               count: {records: 112640000},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  # These 30GB compressible tests have the following features:
+  #    * the database does not fit in the WiredTiger Cache. It is 2x the available Wired Tiger Cache.
+  #    * the database files fit in the Linux FS Cache. They are a quarter the size of the database (4x Compressible).
+  # As a result of compression, it should warm up faster.
+  - name: ycsb_30GB.95read5update.compressible.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.95read5update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 '},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  - name: ycsb_30GB.100read.compressible.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100read.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 '},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  - name: ycsb_30GB.50read50update.compressible.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.50read50update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 '},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  - name: ycsb_30GB.100update.compressible.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 '},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  # These 120GB compressible tests have the following features:
+  #    * the database does not fit in the WiredTiger Cache. It is 8x the available Wired Tiger Cache.
+  #    * the database files do not fit in the Linux FS Cache. They are twice the size of the FS Cache.
+  # As a result of compression, it should warm up faster.
+  - name: ycsb_120GB.95read5update.compressible.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.95read5update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 '},
+               count: {records: 112640000},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  - name: ycsb_120GB.100read.compressible.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100read.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 '},
+               count: {records: 112640000},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  - name: ycsb_120GB.50read50update.compressible.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.50read50update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 '},
+               count: {records: 112640000},
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  - name: ycsb_120GB.100update.compressible.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 '},
+               count: {records: 112640000},
+
+               time: {maxWarmup: 300, maxPhase: 300 }
+            }}
+
+  # OutOfCache Rate Limited (OpenLoop)
+  # These 30GB tests have the following features:
+  #    * the database does not fit in the WiredTiger Cache. It is 2x the available Wired Tiger Cache.
+  #    * the database files do not fit in the Linux FS Cache. It is 2x the available Linux FS Cache.
+  # These tests are also rate limited.
+  - name: ycsb_30GB.95read5update.rate_limited.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.95read5update.2024-05"
+          test_control_params: |
+            {ycsb:{
+              property: {extras: '-p target=10000 -p measurement.interval=both'}
+            }}
+
+  - name: ycsb_30GB.100read.rate_limited.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100read.2024-05"
+          test_control_params: |
+            {ycsb:{
+              property: {extras: '-p target=14000 -p measurement.interval=both'},
+              time: {maxWarmup: 360 }
+            }}
+
+  - name: ycsb_30GB.50read50update.rate_limited.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.50read50update.2024-05"
+          test_control_params: |
+            {ycsb:{
+              property: {extras: '-p target=7000 -p measurement.interval=both'}
+            }}
+
+  - name: ycsb_30GB.100update.rate_limited.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100update.2024-05"
+          test_control_params: |
+            {ycsb:{
+              property: {extras: '-p target=3000 -p measurement.interval=both'}
+            }}
+
+  # InCache ClosedLoop
+  # The following tests have the following features:
+  #    * the database fits in the WiredTiger Cache.
+  #    * the database files fit in the Linux FS Cache.
+  - name: ycsb.95read5update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.95read5update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               count: {records: 5120000},
+               time: {maxWarmup: 480, maxPhase: 300}
+            }}
+
+  - name: ycsb.100read.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100read.2024-05"
+          test_control_params: |
+            {ycsb:{
+               count: {records: 5120000},
+               time: {maxWarmup: 480, maxPhase: 300}
+            }}
+
+  - name: ycsb.50read50update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.50read50update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               count: {records: 5120000},
+               time: {maxWarmup: 480, maxPhase: 300}
+            }}
+
+  - name: ycsb.100update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               count: {records: 5120000},
+               time: {maxWarmup: 480, maxPhase: 300}
+            }}
+
+  # InCache Rate Limited (OpenLoop)
+  # The following tests have the following features:
+  #    * the database fits in the WiredTiger Cache.
+  #    * the database files fit in the Linux FS Cache.
+  # These tests are also rate limited.
+  - name: ycsb.95read5update.rate_limited.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.95read5update.2024-05"
+          test_control_params: |
+            {ycsb:{
+              property: {extras: '-p target=35000 -p measurement.interval=both'},
+              count: {records: 5120000},
+              time: {maxWarmup: 480, maxPhase: 300}
+            }}
+
+  - name: ycsb.100read.rate_limited.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100read.2024-05"
+          test_control_params: |
+            {ycsb:{
+              property: {extras: '-p target=12000 -p measurement.interval=both'},
+              count: {records: 5120000},
+              time: {maxWarmup: 480, maxPhase: 300}
+            }}
+
+  - name: ycsb.50read50update.rate_limited.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.50read50update.2024-05"
+          test_control_params: |
+            {ycsb:{
+              property: {extras: '-p target=6500 -p measurement.interval=both'},
+              count: {records: 5120000},
+              time: {maxWarmup: 480, maxPhase: 300}
+            }}
+
+  - name: ycsb.100update.rate_limited.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100update.2024-05"
+          test_control_params: |
+            {ycsb:{
+              property: {extras: '-p target=4000 -p measurement.interval=both'},
+              count: {records: 5120000},
+              time: {maxWarmup: 480, maxPhase: 300}
+            }}
+
   - name: linkbench
     priority: 5
     commands:
