@@ -58,7 +58,7 @@ assert.commandWorked(st.s.adminCommand({
 
 jsTest.log("Induce a failover on the read shard.");
 assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 60, force: true}));
-
+st.rs0.getPrimary();  // Make sure a new Primary is elected before committing the transaction.
 jsTest.log("Make second attempt to commit, should still return that the transaction committed");
 assert.commandWorked(session.commitTransaction_forTesting());
 
