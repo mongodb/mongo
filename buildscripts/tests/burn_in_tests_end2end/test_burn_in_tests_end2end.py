@@ -35,9 +35,13 @@ class TestBurnInTestsEnd2End(unittest.TestCase):
             text=True,
             capture_output=True,
         )
-        output = process.stdout
-        self.assertEqual(0, process.returncode)
+        self.assertEqual(
+            0,
+            process.returncode,
+            process.stderr,
+        )
 
+        output = process.stdout
         try:
             yaml.safe_load(output)
         except Exception:

@@ -66,7 +66,11 @@ def parse_evergreen_file(path, evergreen_binary="evergreen"):
         cmd = [evergreen_binary, "evaluate", path]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode:
-            raise RuntimeError("Unable to evaluate {}: {}".format(path, result.stdout))
+            raise RuntimeError(
+                "Unable to evaluate {}.\nSTDOUT:{}\nSTDERR:{}".format(
+                    path, result.stdout, result.stderr
+                )
+            )
         config = yaml.safe_load(result.stdout)
     else:
         with open(path, "r") as fstream:
