@@ -68,12 +68,21 @@ mongo_cc_library(
         "//conditions:default": [],
     }) + select({
         "@platforms//os:windows": [
+            "/W3",
             "/wd4141",
             "/wd4305",
             "/wd4003",
+            "/wd4005",
         ],
-        "//conditions:default": ["-Wno-unused-result"],
+        "//conditions:default": [
+            "-Wno-unused-result",
+            "-Wno-deprecated-volatile",
+            "-Wno-sign-compare",
+        ],
     }),
+    features = [
+        "no_volatile",
+    ],
     includes = select({
         "@//bazel/config:linux_aarch64": [
             "platform/linux_aarch64/include",

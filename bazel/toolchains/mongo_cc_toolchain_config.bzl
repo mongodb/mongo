@@ -534,14 +534,56 @@ def _impl(ctx):
         enabled = False,
         flag_sets = [
             flag_set(
-                # This needs to only be set in the cpp compile actions to avoid generating debug info when
-                # building assembly files since the assembler doesn't support gdwarf64.
                 actions = all_cpp_compile_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf64"])],
             ),
             flag_set(
                 actions = all_link_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf64"])],
+            ),
+        ],
+    )
+
+    no_warn_non_virtual_detour_feature = feature(
+        name = "no_warn_non_virtual_detour",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-Wno-non-virtual-dtor"])],
+            ),
+        ],
+    )
+
+    no_deprecated_enum_enum_conversion_feature = feature(
+        name = "no_deprecated_enum_enum_conversion",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-Wno-deprecated-enum-enum-conversion"])],
+            ),
+        ],
+    )
+
+    no_volatile_feature = feature(
+        name = "no_volatile",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-Wno-volatile"])],
+            ),
+        ],
+    )
+
+    fsized_deallocation_feature = feature(
+        name = "fsized_deallocation",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-fsized-deallocation"])],
             ),
         ],
     )
@@ -575,6 +617,10 @@ def _impl(ctx):
         dwarf5_feature,
         dwarf32_feature,
         dwarf64_feature,
+        no_warn_non_virtual_detour_feature,
+        no_deprecated_enum_enum_conversion_feature,
+        no_volatile_feature,
+        fsized_deallocation_feature,
     ]
 
     return [

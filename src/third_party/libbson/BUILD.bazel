@@ -43,7 +43,9 @@ mongo_cc_library(
         "//bazel/config:linux_s390x": glob(["build_linux_s390x/**/*.h"]),
         "//conditions:default": [],
     }),
-    copts = ["-Isrc/third_party/libbson/dist/src/common"] + select({
+    copts = [
+        "-Isrc/third_party/libbson/dist/src/common",
+    ] + select({
         "@platforms//os:windows": [
             # msvc sign-compare warnings
             "/wd4388",
@@ -54,14 +56,19 @@ mongo_cc_library(
         "@platforms//os:macos": [
             "-Wno-sign-compare",
             "-Wno-unguarded-availability-new",
+            "-Wno-implicit-fallthrough",
         ],
         "@platforms//os:linux": [
             "-Wno-sign-compare",
+            "-Wno-implicit-fallthrough",
         ],
         "//conditions:default": [],
     }),
     defines = [
         "BSON_STATIC",
+    ],
+    features = [
+        "no_warn_non_virtual_detour",
     ],
     includes = [
         "dist/src/libbson/src",
