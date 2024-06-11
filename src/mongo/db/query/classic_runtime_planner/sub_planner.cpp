@@ -43,11 +43,14 @@ SubPlanner::SubPlanner(PlannerData plannerData) : ClassicPlannerInterface(std::m
             plan_cache_util::ConditionalClassicPlanCacheWriter{
                 plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
                 opCtx(),
-                collections().getMainCollectionPtrOrAcquisition()},
+                collections().getMainCollectionPtrOrAcquisition(),
+                false /* executeInSbe */},
 
         .onPickPlanWholeQuery =
             plan_cache_util::ClassicPlanCacheWriter{
-                opCtx(), collections().getMainCollectionPtrOrAcquisition()},
+                opCtx(),
+                collections().getMainCollectionPtrOrAcquisition(),
+                false /* executeInSbe */},
     };
 
     auto root = std::make_unique<SubplanStage>(cq()->getExpCtxRaw(),

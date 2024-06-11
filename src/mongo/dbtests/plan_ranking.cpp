@@ -153,13 +153,13 @@ public:
 
         ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 
-        _mps = std::make_unique<MultiPlanStage>(_expCtx.get(),
-                                                &collection.getCollection(),
-                                                cq,
-                                                plan_cache_util::ClassicPlanCacheWriter{
-                                                    opCtx(),
-                                                    &collection.getCollection(),
-                                                });
+        _mps = std::make_unique<MultiPlanStage>(
+            _expCtx.get(),
+            &collection.getCollection(),
+            cq,
+            plan_cache_util::ClassicPlanCacheWriter{
+                opCtx(), &collection.getCollection(), false /* executeInSbe */
+            });
         std::unique_ptr<WorkingSet> ws(new WorkingSet());
         // Put each solution from the planner into the 'MultiPlanStage'.
         for (size_t i = 0; i < solutions.size(); ++i) {

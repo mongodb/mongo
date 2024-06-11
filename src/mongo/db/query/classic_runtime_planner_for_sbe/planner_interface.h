@@ -209,6 +209,7 @@ private:
     // dealing with the possibility of a pushed-down agg pipeline. If '_shouldWriteToPlanCache' is
     // true, writes the resulting SBE plan to the SBE plan cache.
     void _buildSbePlanAndMaybeCache(const CanonicalQuery&,
+                                    MultiPlanStage& mps,
                                     std::unique_ptr<plan_ranker::PlanRankingDecision>,
                                     std::vector<plan_ranker::CandidatePlan>&);
 

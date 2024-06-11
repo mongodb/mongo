@@ -271,7 +271,10 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(ExpressionContext* expCtx,
     auto cq = makeCanonicalQuery(expCtx->opCtx, nss, BSON("foo" << desiredFooValue));
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx, &coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{expCtx->opCtx, &coll});
+        expCtx,
+        &coll,
+        cq.get(),
+        plan_cache_util::ClassicPlanCacheWriter{expCtx->opCtx, &coll, false /* executeInSbe */});
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -328,7 +331,8 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
         _expCtx.get(),
         &ctx.getCollection(),
         cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx(), &ctx.getCollection()});
+        plan_cache_util::ClassicPlanCacheWriter{
+            opCtx(), &ctx.getCollection(), false /* executeInSbe */});
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -488,13 +492,13 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     ASSERT_EQUALS(solutions.size(), 3U);
 
     // Fill out the MultiPlanStage.
-    auto mps = std::make_unique<MultiPlanStage>(_expCtx.get(),
-                                                &collection.getCollection(),
-                                                cq.get(),
-                                                plan_cache_util::ClassicPlanCacheWriter{
-                                                    opCtx(),
-                                                    &collection.getCollection(),
-                                                });
+    auto mps = std::make_unique<MultiPlanStage>(
+        _expCtx.get(),
+        &collection.getCollection(),
+        cq.get(),
+        plan_cache_util::ClassicPlanCacheWriter{
+            opCtx(), &collection.getCollection(), false /* executeInSbe */
+        });
     unique_ptr<WorkingSet> ws(new WorkingSet());
     // Put each solution from the planner into the MPR.
     for (size_t i = 0; i < solutions.size(); ++i) {
@@ -591,8 +595,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
                                          &ctx.getCollection(),
                                          cq.get(),
                                          plan_cache_util::ClassicPlanCacheWriter{
-                                             opCtx(),
-                                             &ctx.getCollection(),
+                                             opCtx(), &ctx.getCollection(), false /* executeInSbe */
                                          });
 
     // Put each plan into the MultiPlanStage. Takes ownership of 'firstPlan' and 'secondPlan'.
