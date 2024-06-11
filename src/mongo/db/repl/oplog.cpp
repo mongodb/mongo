@@ -1085,34 +1085,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               opCtx, nss, opTime, DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
       },
       {ErrorCodes::NamespaceNotFound}}},
-    // deleteIndex(es) is deprecated but still works as of April 10, 2015
-    {"deleteIndex",
-     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status {
-          const auto& entry = *op;
-          const auto& cmd = entry.getObject();
-          return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd), cmd);
-      },
-      {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
-    {"deleteIndexes",
-     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status {
-          const auto& entry = *op;
-          const auto& cmd = entry.getObject();
-          return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd), cmd);
-      },
-      {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
-    {"dropIndex",
-     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status {
-          const auto& entry = *op;
-          const auto& cmd = entry.getObject();
-          return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd), cmd);
-      },
-      {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndexes",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {

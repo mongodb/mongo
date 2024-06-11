@@ -525,7 +525,4 @@ assert.eq(t.findOne({_id: 14}), {_id: 14, x: 'nested apply op update2'});
 
 assert.commandWorked(t.createIndex({a: 1}));
 assert.commandWorked(t.runCommand(
-    {applyOps: [{op: 'c', ns: t.getFullName(), o: {deleteIndexes: 'testColl', index: 'a_1'}}]}));
-assert.commandWorked(t.createIndex({a: 1}));
-assert.commandWorked(t.runCommand(
     {applyOps: [{op: 'c', ns: t.getFullName(), o: {dropIndexes: 'testColl', index: 'a_1'}}]}));
