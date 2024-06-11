@@ -21,24 +21,7 @@ function getNewColl() {
     return coll;
 }
 
-jsTest.log("Rename collection with documents (create SRC and then DST)");
-{
-    const src = getNewColl();
-    const dstName = getNewCollName();
-
-    assert.commandWorked(src.insert([{x: 1}, {x: 2}, {x: 3}]));
-
-    assert.eq(3, src.countDocuments({}));
-
-    assert.commandWorked(src.renameCollection(dstName));
-
-    assert.eq(0, src.countDocuments({}));
-    const dst = db[dstName];
-    assert.eq(3, dst.countDocuments({}));
-    dst.drop();
-}
-
-jsTest.log("Rename collection with documents (create DST and then SRC)");
+jsTest.log("Rename collection with documents");
 {
     const src = getNewColl();
     const dstName = getNewCollName();
