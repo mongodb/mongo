@@ -237,7 +237,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ErrorCodes.NoSuchTransaction,
             ErrorCodes.StaleConfig,
             ErrorCodes.ShardCannotRefreshDueToLocksHeld,
-            ErrorCodes.WriteConflict
+            ErrorCodes.WriteConflict,
+            ErrorCodes.SnapshotUnavailable
         ];
 
         // If we're running in a stepdown suite, then attempting to update the shard key may
