@@ -341,7 +341,6 @@ cc_library(
         "randen_hwaes.h",
     ],
     copts = ABSL_DEFAULT_COPTS + ABSL_RANDOM_RANDEN_COPTS + select({
-        "//bazel/config:gcc_or_clang" ["-Wno-pass-failed"],
         "//absl:msvc_compiler": [],
         "//absl:clang-cl_compiler": [],
         "//conditions:default": ["-Wno-pass-failed"],

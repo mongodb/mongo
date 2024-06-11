@@ -2,16 +2,6 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
-NO_WARN_COPTS = select({
-    "@platforms//os:windows": [
-        "/W0",
-        "/wd9025",
-    ],
-    "//conditions:default": [
-        "-Wno-error",
-    ],
-})
-
 mongo_cc_library(
     name = "tomcrypt_deps",
     srcs = [
@@ -23,7 +13,7 @@ mongo_cc_library(
     ]),
     copts = [
         "-Isrc/third_party/tomcrypt-1.18.2/src/headers",
-    ] + NO_WARN_COPTS,
+    ],
 )
 
 mongo_cc_library(
@@ -65,7 +55,12 @@ mongo_cc_library(
     ]),
     copts = [
         "-Isrc/third_party/tomcrypt-1.18.2/src/headers",
-    ] + NO_WARN_COPTS,
+    ] + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": [
+            "-Wno-error",
+        ],
+    }),
     local_defines = [
         "LTC_NO_PROTOTYPES",
     ],
@@ -84,7 +79,7 @@ mongo_cc_library(
     ]),
     copts = [
         "-Isrc/third_party/tomcrypt-1.18.2/src/headers",
-    ] + NO_WARN_COPTS,
+    ],
     deps = [
         ":tomcrypt_deps",
     ],

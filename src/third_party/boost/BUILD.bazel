@@ -37,9 +37,6 @@ mongo_cc_library(
     ],
     hdrs = BOOST_LIB_HEADERS,
     copts = BOOST_COPTS,
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     local_defines = BOOST_DEFINES,
     deps = [
         "//src/mongo/util:boost_assert_shim",
@@ -62,9 +59,6 @@ mongo_cc_library(
     ],
     hdrs = BOOST_LIB_HEADERS,
     copts = BOOST_COPTS,
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     local_defines = BOOST_DEFINES,
     deps = [
         ":boost_system",
@@ -89,9 +83,6 @@ mongo_cc_library(
     ],
     hdrs = BOOST_LIB_HEADERS,
     copts = BOOST_COPTS,
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     local_defines = BOOST_DEFINES,
     deps = [
         "//src/mongo/util:boost_assert_shim",
@@ -106,9 +97,6 @@ mongo_cc_library(
     ],
     hdrs = BOOST_LIB_HEADERS,
     copts = BOOST_COPTS,
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     local_defines = BOOST_DEFINES,
     deps = [
         ":boost_system",
@@ -146,9 +134,6 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
     copts = BOOST_COPTS,
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     local_defines = BOOST_DEFINES + ["BOOST_THREAD_BUILD_LIB"] + select({
         "@platforms//os:linux": [
             "BOOST_THREAD_PTHREAD",
@@ -212,9 +197,6 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     linkopts = select({
         "@platforms//os:windows": ["synchronization.lib"],
         "//conditions:default": [],

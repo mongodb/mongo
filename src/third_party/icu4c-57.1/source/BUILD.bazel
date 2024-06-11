@@ -15,19 +15,11 @@ ICU4C_DEFINES = [
 
 ICU4C_COPTS = select({
     "//bazel/config:gcc_or_clang": [
-        # TODO: Omit this flag when a resolution for cxxopts vs copts issue is achieved.
-        "-w",
         "-Wno-sign-compare",
-        "-Wno-deprecated-volatile",
-        "-Wno-implicit-fallthrough",
-        "-Wno-ambiguous-reversed-operator",
-        "-Wno-deprecated-anon-enum-enum-conversion",
-        "-Wno-deprecated-array-compare",
     ],
     "@platforms//os:windows": [
         # C4996: "...": was declared deprecated
         "/wd4996",
-        "/wd5056",
     ],
     "//conditions:default": [],
 })
@@ -41,9 +33,6 @@ mongo_cc_library(
         "**/*.h",
     ]),
     copts = ICU4C_COPTS,
-    features = [
-        "no_deprecated_enum_enum_conversion",
-    ],
     includes = [
         "common",
     ],
@@ -240,9 +229,6 @@ mongo_cc_library(
         "**/*.h",
     ]),
     copts = ICU4C_COPTS,
-    features = [
-        "no_deprecated_enum_enum_conversion",
-    ],
     includes = [
         "common",
     ],
@@ -460,9 +446,6 @@ mongo_cc_library(
         "**/*.h",
     ]),
     copts = ICU4C_COPTS,
-    features = [
-        "no_deprecated_enum_enum_conversion",
-    ],
     includes = [
         "i18n",
     ],

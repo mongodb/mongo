@@ -23,13 +23,6 @@ build --experimental_cc_shared_library
 # toolchain_suite elsewhere.
 build:linux --crosstool_top=@mongo_toolchain//:toolchain_suite
 
-# Disable the default compiler flags to avoid certain flags that conflict with flags we setup.
-build:windows --features=-smaller_binary
-build:windows --features=-frame_pointer
-build:windows --features=-opt
-build:windows --features=-dbg
-build:windows --features=-fastbuild
-
 # Dynamic linking on Windows (DLL generation) is currently not supported.
 build:windows --//bazel/config:linkstatic=True
 

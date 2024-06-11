@@ -49,13 +49,6 @@ mongo_cc_library(
             "-DHAVE_SYS_TIME_H",
             "-DHAVE_UNISTD_H",
             "-D_GNU_SOURCE",
-            "-Wno-implicit-fallthrough",
-        ],
-    }),
-    features = select({
-        "@platforms//os:windows": [],
-        "//conditions:default": [
-            "no_warn_non_virtual_detour",
         ],
     }),
     includes = ["."],

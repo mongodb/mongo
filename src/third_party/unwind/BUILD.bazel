@@ -160,7 +160,6 @@ mongo_cc_library(
         "-Wno-unused-result",
         "-Wno-pointer-sign",
         "-Wno-incompatible-pointer-types",
-        "-Wno-unused-command-line-argument",
         "-Wno-unused-variable",
     ] + select({
         "@platforms//cpu:aarch64": [
@@ -191,18 +190,7 @@ mongo_cc_library(
             "-Wno-absolute-value",
         ],
         "//conditions:default": [],
-    }) + select({
-        "@//bazel/config:gcc_or_clang": [
-            "-Wno-deprecated-volatile",
-            "-Wno-implicit-fallthrough",
-            "-Wno-strict-aliasing",
-            "-Wno-unused-value",
-        ],
-        "//conditions:default": [],
     }),
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     local_defines = [
         # Skip autoconf preprocessing.
         "HAVE_CONFIG_H",

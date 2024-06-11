@@ -80,14 +80,10 @@ mongo_cc_library(
         ],
         "//conditions:default": [
             "-Isrc/third_party/pcre2/build_posix",
-            "-Wno-implicit-fallthrough",
         ],
     }),
     defines = [
         "PCRE2_STATIC",
-    ],
-    features = [
-        "no_warn_non_virtual_detour",
     ],
     includes = ["src"],
     local_defines = [
