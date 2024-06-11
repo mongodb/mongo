@@ -235,6 +235,7 @@ selector:
 
   # Test will fail if it is unable to lock the config server primary successfully.
   - jstests/sharding/fsync_lock_unlock.js
+  - jstests/sharding/fsync_deadlock.js
 
   exclude_with_any_tags:
   - does_not_support_stepdowns
