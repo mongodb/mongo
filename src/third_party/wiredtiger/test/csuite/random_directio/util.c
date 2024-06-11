@@ -37,7 +37,7 @@
  * util.c
  * 	Utility functions for test that simulates system crashes.
  */
-#define COPY_BUF_SIZE ((size_t)(64 * 1024))
+#define COPY_BUF_SIZE ((size_t)(128 * 1024))
 
 /*
  * copy_directory --
