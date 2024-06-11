@@ -110,23 +110,23 @@ function checkRetries() {
     jsTestLog("Retrying single batch insert.");
     assert.commandWorked(retryDB.runCommand(singleBatchCommand));
     assert.docEq(secondaryDB[singleBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 singleBatchCommand.documents)
+                 singleBatchCommand.documents);
     assert.docEq(primaryDB[singleBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 singleBatchCommand.documents)
+                 singleBatchCommand.documents);
 
     // Retry multi batch command on new primary and make sure documents match after.
     jsTestLog("Retrying multi batch insert.");
     assert.commandWorked(retryDB.runCommand(multiBatchCommand));
     assert.docEq(secondaryDB[multiBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 multiBatchCommand.documents)
+                 multiBatchCommand.documents);
     assert.docEq(primaryDB[multiBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 multiBatchCommand.documents)
+                 multiBatchCommand.documents);
 
     // Retry broken batch command on new primary and ensure the whole insert worked.
     jsTestLog("Retrying broken batch insert.");
     assert.commandWorked(retryDB.runCommand(brokenBatchCommand));
     assert.docEq(secondaryDB[brokenBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 brokenBatchCommand.documents)
+                 brokenBatchCommand.documents);
     // Since this didn't work the first time, we need to await replication for it to work on the old
     // primary.
     if (retryNode == secondary) {

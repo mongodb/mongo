@@ -54,7 +54,7 @@ function assertExplainFormat(explain, expectedNumReturned) {
     // executionStats - SBE format:
     const stages = getExecutionStages(explain);
     assert.eq(stages.length, 1, explain);
-    const execStage = stages[0]
+    const execStage = stages[0];
     assert(execStage.hasOwnProperty("opens"), explain);
     assert(execStage.hasOwnProperty("closes"), explain);
     assert(!execStage.hasOwnProperty("works"), explain);

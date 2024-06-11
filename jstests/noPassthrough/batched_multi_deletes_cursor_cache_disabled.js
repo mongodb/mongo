@@ -15,7 +15,7 @@ var st =
 
 const primary = st.s0;
 const buildInfo = assert.commandWorked(st.s0.adminCommand({"buildInfo": 1}));
-const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize')
+const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
 
 if (!isSanitizerEnabled) {
     jsTestLog("Skipping " + jsTestName() + " because address sanitizer is not active.");

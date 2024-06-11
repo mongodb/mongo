@@ -64,7 +64,7 @@ function runTest({pipeline, shouldUseSbe, aggStages}) {
 runTest({
     pipeline: [{$match: {m: 17}}],
     shouldUseSbe: false,
-})
+});
 
 // $project by itself is not lowered except in SBE full.
 jsTestLog("ian: SBE full " + sbeFullyEnabled);
@@ -149,7 +149,7 @@ runTest({
 runTest({
     pipeline: [{$sort: {t: 1}}, {$project: {t: 1}}],
     shouldUseSbe: false,
-})
+});
 
 // $match -> $addFields -> $group is permitted only in SBE full.
 runTest({
@@ -159,7 +159,7 @@ runTest({
         {$group: {_id: null, s: {$sum: "$x"}}}
     ],
     shouldUseSbe: sbeFullyEnabled
-})
+});
 
 // A stack of $project stages is permitted only in SBE full.
 runTest({
@@ -179,7 +179,7 @@ runTest({
         {$group: {_id: "$a", n: {$sum: "$b"}}},
     ],
     shouldUseSbe: sbeUnpackPushdownEnabled,
-})
+});
 
 // The full rewrite of a group might avoid unpacking. Let's check that these are fully lowered.
 runTest({
@@ -188,7 +188,7 @@ runTest({
         {$group: {_id: "$m", min: {$min: "$a"}}},
     ],
     shouldUseSbe: sbeUnpackPushdownEnabled,
-})
+});
 
 // Bucket unpacking should not be lowered when there is an eventFilter with a full match
 // expression that is not supported in SBE. This entire pipeline should run in classic.

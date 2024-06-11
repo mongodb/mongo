@@ -35,7 +35,7 @@ let coll = mongos.getDB(dbName)[collName];
 assert.commandWorked(coll.insert({oldKey: 50}));
 
 // Fail if unsharded collection.
-const unshardedCollName = "foo_unsharded"
+const unshardedCollName = "foo_unsharded";
 const unshardedCollNS = dbName + '.' + unshardedCollName;
 assert.commandWorked(st.s.getDB(dbName).runCommand({create: unshardedCollName}));
 assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: unshardedCollNS}),
@@ -81,8 +81,8 @@ assert.eq(mongos.getDB(dbName).getCollectionInfos({name: coll.getName()})[0].inf
 assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns, toShard: shard0}),
                              ErrorCodes.NamespaceNotSharded);
 
-const newCollName = "foo1"
-const newCollNs = dbName + '.' + newCollName
+const newCollName = "foo1";
+const newCollNs = dbName + '.' + newCollName;
 assert.commandWorked(mongos.adminCommand({shardCollection: newCollNs, key: {oldKey: 1}}));
 
 assert.commandWorked(mongos.adminCommand({split: newCollNs, middle: {oldKey: 0}}));
@@ -113,7 +113,7 @@ for (let i = -30; i < 30; ++i) {
     assert.commandWorked(coll.insert({_id: i}));
 }
 
-assert(st.rs0.getPrimary().getCollection(newCollNs).countDocuments({}) == 30)
+assert(st.rs0.getPrimary().getCollection(newCollNs).countDocuments({}) == 30);
 
 // Unshard collection should succeed when collection's original shard key is _id.
 assert.commandWorked(mongos.adminCommand({unshardCollection: newCollNs}));

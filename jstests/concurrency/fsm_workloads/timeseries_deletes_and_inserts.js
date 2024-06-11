@@ -26,7 +26,7 @@ function retryUntilWorked(query) {
             return query();
         } catch (e) {
             if (e.code == ErrorCodes.QueryPlanKilled && TestData.runningWithBalancer) {
-                attempts++
+                attempts++;
             } else {
                 throw e;
             }
@@ -134,13 +134,16 @@ export const $config = (function() {
         // Now validate the state of each reading. We will check all of the seed data and each
         // reading that we may have inserted.
         for (let readingNo = 0; readingNo < data.nTotalReadings; ++readingNo) {
-            const wasDeleted = retryUntilWorked(
-                () => {return logColl.count({readingNo: readingNo, deleted: true}) > 0});
-            const wasInserted = retryUntilWorked(
-                () => {return logColl.count({readingNo: readingNo, inserted: true}) > 0});
+            const wasDeleted = retryUntilWorked(() => {
+                return logColl.count({readingNo: readingNo, deleted: true}) > 0;
+            });
+            const wasInserted = retryUntilWorked(() => {
+                return logColl.count({readingNo: readingNo, inserted: true}) > 0;
+            });
 
-            const nReadings =
-                retryUntilWorked(() => {return db[collName].count({readingNo: readingNo})});
+            const nReadings = retryUntilWorked(() => {
+                return db[collName].count({readingNo: readingNo});
+            });
 
             if (wasDeleted && !wasInserted) {
                 // Easy case: this reading was deleted and never inserted - we expect 0 records.

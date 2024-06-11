@@ -19,8 +19,7 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(coll, {x: 1}, [
     {min: {x: -100}, max: {x: 0}, shard: st.shard0.shardName},
     {min: {x: 0}, max: {x: MaxKey}, shard: st.shard1.shardName},
 ]);
-const performOps =
-    function(ordered, numOps) {
+const performOps = function(ordered, numOps) {
     jsTest.log("Perform write with ordered: " + ordered);
     // Write two documents.
     assert.commandWorked(coll.insert({x: -1, _id: -1}));
@@ -61,7 +60,7 @@ const performOps =
     assert.eq(numOps, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
     assert.eq(numOps, mongosServerStatus.metrics.query.deleteOneWithoutShardKeyWithIdCount);
     session.endSession();
-}
+};
 
 // Test batched ops with ordered: true and ordered: false.
 performOps(true, 2);

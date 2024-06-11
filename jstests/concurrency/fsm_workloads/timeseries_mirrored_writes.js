@@ -104,7 +104,7 @@ export const $config = (function() {
     };
 
     function setup(db, collName, cluster) {
-        assert.commandWorked(db.createCollection(this.getRegularCollectionName()))
+        assert.commandWorked(db.createCollection(this.getRegularCollectionName()));
         assert.commandWorked(db.createCollection(this.getTimeseriesCollectionName(), {
             timeseries: {
                 timeField: this.timeFieldName,

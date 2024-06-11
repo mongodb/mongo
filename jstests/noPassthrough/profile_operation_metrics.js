@@ -1542,7 +1542,7 @@ const runTest = (db) => {
         print(`Caught ${assertions.length} test assertion failures:`);
         assertions.forEach((a) => {
             print(a);
-        })
+        });
         doassert(`Test failed with ${assertions.length} failures`);
         assertions = [];
     }

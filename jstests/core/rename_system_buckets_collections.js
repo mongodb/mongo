@@ -28,7 +28,7 @@ const timeseriesOpts = {
 
 // TODO SERVER-89999: remove once the feature flag version becomes last LTS
 const simpleBucketCollectionsDisallowed =
-    FeatureFlagUtil.isEnabled(db, "DisallowBucketCollectionWithoutTimeseriesOptions")
+    FeatureFlagUtil.isEnabled(db, "DisallowBucketCollectionWithoutTimeseriesOptions");
 
 function setupEnv() {
     db.dropDatabase();
@@ -123,7 +123,7 @@ function runTests(targetDbName) {
     }
 }
 
-jsTest.log("Run test cases with rename within same database")
+jsTest.log("Run test cases with rename within same database");
 runTests(dbName);
-jsTest.log("Run test cases with rename across different databases")
+jsTest.log("Run test cases with rename across different databases");
 runTests(otherDbName);

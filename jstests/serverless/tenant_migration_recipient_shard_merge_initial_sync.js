@@ -103,7 +103,7 @@ function runInitialSyncTest(recipientMergeStage, failpoint) {
     assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 1);
     checkLog.containsJson(initialSyncNode, 7219900);
 
-    fpinitialSyncHangBeforeFinish.off()
+    fpinitialSyncHangBeforeFinish.off();
 
     // Get rid of the failed node so the fixture can stop properly.
     recipientRst.stop(initialSyncNode);
@@ -111,7 +111,7 @@ function runInitialSyncTest(recipientMergeStage, failpoint) {
     recipientRst.reInitiate();
 
     // Disable the failpoint to allow merge to continue.
-    mergeWaitInFailPoint.off()
+    mergeWaitInFailPoint.off();
 
     if (migrationThread !== undefined && migrationThread !== null) {
         migrationThread.join();

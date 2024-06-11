@@ -21,7 +21,7 @@ import {
     forwardIxscan,
     runDoesntRewriteTest,
     runRewritesTest
-} from "jstests/core/timeseries/libs/timeseries_sort_util.js"
+} from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
 const ciStringCollName = 'bucket_unpacking_with_sort_ci';
 const ciStringColl = db[ciStringCollName];

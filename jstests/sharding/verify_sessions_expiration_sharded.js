@@ -97,7 +97,7 @@ for (let i = 0; i < 10; i++) {
 // generate a new session during the commit phase of the create coordinator
 refreshSessionsAndVerifyExistence(mongosConfig, shardConfig, [], false /* expectToExist */);
 let openedSessionIDs = mongosConfig.system.sessions.find().toArray().map(s => s._id);
-assert.commandWorked(db.runCommand({endSessions: openedSessionIDs}))
+assert.commandWorked(db.runCommand({endSessions: openedSessionIDs}));
 
 let cursors = [];
 sessionIDs = [];

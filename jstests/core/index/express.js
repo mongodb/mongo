@@ -62,7 +62,7 @@ let isShardedColl = false;
 function recreateCollWith(documents) {
     coll.drop();
     assert.commandWorked(coll.insert(documents));
-    isShardedColl = FixtureHelpers.isSharded(coll)
+    isShardedColl = FixtureHelpers.isSharded(coll);
 }
 recreateCollWith(docs);
 
@@ -110,7 +110,7 @@ for (let index of [{a: 1}, {a: -1}, {a: 1, b: 1}, {a: 1, b: -1}, {a: -1, b: 1}, 
 
 // When the index is not dotted, queries against nested fields do not use express unless they look
 // for an exact match.
-coll.dropIndexes()
+coll.dropIndexes();
 assert.commandWorked(coll.createIndex({a: 1}));
 runExpressTest({filter: {'a.b': 0}, limit: 1, result: [], usesExpress: false});
 runExpressTest({

@@ -113,7 +113,7 @@ let clusterDropOpId, shardsvrDropOpId;
     assert.eq(ops0.length, 1, ops0);
     assert.eq(ops0[0].role, "ClusterRole{shard}", ops0);
     assert.eq(ops0[0].host, primary.host, ops0);
-    shardsvrDropOpId = ops0[0].opid
+    shardsvrDropOpId = ops0[0].opid;
 
     const ops1 = primary.getDB("admin")
                      .aggregate([
@@ -268,7 +268,7 @@ assert.commandWorked(primaryTestDB.killOp(clusterDropOpId));
     assert.eq(ops0.length, 1, ops0);
     assert.eq(ops0[0].role, "ClusterRole{shard}", ops0);
     assert.eq(ops0[0].host, primary.host, ops0);
-    shardsvrDropOpId = ops0[0].opid
+    shardsvrDropOpId = ops0[0].opid;
 
     const ops1 = primary.getDB("admin")
                      .aggregate([

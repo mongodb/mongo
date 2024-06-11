@@ -24,7 +24,7 @@ export class TestDefinition extends SelinuxBaseTest {
                 const HAS_TAG = 0;
                 const NO_TAG = 1;
                 let checkTagRc = runNonMongoProgram(
-                    python, "buildscripts/resmokelib/utils/check_has_tag.py", t, "^no_selinux$")
+                    python, "buildscripts/resmokelib/utils/check_has_tag.py", t, "^no_selinux$");
                 if (HAS_TAG == checkTagRc) {
                     jsTest.log("Skipping test due to no_selinux tag: " + t);
                     continue;
@@ -35,7 +35,7 @@ export class TestDefinition extends SelinuxBaseTest {
 
                 // Tests relying on featureFlagXXX will not work
                 checkTagRc = runNonMongoProgram(
-                    python, "buildscripts/resmokelib/utils/check_has_tag.py", t, "^featureFlag.+$")
+                    python, "buildscripts/resmokelib/utils/check_has_tag.py", t, "^featureFlag.+$");
                 if (HAS_TAG == checkTagRc) {
                     jsTest.log("Skipping test due to feature flag tag: " + t);
                     continue;

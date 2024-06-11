@@ -17,8 +17,8 @@ assert.neq(null, bpConn, "mongod was unable to start up");
 // queries.
 function isSlowBuild(db) {
     const buildInfo = db.adminCommand("buildInfo");
-    const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize')
-    const optimizationsEnabled = buildInfo.buildEnvironment.ccflags.includes('-O2')
+    const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
+    const optimizationsEnabled = buildInfo.buildEnvironment.ccflags.includes('-O2');
     const debugBuild = buildInfo.debug;
 
     return debugBuild || !optimizationsEnabled || isSanitizerEnabled;

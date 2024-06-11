@@ -200,7 +200,8 @@ const coll = db.index_partial_read_ops;
     explain = getSingleNodeExplain(coll.explain('executionStats').find({x: 2, a: 5}).finish());
     assert.eq(1, explain.executionStats.nReturned);
     assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
-    explain = getSingleNodeExplain(coll.explain('executionStats').find({x: 3, a: 5, b: 1}).finish())
+    explain =
+        getSingleNodeExplain(coll.explain('executionStats').find({x: 3, a: 5, b: 1}).finish());
     assert.eq(1, explain.executionStats.nReturned);
     assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 })();

@@ -37,7 +37,7 @@ let expectedResults = [
     {maxStr: "transmit Ohio AI", minStr: "Louisiana system-worthy Borders"},
     {maxStr: "transmit Ohio AI", minStr: "compressing Supervisor Synchronised"},
     {maxStr: "fuchsia", minStr: "Inlet"},
-]
+];
 
 coll.drop();
 for (let i = 0; i < documents.length; i++) {
@@ -67,9 +67,9 @@ documents = [
     {_id: 0, "num": 10, "str": "ABCDEFGHIJK"},
     {_id: 1, "num": 3, "str": "ABCDE"},
     {_id: 2, "num": 5, "str": "AB"},
-]
+];
 
-expectedResults = [{minStr: "ABCDEFGHIJK"}, {minStr: "AB"}, {minStr: "AB"}]
+expectedResults = [{minStr: "ABCDEFGHIJK"}, {minStr: "AB"}, {minStr: "AB"}];
 
 coll.drop();
 for (let i = 0; i < documents.length; i++) {

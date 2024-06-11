@@ -97,7 +97,8 @@ export var ReplicaSetEndpointTest = class {
 
     _authenticateShard0TestUser() {
         assert(this.shard0AuthDB.logout());
-        assert(this.shard0AuthDB.auth(this._shard0TestUser.userName, this._shard0TestUser.password))
+        assert(
+            this.shard0AuthDB.auth(this._shard0TestUser.userName, this._shard0TestUser.password));
     }
 
     _authenticateShard1AdminUser() {
@@ -194,4 +195,4 @@ export var ReplicaSetEndpointTest = class {
         this._shard0Rst.stopSet();
         this._shard1Rst.stopSet();
     }
-}
+};

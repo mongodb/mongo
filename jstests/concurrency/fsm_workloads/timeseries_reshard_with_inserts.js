@@ -76,9 +76,9 @@ export const $config = (function() {
             if (this.tid === 0 && shouldContinueResharding) {
                 let newShardKey;
                 if (bsonWoCompare(this.shardKey, shardKeys[0]) === 0) {
-                    newShardKey = shardKeys[1]
+                    newShardKey = shardKeys[1];
                 } else {
-                    newShardKey = shardKeys[0]
+                    newShardKey = shardKeys[0];
                 }
 
                 executeReshardTimeseries(db, collName, newShardKey);

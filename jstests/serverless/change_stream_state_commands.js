@@ -28,7 +28,7 @@ replSetTest.initiate();
 function setTokenOnEachNode(token) {
     replSetTest.nodes.forEach(node => {
         node._setSecurityToken(token);
-    })
+    });
 }
 
 function clearTokenOnEachNode(token) {

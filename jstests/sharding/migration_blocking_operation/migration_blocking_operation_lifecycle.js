@@ -33,7 +33,7 @@ function assertCommandReturns(connection, command, uuid, code) {
     if (code === ErrorCodes.OK) {
         assert.commandWorked(response);
     } else {
-        assert.commandFailedWithCode(response, code)
+        assert.commandFailedWithCode(response, code);
     }
 }
 

@@ -56,7 +56,7 @@ const checkBasicCRUD = function(withCollection, _id) {
     withCollection((coll) => {
         assert.commandWorked(coll.remove({_id: _id}, true /* justOne */));
         assert.eq(null, retryableFindOne(coll, {_id: _id}));
-    })
+    });
 
     withCollection((coll) => {
         assert.commandWorked(coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}}));
@@ -114,18 +114,18 @@ const checkDDLOps = function(withDbs) {
         jsTestLog("Running create.");
         runDDLCommandWithRetries(db, {create: DDLCollection});
         assert.commandWorked(db[DDLCollection].insertOne({x: 1}));
-    })
+    });
 
     withDbs((db, _) => {
         jsTestLog("Running createIndexes.");
         let res = runDDLCommandWithRetries(db, {listIndexes: DDLCollection});
-        assert.eq(res["cursor"]["firstBatch"].length, 1, res)
+        assert.eq(res["cursor"]["firstBatch"].length, 1, res);
         runDDLCommandWithRetries(db, {
             createIndexes: DDLCollection,
             indexes: [{name: "x_1", key: {x: 1}}, {name: "y_1", key: {y: 1}}]
         });
         res = runDDLCommandWithRetries(db, {listIndexes: DDLCollection});
-        assert.eq(res["cursor"]["firstBatch"].length, 3, res)
+        assert.eq(res["cursor"]["firstBatch"].length, 3, res);
     });
 
     withDbs((db, _) => {
@@ -173,11 +173,11 @@ const checkDDLOps = function(withDbs) {
         runDDLCommandWithRetries(db, {dropDatabase: 1});
         let res = runDDLCommandWithRetries(adminDb, {listDatabases: 1});
         assert(!res["databases"].some((database) => database["name"] == DDLDb), res);
-    })
+    });
 };
 
-const checkCRUDThread =
-    function(mongosHost, replSetHost, ns, _id, countdownLatch, stage, checkBasicCRUD) {
+const checkCRUDThread = function(
+    mongosHost, replSetHost, ns, _id, countdownLatch, stage, checkBasicCRUD) {
     const [dbName, collName] = ns.split(".");
 
     const mongos = new Mongo(mongosHost);
@@ -214,10 +214,9 @@ const checkCRUDThread =
         checkBasicCRUD(withCollection, _id);
         sleep(1);  // milliseconds.
     }
-}
+};
 
-const checkDDLThread =
-    function(mongosHost, replSetHost, countdownLatch, stage, checkDDLOps) {
+const checkDDLThread = function(mongosHost, replSetHost, countdownLatch, stage, checkDDLOps) {
     const mongos = new Mongo(mongosHost);
     const mongosSession = mongos.startSession({retryWrites: true});
     const mongosDb = mongosSession.getDatabase("DDL");
@@ -258,7 +257,7 @@ const checkDDLThread =
         checkDDLOps(withDbs);
         sleep(1);  // milliseconds.
     }
-}
+};
 
 const nodeOptions = {
     setParameter: {

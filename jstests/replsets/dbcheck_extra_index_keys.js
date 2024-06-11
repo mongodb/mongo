@@ -126,16 +126,16 @@ function noExtraIndexKeys(
     };
     if (start != null) {
         if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix} }
+            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
         } else {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start} }
+            dbCheckParameters = {...dbCheckParameters, start: {a: start}};
         }
     }
     if (end != null) {
         if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix} }
+            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix}};
         } else {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end} }
+            dbCheckParameters = {...dbCheckParameters, end: {a: end}};
         }
     }
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /* awaitCompletion */);
@@ -193,16 +193,16 @@ function recordNotFound(
     };
     if (start != null) {
         if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix} }
+            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
         } else {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start} }
+            dbCheckParameters = {...dbCheckParameters, start: {a: start}};
         }
     }
     if (end != null) {
         if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix} }
+            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix}};
         } else {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end} }
+            dbCheckParameters = {...dbCheckParameters, end: {a: end}};
         }
     }
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
@@ -274,16 +274,16 @@ function recordDoesNotMatch(
     };
     if (start != null) {
         if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix} }
+            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
         } else {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start} }
+            dbCheckParameters = {...dbCheckParameters, start: {a: start}};
         }
     }
     if (end != null) {
         if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix} }
+            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix}};
         } else {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end} }
+            dbCheckParameters = {...dbCheckParameters, end: {a: end}};
         }
     }
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
@@ -351,16 +351,16 @@ function hashingInconsistentExtraKeyOnPrimary(
     };
     if (start != null) {
         if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix} }
+            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
         } else {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start} }
+            dbCheckParameters = {...dbCheckParameters, start: {a: start}};
         }
     }
     if (end != null) {
         if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix} }
+            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix}};
         } else {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end} }
+            dbCheckParameters = {...dbCheckParameters, end: {a: end}};
         }
     }
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
@@ -435,16 +435,16 @@ batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
     };
     if (start != null) {
         if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix} }
+            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
         } else {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start} }
+            dbCheckParameters = {...dbCheckParameters, start: {a: start}};
         }
     }
     if (end != null) {
         if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix} }
+            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix}};
         } else {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end} }
+            dbCheckParameters = {...dbCheckParameters, end: {a: end}};
         }
     }
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);

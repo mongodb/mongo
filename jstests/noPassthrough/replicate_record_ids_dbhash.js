@@ -29,8 +29,7 @@ const findRecordId = function(testDB, collName, doc) {
     return res["$recordId"];
 };
 
-const insertDocWithInconsistentRids =
-    function(primaryDB, secondaryDB, docToInsertWithDifRid) {
+const insertDocWithInconsistentRids = function(primaryDB, secondaryDB, docToInsertWithDifRid) {
     const explicitlySetRecordIdOnInsert = configureFailPoint(
         secondaryDB,
         "explicitlySetRecordIdOnInsert",
@@ -43,7 +42,7 @@ const insertDocWithInconsistentRids =
         primaryDB.runCommand({insert: collName, documents: [docToInsertWithDifRid]}));
     rst.awaitReplication();
     explicitlySetRecordIdOnInsert.off();
-}
+};
 
 const runTest = function(replicatedRecordIds) {
     const primaryDB = primary.getDB(dbName);

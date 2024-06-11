@@ -105,13 +105,12 @@ export const clearHealthLog = (replSet) => {
     replSet.awaitReplication();
 };
 
-export const logEveryBatch =
-    (replSet) => {
-        forEachNonArbiterNode(replSet, conn => {
-            assert.commandWorked(
-                conn.adminCommand({setParameter: 1, "dbCheckHealthLogEveryNBatches": 1}));
-        })
-    }
+export const logEveryBatch = (replSet) => {
+    forEachNonArbiterNode(replSet, conn => {
+        assert.commandWorked(
+            conn.adminCommand({setParameter: 1, "dbCheckHealthLogEveryNBatches": 1}));
+    });
+};
 
 export const dbCheckCompleted = (db) => {
     const inprog = db.getSiblingDB("admin").currentOp().inprog;
@@ -246,7 +245,7 @@ export const insertDocsWithMissingIndexKeys =
             assert.eq(Object.keys(doc).length + 1,
                       node.getDB(dbName)[collName].getIndexes().length);
         });
-    }
+    };
 
 // Run dbCheck with given parameters and potentially wait for completion.
 export const runDbCheck = (replSet,
@@ -519,15 +518,14 @@ export function assertCompleteCoverage(
         return;
     }
 
-    const truncateDocSuffix =
-        (batchBoundary, docSuffix) => {
-            const index = batchBoundary.indexOf(docSuffix);
-            jsTestLog("Index : " + index);
-            if (index < 1) {
-                return batchBoundary;
-            }
-            return batchBoundary.substring(0, batchBoundary.indexOf(docSuffix));
+    const truncateDocSuffix = (batchBoundary, docSuffix) => {
+        const index = batchBoundary.indexOf(docSuffix);
+        jsTestLog("Index : " + index);
+        if (index < 1) {
+            return batchBoundary;
         }
+        return batchBoundary.substring(0, batchBoundary.indexOf(docSuffix));
+    };
 
     let query = logQueries.infoBatchQuery;
     if (inconsistentBatch) {

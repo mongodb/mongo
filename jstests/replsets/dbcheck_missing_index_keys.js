@@ -85,7 +85,7 @@ function checkMissingIndexKeys(doc, numDocs = 1, maxDocsPerBatch = 10000) {
         missingIndexKeysQuery = {
             ...missingIndexKeysQuery,
             "data.context.missingIndexKeys.1.keyString.b": 1
-        }
+        };
     }
 
     forEachNonArbiterNode(replSet, function(node) {

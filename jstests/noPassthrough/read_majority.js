@@ -182,7 +182,7 @@ function testReadConcernLevel(level) {
     assert.eq(getCursorForReadConcernLevel().itcount(), 10);
     assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
 
-    let explain = getExplainPlan({version: 1})
+    let explain = getExplainPlan({version: 1});
     let optimizer = getOptimizer(explain);
     switch (optimizer) {
         case "classic":

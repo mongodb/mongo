@@ -1032,11 +1032,10 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
 
     // Function which runs our $lookup and asserts the expected results. Used to gossip the updated
     // routing information of the inner collection.
-    const runAggregateToRefresh =
-        () => {
-            assert.eq(db[kUnsplittable1CollName].aggregate(sbeLookupPipeline).toArray(),
-                      expectedResults);
-        }
+    const runAggregateToRefresh = () => {
+        assert.eq(db[kUnsplittable1CollName].aggregate(sbeLookupPipeline).toArray(),
+                  expectedResults);
+    };
 
     // Function which verifies that SBE $lookup fails with a 'QueryPlanKilled' error when a
     // collection is moved across getMore commands.
@@ -1072,9 +1071,9 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
             funWithArgs(function(dbName, collName, pipeline) {
                 // At some point during yielding, we expect a QueryPlanKilled error because the
                 // underlying sharding state has changed
-                assert.throwsWithCode(
-                    () => {db.getSiblingDB(dbName)[collName].aggregate(pipeline).toArray()},
-                    ErrorCodes.QueryPlanKilled);
+                assert.throwsWithCode(() => {
+                    db.getSiblingDB(dbName)[collName].aggregate(pipeline).toArray();
+                }, ErrorCodes.QueryPlanKilled);
             }, kDbName, kUnsplittable1CollName, sbeLookupPipeline), st.s.port);
 
         failpoint.wait();

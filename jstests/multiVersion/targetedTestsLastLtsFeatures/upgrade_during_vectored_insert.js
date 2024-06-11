@@ -48,7 +48,7 @@ let insertThread = new Thread(function(host, testCollFullName) {
     TestData.disableImplicitSessions = true;
     assert(jsTest.options().disableImplicitSessions);
     let conn = new Mongo(host);
-    let testColl = conn.getCollection(testCollFullName)
+    let testColl = conn.getCollection(testCollFullName);
     // Run a batch that will fail on the last document due to a DuplicateKeyError.
     jsTestLog("Inserting data");
     let res = testColl.insert(

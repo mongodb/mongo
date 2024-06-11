@@ -18,5 +18,6 @@ outputColl.insert({a: 1});
 
 // You cannot specify a sharded collection as the output collection, so this should throw if
 // collection is indeed sharded.
-assert.throws(() => {inputColl.aggregate(
-                  [{$group: {_id: "$_id", sum: {$sum: "$a"}}}, {$out: outputColl.getName()}])})
+assert.throws(() => {
+    inputColl.aggregate([{$group: {_id: "$_id", sum: {$sum: "$a"}}}, {$out: outputColl.getName()}]);
+});

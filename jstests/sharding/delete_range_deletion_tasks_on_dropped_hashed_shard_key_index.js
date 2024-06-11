@@ -17,7 +17,7 @@ const st = new ShardingTest({
         enableBalancer: false,
         shardOptions: {setParameter: {rangeDeleterBatchSize: rangeDeleterBatchSize}},
     }
-})
+});
 
 // Setup database and collection for test
 const dbName = 'db';

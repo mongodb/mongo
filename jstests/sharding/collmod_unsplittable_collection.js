@@ -30,13 +30,13 @@ function assertIndexExists(coll, indexKey, options, connections) {
         });
 
         assert.eq(1, expectedIndex.length, "Index not found on " + conn.name);
-    })
+    });
 }
 
 function assertIndexDoesntExist(coll, indexKey, options, connections) {
     assert.throws(() => {
         assertIndexExists(coll, indexKey, options, connections);
-    })
+    });
 }
 
 let collId = 1;

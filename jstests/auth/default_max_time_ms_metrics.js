@@ -68,7 +68,7 @@ function runTests(conn, directConn) {
         connectionsToCheck.forEach((db, i) => {
             const serverStatus = assert.commandWorked(db.runCommand({serverStatus: 1}));
             assert.gt(serverStatus.metrics.operation[[metricField]], beforeMetrics[i]);
-        })
+        });
     }
 
     // Times out due to the default value.

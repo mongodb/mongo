@@ -108,4 +108,4 @@ assert.commandWorked(t.insertOne({three: 3, my_list_of_docs: [{z: 1}, {z: 2}]}))
 assertQueryResult({"three": 3, "my_list_of_docs": {"b": 3}}, [
     {$set: {my_list_of_docs: {$ifNull: [null, {b: "$three"}]}}},
     {$project: {_id: 0, my_list_of_docs: 1, three: 1}}
-])
+]);

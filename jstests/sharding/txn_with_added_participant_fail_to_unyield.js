@@ -50,10 +50,10 @@ let fp = configureFailPoint(st.shard0, "restoreLocksFail");
 // Run a $lookup where shard0 will add shard1 as an additional participant. The failpoint above
 // should cause shard0 to fail to unyield after getting a response from shard1, causing the request
 // to fail with a LockTimeout error.
-let err = assert.throwsWithCode(
-    () => {sessionDB.getCollection(localColl).aggregate(
-        [{$lookup: {from: foreignColl, localField: "x", foreignField: "_id", as: "result"}}])},
-    ErrorCodes.LockTimeout);
+let err = assert.throwsWithCode(() => {
+    sessionDB.getCollection(localColl).aggregate(
+        [{$lookup: {from: foreignColl, localField: "x", foreignField: "_id", as: "result"}}]);
+}, ErrorCodes.LockTimeout);
 assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
 
 fp.off();

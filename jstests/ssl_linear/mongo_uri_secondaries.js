@@ -5,7 +5,7 @@
 // To install trusted-ca.pem for local testing on OSX, invoke the following at a console:
 //   security add-trusted-cert -d jstests/libs/trusted-ca.pem
 
-import {getPython3Binary} from "jstests/libs/python.js"
+import {getPython3Binary} from "jstests/libs/python.js";
 
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 jsTest.log("HOST_TYPE = " + HOST_TYPE);

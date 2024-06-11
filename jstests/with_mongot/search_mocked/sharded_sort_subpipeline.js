@@ -32,7 +32,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     }
 });
 
-const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch()
+const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 
 stWithMock.start();
 stWithMock.assertEmptyMocks();

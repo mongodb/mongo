@@ -38,7 +38,8 @@ function runTest(testCase) {
     const session = st.s.startSession();
     session.startTransaction({readConcern: {level: "snapshot"}});
     session.getDatabase(dbName).getCollection(collName2).insert({x: 1});
-    let hangDonorAtStartOfRangeDel = configureFailPoint(st.rs1.getPrimary(), "suspendRangeDeletion")
+    let hangDonorAtStartOfRangeDel =
+        configureFailPoint(st.rs1.getPrimary(), "suspendRangeDeletion");
 
     // Move all chunks for testDb.testColl to shard0.
     const moveChunkShell = startParallelShell(

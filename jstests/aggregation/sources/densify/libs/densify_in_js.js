@@ -103,14 +103,13 @@ export function densifyInJS(stage, docs) {
     // Explicit ranges always generate on-step relative to the lower-bound of the range,
     // this function encapsulates the logic to do that for dates (requires a loop since steps aren't
     // always constant sized).
-    const getNextStepFromBase =
-        (val, base, step) => {
-            let nextStep = base;
-            while (nextStep <= val) {
-                nextStep = add(nextStep, step);
-            }
-            return nextStep;
+    const getNextStepFromBase = (val, base, step) => {
+        let nextStep = base;
+        while (nextStep <= val) {
+            nextStep = add(nextStep, step);
         }
+        return nextStep;
+    };
 
     if (bounds === "full") {
         if (docs.length == 0) {
@@ -120,11 +119,9 @@ export function densifyInJS(stage, docs) {
         const maxValue = docsWithoutNulls[docsWithoutNulls.length - 1][field];
         return densifyInJS({field: stage.field, range: {step, bounds: [minValue, maxValue], unit}},
                            docs);
-    }
-    else if (bounds === "partition") {
+    } else if (bounds === "partition") {
         throw new Error("Partitioning not supported by JS densify.");
-    }
-    else if (bounds.length == 2) {
+    } else if (bounds.length == 2) {
         const [lower, upper] = bounds;
         let currentVal = docsWithoutNulls.length > 0
             ? Math.min(docsWithoutNulls[0], sub(lower, step))

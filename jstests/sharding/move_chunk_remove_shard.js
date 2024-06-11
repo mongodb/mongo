@@ -36,8 +36,9 @@ moveOutSessionChunks(st, st.shard1.shardName, st.shard0.shardName);
 
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
-st.forEachConfigServer((conn) => {assert.commandWorked(conn.adminCommand(
-                           {setParameter: 1, balancerMigrationsThrottlingMs: 200}))});
+st.forEachConfigServer((conn) => {
+    assert.commandWorked(conn.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 200}));
+});
 
 let joinMoveChunk = moveChunkParallel(staticMongod,
                                       st.s.host,

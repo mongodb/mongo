@@ -110,21 +110,19 @@ function assertMergeBehaviour(
         "command.pipeline.$mergeCursors": {$exists: 1}
     };
     const owningShardMergeCount = owningShardDB.system.profile.find(mergeFilter).itcount();
-    const nonPrimaryShardMergeCount = nonOwningShardDB.system.profile.find(mergeFilter).itcount()
+    const nonPrimaryShardMergeCount = nonOwningShardDB.system.profile.find(mergeFilter).itcount();
 
-    const foundMessage =
-        function() {
+    const foundMessage = function() {
         return "found " + owningShardMergeCount + " merges on the owning shard and " +
             nonPrimaryShardMergeCount + " on the other shard. Total merges on shards: " +
             (owningShardMergeCount + nonPrimaryShardMergeCount);
-    }
+    };
 
     if (mergeType === "mongos") {
         assert.eq(owningShardMergeCount + nonPrimaryShardMergeCount,
                   0,
                   "Expected merge on mongos, but " + foundMessage());
-    }
-    else {
+    } else {
         assert(mergeType === "anyShard" || mergeType === "specificShard",
                "unknown merge type: " + mergeType);
         assert.eq(owningShardMergeCount + nonPrimaryShardMergeCount,

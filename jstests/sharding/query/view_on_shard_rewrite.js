@@ -127,8 +127,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, 'TrackUnshardedCollectionsUponCrea
         // shard.
         session1.startTransaction({readConcern: {level: 'snapshot'}});
         session2.startTransaction({readConcern: {level: 'majority'}});
-        assertReadOnView(session1.getDatabase(dbName)[viewName], false /* expectKickBackToMongos */)
-        assertReadOnView(session1.getDatabase(dbName)[viewName], false /* expectKickBackToMongos */)
+        assertReadOnView(session1.getDatabase(dbName)[viewName],
+                         false /* expectKickBackToMongos */);
+        assertReadOnView(session1.getDatabase(dbName)[viewName],
+                         false /* expectKickBackToMongos */);
         session1.commitTransaction();
         session2.commitTransaction();
     }

@@ -274,7 +274,7 @@ function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentP
                 explainOut[key], expectedMatches[key], preMsg, totalFieldName);
         } else if (key == "stage" && expectedMatches[key] == "UPDATE") {
             // Express handles update-by-id post 8.0
-            let want = [expectedMatches[key], "EXPRESS_UPDATE"]
+            let want = [expectedMatches[key], "EXPRESS_UPDATE"];
             assert.contains(explainOut[key],
                             want,
                             preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +
@@ -282,7 +282,7 @@ function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentP
 
         } else if (key == "stage" && expectedMatches[key] == "DELETE") {
             // Express handles delete-by-id post 8.0
-            let want = [expectedMatches[key], "EXPRESS_DELETE"]
+            let want = [expectedMatches[key], "EXPRESS_DELETE"];
             assert.contains(explainOut[key],
                             want,
                             preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +

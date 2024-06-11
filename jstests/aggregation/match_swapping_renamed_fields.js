@@ -211,7 +211,7 @@ assert.eq(2, matchStages.length);
 
 // Test that we correctly match using the '$elemMatch' expression on renamed subfields. Designed to
 // reproduce HELP-59485.
-coll.drop()
+coll.drop();
 assert.commandWorked(coll.insertMany([
     {
         _id: 0,
@@ -266,7 +266,7 @@ runElemMatchTest({
         }
     ],
     expectedDocumentIds: [1]
-})
+});
 
 // Repeat the previous test case, but this time with a $project stage targeting a deeply nested
 // transform.
@@ -289,7 +289,7 @@ runElemMatchTest({
         }
     ],
     expectedDocumentIds: [1],
-})
+});
 
 // Similarly, ensure that we match on the correct documents when using $elemMatch expressions on
 // simple dot-syntax renamed fields.
@@ -303,4 +303,4 @@ runElemMatchTest({
         }
     ],
     expectedDocumentIds: [1]
-})
+});

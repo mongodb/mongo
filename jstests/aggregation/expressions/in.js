@@ -182,7 +182,7 @@ testExpressionWithIntersection({
     array2: [2, 3, 4],
     elementIsIncluded: false,
     queryFormShouldBeEquivalent: false
-})
+});
 
 testExpressionWithIntersection({
     element: 2,
@@ -190,7 +190,7 @@ testExpressionWithIntersection({
     array2: [2, 3, 4],
     elementIsIncluded: true,
     queryFormShouldBeEquivalent: false
-})
+});
 
 testExpressionWithIntersection({
     element: 1,
@@ -198,7 +198,7 @@ testExpressionWithIntersection({
     array2: [4, 5, 6],
     elementIsIncluded: false,
     queryFormShouldBeEquivalent: false
-})
+});
 
 testExpressionWithIntersection({
     element: 1,
@@ -206,7 +206,7 @@ testExpressionWithIntersection({
     array2: [],
     elementIsIncluded: false,
     queryFormShouldBeEquivalent: false
-})
+});
 
 testExpressionWithIntersection({
     element: 1,
@@ -214,7 +214,7 @@ testExpressionWithIntersection({
     array2: [4, 5, 6],
     elementIsIncluded: false,
     queryFormShouldBeEquivalent: false
-})
+});
 
 /* ------------------------ Mismatched Types Tests ------------------------ */
 

@@ -72,7 +72,7 @@ export var WriteWithoutShardKeyTestUtil = (function() {
                         // sort order was updated.
                         if (updatedDocId) {
                             let idField = Object.keys(updatedDocId)[0];
-                            let idValue = updatedDocId[idField]
+                            let idValue = updatedDocId[idField];
                             assert.eq(doc[idField], idValue);
                         }
                     }

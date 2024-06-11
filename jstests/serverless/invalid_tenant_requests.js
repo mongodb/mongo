@@ -14,7 +14,7 @@ function createnewReplSetTest(param) {
 }
 
 function setupNewReplSetWithParam(param) {
-    let rst = createnewReplSetTest(param)
+    let rst = createnewReplSetTest(param);
     let primary = rst.getPrimary();
     let adminDb = primary.getDB('admin');
     assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));

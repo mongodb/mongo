@@ -10,7 +10,7 @@ import {
     getShardQueryPlans,
     getWinningPlanFromExplain,
     runOnAllTopLevelExplains
-} from "jstests/libs/analyze_plan.js"
+} from "jstests/libs/analyze_plan.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {
     leftmostLeafStage,
@@ -476,18 +476,19 @@ function runTest(db, coll, isSharded) {
     // Test that the parsedQuery field is empty when the query is empty.
     explain = coll.find().explain();
     analyzeTopLevelExplain(
-        explain, false /* expectedMaxPSRCountReached */, {"filter": {}} /* expectedParsedQuery */)
+        explain, false /* expectedMaxPSRCountReached */, {"filter": {}} /* expectedParsedQuery */);
 
     explain = coll.explain().aggregate();
-    analyzeTopLevelExplain(
-        explain, false /* expectedMaxPSRCountReached */, {"pipeline": []} /* expectedParsedQuery */)
+    analyzeTopLevelExplain(explain,
+                           false /* expectedMaxPSRCountReached */,
+                           {"pipeline": []} /* expectedParsedQuery */);
 
     // Test that the parsedQuery field is correct for a more complex query.
     explain = coll.find({$or: [{a: 1}, {a: {$lt: 1}}]}, {a: 1}).explain();
     analyzeTopLevelExplain(explain, false /* expectedMaxPSRCountReached */, {
         "filter": {"$or": [{"a": {"$eq": 1}}, {"a": {"$lt": 1}}]},
         "projection": {"a": true, "_id": true}
-    })
+    });
 
     explain = coll.explain().aggregate([{$match: {$and: [{a: {$lt: 5}}, {a: 5}]}}]);
     analyzeTopLevelExplain(explain,

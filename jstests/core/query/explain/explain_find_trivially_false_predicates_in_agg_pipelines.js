@@ -15,7 +15,7 @@
  * ]
  */
 
-import {getExplainPipelineFromAggregationResult} from "jstests/aggregation/extras/utils.js"
+import {getExplainPipelineFromAggregationResult} from "jstests/aggregation/extras/utils.js";
 import {
     aggPlanHasStage,
     getAggPlanStages,
@@ -23,7 +23,7 @@ import {
     isEofPlan,
     planHasStage
 } from "jstests/libs/analyze_plan.js";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js"
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 function assertPlanIsEOF(plan) {
     // Explain query output doesn't include planning for the foreign branch hence we use execution
@@ -48,12 +48,12 @@ function assertUnionOfPlans(plan, firstPartStage, secondPartStage) {
 
 const collName = "explain_find_trivially_false_predicates_in_agg_pipelines";
 
-const localCollName = `${collName}-local`
+const localCollName = `${collName}-local`;
 assertDropAndRecreateCollection(db, localCollName);
 const localColl = db[localCollName];
 assert.commandWorked(localColl.insert(Array.from({length: 10}, (_, i) => ({a: i, side: "local"}))));
 
-const foreignCollName = `${collName}-foreign`
+const foreignCollName = `${collName}-foreign`;
 assertDropAndRecreateCollection(db, foreignCollName);
 const foreignColl = db[foreignCollName];
 assert.commandWorked(

@@ -56,7 +56,7 @@ function runTests() {
         createAndSetSecurityToken(conn, tenant, true);
         insertDb(conn, tenant + "_firstRegDb");
         checkDbNum(conn, 1);
-        resetSecurityToken(conn)
+        resetSecurityToken(conn);
     }
 
     createAndSetSecurityToken(primary, tenant2, false);
@@ -64,13 +64,13 @@ function runTests() {
     insertDb(primary, "thirdRegDb");
     checkDbNum(primary, 2);
 
-    resetSecurityToken(primary)
+    resetSecurityToken(primary);
 
     createAndSetSecurityToken(primary, tenant3, false);
     insertDb(primary, "fourthRegDb");
     checkDbNum(primary, 1);
 
-    resetSecurityToken(primary)
+    resetSecurityToken(primary);
 
     createAndSetSecurityToken(primary, tenant2, false);
     insertDb(primary, "fifthRegDb");
@@ -90,7 +90,7 @@ function runTestExpectPrefixTrue() {
     createAndSetSecurityToken(primary, tenant, true);
     insertDb(primary, tenant + "_firstRegDb");
     checkDbNum(primary, 1);
-    resetSecurityToken(primary)
+    resetSecurityToken(primary);
 
     createAndSetSecurityToken(primary, tenant2, true);
     insertDb(primary, tenant2 + "_secondRegDb");

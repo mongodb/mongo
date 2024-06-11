@@ -81,7 +81,7 @@ assertGetFieldFailedWithCode({field: {$const: []}, input: {"a": 1}}, [5654602, 3
 // Test that $getField returns the correct value from the provided object.
 assertGetFieldResultsEq({field: "a", input: {a: "b"}}, [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
 assertGetFieldResultsEq({field: {$concat: ["a", "b"]}, input: {ab: "b"}},
-                        [{_id: 0, test: "b"}, {_id: 1, test: "b"}])
+                        [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
 assertGetFieldResultsEq({field: {$cond: [false, null, "x"]}, input: {x: "b"}},
                         [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
 assertGetFieldResultsEq({field: {$cond: [{$eq: ["$y", 9]}, null, "x"]}, input: {x: "b"}},

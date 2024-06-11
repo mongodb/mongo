@@ -22,7 +22,9 @@ export function interruptAdminCommand(node, cmdNames) {
             .aggregate([{$currentOp: {}}, {$match: {$or: cmdNameFilter}}],
                        {$readPreference: {mode: "primaryPreferred"}})  // specify secondary ok.
             .toArray();
-    results.forEach(result => {adminDB.killOp(result.opid)});
+    results.forEach(result => {
+        adminDB.killOp(result.opid);
+    });
 }
 
 export function interruptConfigsvrAddShard(configPrimary) {

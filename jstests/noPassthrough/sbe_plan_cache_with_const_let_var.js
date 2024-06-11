@@ -42,11 +42,11 @@ result = assert.commandWorked(db.runCommand(findWithConstLet5)).cursor.firstBatc
 assert.eq(result, [{_id: 5}]);
 assert.gt(coll.getPlanCache().list().length, 0, coll.getPlanCache().list());
 
-let exp = assert.commandWorked(db.runCommand({explain: findWithConstLet5}))
+let exp = assert.commandWorked(db.runCommand({explain: findWithConstLet5}));
 let planCacheKey = getPlanCacheKeyFromExplain(exp);
 
 result = assert.commandWorked(db.runCommand(findWithConstLet500)).cursor.firstBatch;
-exp = assert.commandWorked(db.runCommand({explain: findWithConstLet500}))
+exp = assert.commandWorked(db.runCommand({explain: findWithConstLet500}));
 
 // Test that two queries with different consts have the same planCacheKey and the returned results
 // are correct and different. Otherwise, the const let value may be incorrectly baked into SBE plan

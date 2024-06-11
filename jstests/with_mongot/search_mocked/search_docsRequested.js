@@ -23,7 +23,7 @@ import {
 const dbName = "test";
 const collName = "search_docsrequested";
 const chunkBoundary = 8;
-const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch()
+const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 
 const docs = [
     {"_id": 1, "title": "cakes"},

@@ -108,7 +108,7 @@ for (let i = 0; i < docs.length; i++) {
         relevantDocsSortedByStreams.push(docs[i]);
         relevantSearchDocs.push({_id: docs[i]._id, $searchScore: searchScore});
         relevantStoredSourceDocs.push({storedSource: docs[i], $searchScore: searchScore});
-        relevantDocsOnlyTitle.push({title: docs[i].title})
+        relevantDocsOnlyTitle.push({title: docs[i].title});
     }
 
     // The documents with lower _id will have a higher search score.

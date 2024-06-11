@@ -52,7 +52,7 @@ assert.commandWorked(primary.adminCommand({balancerStop: 1}));
 assert.soon(() => {
     const res = assert.commandWorked(primary.adminCommand({balancerStatus: 1}));
     return !res.inBalancerRound;
-})
+});
 
 const dbName = "testDb";
 const collName = "testColl";

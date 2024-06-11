@@ -51,11 +51,13 @@ function testRenameUnsplittableCollection(configDb,
 
     // Print descriptive test message
     let msg = "Running test: rename collection `" + nssFrom + "` located on shard `" + shardName +
-        "` to `" + nssTo + "` with dropTarget=`" + dropTarget + "`."
+        "` to `" + nssTo + "` with dropTarget=`" + dropTarget + "`.";
     if (collToShouldExist) {
-        msg += " Target collection exists on shard `" + collToShardName + "`."
+        msg += " Target collection exists on shard `" + collToShardName + "`.";
+    } else {
+        msg += " Target collection doesn't exist.";
     }
-    else {msg += " Target collection doesn't exist."} jsTestLog(msg);
+    jsTestLog(msg);
 
     // Create collFrom collection
     assert.commandWorked(
@@ -112,7 +114,7 @@ testRenameUnsplittableCollection(configDb,
                                  primaryShard);
 
 // 3. Rename collection  test:not located on the primary shard
-testRenameUnsplittableCollection(configDb, db, "collFrom3", db, "collTo3", nonPrimaryShard)
+testRenameUnsplittableCollection(configDb, db, "collFrom3", db, "collTo3", nonPrimaryShard);
 
 // 4. Rename collection  test:not located on the primary shard when target exists
 testRenameUnsplittableCollection(configDb,

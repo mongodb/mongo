@@ -1401,7 +1401,7 @@ var ShardingTest = function ShardingTest(params) {
     if (this._useBridge) {
         assert(
             !jsTestOptions().tlsMode,
-            'useBridge cannot be true when using TLS. Add the requires_mongobridge tag to the test to ensure it will be skipped on variants that use TLS.')
+            'useBridge cannot be true when using TLS. Add the requires_mongobridge tag to the test to ensure it will be skipped on variants that use TLS.');
     }
 
     this._unbridgedMongos = [];
@@ -2118,7 +2118,7 @@ var ShardingTest = function ShardingTest(params) {
             // replica set.
             assert.soonNoExcept(() => {
                 function getConfigShardDoc() {
-                    return csrsPrimary.getDB("config").shards.findOne({_id: "config"})
+                    return csrsPrimary.getDB("config").shards.findOne({_id: "config"});
                 }
                 const configShardDoc = this.keyFile
                     ? authutil.asCluster(csrsPrimary, this.keyFile, getConfigShardDoc)

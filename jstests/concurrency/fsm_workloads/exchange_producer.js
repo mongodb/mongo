@@ -50,15 +50,18 @@ export const $config = (function() {
             return function consumerCallback(db, collName) {
                 return runGetMoreOnCursor(
                     db, collName, consumerId, this.batchSize, this.cursorIds, this.sessionId);
-            }
+            };
         }
 
         return {
             // A no-op starting state so the worker threads don't all start on the same cursors.
-            init: function init(db, collName) {}, consumer0: makeConsumerCallback(0),
-                consumer1: makeConsumerCallback(1), consumer2: makeConsumerCallback(2),
-                consumer3: makeConsumerCallback(3), consumer4: makeConsumerCallback(4),
-        }
+            init: function init(db, collName) {},
+            consumer0: makeConsumerCallback(0),
+            consumer1: makeConsumerCallback(1),
+            consumer2: makeConsumerCallback(2),
+            consumer3: makeConsumerCallback(3),
+            consumer4: makeConsumerCallback(4),
+        };
     }();
 
     var allStatesEqual =
@@ -124,7 +127,13 @@ export const $config = (function() {
     // threadCount must be equal to numConsumers. We need as many worker threads as consumers to
     // avoid a deadlock where all threads are waiting for one particular cursor to run a getMore.
     return {
-        threadCount: data.numConsumers, iterations: 20, startState: 'init', states: states,
-            transitions: transitions, setup: setup, teardown: teardown, data: data
-    }
+        threadCount: data.numConsumers,
+        iterations: 20,
+        startState: 'init',
+        states: states,
+        transitions: transitions,
+        setup: setup,
+        teardown: teardown,
+        data: data
+    };
 })();

@@ -112,7 +112,7 @@ jsTest.log("Testing replSetAbortPrimaryCatchUp");
                                    },
                                    "test")
                         .n;
-        return count == 1
+        return count == 1;
     });
     const stopReplProducerFailPoint1 = configureFailPoint(secondary1Conn, 'stopReplProducer');
     stopReplProducerFailPoint1.wait();

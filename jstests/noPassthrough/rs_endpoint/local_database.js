@@ -86,9 +86,7 @@ function runTests(shard0Primary, shard0Secondary, tearDownFunc, isMultitenant) {
     const {router, mongos} = (() => {
         if (shard0Primary.routerHost) {
             const router = new Mongo(shard0Primary.routerHost);
-            return {
-                router
-            }
+            return {router};
         }
         const shard0URL = getReplicaSetURL(shard0Primary);
         const mongos = MongoRunner.runMongos({configdb: shard0URL});

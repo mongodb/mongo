@@ -39,8 +39,7 @@ const _id = "randomId";
 /**
  * Checks that basic CRUD operations work as expected.
  */
-const checkBasicCRUD =
-    function(coll, _id) {
+const checkBasicCRUD = function(coll, _id) {
     const sleepMs = 1;
     const numRetries = 99999;
     const NUM_NODES = 3;
@@ -59,10 +58,9 @@ const checkBasicCRUD =
 
     assert.commandWorked(coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}}));
     assert.eq(_id, retryableFindOne(coll, {_id: _id})._id);
-}
+};
 
-const checkCRUDThread =
-    function(host, ns, _id, countdownLatch, checkBasicCRUD) {
+const checkCRUDThread = function(host, ns, _id, countdownLatch, checkBasicCRUD) {
     const mongo = new Mongo(host);
     const session = mongo.startSession({retryWrites: true});
     const [dbName, collName] = ns.split(".");
@@ -71,7 +69,7 @@ const checkCRUDThread =
         checkBasicCRUD(db[collName], _id);
         sleep(1);  // milliseconds
     }
-}
+};
 
 let replSet = new ReplSetTest({nodes: NUM_NODES, name: "rs_to_config_shard"});
 replSet.startSet({});

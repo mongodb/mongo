@@ -25,7 +25,7 @@ function runCommandWithRecordIdsReplicated(
     const collName = commandObj[commandName];
     const ns = dbName + "." + collName;
     if (commandName === "drop") {
-        createdCollections.delete(ns)
+        createdCollections.delete(ns);
         return func.apply(conn, makeFuncArgs(commandObj));
     }
     if (!commandsToOverride.has(commandName) || createdCollections.has(ns) ||

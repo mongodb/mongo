@@ -24,7 +24,7 @@ import {
     forwardIxscan,
     runRewritesTest,
     setupColl
-} from "jstests/core/timeseries/libs/timeseries_sort_util.js"
+} from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
 const collName = "bucket_unpacking_with_sort";
 const coll = db[collName];

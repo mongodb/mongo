@@ -32,7 +32,7 @@ export function validateProfilerCollections(hostDoc, hostDocs, numProfilerDocsPe
     const conn = new Mongo(hostDoc.host);
     conn.setSecondaryOk();
     jsTest.authenticate(conn);
-    numProfilerDocsPerHost[hostDoc.host] = 0
+    numProfilerDocsPerHost[hostDoc.host] = 0;
 
     const dbNames = conn.getDBNames();
     for (let dbName of dbNames) {

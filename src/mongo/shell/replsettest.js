@@ -2210,7 +2210,7 @@ var ReplSetTest = function ReplSetTest(opts) {
 
         if (targetNode !== undefined) {
             print(`ReplSetTest awaitReplication: wait against targetNode ${
-                targetNode.host} instead of primary.`)
+                targetNode.host} instead of primary.`);
         }
 
         timeout = timeout || this.kDefaultTimeoutMS;
@@ -3151,7 +3151,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         dbs.forEach(db => {
             if (db.tenantId) {
                 try {
-                    const token = _createTenantToken({tenant: db.tenantId})
+                    const token = _createTenantToken({tenant: db.tenantId});
                     rst.nodes.forEach(node => node._setSecurityToken(token));
                     checkTenantChangeCollection(rst, secondaries, db);
                 } finally {
@@ -3888,7 +3888,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         if (rst._useBridge) {
             assert(
                 !jsTestOptions().tlsMode,
-                'useBridge cannot be true when using TLS. Add the requires_mongobridge tag to the test to ensure it will be skipped on variants that use TLS.')
+                'useBridge cannot be true when using TLS. Add the requires_mongobridge tag to the test to ensure it will be skipped on variants that use TLS.');
         }
 
         rst._bridgeOptions = opts.bridgeOptions || {};

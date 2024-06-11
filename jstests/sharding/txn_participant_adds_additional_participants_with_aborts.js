@@ -194,7 +194,7 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
         assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
     const finalMongodTxnMetrics = allParticipants.map((shard) => {
         return assert.commandWorked(shard.adminCommand({serverStatus: 1})).transactions;
-    })
+    });
     verifyFinalAbortedTransactionMetrics(initialMongosTxnMetrics,
                                          initialMongodTxnMetrics,
                                          finalMongosTxnMetrics,
@@ -252,7 +252,7 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
         assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
     const finalMongodTxnMetrics = allParticipants.map((shard) => {
         return assert.commandWorked(shard.adminCommand({serverStatus: 1})).transactions;
-    })
+    });
     verifyFinalAbortedTransactionMetrics(initialMongosTxnMetrics,
                                          initialMongodTxnMetrics,
                                          finalMongosTxnMetrics,

@@ -98,7 +98,7 @@ function assertOneResult(cursor) {
         assert.eq(entry.isPinned, true);
     } else {
         // No version:2 entries should have been written.
-        assert.eq(planCacheEntries.filter((entry) => entry.version === "2").length, 0)
+        assert.eq(planCacheEntries.filter((entry) => entry.version === "2").length, 0);
 
         // We should have two cache entries.
         assert.eq(planCacheEntries.length, 2);
@@ -149,7 +149,7 @@ function assertOneResult(cursor) {
         assert.eq(entry.isPinned, true);
     } else {
         // No version:2 entries should have been written.
-        assert.eq(planCacheEntries.filter((entry) => entry.version == 2).length, 0)
+        assert.eq(planCacheEntries.filter((entry) => entry.version == 2).length, 0);
 
         // We should still have two cache entries.
         assert.eq(planCacheEntries.length, 2);
@@ -199,7 +199,7 @@ function assertOneResult(cursor) {
         // successfully used in the second run.
 
         // No version:2 entries should have been written.
-        assert.eq(planCacheEntries.filter((entry) => entry.version == 2).length, 0)
+        assert.eq(planCacheEntries.filter((entry) => entry.version == 2).length, 0);
 
         // We should still have two cache entries.
         assert.eq(planCacheEntries.length, 2);
@@ -261,7 +261,7 @@ jsTestLog("Running test which forces SubPlanner to plan the entire query");
 // Now we run a query where the planner attempts to use subplanning, but ends up planning the whole
 // query as one.
 {
-    coll.dropIndexes()
+    coll.dropIndexes();
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.createIndex({b: 1}));
     assert.commandWorked(coll.createIndex({x: 1}));

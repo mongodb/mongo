@@ -23,7 +23,7 @@ import {
     forwardIxscan,
     runRewritesTest,
     setupColl
-} from "jstests/core/timeseries/libs/timeseries_sort_util.js"
+} from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
 const metaCollName = "bucket_unpacking_with_sort_with_meta_on_single_field_point_queries";
 const metaColl = db[metaCollName];

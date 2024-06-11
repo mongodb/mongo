@@ -83,7 +83,7 @@ function testQueryShapeHash(query) {
         assert.eq(slowLogQueryShapeHash,
                   querySettingsQueryShapeHash,
                   "Query shape hash from the logs doesn't match the one from query settings");
-    })
+    });
 }
 
 {

@@ -67,7 +67,7 @@ assert.commandWorked(st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUp
     }));
 
     session.abortTransaction();
-    jsTest.log("Exiting verifyStartOrContinueTransactionCanSpecifyReadConcern.")
+    jsTest.log("Exiting verifyStartOrContinueTransactionCanSpecifyReadConcern.");
 })();
 
 st.stop();

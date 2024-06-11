@@ -72,7 +72,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // when the mongos is fetching data from the shard using getMore(). Remove
         // theinterruptedQueryErrors from allowedErrorCodes once this bug is being addressed
         if (TestData.runningWithBalancer) {
-            allowedErrorCodes = allowedErrorCodes.concat(interruptedQueryErrors)
+            allowedErrorCodes = allowedErrorCodes.concat(interruptedQueryErrors);
         }
 
         assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);

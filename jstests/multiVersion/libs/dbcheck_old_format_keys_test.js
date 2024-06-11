@@ -30,7 +30,7 @@ const upgradeVersions = {
     "8.0": {"fcv": "8.1", "nextVersion": "latest"},
     // TODO (SERVER-66611): Automate modifying this list.
     "latest": {}
-}
+};
 
 export class DbCheckOldFormatKeysTest {
     constructor({

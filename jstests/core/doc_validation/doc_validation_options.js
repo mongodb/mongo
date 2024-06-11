@@ -61,7 +61,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
         t.runCommand("collMod", {validationAction: "errorAndLog"}), ErrorCodes.InvalidOptions);
     if (res.ok) {
         assertFailsValidation(t.update({}, {$set: {a: 2}}));
-        checkLogsForFailedValidation(errorAndLogId)
+        checkLogsForFailedValidation(errorAndLogId);
         // make sure persisted
         const info = db.getCollectionInfos({name: t.getName()})[0];
         assert.eq("errorAndLog", info.options.validationAction, tojson(info));
@@ -74,7 +74,7 @@ t.update({}, {$set: {a: 2}});
 assert.eq(1, t.find({a: 2}).itcount());
 // check log for message. In case of sharded deployments, look on all shards and expect the log to
 // be found on one of them.
-checkLogsForFailedValidation(warnLogId)
+checkLogsForFailedValidation(warnLogId);
 // make sure persisted
 const info = db.getCollectionInfos({name: t.getName()})[0];
 assert.eq("warn", info.options.validationAction, tojson(info));

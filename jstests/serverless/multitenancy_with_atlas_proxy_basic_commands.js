@@ -459,18 +459,18 @@ const otherSecurityToken = _createTenantToken({tenant: kOtherTenant, expectPrefi
     rst.awaitSecondaryNodes();
     rst.awaitReplication();
     assert.soon(function() {
-        return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1)
+        return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
     });
     const tenantNss = kPrefixedDbName + "." + kCollName;
     if (FeatureFlagUtil.isPresentAndEnabled(rst.getPrimary(), "SecondaryIndexChecksInDbCheck")) {
         // dbCheckStart and dbCheckStop have tenantId as well
         assert.soon(function() {
-            return (healthlog.find({"namespace": tenantNss}).itcount() == 3)
+            return (healthlog.find({"namespace": tenantNss}).itcount() == 3);
         });
     } else {
         // only dbCheckBatch has tenantId
         assert.soon(function() {
-            return (healthlog.find({"namespace": tenantNss}).itcount() == 1)
+            return (healthlog.find({"namespace": tenantNss}).itcount() == 1);
         });
     }
 }

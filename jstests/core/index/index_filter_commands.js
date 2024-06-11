@@ -292,7 +292,7 @@ if (!FixtureHelpers.isMongos(db)) {
         explain = getSingleNodeExplain(coll.find({z: 1}).explain(verbosity));
         assert.eq(true, getQueryPlanner(explain).indexFilterSet, explain);
         explain =
-            getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity))
+            getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity));
         assert.eq(true, getQueryPlanner(explain).indexFilterSet, verbosity);
     });
 } else {

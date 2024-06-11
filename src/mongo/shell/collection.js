@@ -685,12 +685,12 @@ DBCollection.prototype.createSearchIndex = function(keys, blockUntilSearchIndexQ
             Object.keys(blockUntilSearchIndexQueryable).length != 1 ||
             !blockUntilSearchIndexQueryable.hasOwnProperty('blockUntilSearchIndexQueryable')) {
             throw new Error(
-                "createSearchIndex only accepts index definition object and blockUntilSearchIndexQueryable object")
+                "createSearchIndex only accepts index definition object and blockUntilSearchIndexQueryable object");
         }
 
         blockOnIndexQueryable = blockUntilSearchIndexQueryable["blockUntilSearchIndexQueryable"];
         if (typeof blockOnIndexQueryable != "boolean") {
-            throw new Error("'blockUntilSearchIndexQueryable' argument must be a boolean")
+            throw new Error("'blockUntilSearchIndexQueryable' argument must be a boolean");
         }
     }
 
@@ -721,7 +721,7 @@ DBCollection.prototype.createSearchIndex = function(keys, blockUntilSearchIndexQ
             let host = shardDoc.host;
             // This connects to primary of each shard.
             let sconn = new Mongo(host);
-            response = this._runCreateSearchIndexOnPrimary(keys, blockOnIndexQueryable, sconn)
+            response = this._runCreateSearchIndexOnPrimary(keys, blockOnIndexQueryable, sconn);
         }
         return response;
     }

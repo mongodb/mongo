@@ -28,7 +28,7 @@ function getCollMetadataWithRefresh(node, collName) {
 
         shardVersionRes = res;
         return true;
-    })
+    });
 
     return shardVersionRes;
 }

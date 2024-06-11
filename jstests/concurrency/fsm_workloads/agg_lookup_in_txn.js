@@ -183,7 +183,7 @@ export const $config = (function() {
         coll_aux.createIndex({_id: 1});
         const mustShardForeignCollection = cluster.isSharded() && Random.rand() > 0.5;
         if (mustShardForeignCollection) {
-            jsTest.log("Sharding auxiliary collection")
+            jsTest.log("Sharding auxiliary collection");
             cluster.shardCollection(coll_aux, this.shardKey, false);
         } else {
             jsTest.log("Auxiliary collection will be unsharded");

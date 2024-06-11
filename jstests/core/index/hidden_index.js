@@ -70,7 +70,7 @@ function validateHiddenIndexBehaviour(
             assert.eq(numOfUsedIndexes(explain), 0);
             break;
         default:
-            break
+            break;
     }
 
     assert.commandWorked(coll.hideIndex(index_name));
@@ -102,7 +102,7 @@ function validateHiddenIndexBehaviour(
             assert.eq(numOfUsedIndexes(explain), 0);
             break;
         default:
-            break
+            break;
     }
 
     assert.commandWorked(coll.dropIndex(index_name));

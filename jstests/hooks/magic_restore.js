@@ -272,7 +272,7 @@ const topology = DiscoverTopology.findConnectedNodes(db);
 
 if (topology.type == Topology.kShardedCluster) {
     // Perform restore for the config server.
-    const path = MongoRunner.dataPath + '../magicRestore/configsvr/node0'
+    const path = MongoRunner.dataPath + '../magicRestore/configsvr/node0';
     let configMongo = new Mongo(topology.configsvr.nodes[0]);
     performMagicRestore(configMongo, path, "configsvr", {"replSet": "config-rs", "configsvr": ''});
 

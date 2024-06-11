@@ -17,7 +17,10 @@
  *     cannot_run_during_upgrade_downgrade,
  * ]
  */
-import {runDoesntRewriteTest, setupColl} from "jstests/core/timeseries/libs/timeseries_sort_util.js"
+import {
+    runDoesntRewriteTest,
+    setupColl
+} from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
 const geoCollName = 'bucket_unpacking_with_sort_with_geo';
 const geoColl = db[geoCollName];

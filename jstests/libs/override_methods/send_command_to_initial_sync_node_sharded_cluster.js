@@ -55,7 +55,7 @@ function maybeSendCommandToInitialSyncNodesShardedCluster(
     const shardMap = conn.adminCommand({getShardMap: 1});
     if (!shardMap.ok) {
         jsTestLog("Unable to run getShardMap: " + tojson(shardMap) +
-                  ", skipping forwarding command " + _commandName + " to initial sync node")
+                  ", skipping forwarding command " + _commandName + " to initial sync node");
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 

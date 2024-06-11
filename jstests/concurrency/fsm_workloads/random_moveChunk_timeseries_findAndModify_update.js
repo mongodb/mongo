@@ -14,9 +14,9 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
-} from 'jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_arbitrary_updates.js'
+} from 'jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_arbitrary_updates.js';
 
-const logCollection = "log_collection"
+const logCollection = "log_collection";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Perform arbitrary updates on metric fields of measurements.

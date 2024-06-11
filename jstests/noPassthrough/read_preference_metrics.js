@@ -35,14 +35,14 @@ function verifyMetricIncrement(conn, readPref, executedOn, tagged) {
 
     assert(expectedCount == count,
            `Actual count ${count} did not equal expected count ${
-               expectedCount} for readPreference ${readPref}.`)
+               expectedCount} for readPreference ${readPref}.`);
 
     if (tagged) {
         const expectedTaggedCount = preMetrics[executedOn].tagged.external + 1;
         const taggedCount = postMetrics[executedOn].tagged.external;
         assert(expectedTaggedCount == taggedCount,
                `Actual tagged count ${taggedCount} did not equal to expected tagged count ${
-                   expectedTaggedCount} for read preference ${readPref}.`)
+                   expectedTaggedCount} for read preference ${readPref}.`);
     }
 }
 
@@ -59,15 +59,15 @@ function runTest(fixture) {
     ];
 
     for (const readPref of preferences) {
-        verifyMetricIncrement(primary, readPref, "executedOnPrimary")
+        verifyMetricIncrement(primary, readPref, "executedOnPrimary");
         if (readPref != "primary") {
             // For the tagged test on the primary and both tests on the secondary, we skip the
             // primary read preference case. This is because this read preference does not support
             // tag sets, and the command will fail on the secondary before we increment any
             // metrics.
-            verifyMetricIncrement(primary, readPref, "executedOnPrimary", true /* tagged */)
-            verifyMetricIncrement(secondary, readPref, "executedOnSecondary")
-            verifyMetricIncrement(secondary, readPref, "executedOnSecondary", true /* tagged */)
+            verifyMetricIncrement(primary, readPref, "executedOnPrimary", true /* tagged */);
+            verifyMetricIncrement(secondary, readPref, "executedOnSecondary");
+            verifyMetricIncrement(secondary, readPref, "executedOnSecondary", true /* tagged */);
         }
     }
 }
@@ -83,7 +83,7 @@ const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 
-jsTestLog("Testing against replica set")
+jsTestLog("Testing against replica set");
 runTest(rst);
 
 rst.stopSet();
@@ -95,7 +95,7 @@ serverStatus = assert.commandWorked(st.s.getDB("admin").runCommand({serverStatus
 assert(serverStatus.process.startsWith("mongos"), tojson(serverStatus));
 assert(!serverStatus.hasOwnProperty("readPreferenceCounters"), tojson(serverStatus));
 
-jsTestLog("Testing against sharded cluster")
-runTest(st.rs0)
+jsTestLog("Testing against sharded cluster");
+runTest(st.rs0);
 
 st.stop();

@@ -30,7 +30,7 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(coll, {x: 1}, [
 assert.commandWorked(coll.insert({x: -1, _id: -1}));
 assert.commandWorked(coll.insert({x: 1, _id: 1}));
 
-assert.neq(st.s1.getDB(jsTestName()).coll.findOne({x: -1, _id: -1}))
+assert.neq(st.s1.getDB(jsTestName()).coll.findOne({x: -1, _id: -1}));
 
 // Move chunk from shard0 to shard1.
 assert.commandWorked(

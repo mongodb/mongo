@@ -9,7 +9,7 @@
  * ]
  */
 import {getWinningPlanFromExplain, isEofPlan} from "jstests/libs/analyze_plan.js";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js"
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const collName = "explain_find_trivially_false_predicates_in_tailables_over_capped_colls";
 

@@ -68,7 +68,7 @@ let pipeline = [{
         sortBy: {_id: 1},
         output: {rank: {$rank: "$_id"}},
     }
-}]
+}];
 assertErrCodeAndErrMsgContains(coll, pipeline, 5371603, "$rank");
 
 // Rank based accumulators must have a sortBy.

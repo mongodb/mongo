@@ -107,25 +107,28 @@ shard0Primary.getDB(inputCollection.getDB().getName())
     .advanceClusterTime(inputCollection.getDB().getSession().getClusterTime());
 
 jsTestLog("About to start resharding, first attempt");
-const reshardShell = startParallelShell(
-    funWithArgs((inputCollectionFullName,
-                 inputCollectionUUID,
-                 shardName,
-                 atClusterTime,
-                 tempCollectionFullName) => {assert.commandWorked(db.adminCommand({
-                    testReshardCloneCollection: inputCollectionFullName,
-                    shardKey: {newKey: 1},
-                    uuid: inputCollectionUUID,
-                    shardId: shardName,
-                    atClusterTime: atClusterTime,
-                    outputNs: tempCollectionFullName,
-                }))},
-                inputCollection.getFullName(),
-                inputCollectionUUID,
-                st.shard0.shardName,
-                originalInsertsTs,
-                temporaryReshardingCollection.getFullName()),
-    shard0Primary.port);
+const reshardShell =
+    startParallelShell(funWithArgs(
+                           (inputCollectionFullName,
+                            inputCollectionUUID,
+                            shardName,
+                            atClusterTime,
+                            tempCollectionFullName) => {
+                               assert.commandWorked(db.adminCommand({
+                                   testReshardCloneCollection: inputCollectionFullName,
+                                   shardKey: {newKey: 1},
+                                   uuid: inputCollectionUUID,
+                                   shardId: shardName,
+                                   atClusterTime: atClusterTime,
+                                   outputNs: tempCollectionFullName,
+                               }));
+                           },
+                           inputCollection.getFullName(),
+                           inputCollectionUUID,
+                           st.shard0.shardName,
+                           originalInsertsTs,
+                           temporaryReshardingCollection.getFullName()),
+                       shard0Primary.port);
 // Wait for the first attempt to fail.
 attemptFp.wait();
 

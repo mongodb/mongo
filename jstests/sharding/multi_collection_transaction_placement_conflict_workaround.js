@@ -397,7 +397,7 @@ const st = new ShardingTest({mongos: 1, shards: 2});
         const coll = db['sharded'];
 
         assert.commandWorked(st.s.getDB(db.getName()).dropDatabase());
-        assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}))
+        assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
         assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {x: 0}}));
         assert.commandWorked(st.s.adminCommand({
             moveChunk: coll.getFullName(),

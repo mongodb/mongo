@@ -122,7 +122,7 @@ function testRenameReplRidBehavior(
                `Expected $recordId fields to be reassigned after rename. Before rename: ${
                    tojson(docsBeforeWithRids)}, After: ${tojson(docsAfterWithRids)}`);
     }
-    assert(!src.exists())
+    assert(!src.exists());
     validateRidsAcrossNodes(dst);
 }
 

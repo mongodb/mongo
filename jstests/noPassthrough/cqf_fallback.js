@@ -135,7 +135,7 @@ assertSupportedByBonsaiFully({find: coll.getName(), filter: {'a': {$lte: null}}}
 assertSupportedByBonsaiFully({find: coll.getName(), filter: {'a': {$gt: null}}});
 assertSupportedByBonsaiFully(
     {aggregate: coll.getName(), pipeline: [{$match: {a: {$eq: null}}}], cursor: {}});
-assertSupportedByBonsaiFully({find: coll.getName(), filter: {a: {$in: [1, 2, null, 3]}}})
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {a: {$in: [1, 2, null, 3]}}});
 assertSupportedByBonsaiFully({find: coll.getName(), filter: {a: {$elemMatch: {b: null}}}});
 assertSupportedByBonsaiFully({find: coll.getName(), filter: {'a.c': {$elemMatch: {b: null}}}});
 

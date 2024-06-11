@@ -3,7 +3,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 // Constructs a new Mongo instance with the provided URI and asserts it fails with the provided
 // error code.
 function assertConnectFailsWithErrorCode(uri, errorCode) {
-    jsTestLog(`Connecting to ${uri}`)
+    jsTestLog(`Connecting to ${uri}`);
     assert.throwsWithCode(() => new Mongo(uri), errorCode);
 }
 
@@ -11,7 +11,7 @@ function assertConnectFailsWithErrorCode(uri, errorCode) {
 // (true for success). This is used over assertConnectFailsWithErrorCode when CLI-only arguments
 // need to be specified.
 function testShellConnect(ok, ...args) {
-    const cmd = 'assert.commandWorked(db.runCommand({hello: 1}));'
+    const cmd = 'assert.commandWorked(db.runCommand({hello: 1}));';
     const exitCode = runMongoProgram('mongo', '--eval', cmd, ...args);
     if (ok) {
         assert.eq(exitCode, 0, "failed to connect with `" + args.join(' ') + "`");

@@ -6,7 +6,7 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // TODO SERVER-89399: re-enable the hook once it properly serialize with resharding operations

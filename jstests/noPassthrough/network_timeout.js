@@ -13,12 +13,12 @@ TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
 let st = new ShardingTest({shards: 1, mongos: 1, config: 1, rs: {nodes: 2}});
-let testDB = "test"
-let testColl = "testColl"
+let testDB = "test";
+let testColl = "testColl";
 let testNS = testDB + "." + testColl;
 let admin = st.s.getDB("admin");
 
-let conn = new Mongo(st.s.host)
+let conn = new Mongo(st.s.host);
 
 // Shard the collection to test sharding APIs such as AsyncRequestsSender during cluster find.
 assert.commandWorked(admin.runCommand({enableSharding: testDB}));

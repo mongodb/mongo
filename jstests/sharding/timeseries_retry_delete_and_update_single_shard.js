@@ -14,7 +14,7 @@
 
 import {
     runTimeseriesRetryDeleteAndUpdateTest
-} from "jstests/libs/timeseries_retry_delete_and_update.js"
+} from "jstests/libs/timeseries_retry_delete_and_update.js";
 
 const st = new ShardingTest({
     shards: 1,

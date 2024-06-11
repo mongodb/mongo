@@ -45,7 +45,7 @@ for (let i = 0; i < 10; ++i) {
 assert.commandWorked(coll.insert(docs));
 assert.commandWorked(coll.createIndex({a: 1}));
 
-let testComment = "test1"
+let testComment = "test1";
 assert.commandWorked(testDB.runCommand({
     delete: collName,
     deletes: [{q: {a: {$gte: 2}, b: {$gte: 2}}, limit: 1, collation: {locale: "fr"}}],

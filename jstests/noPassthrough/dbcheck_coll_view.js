@@ -60,7 +60,7 @@ replSet.awaitReplication();
 fp.off();
 
 // Ensure that dbCheck completes successfully on all nodes.
-awaitDbCheckCompletion(replSet, db, true /*waitForHealthLogDbCheckStop*/)
+awaitDbCheckCompletion(replSet, db, true /*waitForHealthLogDbCheckStop*/);
 assertForDbCheckErrorsForAllNodes(replSet, true /*assertForErrors*/, true /*assertForWarnings*/);
 
 // Make sure the dbCheck has one batch with the one document we have inserted.

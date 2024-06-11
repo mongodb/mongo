@@ -24,7 +24,7 @@ const db = conn.getDB(dbName);
 const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db) &&
     FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
 
-const coll = db.timeseries
+const coll = db.timeseries;
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));

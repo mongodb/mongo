@@ -77,7 +77,9 @@ function setPauseMigrationsClusterParameter(db, cluster, enabled) {
 
     cluster.executeOnMongosNodes((db) => {
         // Ensure all mongoses have refreshed cluster parameter after being set.
-        assert.soon(() => {return getPauseMigrationsClusterParameter(db) === enabled});
+        assert.soon(() => {
+            return getPauseMigrationsClusterParameter(db) === enabled;
+        });
     });
 }
 
@@ -225,7 +227,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         ignoreErrorsIfInNonTransactionalStepdownSuite(() => {
             const updates = this.createRandomUpdateBatch(collName);
             jsTestLog("Executing updates: " + tojson(updates));
-            const result = db.runCommand({update: collName, updates})
+            const result = db.runCommand({update: collName, updates});
             jsTestLog("Result: " + tojson(result));
             assert.commandWorked(result);
             let totalUpdates = 0;

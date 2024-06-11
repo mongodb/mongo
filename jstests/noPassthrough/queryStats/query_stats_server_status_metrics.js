@@ -276,7 +276,7 @@ function queryStatsAggregationStageTest(conn, testDB, coll) {
             // Test that you can change it at runtime and have it reflected.
 
             assert.commandWorked(conn.getDB("admin").runCommand(
-                {setParameter: 1, internalQueryStatsCacheSize: "8MB"}))
+                {setParameter: 1, internalQueryStatsCacheSize: "8MB"}));
             const metricsPostGrowth = testDB.serverStatus().metrics.queryStats;
             const debugInfo = {original: metrics, postGrowth: metricsPostGrowth};
             assert.eq(8 * 1024 * 1024, metricsPostGrowth.maxSizeBytes, debugInfo);

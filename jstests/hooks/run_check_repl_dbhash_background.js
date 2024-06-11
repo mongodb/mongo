@@ -246,7 +246,7 @@ function checkReplDbhashBackgroundThread(hosts) {
             jsTestLog(`About to run setSecurity token on ${rst}`);
             rst.nodes.forEach(node => node._setSecurityToken(token));
 
-            jsTestLog(`Running checkcollection for ${dbName} with token ${token}`)
+            jsTestLog(`Running checkcollection for ${dbName} with token ${token}`);
             return checkCollectionHashesForDB(dbName, clusterTime);
         } finally {
             rst.nodes.forEach(node => node._setSecurityToken(undefined));

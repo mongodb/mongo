@@ -3,7 +3,7 @@
  */
 
 const collName = "jstests_explain_optimization_stats";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js"
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
@@ -52,7 +52,7 @@ function runTest(db) {
                         emit("val", 1);
                     },
                     reduce: function(k, v) {
-                        return 1
+                        return 1;
                     },
                     out: "example"
                 }

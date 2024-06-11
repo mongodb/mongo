@@ -2,7 +2,7 @@
  * Tests the planSummary field present in CQF explain output.
  */
 
-import {getPlanSummaries} from "jstests/libs/analyze_plan.js"
+import {getPlanSummaries} from "jstests/libs/analyze_plan.js";
 
 function checkSummaries(db, collName, summaryExpected, hint, isSharded) {
     const commands = [

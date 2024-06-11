@@ -30,7 +30,9 @@ for (let i = 0; i < 300; ++i) {
     docs.push({i, multiKey: array});
 }
 Array.shuffle(docs);
-docs.forEach((doc, index) => {doc.stringIndex = `index${index + 1000}`});
+docs.forEach((doc, index) => {
+    doc.stringIndex = `index${index + 1000}`;
+});
 
 // This query should return 249 documents from {i: 51} to {i: 299}
 const query = {

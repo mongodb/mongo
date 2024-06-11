@@ -53,5 +53,5 @@ switch (getOptimizer(t.find(q1).explain())) {
         // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
         break;
     default:
-        break
+        break;
 }
