@@ -56,7 +56,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
@@ -371,19 +370,12 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             }
         }
     }
-    // See SERVER-87152 for discussion of choice of the eviction thread count to be 50% of number of
-    // available cores and for the choice of min and max thread values.
-    const auto halfNumAvailableCores = ProcessInfo::getNumAvailableCores() / 2;
-    const unsigned long clampedMaxEvictionThreadCount =
-        std::clamp(halfNumAvailableCores, 4UL, 16UL);
 
     std::stringstream ss;
     ss << "create,";
     ss << "cache_size=" << cacheSizeMB << "M,";
     ss << "session_max=33000,";
-    ss << "eviction=(threads_min=4,threads_max=";
-    ss << clampedMaxEvictionThreadCount;
-    ss << "),";
+    ss << "eviction=(threads_min=4,threads_max=4),";
 
     if (gWiredTigerEvictionDirtyTargetGB)
         ss << "eviction_dirty_target="
