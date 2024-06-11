@@ -18,6 +18,15 @@ mongo_cc_library(
         "zutil.c",
     ],
     hdrs = glob(["*.h"]),
+    copts = select({
+        "@//bazel/config:not_windows": [
+            "-Wno-implicit-fallthrough",
+        ],
+        "//conditions:default": [],
+    }),
+    features = [
+        "no_warn_non_virtual_detour",
+    ],
     includes = ["."],
     local_defines = select({
         "@platforms//os:windows": ["HAVE_STDARG_H"],

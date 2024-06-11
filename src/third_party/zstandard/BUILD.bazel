@@ -52,9 +52,14 @@ mongo_cc_library(
         "zstd/lib/*.h",
     ]),
     copts = select({
-        "//bazel/config:compiler_type_gcc": ["-Wno-stringop-overflow"],
+        "//bazel/config:compiler_type_gcc": [
+            "-Wno-stringop-overflow",
+        ],
         "//conditions:default": [],
     }),
+    features = [
+        "no_warn_non_virtual_detour",
+    ],
     includes = [
         "zstd/lib",
     ],

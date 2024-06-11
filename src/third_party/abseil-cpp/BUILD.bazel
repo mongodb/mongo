@@ -617,6 +617,10 @@ mongo_cc_library(
         "dist/absl/crc/internal/crc_non_temporal_memcpy.cc",
     ],
     hdrs = ABSEIL_HEADERS,
+    copts = select({
+        "//bazel/config:gcc_or_clang": ["-Wno-ignored-attributes"],
+        "//conditions:default": [],
+    }),
     includes = ["dist"],
     skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
@@ -1029,6 +1033,9 @@ mongo_cc_library(
         "dist/absl/flags/reflection.cc",
     ],
     hdrs = ABSEIL_HEADERS,
+    features = [
+        "no_warn_non_virtual_detour",
+    ],
     includes = ["dist"],
     skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
@@ -1986,6 +1993,10 @@ mongo_cc_library(
         "dist/absl/random/internal/randen_hwaes.cc",
     ],
     hdrs = ABSEIL_HEADERS,
+    copts = select({
+        "//bazel/config:gcc_or_clang": ["-Wno-pass-failed"],
+        "//conditions:default": [],
+    }),
     includes = ["dist"],
     skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [

@@ -8,6 +8,7 @@ load(
     "compiler_type",
     "dbg",
     "detect_odr_violations",
+    "disable_warnings_as_errors",
     "dwarf_version",
     "fsan",
     "http_client",
@@ -1616,5 +1617,60 @@ selects.config_setting_group(
     match_all = [
         "@platforms//os:linux",
         ":dwarf_version_5",
+    ],
+)
+
+# --------------------------------------
+# disable_warnings_as_errors
+# --------------------------------------
+
+disable_warnings_as_errors(
+    name = "disable_warnings_as_errors",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "warnings_as_errors_disabled",
+    flag_values = {
+        "//bazel/config:disable_warnings_as_errors": "True",
+    },
+)
+
+config_setting(
+    name = "warnings_as_errors_enabled",
+    flag_values = {
+        "//bazel/config:disable_warnings_as_errors": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "disable_warnings_as_errors_linux",
+    match_all = [
+        "@platforms//os:linux",
+        ":warnings_as_errors_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "disable_warnings_as_errors_posix",
+    match_all = [
+        ":not_windows",
+        ":warnings_as_errors_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "disable_warnings_as_errors_macos",
+    match_all = [
+        "@platforms//os:macos",
+        ":warnings_as_errors_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "disable_warnings_as_errors_windows",
+    match_all = [
+        "@platforms//os:windows",
+        ":warnings_as_errors_enabled",
     ],
 )

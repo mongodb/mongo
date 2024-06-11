@@ -10,5 +10,11 @@ mongo_cc_library(
     hdrs = [
         "MurmurHash3.h",
     ],
+    copts = select({
+        "@//bazel/config:not_windows": [
+            "-Wno-implicit-fallthrough",
+        ],
+        "//conditions:default": [],
+    }),
     includes = ["."],
 )
