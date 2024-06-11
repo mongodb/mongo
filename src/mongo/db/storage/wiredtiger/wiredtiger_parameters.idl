@@ -93,17 +93,6 @@ server_parameters:
         default: -100
         redact: false
 
-    wiredTigerMaxCacheOverflowSizeGB:
-      description: >-
-        Maximum amount of disk space to use for cache overflow;
-        Defaults to 0 (unbounded)
-        Deprecated.
-      set_at: runtime
-      cpp_vartype: 'AtomicWord<double>'
-      cpp_varname: gWiredTigerMaxCacheOverflowSizeGBDeprecated
-      default: 0
-      redact: false
-
     wiredTigerEvictionDirtyTargetGB:
       description: >-
          Absolute dirty cache eviction target. Once eviction begins,
