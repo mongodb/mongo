@@ -728,11 +728,9 @@ class MatchExpressionSbePlanCacheKeySerializationVisitor final
     : public MatchExpressionConstVisitor {
 public:
     explicit MatchExpressionSbePlanCacheKeySerializationVisitor(OperationContext* opCtx,
-                                                                BufBuilder* builder)
-        : _opCtx(opCtx), _builder(builder) {
-        invariant(_opCtx);
-        invariant(_builder);
-    }
+                                                                BufBuilder* builder,
+                                                                bool hasSort)
+        : _opCtx(opCtx), _builder(builder), _hasSort(hasSort) {}
 
     void visit(const BitsAllClearMatchExpression* expr) final {
         encodeBitTestExpression(expr);
@@ -775,8 +773,8 @@ public:
         encodeSingleParamPathNode(expr);
         // Encode the number of unique $in values as part of the plan cache key. If the query is
         // optimized by exploding for sort, the number of unique elements in $in determines how many
-        // merge branches we get in the query plan.
-        if (expr->getInputParamId()) {
+        // merge branches we get in the query plan. If there is no sort, this is not necessary.
+        if (expr->getInputParamId() && _hasSort) {
             size_t maxScansToExplode =
                 QueryKnobConfiguration::decoration(_opCtx).getMaxScansToExplodeForOp();
             // Assume that $in have n elements.
@@ -1063,6 +1061,12 @@ private:
 
     OperationContext* const _opCtx;
     BufBuilder* const _builder;
+    // Whether there is a sort absorbed by the Canonical query. Note: '_hasSort' is true only when
+    // there is a sort that can be used for explode for sort optimization. For a $match stage,
+    // '_hasSort' should be false since $match does not perform index selection. In cases where a
+    // $sort is not absorbed by the canonical query '_hasSort' should be false since we only perform
+    // explode for sort using the sort in canonical query.
+    bool _hasSort;
 };
 
 /**
@@ -1075,8 +1079,9 @@ private:
 class MatchExpressionSbePlanCacheKeySerializationWalker {
 public:
     explicit MatchExpressionSbePlanCacheKeySerializationWalker(OperationContext* opCtx,
-                                                               BufBuilder* builder)
-        : _builder{builder}, _visitor{opCtx, _builder} {
+                                                               BufBuilder* builder,
+                                                               bool hasSort)
+        : _builder{builder}, _visitor{opCtx, _builder, hasSort} {
         invariant(_builder);
     }
 
@@ -1115,8 +1120,9 @@ private:
  */
 void encodeKeyForAutoParameterizedMatchSBE(OperationContext* opCtx,
                                            MatchExpression* matchExpr,
-                                           BufBuilder* builder) {
-    MatchExpressionSbePlanCacheKeySerializationWalker walker{opCtx, builder};
+                                           BufBuilder* builder,
+                                           bool hasSort) {
+    MatchExpressionSbePlanCacheKeySerializationWalker walker{opCtx, builder, hasSort};
     tree_walker::walk<true, MatchExpression>(matchExpr, &walker);
 }
 }  // namespace
@@ -1143,7 +1149,7 @@ std::string encodeSBE(const CanonicalQuery& cq) {
         kBufferSizeConstant;
 
     BufBuilder bufBuilder(bufSize);
-    encodeKeyForAutoParameterizedMatchSBE(cq.getOpCtx(), cq.root(), &bufBuilder);
+    encodeKeyForAutoParameterizedMatchSBE(cq.getOpCtx(), cq.root(), &bufBuilder, !sort.isEmpty());
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
     bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
     bufBuilder.appendChar(kEncodeSectionDelimiter);
