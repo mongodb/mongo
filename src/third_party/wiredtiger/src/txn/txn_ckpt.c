@@ -1920,10 +1920,10 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
             WT_RET_MSG(session, ret, "checkpoint %s cannot be dropped when in-use", ckpt->name);
         }
     /*
-     * There are special trees: those being bulk-loaded, salvaged, upgraded or verified during the
-     * checkpoint. They should never be part of a checkpoint: we will fail to lock them because the
-     * operations have exclusive access to the handles. Named checkpoints will fail in that case,
-     * ordinary checkpoints skip files that cannot be opened normally.
+     * There are special trees: those being bulk-loaded, salvaged or verified during the checkpoint.
+     * They should never be part of a checkpoint: we will fail to lock them because the operations
+     * have exclusive access to the handles. Named checkpoints will fail in that case, ordinary
+     * checkpoints skip files that cannot be opened normally.
      */
     WT_ASSERT(session, !is_checkpoint || !F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS));
 

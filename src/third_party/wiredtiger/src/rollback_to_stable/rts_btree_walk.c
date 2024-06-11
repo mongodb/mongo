@@ -286,6 +286,8 @@ __wti_rts_btree_walk_btree_apply(
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool file_skipped, has_txn_updates_gt_than_ckpt_snap, modified, prepared_updates;
 
+    WT_ASSERT(session, rollback_timestamp != WT_TS_NONE);
+
     /* Ignore non-btree objects as well as the metadata and history store files. */
     if (!WT_BTREE_PREFIX(uri) || strcmp(uri, WT_HS_URI) == 0 || strcmp(uri, WT_METAFILE_URI) == 0)
         return (0);
@@ -354,17 +356,12 @@ __wti_rts_btree_walk_btree_apply(
         WT_STAT_CONN_DSRC_INCR(session, txn_rts_inconsistent_ckpt);
     }
 
-    /*
-     * During recovery, a table is skipped by RTS if one of the conditions is met:
-     * 1. The table is empty or newly-created.
-     * 2. The table has timestamped updates without a stable timestamp.
-     */
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
-      (addr_size == 0 || (rollback_timestamp == WT_TS_NONE && max_durable_ts != WT_TS_NONE))) {
+    /* Skip empty and newly-created tables during recovery. */
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING) && addr_size == 0) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-          WT_RTS_VERB_TAG_FILE_SKIP "skipping rollback to stable on file=%s because %s ", uri,
-          addr_size == 0 ? "has never been checkpointed" :
-                           "has timestamped updates and the stable timestamp is 0");
+          WT_RTS_VERB_TAG_FILE_SKIP
+          "skipping rollback to stable on file=%s because has never been checkpointed",
+          uri);
         return (0);
     }
 

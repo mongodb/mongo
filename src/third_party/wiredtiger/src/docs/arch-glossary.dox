@@ -7,7 +7,7 @@ tree - it describes terms internal to the storage engine.
 The definitions list how the terms are used in WiredTiger, which may not match how
 they are used in other settings.
 
-@section arch-glossary-transactions Glossary
+@section arch-glossary-entries Glossary
 
 (click headings to sort)
 
@@ -102,6 +102,7 @@ they are used in other settings.
 <tr><td>table<td>schema<td>an abstraction that allows one or more btrees to be used in a coordinated way, which is specified by the schema.  The table coordinates indices and column groups.
 <tr><td>thread<td>general<td>a thread of control.  WiredTiger uses pthreads for POSIX systems.
 <tr><td>thread group<td>general<td>a group of threads that perform a common task.  Eviction is performed by a thread group.
+<tr><td>tiered storage<td>general<td>an experimental option to store a single Btree across multiple local files and/or objects in cloud storage.
 <tr><td>time window<td>durable history<td>a set of start and stop transaction ids and timestamps which determine when an update is visible.
 <tr><td>timestamp<td>transactions<td>refers to one of several types of 64 bit values used to control transactional visibility of data in WiredTiger.  See oldest timestamp, stable timestamp, commit timestamp, read timestamp.
 <tr><td>transaction<td>transactions<td>a unit of work performed in WiredTiger that is atomic and consistent with the specified isolation level and durability level.

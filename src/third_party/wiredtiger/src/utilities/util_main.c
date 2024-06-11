@@ -61,8 +61,7 @@ usage(void)
       "load an object from a text file", "printlog", "display the database log", "read",
       "read values from an object", "salvage", "salvage a file", "stat",
       "display statistics for an object", "truncate", "truncate an object, removing all content",
-      "upgrade", "upgrade an object", "verify", "verify an object", "write",
-      "write values to an object", NULL, NULL};
+      "verify", "verify an object", "write", "write values to an object", NULL, NULL};
 
     fprintf(stderr, "WiredTiger Data Engine (version %d.%d)\n", WIREDTIGER_VERSION_MAJOR,
       WIREDTIGER_VERSION_MINOR);
@@ -258,10 +257,6 @@ main(int argc, char *argv[])
     case 't':
         if (strcmp(command, "truncate") == 0)
             func = util_truncate;
-        break;
-    case 'u':
-        if (strcmp(command, "upgrade") == 0)
-            func = util_upgrade;
         break;
     case 'v':
         if (strcmp(command, "verify") == 0) {

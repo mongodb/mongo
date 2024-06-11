@@ -1639,23 +1639,6 @@ struct __wt_session {
         const char *name, WT_CURSOR *start, WT_CURSOR *stop, const char *config);
 
     /*!
-     * Upgrade a table.
-     *
-     * Upgrade upgrades a table or file, if upgrade is required.
-     *
-     * @exclusive
-     *
-     * @snippet ex_all.c Upgrade a table
-     *
-     * @param session the session handle
-     * @param name the URI of the table or file to upgrade
-     * @configempty{WT_SESSION.upgrade, see dist/api_data.py}
-     * @ebusy_errors
-     */
-    int __F(upgrade)(WT_SESSION *session,
-        const char *name, const char *config);
-
-    /*!
      * Verify a table.
      *
      * Verify reports if a file, or the files that comprise a table, have been corrupted.
@@ -1986,19 +1969,20 @@ struct __wt_session {
      * all checkpoints before and including the named checkpoint.  Checkpoints cannot be dropped if
      * open in a cursor.  While a hot backup is in progress\, checkpoints created prior to the start
      * of the backup cannot be dropped., a list of strings; default empty.}
-     * @config{flush_tier = (, configure flushing objects to tiered storage after checkpoint., a set
-     * of related configuration options defined as follows.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-     * enabled, if true and tiered storage is in use\, perform one iteration of object switching and
-     * flushing objects to tiered storage., a boolean flag; default \c false.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;force, if false (the default)\, flush_tier of any individual
-     * object may be skipped if the underlying object has not been modified since the previous
-     * flush_tier.  If true\, this option forces the flush_tier., a boolean flag; default \c false.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;sync, wait for all objects to be flushed to the shared
-     * storage to the level specified.  When false\, do not wait for any objects to be written to
-     * the tiered storage system but return immediately after generating the objects and work units
-     * for an internal thread.  When true\, the caller waits until all work queued for this call to
-     * be completely processed before returning., a boolean flag; default \c true.}
+     * @config{flush_tier = (, configure flushing objects to tiered storage after checkpoint.  See
+     * @ref tiered_storage., a set of related configuration options defined as follows.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if true and tiered storage is in use\, perform one
+     * iteration of object switching and flushing objects to tiered storage., a boolean flag;
+     * default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;force, if false (the default)\, flush_tier
+     * of any individual object may be skipped if the underlying object has not been modified since
+     * the previous flush_tier.  If true\, this option forces the flush_tier., a boolean flag;
+     * default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;sync, wait for all objects to be flushed
+     * to the shared storage to the level specified.  When false\, do not wait for any objects to be
+     * written to the tiered storage system but return immediately after generating the objects and
+     * work units for an internal thread.  When true\, the caller waits until all work queued for
+     * this call to be completely processed before returning., a boolean flag; default \c true.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;timeout, amount of time\, in seconds\, to wait for flushing
      * of objects to complete.  WiredTiger returns EBUSY if the timeout is reached.  A value of zero
      * disables the timeout., an integer; default \c 0.}

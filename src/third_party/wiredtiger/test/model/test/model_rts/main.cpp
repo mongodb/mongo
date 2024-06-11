@@ -98,9 +98,9 @@ test_rts(void)
     /* Test RTS before setting the stable timestamp. */
     txn1 = database.begin_transaction();
     testutil_check(table->insert(txn1, key1, value1));
-    txn1->commit(15);
+    txn1->commit(5);
     database.rollback_to_stable();
-    testutil_assert(table->get(key1) == model::NONE);
+    testutil_assert(table->get(key1) == value1);
 
     /* Add some data. */
     txn1 = database.begin_transaction();
@@ -166,7 +166,7 @@ test_rts_wt(void)
     /* Test RTS before setting the stable timestamp. */
     wt_model_txn_begin_both(txn1, session1);
     wt_model_txn_insert_both(table, uri, txn1, session1, key1, value1);
-    wt_model_txn_commit_both(txn1, session1, 15);
+    wt_model_txn_commit_both(txn1, session1, 5);
     wt_model_rollback_to_stable_both();
     wt_model_assert(table, uri, key1);
 

@@ -1,0 +1,30 @@
+required-version = "==0.4.5"
+
+extend-exclude = [
+    "../test/3rdparty",
+]
+
+[lint]
+ignore = [
+    "E401", # multiple-imports-on-one-line
+    "E402", # module-import-not-at-top-of-file
+    "E701", # multiple-statements-on-one-line-colon
+    "E702", # multiple-statements-on-one-line-semicolon
+    "E703", # useless-semicolon
+    "E711", # none-comparison
+    "E712", # true-false-comparison
+    "E713", # not-in-test
+    "E721", # type-comparison
+    "E722", # bare-except
+    "E731", # lambda-assignment
+    "E741", # ambiguous-variable-name
+    "F401", # unused-import
+    "F403", # undefined-local-with-import-star
+    "F405", # undefined-local-with-import-star-usage
+    "F504", # percent-format-extra-named-arguments
+    "F523", # string-dot-format-extra-positional-arguments
+    "F541", # f-string-missing-placeholders
+    "F811", # redefined-while-unused
+    "F821", # undefined-name
+    "F841", # unused-variable
+]

@@ -142,6 +142,9 @@ run "prototypes.py"
 run "s_typedef -b"
 run "test_tag.py"
 run "s_mentions" "--warning-only"
+# Execute Ruff checks at the very end once all the Python files have been generated/processed by the
+# previous scripts.
+run "ruff_check.py"
 
 # Run in parallel.
 run --bg "s_define" &

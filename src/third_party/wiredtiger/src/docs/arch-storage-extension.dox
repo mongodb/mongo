@@ -48,7 +48,7 @@ presence, and access the file by creating a file handle.
 
 The storage sources use the file system's put-object functionality to flush files into the cloud.
 The Tier Manager inside WiredTiger directs this flush. Only S3 storage source files pushed to the
-cloud are also copied to the local cache.
+cloud are also copied to the local cache.  See \ref tiered_storage and \ref arch-tiered-storage.
 
 @section extension_cloud_file_handle Cloud File Handle Interface
 

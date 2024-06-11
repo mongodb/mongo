@@ -289,6 +289,10 @@ kv_database::rollback_to_stable_nolock(timestamp_t timestamp, kv_transaction_sna
     if (!_active_transactions.empty())
         throw model_exception("There are active transactions");
 
+    /* If the stable timestamp is not set, do not roll back based on it. */
+    if (timestamp == k_timestamp_none)
+        timestamp = k_timestamp_latest;
+
     for (auto &p : _tables)
         p.second->rollback_to_stable(timestamp, snapshot);
 

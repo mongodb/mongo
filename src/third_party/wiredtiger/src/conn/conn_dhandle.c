@@ -354,7 +354,7 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
     __wt_spin_lock(session, &dhandle->close_lock);
 
     discard = is_mapped = marked_dead = false;
-    if (is_btree && !F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+    if (is_btree && !F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_VERIFY)) {
         /*
          * If the handle is already marked dead, we're just here to discard it.
          */

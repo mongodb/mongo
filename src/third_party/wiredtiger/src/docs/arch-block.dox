@@ -4,7 +4,7 @@ The WiredTiger block manager subsystem manages the reading and writing of data
 from the disk. It is designed to facilitate high performance, economic use of
 disk space and customizability.
 
-@section block What is a block?
+@section block_what What is a block?
 
 A block is a chunk of data that is stored on the disk and operated on as a
 single unit. Each WiredTiger data file (any file in the home directory with the
@@ -15,6 +15,8 @@ re-written, they are written to new locations in the file. The size of a block
 is a multiple of the allocation size which is set during creation of the
 associated WiredTiger data file see: WT_SESSION::create.
 
+@subsection block_address_cookie Address Cookies
+
 Once a block is written an address cookie is returned. This address cookie is
 stored as the \c addr on the associated page ref. The \c WT_REF structure can
 be found in \c btmem.h. The address cookie is opaque to other parts of the
@@ -23,8 +25,9 @@ system and cannot be interpreted meaningfully.
 The address cookie is made up of 4 components:
  - offset: The offset in the file. In order to avoid storing large offsets this
    value is divided by the allocation size.
- - file_id: Optional and only relevant to the tiered storage type, the file_id
-   is maintained in the address.
+ - object_id: Optional and only relevant to the tiered storage type, the object_id
+   is maintained in the address. When it is missing, it indicates that the
+   reference is to the same object as where the cookie was stored.
  - size: The size of the block, also divided by the allocation size.
  - checksum: The checksum of the block for validation purposes.
 
@@ -173,7 +176,7 @@ the data being flushed to disk. In the checkpoint scenario WiredTiger will also
 call \c bm->sync once all blocks have been written which will call the file
 system dependent flush function.
 
-* Checkpoint deletion and merging *
+<b>Checkpoint deletion and merging</b>
 
 As a checkpoint progresses it takes a snapshot of the three extent lists kept
 by the block manager, these extent lists are written out to disk as part of
@@ -220,6 +223,28 @@ of checkpoint \c C.
 We don't want to list each block individually in the extent lists, so instead of
 listing each block separately in the list, we use extents, which can describe a
 range in the file, that is, any number of contiguous blocks.
+
+<b>Checkpoint cookies</b>
+
+After a checkpoint is written, the block manager creates a <em>checkpoint cookie</em>
+to describe it. Similar to an <em>address cookie</em>, a checkpoint cookie is
+a sequence of bytes that is encoded and decoded by the block manager, and is
+opaque to other parts of the system. A checkpoint cookie is composed of
+four address cookies and two additional values:
+  - an address cookie for the root page
+  - an address cookie for the extent list with allocated entries
+  - an address cookie for the extent list with available entries
+  - an address cookie for the extent list with discarded entries
+  - the file size for the checkpoint, the first byte position past the end of the checkpoint data
+  - the checkpoint size, a byte size of all written checkpoint data
+
+As described in @ref block_address_cookie, an address cookie used with a tiered storage
+has an additional value (the \c object_id). As a result, the checkpoint cookie for a
+tiered btree will include four additional \c object_id values that are not in other
+checkpoints.
+
+The program in \c tools/wt_ckpt_decode.py can be used to unpack a set of bytes representing
+a checkpoint cookie and show its values.
 
 @subsubsection Eviction
 

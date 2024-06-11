@@ -34,6 +34,7 @@ each of which is ordered by one or more columns.
 <h2>Storage options</h2>
 - @subpage lsm
 - @subpage file_formats
+- @subpage tiered_storage
 - @subpage compression
 - @subpage encryption
 

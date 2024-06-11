@@ -258,8 +258,8 @@ __background_compact_should_skip(WT_SESSION_IMPL *session, const char *uri, int6
     WT_PREFIX_SKIP(filename, "file:");
     ret = __wt_block_manager_named_size(session, filename, &file_size);
 
-    /* It is possible that the file no longer exists. */
-    if (ret == ENOENT) {
+    /* Ignore the error if the file no longer exists or in case of permission issues. */
+    if (ret == ENOENT || ret == EACCES) {
         *skipp = true;
         return (0);
     }

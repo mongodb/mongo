@@ -262,26 +262,24 @@ struct __wt_btree {
  * explanation.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 12 */
-#define WT_BTREE_ALTER 0x0001000u          /* Handle is for alter */
-#define WT_BTREE_BULK 0x0002000u           /* Bulk-load handle */
-#define WT_BTREE_CLOSED 0x0004000u         /* Handle closed */
-#define WT_BTREE_IGNORE_CACHE 0x0008000u   /* Cache-resident object */
-#define WT_BTREE_IN_MEMORY 0x0010000u      /* Cache-resident object */
-#define WT_BTREE_LOGGED 0x0020000u         /* Commit-level durability without timestamps */
-#define WT_BTREE_NO_CHECKPOINT 0x0040000u  /* Disable checkpoints */
-#define WT_BTREE_OBSOLETE_PAGES 0x0080000u /* Handle has obsolete pages */
-#define WT_BTREE_READONLY 0x0100000u       /* Handle is readonly */
-#define WT_BTREE_SALVAGE 0x0200000u        /* Handle is for salvage */
-#define WT_BTREE_SKIP_CKPT 0x0400000u      /* Handle skipped checkpoint */
-#define WT_BTREE_UPGRADE 0x0800000u        /* Handle is for upgrade */
-#define WT_BTREE_VERIFY 0x1000000u         /* Handle is for verify */
-                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+#define WT_BTREE_ALTER 0x001000u          /* Handle is for alter */
+#define WT_BTREE_BULK 0x002000u           /* Bulk-load handle */
+#define WT_BTREE_CLOSED 0x004000u         /* Handle closed */
+#define WT_BTREE_IGNORE_CACHE 0x008000u   /* Cache-resident object */
+#define WT_BTREE_IN_MEMORY 0x010000u      /* Cache-resident object */
+#define WT_BTREE_LOGGED 0x020000u         /* Commit-level durability without timestamps */
+#define WT_BTREE_NO_CHECKPOINT 0x040000u  /* Disable checkpoints */
+#define WT_BTREE_OBSOLETE_PAGES 0x080000u /* Handle has obsolete pages */
+#define WT_BTREE_READONLY 0x100000u       /* Handle is readonly */
+#define WT_BTREE_SALVAGE 0x200000u        /* Handle is for salvage */
+#define WT_BTREE_SKIP_CKPT 0x400000u      /* Handle skipped checkpoint */
+#define WT_BTREE_VERIFY 0x800000u         /* Handle is for verify */
+                                          /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
 /* Flags that make a btree handle special (not for normal use). */
-#define WT_BTREE_SPECIAL_FLAGS \
-    (WT_BTREE_ALTER | WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
+#define WT_BTREE_SPECIAL_FLAGS (WT_BTREE_ALTER | WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_VERIFY)
 
 /*
  * WT_SALVAGE_COOKIE --

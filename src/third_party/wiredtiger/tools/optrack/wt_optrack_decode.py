@@ -70,7 +70,7 @@ def buildTranslationMap(mapFileName):
         print(color.BOLD + color.RED);
         print("Could not open " + mapFileName + " for reading");
         print(color.END);
-        raise;
+        raise
 
     # Read lines from the map file and build an in-memory map
     # of translations. Each line has a function ID followed by space and
@@ -149,12 +149,12 @@ def validateHeader(file):
     except:
         print(color.BOLD + color.RED +
               "failed read of input file" + color.END);
-        raise;
+        raise
 
     if (len(bytesRead) < MIN_HEADER_SIZE):
         print(color.BOLD + color.RED +
               "unexpected sized input file" + color.END);
-        raise;
+        raise
 
     version, threadType, tsc_nsec = struct.unpack('=III', bytesRead);
     print("VERSION IS " + str(version));
@@ -211,7 +211,7 @@ def parseFile(fileName):
     except:
         print(color.BOLD + color.RED +
               "Could not open " + fileName + " for reading" + color.END);
-        raise;
+        raise
 
     # Read and validate log header
     validVersion, threadType, tsc_nsec_ratio, sec_from_epoch = \

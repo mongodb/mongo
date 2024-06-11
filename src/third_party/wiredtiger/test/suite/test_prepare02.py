@@ -73,8 +73,6 @@ class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate("table:mytable", None, None, None), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.upgrade("table:mytable", None), msg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.verify("table:mytable", None), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.session.begin_transaction(), msg)

@@ -113,9 +113,8 @@ class test_rollback_to_stable31(test_rollback_to_stable_base):
                 self.check(value_b, uri, 0, 0, 25)
                 self.check(value_c, uri, 0, 0, 35)
         else:
-            # With an explicit runtime RTS we roll back to 0, but the end of the FLCS table
-            # still moves forward.
+            # With an explicit runtime RTS, the RTS does not do anything.
             self.check(0, uri, 0, nrows, 5)
-            self.check(value_a, uri, 0, nrows, 15)
-            self.check(value_b, uri, 0, nrows, 25)
-            self.check(value_c, uri, 0, nrows, 35)
+            self.check(value_a, uri, nrows, 0, 15)
+            self.check(value_b, uri, nrows, 0, 25)
+            self.check(value_c, uri, nrows, 0, 35)

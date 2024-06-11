@@ -6,7 +6,9 @@ WiredTiger supports three underlying file formats: row-store and
 column-store, with an underlying special case of column-store for
 bit-field values. All three formats are B+tree implementations of
 key/value stores. WiredTiger also supports @ref lsm, implemented as a
-tree of B+trees.
+tree of B+trees. In addition, there is experimental support for
+@ref tiered_storage, allowing a B+tree to span multiple files and
+cloud objects.
 
 In a row-store, both keys and data are variable-length byte strings.  In
 a column-store, keys are 64-bit record numbers (key_format type 'r'),

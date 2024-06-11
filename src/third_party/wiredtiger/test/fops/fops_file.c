@@ -259,25 +259,6 @@ obj_checkpoint(void)
 }
 
 /*
- * obj_upgrade --
- *     TODO: Add a comment describing this function.
- */
-void
-obj_upgrade(void)
-{
-    WT_SESSION *session;
-    int ret;
-
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
-    if ((ret = session->upgrade(session, uri, NULL)) != 0)
-        if (ret != ENOENT && ret != EBUSY)
-            testutil_die(ret, "session.upgrade");
-
-    testutil_check(session->close(session, NULL));
-}
-
-/*
  * obj_verify --
  *     TODO: Add a comment describing this function.
  */

@@ -195,15 +195,14 @@ already been written to disk and can be read in again later.)
 However, VLCS pages end up marked dirty anyway because the instantiation logic uses \c
 col_modify to post the tombstones and that always marks its page dirty.
 
-Note that in three cases the instantiation code is skipped: verify, salvage, and upgrade
-are concerned only with the on-disk state.
-These cases also skip the optimization that generates blank pages instead of reading pages
-that contain only obsolete values (those with a globally visible truncation) -- verify is,
-at least in part, concerned with the physical structure of the tree and this substitution
-can confuse it.
-Salvage and upgrade are included for consistency, and also because in salvage the internal
-page with the deletion information is not necessarily available (or correct) and it is
-probably better to not try to use it.
+Note that in two cases the instantiation code is skipped: verify, and salvage are concerned only
+with the on-disk state. These cases also skip the optimization that generates blank pages instead of
+reading pages that contain only obsolete values (those with a globally visible truncation) -- verify
+is, at least in part, concerned with the physical structure of the tree and this substitution can
+confuse it.
+
+Salvage is included for consistency because the internal page with the deletion information is not
+necessarily available (or correct) and it is probably better to not try to use it.
 
 @section ft_internal_reconciliation Internal page reconciliation
 

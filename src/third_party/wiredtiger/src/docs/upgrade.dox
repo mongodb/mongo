@@ -50,12 +50,6 @@ relinking or installing a new version of the WiredTiger shared library.
 <br><br>
 -# Start the new version of the application.
 <br><br>
-If the upgrading documentation for any release after the previous
-release and up to and including the release you are using, specifies
-underlying data file formats are no longer backward compatible and will
-not be upgraded at run-time, a data upgrade step is required before the
-data can be accessed. In this case, data files must be upgraded using
-the WT_SESSION::upgrade method.
 
 Applications wanting the ability to downgrade to previous releases of
 WiredTiger are constrained in some important ways:

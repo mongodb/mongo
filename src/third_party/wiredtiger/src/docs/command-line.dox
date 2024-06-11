@@ -461,20 +461,6 @@ call to WT_SESSION::truncate with no start or stop specified.
 The \c truncate command has no command-specific options.
 
 <hr>
-@section util_upgrade wt upgrade
-Upgrade a table.
-
-The \c upgrade command upgrades the specified table, exiting success if
-the data source is up-to-date, and failure if the data source cannot be
-upgraded.
-
-@subsection util_upgrade_synopsis Synopsis
-`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] upgrade uri`
-
-@subsection util_upgrade_options Options
-The \c upgrade command has no command-specific options.
-
-<hr>
 @section util_verify wt verify
 Check the structural integrity of a table.
 

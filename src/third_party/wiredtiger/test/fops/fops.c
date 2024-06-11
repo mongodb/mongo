@@ -39,7 +39,6 @@ typedef struct {
     int create_unique; /* session.create of new file */
     int cursor;        /* session.open_cursor */
     int drop;          /* session.drop */
-    int upgrade;       /* session.upgrade */
     int verify;        /* session.verify */
 } STATS;
 
@@ -124,18 +123,14 @@ fop(void *arg)
             obj_checkpoint();
             break;
         case 5:
-            ++s->upgrade;
-            obj_upgrade();
-            break;
-        case 6:
             ++s->verify;
             obj_verify();
             break;
-        case 7:
+        case 6:
             ++s->bulk_unique;
             obj_bulk_unique(__wt_random(&rnd) & 1);
             break;
-        case 8:
+        case 7:
             ++s->create_unique;
             obj_create_unique(__wt_random(&rnd) & 1);
             break;
@@ -161,7 +156,7 @@ print_stats(u_int nthreads)
           "\t"
           "bulk %3d, checkpoint %3d, create %3d, cursor %3d,\n"
           "\t"
-          "drop %3d, upgrade %3d, verify %3d\n",
+          "drop %3d, verify %3d\n",
           id, s->bulk + s->bulk_unique, s->ckpt, s->create + s->create_unique, s->cursor, s->drop,
-          s->upgrade, s->verify);
+          s->verify);
 }

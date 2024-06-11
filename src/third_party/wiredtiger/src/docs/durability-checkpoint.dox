@@ -37,8 +37,7 @@ by the checkpoint, therefore the frequency of checkpoints limits the
 volume of data that may be lost due to application or system failure.
 
 Data sources that are involved in an exclusive operation when the checkpoint
-starts, including bulk load, upgrade or salvage, will be skipped by the
-checkpoint.
+starts, including bulk load or salvage, will be skipped by the checkpoint.
 
 When a data source is first opened, it appears in the same state it was
 in when it was most recently checkpointed. In other words, updates after

@@ -50,5 +50,4 @@ void obj_create(void);
 void obj_create_unique(int);
 void obj_cursor(void);
 void obj_drop(int);
-void obj_upgrade(void);
 void obj_verify(void);

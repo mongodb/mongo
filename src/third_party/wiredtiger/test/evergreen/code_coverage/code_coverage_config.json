@@ -56,8 +56,6 @@
     "./wt -h WT_HOME_COVERAGE stat -?",
     "./wt -h WT_HOME_COVERAGE truncate",
     "./wt -h WT_HOME_COVERAGE truncate -?",
-    "./wt -h WT_HOME_COVERAGE upgrade",
-    "./wt -h WT_HOME_COVERAGE upgrade -?",
     "./wt -h WT_HOME_COVERAGE verify",
     "./wt -h WT_HOME_COVERAGE verify -?",
     "./wt -h WT_HOME_COVERAGE write",
@@ -262,7 +260,6 @@
     "python3 ../test/suite/run.py test_turtle01",
     "python3 ../test/suite/run.py test_txn15",
     "python3 ../test/suite/run.py test_unicode01",
-    "python3 ../test/suite/run.py test_upgrade",
     "python3 ../test/suite/run.py test_verbose02",
     "python3 ../test/suite/run.py test_verify2",
     "python3 ../test/suite/run.py test_version "

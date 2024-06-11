@@ -140,7 +140,6 @@ typedef struct {
 #define CREATE_UNQ "create_unique"
 #define CURSOR "cursor"
 #define DROP "drop"
-#define UPGRADE "upgrade"
 #define VERIFY "verify"
 
 static void sig_handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
@@ -464,28 +463,6 @@ test_drop(THREAD_DATA *td, int force)
         if (ret == EINVAL)
             testutil_die(ret, "session.commit drop");
     }
-    testutil_check(session->close(session, NULL));
-}
-
-/*
- * test_upgrade --
- *     Upgrade a tree.
- */
-static void
-test_upgrade(THREAD_DATA *td)
-{
-    WT_DECL_RET;
-    WT_SESSION *session;
-
-    /* FIXME-WT-11366 Remove this return when tiered storage supports upgrade. */
-    if (opts->tiered_storage)
-        return;
-    testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-
-    if ((ret = session->upgrade(session, uri, NULL)) != 0)
-        if (ret != ENOENT && ret != EBUSY)
-            testutil_die(ret, "session.upgrade");
-
     testutil_check(session->close(session, NULL));
 }
 
@@ -820,10 +797,6 @@ thread_run(void *arg)
                 test_drop(td, __wt_random(&td->data_rnd) & 1);
                 break;
             case 6:
-                WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, UPGRADE);
-                test_upgrade(td);
-                break;
-            case 7:
                 WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, VERIFY);
                 test_verify(td);
                 break;

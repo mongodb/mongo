@@ -170,6 +170,7 @@ of the documentation.
     - @ref arch-block
     - @ref arch-data-file
     - @ref arch-cloud-storage-extension
+    - @ref arch-tiered-storage
 
 - @subpage arch-toc-on-disk
     - @ref arch-checkpoint
@@ -297,6 +298,11 @@ The format of the data file is given by structures in \c block.h .
 @subpage arch-cloud-storage-extension
 
 The cloud storage source extension which manage the flushing of the data files to and reading from different cloud object stores.
+
+@subpage arch-tiered-storage
+
+Tiered storage allows B-Trees to be stored into multiple places, more
+recently updated blocks are on local disk and less recently updated blocks are in cloud storage.
 
 */
 

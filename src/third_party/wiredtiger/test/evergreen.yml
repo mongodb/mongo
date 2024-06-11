@@ -1034,7 +1034,7 @@ functions:
 
           # We are ignoring the table:wt table. This table does not participate in
           # predictable replay, as it may be concurrently created, opened (regular or bulk cursor),
-          # verified, upgraded and dropped by multiple threads in test_schema_abort.
+          # verified and dropped by multiple threads in test_schema_abort.
           $toolsdir/wt_cmp_dir -i '^table:wt$' RUNDIR_1/WT_HOME RUNDIR_2/WT_HOME || exit 1
         done
   "upload artifact":
@@ -2543,12 +2543,22 @@ tasks:
       - func: "get project"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/dist"
+          working_dir: "wiredtiger"
           shell: bash
           script: |
             set -o errexit
             set -o verbose
+            ${PREPARE_PATH}
+
+            # Install Ruff as it is executed as part of s_all.
+            RUFF_VERSION=$(grep required-version dist/ruff.toml | grep -o [0-9]\\.[0-9]\\.[0-9])
+            virtualenv -p python3 venv
+            source venv/bin/activate
+            python3 -m pip install ruff==$RUFF_VERSION
+
+            cd dist
             bash -x s_all -E 2>&1
+
             # Run s_string with the "-r" option to remove no-longer-needed words from s_string.ok
             # This is run separately from s_all as it can be too proactive when run as part of
             # developers local workflow, but needs to be run in PR builds before the code is merged.

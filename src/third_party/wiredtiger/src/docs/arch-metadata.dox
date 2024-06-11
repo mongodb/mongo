@@ -73,4 +73,41 @@ cursor causes WiredTiger to strip out internal metadata when querying.
 Lastly the metadata in the \c WiredTiger.wt table can be dumped using the \c wt utility. A command option for
 specifically printing the metadata is \c "wt list -v". This will display the various \c uri key strings with their associated
 configuration strings.
+
+@section metadata_example Example Metadata
+
+When table \c A is created (without named column groups), there are three entries in the metadata file, having these keys:
+- \c "table:A"
+- \c "colgroup:A"
+- \c "file:A.wt"
+
+For brevity, just the keys are shown; the values in the metadata
+btree are configuration strings that would show information about
+key/value format and other creation options, checkpoints associated with the table, etc.
+
+The \c "table:A" represents the table interface that the API caller
+uses, and the associated data structure in memory for the table is \c WT_TABLE.  If
+there were column groups or indices, there may be multiple btrees
+associated with the table, and listed in the metadata,
+but in this example there is just one.
+
+Every table has one or more \c "colgroup:" entries. The column group entry's metadata
+references the \c "file:" entry that stores the btree, in this case it would
+reference \c "file:A.wt". Column groups do not have an explicit data structure
+associated with them, but their associated btrees are referenced via an array
+in the \c WT_TABLE.
+
+The \c "file:" entry represents the btree stored on disk, as well as parts
+cached in memory.  The data structure implied by this entry is a \c
+WT_BTREE.
+
+In summary, the relationship between prefixes and data structures is as follows:
+
+URI prefix    | struct type    | has dhandle?  | notes
+------------- | -------------- | ------------- | --------------------------------------
+\c table:     | WT_TABLE       | yes           | the dhandle is cast to (WT_TABLE *)
+\c file:      | WT_BTREE       | yes           | dhandle->handle is a (WT_BTREE *)
+\c colgroup:  |                | no            | stored in an array in the WT_TABLE
+
+See @ref arch-dhandle for more information about data handles (dhandles).
 */
