@@ -298,10 +298,6 @@ class _AddRemoveShardThread(threading.Thread):
         if err.code == self._ILLEGAL_OPERATION:
             if "Can't move an internal resharding collection" in str(err):
                 return True
-            if "Cannot remove from a capped collection in a multi-document transaction" in str(err):
-                # TODO (SERVER-89826): Investigate errors related to moving capped collection that
-                # are part of multi-document transactions.
-                return True
             for regex in self._UNMOVABLE_NAMESPACE_REGEXES:
                 if re.search(regex, namespace):
                     return True
