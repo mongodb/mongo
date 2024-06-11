@@ -6,6 +6,8 @@ These custom templates can be used for example, by individual teams to have a cu
 
 Read more in [Github's docs](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/creating-a-pull-request-template-for-your-repository)
 
+If you update the default PR template, you also need to update the commit metadata in github branch rulesets.
+
 # How To Use This Folder
 
 To create a custom template, create a new markdown file in this folder.
