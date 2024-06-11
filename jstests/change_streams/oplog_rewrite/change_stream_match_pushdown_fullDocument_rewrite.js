@@ -54,14 +54,18 @@ function verifyOnWholeCluster(userMatchExpr,
 
 // These operations will create oplog events. The change stream will apply several filters on these
 // series of events and ensure that the '$match' expressions are rewritten correctly.
-assert.commandWorked(coll.insert({_id: 2, shard: 0}));
-assert.commandWorked(coll.insert({_id: 3, shard: 0}));
-assert.commandWorked(coll.insert({_id: 2, shard: 1}));
-assert.commandWorked(coll.insert({_id: 3, shard: 1}));
-assert.commandWorked(coll.replaceOne({_id: 2, shard: 0}, {_id: 2, shard: 0, foo: "a"}));
-assert.commandWorked(coll.replaceOne({_id: 3, shard: 0}, {_id: 3, shard: 0, foo: "a"}));
-assert.commandWorked(coll.replaceOne({_id: 2, shard: 1}, {_id: 2, shard: 1, foo: "a"}));
-assert.commandWorked(coll.replaceOne({_id: 3, shard: 1}, {_id: 3, shard: 1, foo: "a"}));
+assert.commandWorked(coll.insert({_id: 2, shard: 0, arr: [0, 2]}));
+assert.commandWorked(coll.insert({_id: 3, shard: 0, arr: [1, 3]}));
+assert.commandWorked(coll.insert({_id: 2, shard: 1, arr: [0, 2]}));
+assert.commandWorked(coll.insert({_id: 3, shard: 1, arr: [1, 3]}));
+assert.commandWorked(
+    coll.replaceOne({_id: 2, shard: 0}, {_id: 2, shard: 0, arr: [0, 2], foo: "a"}));
+assert.commandWorked(
+    coll.replaceOne({_id: 3, shard: 0}, {_id: 3, shard: 0, arr: [1, 3], foo: "a"}));
+assert.commandWorked(
+    coll.replaceOne({_id: 2, shard: 1}, {_id: 2, shard: 1, arr: [0, 2], foo: "a"}));
+assert.commandWorked(
+    coll.replaceOne({_id: 3, shard: 1}, {_id: 3, shard: 1, arr: [1, 3], foo: "a"}));
 assert.commandWorked(coll.update({_id: 2, shard: 0}, {$set: {foo: "b"}}));
 assert.commandWorked(coll.update({_id: 3, shard: 0}, {$set: {foo: "b"}}));
 assert.commandWorked(coll.update({_id: 2, shard: 1}, {$set: {foo: "b"}}));
@@ -189,7 +193,7 @@ const runVerifyOpsTestcases = (op) => {
     // Initialize 'doc' so that it matches the 'fullDocument' field of one of the events where
     // operationType == 'op'. For all 'insert' events, 'fullDocument' only has the '_id' field and
     // the 'shard' field. For 'replace' and 'update' events, 'fullDocument' also has a 'foo' field.
-    const doc = {_id: 2, shard: 0};
+    const doc = {_id: 2, shard: 0, arr: [0, 2]};
     if (op != "insert") {
         doc.foo = (op == "replace" ? "a" : "b");
     }
@@ -216,6 +220,14 @@ const runVerifyOpsTestcases = (op) => {
                          {[collName]: {[op]: [2, 3]}},
                          op != "update" ? [0, 2] : [2, 2] /* expectedOplogRetDocsForEachShard */,
                          [0, 2] /* expectedChangeStreamDocsForEachShard */);
+
+    // Test out a $elemMatch predicate on 'fullDocument.arr'.
+    const isEvenExpr = {$mod: [2, 0]};
+    verifyOnWholeCluster(
+        {$match: {operationType: op, "fullDocument.arr": {$elemMatch: isEvenExpr}}},
+        {[collName]: {[op]: [2, 2]}},
+        op != "update" ? [1, 1] : [2, 2] /* expectedOplogRetDocsForEachShard */,
+        [1, 1] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out a negated predicate on the full 'fullDocument' field.
     verifyOnWholeCluster({$match: {operationType: op, fullDocument: {$not: {$eq: doc}}}},
