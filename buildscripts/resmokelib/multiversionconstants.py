@@ -89,9 +89,10 @@ def in_git_root_dir():
         # We are not in a git directory.
         return False
 
-    git_root_dir = check_output("git rev-parse --show-toplevel", shell=True, text=True).strip()
-    # Always use forward slash for the cwd path to resolve inconsistent formatting with Windows.
-    curr_dir = os.getcwd().replace("\\", "/")
+    git_root_dir = os.path.realpath(
+        check_output("git rev-parse --show-toplevel", shell=True, text=True).strip()
+    )
+    curr_dir = os.path.realpath(os.getcwd())
     return git_root_dir == curr_dir
 
 
