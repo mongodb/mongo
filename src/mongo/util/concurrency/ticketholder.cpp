@@ -37,13 +37,10 @@
 
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(hangTicketRelease);
 
 #if defined(__linux__)
 namespace {
@@ -135,12 +132,6 @@ bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
 }
 
 void TicketHolder::release() {
-    if (MONGO_unlikely(hangTicketRelease.shouldFail())) {
-        LOGV2(8435300,
-              "Hanging hangTicketRelease in release() due to 'hangTicketRelease' "
-              "failpoint");
-        hangTicketRelease.pauseWhileSet();
-    }
     check(sem_post(&_sem));
 }
 
@@ -218,12 +209,6 @@ bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
 }
 
 void TicketHolder::release() {
-    if (MONGO_unlikely(hangTicketRelease.shouldFail())) {
-        LOGV2(8435301,
-              "Hanging hangTicketRelease in release() due to 'hangTicketRelease' "
-              "failpoint");
-        hangTicketRelease.pauseWhileSet();
-    }
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _num++;
