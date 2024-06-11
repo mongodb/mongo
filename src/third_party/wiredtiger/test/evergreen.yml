@@ -2638,7 +2638,7 @@ tasks:
     patch_only: true
     depends_on:
     - name: compile
-    run_on: ubuntu2004-perf-testing
+    run_on: ubuntu2004-medium
     commands:
       - func: "fetch artifacts"
       - func: "unit test"
@@ -3895,8 +3895,8 @@ tasks:
 
   - name: split-stress-test
     tags: ["stress-test-1", "stress-test-ppc-1", "stress-test-zseries-1"]
-    # Set 2.5 hours timeout (60 * 60 * 2.5)
-    exec_timeout_secs: 9000
+    # Set 5 hours timeout (60 * 60 * 5)
+    exec_timeout_secs: 18000
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -3904,8 +3904,8 @@ tasks:
 
   - name: split-stress-test-nonstandalone
     tags: ["stress-test-1-nonstandalone"]
-    # Set 2.5 hours timeout (60 * 60 * 2.5)
-    exec_timeout_secs: 9000
+    # Set 5 hours timeout (60 * 60 * 5)
+    exec_timeout_secs: 18000
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5403,7 +5403,7 @@ buildvariants:
     - name: ".stress-test-no-barrier"
     - name: ".stress-test-sanitizer"
       run_on:
-      - ubuntu2004-perf-testing
+      - ubuntu2004-medium
     - name: format-abort-recovery-stress-test
     - name: ".stress-test-1-nonstandalone"
     - name: ".stress-test-2-nonstandalone"
@@ -5421,7 +5421,7 @@ buildvariants:
 - name: ubuntu2004-stress-tests-arm64
   display_name: Ubuntu 20.04 Stress tests (ARM64)
   run_on:
-  - ubuntu2004-arm64-perf-testing
+  - ubuntu2004-arm64-large
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
@@ -5454,7 +5454,7 @@ buildvariants:
   batchtime: 720 # twice a day
   run_on:
   # We run on medium as small has too small a disk.
-  - ubuntu2004-perf-testing
+  - ubuntu2004-medium
   expansions:
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
@@ -5477,7 +5477,7 @@ buildvariants:
   display_name: "Cppsuite Stress Tests ARM64"
   batchtime: 720 # twice a day
   run_on:
-  - ubuntu2004-arm64-perf-testing
+  - ubuntu2004-arm64-large
   expansions:
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
@@ -5756,7 +5756,7 @@ buildvariants:
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: unit-test-extra-long
-      distros: ubuntu2004-arm64-perf-testing
+      distros: ubuntu2004-arm64-large
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: wtperf-test
