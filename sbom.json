@@ -879,37 +879,6 @@
             "supplier": {
                 "name": "Organization: github"
             },
-            "name": "mongo-cxx-driver",
-            "version": "r3.7.1",
-            "licenses": [
-                {
-                    "license": {
-                        "id": "Apache-2.0"
-                    }
-                }
-            ],
-            "purl": "pkg:github/mongodb/mongo-cxx-driver@r3.7.1",
-            "properties": [
-                {
-                    "name": "internal:team_responsible",
-                    "value": "Atlas Streams"
-                }
-            ],
-            "type": "library",
-            "bom-ref": "656c828e-940d-481b-bf47-6bb67fdb161d",
-            "evidence": {
-                "occurrences": [
-                    {
-                        "location": "enterprise/src/streams/third_party/mongocxx"
-                    }
-                ]
-            },
-            "scope": "required"
-        },
-        {
-            "supplier": {
-                "name": "Organization: github"
-            },
             "name": "MongoDB C Driver",
             "version": "1.23.0",
             "licenses": [
