@@ -62,6 +62,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/ops/write_ops",
         "$BUILD_DIR/mongo/db/repl/primary_only_service",
         "$BUILD_DIR/mongo/db/s/query_analysis_writer",
+        "$BUILD_DIR/mongo/db/s/transaction_coordinator",
         "$BUILD_DIR/mongo/db/server_feature_flags",
         "$BUILD_DIR/mongo/db/session/session_catalog",
         "$BUILD_DIR/mongo/db/stats/top",

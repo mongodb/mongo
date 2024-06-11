@@ -29,16 +29,18 @@
 
 #include <string>
 
-#include "mongo/base/shim.h"
 #include "mongo/db/s/transaction_coordinator_curop.h"
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
 
 namespace mongo {
 
 void reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
                                                 bool includeIdle,
                                                 std::vector<BSONObj>* ops) {
-    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(reportCurrentOpsForTransactionCoordinators);
-    w(opCtx, includeIdle, ops);
+    TransactionCoordinatorService::get(opCtx)->reportCoordinators(opCtx, includeIdle, ops);
 }
 
 }  // namespace mongo

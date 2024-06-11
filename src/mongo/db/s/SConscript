@@ -270,7 +270,7 @@ env.Library(
         "server_transaction_coordinators_metrics.cpp",
         "single_transaction_coordinator_stats.cpp",
         "transaction_coordinator_catalog.cpp",
-        "transaction_coordinator_curop_mongod.cpp",
+        "transaction_coordinator_curop.cpp",
         "transaction_coordinator_document.idl",
         "transaction_coordinator_factory_mongod.cpp",
         "transaction_coordinator_futures_util.cpp",
