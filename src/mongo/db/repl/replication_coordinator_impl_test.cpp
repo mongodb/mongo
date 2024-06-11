@@ -1331,7 +1331,6 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupNewConfigNoMajor
     ASSERT_FALSE(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());
 }
 
-
 TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedWhenAWriteConcernTimesOutBeforeBeingSatisified) {
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -1358,8 +1357,9 @@ TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedWhenAWriteConcernTimesOutBefo
     OpTimeWithTermOne time3(100, 3);
 
     WriteConcernOptions writeConcern;
-    writeConcern.wDeadline = getNet()->now() + Milliseconds(50);
+    writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
     writeConcern.w = 2;
+    Date_t timeoutTime = getNet()->now() + Milliseconds(50);
 
     // 1 waiter waiting for 2 nodes to reach time2 with timeout.
     awaiter.setOpTime(time2);
@@ -1369,8 +1369,8 @@ TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedWhenAWriteConcernTimesOutBefo
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time1));
     {
         NetworkInterfaceMock::InNetworkGuard inNet(getNet());
-        getNet()->runUntil(writeConcern.wDeadline);
-        ASSERT_EQUALS(writeConcern.wDeadline, getNet()->now());
+        getNet()->runUntil(timeoutTime);
+        ASSERT_EQUALS(timeoutTime, getNet()->now());
     }
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);

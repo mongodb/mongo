@@ -2363,9 +2363,6 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
 
     auto wTimeoutDate = [&]() -> Date_t {
         auto clockSource = opCtx->getServiceContext()->getFastClockSource();
-        if (writeConcern.wDeadline != Date_t::max()) {
-            return writeConcern.wDeadline;
-        }
         if (writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
             return Date_t::max();
         }
@@ -2423,9 +2420,8 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::awaitReplicationAsyncNoWTimeo
     WriteConcernOptions fixedWriteConcern =
         _populateUnsetWriteConcernOptionsSyncMode(lg, writeConcern);
 
-    // The returned future won't account for wTimeout or wDeadline, so reject any write concerns
-    // with either option to avoid misuse.
-    invariant(fixedWriteConcern.wDeadline == Date_t::max());
+    // The returned future won't account for wTimeout, so reject any write concerns
+    // with this option to avoid misuse.
     invariant(fixedWriteConcern.wTimeout == WriteConcernOptions::kNoTimeout);
 
     return _startWaitingForReplication(lg, opTime, fixedWriteConcern).first;

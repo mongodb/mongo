@@ -223,9 +223,6 @@ public:
     SyncMode syncMode{SyncMode::UNSET};
     // Timeout in milliseconds.
     Timeout wTimeout;
-    // Deadline. If this is set to something other than Date_t::max(), this takes precedence over
-    // wTimeout.
-    Date_t wDeadline{Date_t::max()};
 
     // True if the default constructed WC ({w:1}) was used.
     //      - Implicit default WC when value of w is {w:1}.

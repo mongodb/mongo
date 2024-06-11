@@ -234,8 +234,8 @@ bool WriteConcernOptions::needToWaitForOtherNodes() const {
 }
 
 bool WriteConcernOptions::operator==(const WriteConcernOptions& other) const {
-    return w == other.w && syncMode == other.syncMode && wDeadline == other.wDeadline &&
-        wTimeout == other.wTimeout && _provenance == other._provenance;
+    return w == other.w && syncMode == other.syncMode && wTimeout == other.wTimeout &&
+        _provenance == other._provenance;
 }
 
 }  // namespace mongo
