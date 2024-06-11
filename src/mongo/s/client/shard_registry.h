@@ -66,6 +66,12 @@
 
 namespace mongo {
 
+namespace shard_registry_stats {
+
+extern Counter64& blockedOpsGauge;
+
+}  // namespace shard_registry_stats
+
 class ShardRegistryData {
 public:
     using ShardMap = stdx::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
