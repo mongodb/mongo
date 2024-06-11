@@ -711,14 +711,6 @@ public:
      */
     BatonHandle makeBaton(OperationContext* opCtx) const;
 
-    uint64_t getCatalogGeneration() const {
-        return _catalogGeneration.load();
-    }
-
-    void incrementCatalogGeneration() {
-        _catalogGeneration.fetchAndAdd(1);
-    }
-
     void disallowUserWrites() {
         _userWritesAllowed.store(false);
     }
@@ -849,9 +841,6 @@ private:
 
     // protected by _mutex
     std::vector<KillOpListenerInterface*> _killOpListeners;
-
-    // When the catalog is restarted, the generation goes up by one each time.
-    AtomicWord<uint64_t> _catalogGeneration{0};
 
     // Server-wide flag indicating whether users' writes are allowed.
     AtomicWord<bool> _userWritesAllowed{true};
