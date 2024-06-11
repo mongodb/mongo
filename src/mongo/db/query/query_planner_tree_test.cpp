@@ -27,8 +27,12 @@
  *    it in the license file.
  */
 
+#include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -41,6 +45,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/db/query/util/cartesian_product.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/assert.h"
@@ -3004,9 +3009,197 @@ TEST_F(QueryPlannerTest, EOFForAlwaysFalsePredicatesUsingClusteredCollections) {
     assertSolutionExists("{eof: 1}");
 }
 
+TEST_F(QueryPlannerTest, EOFForTriviallyFalseMatchForIxScan) {
+    withIndexCombinations(
+        [&]() {
+            runQuery(fromjson("{one: 1, two:{$in:[]}}"));
+            assertNumSolutions(1);
+            assertSolutionExists("{eof: 1}");
+        },
+        std::forward_as_tuple(BSON("one" << 1)),
+        std::forward_as_tuple(BSON("two" << 1)));
+}
+
+TEST_F(QueryPlannerTest, EOFForTriviallyFalseMatchForOr) {
+    withIndexCombinations(
+        [&] {
+            runQuery(fromjson("{one: 1, $or:[{two:{$in:[]}}]}"));
+            assertNumSolutions(1);
+            assertSolutionExists("{eof: 1}");
+        },
+        std::forward_as_tuple(BSON("one" << 1)),
+        std::forward_as_tuple(BSON("two" << 1)));
+}
+
+TEST_F(QueryPlannerTest, EOFForTriviallyFalseMatchForAnd) {
+    withIndexCombinations(
+        [&] {
+            runQuery(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"));
+            assertNumSolutions(1);
+            assertSolutionExists("{eof: 1}");
+        },
+        std::forward_as_tuple(BSON("one" << 1)),
+        std::forward_as_tuple(BSON("two" << 1)));
+}
+
+TEST_F(QueryPlannerTest, NoEOFForHintedIndex) {
+    // Sanity check that hints for non-existent indexes fail the query.
+    runInvalidQueryHint(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"), fromjson("{one:1}"));
+    runInvalidQueryHint(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"), fromjson("{two:1}"));
+    // Verify that if a useable index has been explicitly hinted, that is respected and an EOF
+    // solution is _not_ generated for a trivially false match expression.
+    withIndex(
+        [&] {
+            runQueryHint(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"), fromjson("{one:1}"));
+            assertSolutionDoesntExist("{eof: 1}");
+            assertSolutionExists(
+                "{fetch: {filter: {'$alwaysFalse':1}, node: {ixscan: "
+                "{filter: null, pattern: {one: 1}}}}}");
+        },
+        BSON("one" << 1));
+    withIndex(
+        [&] {
+            runQueryHint(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"), fromjson("{two:1}"));
+            assertSolutionExists(
+                "{fetch: {filter: {'$alwaysFalse':1}, node: {ixscan: "
+                "{filter: null, pattern: {two: 1}}}}}");
+        },
+        BSON("two" << 1));
+
+    // An irrelevant hinted index should still not allow eof.
+    withIndex(
+        [&] {
+            runQueryHint(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"), fromjson("{three:1}"));
+            assertSolutionExists(
+                "{fetch: {filter: {'$alwaysFalse':1}, node: {ixscan: "
+                "{filter: null, pattern: {three: 1}}}}}");
+        },
+        BSON("three" << 1));
+}
+
+/**
+ * Given N collections of BSONObjs, first take the cartesian product of all collections, then for
+ * each member of the cartesian product, find all permutations.
+ *
+ * e.g.,
+ *     getBsonPermutations(std::array{BSONObj(), BSON("one" << 1)},
+ *                         std::array{BSONObj(), BSON("two" << 1)})
+ *
+ * First computes the cartesian product:
+ *
+ * * [BSONObj(), BSONObj()]
+ * * [BSONObj(), BSON("two" << 1)]
+ * * [BSON("one" << 1), BSONObj()]
+ * * [BSON("one" << 1), BSON("two" << 1)]
+ *
+ * then, for each of those, generates a BSONObj for every permutation:
+ *
+ * * {}
+ * * {two:1}
+ * * {one:1}
+ * * {one:1, two:1}
+ * * {two:1, one:1} // this was found as a permutation of the preceding value.
+ *
+ * Useful for exhaustively testing every way of combining some bson objects, e.g., to find all
+ * possible sort values for a query.
+ */
+auto getBsonPermutations(const auto&... inputRanges) {
+    static constexpr auto combineBson = [](const std::vector<BSONObj>& inputs) {
+        BSONObj result;
+        for (const auto& input : inputs) {
+            result = result.addFields(input);
+        }
+        return result;
+    };
+    std::set<BSONObj, SimpleBSONObjComparator::LessThan> results;
+
+    for (const auto& valuesTuple : utils::cartesian_product(inputRanges...)) {
+        // The cartesian product results are a tuple; convert to a vector of BSONObjs.
+        auto values =
+            std::apply([](const auto&... values) { return std::vector{values...}; }, valuesTuple);
+
+        // First, sort the values into the lexicographically "lowest" permutation
+        std::sort(values.begin(), values.end(), SimpleBSONObjComparator::LessThan{});
+
+        // Record this permutation.
+        results.insert(combineBson(values));
+
+        // Now keep advancing to the next lexicographically ordered permutation.
+        while (std::next_permutation(
+            values.begin(), values.end(), SimpleBSONObjComparator::LessThan{})) {
+            // Collect that permutation also.
+            results.insert(combineBson(values));
+        }
+        // Done; no more permutations of this combination.
+    }
+    return results;
+}
+
+TEST_F(QueryPlannerTest, EOFForTriviallyFalseMatchWithSortOrProj) {
+    // Test with each of the following queries.
+    static const auto queries = std::array{
+        fromjson("{one: 1, two:{$in:[]}}"),
+        fromjson("{one: 1, $or:[{two:{$in:[]}}]}"),
+        fromjson("{one: 1, $and:[{two:{$in:[]}}]}"),
+    };
+
+
+    // Test with all possible permutations of the following sorts.
+    // This will include, for example, both {one:1, two:1} and {two:1, one:1}.
+    static const auto possibleSortValues = getBsonPermutations(
+        // Sort on field "one" : <none>, forward, backward
+        std::array{BSONObj(), BSON("one" << 1), BSON("one" << -1)},
+        // Sort on field "two" : <none>, forward, backward
+        std::array{BSONObj(), BSON("two" << 1), BSON("two" << -1)},
+        // Sort on (unrelated!) field "three" : <none>, forward, backward
+        std::array{BSONObj(), BSON("three" << 1), BSON("three" << -1)},
+        // Sort on _id : <none>, forward, backward
+        std::array{BSONObj(), BSON("_id" << 1), BSON("_id" << -1)});
+
+
+    // Test with all possible permutations of the following projections.
+    // Projections can't mix inclusion and exclusion, except for excluding _id.
+    static const auto possibleProjectionValues = []() {
+        auto res = getBsonPermutations(
+            // Project on field "one" : <none>, included
+            std::array{BSONObj(), BSON("one" << 1)},
+            // Project on field "two" : <none>, included
+            std::array{BSONObj(), BSON("two" << 1)},
+            // Project on (unrelated!) field "three" : <none>, included
+            std::array{BSONObj(), BSON("three" << 1)},
+            // Project on _id : <none>, included, excluded
+            std::array{BSONObj(), BSON("_id" << 1), BSON("_id" << 0)});
+
+        // Test with all possible permutations of the following projections.
+        res.merge(getBsonPermutations(
+            // Project on field "one" : <none>, excluded
+            std::array{BSONObj(), BSON("one" << 0)},
+            // Project on field "two" : <none>, excluded
+            std::array{BSONObj(), BSON("two" << 0)},
+            // Project on (unrelated!) field "three" : <none>, excluded
+            std::array{BSONObj(), BSON("three" << 0)}));
+        return res;
+    }();
+
+    for (const auto& variant :
+         utils::cartesian_product(queries, possibleSortValues, possibleProjectionValues)) {
+        withIndexCombinations(
+            [&] {
+                // Some platforms don't handle capturing structured bindings; unpack here.
+                const auto& [query, sort, proj] = variant;
+                // Regardless of sort and proj, this query can never match anything.
+                runQuerySortProj(query, sort, proj);
+                assertNumSolutions(1);
+                assertSolutionExists("{eof: 1}");
+            },
+            std::forward_as_tuple(BSON("one" << 1)),
+            std::forward_as_tuple(BSON("two" << 1)));
+    }
+}
+
 TEST_F(QueryPlannerTest, NotEOFForChangeStreamsEvenIfAlwaysFalsePredicateIsGiven) {
-    // Here we simulate a change stream by requesting a tailable cursor on the oplog of the testColl
-    // collection. See NamespaceString::oplog() method.
+    // Here we simulate a change stream by requesting a tailable cursor on the oplog of the
+    // testColl collection. See NamespaceString::oplog() method.
     nss = NamespaceString::createNamespaceString_forTest("local.oplog");
     auto cmdObj = fromjson("{find: 'oplog.testColl', filter: {$alwaysFalse: 1}, tailable: true}");
     runQueryAsCommand(cmdObj);
