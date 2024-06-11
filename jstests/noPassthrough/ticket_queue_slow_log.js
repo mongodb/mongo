@@ -72,6 +72,9 @@ assert.soon(() => {
     return stats.queues.execution.read.available == 0;
 }, "Expected to have no available read tickets.");
 
+// Force thread to sleep for 1ms to guarantee readers accrue wait time in queue.
+sleep(1);
+
 jsTestLog("Stop readers and clean up");
 assert.commandWorked(db.getSiblingDB(dbName).timing_coordination.insertOne({_id: "stop reading"}));
 
