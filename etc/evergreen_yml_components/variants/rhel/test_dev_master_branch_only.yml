@@ -486,34 +486,6 @@ buildvariants:
       - name: noPassthroughHotBackups_gen
       - name: generate_buildid_to_debug_symbols_mapping
 
-  - name: &enterprise-rhel80-no-latch-64-bit enterprise-rhel80-no-latch-64-bit
-    display_name: "~ Enterprise RHEL 8.0 (without Diagnostic Latches)"
-    tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    expansions:
-      compile_flags: >-
-        MONGO_DISTMOD=rhel80
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --link-model=dynamic
-      scons_cache_mode: all
-      scons_cache_scope: shared
-      num_scons_link_jobs_available: 0.99
-      compile_variant: *enterprise-rhel80-no-latch-64-bit
-    tasks:
-      - name: compile_test_parallel_core_stream_TG
-        distros:
-          - rhel80-build
-      - name: compile_test_parallel_unittest_stream_TG
-        distros:
-          - rhel80-build
-      - name: compile_test_parallel_dbtest_stream_TG
-        distros:
-          - rhel80-build
-      - name: generate_buildid_to_debug_symbols_mapping
-        distros:
-          - rhel80-build
-
   - name: &enterprise-rhel80-sdam-replica-set-monitor-64-bit enterprise-rhel80-sdam-replica-set-monitor-64-bit
     display_name: "~ Enterprise RHEL 8.0 (with SdamReplicaSetMonitor)"
     tags: []
