@@ -39,3 +39,13 @@ server_parameters:
         validator:
           gte: 0
         default: 500
+
+    directConnectionChecksWithSingleShard:
+        description: >-
+          Controls whether warnings should be emitted for direct connection operations when there is
+          only a single shard in the cluster. Will have no effect on the behavior in clusters with
+          two or more shards.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: directConnectionChecksWithSingleShard
+        default: false

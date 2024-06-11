@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/s/sharding_api_d_params_gen.h"
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -60,7 +61,8 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const DatabaseNam
                     "shardedClusterCardinalityForDirectConns");
             return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
         }();
-        if (clusterHasTwoOrMoreShards) {
+
+        if (clusterHasTwoOrMoreShards || directConnectionChecksWithSingleShard.load()) {
             const bool authIsEnabled = AuthorizationManager::get(opCtx->getServiceContext()) &&
                 AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled();
 
