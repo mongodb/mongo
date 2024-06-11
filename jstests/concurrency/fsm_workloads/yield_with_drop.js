@@ -15,6 +15,12 @@ export const $config = (function() {
             ErrorCodes.NoProgressMade,
             ErrorCodes.OperationFailed,
             ErrorCodes.QueryPlanKilled,
+            // Encountered when executing createIndexes while a dropCollection is inside the
+            // critical section
+            ErrorCodes.StaleConfig,
+            // Encountered when two threads execute concurrently and repeatedly create collection
+            // (as part of createIndexes) and drop collection
+            ErrorCodes.CannotImplicitlyCreateCollection,
         ],
         nDocs: 200,
         genUpdateDoc: function genUpdateDoc() {
