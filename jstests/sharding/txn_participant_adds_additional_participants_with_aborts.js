@@ -262,12 +262,10 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
 }
 
 /* Test case 3 */
-/****
- * TODO SERVER-91330 Fix test case 3
 {
     jsTest.log(
-        "Testing that an additional participant not reported to mongos is not included in abort
-protocol" + " and the additional participant is reaped after transactionLifetimeLimitSeconds.");
+        "Testing that an additional participant not reported to mongos is not included in abort" +
+        "protocol and the additional participant is reaped after transactionLifetimeLimitSeconds.");
     dropCollections(st);
 
     const numDocs = 500;
@@ -351,7 +349,7 @@ protocol" + " and the additional participant is reaped after transactionLifetime
         configureFailPoint(st.shard1, "hangWhenSubRouterHandlesResponseFromAddedParticipant");
     // Set a failpoint on shard0 so that it does not respond to mongos for the aggregate command
     // until after shard1 has hung.
-    const fpHangShard0 = configureFailPoint(st.shard0, "hangAfterAcquiringCollectionCatalog");
+    const fpHangShard0 = configureFailPoint(st.shard0, "getMoreHangAfterPinCursor");
 
     const waitForAbort = new CountDownLatch(2);
 
@@ -409,14 +407,18 @@ protocol" + " and the additional participant is reaped after transactionLifetime
     // Allow shard0 to proceed; aggregation pipeline will finish without results from shard1.
     fpHangShard0.off();
 
-    // Wait until aggregation is complete
-    assert.soon(() => {return waitForAbort.getCount() < 2});
+    // Wait until aggregation is complete without responses from shard1 and shard2.
+    assert.soon(() => {
+        return waitForAbort.getCount() < 2;
+    });
 
-    // allow shard1 to proceed; any response regarding aggergation will be ignored by mongos.
+    // Allow shard1 to proceed; any response for the aggregation will be ignored by mongos.
     fpHangShard1.off();
 
     // Wait until txn is aborted.
-    assert.soon(() => {return waitForAbort.getCount() == 0});
+    assert.soon(() => {
+        return waitForAbort.getCount() == 0;
+    });
 
     aggRequestThread.join();
 
@@ -425,7 +427,7 @@ protocol" + " and the additional participant is reaped after transactionLifetime
         assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
     let finalMongodTxnMetrics = allParticipants.map((shard) => {
         return assert.commandWorked(shard.adminCommand({serverStatus: 1})).transactions;
-    })
+    });
 
     // shard2 should not have participated in the txn abort
     verifyFinalAbortedTransactionMetrics(initialMongosTxnMetrics,
@@ -441,7 +443,7 @@ protocol" + " and the additional participant is reaped after transactionLifetime
     // Now shard2 should have aborted due to timeout.
     finalMongodTxnMetrics = allParticipants.map((shard) => {
         return assert.commandWorked(shard.adminCommand({serverStatus: 1})).transactions;
-    })
+    });
     verifyFinalAbortedTransactionMetrics(initialMongosTxnMetrics,
                                          initialMongodTxnMetrics,
                                          finalMongosTxnMetrics,
@@ -449,6 +451,5 @@ protocol" + " and the additional participant is reaped after transactionLifetime
                                          allParticipants,
                                          allParticipants);
 }
-****/
 
 st.stop();
