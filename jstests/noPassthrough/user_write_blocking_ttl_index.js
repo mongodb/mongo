@@ -5,6 +5,9 @@
 //   requires_fcv_60,
 //   requires_non_retryable_commands,
 //   requires_replication,
+//   # system.js stored functions only work for collections that live on the db-primary shard so
+//   # we have to make sure it wont be moved anywhere by the balancer
+//   assumes_balancer_off,
 // ]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

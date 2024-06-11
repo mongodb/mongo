@@ -5,6 +5,9 @@
 //   # Uses $function operator.
 //   requires_scripting,
 //   requires_system_dot_js_stored_functions,
+//   # system.js stored functions only work for collections that live on the db-primary shard so
+//   # we have to make sure it wont be moved anywhere by the balancer
+//   assumes_balancer_off,
 // ]
 
 const testDB = db.getSiblingDB('system_js_access');
