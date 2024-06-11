@@ -138,6 +138,10 @@ function testMongodError(errorCode, isWCError) {
 function testMongosError() {
     const shard0Primary = st.rs0.getPrimary();
 
+    // Insert initial documents used by the test.
+    const docs = [{k: 0, x: 0}, {k: 1, x: 1}];
+    assert.commandWorked(shard0Primary.getDB(dbName)[collName].insert(docs));
+
     // Test retryable writes.
     jsTestLog("Retryable write should return mongos shutdown error with RetryableWriteError label");
 
@@ -210,7 +214,7 @@ function testMongosError() {
         const sessionDb = session.getDatabase(dbName);
         const sessionColl = sessionDb.getCollection(collName);
         session.startTransaction();
-        assert.commandWorked(sessionColl.update({}, {$inc: {x: 1}}));
+        assert.commandWorked(sessionColl.update({k: 0}, {$inc: {x: 1}}));
         return sessionDb.adminCommand({
             commitTransaction: 1,
             txnNumber: NumberLong(session.getTxnNumber_forTesting()),
@@ -245,7 +249,7 @@ function testMongosError() {
         const sessionDb = session.getDatabase(dbName);
         const sessionColl = sessionDb.getCollection(collName);
         session.startTransaction();
-        assert.commandWorked(sessionColl.update({}, {$inc: {x: 1}}));
+        assert.commandWorked(sessionColl.update({k: 1}, {$inc: {x: 1}}));
         return sessionDb.adminCommand({
             abortTransaction: 1,
             txnNumber: NumberLong(session.getTxnNumber_forTesting()),
