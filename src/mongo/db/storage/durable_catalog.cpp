@@ -287,6 +287,26 @@ DurableCatalog::EntryIdentifier DurableCatalog::getEntry(const RecordId& catalog
     return it->second;
 }
 
+NamespaceString DurableCatalog::getNSSFromCatalog(OperationContext* opCtx,
+                                                  const RecordId& catalogId) const {
+    {
+        stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+        auto it = _catalogIdToEntryMap.find(catalogId);
+        if (it != _catalogIdToEntryMap.end()) {
+            return it->second.nss;
+        }
+    }
+
+    // Re-read the catalog at the provided timestamp in case the collection was dropped.
+    BSONObj obj = _findEntry(opCtx, catalogId);
+    if (!obj.isEmpty()) {
+        return NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj["ns"].String());
+    }
+
+    tassert(9117800, str::stream() << "Namespace not found for " << catalogId, false);
+}
+
 StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_addEntry(
     OperationContext* opCtx, NamespaceString nss, const CollectionOptions& options) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
