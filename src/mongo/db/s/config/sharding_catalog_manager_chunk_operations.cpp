@@ -646,6 +646,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     newChunkBounds.push_back(range.getMax());
 
     if (isSplitAlreadyDone(opCtx, range, shardName, origChunk.getValue(), newChunkBounds)) {
+        // In case the request was already fullfilled, we still need to wait until the original
+        // request is majority written. The timestamp is not known, so we use the system's last
+        // optime. Otherwise the next RoutingInfo cache refresh from the shard may not see the
+        // newest information.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         return buildChunkVersionBSON(collVersion);
     }
 
