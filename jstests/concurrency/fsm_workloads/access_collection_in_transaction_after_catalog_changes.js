@@ -32,6 +32,7 @@ export const $config = (function() {
             if (TestData.testingReplicaSetEndpoint) {
                 expectedTxnErrorCodes.push(ErrorCodes.StaleConfig);
                 expectedTxnErrorCodes.push(ErrorCodes.StaleDbVersion);
+                expectedTxnErrorCodes.push(ErrorCodes.ExceededTimeLimit);
                 // This error is thrown when there is a placement change during the transaction.
                 expectedTxnErrorCodes.push(ErrorCodes.MigrationConflict);
             }
