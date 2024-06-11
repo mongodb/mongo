@@ -5,6 +5,15 @@
  */
 (function() {
 'use strict';
+
+const slowTestVariant = buildInfo().buildEnvironment.target_arch.includes('ppc');
+const isStepdownSuite = typeof ContinuousStepdown != "undefined";
+
+if (slowTestVariant && isStepdownSuite) {
+    jsTestLog("Test times out in slow variants with continuous stepdown suites.");
+    return;
+}
+
 const st = new ShardingTest({shards: 2});
 
 assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: '4.4'}));
