@@ -437,6 +437,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         """Return a list of dicts of NodeInfo objects."""
         output = []
         for shard in self.shards:
+            if shard is self.configsvr:
+                continue
             output += shard.get_node_info()
         for mongos in self.mongos:
             output += mongos.get_node_info()
