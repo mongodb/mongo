@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/json.h"
+#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
@@ -148,70 +149,149 @@ public:
         }
     }
 
+    // Given an object that matches what we might see in the data field of a bucket, produce the
+    // corresonding vector of objects.
+    std::vector<BSONObj> columnsToObjs(BSONObj bsonColumns) {
+        using mongo::BSONColumn;
+        std::vector<BSONObj> objs;
+
+        std::vector<StringData> fieldNames;
+        std::vector<BSONColumn> columns;
+        for (BSONElement elem : bsonColumns) {
+            fieldNames.push_back(elem.fieldNameStringData());
+            int dataLen;
+            const char* data = elem.binDataClean(dataLen);
+            columns.emplace_back(data, dataLen);
+        }
+
+        std::vector<BSONColumn::Iterator> iters;
+        for (auto& col : columns) {
+            iters.emplace_back(col.begin());
+        }
+
+        invariant(!iters.empty());
+        const auto end = columns[0].end();
+        while (iters[0] != end) {
+            BSONObjBuilder builder;
+            size_t i = 0;
+            for (auto& iter : iters) {
+                BSONElement elem = *iter;
+                if (!elem.eoo()) {
+                    builder.appendAs(elem, fieldNames[i]);
+                }
+                ++iter;
+                ++i;
+            }
+
+            objs.push_back(builder.obj());
+        }
+
+        // Every BSONColumn should have the same number of elements.
+        for (size_t i = 0; i < iters.size(); ++i) {
+            invariant(iters[i] == columns[i].end());
+        }
+
+        return objs;
+    }
+
+    // Shred the bsons producing a time series "bucket"-like thing, which can be used by the TS
+    // decoding implementation.
+    BSONObj objsToColumns(const std::vector<BSONObj>& bsons) {
+        StringMap<std::unique_ptr<BSONColumnBuilder<>>> shredMap;
+
+        size_t bsonIdx = 0;
+        for (auto&& bson : bsons) {
+            // Keep track of which fields we visited for this bson, so we can pad the
+            // unvisited fields with 'gaps'.
+            StringDataSet fieldsVisited;
+            for (auto elt : bson) {
+                auto [it, inserted] = shredMap.insert(
+                    std::pair(elt.fieldName(), std::make_unique<BSONColumnBuilder<>>()));
+
+                if (inserted) {
+                    // Backfill with missing values.
+                    for (size_t i = 0; i < bsonIdx; ++i) {
+                        it->second->append(BSONElement());
+                    }
+                }
+
+                it->second->append(elt);
+                fieldsVisited.insert(elt.fieldNameStringData());
+            }
+
+            // Fill in missings for fields not present in this document.
+            for (auto& [k, v] : shredMap) {
+                if (!fieldsVisited.count(k)) {
+                    v->append(BSONElement());
+                }
+            }
+
+            ++bsonIdx;
+        }
+        BSONObjBuilder dataFieldBuilder;
+        for (auto& [fieldName, builder] : shredMap) {
+            dataFieldBuilder.append(fieldName, builder->finalize());
+        }
+        return dataFieldBuilder.obj();
+    }
+
+    // Given a collection of documents that might appear in a bucket, produce the corresponding min
+    // and max objects that would appear in the control block.
+    std::pair<BSONObj, BSONObj> computeMinMax(const std::vector<BSONObj>& bsons) {
+        StringMap<std::pair<BSONElement, BSONElement>> minMaxMap;
+
+        SimpleStringDataComparator strCmpor;
+        BSONElementComparator cmpor{BSONElementComparator::FieldNamesMode::kIgnore, &strCmpor};
+        auto bsonCmp = [&cmpor](BSONElement a, BSONElement b) {
+            return cmpor.evaluate(a < b);
+        };
+
+        for (auto&& bson : bsons) {
+            for (auto elt : bson) {
+                if (auto&& it = minMaxMap.find(elt.fieldName()); it != minMaxMap.end()) {
+                    it->second.first = std::min(it->second.first, elt, bsonCmp);
+                    it->second.second = std::max(it->second.first, elt, bsonCmp);
+                } else {
+                    minMaxMap.insert({elt.fieldName(), {elt, elt}});
+                }
+            }
+        }
+
+        BSONObjBuilder controlMinBuilder, controlMaxBuilder;
+        for (auto& [_, minMax] : minMaxMap) {
+            controlMinBuilder.append(minMax.first);
+            controlMaxBuilder.append(minMax.second);
+        }
+
+        return std::pair{controlMinBuilder.obj(), controlMaxBuilder.obj()};
+    }
+
     std::pair<std::vector<std::unique_ptr<value::TsBlock>>,
               std::vector<std::unique_ptr<value::CellBlock>>>
     extractCellBlocks(const std::vector<value::CellBlock::PathRequest>& paths,
-                      const std::vector<BSONObj>& bsons) {
+                      const std::variant<std::vector<BSONObj>, BSONObj>& data) {
+        // Get the de-blocked collection of BSON documents for the bucket.
+        std::vector<BSONObj> bsons;
+        if (auto* docs = std::get_if<std::vector<BSONObj>>(&data)) {
+            // The caller gave us the documents directly, just use them.
+            bsons = std::move(*docs);
+        } else {
+            // The caller gave us a compressed representation of the bucket data. Decompress them to
+            // produce the logical collection of documents.
+            BSONObj bsonColumns = std::get<BSONObj>(data);
+            bsons = columnsToObjs(bsonColumns);
+        }
 
         if (useTsImpl) {
-            // Shred the bsons here, produce a time series "bucket"-like thing, and pass it to the
-            // TS decoding implementation.
-            StringMap<std::unique_ptr<BSONColumnBuilder<>>> shredMap;
-            StringMap<std::pair<BSONElement, BSONElement>> minMaxMap;
-
-            SimpleStringDataComparator strCmpor;
-            BSONElementComparator cmpor{BSONElementComparator::FieldNamesMode::kIgnore, &strCmpor};
-            auto bsonCmp = [&cmpor](BSONElement a, BSONElement b) {
-                return cmpor.evaluate(a < b);
-            };
-
-            size_t bsonIdx = 0;
-            for (auto&& bson : bsons) {
-                // Keep track of which fields we visited for this bson, so we can pad the
-                // unvisited fields with 'gaps'.
-                StringDataSet fieldsVisited;
-                for (auto elt : bson) {
-                    auto [it, inserted] = shredMap.insert(
-                        std::pair(elt.fieldName(), std::make_unique<BSONColumnBuilder<>>()));
-
-                    if (inserted) {
-                        // Backfill with missing values.
-                        for (size_t i = 0; i < bsonIdx; ++i) {
-                            it->second->append(BSONElement());
-                        }
-                    }
-
-                    it->second->append(elt);
-                    fieldsVisited.insert(elt.fieldNameStringData());
-
-                    if (auto&& it = minMaxMap.find(elt.fieldName()); it != minMaxMap.end()) {
-                        it->second.first = std::min(it->second.first, elt, bsonCmp);
-                        it->second.second = std::max(it->second.first, elt, bsonCmp);
-                    } else {
-                        minMaxMap.insert({elt.fieldName(), {elt, elt}});
-                    }
-                }
-
-                // Fill in missings for fields not present in this document.
-                for (auto& [k, v] : shredMap) {
-                    if (!fieldsVisited.count(k)) {
-                        v->append(BSONElement());
-                    }
-                }
-
-                ++bsonIdx;
+            BSONObj dataField;
+            if (auto obj = std::get_if<BSONObj>(&data)) {
+                dataField = *obj;
+            } else {
+                dataField = objsToColumns(bsons);
             }
 
-            BSONObjBuilder dataFieldBuilder;
-            for (auto& [fieldName, builder] : shredMap) {
-                dataFieldBuilder.append(fieldName, builder->finalize());
-            }
-
-            BSONObjBuilder controlMinBuilder, controlMaxBuilder;
-            for (auto& [_, minMax] : minMaxMap) {
-                controlMinBuilder.append(minMax.first);
-                controlMaxBuilder.append(minMax.second);
-            }
+            BSONObj minData, maxData;
+            std::tie(minData, maxData) = computeMinMax(bsons);
 
             // Store the bucket into a member variable so that the memory remains valid for the
             // rest of the test.
@@ -219,9 +299,8 @@ public:
                 BSON(timeseries::kBucketControlFieldName
                      << BSON(timeseries::kBucketControlCountFieldName
                              << (long long)bsons.size() << timeseries::kBucketControlMinFieldName
-                             << controlMinBuilder.obj() << timeseries::kBucketControlMaxFieldName
-                             << controlMaxBuilder.obj())
-                     << timeseries::kBucketDataFieldName << dataFieldBuilder.obj());
+                             << minData << timeseries::kBucketControlMaxFieldName << maxData)
+                     << timeseries::kBucketDataFieldName << dataField);
 
             // Now call into the time series extractor.
             value::TsBucketPathExtractor extractor(paths, "time");
@@ -233,8 +312,12 @@ public:
         }
     }
 
+    // Run the given testcases against the specified data. Data will be one of:
+    // - A vector of the collection of documents represented by a bucket
+    // - An object that is consistent with the data field of a bucket, e.g.
+    //     {"topLevelField0": <BinData of type Column>, "topLevelField1": <BinData of type Column>}
     void testPaths(const std::vector<PathTestCase>& testCases,
-                   const std::vector<BSONObj>& bsons,
+                   const std::variant<std::vector<BSONObj>, BSONObj>& data,
                    bool skipProjectPath = false);
 
 private:
@@ -244,7 +327,7 @@ private:
 };
 
 void BsonBlockDecodingTest::testPaths(const std::vector<PathTestCase>& testCases,
-                                      const std::vector<BSONObj>& bsons,
+                                      const std::variant<std::vector<BSONObj>, BSONObj>& data,
                                       bool skipProjectPath) {
     std::vector<value::CellBlock::PathRequest> pathReqs;
     for (auto& tc : testCases) {
@@ -257,7 +340,7 @@ void BsonBlockDecodingTest::testPaths(const std::vector<PathTestCase>& testCases
         }
     }
 
-    auto [tsBlocks, cellBlocks] = extractCellBlocks(pathReqs, bsons);
+    auto [tsBlocks, cellBlocks] = extractCellBlocks(pathReqs, data);
     ASSERT_EQ(cellBlocks.size(), pathReqs.size());
 
     size_t idx = 0;
@@ -692,6 +775,44 @@ TEST_F(BsonBlockDecodingTest, PathBasedDecompressionOneBadPath) {
     // Path-based decompression not applied even when only extracting filter paths because of the
     // array traversal in the second path.
     testPaths(tests, bsons, true /* skip project paths */);
+}
+
+TEST_F(BsonBlockDecodingTest, PathBasedLegacyInterleaved) {
+    // base 64-encoded BSONColumn of objects:
+    //   {a: [10], b: 20}
+    //   {a: [10], b: 20}
+    //   {a: [10], b: 20}
+    //   {a: [10], b: 20}
+    // Legacy interleaved encoding is used, meaning we will get an error if we try to use path-based
+    // decompression to decompress the scalar 10s. We can use path-based decompression for the 20s
+    // though.
+    StringData b64Col = "8BsAAAAEYQAMAAAAEDAACgAAAAAQYgAUAAAAAIALAAAAAAAAAIALAAAAAAAAAAAA"_sd;
+
+    std::string compressedCol = base64::decode(b64Col);
+    BSONBinData bd{
+        compressedCol.data(), static_cast<int>(compressedCol.size()), BinDataType::Column};
+    BSONObjBuilder builder;
+    builder.append("fld"_sd, bd);
+    BSONObj bucketData = builder.obj();
+
+    std::vector<PathTestCase> tests{
+        // We won't use path-based decompression for this path. If we did, the BSONColumn layer
+        // would produce an error, "unknown element".
+        PathTestCase{.path = {Get{"fld"}, Traverse{}, Get{"a"}, Traverse{}, Id{}},
+                     .filterValues = fromjson("{result: [10, 10, 10, 10]}"),
+                     .filterPosInfo = {1, 1, 1, 1},
+                     .projectValues = fromjson("{result: [[10], [10], [10], [10]]}")},
+        // We will use path-based decompression for this path.
+        PathTestCase{.path = {Get{"fld"}, Traverse{}, Get{"b"}, Traverse{}, Id{}},
+                     .filterValues = fromjson("{result: [20, 20, 20, 20]}"),
+                     .filterPosInfo = {1, 1, 1, 1},
+                     .projectValues = fromjson("{result: [20, 20, 20, 20]}")},
+    };
+
+    for (auto& test : tests) {
+        testPaths({test}, bucketData);
+        testPaths({test}, bucketData, true);
+    }
 }
 
 class ValueBlockTest : public mongo::unittest::Test {

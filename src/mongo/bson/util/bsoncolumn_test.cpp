@@ -8724,6 +8724,62 @@ TEST_F(BSONColumnTest, EmptyObjectSkipAndInterleaved) {
     verifyDecompressPathFast(binData, elems, TestPath{{}});
 }
 
+TEST_F(BSONColumnTest, LegacyInterleavedPaths) {
+    // This test encodes a BSONColumn with legacy interleaved mode. That means that arrays are
+    // considered a leaf when traversing the reference object. Therefore we can't decompress
+    // individual elements of any arrays. We need to return an error for paths that try to do this.
+    std::vector<BSONElement> elems = {createElementObj(BSON("a" << BSON_ARRAY(10) << "b" << 20)),
+                                      createElementObj(BSON("a" << BSON_ARRAY(10) << "b" << 20)),
+                                      createElementObj(BSON("a" << BSON_ARRAY(10) << "b" << 20)),
+                                      createElementObj(BSON("a" << BSON_ARRAY(10) << "b" << 20))};
+    BufBuilder bb;
+    appendInterleavedStartLegacy(bb, elems.front().Obj());
+    appendSimple8bControl(bb, 0b1000, 0b0000);
+    appendSimple8bBlocks64(bb,
+                           {kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues},
+                           1);
+    appendSimple8bControl(bb, 0b1000, 0b0000);
+    appendSimple8bBlocks64(bb,
+                           {kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues},
+                           1);
+    appendEOO(bb);
+    appendEOO(bb);
+    verifyDecompression(bb, elems);
+
+    // Now try path-based decompression with a path that we cannot support.
+    BSONColumnBlockBased column{bb.buf(), static_cast<size_t>(bb.len())};
+
+    // This path is trying to get the element in the array. We cannot handle this path.
+    struct ArrayElemPath {
+        std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+            return {refObj["a"].Array()[0].value()};
+        }
+    };
+
+    std::vector<BSONElement> output;
+    std::vector<std::pair<ArrayElemPath, std::vector<BSONElement>&>> paths = {
+        {ArrayElemPath{}, output}};
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    // 'Request for unknown element'
+    ASSERT_THROWS_CODE(column.decompress<BSONElementMaterializer>(allocator, std::span(paths)),
+                       DBException,
+                       9071200);
+
+    // Try again with a path that we can support.
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    auto binData = cb.finalize();
+    verifyDecompressPathFast(binData, elems, TestPath{{"b"}});
+}
+
 TEST_F(BSONColumnTest, FuzzerDiscoveredEdgeCases) {
     // This test is a collection of binaries produced by the fuzzer that exposed bugs at some point
     // and contains coverage missing from the tests defined above.
