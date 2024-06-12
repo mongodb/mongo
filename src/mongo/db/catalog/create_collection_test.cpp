@@ -400,13 +400,33 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagAlwaysTrue)
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", false);
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
+    auto bucketsColl =
+        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
+
+    auto opCtx = makeOpCtx();
+    auto tsOptions = TimeseriesOptions("t");
+    CreateCommand cmd = CreateCommand(curNss);
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+
+    ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
+    AutoGetCollectionForRead collForRead(opCtx.get(), bucketsColl);
+    ASSERT_TRUE(collForRead->timeseriesBucketingParametersHaveChanged());
+    ASSERT_TRUE(*collForRead->timeseriesBucketingParametersHaveChanged());
+}
+
+TEST_F(CreateCollectionTest,
+       TimeseriesBucketingParametersChangedFlagNotSetIfCollectionNotTimeseries) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTSBucketingParametersUnchanged", false);
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
 
     auto opCtx = makeOpCtx();
     uassertStatusOK(createCollection(opCtx.get(), CreateCommand(curNss)));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), curNss));
     AutoGetCollectionForRead collForRead(opCtx.get(), curNss);
-    ASSERT_TRUE(collForRead->timeseriesBucketingParametersHaveChanged());
+    ASSERT_FALSE(collForRead->timeseriesBucketingParametersHaveChanged());
 }
 
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {

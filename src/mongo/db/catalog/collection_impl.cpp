@@ -831,6 +831,10 @@ boost::optional<bool> CollectionImpl::getTimeseriesBucketsMayHaveMixedSchemaData
 }
 
 boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged() const {
+    if (!getTimeseriesOptions()) {
+        return boost::none;
+    }
+
     if (!feature_flags::gTSBucketingParametersUnchanged.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Pessimistically return true because v7.1+ versions may have missed cloning this catalog
