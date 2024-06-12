@@ -2,6 +2,9 @@
 //   requires_fcv_61,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
+//   # system.js stored functions only work for collections that live on the db-primary shard so
+//   # we have to make sure it wont be moved anywhere by the balancer
+//   assumes_balancer_off,
 // ]
 
 // Use a private sister database to avoid conflicts with other tests that use system.js

@@ -1,5 +1,11 @@
 // Tests that it is illegal to write to system collections within a transaction.
-// @tags: [uses_transactions, uses_snapshot_read_concern]
+// @tags: [
+//   uses_transactions,
+//   uses_snapshot_read_concern,
+//   # system.js stored functions only work for collections that live on the db-primary shard so
+//   # we have to make sure it wont be moved anywhere by the balancer
+//   assumes_balancer_off
+// ]
 const session = db.getMongo().startSession();
 
 // Use a custom database, to avoid conflict with other tests that use the system.js collection.
