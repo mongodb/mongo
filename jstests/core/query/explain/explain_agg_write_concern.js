@@ -7,6 +7,10 @@
 //   does_not_support_stepdowns,
 //   references_foreign_collection,
 //   requires_non_retryable_commands,
+//   # TODO SERVER-88275: aggregation using a $mergeCursor stage can fail with QueryPlanKilled in
+//   # suites with random migrations because moveCollection changes the collection UUID by dropping
+//   # and re-creating the collection.
+//   assumes_balancer_off,
 // ]
 
 /**
