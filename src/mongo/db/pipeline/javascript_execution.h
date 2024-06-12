@@ -64,6 +64,15 @@ public:
                             const DatabaseName& database,
                             bool loadStoredProcedures,
                             boost::optional<int> jsHeapLimitMB);
+
+    /**
+     * Gets a pointer to the cached JsExecution instance if it exists, else returns nullptr. This
+     * allows the caller to skip passing all the arguments to the more general JsExecution::get()
+     * method, which avoids having to potentially construct and create a heap copy of a large scope
+     * object that will not be used because a cached JsExecution object already exists.
+     */
+    static JsExecution* getCached(OperationContext* opCtx, bool loadStoredProcedures);
+
     /**
      * Construct with a thread-local scope and initialize with the given scope variables.
      */

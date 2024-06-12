@@ -427,10 +427,8 @@ public:
      * created yet. Initializes the Scope with the 'jsScope' variables from the runtimeConstants.
      * Loads the Scope with the functions stored in system.js if the expression isn't executed on
      * mongos and is called from a MapReduce command or `forceLoadOfStoredProcedures` is true.
-     *
-     * Returns a JsExec and a boolean indicating whether the Scope was created as part of this call.
      */
-    auto getJsExecWithScope(bool forceLoadOfStoredProcedures = false) const {
+    JsExecution* getJsExecWithScope(bool forceLoadOfStoredProcedures = false) const {
         uassert(31264,
                 "Cannot run server-side javascript without the javascript engine enabled",
                 getGlobalScriptEngine());
@@ -452,9 +450,17 @@ public:
                       "$where.");
         }
 
-        auto scopeObj = BSONObj();
+        // If there is a cached JsExecution object, return it. This is a performance optimization
+        // that avoids potentially copying the scope object, which is not needed if a cached exec
+        // object already exists.
+        JsExecution* jsExec = JsExecution::getCached(opCtx, loadStoredProcedures);
+        if (jsExec) {
+            return jsExec;
+        }
+
+        BSONObj scopeObj = BSONObj();
         if (variables.hasValue(Variables::kJsScopeId)) {
-            auto scopeVar = variables.getValue(Variables::kJsScopeId);
+            Value scopeVar = variables.getValue(Variables::kJsScopeId);
             invariant(scopeVar.isObject());
             scopeObj = scopeVar.getDocument().toBson();
         }
