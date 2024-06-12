@@ -9,6 +9,7 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
@@ -37,15 +38,20 @@ function runTest(testCase) {
     const session = st.s.startSession();
     session.startTransaction({readConcern: {level: "snapshot"}});
     session.getDatabase(dbName).getCollection(collName2).insert({x: 1});
+    let hangDonorAtStartOfRangeDel =
+        configureFailPoint(st.rs1.getPrimary(), "suspendRangeDeletion");
 
     // Move all chunks for testDb.testColl to shard0.
     assert.commandWorked(
         st.s.adminCommand({moveChunk: nss, find: {x: 0}, to: st.shard0.shardName}));
+    hangDonorAtStartOfRangeDel.wait();
 
-    // This find and modify MUST fail, the data moved to another shard, we can't try on shard0 nor
+    // This write cmd MUST fail, the data moved to another shard, we can't try on shard0 nor
     // shard1 with the original clusterTime of the transaction.
     assert.commandFailedWithCode(session.getDatabase(dbName).runCommand(testCase.cmdObj),
                                  ErrorCodes.MigrationConflict);
+
+    hangDonorAtStartOfRangeDel.off();
 
     // Reset the chunk distribution for the next test.
     assert.commandWorked(
