@@ -7221,6 +7221,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankFinalize(
     auto [stateOwned, stateTag, stateVal] = getFromStack(0);
     auto [state, lastValue, lastValueIsNothing, lastRank, sameRankCount, sortSpec] =
         rankState(stateTag, stateVal);
+    if (static_cast<int32_t>(lastRank) == lastRank) {
+        return {true, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(lastRank)};
+    }
     return {true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(lastRank)};
 }
 
