@@ -503,11 +503,6 @@ void PreImagesTenantMarkers::refreshMarkers(OperationContext* opCtx) {
                 updateOnInsert(highestRid, nsUUID, highestWallTime, 0, 0);
             }
         });
-
-    LOGV2(9023600,
-          "Completed initialization of pre-image tenant truncate markers",
-          "preImagesCollectionUUID"_attr = _preImagesCollectionUUID,
-          "tenantId"_attr = _tenantId);
 }
 
 PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(OperationContext* opCtx) {
@@ -542,6 +537,22 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(Operatio
     // there may be oplog holes or inconsistent data prior to it. Compute the value once, as it
     // requires making an additional call into the storage engine.
     Timestamp maxTSEligibleForTruncate = getMaxTSEligibleForTruncate(opCtx);
+
+
+    // TODO SERVER-90305: Explore options for handling rollback-to-stable with truncate markers.
+    //
+    // Truncate markers can be generated with data that is later rolled back via rollback-to-stable.
+    // This behavior is acceptable given the following:
+    //      (1) Only expired data is truncated (expire by seconds or oldest oplog TS).
+    //      (2) If a marker's 'lastRecord' is rolled back, it's wallTime or ts field will
+    //      eventually expire. An expired marker's 'lastRecord' serves as an upper bound for the
+    //      truncate range. Even if the 'lastRecord' doesn't exist anymore, all pre-images older
+    //      than it are truncated for the nsUUID.
+    //          . Caveat: Size metadata isn't accurate if pre-image inserts are rolled back. It will
+    //          eventually converge to a correct state in absence of another rollback-to-stable.
+    //      (3) If a truncate is issued on data that is later rolled back, unexpired pre-images will
+    //      be rolled back in the process. From the stable timestamp, oplog entries will be replayed
+    //      and re-inserted into truncate markers (mirroring truncate behavior in a stable state).
     PreImagesTruncateStats stats;
     for (auto& [nsUUID, truncateMarkersForNsUUID] : *markersMapSnapshot) {
         RecordId minRecordId =

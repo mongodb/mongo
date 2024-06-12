@@ -449,6 +449,85 @@ TEST_F(PreImagesRemoverTest, serverlessHasExcessMarkers) {
     ASSERT_TRUE(excessMarkers);
 }
 
+// Tests an empty 'PreImagesTruncateMarkersPerNsUUID' doesn't generate partial markers for
+// truncation.
+TEST_F(PreImagesRemoverTest, createPartialMarkerIfNecessaryEmptySet) {
+    auto opCtx = operationContext();
+
+    // Expiry by oldest oplog entry timestamp.
+    auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
+    setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
+
+    PreImagesTruncateMarkersPerNsUUID nsUUIDMarkers(nullTenantId() /* tenantId */,
+                                                    std::deque<CollectionTruncateMarkers::Marker>{},
+                                                    0,
+                                                    0,
+                                                    100,
+                                                    kArbitraryMarkerCreationMethod);
+    auto numMarkersBefore = nsUUIDMarkers.numMarkers_forTest();
+    ASSERT_EQ(numMarkersBefore, 0);
+    nsUUIDMarkers.createPartialMarkerIfNecessary(opCtx);
+    auto numMarkersAfter = nsUUIDMarkers.numMarkers_forTest();
+    ASSERT_EQ(numMarkersAfter, 0);
+}
+
+// Tests that without a highest recordId or wall time, 'PreImagesTruncateMarkersPerNsUUID' won't
+// generate partial markers for truncation.
+TEST_F(PreImagesRemoverTest, createPartialMarkerIfNecessaryNoHighestRecordIdOrWallTime) {
+    auto opCtx = operationContext();
+
+    // Expiry by oldest oplog entry timestamp.
+    auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
+    setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
+
+    PreImagesTruncateMarkersPerNsUUID nsUUIDMarkers(nullTenantId() /* tenantId */,
+                                                    std::deque<CollectionTruncateMarkers::Marker>{},
+                                                    1,
+                                                    1,
+                                                    100,
+                                                    kArbitraryMarkerCreationMethod);
+    auto numMarkersBefore = nsUUIDMarkers.numMarkers_forTest();
+    ASSERT_EQ(numMarkersBefore, 0);
+    nsUUIDMarkers.createPartialMarkerIfNecessary(opCtx);
+    auto numMarkersAfter = nsUUIDMarkers.numMarkers_forTest();
+    ASSERT_EQ(numMarkersAfter, 0);
+}
+
+TEST_F(PreImagesRemoverTest, createPartialMarkerSucceedsExpiryByOldestOplogEntry) {
+    auto opCtx = operationContext();
+
+    // Expiry by oldest oplog entry timestamp.
+    auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
+    setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
+
+    const auto currentEarliestOplogEntryTs =
+        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
+
+    // Generate a timestamp older than oldest oplog entry.
+    auto ts = currentEarliestOplogEntryTs - 1;
+    ASSERT_GT(currentEarliestOplogEntryTs, ts);
+    auto wallTime = Date_t::fromMillisSinceEpoch(ts.asInt64());
+    auto recordIdToInsert = generatePreImageRecordId(wallTime);
+    auto numBytesToInsert = 3;
+    auto numRecordsToInsert = 1;
+
+    PreImagesTruncateMarkersPerNsUUID nsUUIDMarkers(nullTenantId() /* tenantId */,
+                                                    std::deque<CollectionTruncateMarkers::Marker>{},
+                                                    0,
+                                                    0,
+                                                    100,
+                                                    kArbitraryMarkerCreationMethod);
+    // Simulate an insert of an "expired" pre-image with few enough bytes that a new marker isn't
+    // auto-generated.
+    nsUUIDMarkers.updateMarkers(numBytesToInsert, recordIdToInsert, wallTime, numRecordsToInsert);
+
+    auto numMarkersBefore = nsUUIDMarkers.numMarkers_forTest();
+    ASSERT_EQ(numMarkersBefore, 0);
+    nsUUIDMarkers.createPartialMarkerIfNecessary(opCtx);
+    auto numMarkersAfter = nsUUIDMarkers.numMarkers_forTest();
+    ASSERT_EQ(numMarkersAfter, 1);
+}
+
 TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimstampRetrieval) {
     // Basic case.
     {

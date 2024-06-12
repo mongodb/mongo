@@ -242,6 +242,11 @@ bool PreImagesTruncateMarkersPerNsUUID::_hasPartialMarkerExpired(
     OperationContext* opCtx,
     const RecordId& highestSeenRecordId,
     const Date_t& highestSeenWallTime) const {
+    if (highestSeenRecordId.isNull()) {
+        // 'PreImagesTruncateMarkersPerNsUUID' are constructed without specifying a
+        // 'highestSeenRecordId'. Account for newly constructed markers that have yet to be updated.
+        return false;
+    }
     return isExpired(opCtx, _tenantId, highestSeenRecordId, highestSeenWallTime);
 }
 }  // namespace mongo

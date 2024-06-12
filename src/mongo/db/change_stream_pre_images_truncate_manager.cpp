@@ -53,11 +53,26 @@ PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(
     ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
         opCtx, AdmissionContext::Priority::kExempt);
 
-    auto tenantTruncateMarkers = _getInitializedMarkersForPreImagesCollection(opCtx, tenantId);
-    if (!tenantTruncateMarkers) {
-        return {};
+    try {
+        auto tenantTruncateMarkers = _getInitializedMarkersForPreImagesCollection(opCtx, tenantId);
+        if (!tenantTruncateMarkers) {
+            return {};
+        }
+
+        return tenantTruncateMarkers->truncateExpiredPreImages(opCtx);
+    } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& ex) {
+        // TODO SERVER-90305: Revisit handling truncate markers generated on stale data.
+        LOGV2_INFO(9023601,
+                   "Pre-image truncation process interrupted due to storage change. Clearing "
+                   "stale in-memory state",
+                   "reason"_attr = ex.toStatus());
+        // Pre-image truncate markers across tenants were created with an old storage engine and are
+        // no longer reliable.
+        _tenantMap.clear();
+        throw;
+    } catch (const DBException&) {
+        throw;
     }
-    return tenantTruncateMarkers->truncateExpiredPreImages(opCtx);
 }
 
 void PreImagesTruncateManager::dropAllMarkersForTenant(boost::optional<TenantId> tenantId) {
@@ -110,6 +125,8 @@ PreImagesTruncateManager::_getInitializedMarkersForPreImagesCollection(
     });
     opCtx->setEnforceConstraints(false);
 
+    // Guard against an early exit with incomplete truncate markers installed in the '_tenantMap'.
+    ScopeGuard uninstallIncompleteTruncateMarkers([&] { _tenantMap.erase(tenantId); });
     try {
         // (A) Create 'PreImagesTenantMarkers' for the tenant's pre-images collection and install
         // them into the _tenantMap. The 'tenantMarkers' might not account for concurrent pre-image
@@ -118,8 +135,12 @@ PreImagesTruncateManager::_getInitializedMarkersForPreImagesCollection(
         if (!tenantMarkers) {
             return nullptr;
         }
-
-        // Markers are installed, inserts are routed to the installed markers.
+        LOGV2_DEBUG(9023602,
+                    1,
+                    "Installed pre-image truncate markers in tenant map. Markers must be finalized "
+                    "for safe truncation",
+                    "preImagesCollectionUUID"_attr = tenantMarkers->getPreImagesCollectionUUID(),
+                    "tenantId"_attr = tenantMarkers->getTenantId());
 
         // (B) Ensure that 'tenantMarkers' account for the most recent pre-image inserts -
         // specifically, any inserts that occurred during (A) at a later snapshot than the
@@ -127,22 +148,20 @@ PreImagesTruncateManager::_getInitializedMarkersForPreImagesCollection(
         // there are pre-images past the snapshot from (A) until a new insert comes along for each
         // pre-image nsUUID out of date.
         tenantMarkers->refreshMarkers(opCtx);
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-        // The truncate markers were created with an earlier incarnation of the tenant's
-        // pre-images collection. Installed markers are removed by another thread.
-        LOGV2_INFO(8198001,
-                   "Pre images dropped while creating truncate markers. Discarding "
-                   "partially installed truncate markers and deferring installation to "
-                   "the next removal pass",
-                   "reason"_attr = ex.reason());
-        return nullptr;
+
+        LOGV2(9023600,
+              "Completed initialization of pre-image tenant truncate markers",
+              "preImagesCollectionUUID"_attr = tenantMarkers->getPreImagesCollectionUUID(),
+              "tenantId"_attr = tenantMarkers->getTenantId());
     } catch (const DBException& ex) {
-        LOGV2_ERROR(9023601,
-                    "Failed to complete pre-image truncate marker initialization",
-                    "tenantId"_attr = tenantId,
-                    "reason"_attr = ex.toStatus());
+        LOGV2_INFO(9030100,
+                   "Failed to complete pre-image truncate marker initialization",
+                   "tenantId"_attr = tenantId,
+                   "reason"_attr = ex.toStatus());
         throw;
     }
+
+    uninstallIncompleteTruncateMarkers.dismiss();
     return tenantMarkers;
 }
 
@@ -175,11 +194,6 @@ std::shared_ptr<PreImagesTenantMarkers> PreImagesTruncateManager::_createAndInst
             auto baseMarkers =
                 PreImagesTenantMarkers::createMarkers(opCtx, tenantId, preImagesCollection);
             auto tenantMapEntry = _tenantMap.getOrEmplace(tenantId, std::move(baseMarkers));
-            LOGV2_DEBUG(9023602,
-                        1,
-                        "Installed truncate markers for pre-images collection",
-                        "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
-                        "tenantId"_attr = tenantId);
             return tenantMapEntry;
         });
 }
