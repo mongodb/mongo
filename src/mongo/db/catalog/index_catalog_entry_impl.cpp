@@ -546,7 +546,7 @@ std::unique_ptr<const IndexCatalogEntry> IndexCatalogEntryImpl::getNormalizedEnt
 // ----
 
 NamespaceString IndexCatalogEntryImpl::getNSSFromCatalog(OperationContext* opCtx) const {
-    return DurableCatalog::get(opCtx)->getEntry(_shared->_catalogId).nss;
+    return DurableCatalog::get(opCtx)->getNSSFromCatalog(opCtx, _shared->_catalogId);
 }
 
 bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,

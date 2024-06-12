@@ -154,6 +154,13 @@ public:
 
     EntryIdentifier getEntry(const RecordId& catalogId) const;
 
+    /**
+     * First tries to return the in-memory entry. If not found, e.g. when collection is dropped
+     * after the provided timestamp, loads the entry from the persisted catalog at the provided
+     * timestamp.
+     */
+    NamespaceString getNSSFromCatalog(OperationContext* opCtx, const RecordId& catalogId) const;
+
     std::string getIndexIdent(OperationContext* opCtx,
                               const RecordId& id,
                               StringData idxName) const;
