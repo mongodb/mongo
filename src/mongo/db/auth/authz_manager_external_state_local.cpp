@@ -249,36 +249,14 @@ ResolveRoleOption makeResolveRoleOption(PrivilegeFormat showPrivileges,
 }
 
 MONGO_FAIL_POINT_DEFINE(authLocalGetUser);
-void handleAuthLocalGetUserFailPoint(const UserName& userName) {
+void handleAuthLocalGetUserFailPoint(const std::vector<RoleName>& directRoles) {
     auto sfp = authLocalGetUser.scoped();
     if (!sfp.isActive()) {
         return;
     }
 
     IDLParserContext ctx("authLocalGetUser");
-    auto delay = AuthLocalGetUserFailPoint::parse(ctx, sfp.getData()).getResolveUserDelayMS();
-
-    if (delay <= 0) {
-        return;
-    }
-
-    LOGV2_DEBUG(9139100,
-                3,
-                "Sleeping prior to loading user document",
-                "duration"_attr = Milliseconds(delay),
-                "user"_attr = userName);
-    sleepmillis(delay);
-}
-
-MONGO_FAIL_POINT_DEFINE(authLocalGetSubRoles);
-void handleAuthLocalGetSubRolesFailPoint(const std::vector<RoleName>& directRoles) {
-    auto sfp = authLocalGetSubRoles.scoped();
-    if (!sfp.isActive()) {
-        return;
-    }
-
-    IDLParserContext ctx("authLocalGetSubRoles");
-    auto delay = AuthLocalGetSubRolesFailPoint::parse(ctx, sfp.getData()).getResolveRolesDelayMS();
+    auto delay = AuthLocalGetUserFailPoint::parse(ctx, sfp.getData()).getResolveRolesDelayMS();
 
     if (delay <= 0) {
         return;
@@ -358,7 +336,6 @@ StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(
     User user(userReq);
 
     auto rolesLock = _lockRoles(opCtx, userName.tenantId());
-    handleAuthLocalGetUserFailPoint(userName);
 
     if (!userReq.roles) {
         // Normal path: Acquire a user from the local store by UserName.
@@ -399,7 +376,7 @@ StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(
         }
     }
 
-    handleAuthLocalGetSubRolesFailPoint(directRoles);
+    handleAuthLocalGetUserFailPoint(directRoles);
 
     auto data = uassertStatusOK(resolveRoles(opCtx, directRoles, ResolveRoleOption::kAll));
     data.roles->insert(directRoles.cbegin(), directRoles.cend());
@@ -428,7 +405,6 @@ Status AuthzManagerExternalStateLocal::getUserDescription(
     BSONObjBuilder resultBuilder;
 
     auto rolesLock = _lockRoles(opCtx, userName.tenantId());
-    handleAuthLocalGetUserFailPoint(userName);
 
     if (!userReq.roles) {
         BSONObj userDoc;
@@ -471,7 +447,7 @@ Status AuthzManagerExternalStateLocal::getUserDescription(
         }
     }
 
-    handleAuthLocalGetSubRolesFailPoint(directRoles);
+    handleAuthLocalGetUserFailPoint(directRoles);
 
     auto data = uassertStatusOK(resolveRoles(opCtx, directRoles, ResolveRoleOption::kAll));
     data.roles->insert(directRoles.cbegin(), directRoles.cend());

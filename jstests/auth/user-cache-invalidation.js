@@ -91,7 +91,7 @@ function assertLacksLog(conn, cond, start, end) {
  * Create a user with read permission and simply
  * auth and read in a parallel shell.
  *
- * We use FailPoint 'authLocalGetUser.resolveUserDelayMS' to
+ * We use FailPoint 'authLocalGetUser.resolveRolesDelayMS' to
  * give us time to invalidate the user mid-acquisition.
  *
  * We also use pauseBatchApplicationBeforeCompletion with replsets
@@ -137,11 +137,11 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
         readNode, 'waitForUserCacheInvalidation', {userName: {db: testDB, user: testUser}});
 
     // We need some time to mutate the auth state before the acquisition completes.
-    const kResolveUserDelayMS = 5 * 1000;
+    const kResolveRolesDelayMS = 5 * 1000;
     assert.commandWorked(readAdmin.runCommand({
         configureFailPoint: 'authLocalGetUser',
         mode: 'alwaysOn',
-        data: {resolveUserDelayMS: NumberInt(kResolveUserDelayMS)}
+        data: {resolveRolesDelayMS: NumberInt(kResolveRolesDelayMS)}
     }));
 
     const thread = new Thread(function(port, testUser, testDB) {
