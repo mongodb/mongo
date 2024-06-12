@@ -113,18 +113,18 @@ TEST_F(HedgeOptionsUtilTestFixture, ExplicitOperationHedging) {
     const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "primaryPreferred"
-                             << "hedge" << BSONObj());
+                             << "hedge" << BSON("enabled" << true));
 
     checkHedgeOptions(parameters, cmdObj, rspObj, true);
 }
 
-TEST_F(HedgeOptionsUtilTestFixture, ImplicitOperationHedging) {
+TEST_F(HedgeOptionsUtilTestFixture, ImplicitOperationHedgingDisabled) {
     const auto parameters = BSONObj();
     const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "nearest");
-
-    checkHedgeOptions(parameters, cmdObj, rspObj, true);
+    // Mode:nearest no longer defaults to hedge enabled in 8.0.
+    checkHedgeOptions(parameters, cmdObj, rspObj, false);
 }
 
 TEST_F(HedgeOptionsUtilTestFixture, DenylistAggregate) {
@@ -142,7 +142,7 @@ TEST_F(HedgeOptionsUtilTestFixture, DenylistMapReduce) {
     const auto parameters = BSONObj();
     const auto rspObj = BSON("mode"
                              << "nearest"
-                             << "hedge" << BSONObj());
+                             << "hedge" << BSON("enabled" << false));
 
     {
         const auto cmdObj = BSON("mapreduce"
@@ -180,7 +180,7 @@ TEST_F(HedgeOptionsUtilTestFixture, ReadHedgingModeOff) {
     const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "nearest"
-                             << "hedge" << BSONObj());
+                             << "hedge" << BSON("enabled" << true));
 
     checkHedgeOptions(parameters, cmdObj, rspObj, false);
 }
@@ -191,7 +191,7 @@ TEST_F(HedgeOptionsUtilTestFixture, MaxTimeMSForHedgedReads) {
     const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "nearest"
-                             << "hedge" << BSONObj());
+                             << "hedge" << BSON("enabled" << true));
 
     checkHedgeOptions(parameters, cmdObj, rspObj, true, 100);
 }

@@ -71,6 +71,7 @@ function runCommandWithHedgedReads(conn, dbName, commandName, commandObj, func, 
             }
         } else {
             commandObj.$readPreference = kReadPreferenceNearest;
+            commandObj.$readPreference.hedge = {enabled: true};
         }
     }
 

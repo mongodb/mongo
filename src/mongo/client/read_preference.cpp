@@ -44,10 +44,12 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/read_preference_gen.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 namespace mongo {
 namespace {
 
@@ -129,13 +131,14 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromReadPreferenceIdl(
     boost::optional<HedgingMode> hedgingMode;
     if (rp.getHedge()) {
         hedgingMode = rp.getHedge();
+        LOGV2_WARNING(9029001,
+                      "Hedged reads have been deprecated. For more information please see "
+                      "https://dochub.mongodb.org/core/hedged-reads-deprecated");
         if (hedgingMode->getEnabled() && rp.getMode() == ReadPreference::PrimaryOnly) {
             return {
                 ErrorCodes::InvalidOptions,
                 str::stream() << "cannot enable hedging for $readPreference mode \"primaryOnly\""};
         }
-    } else if (rp.getMode() == ReadPreference::Nearest) {
-        hedgingMode = HedgingMode();
     }
 
     TagSet tags;
