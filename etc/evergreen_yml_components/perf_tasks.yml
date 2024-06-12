@@ -749,12 +749,12 @@ tasks:
         vars:
           test_control: "tsbs_load"
 
-  - name: tsbs_load.2024-06
+  - name: tsbs_load.2024-05
     priority: 5
     commands:
       - func: f_dsi_run_workload
         vars:
-          test_control: "tsbs_load.2024-06"
+          test_control: "tsbs_load.2024-05"
 
   - name: tsbs_query
     priority: 5

@@ -395,7 +395,7 @@ buildvariants:
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
       - name: smoke_test
-      - name: tsbs_load.2024-06
+      - name: tsbs_load.2024-05
         cron: *high-value-workload-cron
       - name: tsbs_query
         cron: *high-value-workload-cron
