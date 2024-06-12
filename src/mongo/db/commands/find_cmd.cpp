@@ -230,7 +230,10 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
             return std::make_unique<query_stats::FindKey>(
                 expCtx, *parsedRequest, collOrViewAcquisition.getCollectionType());
         });
-        if (parsedRequest->findCommandRequest->getIncludeQueryStatsMetrics()) {
+
+        if (parsedRequest->findCommandRequest->getIncludeQueryStatsMetrics() &&
+            feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested = true;
         }
     }

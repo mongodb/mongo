@@ -45,8 +45,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/query_stats/key.h"
-#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
@@ -177,8 +175,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     if (routerSort) {
         params.sortToApplyOnRouter = *routerSort;
     }
-    params.requestQueryStatsFromRemotes =
-        query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
+    params.requestQueryStatsFromRemotes = incomingCursorResponse.getCursorMetrics().has_value();
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, std::move(executor), std::move(params));
     collectQueryStatsMongos(opCtx, ccc);

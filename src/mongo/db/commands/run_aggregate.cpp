@@ -1167,7 +1167,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
             },
             liteParsedPipeline.hasChangeStream());
 
-        if (request.getIncludeQueryStatsMetrics()) {
+        if (request.getIncludeQueryStatsMetrics() &&
+            feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested = true;
         }
     }

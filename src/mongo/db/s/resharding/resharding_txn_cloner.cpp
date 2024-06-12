@@ -160,7 +160,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_targetAggregati
     request.setUnwrappedReadPref(ReadPreferenceSetting{ReadPreference::Nearest}.toContainingBSON());
 
     return sharded_agg_helpers::runPipelineDirectlyOnSingleShard(
-        pipeline.getContext(), std::move(request), _sourceId.getShardId());
+        pipeline.getContext(),
+        std::move(request),
+        _sourceId.getShardId(),
+        false /* requestQueryStatsFromRemotes */);
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_restartPipeline(

@@ -176,6 +176,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     bool eligibleForSampling,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
+    bool requestQueryStatsFromRemotes = false,
     boost::optional<CollectionRoutingInfo> cri = boost::none,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none,
@@ -189,7 +190,8 @@ BSONObj createPassthroughCommandForShard(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     Pipeline* pipeline,
     boost::optional<BSONObj> readConcern,
-    boost::optional<int> overrideBatchSize);
+    boost::optional<int> overrideBatchSize,
+    bool requestQueryStatsFromRemotes);
 
 BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        Document serializedCommand,
@@ -197,7 +199,8 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
                                        boost::optional<ShardedExchangePolicy> exchangeSpec,
                                        bool needsMerge,
                                        boost::optional<ExplainOptions::Verbosity> explain,
-                                       boost::optional<BSONObj> readConcern = boost::none);
+                                       boost::optional<BSONObj> readConcern = boost::none,
+                                       bool requestQueryStatsFromRemotes = false);
 
 /**
  * Convenience method for callers that want to do 'partitionCursors', 'injectMetaCursors', and
@@ -205,7 +208,8 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
  */
 void partitionAndAddMergeCursorsSource(Pipeline* pipeline,
                                        std::vector<OwnedRemoteCursor> cursors,
-                                       boost::optional<BSONObj> shardCursorsSortSpec);
+                                       boost::optional<BSONObj> shardCursorsSortSpec,
+                                       bool requestQueryStatsFromRemotes);
 
 /**
  * Targets the shards with an aggregation command built from `ownedPipeline` and explain set to
@@ -303,7 +307,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
 std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     AggregateCommandRequest request,
-    ShardId shardId);
+    ShardId shardId,
+    bool requestQueryStatsFromRemotes);
 
 }  // namespace sharded_agg_helpers
 }  // namespace mongo

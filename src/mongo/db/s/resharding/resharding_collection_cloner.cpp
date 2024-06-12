@@ -640,6 +640,7 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
                                                    false /* eligibleForSampling */,
                                                    std::move(pipeline),
                                                    boost::none /* explain */,
+                                                   false /* requestQueryStatsFromRemotes */,
                                                    boost::none /* cri */,
                                                    ShardTargetingPolicy::kAllowed,
                                                    readConcern.toBSONInner(),

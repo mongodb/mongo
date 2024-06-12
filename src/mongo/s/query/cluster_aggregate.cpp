@@ -646,6 +646,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }
 
     auto status = [&]() {
+        bool requestQueryStatsFromRemotes =
+            query_stats::shouldRequestRemoteMetrics(CurOp::get(expCtx->opCtx)->debug());
         try {
             switch (targeter.policy) {
                 case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
@@ -670,7 +672,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                             aggregation_request_helper::kDefaultBatchSize),
                         std::move(targeter.pipeline),
                         result,
-                        privileges);
+                        privileges,
+                        requestQueryStatsFromRemotes);
                 }
 
                 case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kAnyShard: {
@@ -685,7 +688,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                         privileges,
                         result,
                         pipelineDataSource,
-                        eligibleForSampling);
+                        eligibleForSampling,
+                        requestQueryStatsFromRemotes);
                 }
                 case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
                     kSpecificShardOnly: {
@@ -710,7 +714,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                         privileges,
                         shardId,
                         eligibleForSampling,
-                        result);
+                        result,
+                        requestQueryStatsFromRemotes);
                 }
 
                     MONGO_UNREACHABLE;

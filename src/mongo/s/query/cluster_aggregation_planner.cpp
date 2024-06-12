@@ -241,7 +241,8 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                                      const ChunkManager& cm,
                                      const boost::optional<ShardingIndexesCatalogCache>& sii,
                                      bool mergingShardContributesData,
-                                     const Pipeline* pipelineForMerging) {
+                                     const Pipeline* pipelineForMerging,
+                                     bool requestQueryStatsFromRemotes) {
     MutableDocument mergeCmd(serializedCommand);
 
     mergeCmd["pipeline"] = Value(pipelineForMerging->serialize());
@@ -250,7 +251,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     mergeCmd[AggregateCommandRequest::kLetFieldName] =
         Value(mergeCtx->variablesParseState.serialize(mergeCtx->variables));
 
-    if (query_stats::shouldRequestRemoteMetrics(CurOp::get(mergeCtx->opCtx)->debug())) {
+    if (requestQueryStatsFromRemotes) {
         mergeCmd[AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName] = Value(true);
     }
 
@@ -358,7 +359,8 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                                DispatchShardPipelineResults&& shardDispatchResults,
                                BSONObjBuilder* result,
                                const PrivilegeVector& privileges,
-                               bool hasChangeStream) {
+                               bool hasChangeStream,
+                               bool requestQueryStatsFromRemotes) {
     // We should never be in a situation where we call this function on a non-merge pipeline.
     tassert(6525900,
             "tried to dispatch merge pipeline but the pipeline was not split",
@@ -378,7 +380,8 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     sharded_agg_helpers::partitionAndAddMergeCursorsSource(
         mergePipeline,
         std::move(shardDispatchResults.remoteCursors),
-        shardDispatchResults.splitPipeline->shardCursorsSortSpec);
+        shardDispatchResults.splitPipeline->shardCursorsSortSpec,
+        requestQueryStatsFromRemotes);
 
     // First, check whether we can merge on the mongoS. If the merge pipeline MUST run on mongoS,
     // then ignore the internalQueryProhibitMergingOnMongoS parameter.
@@ -389,7 +392,8 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                                    batchSize,
                                    std::move(shardDispatchResults.splitPipeline->mergePipeline),
                                    result,
-                                   privileges);
+                                   privileges,
+                                   requestQueryStatsFromRemotes);
     }
 
     // If we are not merging on mongoS, then this is not a $changeStream aggregation, and we
@@ -411,7 +415,8 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                                                     cri->cm,
                                                     cri->sii,
                                                     mergingShardContributesData,
-                                                    mergePipeline);
+                                                    mergePipeline,
+                                                    requestQueryStatsFromRemotes);
 
     LOGV2_DEBUG(22835,
                 1,
@@ -452,7 +457,8 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
                                      long long batchSize,
                                      const NamespaceString& requestedNss,
                                      std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging,
-                                     const PrivilegeVector& privileges) {
+                                     const PrivilegeVector& privileges,
+                                     bool requestQueryStatsFromRemotes) {
     ClusterClientCursorParams params(requestedNss,
                                      APIParameters::get(opCtx),
                                      ReadPreferenceSetting::get(opCtx),
@@ -476,8 +482,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     // had a batch size of 0.
     params.batchSize = batchSize == 0 ? boost::none : boost::make_optional(batchSize);
     params.originatingPrivileges = privileges;
-    params.requestQueryStatsFromRemotes =
-        query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
+    params.requestQueryStatsFromRemotes = requestQueryStatsFromRemotes;
 
     auto ccc = cluster_aggregation_planner::buildClusterCursor(
         opCtx, std::move(pipelineForMerging), std::move(params));
@@ -594,7 +599,8 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& executionNss,
     Document serializedCommand,
-    DispatchShardPipelineResults* shardDispatchResults) {
+    DispatchShardPipelineResults* shardDispatchResults,
+    bool requestQueryStatsFromRemotes) {
     tassert(7163600,
             "dispatchExchangeConsumerPipeline() must not be called for explain operation",
             !expCtx->explain);
@@ -628,7 +634,8 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
         sharded_agg_helpers::partitionAndAddMergeCursorsSource(
             consumerPipeline.get(),
             std::move(producers),
-            shardDispatchResults->splitPipeline->shardCursorsSortSpec);
+            shardDispatchResults->splitPipeline->shardCursorsSortSpec,
+            requestQueryStatsFromRemotes);
 
         consumerPipelines.emplace_back(std::move(consumerPipeline), nullptr, boost::none);
 
@@ -638,7 +645,9 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
                                                                 consumerPipelines.back(),
                                                                 boost::none, /* exchangeSpec */
                                                                 false /* needsMerge */,
-                                                                boost::none /* explain */);
+                                                                boost::none /* explain */,
+                                                                boost::none /* readConcern */,
+                                                                requestQueryStatsFromRemotes);
 
         requests.emplace_back(shardDispatchResults->exchangeSpec->consumerShards[idx],
                               consumerCmdObj);
@@ -773,7 +782,8 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
                            long long batchSize,
                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                            BSONObjBuilder* result,
-                           const PrivilegeVector& privileges) {
+                           const PrivilegeVector& privileges,
+                           bool requestQueryStatsFromRemotes) {
     auto expCtx = pipeline->getContext();
 
     // We should never receive a pipeline which cannot run on mongoS.
@@ -790,8 +800,12 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
             !pipeline->getSources().front()->constraints().requiresInputDocSource);
 
     // Register the new mongoS cursor, and retrieve the initial batch of results.
-    auto cursorResponse = establishMergingMongosCursor(
-        expCtx->opCtx, batchSize, namespaces.requestedNss, std::move(pipeline), privileges);
+    auto cursorResponse = establishMergingMongosCursor(expCtx->opCtx,
+                                                       batchSize,
+                                                       namespaces.requestedNss,
+                                                       std::move(pipeline),
+                                                       privileges,
+                                                       requestQueryStatsFromRemotes);
 
     // We don't need to storePossibleCursor or propagate writeConcern errors; a pipeline with
     // writing stages like $out can never run on mongoS. Filter the command response and return
@@ -808,7 +822,8 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 const PrivilegeVector& privileges,
                                 BSONObjBuilder* result,
                                 PipelineDataSource pipelineDataSource,
-                                bool eligibleForSampling) {
+                                bool eligibleForSampling,
+                                bool requestQueryStatsFromRemotes) {
     auto expCtx = targeter.pipeline->getContext();
     // If not, split the pipeline as necessary and dispatch to the relevant shards.
     auto shardDispatchResults =
@@ -817,6 +832,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                                    eligibleForSampling,
                                                    std::move(targeter.pipeline),
                                                    expCtx->explain,
+                                                   requestQueryStatsFromRemotes,
                                                    targeter.cri);
 
     // Check for valid usage of SEARCH_META. We wait until after we've dispatched pipelines to the
@@ -866,8 +882,11 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
 
     // If we have the exchange spec then dispatch all consumers.
     if (shardDispatchResults.exchangeSpec) {
-        shardDispatchResults = dispatchExchangeConsumerPipeline(
-            expCtx, namespaces.executionNss, serializedCommand, &shardDispatchResults);
+        shardDispatchResults = dispatchExchangeConsumerPipeline(expCtx,
+                                                                namespaces.executionNss,
+                                                                serializedCommand,
+                                                                &shardDispatchResults,
+                                                                requestQueryStatsFromRemotes);
     }
 
     shardedAggregateHangBeforeDispatchMergingPipeline.pauseWhileSet();
@@ -881,7 +900,8 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                    std::move(shardDispatchResults),
                                    result,
                                    privileges,
-                                   pipelineDataSource == PipelineDataSource::kChangeStream);
+                                   pipelineDataSource == PipelineDataSource::kChangeStream,
+                                   requestQueryStatsFromRemotes);
 }
 
 BSONObj getCollation(OperationContext* opCtx,
@@ -920,7 +940,8 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                       const PrivilegeVector& privileges,
                                       ShardId shardId,
                                       bool eligibleForSampling,
-                                      BSONObjBuilder* out) {
+                                      BSONObjBuilder* out,
+                                      bool requestQueryStatsFromRemotes) {
     auto opCtx = expCtx->opCtx;
 
     tassert(6273804,
@@ -932,8 +953,14 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
 
     // Format the command for the shard. This wraps the command as an explain if necessary, and
     // rewrites the result into a format safe to forward to shards.
-    BSONObj cmdObj = sharded_agg_helpers::createPassthroughCommandForShard(
-        expCtx, serializedCommand, explain, nullptr /* pipeline */, boost::none, overrideBatchSize);
+    BSONObj cmdObj =
+        sharded_agg_helpers::createPassthroughCommandForShard(expCtx,
+                                                              serializedCommand,
+                                                              explain,
+                                                              nullptr /* pipeline */,
+                                                              boost::none,
+                                                              overrideBatchSize,
+                                                              requestQueryStatsFromRemotes);
 
     if (eligibleForSampling) {
         if (auto sampleId = analyze_shard_key::tryGenerateSampleId(

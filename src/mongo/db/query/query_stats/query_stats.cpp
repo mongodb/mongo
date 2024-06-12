@@ -360,9 +360,12 @@ void registerRequest(OperationContext* opCtx,
 }
 
 bool shouldRequestRemoteMetrics(const OpDebug& opDebug) {
-    return feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
-               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        (opDebug.queryStatsInfo.key != nullptr || opDebug.queryStatsInfo.metricsRequested);
+    // metricsRequested should only be set to true when the feature flag is set; we don't need to
+    // re-check the feature flag in that case.
+    return opDebug.queryStatsInfo.metricsRequested ||
+        (feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
+             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+         opDebug.queryStatsInfo.key != nullptr);
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
