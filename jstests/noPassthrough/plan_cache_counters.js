@@ -144,15 +144,13 @@ function runCommandAndCheckPlanCacheMetric({
         planCacheType: "classic"
     },
     // Hinted queries are cached and can be recovered only in SBE. Note that 'hint' changes the
-    // query shape, so we expect to recover only on a second run.
+    // query shape when the SBE cache is used, so we expect to recover only on a second run.
     {
         command: {find: coll.getName(), filter: {a: 1}, comment: "query hint", hint: {a: 1}},
-        // TODO: SERVER-91076 SBE with classic plan cache uses same plan cache key for queries with
-        // and without hints.
         expectedCacheBehaviors: [
-            shouldGenerateSbePlan ? (isUsingSbePlanCache ? cacheBehavior.miss : cacheBehavior.hit)
-                                  : cacheBehavior.skip,
-            shouldGenerateSbePlan ? cacheBehavior.hit : cacheBehavior.skip
+            (shouldGenerateSbePlan && isUsingSbePlanCache) ? cacheBehavior.miss
+                                                           : cacheBehavior.skip,
+            (shouldGenerateSbePlan && isUsingSbePlanCache) ? cacheBehavior.hit : cacheBehavior.skip
         ],
     },
     // Min queries never get cached.
