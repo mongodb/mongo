@@ -130,12 +130,18 @@ PreImagesTruncateManager::_getInitializedMarkersForPreImagesCollection(
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         // The truncate markers were created with an earlier incarnation of the tenant's
         // pre-images collection. Installed markers are removed by another thread.
-        LOGV2_WARNING(8198001,
-                      "Pre images dropped while creating truncate markers. Discarding "
-                      "partially installed truncate markers and deferring installation to "
-                      "the next removal pass",
-                      "reason"_attr = ex.reason());
+        LOGV2_INFO(8198001,
+                   "Pre images dropped while creating truncate markers. Discarding "
+                   "partially installed truncate markers and deferring installation to "
+                   "the next removal pass",
+                   "reason"_attr = ex.reason());
         return nullptr;
+    } catch (const DBException& ex) {
+        LOGV2_ERROR(9023601,
+                    "Failed to complete pre-image truncate marker initialization",
+                    "tenantId"_attr = tenantId,
+                    "reason"_attr = ex.toStatus());
+        throw;
     }
     return tenantMarkers;
 }
@@ -169,6 +175,11 @@ std::shared_ptr<PreImagesTenantMarkers> PreImagesTruncateManager::_createAndInst
             auto baseMarkers =
                 PreImagesTenantMarkers::createMarkers(opCtx, tenantId, preImagesCollection);
             auto tenantMapEntry = _tenantMap.getOrEmplace(tenantId, std::move(baseMarkers));
+            LOGV2_DEBUG(9023602,
+                        1,
+                        "Installed truncate markers for pre-images collection",
+                        "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
+                        "tenantId"_attr = tenantId);
             return tenantMapEntry;
         });
 }

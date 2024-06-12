@@ -177,8 +177,8 @@ protected:
 
         // Truncate markers store the UUID, nss, and tenantId corresponding the tenant's pre-images
         // collection they were created with.
-        ASSERT_EQ(tenantMarkers->_tenantUUID, preImagesCollection.uuid());
-        ASSERT_EQ(tenantMarkers->_tenantNss, preImagesCollection.nss());
+        ASSERT_EQ(tenantMarkers->_preImagesCollectionUUID, preImagesCollection.uuid());
+        ASSERT_EQ(tenantMarkers->_preImagesCollectionNss, preImagesCollection.nss());
         ASSERT_EQ(tenantMarkers->_tenantId, tenantId);
 
         const auto& preImagesCollPtr = preImagesCollection.getCollectionPtr();

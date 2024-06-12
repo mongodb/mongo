@@ -62,8 +62,9 @@ public:
     /**
      * Returns a 'PreImagesTenantMarkers' instance populated with truncate markers that span the
      * tenant's pre-images collection. However, these markers are not safe to use until
-     * 'refreshMarkers' is called to update the highest seen recordId and wall time for each nsUUID.
-     * Otherwise, pre-images would not be truncated until new inserts come in for each nsUUID.
+     * 'refreshMarkers' is called to update the highest seen recordId and wall time for each
+     * nsUUID. Otherwise, pre-images would not be truncated until new inserts come in for each
+     * nsUUID.
      *
      * Note: Pre-images inserted concurrently with creation might not be covered by the resulting
      * truncate markers.
@@ -75,6 +76,8 @@ public:
     /**
      * Opens a fresh snapshot and ensures the all pre-images visible in the snapshot are
      * covered by truncate markers.
+     *
+     * Required to ensure truncate markers are viable for truncation.
      */
     void refreshMarkers(OperationContext* opCtx);
 
@@ -97,22 +100,22 @@ public:
 private:
     friend class PreImagesTruncateManagerTest;
 
-    PreImagesTenantMarkers(boost::optional<TenantId> tenantId, const UUID& tenantUUID)
+    PreImagesTenantMarkers(boost::optional<TenantId> tenantId, const UUID& preImagesCollectionUUID)
         : _tenantId{tenantId},
-          _tenantUUID{tenantUUID},
-          _tenantNss(NamespaceString::makePreImageCollectionNSS(tenantId)) {}
+          _preImagesCollectionUUID{preImagesCollectionUUID},
+          _preImagesCollectionNss(NamespaceString::makePreImageCollectionNSS(tenantId)) {}
 
     boost::optional<TenantId> _tenantId;
 
     /**
      * UUID of the tenant's pre-images collection.
      */
-    UUID _tenantUUID;
+    UUID _preImagesCollectionUUID;
 
     /**
      * Namespace of the tenant's pre-images collection.
      */
-    NamespaceString _tenantNss;
+    NamespaceString _preImagesCollectionNss;
 
     /**
      * The tenant's pre-images collection spans pre-images generated across all the tenant's

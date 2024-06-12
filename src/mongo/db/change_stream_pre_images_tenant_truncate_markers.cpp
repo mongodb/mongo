@@ -161,6 +161,7 @@ using NsUUIDToSamplesMap = stdx::
 
 void distributeUnaccountedBytesAndRecords(
     const stdx::unordered_set<UUID, UUID::Hash>& nsUUIDs,
+    const UUID& preImagesCollectionUUID,
     int64_t preImagesCollNumRecords,
     int64_t preImagesCollDataSize,
     int64_t recordsInMarkersMap,
@@ -176,6 +177,7 @@ void distributeUnaccountedBytesAndRecords(
             7658603,
             "Pre-images inital truncate markers account for more bytes and/or records than "
             "expected",
+            "preImagesCollectionUUID"_attr = preImagesCollectionUUID,
             "recordsAcrossMarkers"_attr = recordsInMarkersMap,
             "bytesAcrossMarkers"_attr = bytesInMarkersMap,
             "expectedRecords"_attr = preImagesCollNumRecords,
@@ -287,6 +289,7 @@ NsUUIDToSamplesMap gatherOrderedSamplesAcrossNsUUIDs(
             LOGV2(7658600,
                   "Pre-images collection random sampling progress",
                   "namespace"_attr = preImagesCollection.nss(),
+                  "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
                   "completed"_attr = (i + 1),
                   "totalRandomSamples"_attr = numSamplesRemaining,
                   "totalSamples"_attr = numSamples);
@@ -342,9 +345,10 @@ void sampleToPopulate(
         LOGV2(8198000,
               "Reverting to scanning for initial pre-images truncate markers. The number of "
               "samples needed is 0",
+              "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
               "tenantId"_attr = tenantId);
 
-        scanToPopulate(opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
+        return scanToPopulate(opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////
@@ -367,6 +371,7 @@ void sampleToPopulate(
               "samples collected does not match the desired number of samples",
               "samplesTaken"_attr = totalSamples,
               "samplesDesired"_attr = numSamples,
+              "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
               "tenantId"_attr = tenantId);
         return scanToPopulate(opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
     }
@@ -386,7 +391,12 @@ void sampleToPopulate(
 
         auto initialSetOfMarkers =
             PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
-                opCtx, nsUUID, samples, estimatedRecordsPerMarker, estimatedBytesPerMarker);
+                opCtx,
+                preImagesCollection.uuid(),
+                nsUUID,
+                samples,
+                estimatedRecordsPerMarker,
+                estimatedBytesPerMarker);
 
         updateMarkersMapAggregates(initialSetOfMarkers, recordsInMarkersMap, bytesInMarkersMap);
 
@@ -406,6 +416,7 @@ void sampleToPopulate(
     //
     ////////////////////////////////////////////////////////////////////////////////////////////
     distributeUnaccountedBytesAndRecords(nsUUIDs,
+                                         preImagesCollection.uuid(),
                                          preImagesCollNumRecords,
                                          preImagesCollDataSize,
                                          recordsInMarkersMap,
@@ -438,7 +449,7 @@ void populateMarkersMap(
                    CollectionTruncateMarkers::toString(initialCreationMethod),
                "dataSize"_attr = dataSize,
                "numRecords"_attr = numRecords,
-               "ns"_attr = preImagesCollection.nss(),
+               "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
                "tenantId"_attr = tenantId);
 
     if (initialCreationMethod == CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {
@@ -473,11 +484,15 @@ void PreImagesTenantMarkers::refreshMarkers(OperationContext* opCtx) {
     // Use writeConflictRetry since acquiring the collection can yield a WriteConflictException if
     // it races with concurrent catalog changes.
     writeConflictRetry(
-        opCtx, "Refreshing the pre image truncate markers in a new snapshot", _tenantNss, [&] {
+        opCtx,
+        "Refreshing the pre image truncate markers in a new snapshot",
+        _preImagesCollectionNss,
+        [&] {
             // writeConflictRetry automatically abandon's the snapshot before retrying.
             //
             const auto preImagesCollection = acquirePreImagesCollectionForRead(
-                opCtx, NamespaceStringOrUUID{_tenantNss.dbName(), _tenantUUID});
+                opCtx,
+                NamespaceStringOrUUID{_preImagesCollectionNss.dbName(), _preImagesCollectionUUID});
             const auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
 
             NsUUIDToSamplesMap highestRecordIdAndWallTimeSamples;
@@ -488,6 +503,11 @@ void PreImagesTenantMarkers::refreshMarkers(OperationContext* opCtx) {
                 updateOnInsert(highestRid, nsUUID, highestWallTime, 0, 0);
             }
         });
+
+    LOGV2(9023600,
+          "Completed initialization of pre-image tenant truncate markers",
+          "preImagesCollectionUUID"_attr = _preImagesCollectionUUID,
+          "tenantId"_attr = _tenantId);
 }
 
 PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(OperationContext* opCtx) {
@@ -514,7 +534,7 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(Operatio
     //      'abandonSnapshot()' is called, which can invalidate the acquired collection instance,
     //      like after a WriteConflictException.
     const auto preImagesCollection = acquirePreImagesCollectionForWrite(
-        opCtx, NamespaceStringOrUUID{_tenantNss.dbName(), _tenantUUID});
+        opCtx, NamespaceStringOrUUID{_preImagesCollectionNss.dbName(), _preImagesCollectionUUID});
     const auto& preImagesColl = preImagesCollection.getCollectionPtr();
 
     // All pre-images with 'ts' <= 'maxTSEligibleForTruncate' are candidates for truncation.

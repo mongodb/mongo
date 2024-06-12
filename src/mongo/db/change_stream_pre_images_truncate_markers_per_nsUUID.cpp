@@ -127,6 +127,7 @@ Date_t PreImagesTruncateMarkersPerNsUUID::getWallTime(const BSONObj& preImageObj
 CollectionTruncateMarkers::InitialSetOfMarkers
 PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
     OperationContext* opCtx,
+    const UUID& preImagesCollectionUUID,
     const UUID& nsUUID,
     const std::vector<CollectionTruncateMarkers::RecordIdAndWallTime>& samples,
     int64_t estimatedRecordsPerMarker,
@@ -137,12 +138,13 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
     for (size_t i = CollectionTruncateMarkers::kRandomSamplesPerMarker - 1; i < numSamples;
          i = i + CollectionTruncateMarkers::kRandomSamplesPerMarker) {
         const auto& [id, wallTime] = samples[i];
-        LOGV2_DEBUG(
-            7658602,
-            0,
-            "Marking entry as a potential future truncation point for pre-images collection",
-            "wall"_attr = wallTime,
-            "ts"_attr = id);
+        LOGV2_DEBUG(7658602,
+                    1,
+                    "Marking potential future truncation point for pre-images collection",
+                    "preImagesCollectionUUID"_attr = preImagesCollectionUUID,
+                    "nsUUID"_attr = nsUUID,
+                    "wallTime"_attr = wallTime,
+                    "ts"_attr = change_stream_pre_image_util::getPreImageTimestamp(id));
         markers.emplace_back(estimatedRecordsPerMarker, estimatedBytesPerMarker, id, wallTime);
     }
 
@@ -194,10 +196,11 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
         if (currentBytes >= minBytesPerMarker) {
             LOGV2_DEBUG(7500500,
                         1,
-                        "Marking entry as a potential future truncation point for collection with "
-                        "pre-images enabled",
+                        "Marking potential future truncation point for pre-images collection",
+                        "preImagesCollectionUUID"_attr = collAcq.uuid(),
+                        "nsUuid"_attr = nsUUID,
                         "wallTime"_attr = wallTime,
-                        "nsUuid"_attr = nsUUID);
+                        "ts"_attr = change_stream_pre_image_util::getPreImageTimestamp(rIdOut));
 
             markers.emplace_back(
                 std::exchange(currentRecords, 0), std::exchange(currentBytes, 0), rIdOut, wallTime);
