@@ -576,6 +576,14 @@ public:
         return atom == helloAtom || atom == isMasterAtom;
     }
 
+    // Decides if the command can be retried based on the execution error.
+    bool canRetryCommand(const Status& execError);
+
+    // Sets a flag indicating that the command cannot be retried, regardless of the execution error.
+    void setCannotRetry() {
+        _cannotRetry = true;
+    }
+
 private:
     void _parseCommand() {
         auto opCtx = _execContext.getOpCtx();
@@ -646,9 +654,6 @@ private:
     // error status if the refresh failed.
     StatusWith<bool> _refreshIfNeeded(const Status& execError);
 
-    // Decides if the command can be retried based on the execution error.
-    bool _canRetryCommand(const Status& execError);
-
     // Any error-handling logic that must be performed if the command initiation/execution fails.
     void _handleFailure(Status status);
 
@@ -676,6 +681,7 @@ private:
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
     bool _refreshedCatalogCache = false;
+    bool _cannotRetry = false;
 
     boost::optional<Ticket> _admissionTicket;
 };
@@ -1088,7 +1094,6 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
 }
 
 void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
-    const OperationSessionInfoFromClient& sessionOptions = _ecd->getSessionOptions();
     auto& execContext = _ecd->getExecutionContext();
     auto opCtx = execContext.getOpCtx();
 
@@ -1106,15 +1111,14 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
         // Exceptions are used to resolve views in a sharded cluster, so they should be handled
         // specially to avoid unnecessary aborts.
 
-        // If "startTransaction" is present, it must be true.
-        if (sessionOptions.getStartTransaction()) {
+        if (opCtx->isStartingMultiDocumentTransaction()) {
             // If the first command a shard receives in a transactions fails with this code, the
             // shard may not be included in the final participant list if the router's retry after
             // resolving the view does not re-target it, which is possible if the underlying
             // collection is sharded. The shard's transaction should be preemptively aborted to
             // avoid leaving it orphaned in this case, which is fine even if it is re-targeted
-            // because the retry will include "startTransaction" again and "restart" a transaction
-            // at the active txnNumber.
+            // because the retry will include "startTransaction" or "startOrContinueTransaction"
+            // again and "restart" a transaction at the active txnNumber.
             return;
         }
 
@@ -1132,6 +1136,24 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
         // If this shard has completed an earlier statement for this transaction, it must already be
         // in the transaction's participant list, so it is guaranteed to learn its outcome.
         _stashTransaction(txnParticipant);
+    } else if (_ecd->canRetryCommand(status)) {
+        // If the session is yielded, set a flag on ExecCommandDatabase to disallow retrying even on
+        // a retryable error - we can't know whether this participant acted as a sub-router, so we
+        // can't know whether it is safe to retry.
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        if (!txnParticipant) {
+            _ecd->setCannotRetry();
+        }
+
+        // If this shard acted as a sub-router, set the flag to disallow retrying.
+        auto txnRouter = TransactionRouter::get(opCtx);
+        if (!txnRouter)
+            return;
+
+        auto additionalParticipants = txnRouter.getAdditionalParticipantsForResponse(opCtx);
+        if (additionalParticipants) {
+            _ecd->setCannotRetry();
+        }
     }
 }
 
@@ -1920,7 +1942,7 @@ void ExecCommandDatabase::_commandExec() {
         const auto metadataRefreshStatus = _refreshIfNeeded(ex.toStatus());
         const auto refreshed = uassertStatusOK(metadataRefreshStatus);
 
-        if (refreshed && _canRetryCommand(ex.toStatus())) {
+        if (refreshed && canRetryCommand(ex.toStatus())) {
             _resetLockerStateAfterShardingUpdate(opCtx);
             _commandExec();
             return;
@@ -2041,7 +2063,7 @@ StatusWith<bool> ExecCommandDatabase::_refreshIfNeeded(const Status& execError) 
     return false;
 }
 
-bool ExecCommandDatabase::_canRetryCommand(const Status& execError) {
+bool ExecCommandDatabase::canRetryCommand(const Status& execError) {
     auto opCtx = _execContext.getOpCtx();
 
     tassert(8462309, "Expected to find an error in the status of the command", !execError.isOK());
@@ -2049,7 +2071,7 @@ bool ExecCommandDatabase::_canRetryCommand(const Status& execError) {
             "Expected to not be in a direct client connection",
             !opCtx->getClient()->isInDirectClient());
 
-    if (opCtx->isContinuingMultiDocumentTransaction()) {
+    if (opCtx->isContinuingMultiDocumentTransaction() || _cannotRetry) {
         return false;
     }
 

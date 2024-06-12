@@ -5,7 +5,11 @@
  * views against other eachother and the underlying collection. We are looking to expose situations
  * where a $lookup or $graphLookup view that forms a cycle is created successfully.
  *
- * @tags: [requires_fcv_51]
+ * TODO SERVER-90385 Enable this test in embedded router suites
+ * @tags: [
+ *     requires_fcv_51,
+ *     temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

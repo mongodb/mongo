@@ -19,6 +19,11 @@
           set_parameters:
             queryAnalysisSamplerConfigurationRefreshSecs: 1
 
+- name: exclude_disabled_embedded_router_tests
+  value:
+    exclude_with_any_tags:
+      - temp_disabled_embedded_router_uncategorized
+
 # Explicit auth is not supported in embedded router mode yet.
 # TODO SERVER-87681: Enable authentication testing.
 - name: exclude_auth_tests
