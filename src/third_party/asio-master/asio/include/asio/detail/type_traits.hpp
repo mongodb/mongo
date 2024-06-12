@@ -58,7 +58,7 @@ template <typename> struct result_of;
 template <typename F, typename... Args>
 struct result_of<F(Args...)> : std::invoke_result<F, Args...> {};
 #else // defined(ASIO_HAS_STD_INVOKE_RESULT)
-using std::result_of;
+using std::invoke_result;
 #endif // defined(ASIO_HAS_STD_INVOKE_RESULT)
 using std::true_type;
 #else // defined(ASIO_HAS_STD_TYPE_TRAITS)
