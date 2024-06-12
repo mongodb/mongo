@@ -96,6 +96,9 @@ selector:
     - jstests/concurrency/fsm_workloads/create_index_background_unique.js
     - jstests/concurrency/fsm_workloads/create_index_background_unique_capped.js
 
+    # TODO SERVER-91413: Enable test.
+    - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
