@@ -188,6 +188,9 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
         .thenRunOn(**getInstanceExecutor())
         .getAsync([this, coordinatorType = coord->operationType()](auto status) {
             stdx::lock_guard lg(_mutex);
+            if (_state == State::kPaused) {
+                return;
+            }
             const auto it = _numActiveCoordinatorsPerType.find(coordinatorType);
             invariant(it != _numActiveCoordinatorsPerType.end());
             it->second--;
