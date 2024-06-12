@@ -234,6 +234,9 @@ struct SerializationOptions {
     // elements. Otherwise, serializes InMatchExpressions using the original (unsorted) list of
     // elements. This flag has no effect on other types of MatchExpressions.
     bool inMatchExprSortAndDedupElements = true;
+
+    // If set to true, serializes each stage and expression as needed for query analysis.
+    bool serializeForQueryAnalysis = false;
 };
 
 }  // namespace mongo
