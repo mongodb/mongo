@@ -683,8 +683,8 @@ TEST(SerializeBasic, ExpressionJsonSchemaWithDollarFieldSerializesShapeCorrectly
             "$and":[{
                 "$and":[{
                     "$or":[
-                        {"$stdDevPop":{"$not":{"$exists": true}}},
-                        {"$and":[{"$stdDevPop":{"$_internalSchemaType":[4]}}]}
+                        {"$nor": [{"$_internalPath": {"$stdDevPop":{"$exists": true}}}]},
+                        {"$and":[{"$_internalPath":{"$stdDevPop":{"$_internalSchemaType":[4]}}}]}
                     ]
                 }]
             }]
@@ -713,13 +713,35 @@ TEST(SerializeBasic, ExpressionJsonSchemaWithKeywordDollarFieldSerializesShapeCo
             "$and":[{
                 "$and":[{
                     "$or":[
-                        {"$or":{"$not":{"$exists": true}}},
-                        {"$and":[{"$or":{"$_internalSchemaType":[4]}}]}
+                        {"$nor": [{"$_internalPath": {"$or":{"$exists": true}}}]},
+                        {"$and":[{"$_internalPath":{"$or":{"$_internalSchemaType":[4]}}}]}
                     ]
                 }]
             }]
         })",
         serialized);
+
+    // Confirm that round trip serialization (reparsing) works correctly for query stats.
+    auto roundTrip = MatchExpressionParser::parse(serialized, expCtx).getValue()->serialize(opts);
+    ASSERT_BSONOBJ_EQ(roundTrip, serialized);
+}
+
+TEST(SerializeBasic, NonLeafDollarPrefixedPathSerializesShapeCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    auto baseOperandVal = BSON("$gt" << 5);
+    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperandVal["$gt"]);
+    auto elemMatchValExpr = std::make_unique<ElemMatchValueMatchExpression>("$a"_sd);
+    elemMatchValExpr->add(std::move(gt));
+
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+
+    // Serialization is correct upon the first parse.
+    BSONObjBuilder bob;
+    elemMatchValExpr->serialize(&bob, opts);
+    auto serialized = bob.obj();
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"$_internalPath": {"$a":{"$elemMatch": {"$gt": 1}}}})", serialized);
 
     // Confirm that round trip serialization (reparsing) works correctly for query stats.
     auto roundTrip = MatchExpressionParser::parse(serialized, expCtx).getValue()->serialize(opts);
@@ -1319,9 +1341,11 @@ TEST(SerializeBasic, ExpressionJsonSchemaWithDollarFieldSerializesCorrectly) {
                       fromjson("{$and: ["
                                "  {$and: ["
                                "    {$or: ["
-                               "      {$stdDevPop: {$not: {$exists: true}}},"
+                               "      {$nor: [{$_internalPath:{$stdDevPop: {$exists: true}}}]},"
                                "      {$and: ["
-                               "        {$stdDevPop: {$_internalSchemaType: [4]}}"
+                               "        {$_internalPath:"
+                               "          {$stdDevPop: {$_internalSchemaType: [4]}}"
+                               "        }"
                                "      ]}"
                                "    ]}"
                                "  ]}"
@@ -1349,9 +1373,9 @@ TEST(SerializeBasic, ExpressionJsonSchemaWithKeywordDollarFieldSerializesCorrect
                       fromjson("{$and: ["
                                "  {$and: ["
                                "    {$or: ["
-                               "      {$or: {$not: {$exists: true}}},"
+                               "      {$nor: [{$_internalPath:{$or: {$exists: true}}}]},"
                                "      {$and: ["
-                               "        {$or: {$_internalSchemaType: [2]}}"
+                               "        {$_internalPath: {$or: {$_internalSchemaType: [2]}}}"
                                "      ]}"
                                "    ]}"
                                "  ]}"

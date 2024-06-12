@@ -378,8 +378,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
                                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 const ExtensionsCallback* extensionsCallback,
                                 MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-                                DocumentParseLevel currentLevel,
-                                const BSONObj& parentObj = BSONObj()) {
+                                DocumentParseLevel currentLevel) {
     auto root = std::make_unique<AndMatchExpression>(createAnnotation(expCtx, "$and", BSONObj()));
 
     const DocumentParseLevel nextLevel = (currentLevel == DocumentParseLevel::kPredicateTopLevel)
@@ -405,19 +404,10 @@ StatusWithMatchExpression parse(const BSONObj& obj,
 
                     expCtx->incrementMatchExprCounter(e.fieldNameStringData());
                     continue;
-                } else if (parentObj.toString().find("$_internalSchema") == std::string::npos) {
-                    // Only return error if the input is not the parsed form of a $jsonSchema
-                    // MatchExpression. It is legal to have dollar-prefixed field paths that are the
-                    // same as MQL keywords ($or, $and, $nor, etc.). If this is the case, we will
-                    // disregard the corresponding operator's parser and simply treat the
-                    // BSONElement as a regular field path.
-                    // TODO SERVER-89844: Make $jsonSchema with dollar fields in all keyword fields
-                    // reparseable.
+                } else {
                     return parsedExpression;
                 }
-            } else if (parentObj.toString().find("$_internalSchema") == std::string::npos) {
-                // If the field is dollar-prefixed and not an operator, error if the current
-                // expression doesn't support dollar-prefixed field paths.
+            } else {
                 std::string hint = "";
                 if (name == "not") {
                     hint = ". If you are trying to negate an entire expression, use $nor.";
@@ -582,6 +572,41 @@ StatusWithMatchExpression parseDBRef(StringData name,
     eq->setCollator("id"_sd == name ? expCtx->getCollator() : nullptr);
 
     return {std::move(eq)};
+}
+
+/**
+ * Handles the "$_internalPath" special parser keyword by calling the corresponding
+ * PathMatchExpression parser on its embedded object. This keyword exists because dollar-prefixed
+ * fields, which are allowed under $jsonSchema, are wrapped by a $_internalPath keyword during
+ * serialization so that they will be correctly handled upon query stats reparsing.
+ *
+ * Given: {$_internalDollarField: {<path>: <right-hand side>}}
+ * Parse: {<path>: <right-hand side>}
+ */
+StatusWithMatchExpression parseInternalPath(
+    StringData name,
+    BSONElement elem,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExtensionsCallback* extensionsCallback,
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+    DocumentParseLevel currentLevel) {
+    auto root = std::make_unique<AndMatchExpression>(createAnnotation(expCtx, "$and", BSONObj()));
+    auto escapedElt = elem.Obj().firstElement();
+
+    auto s = parseSub(escapedElt.fieldNameStringData(),
+                      escapedElt.Obj(),
+                      root.get(),
+                      expCtx,
+                      extensionsCallback,
+                      allowedFeatures,
+                      currentLevel);
+    if (!s.isOK())
+        return s;
+
+    // Since $_internalPath wraps only a single object with a dollar-prefixed fieldname, there will
+    // only ever be one child.
+    tassert(8984400, "Expected $_internalPath to have one child.", root->numChildren() == 1);
+    return {std::move((*root->getChildVector())[0])};
 }
 
 StatusWithMatchExpression parseJSONSchema(StringData name,
@@ -1357,7 +1382,7 @@ StatusWithMatchExpression parseTreeTopLevel(
             return Status(ErrorCodes::BadValue,
                           str::stream() << T::kName << " argument's entries must be objects");
 
-        auto sub = parse(e.Obj(), expCtx, extensionsCallback, allowedFeatures, currentLevel, arr);
+        auto sub = parse(e.Obj(), expCtx, extensionsCallback, allowedFeatures, currentLevel);
         if (!sub.isOK())
             return sub.getStatus();
 
@@ -2206,6 +2231,7 @@ MONGO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
                                                     MatchExpressionParser::AllowedFeatureSet,
                                                     DocumentParseLevel)>>{
             {"_internalBucketGeoWithin", &parseInternalBucketGeoWithinMatchExpression},
+            {"_internalPath", &parseInternalPath},
             {"_internalSchemaAllowedProperties", &parseInternalSchemaAllowedProperties},
             {"_internalSchemaCond",
              &parseInternalSchemaFixedArityArgument<InternalSchemaCondMatchExpression>},
