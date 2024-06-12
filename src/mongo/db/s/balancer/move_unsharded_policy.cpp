@@ -291,7 +291,8 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::BackgroundOperationInProgressForNamespace:
                 // TODO SERVER-89892 Investigate CannotCreateIndex error
                 case ErrorCodes::CannotCreateIndex:
-                // TODO SERVER-91193 Investigate CannotInsertTimeseriesBucketsWithMixedSchema error
+                // TODO SERVER-91194 Do not accept anymore
+                // CannotInsertTimeseriesBucketsWithMixedSchema errors
                 case ErrorCodes::CannotInsertTimeseriesBucketsWithMixedSchema:
                 case ErrorCodes::CommandNotSupported:
                 case ErrorCodes::DuplicateKey:
