@@ -1,12 +1,71 @@
-"""Minimum and maximum dictionary declarations for the different randomized parameters (mongod, mongos, and flow control)."""
+"""Minimum and maximum dictionary declarations for the different randomized parameters (mongod and mongos)."""
+
+"""
+How to add a fuzzed mongod/mongos parameter:
+
+Below is a list of ways to fuzz configs which are supported without having to also change buildscripts/resmokelib/mongo_fuzzer_configs.py.
+Please ensure that you add it correctly to the "mongod" or "mongos" subdictionary.
+Let choices = [choice1, choice2, ..., choiceN] (an array of choices that the parameter can have as a value).
+The parameters are added in order of priority chosen in the if-elif-else statement in generate_normal_mongo_parameters()
+in buildscripts/resmokelib/mongo_fuzzer_configs.py.
+So, if you added the fields "default", "min", and "max" for a "param", case 4 would get evaluated over case 5.
+
+1. param = rng.uniform(lower_bound, upper_bound)
+    Add:
+    “param”: {“min”: lower_bound, “max”: upper_bound, "isUniform": True}
+
+2. param = rng.randint([choices, rng.randint(lower_bound, upper_bound)])
+    Add:
+    "param": {"min": <min of lower_bound and choices>, "max": <max of upper_bound and choices>, "lower_bound": lower_bound, "upper_bound": upper_bound, "choices": [choice1, choice2, ..., choiceN], "isRandomizedChoice": true}
+
+3. param = rng.choices(choices), where choices is an array
+    Add:
+    "param": {"choices": [choice1, choice2, ..., choiceN]}
+
+4. param = rng.randint(lower_bound, upper_bound)
+    Add:
+    “param”: {“min”: lower_bound, “max”: upper_bound}
+
+5. param = default
+    Add:
+    "param": {"default": default}
+
+If you have a parameter that depends on another parameter being generated (see throughputProbingInitialConcurrency needing to be initialized before
+throughputProbingMinConcurrency and throughputProbingMaxConcurrency as an example in buildscripts/resmokelib/mongo_fuzzer_configs.py) or behavior that
+differs from the above cases, please do the following steps:
+1. Add the parameter and the needed information about the parameters here (ensure to correctly add to the mongod or mongos sub-dictionary)
+
+In buildscripts/resmokelib/mongo_fuzzer_configs.py:
+2. Add the parameter to excluded_normal_parameters in the generate_mongod_parameters() or generate_mongos_parameters()
+3. Add the parameter's special handling in generate_special_mongod_parameters() or generate_special_mongos_parameters()
+
+If you add a flow control parameter, please add the the parameter's name to flow_control_params in generate_mongod_parameters.
+"""
 
 config_fuzzer_params = {
     "mongod": {
         "analyzeShardKeySplitPointExpirationSecs": {"min": 1, "max": 300},
-        # minSnapshotHistoryWindowInSeconds has two sources of randomization (rng.randint(1, 10) * rng.choice(mongod_param_choices["minSnapshotHistoryWindowInSeconds"]))
-        # You need to manually update minSnapshotHistoryWindowInSeconds min and max in the case that you change either randomized choices
-        "minSnapshotHistoryWindowInSeconds": {"min": 30, "max": 600},
         "chunkMigrationConcurrency": {"choices": [1, 4, 16], "min": 1, "max": 16},
+        "disableLogicalSessionCacheRefresh": {
+            "choices": [True, False],
+        },
+        "enableAutoCompaction": {
+            "choices": [True, False],
+        },
+        "initialServiceExecutorUseDedicatedThread": {
+            "choices": [True, False],
+        },
+        "initialSyncMethod": {"choices": ["fileCopyBased", "logical"]},
+        # For `initialSyncSourceReadPreference`, the option `secondary` is excluded from the fuzzer
+        # because the generated mongod parameters are used for every node in the replica set, so the
+        # secondaries in the replica set will not be able to find a valid sync source.
+        "initialSyncSourceReadPreference": {
+            "choices": ["nearest", "primary", "primaryPreferred", "secondaryPreferred"],
+        },
+        "internalQueryExecYieldIterations": {"min": 1, "max": 1000},
+        "internalQueryExecYieldPeriodMS": {"min": 1, "max": 100},
+        "internalQueryFindCommandBatchSize": {"min": 1, "max": 500},
+        "lockCodeSegmentsInMemory": {"choices": [True, False]},
         "logicalSessionRefreshMillis": {
             "choices": [100, 1000, 10000, 100000],
             "min": 100,
@@ -19,49 +78,9 @@ config_fuzzer_params = {
             "min": 100,
             "max": 100000,
         },
-        "enableAutoCompaction": {
-            "choices": [True, False],
-        },
-        "initialServiceExecutorUseDedicatedThread": {
-            "choices": [True, False],
-        },
-        "disableLogicalSessionCacheRefresh": {
-            "choices": [True, False],
-        },
-        "wiredTigerStressConfig": {
-            "choices": [True, False],
-        },
         "oplogFetcherUsesExhaust": {
             "choices": [True, False],
         },
-        "storageEngineConcurrencyAdjustmentAlgorithm": {
-            "choices": ["throughputProbing", "fixedConcurrentTransactions"],
-        },
-        # For `initialSyncSourceReadPreference`, the option `secondary` is excluded from the fuzzer
-        # because the generated mongod parameters are used for every node in the replica set, so the
-        # secondaries in the replica set will not be able to find a valid sync source.
-        "initialSyncSourceReadPreference": {
-            "choices": ["nearest", "primary", "primaryPreferred", "secondaryPreferred"],
-        },
-        "initialSyncMethod": {"choices": ["fileCopyBased", "logical"]},
-        "syncdelay": {"min": 15, "max": 180},
-        "wiredTigerCursorCacheSize": {"min": -100, "max": 100},
-        "wiredTigerSessionCloseIdleTimeSecs": {"min": 0, "max": 300},
-        "storageEngineConcurrencyAdjustmentIntervalMillis": {"min": 10, "max": 1000},
-        "throughputProbingStepMultiple": {"min": 0.1, "max": 0.5},
-        "throughputProbingInitialConcurrency": {"min": 4, "max": 128},
-        "throughputProbingMinConcurrency": {"min": 4, "max": "throughputProbingInitialConcurrency"},
-        "throughputProbingMaxConcurrency": {
-            "min": "throughputProbingInitialConcurrency",
-            "max": 128,
-        },
-        "throughputProbingReadWriteRatio": {"min": 0, "max": 1},
-        "throughputProbingConcurrencyMovingAverageWeight": {"min": 0.0, "max": 1.0},
-        "wiredTigerConcurrentWriteTransactions": {"min": 5, "max": 32},
-        "wiredTigerConcurrentReadTransactions": {"min": 5, "max": 32},
-        "wiredTigerSizeStorerPeriodicSyncHits": {"min": 1, "max": 100000},
-        "wiredTigerSizeStorerPeriodicSyncPeriodMillis": {"min": 1, "max": 60000},
-        "replWriterThreadCount": {"min": 1, "max": 256},
         # The actual maximum of `replBatchLimitOperations` is 1000 * 1000 but this range doesn't work
         # for WINDOWS DEBUG, so that maximum is multiplied by 0.2, which is still a lot more than the
         # default value of 5000. The reason why the full range [1, 1000*1000] doesn't work on WINDOWS
@@ -70,21 +89,65 @@ config_fuzzer_params = {
         # batch limit operations.
         "replBatchLimitOperations": {"min": 1, "max": 0.2 * 1000 * 1000},
         "replBatchLimitBytes": {"min": 16 * 1024 * 1024, "max": 100 * 1024 * 1024},
+        "replWriterThreadCount": {"min": 1, "max": 256},
+        "storageEngineConcurrencyAdjustmentAlgorithm": {
+            "choices": ["throughputProbing", "fixedConcurrentTransactions"],
+        },
+        "storageEngineConcurrencyAdjustmentIntervalMillis": {"min": 10, "max": 1000},
+        "throughputProbingStepMultiple": {"min": 0.1, "max": 0.5, "isUniform": True},
+        "throughputProbingInitialConcurrency": {"min": 4, "max": 128},
+        "throughputProbingMinConcurrency": {"min": 4, "max": "throughputProbingInitialConcurrency"},
+        "throughputProbingMaxConcurrency": {
+            "min": "throughputProbingInitialConcurrency",
+            "max": 128,
+        },
+        "throughputProbingReadWriteRatio": {"min": 0, "max": 1, "isUniform": True},
+        "throughputProbingConcurrencyMovingAverageWeight": {"min": 0.0, "max": 1.0},
+        "wiredTigerStressConfig": {
+            "choices": [True, False],
+        },
+        "wiredTigerCursorCacheSize": {"min": -100, "max": 100},
+        "wiredTigerSessionCloseIdleTimeSecs": {"min": 0, "max": 300},
+        "wiredTigerConcurrentWriteTransactions": {"min": 5, "max": 32},
+        "wiredTigerConcurrentReadTransactions": {"min": 5, "max": 32},
+        "wiredTigerSizeStorerPeriodicSyncHits": {"min": 1, "max": 100000},
+        "wiredTigerSizeStorerPeriodicSyncPeriodMillis": {"min": 1, "max": 60000},
         "queryAnalysisWriterMaxMemoryUsageBytes": {"min": 1024 * 1024, "max": 1024 * 1024 * 100},
-        "internalQueryExecYieldIterations": {"min": 1, "max": 1000},
-        "internalQueryExecYieldPeriodMS": {"min": 1, "max": 100},
-        "mirrorReads": {"samplingRate": {"min": 0.0, "max": 0.01}},
+        "mirrorReads": {"samplingRate": {"min": 0.0, "max": 1.0}},
+        # Flow control related parameters
+        "enableFlowControl": {"choices": [True, False]},
+        "flowControlMaxSamples": {"min": 1, "max": 1000 * 1000},
+        "flowControlMinTicketsPerSecond": {"min": 1, "max": 10 * 1000},
+        "flowControlSamplePeriod": {"min": 1, "max": 1000 * 1000},
         "flowControlTargetLagSeconds": {"min": 1, "max": 1000},
         "flowControlThresholdLagPercentage": {"min": 0.0, "max": 1.0},
-        "flowControlMaxSamples": {"min": 1, "max": 1000 * 1000},
-        "flowControlSamplePeriod": {"min": 1, "max": 1000 * 1000},
-        "flowControlMinTicketsPerSecond": {"min": 1, "max": 10 * 1000},
-        "enableFlowControl": {"choices": [True, False]},
-        "internalQueryFindCommandBatchSize": {"min": 1, "max": 500},
+        # We need a higher timeout to account for test slowness
+        "receiveChunkWaitForRangeDeleterTimeoutMS": {"default": 300000},
+        "defaultConfigCommandTimeoutMS": {"default": 90000},
+        # These parameters have a min, max, and a choice with one value because we first find rng.randint(min, max)
+        # and then add this value to the choices array and call rng.choices(choices).
+        "minSnapshotHistoryWindowInSeconds": {
+            "choices": [300],
+            "lower_bound": 30,
+            "upper_bound": 600,
+            "min": 30,
+            "max": 600,
+            "isRandomizedChoice": True,
+        },
+        "syncdelay": {
+            "choices": [60],
+            "lower_bound": 15,
+            "upper_bound": 180,
+            "min": 15,
+            "max": 180,
+            "isRandomizedChoice": True,
+        },
     },
     "mongos": {
+        # We need a higher timeout to account for test slowness
+        "defaultConfigCommandTimeoutMS": {"default": 90000},
         "initialServiceExecutorUseDedicatedThread": {"choices": [True, False]},
-        "opportunisticSecondaryTargeting": {"choices": [True, False]},
         "internalQueryFindCommandBatchSize": {"min": 1, "max": 500},
+        "opportunisticSecondaryTargeting": {"choices": [True, False]},
     },
 }
