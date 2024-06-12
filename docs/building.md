@@ -83,7 +83,7 @@ fail to build since the build system treats compiler warnings as
 errors. To ignore the warnings, pass the switch
 `--disable-warnings-as-errors` to scons.
 
-    $ python3 buildscripts/scons.py install-mongod --disable-warnings-as-errors
+    $ python3 buildscripts/scons.py install-mongod --disable-warnings-as-errors=configure --disable-warnings-as-errors=source
 
 **_Note_**: On memory-constrained systems, you may run into an error such as `g++: fatal error: Killed signal terminated program cc1plus`. To use less memory during building, pass the parameter `-j1` to scons. This can be incremented to `-j2`, `-j3`, and higher as appropriate to find the fastest working option on your system.
 
