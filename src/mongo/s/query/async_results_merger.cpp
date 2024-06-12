@@ -109,21 +109,22 @@ int compareSortKeys(BSONObj leftSortKey, BSONObj rightSortKey, BSONObj sortKeyPa
     return leftSortKey.woCompare(rightSortKey, sortKeyPattern, rules);
 }
 
-void processAdditionaTransactionParticipantFromResponse(
+void processAdditionalTransactionParticipantFromResponse(
     OperationContext* opCtx,
     const ShardId& shardId,
     const BSONObj& originalResponse,
     const ServerGlobalParams::FCVSnapshot& fcvSnapshot) {
     if (gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
-        transaction_request_sender_details::processReplyMetadata(opCtx, shardId, originalResponse);
+        transaction_request_sender_details::processReplyMetadataForAsyncGetMore(
+            opCtx, shardId, originalResponse);
     }
 }
 
-void processAdditionaTransactionParticipantFromResponse(OperationContext* opCtx,
-                                                        const ShardId& shardId,
-                                                        const BSONObj& originalResponse) {
+void processAdditionalTransactionParticipantFromResponse(OperationContext* opCtx,
+                                                         const ShardId& shardId,
+                                                         const BSONObj& originalResponse) {
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    processAdditionaTransactionParticipantFromResponse(
+    processAdditionalTransactionParticipantFromResponse(
         opCtx, shardId, originalResponse, fcvSnapshot);
 }
 
@@ -410,7 +411,7 @@ void AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationCont
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     while (!_remoteResponses.empty()) {
         const auto& response = _remoteResponses.front();
-        processAdditionaTransactionParticipantFromResponse(
+        processAdditionalTransactionParticipantFromResponse(
             opCtx, response.shardId, response.originalResponse, fcvSnapshot);
         _remoteResponses.pop();
     }

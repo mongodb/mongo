@@ -173,7 +173,7 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
         {{mergingShardId, mergeCmdObj}},
         ReadPreferenceSetting::get(opCtx),
         sharded_agg_helpers::getDesiredRetryPolicy(opCtx));
-    auto response = ars.next();
+    auto response = ars.next(true /* forMergeCursors*/);
     tassert(6273807,
             "requested and received data from just one shard, but results are still pending",
             ars.done());

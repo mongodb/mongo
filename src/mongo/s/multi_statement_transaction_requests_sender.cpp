@@ -45,6 +45,19 @@
 namespace mongo {
 
 namespace transaction_request_sender_details {
+namespace {
+void processReplyMetadata(OperationContext* opCtx,
+                          const ShardId& shardId,
+                          const BSONObj& responseBson,
+                          bool forAsyncGetMore = false) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    if (!txnRouter) {
+        return;
+    }
+
+    txnRouter.processParticipantResponse(opCtx, shardId, responseBson, forAsyncGetMore);
+}
+}  // namespace
 
 std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     OperationContext* opCtx, const std::vector<AsyncRequestsSender::Request>& requests) {
@@ -76,23 +89,21 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     return newRequests;
 }
 
-void processReplyMetadata(OperationContext* opCtx, const AsyncRequestsSender::Response& response) {
+void processReplyMetadata(OperationContext* opCtx,
+                          const AsyncRequestsSender::Response& response,
+                          bool forAsyncGetMore) {
     if (!response.swResponse.isOK()) {
         return;
     }
 
-    processReplyMetadata(opCtx, response.shardId, response.swResponse.getValue().data);
+    processReplyMetadata(
+        opCtx, response.shardId, response.swResponse.getValue().data, forAsyncGetMore);
 }
 
-void processReplyMetadata(OperationContext* opCtx,
-                          const ShardId& shardId,
-                          const BSONObj& responseBson) {
-    auto txnRouter = TransactionRouter::get(opCtx);
-    if (!txnRouter) {
-        return;
-    }
-
-    txnRouter.processParticipantResponse(opCtx, shardId, responseBson);
+void processReplyMetadataForAsyncGetMore(OperationContext* opCtx,
+                                         const ShardId& shardId,
+                                         const BSONObj& responseBson) {
+    processReplyMetadata(opCtx, shardId, responseBson, true /* forAsyncGetMore */);
 }
 
 }  // namespace transaction_request_sender_details
@@ -130,9 +141,9 @@ bool MultiStatementTransactionRequestsSender::done() {
     return _ars->done();
 }
 
-AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::next() {
+AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::next(bool forMergeCursors) {
     auto response = _ars->next();
-    transaction_request_sender_details::processReplyMetadata(_opCtx, response);
+    transaction_request_sender_details::processReplyMetadata(_opCtx, response, forMergeCursors);
     return response;
 }
 

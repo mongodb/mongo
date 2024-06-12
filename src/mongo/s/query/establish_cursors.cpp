@@ -67,6 +67,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
@@ -289,6 +290,12 @@ void CursorEstablisher::checkForFailedRequests() {
               "Unable to establish remote cursors",
               "error"_attr = *_maybeFailure,
               "nRemotes"_attr = _remotesToClean.size());
+    } else {
+        // If this is a shard acting as a sub-router, clear the pending participant.
+        auto txnRouter = TransactionRouter::get(_opCtx);
+        if (txnRouter && _opCtx->isActiveTransactionParticipant()) {
+            txnRouter.onViewResolutionError(_opCtx, _nss);
+        }
     }
 
     if (_remotesToClean.empty()) {

@@ -11,10 +11,13 @@
  * Any inconsistencies would mean that snapshot transactions do not work properly as the cycle gets
  * updated transactionally and no leftover documents in coll_aux can exist.
  *
+ * TODO SERVER-90385 Enable this test in embedded router suites
  * @tags: [
  *     uses_transactions,
  *     assumes_snapshot_transactions,
  *     requires_fcv_80,
+ *     temp_disabled_embedded_router_uncategorized,
+ * ]
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

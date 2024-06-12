@@ -76,6 +76,7 @@ selector:
   - assumes_balancer_on
   - requires_profiling
   - assumes_unsharded_collection
+  - temp_disabled_embedded_router_uncategorized
   roots:
   - jstests/concurrency/fsm_workloads/**/*.js
   - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
