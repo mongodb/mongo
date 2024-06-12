@@ -6,6 +6,7 @@
  * ]
  */
 import {assertCacheUsage, setUpActiveCacheEntry} from "jstests/libs/plan_cache_utils.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
@@ -104,5 +105,45 @@ assertCacheEntryIsCreatedAndUsed({
     shouldPipelinesShareCacheEntry: true,
     cacheEntryVersion: expectedCacheVersion
 });
+
+// Run a pipeline with a hint and ensure that it does not get cached when the classic cache is
+// being used. When the SBE cache is used, we do expect a cache entry to be written.
+{
+    coll.getPlanCache().clear();
+
+    const pipe = [
+        {$match: {a: 123, b: 123}},
+        {$group: {_id: "$foobar"}},
+    ];
+
+    {
+        const res = coll.aggregate(pipe, {hint: {a: 1}}).toArray();
+
+        const planCacheContents = coll.getPlanCache().list();
+
+        if (expectedCacheVersion == 1) {
+            // Ensure no plan cache entry was written.
+            assert.eq(planCacheContents.length, 0);
+        } else if (expectedCacheVersion == 2) {
+            // One entry should have been written.
+            assert.eq(planCacheContents.length, 1);
+        } else {
+            throw 'Unknown cache version, test must be updated';
+        }
+    }
+
+    // Now run the query without a hint and set up a cache entry
+    setUpActiveCacheEntry(
+        coll, pipe, expectedCacheVersion, "a_1" /* cachedIndexName */, assertCountIsOne);
+
+    // Run the query with a hint.
+    const res = coll.aggregate(pipe, {hint: {b: 1}}).toArray();
+    const profileObj = getLatestProfilerEntry(db, {op: {$in: ["command"]}, ns: coll.getFullName()});
+
+    // The hinted query should NOT have used the plan cache, regardless of the cache version.
+    // For v:1, a hinted query should not consult the cache. For v:2, the cache key contains
+    // the hint.
+    assert(!profileObj.fromPlanCache);
+}
 
 MongoRunner.stopMongod(conn);
