@@ -119,7 +119,9 @@ private:
 };
 
 struct ElementAnalysis {
-    absl::flat_hash_set<const char*> _scalarValues = {};
+    // The set of all scalar values reachable along an arbitrarily deep path containing objects only
+    // (no arrays).
+    absl::flat_hash_set<const char*> _scalarValuesInObjects = {};
     bool _containsArrays = false;
 };
 
@@ -130,11 +132,16 @@ struct ElementAnalysis {
 void analyzeElement(ElementAnalysis& analysis, BSONElement elem) {
     if (elem.type() == BSONType::Array) {
         analysis._containsArrays = true;
+        // Do not recurse into children; elements within arrays are not candidates for path-based
+        // decompression due to challenges with arrays in BSONColumns with legacy interleaved mode.
+        // See SERVER-90712.
+        return;
     }
 
-    // Note: isABSONObj() returns true for both objects and arrays.
+    // Note: isABSONObj() returns true for both objects and arrays. But we just checked that this is
+    // not an array.
     if (!elem.isABSONObj()) {
-        analysis._scalarValues.insert(elem.value());
+        analysis._scalarValuesInObjects.insert(elem.value());
         return;
     }
 
@@ -194,7 +201,7 @@ boost::optional<bsoncolumn::SBEPath> canUsePathBasedDecompression(
             return boost::none;
         }
 
-        if (!elems.empty() && !analysis._scalarValues.contains(elems[0])) {
+        if (!elems.empty() && !analysis._scalarValuesInObjects.contains(elems[0])) {
             return boost::none;
         }
     }
