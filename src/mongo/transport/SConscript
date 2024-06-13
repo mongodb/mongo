@@ -249,6 +249,7 @@ tlEnv.CppUnitTest(
         "service_executor_test.cpp",
         "max_conns_override_test.cpp",
         "session_manager_test.cpp",
+        "session_manager_common_test.cpp" if env.TargetOSIs("linux") else [],
         "session_workflow_test.cpp",
         "transport_layer_manager_test.cpp",
         "transport_layer_manager_grpc_test.cpp" if shouldBuildGRPC(tlEnv) else [],
