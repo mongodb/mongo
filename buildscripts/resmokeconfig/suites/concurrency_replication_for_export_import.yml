@@ -27,6 +27,11 @@ selector:
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_simple_kill_sessions.js
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_simple_read_write_kill_sessions.js
 
+    # This suite has TestData.discoveryTopology: False so clusterOptions.replication.enabled doesn't
+    # get set true. analyze_shard_key.js calls cluster.awaitReplication() which has an
+    # isReplication() check. So it is expected to fail every time it gets run in this suite.
+    - jstests/concurrency/fsm_workloads/analyze_shard_key.js
+
   exclude_with_any_tags:
     # Workloads that use a write concern will fail since the workload only connects to the primary.
     - uses_write_concern
