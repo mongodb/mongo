@@ -115,6 +115,16 @@ reshardingTest.withReshardingInBackground(
                 {dropIndexes: collName, index: {indexToDropDuringResharding: 1}, maxTimeMS: 3000});
             assert(ErrorCodes.isExceededTimeLimitError(res.code));
 
+            assert.soon(() => {
+                let ops = reshardingTest._st.s.getDB('admin')
+                              .aggregate([
+                                  {$currentOp: {}},
+                                  {$match: {"command._shardsvrDropIndexes": collName}}
+                              ])
+                              .toArray();
+                return ops.length == 0;
+            });
+
             jsTestLog("Completed operations");
         },
         afterReshardingFn: () => {
@@ -125,27 +135,21 @@ reshardingTest.withReshardingInBackground(
 
 jsTestLog("Verify that writes succeed after resharding operation has completed");
 
-assert.commandWorked(timeseriesCollection.runCommand({
-    insert: collName,
-    documents: [{data: 3, ts: new Date(), meta: {x: -2, y: -2}}],
-    maxTimeMS: 3000
-}));
-
-assert.commandWorked(timeseriesCollection.runCommand({
-    update: collName,
-    updates: [{q: {'meta.x': -1}, u: {$set: {'meta.x': -15}}, multi: true}],
-    maxTimeMS: 3000
-}));
+assert.commandWorked(timeseriesCollection.runCommand(
+    {insert: collName, documents: [{data: 3, ts: new Date(), meta: {x: -2, y: -2}}]}));
 
 assert.commandWorked(timeseriesCollection.runCommand(
-    {delete: collName, deletes: [{q: {'meta.x': -1}, limit: 1}], maxTimeMS: 3000}));
+    {update: collName, updates: [{q: {'meta.x': -1}, u: {$set: {'meta.x': -15}}, multi: true}]}));
+
+assert.commandWorked(
+    timeseriesCollection.runCommand({delete: collName, deletes: [{q: {'meta.x': -1}, limit: 1}]}));
 
 assert.commandWorked(timeseriesCollection.runCommand(
-    {createIndexes: collName, indexes: [{key: {'meta.z': 1}, name: "metaz_0"}], maxTimeMS: 3000}));
+    {createIndexes: collName, indexes: [{key: {'meta.z': 1}, name: "metaz_0"}]}));
 
-assert.commandWorked(timeseriesCollection.runCommand({collMod: collName, maxTimeMS: 3000}));
+assert.commandWorked(timeseriesCollection.runCommand({collMod: collName}));
 
 assert.commandWorked(timeseriesCollection.runCommand(
-    {dropIndexes: collName, index: {indexToDropDuringResharding: 1}, maxTimeMS: 3000}));
+    {dropIndexes: collName, index: {indexToDropDuringResharding: 1}}));
 
 reshardingTest.teardown();
