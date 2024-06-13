@@ -73,6 +73,7 @@ selector:
 executor:
   archive:
     hooks:
+      - CheckReplDBHash
       - ValidateCollections
   config:
     shell_options:
@@ -83,6 +84,10 @@ executor:
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
         await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
   hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplDBHash
     - class: ValidateCollections
       shell_options:
         global_vars:
