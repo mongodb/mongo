@@ -29,10 +29,13 @@
 #include <algorithm>
 #include <iostream>
 #include <string>
+#include <fstream>
 
 #include "src/common/logger.h"
 #include "src/main/test.h"
 
+#include "api_timing_benchmarks.cpp"
+#include "api_instruction_count_benchmarks.cpp"
 #include "background_compact.cpp"
 #include "bounded_cursor_perf.cpp"
 #include "bounded_cursor_prefix_indices.cpp"
@@ -137,7 +140,11 @@ run_test(const std::string &test_name, const std::string &config, const std::str
       .wt_open_config = wt_open_config,
       .home = home};
 
-    if (test_name == "background_compact")
+    if (test_name == "api_timing_benchmarks")
+        api_timing_benchmarks(args).run();
+    else if (test_name == "api_instruction_count_benchmarks")
+        api_instruction_count_benchmarks(args).run();
+    else if (test_name == "background_compact")
         background_compact(args).run();
     else if (test_name == "bounded_cursor_perf")
         bounded_cursor_perf(args).run();
@@ -184,7 +191,8 @@ main(int argc, char *argv[])
     std::string cfg, config_filename, current_cfg, current_test_name, home, test_name,
       wt_open_config;
     int64_t error_code = 0;
-    const std::vector<std::string> all_tests = {"background_compact", "bounded_cursor_perf",
+    const std::vector<std::string> all_tests = {"api_timing_benchmarks",
+      "api_instruction_count_benchmarks", "background_compact", "bounded_cursor_perf",
       "bounded_cursor_prefix_indices", "bounded_cursor_prefix_search_near",
       "bounded_cursor_prefix_stat", "bounded_cursor_stress", "burst_inserts", "cache_resize",
       "hs_cleanup", "operations_test", "reverse_split", "test_template"};
@@ -263,6 +271,9 @@ main(int argc, char *argv[])
                 else
                     current_cfg = cfg;
 
+                /* This test is skipped as it requires elevated permissions to run. */
+                if (current_test_name == "api_instruction_count_benchmarks")
+                    continue;
                 error_code = run_test(current_test_name, current_cfg, wt_open_config, home);
                 /*
                  * The connection is usually closed using the destructor of the connection manager.

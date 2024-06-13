@@ -303,6 +303,7 @@ Posix
 PostgreSQL
 Pre
 Precompiled
+Prefetch
 Preload
 Prepend
 Prepending
@@ -509,6 +510,7 @@ bbuilddir
 bcr
 bd
 beginthreadex
+benchmarking
 binutils
 bitcnt
 bitfield
@@ -615,6 +617,7 @@ countp
 cp
 cpp
 cppsuite
+cpu
 cpuid
 crc
 crypto
@@ -812,6 +815,7 @@ getone
 getones
 getopt
 getraw
+getter
 getters
 gettime
 gettimeofday
@@ -825,6 +829,7 @@ gostring
 gostruct
 goto
 goutf
+groupd
 gte
 handleops
 handlep
@@ -1349,6 +1354,7 @@ umount
 unallocated
 unbare
 unbuffered
+uncached
 unconfigured
 uncustomized
 undef

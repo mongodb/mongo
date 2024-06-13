@@ -1043,10 +1043,15 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_v
         cfg = NULL;
 
     /* WT_CURSTD_OVERWRITE: Fast path overwrite configuration */
-    if (have_config && cfg[2] == NULL && strcmp(cfg[1], "overwrite=false") == 0) {
-        have_config = false;
-        overwrite_flag = 0;
-        cfg = NULL;
+    if (have_config) {
+        if (cfg[2] == NULL && strcmp(cfg[1], "overwrite=false") == 0) {
+            have_config = false;
+            overwrite_flag = 0;
+            cfg = NULL;
+        } else {
+            WT_RET(__wt_config_gets_def(session, cfg, "overwrite", 1, &cval));
+            overwrite_flag = (cval.val != 0) ? WT_CURSTD_OVERWRITE : 0;
+        }
     } else
         overwrite_flag = WT_CURSTD_OVERWRITE;
 

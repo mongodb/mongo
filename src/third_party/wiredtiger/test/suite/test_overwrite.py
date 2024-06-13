@@ -50,8 +50,18 @@ class test_overwrite(wttest.WiredTigerTestCase):
         ('table-simple', dict(uri='table:', lsm=False, ds=SimpleDataSet)),
         ('table-simple-lsm', dict(uri='table:', lsm=True, ds=SimpleLSMDataSet)),
     ]
+
+    # The cursor fast path logic checks against the exact string only, but other valid
+    # configurations should also disable overwrite through the normal config parsing flow.
+    cursor_configs = [
+        ('cfg1', dict(cursor_cfg='overwrite=false', valid=True)),
+        ('cfg2', dict(cursor_cfg='overwrite=false,', valid=True)),
+        ('cfg3', dict(cursor_cfg='overwrite=false,,,', valid=True)),
+        ('cfg4', dict(cursor_cfg=',,,,overwrite=false', valid=True)),
+        ('cfg5', dict(cursor_cfg='append=false,overwrite=false', valid=True)),
+    ]
     # Skip record number keys with LSM.
-    scenarios = filter_scenarios(make_scenarios(types, keyfmt),
+    scenarios = filter_scenarios(make_scenarios(types, keyfmt, cursor_configs),
         lambda name, d: not (d['lsm'] and d['keyfmt'] == 'r'))
 
     # Confirm a cursor configured with/without overwrite correctly handles
@@ -62,7 +72,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         ds.populate()
 
         # Insert of an existing record with overwrite off fails.
-        cursor = ds.open_cursor(uri, None, "overwrite=false")
+        cursor = ds.open_cursor(uri, None, self.cursor_cfg)
         cursor.set_key(ds.key(5))
         cursor.set_value(ds.value(1000))
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
@@ -71,7 +81,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         # configured and then the insert should succeed.  This test is only for the insert method
         # because the update method's failure modes are for non-existent records, and you cannot
         # duplicate a cursor pointing to non-existent records.
-        cursor = ds.open_cursor(uri, None, "overwrite=false")
+        cursor = ds.open_cursor(uri, None, self.cursor_cfg)
         cursor.set_key(ds.key(5))
         dupc = self.session.open_cursor(None, cursor, "overwrite=true")
         dupc.set_value(ds.value(1001))
@@ -84,7 +94,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         self.assertEquals(cursor.insert(), 0)
 
         # Insert of a non-existent record with overwrite off succeeds.
-        cursor = ds.open_cursor(uri, None, "overwrite=false")
+        cursor = ds.open_cursor(uri, None, self.cursor_cfg)
         cursor.set_key(ds.key(200))
         cursor.set_value(ds.value(1003))
         self.assertEquals(cursor.insert(), 0)
@@ -102,7 +112,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         ds.populate()
 
         # Remove of an existing record with overwrite off succeeds.
-        cursor = ds.open_cursor(uri, None, "overwrite=false")
+        cursor = ds.open_cursor(uri, None, self.cursor_cfg)
         cursor.set_key(ds.key(5))
         self.assertEquals(cursor.remove(), 0)
 
@@ -112,7 +122,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         self.assertEquals(cursor.remove(), 0)
 
         # Remove of a non-existent record with overwrite off fails.
-        cursor = ds.open_cursor(uri, None, "overwrite=false")
+        cursor = ds.open_cursor(uri, None, self.cursor_cfg)
         cursor.set_key(ds.key(200))
         self.assertEquals(cursor.remove(), wiredtiger.WT_NOTFOUND)
 
@@ -127,7 +137,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         ds.populate()
 
         # Update of an existing record with overwrite off succeeds.
-        cursor = ds.open_cursor(uri, None, "overwrite=false")
+        cursor = ds.open_cursor(uri, None, self.cursor_cfg)
         cursor.set_key(ds.key(5))
         cursor.set_value(ds.value(1005))
         self.assertEquals(cursor.update(), 0)
@@ -139,7 +149,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         self.assertEquals(cursor.update(), 0)
 
         # Update of a non-existent record with overwrite off fails.
-        cursor = ds.open_cursor(uri, None, "overwrite=false")
+        cursor = ds.open_cursor(uri, None, self.cursor_cfg)
         cursor.set_key(ds.key(200))
         cursor.set_value(ds.value(1007))
         self.assertEquals(cursor.update(), wiredtiger.WT_NOTFOUND)

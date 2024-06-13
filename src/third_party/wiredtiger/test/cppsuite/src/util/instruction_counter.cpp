@@ -31,27 +31,31 @@
 #include <algorithm>
 #include <cmath>
 
-#include "execution_timer.h"
+#include "instruction_counter.h"
 #include "src/component/metrics_writer.h"
 
 namespace test_harness {
-execution_timer::execution_timer(const std::string &id, const std::string &test_name)
-    : _id(id), _test_name(test_name)
+instruction_counter::instruction_counter(const std::string &id, const std::string &test_name)
+    : _id(id), _test_name(test_name), _instruction_count(0)
 {
+    memset(&_pe, 0, sizeof(_pe));
+    _pe.type = PERF_TYPE_HARDWARE;
+    _pe.size = sizeof(_pe);
+    _pe.config = PERF_COUNT_HW_INSTRUCTIONS;
+    _pe.disabled = 1;
+    _pe.exclude_kernel = 1;
+    _pe.exclude_hv = 1;
 }
 
 void
-execution_timer::append_stats()
+instruction_counter::append_stats()
 {
-    std::sort(_time_recordings.begin(), _time_recordings.end());
-    auto percentile = _time_recordings[std::floor(_time_recordings.size() * 0.9)];
     metrics_writer::instance().add_stat("{\"name\":\"" + _id +
-      "_nanoseconds_90th_percentile\",\"value\":" + std::to_string(percentile) + "}");
+      "_instructions\",\"value\":" + std::to_string(_instruction_count) + "}");
 }
 
-execution_timer::~execution_timer()
+instruction_counter::~instruction_counter()
 {
-    if (_time_recordings.size() != 0)
-        append_stats();
+    append_stats();
 }
 }; // namespace test_harness

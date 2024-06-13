@@ -620,8 +620,13 @@ functions:
       script: |
         set -o verbose
         ${PREPARE_TEST_ENV}
+        # Get the current setting of the required perf field
+        paranoia_level=`sudo sysctl kernel.perf_event_paranoid | cut -d '=' -f 2 | xargs`
+        sudo sysctl -w kernel.perf_event_paranoid=2
         ./run -t ${test_name} -C '${test_config}' -f ${test_config_filename} -l 2
         exit_code=$?
+        # Restore the kernel perf event paranoid level
+        sudo sysctl -w kernel.perf_event_paranoid=$paranoia_level
         echo "$exit_code" > cppsuite_exit_code
         if [ "$exit_code" != 0 ]; then
           echo "[{\"info\":{\"test_name\": \"${test_name}\"},\"metrics\": []}]" > ${test_name}.json
@@ -2028,6 +2033,29 @@ tasks:
         vars:
           test_config_filename: configs/bounded_cursor_perf_stress.txt
           test_name: bounded_cursor_perf
+
+  - name: cppsuite-cursor-microbenchmarks-default-perf
+    depends_on:
+      - name: compile
+    # This and the later test only run on ARM as the required harsware counter is missing on x86.
+    tags: ["cppsuite-perf-test-arm"]
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite perf test"
+        vars:
+          test_config_filename: configs/api_instruction_count_benchmarks_default.txt
+          test_name: api_instruction_count_benchmarks
+
+  - name: cppsuite-session-microbenchmarks-default-perf
+    depends_on:
+      - name: compile
+    tags: ["cppsuite-perf-test-arm"]
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite perf test"
+        vars:
+          test_config_filename: configs/api_timing_benchmarks_default.txt
+          test_name: api_timing_benchmarks
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks

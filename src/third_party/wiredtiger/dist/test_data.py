@@ -244,6 +244,8 @@ test_config = [
         The duration that the test run will last''', min=0, max=1000000),
     Config('enable_logging', 'false', r'''
         Enables write ahead logs''', type='boolean'),
+    Config('in_memory', 'false', r'''
+        Enables WiredTiger's in memory mode.''', type='boolean'),
     Config('reverse_collator', 'false', r'''
         Configure the database files to use the reverse collator.''', type='boolean'),
     Config('statistics_config', '', r'''
@@ -256,6 +258,9 @@ test_config = [
             Configuration enabling or disabling statistics logging in the form of json logging.''',
             type='boolean')
         ]),
+    Config('sweep_interval', 10, r'''
+        The frequency that the sweep server will sweep at, defaults to the same as the WiredTiger
+        default.'''),
     Config('validate', 'true', r'''
         Enables the validation stage.''', type='boolean'),
 ]
@@ -264,6 +269,8 @@ test_config = [
 # Test and their respective configuration sorted alphabetically.
 #
 methods = {
+    'api_instruction_count_benchmarks' : Method(test_config),
+    'api_timing_benchmarks' : Method(test_config),
     'background_compact' : Method(test_config),
     'bounded_cursor_perf' : Method(test_config),
     'bounded_cursor_prefix_indices' : Method(test_config),

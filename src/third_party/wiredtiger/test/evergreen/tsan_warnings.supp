@@ -29,7 +29,10 @@ race:__ref_track_state
 race:__wt_configure_method
 
 # FIXME-WT-13074 This Work has been split out into a separate ticket to keep PR sizes down.
-race:__wt_calloc
+race:__wt_free_int
+race:__wt_free_update_list
+race:__wt_page_out
+race:__read_blocked
 race:__sweep_mark
 race:__posix_file_close
 race:__log_newfile

@@ -28,12 +28,14 @@
 #
 # test_timestamp03.py
 #   Timestamps: checkpoints
+#   Verify logging configurations of all the URI's and history store file
+#   in the metadata file.
 #
 
 from helper import copy_wiredtiger_home
 import random
 from suite_subprocess import suite_subprocess
-import wttest
+import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
@@ -41,6 +43,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     table_ts_nolog   = 'ts03_ts_nologged'
     table_nots_log   = 'ts03_nots_logged'
     table_nots_nolog = 'ts03_nots_nologged'
+    hs_file = 'file:WiredTigerHS.wt'
 
     types = [
         ('file-row', dict(uri='file:', key_format='i', value_format='S')),
@@ -64,6 +67,17 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     scenarios = make_scenarios(types, ckpt, conncfg)
+
+    # Verify the log string for this URI in the metadata file is correct.
+    def verify_metadata(self, metadata_uri, metastr):
+        c = self.session.open_cursor('metadata:', None, None)
+        c.set_key(metadata_uri)
+        check_meta = metadata_uri.find("lsm:") == 0 or metadata_uri.find("file:") == 0
+        if check_meta:
+            self.assertNotEqual(c.search(), wiredtiger.WT_NOTFOUND)
+            value = c.get_value()
+            self.assertTrue(value.find(metastr) != -1)
+        c.close()
 
     def moresetup(self):
         # Binary values.
@@ -383,3 +397,10 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         valcnt_ts_log = valcnt_nots_log = nkeys
         self.backup_check(self.value3, valcnt_ts_log, valcnt_ts_nolog,
             valcnt_nots_log, valcnt_nots_nolog)
+
+        # Verify logging of all the URI's and history store in the metadata.
+        self.verify_metadata(uri_ts_log, 'log=(enabled=true)')
+        self.verify_metadata(uri_ts_nolog, 'log=(enabled=false)')
+        self.verify_metadata(uri_nots_log, 'log=(enabled=true)')
+        self.verify_metadata(uri_nots_nolog, 'log=(enabled=false)')
+        self.verify_metadata(self.hs_file, 'log=(enabled=false)')

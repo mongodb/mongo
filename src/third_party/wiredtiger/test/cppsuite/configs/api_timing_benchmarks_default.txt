@@ -1,0 +1,30 @@
+# Configuration for api_timing_benchmarks.
+duration_seconds=1,
+cache_size_mb=2000,
+validate=false,
+in_memory=true,
+sweep_interval=1000,
+workload_manager=
+(
+    populate_config=
+    (
+        collection_count=1,
+        key_count_per_collection=1,
+        key_size=1,
+        value_size=1,
+        thread_count=1,
+    ),
+    custom_config=
+    (
+        op_rate=10s,
+        thread_count=1
+    ),
+    checkpoint_config=
+    (
+        thread_count=0
+    )
+),
+operation_tracker=
+(
+    enabled=false,
+)

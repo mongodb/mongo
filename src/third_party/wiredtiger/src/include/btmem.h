@@ -222,9 +222,11 @@ struct __wt_ovfl_reuse {
 #endif
 #define WT_HS_KEY_FORMAT WT_UNCHECKED_STRING(IuQQ)
 #define WT_HS_VALUE_FORMAT WT_UNCHECKED_STRING(QQQu)
+/* Disable logging for history store in the metadata. */
 #define WT_HS_CONFIG                                                   \
     "key_format=" WT_HS_KEY_FORMAT ",value_format=" WT_HS_VALUE_FORMAT \
     ",block_compressor=" WT_HS_COMPRESSOR                              \
+    ",log=(enabled=false)"                                             \
     ",internal_page_max=16KB"                                          \
     ",leaf_value_max=64MB"                                             \
     ",prefix_compression=false"
@@ -616,17 +618,38 @@ struct __wt_page {
  * but it's not always required: for example, if a page is locked for splitting, or being created or
  * destroyed.
  */
-#define WT_INTL_INDEX_GET_SAFE(page) __wt_atomic_load_pointer(&(page)->u.intl.__index)
+#ifdef TSAN_BUILD
+/*
+ * TSan doesn't detect the acquire/release barriers used in our normal WT_INTL_INDEX_* functions, so
+ * use __atomic intrinsics instead. We can use __atomics here as MSVC doesn't support TSan.
+ */
+#define WT_INTL_INDEX_GET_SAFE(page, pindex)                                   \
+    do {                                                                       \
+        (pindex) = __atomic_load_n(&(page)->u.intl.__index, __ATOMIC_ACQUIRE); \
+    } while (0)
 #define WT_INTL_INDEX_GET(session, page, pindex)                          \
     do {                                                                  \
         WT_ASSERT(session, __wt_session_gen(session, WT_GEN_SPLIT) != 0); \
-        (pindex) = WT_INTL_INDEX_GET_SAFE(page);                          \
+        WT_INTL_INDEX_GET_SAFE(page, (pindex));                           \
+    } while (0)
+#define WT_INTL_INDEX_SET(page, v)                                        \
+    do {                                                                  \
+        __atomic_store_n(&(page)->u.intl.__index, (v), __ATOMIC_RELEASE); \
+    } while (0)
+#else
+/* Use WT_ACQUIRE_READ to enforce acquire semantics rather than relying on address dependencies. */
+#define WT_INTL_INDEX_GET_SAFE(page, pindex) WT_ACQUIRE_READ((pindex), (page)->u.intl.__index)
+#define WT_INTL_INDEX_GET(session, page, pindex)                          \
+    do {                                                                  \
+        WT_ASSERT(session, __wt_session_gen(session, WT_GEN_SPLIT) != 0); \
+        WT_INTL_INDEX_GET_SAFE(page, (pindex));                           \
     } while (0)
 #define WT_INTL_INDEX_SET(page, v)                               \
     do {                                                         \
         WT_RELEASE_BARRIER();                                    \
         __wt_atomic_store_pointer(&(page)->u.intl.__index, (v)); \
     } while (0)
+#endif
 
 /*
  * Macro to walk the list of references in an internal page.

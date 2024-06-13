@@ -376,7 +376,8 @@ __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_PAGE_INDEX *pindex;
     uint32_t i;
 
-    for (pindex = WT_INTL_INDEX_GET_SAFE(page), i = 0; i < pindex->entries; ++i)
+    WT_INTL_INDEX_GET_SAFE(page, pindex);
+    for (i = 0; i < pindex->entries; ++i)
         __wti_free_ref(session, pindex->index[i], page->type, false);
 
     __wt_free(session, pindex);

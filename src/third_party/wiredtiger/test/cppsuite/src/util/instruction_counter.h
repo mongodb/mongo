@@ -28,24 +28,26 @@
 
 #pragma once
 
-#include <chrono>
-#include <string>
-#include <vector>
+#include <linux/perf_event.h>
+#include <linux/hw_breakpoint.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
 
 #include "src/main/test.h"
 
 namespace test_harness {
 
 /*
- * Class that measures the average execution time of a given function and adds the stats to the
- * statistics writer when destroyed.
+ * Class that measures the number of instructions execute by a given function and adds the stats to
+ * the statistics writer when destroyed.
  */
-class execution_timer {
+class instruction_counter {
 public:
-    execution_timer(const std::string &id, const std::string &test_name);
-    virtual ~execution_timer();
+    instruction_counter(const std::string &id, const std::string &test_name);
+    virtual ~instruction_counter();
 
-    /* Calculates the average time and appends the stat to the perf file. */
+    /* Appends the stat to the perf file. */
     void append_stats();
 
     /*
@@ -56,18 +58,35 @@ public:
     int
     track(T lambda)
     {
-        auto start_time = std::chrono::steady_clock::now();
+        int fd = syscall(SYS_perf_event_open, &_pe,
+          0,  // pid: calling process/thread
+          -1, // cpu: any CPU
+          -1, // groupd_fd: group with only 1 member
+          0); // flags
+        testutil_assert(fd != -1);
+        ioctl(fd, PERF_EVENT_IOC_RESET, 0);
+        ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
 
         int ret = lambda();
-        _time_recordings.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(
-          (std::chrono::steady_clock::now() - start_time))
-                                     .count());
+
+        long long count;
+
+        ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
+        ssize_t bytes_read = read(fd, &count, sizeof(count));
+        testutil_assert(bytes_read == sizeof(count));
+
+        _instruction_count = count;
+
+        if (fd > 0) {
+            close(fd);
+        }
         return ret;
     }
 
 private:
     std::string _id;
     std::string _test_name;
-    std::vector<uint64_t> _time_recordings;
+    uint64_t _instruction_count;
+    struct perf_event_attr _pe;
 };
 } // namespace test_harness

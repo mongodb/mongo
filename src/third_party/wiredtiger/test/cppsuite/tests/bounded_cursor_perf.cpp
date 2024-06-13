@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/util/execution_timer.cpp"
+#include "src/util/execution_timer.h"
 #include "src/main/test.h"
 
 using namespace test_harness;
@@ -81,13 +81,12 @@ public:
           conn->compile_configuration(conn, "WT_CURSOR.bound", "bound=upper", &compiled_ptr_upper));
 
         /* Initialize the different timers for each function. */
-        execution_timer bounded_next("bounded_next_ticks", test::_args.test_name);
-        execution_timer bounded_prev("bounded_prev_ticks", test::_args.test_name);
-        execution_timer default_next("default_next_ticks", test::_args.test_name);
-        execution_timer default_prev("default_prev_ticks", test::_args.test_name);
-        execution_timer regular_config_timer(
-          "set_bounds non-compiled ticks", test::_args.test_name);
-        execution_timer compiled_config_timer("set_bounds compiled ticks", test::_args.test_name);
+        execution_timer bounded_next("bounded_next", test::_args.test_name);
+        execution_timer bounded_prev("bounded_prev", test::_args.test_name);
+        execution_timer default_next("default_next", test::_args.test_name);
+        execution_timer default_prev("default_prev", test::_args.test_name);
+        execution_timer regular_config_timer("set_bounds_non-compiled", test::_args.test_name);
+        execution_timer compiled_config_timer("set_bounds_compiled", test::_args.test_name);
 
         /* Get the collection to work on. */
         testutil_assert(tc->collection_count == 1);

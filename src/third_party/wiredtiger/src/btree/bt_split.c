@@ -400,6 +400,9 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
     uint64_t split_gen;
     uint32_t children, chunk, i, j, remain, slots;
     void *p;
+#ifdef HAVE_DIAGNOSTIC
+    WT_PAGE_INDEX *check_root;
+#endif
 
     btree = S2BT(session);
     alloc_index = NULL;
@@ -415,7 +418,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
      * Our caller is holding the root page locked to single-thread splits, which means we can safely
      * look at the page's index without setting a split generation.
      */
-    pindex = WT_INTL_INDEX_GET_SAFE(root);
+    WT_INTL_INDEX_GET_SAFE(root, pindex);
 
     /*
      * Decide how many child pages to create, then calculate the standard chunk and whatever
@@ -485,7 +488,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
          * have to fix that, because the disk image for the page that has a page index entry for the
          * WT_REF is about to change.
          */
-        child_pindex = WT_INTL_INDEX_GET_SAFE(child);
+        WT_INTL_INDEX_GET_SAFE(child, child_pindex);
         child_incr = 0;
         for (child_refp = child_pindex->index, j = 0; j < slots; ++child_refp, ++root_refp, ++j)
             WT_ERR(__split_ref_move(session, root, root_refp, &root_decr, child_refp, &child_incr));
@@ -510,7 +513,10 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
      * Confirm the root page's index hasn't moved, then update it, which makes the split visible to
      * threads descending the tree.
      */
-    WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(root) == pindex);
+#ifdef HAVE_DIAGNOSTIC
+    WT_INTL_INDEX_GET_SAFE(root, check_root);
+    WT_ASSERT(session, check_root == pindex);
+#endif
     WT_INTL_INDEX_SET(root, alloc_index);
     alloc_index = NULL;
 
@@ -650,6 +656,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     uint32_t deleted_entries, *deleted_refs, hint, i, j, parent_entries, result_entries;
     bool empty_parent;
 
+#ifdef HAVE_DIAGNOSTIC
+    WT_PAGE_INDEX *check_pindex;
+#endif
+
     btree = S2BT(session);
     parent = ref->home;
 
@@ -667,7 +677,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
      * We've locked the parent, which means it cannot split (which is the only reason to worry about
      * split generation values).
      */
-    pindex = WT_INTL_INDEX_GET_SAFE(parent);
+    WT_INTL_INDEX_GET_SAFE(parent, pindex);
     parent_entries = pindex->entries;
 
     /*
@@ -771,7 +781,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
      * Confirm the parent page's index hasn't moved then update it, which makes the split visible to
      * threads descending the tree.
      */
-    WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
+#ifdef HAVE_DIAGNOSTIC
+    WT_INTL_INDEX_GET_SAFE(parent, check_pindex);
+    WT_ASSERT(session, check_pindex == pindex);
+#endif
     WT_INTL_INDEX_SET(parent, alloc_index);
     alloc_index = NULL;
 
@@ -904,6 +917,10 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
     uint32_t children, chunk, i, j, remain, slots;
     void *p;
 
+#ifdef HAVE_DIAGNOSTIC
+    WT_PAGE_INDEX *check_pindex;
+#endif
+
     /* Mark the page dirty. */
     WT_RET(__wt_page_modify_init(session, page));
     __wt_page_modify_set(session, page);
@@ -919,7 +936,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
      * Our caller is holding the page locked to single-thread splits, which means we can safely look
      * at the page's index without setting a split generation.
      */
-    pindex = WT_INTL_INDEX_GET_SAFE(page);
+    WT_INTL_INDEX_GET_SAFE(page, pindex);
 
     /*
      * Decide how many child pages to create, then calculate the standard chunk and whatever
@@ -1010,7 +1027,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
          * have to fix that, because the disk image for the page that has a page index entry for the
          * WT_REF is about to be discarded.
          */
-        child_pindex = WT_INTL_INDEX_GET_SAFE(child);
+        WT_INTL_INDEX_GET_SAFE(child, child_pindex);
         child_incr = 0;
         for (child_refp = child_pindex->index, j = 0; j < slots; ++child_refp, ++page_refp, ++j)
             WT_ERR(__split_ref_move(session, page, page_refp, &page_decr, child_refp, &child_incr));
@@ -1039,7 +1056,10 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
      * Confirm the page's index hasn't moved, then update it, which makes the split visible to
      * threads descending the tree.
      */
-    WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(page) == pindex);
+#ifdef HAVE_DIAGNOSTIC
+    WT_INTL_INDEX_GET_SAFE(page, check_pindex);
+    WT_ASSERT(session, check_pindex == pindex);
+#endif
     WT_INTL_INDEX_SET(page, replace_index);
 
     /* Encourage a race */
@@ -1129,7 +1149,7 @@ err:
                 continue;
 
             child = ref->page;
-            child_pindex = WT_INTL_INDEX_GET_SAFE(child);
+            WT_INTL_INDEX_GET_SAFE(child, child_pindex);
             __wt_free(session, child_pindex);
             WT_INTL_INDEX_SET(child, NULL);
         }
@@ -1241,7 +1261,7 @@ __split_internal_should_split(WT_SESSION_IMPL *session, WT_REF *ref)
      * Our caller is holding the parent page locked to single-thread splits, which means we can
      * safely look at the page's index without setting a split generation.
      */
-    pindex = WT_INTL_INDEX_GET_SAFE(page);
+    WT_INTL_INDEX_GET_SAFE(page, pindex);
 
     /* Sanity check for a reasonable number of on-page keys. */
     if (pindex->entries < WT_INTERNAL_SPLIT_MIN_KEYS)

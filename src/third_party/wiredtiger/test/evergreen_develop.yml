@@ -51,6 +51,18 @@ buildvariants:
     <<: *ubuntu2004-perf-tests-expansions-template
     collection: AllPerfTestsARM64
 
+- <<: *perf-tasks-template
+  name: ubuntu2004-perf-tests-arm64-only
+  display_name: ~ Ubuntu 20.04 Performance tests (ARM64 only)
+  run_on:
+    - ubuntu2004-arm64-perf-testing
+  expansions:
+    <<: *ubuntu2004-perf-tests-expansions-template
+    collection: AllPerfTestsARM64
+  tasks:
+    - name: compile
+    - ".cppsuite-perf-test-arm"
+
 - name: documentation-update
   display_name: "~ Documentation update"
   batchtime: 10080 # 7 days

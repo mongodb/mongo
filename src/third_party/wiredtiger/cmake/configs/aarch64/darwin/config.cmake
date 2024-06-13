@@ -15,6 +15,8 @@ else()
     add_cmake_flag(CMAKE_CXX_FLAGS -march=armv8-a+crc)
 endif()
 
+# Disable cppsuite as it only runs on linux.
+set(ENABLE_CPPSUITE 0)
 check_c_compiler_flag("-moutline-atomics" has_moutline_atomics)
 
 # moutline-atomics preserves backwards compatibility with Arm v8.0 systems but also supports
