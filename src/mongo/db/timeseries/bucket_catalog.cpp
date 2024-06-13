@@ -127,8 +127,70 @@ std::pair<OID, Date_t> generateBucketId(const Date_t& time, const TimeseriesOpti
 }
 }  // namespace
 
-const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::kEmptyStats{
-    std::make_shared<BucketCatalog::ExecutionStats>()};
+void BucketCatalog::ExecutionStatsController::incNumBucketInserts(long long increment) {
+    _collectionStats->numBucketInserts.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketInserts.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketUpdates(long long increment) {
+    _collectionStats->numBucketUpdates.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketUpdates.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsOpenedDueToMetadata(
+    long long increment) {
+    _collectionStats->numBucketsOpenedDueToMetadata.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsOpenedDueToMetadata.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToCount(long long increment) {
+    _collectionStats->numBucketsClosedDueToCount.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsClosedDueToCount.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToSchemaChange(
+    long long increment) {
+    _collectionStats->numBucketsClosedDueToSchemaChange.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsClosedDueToSchemaChange.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToSize(long long increment) {
+    _collectionStats->numBucketsClosedDueToSize.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsClosedDueToSize.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToTimeForward(
+    long long increment) {
+    _collectionStats->numBucketsClosedDueToTimeForward.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsClosedDueToTimeForward.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToTimeBackward(
+    long long increment) {
+    _collectionStats->numBucketsClosedDueToTimeBackward.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsClosedDueToTimeBackward.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToMemoryThreshold(
+    long long increment) {
+    _collectionStats->numBucketsClosedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsClosedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumCommits(long long increment) {
+    _collectionStats->numCommits.fetchAndAddRelaxed(increment);
+    _globalStats->numCommits.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumWaits(long long increment) {
+    _collectionStats->numWaits.fetchAndAddRelaxed(increment);
+    _globalStats->numWaits.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumMeasurementsCommitted(long long increment) {
+    _collectionStats->numMeasurementsCommitted.fetchAndAddRelaxed(increment);
+    _globalStats->numMeasurementsCommitted.fetchAndAddRelaxed(increment);
+}
 
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
     return getBucketCatalog(svcCtx);
@@ -163,7 +225,6 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
     auto key = BucketKey{ns, BucketMetadata{metadata, comparator}};
 
     auto stats = _getExecutionStats(ns);
-    invariant(stats);
 
     auto timeElem = doc[options.getTimeField()];
     if (!timeElem || BSONType::Date != timeElem.type()) {
@@ -174,7 +235,7 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
 
     auto time = timeElem.Date();
 
-    BucketAccess bucket{this, key, options, stats.get(), time};
+    BucketAccess bucket{this, key, options, stats, time};
     invariant(bucket);
 
     NewFieldNames newFieldNamesToBeInserted;
@@ -188,21 +249,21 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
 
     auto isBucketFull = [&](BucketAccess* bucket) -> bool {
         if ((*bucket)->_numMeasurements == static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
-            stats->numBucketsClosedDueToCount.fetchAndAddRelaxed(1);
+            stats.incNumBucketsClosedDueToCount(1);
             return true;
         }
         if ((*bucket)->_size + sizeToBeAdded >
             static_cast<std::uint64_t>(gTimeseriesBucketMaxSize)) {
-            stats->numBucketsClosedDueToSize.fetchAndAddRelaxed(1);
+            stats.incNumBucketsClosedDueToSize(1);
             return true;
         }
         auto bucketTime = (*bucket)->getTime();
         if (time - bucketTime >= Seconds(*options.getBucketMaxSpanSeconds())) {
-            stats->numBucketsClosedDueToTimeForward.fetchAndAddRelaxed(1);
+            stats.incNumBucketsClosedDueToTimeForward();
             return true;
         }
         if (time < bucketTime) {
-            stats->numBucketsClosedDueToTimeBackward.fetchAndAddRelaxed(1);
+            stats.incNumBucketsClosedDueToTimeBackward();
             return true;
         }
         return false;
@@ -294,14 +355,14 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
     }
 
     auto& stats = batch->_stats;
-    stats->numCommits.fetchAndAddRelaxed(1);
+    stats.incNumCommits();
     if (batch->numPreviouslyCommittedMeasurements() == 0) {
-        stats->numBucketInserts.fetchAndAddRelaxed(1);
+        stats.incNumBucketInserts();
     } else {
-        stats->numBucketUpdates.fetchAndAddRelaxed(1);
+        stats.incNumBucketUpdates();
     }
 
-    stats->numMeasurementsCommitted.fetchAndAddRelaxed(batch->measurements().size());
+    stats.incNumMeasurementsCommitted(batch->measurements().size());
     if (bucket) {
         bucket->_numCommittedMeasurements += batch->measurements().size();
     }
@@ -407,8 +468,16 @@ void BucketCatalog::clear(StringData dbName) {
 }
 
 void BucketCatalog::appendExecutionStats(const NamespaceString& ns, BSONObjBuilder* builder) const {
-    const auto stats = _getExecutionStats(ns);
+    const std::shared_ptr<ExecutionStats> stats = _getExecutionStats(ns);
+    _appendExecutionStatsToBuilder(stats.get(), builder);
+}
 
+void BucketCatalog::appendGlobalExecutionStats(BSONObjBuilder* builder) const {
+    _appendExecutionStatsToBuilder(&_globalExecutionStats, builder);
+}
+
+void BucketCatalog::_appendExecutionStatsToBuilder(const ExecutionStats* stats,
+                                                   BSONObjBuilder* builder) const {
     builder->appendNumber("numBucketInserts", stats->numBucketInserts.load());
     builder->appendNumber("numBucketUpdates", stats->numBucketUpdates.load());
     builder->appendNumber("numBucketsOpenedDueToMetadata",
@@ -574,7 +643,7 @@ void BucketCatalog::_verifyBucketIsUnused(Bucket* bucket) const {
     stdx::lock_guard<Mutex> lk{bucket->_mutex};
 }
 
-void BucketCatalog::_expireIdleBuckets(ExecutionStats* stats) {
+void BucketCatalog::_expireIdleBuckets(ExecutionStatsController& stats) {
     // Must hold an exclusive lock on _bucketMutex from outside.
     stdx::unique_lock lk{_idleMutex};
 
@@ -594,7 +663,7 @@ void BucketCatalog::_expireIdleBuckets(ExecutionStats* stats) {
         }
 
         if (_removeBucket(bucket, true /* expiringBuckets */)) {
-            stats->numBucketsClosedDueToMemoryThreshold.fetchAndAddRelaxed(1);
+            stats.incNumBucketsClosedDueToMemoryThreshold(1);
         }
     }
 }
@@ -607,7 +676,7 @@ std::size_t BucketCatalog::_numberOfIdleBuckets() const {
 BucketCatalog::Bucket* BucketCatalog::_allocateBucket(const BucketKey& key,
                                                       const Date_t& time,
                                                       const TimeseriesOptions& options,
-                                                      ExecutionStats* stats,
+                                                      ExecutionStatsController& stats,
                                                       bool openedDuetoMetadata) {
     _expireIdleBuckets(stats);
 
@@ -639,7 +708,7 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(const BucketKey& key,
     }
 
     if (openedDuetoMetadata) {
-        stats->numBucketsOpenedDueToMetadata.fetchAndAddRelaxed(1);
+        stats.incNumBucketsOpenedDueToMetadata(1);
     }
 
     bucket->_minTime = roundedTime;
@@ -652,23 +721,25 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(const BucketKey& key,
     return bucket;
 }
 
-std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutionStats(
+BucketCatalog::ExecutionStatsController BucketCatalog::_getExecutionStats(
     const NamespaceString& ns) {
     {
         auto lock = _statsMutex.lockShared();
         auto it = _executionStats.find(ns);
         if (it != _executionStats.end()) {
-            return it->second;
+            return {it->second, &_globalExecutionStats};
         }
     }
 
     auto lock = _statsMutex.lockExclusive();
     auto res = _executionStats.emplace(ns, std::make_shared<ExecutionStats>());
-    return res.first->second;
+    return {res.first->second, &_globalExecutionStats};
 }
 
 const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutionStats(
     const NamespaceString& ns) const {
+    static const auto kEmptyStats{std::make_shared<ExecutionStats>()};
+
     auto lock = _statsMutex.lockShared();
 
     auto it = _executionStats.find(ns);
@@ -830,7 +901,7 @@ Date_t BucketCatalog::Bucket::getTime() const {
 }
 
 std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::Bucket::_activeBatch(
-    OperationId opId, const std::shared_ptr<ExecutionStats>& stats) {
+    OperationId opId, ExecutionStatsController& stats) {
     auto it = _batches.find(opId);
     if (it == _batches.end()) {
         it = _batches.try_emplace(opId, std::make_shared<WriteBatch>(_id, opId, stats)).first;
@@ -841,9 +912,9 @@ std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::Bucket::_activeBatch(
 BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog,
                                           BucketKey& key,
                                           const TimeseriesOptions& options,
-                                          ExecutionStats* stats,
+                                          ExecutionStatsController& stats,
                                           const Date_t& time)
-    : _catalog(catalog), _key(&key), _options(&options), _stats(stats), _time(&time) {
+    : _catalog(catalog), _key(&key), _options(&options), _stats(&stats), _time(&time) {
 
     auto bucketFound = [](BucketState bucketState) {
         return bucketState == BucketState::kNormal || bucketState == BucketState::kPrepared;
@@ -1031,7 +1102,7 @@ void BucketCatalog::BucketAccess::_create(const HashedBucketKey& normalizedKey,
                                           bool openedDuetoMetadata) {
     invariant(_options);
     _bucket =
-        _catalog->_allocateBucket(normalizedKey, *_time, *_options, _stats, openedDuetoMetadata);
+        _catalog->_allocateBucket(normalizedKey, *_time, *_options, *_stats, openedDuetoMetadata);
     _catalog->_openBuckets[nonNormalizedKey] = _bucket;
     _bucket->_nonNormalizedKeyMetadatas.push_back(nonNormalizedKey.key->metadata.toBSON());
     _acquire();
@@ -1106,16 +1177,16 @@ void BucketCatalog::BucketAccess::rollover(const std::function<bool(BucketAccess
 
 BucketCatalog::WriteBatch::WriteBatch(const OID& bucketId,
                                       OperationId opId,
-                                      const std::shared_ptr<ExecutionStats>& stats)
+                                      ExecutionStatsController& stats)
     : _bucketId{bucketId}, _opId(opId), _stats{stats} {}
 
 bool BucketCatalog::WriteBatch::claimCommitRights() {
     return !_commitRights.swap(true);
 }
 
-StatusWith<BucketCatalog::CommitInfo> BucketCatalog::WriteBatch::getResult() const {
+StatusWith<BucketCatalog::CommitInfo> BucketCatalog::WriteBatch::getResult() {
     if (!_promise.getFuture().isReady()) {
-        _stats->numWaits.fetchAndAddRelaxed(1);
+        _stats.incNumWaits(1);
     }
     return _promise.getFuture().getNoThrow();
 }
@@ -1269,6 +1340,10 @@ public:
                              static_cast<long long>(bucketCatalog._numberOfIdleBuckets()));
         builder.appendNumber("memoryUsage",
                              static_cast<long long>(bucketCatalog._memoryUsage.load()));
+
+        // Append the global execution stats for all namespaces.
+        bucketCatalog.appendGlobalExecutionStats(&builder);
+
         return builder.obj();
     }
 } bucketCatalogServerStatus;

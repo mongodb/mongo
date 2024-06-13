@@ -46,11 +46,48 @@
 namespace mongo {
 
 class BucketCatalog {
-    struct ExecutionStats;
-
     // Number of new field names we can hold in NewFieldNames without needing to allocate memory.
     static constexpr std::size_t kNumStaticNewFields = 10;
     using NewFieldNames = boost::container::small_vector<StringMapHashedKey, kNumStaticNewFields>;
+
+    struct ExecutionStats {
+        AtomicWord<long long> numBucketInserts;
+        AtomicWord<long long> numBucketUpdates;
+        AtomicWord<long long> numBucketsOpenedDueToMetadata;
+        AtomicWord<long long> numBucketsClosedDueToCount;
+        AtomicWord<long long> numBucketsClosedDueToSchemaChange;
+        AtomicWord<long long> numBucketsClosedDueToSize;
+        AtomicWord<long long> numBucketsClosedDueToTimeForward;
+        AtomicWord<long long> numBucketsClosedDueToTimeBackward;
+        AtomicWord<long long> numBucketsClosedDueToMemoryThreshold;
+        AtomicWord<long long> numCommits;
+        AtomicWord<long long> numWaits;
+        AtomicWord<long long> numMeasurementsCommitted;
+    };
+
+    class ExecutionStatsController {
+    public:
+        ExecutionStatsController(const std::shared_ptr<ExecutionStats>& collectionStats,
+                                 ExecutionStats* globalStats)
+            : _collectionStats(collectionStats), _globalStats(globalStats) {}
+
+        void incNumBucketInserts(long long increment = 1);
+        void incNumBucketUpdates(long long increment = 1);
+        void incNumBucketsOpenedDueToMetadata(long long increment = 1);
+        void incNumBucketsClosedDueToCount(long long increment = 1);
+        void incNumBucketsClosedDueToSchemaChange(long long increment = 1);
+        void incNumBucketsClosedDueToSize(long long increment = 1);
+        void incNumBucketsClosedDueToTimeForward(long long increment = 1);
+        void incNumBucketsClosedDueToTimeBackward(long long increment = 1);
+        void incNumBucketsClosedDueToMemoryThreshold(long long increment = 1);
+        void incNumCommits(long long increment = 1);
+        void incNumWaits(long long increment = 1);
+        void incNumMeasurementsCommitted(long long increment = 1);
+
+    private:
+        std::shared_ptr<ExecutionStats> _collectionStats;
+        ExecutionStats* _globalStats;
+    };
 
 public:
     class Bucket;
@@ -81,9 +118,7 @@ public:
     public:
         WriteBatch() = delete;
 
-        WriteBatch(const OID& bucketId,
-                   OperationId opId,
-                   const std::shared_ptr<ExecutionStats>& stats);
+        WriteBatch(const OID& bucketId, OperationId opId, ExecutionStatsController& stats);
 
         /**
          * Attempt to claim the right to commit (or abort) a batch. If it returns true, rights are
@@ -96,7 +131,7 @@ public:
          * Retrieve the result of the write batch commit. Should be called by any interested party
          * that does not have commit rights. Blocking.
          */
-        StatusWith<CommitInfo> getResult() const;
+        StatusWith<CommitInfo> getResult();
 
         const OID& bucketId() const;
 
@@ -151,7 +186,7 @@ public:
 
         const OID _bucketId;
         OperationId _opId;
-        std::shared_ptr<ExecutionStats> _stats;
+        ExecutionStatsController _stats;
 
         std::vector<BSONObj> _measurements;
         BSONObj _min;  // Batch-local min; full if first batch, updates otherwise.
@@ -248,6 +283,11 @@ public:
      * collision.
      */
     void resetBucketOIDCounter();
+
+    /**
+     * Appends the global execution stats for all namespaces to the builder.
+     */
+    void appendGlobalExecutionStats(BSONObjBuilder* builder) const;
 
 private:
     /**
@@ -380,8 +420,7 @@ public:
         /**
          * Return a pointer to the current, open batch.
          */
-        std::shared_ptr<WriteBatch> _activeBatch(OperationId opId,
-                                                 const std::shared_ptr<ExecutionStats>& stats);
+        std::shared_ptr<WriteBatch> _activeBatch(OperationId opId, ExecutionStatsController& stats);
 
         // Access to the bucket is controlled by this lock
         mutable Mutex _mutex =
@@ -443,20 +482,6 @@ public:
     };
 
 private:
-    struct ExecutionStats {
-        AtomicWord<long long> numBucketInserts;
-        AtomicWord<long long> numBucketUpdates;
-        AtomicWord<long long> numBucketsOpenedDueToMetadata;
-        AtomicWord<long long> numBucketsClosedDueToCount;
-        AtomicWord<long long> numBucketsClosedDueToSize;
-        AtomicWord<long long> numBucketsClosedDueToTimeForward;
-        AtomicWord<long long> numBucketsClosedDueToTimeBackward;
-        AtomicWord<long long> numBucketsClosedDueToMemoryThreshold;
-        AtomicWord<long long> numCommits;
-        AtomicWord<long long> numWaits;
-        AtomicWord<long long> numMeasurementsCommitted;
-    };
-
     enum class BucketState {
         // Bucket can be inserted into, and does not have an outstanding prepared commit
         kNormal,
@@ -566,7 +591,7 @@ private:
         BucketAccess(BucketCatalog* catalog,
                      BucketKey& key,
                      const TimeseriesOptions& options,
-                     ExecutionStats* stats,
+                     ExecutionStatsController& stats,
                      const Date_t& time);
         BucketAccess(BucketCatalog* catalog,
                      const OID& bucketId,
@@ -636,7 +661,7 @@ private:
         BucketCatalog* _catalog;
         BucketKey* _key = nullptr;
         const TimeseriesOptions* _options = nullptr;
-        ExecutionStats* _stats = nullptr;
+        ExecutionStatsController* _stats;
         const Date_t* _time = nullptr;
 
         Bucket* _bucket = nullptr;
@@ -690,7 +715,7 @@ private:
     /**
      * Expires idle buckets until the bucket catalog's memory usage is below the expiry threshold.
      */
-    void _expireIdleBuckets(ExecutionStats* stats);
+    void _expireIdleBuckets(ExecutionStatsController& stats);
 
     std::size_t _numberOfIdleBuckets() const;
 
@@ -698,11 +723,13 @@ private:
     Bucket* _allocateBucket(const BucketKey& key,
                             const Date_t& time,
                             const TimeseriesOptions& options,
-                            ExecutionStats* stats,
+                            ExecutionStatsController& stats,
                             bool openedDuetoMetadata);
 
-    std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns);
+    ExecutionStatsController _getExecutionStats(const NamespaceString& ns);
     const std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns) const;
+
+    void _appendExecutionStatsToBuilder(const ExecutionStats* stats, BSONObjBuilder* builder) const;
 
     /**
      * Changes the bucket state, taking into account the current state, the specified target state,
@@ -760,11 +787,11 @@ private:
     // Per-namespace execution stats.
     stdx::unordered_map<NamespaceString, std::shared_ptr<ExecutionStats>> _executionStats;
 
-    // A placeholder to be returned in case a namespace has no allocated statistics object
-    static const std::shared_ptr<ExecutionStats> kEmptyStats;
-
     // Counter for buckets created by the bucket catalog.
     uint64_t _bucketNum = 0;
+
+    // Global execution stats used to report aggregated metrics in server status.
+    ExecutionStats _globalExecutionStats;
 
     // Approximate memory usage of the bucket catalog.
     AtomicWord<uint64_t> _memoryUsage;
