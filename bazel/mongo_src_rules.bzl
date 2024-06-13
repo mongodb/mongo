@@ -1,6 +1,5 @@
 # config selection
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 
 # Common mongo-specific bazel build rules intended to be used in individual BUILD files in the "src/" subtree.
 load("@poetry//:dependencies.bzl", "dependency")
@@ -1226,6 +1225,9 @@ def mongo_cc_library(
     if "allocator" not in skip_global_deps:
         deps += TCMALLOC_DEPS
 
+    if native.package_name().startswith("src/mongo"):
+        hdrs = hdrs + ["//:mongo_config_header"]
+
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
     package_specific_copts = package_specific_copt(native.package_name())
@@ -1385,6 +1387,9 @@ def mongo_cc_binary(
         fail("""Linking specific targets statically is not supported.
         The mongo build must link entirely statically or entirely dynamically.
         This can be configured via //config/bazel:linkstatic.""")
+
+    if native.package_name().startswith("src/mongo"):
+        srcs = srcs + ["//:mongo_config_header"]
 
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)

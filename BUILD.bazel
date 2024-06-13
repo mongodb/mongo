@@ -1,4 +1,5 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//bazel/config:mongo_config_header.bzl", "mongo_config_header")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -34,4 +35,11 @@ genrule(
     sed -i 's|@MONGO_BUILD_DIR@|$(RULEDIR)/src/mongo|g' $@
     """,
     visibility = ["//visibility:public"],
+)
+
+mongo_config_header(
+    name = "mongo_config_header",
+    # TODO(SERVER-91399): Change "mongo/config_dummy.h" -> "mongo/config.h" after all compiler checks in
+    # SCons have been ported to Bazel
+    output = "mongo/config_dummy.h",
 )

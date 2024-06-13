@@ -40,6 +40,18 @@ load(
 
 package(default_visibility = ["//visibility:public"])
 
+# Expose script for external usage through bazel.
+exports_files([
+    "generate_config_header.py",
+])
+
+filegroup(
+    name = "generate_config_header",
+    srcs = [
+        "generate_config_header.py",
+    ],
+)
+
 # --------------------------------------
 # Compiler types
 # --------------------------------------
