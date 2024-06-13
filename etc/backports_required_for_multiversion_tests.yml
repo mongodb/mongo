@@ -619,6 +619,8 @@ last-continuous:
     ticket: SERVER-87961
   - test_file: jstests/core/query/in_expression_plan_cache.js
     ticket: SERVER-83712
+  - test_file: jstests/core/index/index_count_scan.js
+    ticket: SERVER-90461
   - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_negative.js
     ticket: SERVER-90833
   - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
