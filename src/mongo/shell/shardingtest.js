@@ -1273,6 +1273,15 @@ var ShardingTest = function ShardingTest(params) {
         return numNodesPerReplSet.reduce((a, b) => a + b, 0);
     }
 
+    /**
+     * Returns all nodes in the cluster including shards, config servers and mongoses.
+     */
+    ShardingTest.prototype.getAllNodes = function() {
+        let nodes = [];
+        nodes.concat([this._configDB, this._connections, this._mongos]);
+        return [...new Set(nodes)];
+    };
+
     // ShardingTest initialization
 
     assert(isObject(params), 'ShardingTest configuration must be a JSON object');

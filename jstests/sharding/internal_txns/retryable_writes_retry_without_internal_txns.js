@@ -5,6 +5,7 @@
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
 import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
@@ -25,12 +26,18 @@ function setUpTestMode(mode) {
         st.rs0.stopSet(null /* signal */, true /*forRestart */);
         st.rs0.startSet({restart: true});
         const newPrimary = st.rs0.getPrimary();
+        st.getAllNodes().forEach((conn) => {
+            awaitRSClientHosts(conn, {host: newPrimary.host}, {ok: true, ismaster: true});
+        });
     } else if (mode == kTestMode.kFailover) {
         const oldPrimary = st.rs0.getPrimary();
         assert.commandWorked(
             oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
         assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
         const newPrimary = st.rs0.getPrimary();
+        st.getAllNodes().forEach((conn) => {
+            awaitRSClientHosts(conn, {host: newPrimary.host}, {ok: true, ismaster: true});
+        });
     }
 }
 
