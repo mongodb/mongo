@@ -132,7 +132,10 @@ if jsEngine:
 
     scriptingEnv.CppUnitTest(
         target='scripting_mozjs_test',
-        source=['mozjs/module_loader_test.cpp'],
+        source=[
+            'mozjs/asan_handles_test.cpp',
+            'mozjs/module_loader_test.cpp',
+        ],
         LIBDEPS=[
             'bson_template_evaluator',
             'scripting',
