@@ -358,29 +358,12 @@ TEST_F(QueryPlannerTest, SparseIndexCannotSupportEqualsNull) {
 
     runQuery(fromjson("{i: {$eq: null}}"));
     assertHasOnlyCollscan();
-}
-
-// TODO: SERVER-37164: The semantics of {$gte: null} and {$lte: null} are inconsistent with and
-// without a sparse index. It is unclear whether or not a sparse index _should_ be able to support
-// these operations.
-TEST_F(QueryPlannerTest, SparseIndexCanSupportGTEOrLTENull) {
-    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
-    addIndex(BSON("i" << 1),
-             false,  // multikey
-             true    // sparse
-    );
 
     runQuery(fromjson("{i: {$gte: null}}"));
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: {i: {$gte: null}}, node: {ixscan: {pattern: "
-        "{i: 1}, bounds: {i: [[null,null,true,true]]}}}}}");
+    assertHasOnlyCollscan();
 
     runQuery(fromjson("{i: {$lte: null}}"));
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: {i: {$lte: null}}, node: {ixscan: {pattern: "
-        "{i: 1}, bounds: {i: [[null,null,true,true]]}}}}}");
+    assertHasOnlyCollscan();
 }
 
 TEST_F(QueryPlannerTest, PlannerCanUseIndexesWithSameKeyButDifferentSparseProperty) {
