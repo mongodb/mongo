@@ -7,6 +7,7 @@
  *  assumes_balancer_off,
  *  requires_non_retryable_writes,
  *  does_not_support_transactions,
+ *  requires_fcv_51,
  * ]
  */
 load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers
