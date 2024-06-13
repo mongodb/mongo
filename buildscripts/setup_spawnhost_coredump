@@ -61,7 +61,7 @@ else
 
     # Write this file that gets cat'ed on login to communicate to users logging in if this setup script is still running.
     echo '+-----------------------------------------------------------------------------------+' > ~/.setup_spawnhost_coredump_progress
-    echo '| The setup script is still setting up data files for inspection on a [${machine}] host. |' >> ~/.setup_spawnhost_coredump_progress
+    echo "| The setup script is still setting up data files for inspection on a [${machine}] host. |" >> ~/.setup_spawnhost_coredump_progress
     echo '+-----------------------------------------------------------------------------------+' >> ~/.setup_spawnhost_coredump_progress
 
     cat >> ~/.profile <<EOF
@@ -156,4 +156,45 @@ EOF
     # Alert currently logged in users that this setup script has completed. Logging back in will ensure any
     # paths/environment variables will be set as intended.
     wall "The setup_spawnhost_coredump script has completed, please relogin to ensure the right environment variables are set."
+fi
+
+# Send a Slack notification as the very last thing the setup_spawnhost_coredump script does.
+# This way a Server engineer can temporarily forget about the Evergreen host they spawned until the
+# paths and environment variables are configured as intended for when they first connect.
+if [[ "${machine}" = "Cygwin" ]]; then
+    # The setup_spawnhost_coredump script runs as the mci-exec user on Windows hosts. However,
+    # Server engineers log in as the Administrator user.
+    ssh_user="Administrator"
+    # The Evergreen binary only expects a Windows path. The rest of Cygwin is flexible about it
+    # being a Cygwin path or a Windows path so we do the conversion here.
+    evg_credentials_pathname=$(cygpath -w ~Administrator/.evergreen.yml)
+    evg_binary_pathname=~Administrator/cli_bin/evergreen
+else
+    ssh_user=$(whoami)
+    evg_credentials_pathname=~/.evergreen.yml
+    evg_binary_pathname=evergreen
+fi
+
+slack_user=$(awk '{if ($1 == "user:") print $2}' "$evg_credentials_pathname")
+# Refer to the https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
+# documentation for more information on the AWS instance metadata endpoints.
+aws_metadata_svc="http://169.254.169.254"
+aws_token=$(curl -s -X PUT "$aws_metadata_svc/latest/api/token" -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')
+ssh_host=$(curl -s -H "X-aws-ec2-metadata-token: $aws_token" "$aws_metadata_svc/latest/meta-data/public-hostname")
+if [[ "${machine}" = "Cygwin" ]]; then
+    slack_message=$(printf "The setup_spawnhost_coredump script has finished setting things up. \
+Please use Windows Remote Desktop with\n\
+1. PC name: $ssh_host\n\
+2. User account: $ssh_user\n\
+3. The RDP password configured under the edit dialog at https://spruce.mongodb.com/spawn/host\n\
+to log in.")
+else
+    slack_message="The setup_spawnhost_coredump script has finished setting things up. Please run "'```'"ssh $ssh_user@$ssh_host"'```'" to log in."
+fi
+
+# The Evergreen spawn host is expected to be provisioned with the user's .evergreen.yml credentials.
+# But in case something unexpected happens we don't want the setup_spawnhost_coredump script itself
+# to error.
+if [[ -n "${slack_user}" ]]; then
+    "$evg_binary_pathname" --config "$evg_credentials_pathname" notify slack -t "@$slack_user" -m "$slack_message"
 fi
