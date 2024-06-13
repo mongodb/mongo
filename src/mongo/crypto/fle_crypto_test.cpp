@@ -59,6 +59,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/encryption_fields_validation.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
@@ -5078,10 +5079,15 @@ public:
                                        const T& ub,
                                        const boost::optional<std::uint32_t>& precision,
                                        int sparsity,
-                                       GetEdges getEdges) {
+                                       GetEdges getEdges,
+                                       BSONType fieldType) {
         const auto edges = [&] {
             if constexpr (std::is_same_v<T, double> || std::is_same_v<T, Decimal128>) {
                 return getEdges(lb, lb, ub, precision, sparsity, 0);
+            } else if constexpr (std::is_same_v<T, Date_t>) {
+                auto lbInMillis = lb.toMillisSinceEpoch();
+                auto ubInMillis = ub.toMillisSinceEpoch();
+                return getEdges(lbInMillis, lbInMillis, ubInMillis, sparsity, 0);
             } else {
                 return getEdges(lb, lb, ub, sparsity, 0);
             }
@@ -5090,7 +5096,7 @@ public:
         // The actual size of edges should be equal to edges->size(). This is a sanity check.
         ASSERT_EQ(expect, edges->size());
         const auto calculated =
-            getEdgesLength(makeRangeQueryTypeConfig(lb, ub, precision, sparsity));
+            getEdgesLength(fieldType, makeRangeQueryTypeConfig(lb, ub, precision, sparsity));
         if (expect != calculated) {
             // Context for the exception we're about to throw.
             LOGV2(8574790,
@@ -5107,7 +5113,7 @@ public:
     }
 
     template <typename T, typename GetEdges>
-    static void runEdgesLengthTestForFunamentalType(GetEdges getEdges) {
+    static void runEdgesLengthTestForFunamentalType(GetEdges getEdges, BSONType fieldType) {
         constexpr auto low = std::numeric_limits<T>::lowest();
         constexpr auto max = std::numeric_limits<T>::max();
 
@@ -5150,7 +5156,34 @@ public:
                         continue;
                     }
                     for (const auto& precision : testPrecisions) {
-                        assertEdgesLengthMatch(lb, ub, precision, sparsity, getEdges);
+                        boost::optional<ErrorCodes::Error> thrownCode;
+                        if constexpr (std::is_same_v<T, double>) {
+                            // getEdgesLength will throw if the precision is invalid for the
+                            // min & max.
+                            // Here we do a pre-check to see if that validation will fail on those
+                            // assertions, and if so, also assert that the same error code is thrown
+                            // by the test.
+                            try {
+                                auto qtc = makeRangeQueryTypeConfig(lb, ub, precision, sparsity);
+                                validateRangeIndex(BSONType::NumberDouble, qtc);
+                            } catch (DBException& e) {
+                                if (e.code() == 6966805 || e.code() == 6966806) {
+                                    thrownCode = e.code();
+                                } else {
+                                    throw;
+                                }
+                            }
+                        }
+                        try {
+                            assertEdgesLengthMatch(
+                                lb, ub, precision, sparsity, getEdges, fieldType);
+                        } catch (DBException& e) {
+                            if (thrownCode) {
+                                ASSERT_EQ(e.code(), *thrownCode);
+                            } else {
+                                throw;
+                            }
+                        }
                     }
                 }
             }
@@ -5159,15 +5192,15 @@ public:
 };
 
 TEST_F(EdgeTestFixture, getEdgesLengthInt32) {
-    runEdgesLengthTestForFunamentalType<int32_t>(getEdgesInt32);
+    runEdgesLengthTestForFunamentalType<int32_t>(getEdgesInt32, BSONType::NumberInt);
 }
 
 TEST_F(EdgeTestFixture, getEdgesLengthInt64) {
-    runEdgesLengthTestForFunamentalType<int64_t>(getEdgesInt64);
+    runEdgesLengthTestForFunamentalType<int64_t>(getEdgesInt64, BSONType::NumberLong);
 }
 
 TEST_F(EdgeTestFixture, getEdgesLengthDouble) {
-    runEdgesLengthTestForFunamentalType<double>(getEdgesDouble);
+    runEdgesLengthTestForFunamentalType<double>(getEdgesDouble, BSONType::NumberDouble);
 }
 
 // Decimal128 is less well templated than the fundamental types,
@@ -5198,7 +5231,8 @@ TEST_F(EdgeTestFixture, getEdgesLengthDecimal128) {
                 }
                 for (std::uint32_t precision = 1; precision <= kMaxPrecisionDecimal128;
                      ++precision) {
-                    assertEdgesLengthMatch(lb, ub, precision, sparsity, getEdgesDecimal128);
+                    assertEdgesLengthMatch(
+                        lb, ub, precision, sparsity, getEdgesDecimal128, BSONType::NumberDecimal);
                 }
             }
         }
@@ -5220,11 +5254,8 @@ TEST_F(EdgeTestFixture, getEdgesLengthDate) {
                 if (lb >= ub) {
                     continue;
                 }
-                assertEdgesLengthMatch(lb.toMillisSinceEpoch(),
-                                       ub.toMillisSinceEpoch(),
-                                       boost::none,
-                                       sparsity,
-                                       getEdgesInt64);
+                assertEdgesLengthMatch(
+                    lb, ub, boost::none, sparsity, getEdgesInt64, BSONType::Date);
             }
         }
     }

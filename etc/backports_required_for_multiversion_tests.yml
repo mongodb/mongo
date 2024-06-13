@@ -276,4 +276,28 @@ last-lts:
       ticket: SERVER-91114
     - test_file: jstests/aggregation/sources/redact/root_redact.js
       ticket: SERVER-91339
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_create_collection.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_delete_range.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_find_and_modify_range.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_insert_range.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_update_range.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/compact_collection_range.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_range_explain_collscan.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/range/one_sided_agg.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/range/one_sided_find.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/range/trim_factor.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/range/two_sided_agg.js
+      ticket: SERVER-91075
+    - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/range/two_sided_find.js
+      ticket: SERVER-91075
   suites: null

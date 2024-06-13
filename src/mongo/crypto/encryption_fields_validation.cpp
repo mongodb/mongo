@@ -61,6 +61,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 Value coerceValueToRangeIndexTypes(Value val, BSONType fieldType) {
     BSONType valType = val.getType();
 
@@ -164,6 +166,33 @@ uint32_t getNumberOfBitsInDomain(const boost::optional<Decimal128>& min,
         return 0;
     }
 }
+
+std::int64_t getRangeSparsityDefault() {
+    // TODO: SERVER-91077 change to a more suitable default value
+    return 1;
+}
+
+std::pair<mongo::Value, mongo::Value> getRangeMinMaxDefaults(BSONType fieldType) {
+    switch (fieldType) {
+        case NumberDouble:
+            return {mongo::Value(std::numeric_limits<double>::lowest()),
+                    mongo::Value(std::numeric_limits<double>::max())};
+        case NumberDecimal:
+            return {mongo::Value(Decimal128::kLargestNegative),
+                    mongo::Value(Decimal128::kLargestPositive)};
+        case NumberInt:
+            return {mongo::Value(std::numeric_limits<int>::min()),
+                    mongo::Value(std::numeric_limits<int>::max())};
+        case NumberLong:
+            return {mongo::Value(std::numeric_limits<long long>::min()),
+                    mongo::Value(std::numeric_limits<long long>::max())};
+        case Date:
+            return {mongo::Value(Date_t::min()), mongo::Value(Date_t::max())};
+        default:
+            uasserted(7018202, "Range index only supports numeric types and the Date type.");
+    }
+    MONGO_UNREACHABLE;
+}
 }  // namespace
 
 uint32_t getNumberOfBitsInDomain(BSONType fieldType,
@@ -222,104 +251,77 @@ void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query) {
                           << "' is not a supported range indexed type",
             isFLE2RangeIndexedSupportedType(fieldType));
 
-    uassert(6775202,
-            "The field 'sparsity' is missing but required for range index",
-            query.getSparsity().has_value());
-    uassert(6775214,
-            "The field 'sparsity' must be between 1 and 4",
-            query.getSparsity().value() >= 1 && query.getSparsity().value() <= 4);
+    auto& indexMin = query.getMin();
+    auto& indexMax = query.getMax();
 
+    if (query.getSparsity().has_value()) {
+        uassert(6775214,
+                "The field 'sparsity' must be between 1 and 4",
+                query.getSparsity().value() >= 1 && query.getSparsity().value() <= 4);
+    }
 
-    switch (fieldType) {
-        case NumberDouble:
-        case NumberDecimal: {
-            if (!((query.getMin().has_value() == query.getMax().has_value()) &&
-                  (query.getMin().has_value() == query.getPrecision().has_value()))) {
-                uasserted(6967100,
-                          str::stream() << "Precision, min, and max must all be specified "
-                                        << "together for floating point fields");
-            }
+    if (indexMin) {
+        uassert(7018200,
+                "Range field type '{}' does not match the min value type '{}'"_format(
+                    typeName(fieldType), typeName(indexMin->getType())),
+                fieldType == indexMin->getType());
+    }
+    if (indexMax) {
+        uassert(7018201,
+                "Range field type '{}' does not match the max value type '{}'"_format(
+                    typeName(fieldType), typeName(indexMax->getType())),
+                fieldType == indexMax->getType());
+    }
+    if (indexMin && indexMax) {
+        uassert(6720005,
+                "Min must be less than max.",
+                Value::compare(*indexMin, *indexMax, nullptr) < 0);
+    }
 
-            if (!query.getMin().has_value()) {
-                if (fieldType == NumberDouble) {
-                    query.setMin(mongo::Value(std::numeric_limits<double>::lowest()));
-                    query.setMax(mongo::Value(std::numeric_limits<double>::max()));
-                } else {
-                    query.setMin(mongo::Value(Decimal128::kLargestNegative));
-                    query.setMax(mongo::Value(Decimal128::kLargestPositive));
-                }
-            }
-
-            if (query.getPrecision().has_value()) {
-                uint32_t precision = query.getPrecision().value();
-                if (fieldType == NumberDouble) {
-                    uassert(
-                        6966805,
+    if (fieldType == NumberDouble || fieldType == NumberDecimal) {
+        if (!((indexMin.has_value() == indexMax.has_value()) &&
+              (indexMin.has_value() == query.getPrecision().has_value()))) {
+            uasserted(6967100,
+                      str::stream() << "Precision, min, and max must all be specified "
+                                    << "together for floating point fields");
+        }
+        if (query.getPrecision().has_value()) {
+            uint32_t precision = query.getPrecision().value();
+            if (fieldType == NumberDouble) {
+                uassert(6966805,
                         "The number of decimal digits for minimum value must be less than or equal "
                         "to precision",
                         validateDoublePrecisionRange(query.getMin()->coerceToDouble(), precision));
-                    uassert(
-                        6966806,
+                uassert(6966806,
                         "The number of decimal digits for maximum value must be less than or equal "
                         "to precision",
                         validateDoublePrecisionRange(query.getMax()->coerceToDouble(), precision));
 
-                } else {
-                    auto minDecimal = query.getMin()->coerceToDecimal();
-                    uassert(6966807,
-                            "The number of decimal digits for minimum value must be less than or "
-                            "equal to precision",
-                            validateDecimal128PrecisionRange(minDecimal, precision));
-                    auto maxDecimal = query.getMax()->coerceToDecimal();
-                    uassert(6966808,
-                            "The number of decimal digits for maximum value must be less than or "
-                            "equal to precision",
-                            validateDecimal128PrecisionRange(maxDecimal, precision));
-                }
+            } else {
+                auto minDecimal = query.getMin()->coerceToDecimal();
+                uassert(6966807,
+                        "The number of decimal digits for minimum value must be less than or "
+                        "equal to precision",
+                        validateDecimal128PrecisionRange(minDecimal, precision));
+                auto maxDecimal = query.getMax()->coerceToDecimal();
+                uassert(6966808,
+                        "The number of decimal digits for maximum value must be less than or "
+                        "equal to precision",
+                        validateDecimal128PrecisionRange(maxDecimal, precision));
             }
         }
-            // We want to perform the same validation after sanitizing floating
-            // point parameters, so we call FMT_FALLTHROUGH here.
-
-            FMT_FALLTHROUGH;
-        case NumberInt:
-        case NumberLong:
-        case Date: {
-            uassert(6775203,
-                    "The field 'min' is missing but required for range index",
-                    query.getMin().has_value());
-            uassert(6775204,
-                    "The field 'max' is missing but required for range index",
-                    query.getMax().has_value());
-
-            auto indexMin = query.getMin().value();
-            auto indexMax = query.getMax().value();
-
-            uassert(7018200,
-                    "Min should have the same type as the field.",
-                    fieldType == indexMin.getType());
-            uassert(7018201,
-                    "Max should have the same type as the field.",
-                    fieldType == indexMax.getType());
-
-            uassert(6720005,
-                    "Min must be less than max.",
-                    Value::compare(indexMin, indexMax, nullptr) < 0);
-        }
-
-        break;
-        default:
-            uasserted(7018202, "Range index only supports numeric types and the Date type.");
     }
 
     if (gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         query.getTrimFactor().has_value()) {
         uint32_t tf = query.getTrimFactor().value();
+
+        auto [defMin, defMax] = getRangeMinMaxDefaults(fieldType);
         uint32_t bits = getNumberOfBitsInDomain(
             fieldType,
-            query.getMin().value(),
-            query.getMax().value(),
+            query.getMin().value_or(defMin),
+            query.getMax().value_or(defMax),
             query.getPrecision().map([](int32_t i) { return (uint32_t)(i); }));
         // We allow the case where #bits = TF = 0.
         uassert(8574000,
@@ -449,6 +451,19 @@ bool validateDecimal128PrecisionRange(Decimal128& dec, uint32_t precision) {
     Decimal128 trunc_integer = maybe_integer.round(Decimal128::kRoundTowardZero);
 
     return maybe_integer == trunc_integer;
+}
+
+void setRangeDefaults(BSONType fieldType, QueryTypeConfig* queryp) {
+    auto& query = *queryp;
+
+    // Make sure the QueryTypeConfig is valid before setting defaults
+    validateRangeIndex(fieldType, query);
+
+    auto [defMin, defMax] = getRangeMinMaxDefaults(fieldType);
+    auto defSparsity = getRangeSparsityDefault();
+    query.setMin(query.getMin().value_or(defMin));
+    query.setMax(query.getMax().value_or(defMax));
+    query.setSparsity(query.getSparsity().value_or(defSparsity));
 }
 
 }  // namespace mongo

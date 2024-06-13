@@ -118,6 +118,7 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
  */
 void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              const NamespaceString& escNss,
+                             BSONType fieldType,
                              const QueryTypeConfig& queryTypeConfig,
                              double anchorPaddingFactor,
                              std::size_t uniqueLeaves,
