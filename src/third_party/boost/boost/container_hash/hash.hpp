@@ -129,7 +129,7 @@ namespace boost
         };
 #else
         template <typename T>
-        struct hash_base : std::unary_function<T, std::size_t> {};
+        struct hash_base : std::__unary_function<T, std::size_t> {};
 #endif
 
         struct enable_hash_value { typedef std::size_t type; };

@@ -799,9 +799,9 @@ class async_result<detail::packaged_token<Function, Allocator>, Result(Args...)>
 public:
   explicit async_result(
     typename detail::packaged_async_result<Function, Allocator,
-      typename result_of<Function(Args...)>::type>::completion_handler_type& h)
+      typename boost::result_of<Function(Args...)>::type>::completion_handler_type& h)
     : detail::packaged_async_result<Function, Allocator,
-        typename result_of<Function(Args...)>::type>(h)
+        typename boost::result_of<Function(Args...)>::type>(h)
   {
   }
 };
