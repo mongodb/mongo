@@ -22,6 +22,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const historyWindowSecs = 10;
+const testMarginSecs = 1;
 const st = new ShardingTest({
     shards: {rs0: {nodes: 1}},
     other: {rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: historyWindowSecs}}}
@@ -48,14 +49,14 @@ jsTestLog(`Inserted document at ${tojson(insertTS)}`);
 
 const fp = configureFailPoint(primary, "waitInFindBeforeMakingBatch", {nss: "test.test"});
 
-function read(insertTS, enableCausal, retries) {
-    assert.lt(retries, 10);
+function read(insertTS, enableCausal, updatedValue, retries) {
+    assert.lte(retries, 60);
     const readConcern = {level: "snapshot"};
     if (enableCausal) {
         readConcern.afterClusterTime = insertTS;
     }
 
-    let result = assert.commandWorked(db.runCommand({
+    const result = assert.commandWorked(db.runCommand({
         find: "test",
         filter: {_id: 0},
         projection: {
@@ -68,22 +69,28 @@ function read(insertTS, enableCausal, retries) {
     }));
 
     jsTestLog(`find result for enableCausal=${enableCausal}: ${tojson(result)}`);
-    let act = result.cursor.atClusterTime;
+    const act = result.cursor.atClusterTime;
     assert.gte(act, insertTS);
-
-    if (act < TestData.updateTS) {
-        let sleepMS = 1000;
-        jsTestLog(`atClusterTime=${act} has not caught up to updateTS=${
-            TestData.updateTS}. Will retry in ${sleepMS}ms.`);
+    const firstResult = result.cursor.firstBatch[0];
+    assert.eq(firstResult["_id"], 0);
+    // The fundamental problem with this test is that we don't know if we have reached updateTS or
+    // not because we cannot pass updateTS to the shells after they have started. The only guarantee
+    // (modulo a bug) is that we have reached insertTS. Therefore, we retry the read until we see
+    // the update.
+    if (firstResult["x"] === null) {
+        const sleepMS = 1000;
+        jsTestLog(`Wait ${sleepMS}ms for the clusterTime to catch up (retries: ${retries})`);
         sleep(sleepMS);
-        return read(insertTS, enableCausal, retries + 1);
+        return read(insertTS, enableCausal, updatedValue, retries + 1);
     }
-
-    assert.eq(result.cursor.firstBatch[0], {_id: 0, x: "updatedValue"});
+    assert.eq(firstResult["x"], updatedValue);
 }
 
-const waitForShell = startParallelShell(funWithArgs(read, insertTS, false, 0), st.s.port);
-const waitForShellCausal = startParallelShell(funWithArgs(read, insertTS, true, 0), st.s.port);
+const updatedValue = "updatedValue";
+const waitForShell =
+    startParallelShell(funWithArgs(read, insertTS, false, updatedValue, 0), st.s.port);
+const waitForShellCausal =
+    startParallelShell(funWithArgs(read, insertTS, true, updatedValue, 0), st.s.port);
 
 jsTestLog("Wait for shells to hit waitInFindBeforeMakingBatch failpoint");
 fp.wait(kDefaultWaitForFailPointTimeout, 2);
@@ -91,21 +98,22 @@ fp.wait(kDefaultWaitForFailPointTimeout, 2);
 jsTestLog("Update document");
 result = mongosDB.runCommand({
     update: "test",
-    updates: [{q: {_id: 0}, u: {$set: {x: "updatedValue"}}}],
+    updates: [{q: {_id: 0}, u: {$set: {x: updatedValue}}}],
     writeConcern: {w: "majority"}
 });
 
-TestData.updateTS = assert.commandWorked(result).operationTime;
-jsTestLog(`Updated document at updateTS ${tojson(TestData.updateTS)}`);
-assert.gt(TestData.updateTS, insertTS);
+const updateTS = assert.commandWorked(result).operationTime;
+jsTestLog(`Updated document at updateTS ${tojson(updateTS)}`);
+assert.gt(updateTS, insertTS);
 
 jsTestLog("Sleep until updateTS is older than historyWindowSecs");
-const testMarginMS = 1000;
-sleep(historyWindowSecs * 1000 + testMarginMS);
+sleep((historyWindowSecs + testMarginSecs) * 1000);
 
 jsTestLog("Trigger history cleanup with a w-majority insert");
-assert.commandWorked(
+result = assert.commandWorked(
     mongosDB.runCommand({insert: "test", documents: [{_id: 1}], writeConcern: {w: "majority"}}));
+const historyCleanupTS = result.operationTime;
+jsTestLog(`History cleanup at ${tojson(historyCleanupTS)}`);
 
 jsTestLog("Disable failpoint");
 fp.off();
