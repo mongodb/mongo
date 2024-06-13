@@ -144,10 +144,6 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
     }
 
     if (BSONElement prepareUniqueElement = _infoObj[kPrepareUniqueFieldName]) {
-        uassert(
-            ErrorCodes::InvalidOptions,
-            "Index does not support the 'prepareUnique' field",
-            feature_flags::gCollModIndexUnique.isEnabled(serverGlobalParams.featureCompatibility));
         _prepareUnique = prepareUniqueElement.trueValue();
     }
 
