@@ -536,6 +536,7 @@ def convert_cert_to_pkcs12(cert):
     args = [
         "openssl",
         "pkcs12",
+        "-legacy",
         "-export",
         "-in",
         src,
