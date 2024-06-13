@@ -625,6 +625,8 @@ last-continuous:
     ticket: SERVER-90833
   - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
     ticket: SERVER-91114
+  - test_file: jstests/aggregation/sources/redact/root_redact.js
+    ticket: SERVER-91339
   suites: null
 last-lts:
   all:
@@ -1304,4 +1306,6 @@ last-lts:
     ticket: SERVER-89994
   - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
     ticket: SERVER-91114
+  - test_file: jstests/aggregation/sources/redact/root_redact.js
+    ticket: SERVER-91339
   suites: null
