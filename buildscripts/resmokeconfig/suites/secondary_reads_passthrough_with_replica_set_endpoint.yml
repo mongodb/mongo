@@ -69,7 +69,7 @@ selector:
     - jstests/core/query/explain/explain_missing_database.js
     # This test runs {find: uuid} commands which are not supported for replica set endpoints.
     - jstests/core/commands_with_uuid.js
-    # TODO (SERVER-84091): cloneCollectionAsCapped command stops working after a replica set
+    # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
     # is bootstrapped as a sharded cluster.
     - jstests/core/collation.js
     - jstests/core/ddl/capped_convertToCapped1.js

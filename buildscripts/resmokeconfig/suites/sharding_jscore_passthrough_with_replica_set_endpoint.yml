@@ -48,7 +48,7 @@ selector:
     - jstests/core/write/update/update_metrics.js
     # This test runs {find: uuid} commands which are not supported for replica set endpoints.
     - jstests/core/commands_with_uuid.js
-    # TODO (SERVER-84091): cloneCollectionAsCapped command stops working after a replica set
+    # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
     # is bootstrapped as a sharded cluster.
     - jstests/core/collation.js
     # Test expects changes in metrics (rejected command count), but these are
