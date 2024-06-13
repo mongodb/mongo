@@ -631,7 +631,6 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
 
 void WiredTigerKVEngine::notifyStorageStartupRecoveryComplete() {
     unpinOldestTimestamp(kPinOldestTimestampAtStartupName);
-    WiredTigerUtil::notifyStorageStartupRecoveryComplete();
 }
 
 void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opCtx) {

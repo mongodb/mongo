@@ -398,8 +398,6 @@ public:
                                      std::vector<std::string>& errors,
                                      std::vector<std::string>& warnings);
 
-    static void notifyStorageStartupRecoveryComplete();
-
     static bool useTableLogging(const NamespaceString& nss);
 
     static Status setTableLogging(WiredTigerRecoveryUnit&, const std::string& uri, bool on);

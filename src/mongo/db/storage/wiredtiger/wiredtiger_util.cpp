@@ -126,32 +126,9 @@ namespace {
 // TODO SERVER-81069: Remove this.
 MONGO_FAIL_POINT_DEFINE(allowEncryptionOptionsInCreationString);
 
-const std::string kTableChecksFileName = "_wt_table_checks";
 const std::string kTableExtension = ".wt";
 const std::string kWiredTigerBackupFile = "WiredTiger.backup";
 const static StaticImmortal<pcre::Regex> encryptionOptsRegex(R"re(encryption=\([^\)]*\),?)re");
-
-/**
- * Removes the 'kTableChecksFileName' file in the dbpath, if it exists.
- */
-void removeTableChecksFile() {
-    auto path = boost::filesystem::path(storageGlobalParams.dbpath) /
-        boost::filesystem::path(kTableChecksFileName);
-
-    if (!boost::filesystem::exists(path)) {
-        return;
-    }
-
-    boost::system::error_code errorCode;
-    boost::filesystem::remove(path, errorCode);
-
-    if (errorCode) {
-        LOGV2_FATAL_NOTRACE(4366403,
-                            "Failed to remove file",
-                            "file"_attr = path.generic_string(),
-                            "error"_attr = errorCode.message());
-    }
-}
 
 }  // namespace
 
@@ -1001,10 +978,6 @@ void WiredTigerUtil::validateTableLogging(WiredTigerRecoveryUnit& ru,
                                                : "collection"));
         valid = false;
     }
-}
-
-void WiredTigerUtil::notifyStorageStartupRecoveryComplete() {
-    removeTableChecksFile();
 }
 
 bool WiredTigerUtil::useTableLogging(const NamespaceString& nss) {
