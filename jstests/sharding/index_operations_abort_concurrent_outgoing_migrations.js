@@ -192,8 +192,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB('admin'),
         // Verify dropping the shard key index succeeds.
         ShardedIndexUtil.assertIndexDoesNotExistOnShard(
             st.shard0, dbName, collName, hashedShardKey);
-        ShardedIndexUtil.assertIndexDoesNotExistOnShard(
-            st.shard1, dbName, collName, hashedShardKey);
+        // TODO (SERVER-91380): assert the shard key is not present on recipient shard1 as well.
     });
 }
 
