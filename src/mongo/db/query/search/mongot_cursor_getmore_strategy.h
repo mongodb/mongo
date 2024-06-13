@@ -46,15 +46,14 @@ namespace executor {
 class MongotTaskExecutorCursorGetMoreStrategy final : public TaskExecutorCursorGetMoreStrategy {
 public:
     // Specifies the factor by which the batchSize sent from mongod to mongot increases per batch.
-    // TODO SERVER-88412: Convert this into an atomic, configurable cluster parameter.
-    static constexpr double kInternalSearchBatchSizeGrowthFactor = 2.0;
     static constexpr int kAlwaysPrefetchAfterNBatches = 3;
 
     MongotTaskExecutorCursorGetMoreStrategy(
         std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
         boost::optional<long long> startingBatchSize = mongot_cursor::kDefaultMongotBatchSize,
         DocsNeededBounds minDocsNeededBounds = docs_needed_bounds::Unknown(),
-        DocsNeededBounds maxDocsNeededBounds = docs_needed_bounds::Unknown());
+        DocsNeededBounds maxDocsNeededBounds = docs_needed_bounds::Unknown(),
+        boost::optional<TenantId> tenantId = boost::none);
 
     MongotTaskExecutorCursorGetMoreStrategy(MongotTaskExecutorCursorGetMoreStrategy&& other) =
         default;
@@ -117,6 +116,9 @@ private:
     // TODO SERVER-86738 Incorporate batchSizeHistory into explain executionStats with $search.
     // Tracks all batchSizes sent to mongot, to be included in the $search explain execution stats.
     std::vector<long long> _batchSizeHistory;
+
+    // The TenantId is necessary when retrieving the InternalSearchOptions cluster parameter value.
+    boost::optional<TenantId> _tenantId;
 };
 }  // namespace executor
 }  // namespace mongo

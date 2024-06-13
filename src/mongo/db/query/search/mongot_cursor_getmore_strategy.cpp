@@ -31,7 +31,10 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/db/query/search/internal_search_cluster_parameters_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
@@ -41,12 +44,14 @@ MongotTaskExecutorCursorGetMoreStrategy::MongotTaskExecutorCursorGetMoreStrategy
     std::function<boost::optional<long long>()> calcDocsNeededFn,
     boost::optional<long long> startingBatchSize,
     DocsNeededBounds minDocsNeededBounds,
-    DocsNeededBounds maxDocsNeededBounds)
+    DocsNeededBounds maxDocsNeededBounds,
+    boost::optional<TenantId> tenantId)
     : _calcDocsNeededFn(calcDocsNeededFn),
       _currentBatchSize(startingBatchSize),
       _minDocsNeededBounds(minDocsNeededBounds),
       _maxDocsNeededBounds(maxDocsNeededBounds),
-      _batchSizeHistory({}) {
+      _batchSizeHistory({}),
+      _tenantId(tenantId) {
     if (startingBatchSize.has_value()) {
         _batchSizeHistory.emplace_back(*startingBatchSize);
     }
@@ -87,10 +92,15 @@ long long MongotTaskExecutorCursorGetMoreStrategy::_getNextBatchSize(
     // Don't increase batchSize if the previous batch was returned without filling to the requested
     // batchSize. That indicates the BSON limit was reached, which likely could happen again.
     if (prevBatchNumReceived == *_currentBatchSize) {
+        auto batchSizeGrowthFactor =
+            ServerParameterSet::getClusterParameterSet()
+                ->get<ClusterParameterWithStorage<InternalSearchOptions>>("internalSearchOptions")
+                ->getValue(_tenantId)
+                .getBatchSizeGrowthFactor();
         // In case the growth factor is small enough that the next batchSize rounds back to the
         // previous batchSize, we use std::ceil to make sure it always grows by at least 1,
         // unless the growth factor is exactly 1.
-        _currentBatchSize = std::ceil(*_currentBatchSize * kInternalSearchBatchSizeGrowthFactor);
+        _currentBatchSize = std::ceil(*_currentBatchSize * batchSizeGrowthFactor);
     }
     _batchSizeHistory.emplace_back(*_currentBatchSize);
     return *_currentBatchSize;

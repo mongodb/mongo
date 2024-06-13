@@ -53,6 +53,12 @@ structs:
         default: 1.064
         validator:
           gte: 1.0
+      batchSizeGrowthFactor:
+        description: Specifies the factor by which the batchSize sent to mongot increases per batch.
+        type: double
+        default: 2.00
+        validator:
+          gte: 1.0
 
 server_parameters:
   internalSearchOptions:

@@ -78,5 +78,32 @@ assert.commandFailedWithCode(
     testDB.runCommand({aggregate: 'idView', pipeline: [{$search: searchQuery}], cursor: {}}),
     40602);
 
+// Assert the oversubscription factor cannot be configured to any value less than 1.
+assert.commandFailedWithCode(
+    testDB.adminCommand(
+        {setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: 0.9}}}),
+    ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    testDB.adminCommand(
+        {setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: 0}}}),
+    ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    testDB.adminCommand(
+        {setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: -5}}}),
+    ErrorCodes.BadValue);
+
+// Assert the batchSize growth factor cannot be configured to any value less than 1.
+assert.commandFailedWithCode(
+    testDB.adminCommand(
+        {setClusterParameter: {internalSearchOptions: {batchSizeGrowthFactor: 0.9}}}),
+    ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    testDB.adminCommand({setClusterParameter: {internalSearchOptions: {batchSizeGrowthFactor: 0}}}),
+    ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    testDB.adminCommand(
+        {setClusterParameter: {internalSearchOptions: {batchSizeGrowthFactor: -5}}}),
+    ErrorCodes.BadValue);
+
 mongotMock.stop();
 rst.stopSet();

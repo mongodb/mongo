@@ -237,7 +237,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
         calcDocsNeededFn,
         batchSize,
         minDocsNeededBounds.value_or(docs_needed_bounds::Unknown()),
-        maxDocsNeededBounds.value_or(docs_needed_bounds::Unknown()));
+        maxDocsNeededBounds.value_or(docs_needed_bounds::Unknown()),
+        expCtx->ns.tenantId());
     return establishCursors(expCtx,
                             getRemoteCommandRequestForSearchQuery(expCtx->opCtx,
                                                                   expCtx->ns,

@@ -192,6 +192,56 @@ export function mongotCommandForVectorSearchQuery({
     return cmd;
 }
 
+export function mockAllRequestsWithBatchSizes({
+    query,
+    collName,
+    dbName,
+    collectionUUID,
+    documents,
+    expectedBatchSizes,
+    cursorId,
+    mongotMockConn
+}) {
+    const responseOk = 1;
+
+    // Tracks which doc to return as the start of the next batch.
+    let docIndex = 0;
+    const history = [];
+
+    // Fill the expected mongot history based on the array of expectedBatchSizes.
+    for (let i = 0; i < expectedBatchSizes.length; i++) {
+        const batchSize = expectedBatchSizes[i];
+        let expectedCommand;
+        let response;
+
+        // The first batch will be requested via a normal mongot request; the rest of the batches
+        // will be requested via getMores.
+        if (i === 0) {
+            expectedCommand = mongotCommandForQuery(
+                {query, collName, db: dbName, collectionUUID, cursorOptions: {batchSize}});
+        } else {
+            expectedCommand = {getMore: cursorId, collection: collName, cursorOptions: {batchSize}};
+        }
+
+        // If this batch exhausts the remaining mongot results, return a response with cursorId = 0
+        // to indicate the results have been fully exhausted. Otherwise, return the cursorId.
+        if (docIndex + batchSize > documents.length) {
+            response = mongotResponseForBatch(
+                documents.slice(docIndex), NumberLong(0), dbName + "." + collName, responseOk);
+        } else {
+            response = mongotResponseForBatch(documents.slice(docIndex, docIndex + batchSize),
+                                              cursorId,
+                                              dbName + "." + collName,
+                                              responseOk);
+            docIndex += batchSize;
+        }
+
+        history.push({expectedCommand, response});
+    }
+
+    mongotMockConn.setMockResponses(history, cursorId);
+}
+
 export class MongotMock {
     /**
      * Create a new mongotmock.
