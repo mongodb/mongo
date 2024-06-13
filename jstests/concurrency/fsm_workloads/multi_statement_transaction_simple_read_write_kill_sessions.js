@@ -2,8 +2,6 @@
  * Tests periodically killing sessions that are running transactions that may use the single write
  * shard commit optimization.
  *
- * TODO (SERVER-88903): Investigate why multi_statement_transaction_simple_read_write_kill_
- * sessions.js hang when run in concurrency_embedded_router_* suites on config shard build variant.
  * @tags: [
  *    uses_transactions,
  *    assumes_snapshot_transactions,
