@@ -14,4 +14,5 @@ export const commandsAddedToMongodSinceLastLTS = [
     "clusterBulkWrite",
     "setQuerySettings",
     "removeQuerySettings",
+    "rotateFTDC",
 ];

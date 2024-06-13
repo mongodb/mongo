@@ -27,5 +27,6 @@ export const commandsAddedToMongosSinceLastLTS = [
     "unshardCollection",
     "changePrimary",
     "autoSplitVector",
-    "transitionFromDedicatedConfigServer"
+    "transitionFromDedicatedConfigServer",
+    "rotateFTDC",
 ];
