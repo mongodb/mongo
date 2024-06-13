@@ -84,6 +84,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
 // From src/third_party/wiredtiger/src/include/txn.h
+#define WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW "transaction rolled back because of cache overflow"
+
 #define WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION \
     "oldest pinned transaction ID rolled back for eviction"
 
@@ -133,18 +135,6 @@ const static StaticImmortal<pcre::Regex> encryptionOptsRegex(R"re(encryption=\([
 }  // namespace
 
 using std::string;
-
-bool wasRollbackReasonCachePressure(WT_SESSION* session) {
-    if (session) {
-        const auto reason = session->get_rollback_reason(session);
-        if (reason) {
-            return strncmp(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION,
-                           reason,
-                           sizeof(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION)) == 0;
-        }
-    }
-    return false;
-}
 
 /**
  * Configured WT cache is deemed insufficient for a transaction when its dirty bytes in cache
@@ -202,18 +192,25 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
         double cacheThreshold = gTransactionTooLargeForCacheThreshold.load();
         bool txnTooLargeEnabled = cacheThreshold < 1.0;
         bool temporarilyUnavailableEnabled = gEnableTemporarilyUnavailableExceptions.load();
+        const char* reason = session ? session->get_rollback_reason(session) : "";
         bool reasonWasCachePressure = (txnTooLargeEnabled || temporarilyUnavailableEnabled) &&
-            wasRollbackReasonCachePressure(session);
+            reason && session &&
+            (strncmp(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION,
+                     reason,
+                     sizeof(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION)) == 0 ||
+             strncmp(WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW,
+                     reason,
+                     sizeof(WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW)) == 0);
 
         if (reasonWasCachePressure) {
             if (txnTooLargeEnabled && isCacheInsufficientForTransaction(session, cacheThreshold)) {
                 throwTransactionTooLargeForCache(
-                    generateContextStrStream(WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE));
+                    generateContextStrStream(WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE)
+                    << " (" << reason << ")");
             }
 
             if (temporarilyUnavailableEnabled) {
-                throwTemporarilyUnavailableException(
-                    generateContextStrStream(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION));
+                throwTemporarilyUnavailableException(generateContextStrStream(reason));
             }
         }
 
