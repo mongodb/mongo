@@ -1273,9 +1273,11 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     // Index builds are not restarted in standalone mode. If the node is started with
-    // recoverFromOplogAsStandalone and when replaying the commitIndexBuild oplog entry for a paused
-    // index, there is no active index build thread to commit.
-    if (!swReplState.isOK() && replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
+    // recoverFromOplogAsStandalone or is in magic restore and when replaying the commitIndexBuild
+    // oplog entry for a paused index, there is no active index build thread to commit.
+    if (!swReplState.isOK() &&
+        (replCoord->getSettings().shouldRecoverFromOplogAsStandalone() ||
+         storageGlobalParams.magicRestore)) {
         // Restart the 'paused' index build in the background.
         IndexBuilds buildsToRestart;
         IndexBuildDetails details{collUUID};
