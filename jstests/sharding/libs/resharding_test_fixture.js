@@ -2,6 +2,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {getDBNameAndCollNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 /**
@@ -1197,6 +1198,9 @@ export var ReshardingTest = class {
             if (res.ok === 1) {
                 replSet.awaitNodesAgreeOnPrimary();
                 assert.eq(newPrimary, replSet.getPrimary());
+                this._st.getAllNodes().forEach((conn) => {
+                    awaitRSClientHosts(conn, {host: newPrimary.host}, {ok: true, ismaster: true});
+                });
                 return;
             }
 
@@ -1221,6 +1225,10 @@ export var ReshardingTest = class {
         const opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
         replSet.restart(originalPrimaryConn, opts, SIGKILL);
         replSet.awaitNodesAgreeOnPrimary();
+        const newPrimaryConn = replSet.getPrimary();
+        this._st.getAllNodes().forEach((conn) => {
+            awaitRSClientHosts(conn, {host: newPrimaryConn.host}, {ok: true, ismaster: true});
+        });
     }
 
     shutdownAndRestartPrimaryOnShard(shardName) {
@@ -1233,6 +1241,10 @@ export var ReshardingTest = class {
         const SIGTERM = 15;
         replSet.restart(originalPrimaryConn, {}, SIGTERM);
         replSet.awaitNodesAgreeOnPrimary();
+        const newPrimaryConn = replSet.getPrimary();
+        this._st.getAllNodes().forEach((conn) => {
+            awaitRSClientHosts(conn, {host: newPrimaryConn.host}, {ok: true, ismaster: true});
+        });
     }
 
     /**
