@@ -641,9 +641,23 @@ void Balancer::_consumeActionStreamLoop() {
                   "selectedStream"_attr = selectedStream->getName());
         }
 
-        _newInfoOnStreamingActions.store(false);
-        auto nextAction = selectedStream->getNextStreamingAction(opCtx.get());
-        if ((streamDrained = !nextAction.is_initialized())) {
+        boost::optional<DefragmentationAction> nextAction;
+        try {
+            _newInfoOnStreamingActions.store(false);
+            nextAction = selectedStream->getNextStreamingAction(opCtx.get());
+        } catch (const DBException& e) {
+            LOGV2_WARNING(7435001,
+                          "Failed to get next action from action stream",
+                          "error"_attr = redact(e),
+                          "stream"_attr = selectedStream->getName());
+
+            _newInfoOnStreamingActions.store(true);
+            continue;
+        }
+
+        if (!nextAction.is_initialized()) {
+            // No action was returned by this stream. This means that the stream is drained.
+            streamDrained = true;
             continue;
         }
 
