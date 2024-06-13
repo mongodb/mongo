@@ -664,7 +664,6 @@ let testCases = {
     refineCollectionShardKey: {skip: "does not accept read or write concern"},
     refreshLogicalSessionCacheNow: {skip: "does not accept read or write concern"},
     refreshSessions: {skip: "does not accept read or write concern"},
-    refreshSessionsInternal: {skip: "internal command"},
     removeShard: {skip: "does not accept read or write concern"},
     removeShardFromZone: {skip: "does not accept read or write concern"},
     renameCollection: {

@@ -391,7 +391,6 @@ let testCases = {
     refineCollectionShardKey: {skip: "primary only"},
     refreshLogicalSessionCacheNow: {skip: "does not return user data"},
     refreshSessions: {skip: "does not return user data"},
-    refreshSessionsInternal: {skip: "does not return user data"},
     removeShard: {skip: "primary only"},
     removeShardFromZone: {skip: "primary only"},
     renameCollection: {skip: "primary only"},
