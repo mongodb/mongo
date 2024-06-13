@@ -5,6 +5,7 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
+ *   incompatible_with_windows_tls,
  * ]
  */
 (function() {

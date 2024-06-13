@@ -8,6 +8,7 @@
  *   requires_persistence,
  *   requires_replication,
  *   requires_wiredtiger,
+ *   incompatible_with_windows_tls,
  * ]
  */
 
