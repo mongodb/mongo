@@ -149,7 +149,7 @@ export var ReshardingTest = class {
             // cloneTimestamp and tests involving elections do not run operations which would bump
             // the minimum visible timestamp (e.g. creating or dropping indexes).
             rsOptions.setParameter["failpoint.setMinVisibleForAllCollectionsToOldestOnStartup"] =
-                tojson({mode: "alwaysOn"});
+                tojson({mode: {"times": 1}});
         }
 
         if (this._minimumOperationDurationMS !== undefined) {

@@ -304,6 +304,14 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         }
     }
 
+    bool setMinVisibleToOldestFailpointSet = false;
+    if (MONGO_unlikely(setMinVisibleForAllCollectionsToOldestOnStartup.shouldFail())) {
+        // Failpoint is intended to apply to all collections. Additionally, we want to leverage
+        // nTimes to execute the failpoint for a single 'loadCatalog' call.
+        LOGV2(9106700, "setMinVisibleForAllCollectionsToOldestOnStartup failpoint is set");
+        setMinVisibleToOldestFailpointSet = true;
+    }
+
     const auto loadingFromUncleanShutdownOrRepair =
         lastShutdownState == LastShutdownState::kUnclean || _options.forRepair;
     // Use the stable timestamp as minValid. We know for a fact that the collection exist at
@@ -398,7 +406,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
 
         // If there's no recovery timestamp, every collection is available.
         auto collectionMinValidTs = minValidTs;
-        if (stableTs) {
+        if (MONGO_unlikely(stableTs && setMinVisibleToOldestFailpointSet)) {
             // This failpoint is useful for tests which want to exercise atClusterTime reads across
             // server starts (e.g. resharding). It is only safe for tests which can guarantee the
             // collection always exists for the atClusterTime value(s) and have not changed (i.e. no
@@ -408,22 +416,22 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
             // controls the minValidTs in MongoDB Server versions with a point-in-time
             // CollectionCatalog but had controlled the minVisibleTs in older MongoDB Server
             // versions. We haven't renamed it to avoid issues in multiversion testing.
-            setMinVisibleForAllCollectionsToOldestOnStartup.executeIf(
-                [&](const BSONObj& data) {
-                    auto oldestTs = _engine->getOldestTimestamp();
-                    if (collectionMinValidTs > oldestTs)
-                        collectionMinValidTs = oldestTs;
-                },
-                [&](const auto&) {
-                    // We only do this for collections that existed at the oldest timestamp or after
-                    // startup when we aren't sure if it existed or not.
-                    const auto catalog = CollectionCatalog::latest(opCtx);
-                    const auto& tracker = catalog->catalogIdTracker();
-                    auto oldestTs = _engine->getOldestTimestamp();
-                    auto lookup = tracker.lookup(entry.nss, oldestTs);
-                    return lookup.result !=
-                        HistoricalCatalogIdTracker::LookupResult::Existence::kNotExists;
-                });
+            auto shouldSetMinVisibleToOldest = [&]() {
+                // We only do this for collections that existed at the oldest timestamp or after
+                // startup when we aren't sure if it existed or not.
+                const auto catalog = CollectionCatalog::latest(opCtx);
+                const auto& tracker = catalog->catalogIdTracker();
+                auto oldestTs = _engine->getOldestTimestamp();
+                auto lookup = tracker.lookup(entry.nss, oldestTs);
+                return lookup.result !=
+                    HistoricalCatalogIdTracker::LookupResult::Existence::kNotExists;
+            }();
+
+            if (shouldSetMinVisibleToOldest) {
+                auto oldestTs = _engine->getOldestTimestamp();
+                if (collectionMinValidTs > oldestTs)
+                    collectionMinValidTs = oldestTs;
+            }
         }
 
         _initCollection(
