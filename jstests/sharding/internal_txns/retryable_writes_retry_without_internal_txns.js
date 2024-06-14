@@ -63,6 +63,7 @@ let currentParentTxnNumber = NumberLong(35);
         const childTxnNumber1 = NumberLong(0);
         jsTest.log(`Running an update inside a retryable internal transaction with lsid ${
             tojson(childLsid1)}`);
+
         assert.commandWorked(testDB.runCommand({
             update: kCollName,
             updates: [{q: {x: 1}, u: {$inc: {y: 1}}}],
@@ -80,6 +81,7 @@ let currentParentTxnNumber = NumberLong(35);
         const childTxnNumber2 = NumberLong(0);
         jsTest.log(`Running an update inside a retryable internal transaction with lsid ${
             tojson(childLsid2)}`);
+
         assert.commandWorked(testDB.runCommand({
             update: kCollName,
             updates: [{q: {x: 2}, u: {$inc: {y: 1}}}],
@@ -96,13 +98,25 @@ let currentParentTxnNumber = NumberLong(35);
         setUpTestMode(testMode);
 
         jsTest.log(`Retrying both updates as retryable writes with lsid ${tojson(parentLsid)}`);
-        const retryRes = assert.commandWorked(testDB.runCommand({
-            update: kCollName,
-            updates: [{q: {x: 1}, u: {$inc: {y: 1}}}, {q: {x: 2}, u: {$inc: {y: 1}}}],
-            lsid: parentLsid,
-            txnNumber: parentTxnNumber,
-            stmtIds: [stmtId1, stmtId2]
-        }));
+
+        // Retry the transaction if the RSM topology is not up to date and we receive a
+        // TransientTransactionError. Remove after SERVER-60369 is completed.
+        let retryRes;
+        assert.soon(() => {
+            try {
+                retryRes = testDB.runCommand({
+                    update: kCollName,
+                    updates: [{q: {x: 1}, u: {$inc: {y: 1}}}, {q: {x: 2}, u: {$inc: {y: 1}}}],
+                    lsid: parentLsid,
+                    txnNumber: parentTxnNumber,
+                    stmtIds: [stmtId1, stmtId2]
+                });
+                return true;
+            } catch (e) {
+                assert(TransactionsUtil.isTransientTransactionError(e));
+                return false;
+            }
+        });
         assert.eq(retryRes.n, 2);
         assert.eq(testColl.find({x: 1, y: 1}).itcount(), 1);
         assert.eq(testColl.find({x: 2, y: 1}).itcount(), 1);
@@ -131,6 +145,7 @@ let currentParentTxnNumber = NumberLong(35);
         const childTxnNumber1 = NumberLong(0);
         jsTest.log(`Running an update in a retryable internal transaction with lsid ${
             tojson(childLsid1)}`);
+
         assert.commandWorked(testDB.runCommand({
             update: kCollName,
             updates: [{q: {x: 1}, u: {$inc: {y: 1}}}],
@@ -150,17 +165,31 @@ let currentParentTxnNumber = NumberLong(35);
         const childTxnNumber2 = NumberLong(0);
         jsTest.log(`Retrying the update in a retryable internal transaction with lsid ${
             tojson(childLsid2)}`);
-        const retryRes = assert.commandWorked(testDB.runCommand({
-            update: kCollName,
-            updates: [{q: {x: 1}, u: {$inc: {y: 1}}}],
-            lsid: childLsid2,
-            txnNumber: childTxnNumber2,
-            startTransaction: true,
-            autocommit: false,
-            stmtId: stmtId,
-        }));
+
+        // Retry the transaction if the RSM topology is not up to date and we receive a
+        // TransientTransactionError. Remove after SERVER-60369 is completed.
+        let retryRes;
+        assert.soon(() => {
+            try {
+                retryRes = testDB.runCommand({
+                    update: kCollName,
+                    updates: [{q: {x: 1}, u: {$inc: {y: 1}}}],
+                    lsid: childLsid2,
+                    txnNumber: childTxnNumber2,
+                    startTransaction: true,
+                    autocommit: false,
+                    stmtId: stmtId,
+                });
+                return true;
+            } catch (e) {
+                assert(TransactionsUtil.isTransientTransactionError(e));
+                return false;
+            }
+        });
+
         assert.commandWorked(
             testDB.adminCommand(makeCommitTransactionCmdObj(childLsid2, childTxnNumber2)));
+
         assert.eq(retryRes.n, 1);
         assert.eq(testColl.find({x: 1, y: 1}).itcount(), 1);
 
@@ -202,17 +231,31 @@ let currentParentTxnNumber = NumberLong(35);
         const childTxnNumber1 = NumberLong(0);
         jsTest.log(`Retrying one of the updates in a retryable internal transaction with lsid ${
             tojson(childLsid1)}`);
-        const retryRes1 = assert.commandWorked(testDB.runCommand({
-            update: kCollName,
-            updates: [{q: {x: 1}, u: {$inc: {y: 1}}}],
-            lsid: childLsid1,
-            txnNumber: childTxnNumber1,
-            startTransaction: true,
-            autocommit: false,
-            stmtId: stmtId1,
-        }));
+
+        // Retry the transaction if the RSM topology is not up to date and we receive a
+        // TransientTransactionError. Remove after SERVER-60369 is completed.
+        let retryRes1;
+        assert.soon(() => {
+            try {
+                retryRes1 = testDB.runCommand({
+                    update: kCollName,
+                    updates: [{q: {x: 1}, u: {$inc: {y: 1}}}],
+                    lsid: childLsid1,
+                    txnNumber: childTxnNumber1,
+                    startTransaction: true,
+                    autocommit: false,
+                    stmtId: stmtId1,
+                });
+                return true;
+            } catch (e) {
+                assert(TransactionsUtil.isTransientTransactionError(e));
+                return false;
+            }
+        });
+
         assert.commandWorked(
             testDB.adminCommand(makeCommitTransactionCmdObj(childLsid1, childTxnNumber1)));
+
         assert.eq(retryRes1.n, 1);
         assert.eq(testColl.find({x: 1, y: 1}).itcount(), 1);
 
@@ -220,6 +263,7 @@ let currentParentTxnNumber = NumberLong(35);
         const childTxnNumber2 = NumberLong(0);
         jsTest.log(`Retrying one of the updates in a retryable internal transaction with lsid ${
             tojson(childLsid2)}`);
+
         const retryRes2 = assert.commandWorked(testDB.runCommand({
             update: kCollName,
             updates: [{q: {x: 2}, u: {$inc: {y: 1}}}],
@@ -231,6 +275,7 @@ let currentParentTxnNumber = NumberLong(35);
         }));
         assert.commandWorked(
             testDB.adminCommand(makeCommitTransactionCmdObj(childLsid2, childTxnNumber2)));
+
         assert.eq(retryRes2.n, 1);
         assert.eq(testColl.find({x: 2, y: 1}).itcount(), 1);
 
