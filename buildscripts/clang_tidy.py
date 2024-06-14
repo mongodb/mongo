@@ -146,7 +146,7 @@ def __dedup_errors(clang_tidy_errors_threads: List[str]) -> str:
     return os.linesep.join(unique_single_error_flatten)
 
 
-def _run_tidy(args):
+def _run_tidy(args, parser_defaults):
     clang_tidy_binary = f"/opt/mongodbtoolchain/{args.clang_tidy_toolchain}/bin/clang-tidy"
 
     if os.path.exists(args.check_module):
@@ -158,7 +158,7 @@ def _run_tidy(args):
         with open(args.compile_commands) as compile_commands:
             compile_commands = sorted(json.load(compile_commands), key=lambda x: x["file"])
     else:
-        if args.compile_commands == parser.get_default("compile_commands"):
+        if args.compile_commands == parser_defaults.compile_commands:
             print(
                 f"Could not find compile commands: '{args.compile_commands}', to generate it, use the build command:\n\n"
                 + "python3 buildscripts/scons.py --build-profile=compiledb compiledb\n"
@@ -171,7 +171,7 @@ def _run_tidy(args):
         with open(args.clang_tidy_cfg) as clang_tidy_cfg:
             clang_tidy_cfg = yaml.safe_load(clang_tidy_cfg)
     else:
-        if args.clang_tidy_cfg == parser.get_default("clang_tidy_cfg"):
+        if args.clang_tidy_cfg == parser_defaults.clang_tidy_cfg:
             print(
                 f"Could not find config file: '{args.clang_tidy_cfg}', to generate it, use the build command:\n\n"
                 + "python3 buildscripts/scons.py --build-profile=compiledb compiledb\n"
@@ -354,7 +354,8 @@ def main():
                 break
             files_to_parse.append(str(line.rstrip().decode("utf-8")))
     else:
-        clang_tidy_errors_futures, files_to_parse = _run_tidy(args)
+        parser_defaults = parser.parse_args([])
+        clang_tidy_errors_futures, files_to_parse = _run_tidy(args, parser_defaults)
 
     failed_files = _combine_errors(Path(args.output_dir, args.fixes_file), files_to_parse)
 
