@@ -1825,6 +1825,7 @@ if wiredtiger:
             "repl_set_config_checks_test.cpp",
             "repl_set_config_test.cpp",
             "repl_set_heartbeat_response_test.cpp",
+            "repl_set_request_votes_args_test.cpp",
             "repl_set_tag_test.cpp",
             "repl_set_write_concern_mode_definitions_test.cpp",
             "replication_consistency_markers_impl_test.cpp",
