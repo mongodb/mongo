@@ -156,10 +156,30 @@ export var FeatureFlagUtil = (function() {
         return getStatus(db, featureFlag, user, ignoreFCV) == FlagStatus.kEnabled;
     }
 
+    /**
+     *
+     * Wrapper around 'getStatus' - see that function for more details on the arguemnts.
+     *
+     * @param 'featureFlag' - the name of the flag you want to check, but *without* the
+     *     'featureFlag' prefix. For example, just "Toaster" instead of "featureFlagToaster."
+     *
+     * @returns true if the provided feature flag is known and disabled. Returns false otherwise
+     *     (either enabled or not known).
+     *
+     * This can be helpful if you want to check that a feature flag has been properly initialized
+     * in your project.
+     *
+     *   assert(FeatureFlagUtil.isPresentAndDisabled(db, "MyFlag"))
+     */
+    function isPresentAndDisabled(db, featureFlag, user, ignoreFCV) {
+        return getStatus(db, featureFlag, user, ignoreFCV) == FlagStatus.kDisabled;
+    }
+
     return {
         FlagStatus: FlagStatus,
         isEnabled: isEnabled,
         isPresentAndEnabled: isPresentAndEnabled,
+        isPresentAndDisabled: isPresentAndDisabled,
         getStatus: getStatus,
     };
 })();

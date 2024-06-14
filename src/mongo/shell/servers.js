@@ -254,6 +254,7 @@ MongoRunner.getBinVersionFor = function(version) {
         version = version.current();
     }
 
+    // Undefined version defaults to latest.
     if (version == null)
         version = "";
     version = version.trim();

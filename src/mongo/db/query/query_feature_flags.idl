@@ -176,3 +176,9 @@ feature_flags:
       cpp_varname: gFeatureFlagArrayAccumulators
       default: false
       shouldBeFCVGated: true
+
+    featureFlagQueryStatsCountDistinct:
+      description: "Feature flag to enable query stats for the count and distinct commands."
+      cpp_varname: gFeatureFlagQueryStatsCountDistinct
+      default: false
+      shouldBeFCVGated: true
