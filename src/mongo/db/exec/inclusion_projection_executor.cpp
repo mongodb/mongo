@@ -269,7 +269,10 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
             auto expr = expressionSpec.second;
 
             // If the $addFields spec field name itself is using the old field name, then we need to
-            // rename the field as well.
+            // rename the field as well since it would have been the new meta field. For example,
+            // {$addFields: {m: "$m.sub"}} where the 'm' is the meta field. If this $addFields is
+            // pushed down before the unpack bucket, it should be {$addFields: {meta: "$meta.sub"}}
+            // because this $addFields will hide the original meta and become the new meta.
             auto addFieldsFieldName = oldName == fieldName ? newName : fieldName;
             expr->serialize().addToBsonObj(&bb, addFieldsFieldName);
 

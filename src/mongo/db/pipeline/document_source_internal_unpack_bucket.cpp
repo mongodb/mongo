@@ -1045,42 +1045,62 @@ DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
         return boost::none;
     }
 
-    if (auto nextTransform =
-            dynamic_cast<DocumentSourceSingleDocumentTransformation*>(std::next(itr)->get());
-        nextTransform &&
-        (nextTransform->getType() == TransformerInterface::TransformerType::kInclusionProjection ||
-         nextTransform->getType() == TransformerInterface::TransformerType::kComputedProjection)) {
+    auto nextTransform =
+        dynamic_cast<DocumentSourceSingleDocumentTransformation*>(std::next(itr)->get());
+    if (!nextTransform) {
+        return boost::none;
+    }
 
-        auto& metaName = _bucketUnpacker.bucketSpec().metaField().value();
-        auto [addFieldsSpec, deleteStage] =
-            nextTransform->extractComputedProjections(metaName,
-                                                      timeseries::kBucketMetaFieldName.toString(),
-                                                      BucketUnpacker::reservedBucketFieldNames);
-        if (!addFieldsSpec.isEmpty()) {
-            // Extend bucket specification of this stage to include the computed meta projections
-            // that are passed through.
-            std::vector<StringData> computedMetaProjFields;
-            for (auto&& elem : addFieldsSpec) {
-                computedMetaProjFields.emplace_back(elem.fieldName());
-            }
+    if (auto transformType = nextTransform->getType();
+        (transformType != TransformerInterface::TransformerType::kInclusionProjection &&
+         transformType != TransformerInterface::TransformerType::kComputedProjection)) {
+        return boost::none;
+    }
 
-            _bucketUnpacker.addComputedMetaProjFields(computedMetaProjFields);
-            // Insert extracted computed projections before the $_internalUnpackBucket.
-            container->insert(
-                itr,
-                DocumentSourceAddFields::createFromBson(
-                    BSON("$addFields" << addFieldsSpec).firstElement(), getContext()));
-            // Remove the next stage if it became empty after the field extraction.
-            if (deleteStage) {
-                container->erase(std::next(itr));
-                return std::prev(itr) == container->begin() ? std::prev(itr)
-                                                            : std::prev(std::prev(itr));
-            }
-            return std::prev(itr);
+    // We should remember which $project / $addFields we have applied this optimization to and don't
+    // reapply this optimization as this method makes the optimization process restart at the newly
+    // pushed down stage which is inserted before $_internalUnpackBucket. Otherwise, an infinite
+    // optimization loop will be formed.
+    if (std::find(_triedComputedMetaPushDownFor.begin(),
+                  _triedComputedMetaPushDownFor.end(),
+                  nextTransform) != _triedComputedMetaPushDownFor.end()) {
+        return boost::none;
+    }
+    _triedComputedMetaPushDownFor.push_back(nextTransform);
+
+    auto& metaName = _bucketUnpacker.bucketSpec().metaField().value();
+    auto [addFieldsSpec, deleteStage] =
+        nextTransform->extractComputedProjections(metaName,
+                                                  timeseries::kBucketMetaFieldName.toString(),
+                                                  BucketUnpacker::reservedBucketFieldNames);
+    if (addFieldsSpec.isEmpty()) {
+        return boost::none;
+    }
+
+    // Extend bucket specification of this stage to include the computed meta projections that are
+    // passed through.
+    std::vector<StringData> computedMetaProjFields;
+    for (auto&& elem : addFieldsSpec) {
+        // If the added field name is same as 'meta', it should be treated as if it's the new 'meta'
+        // since it shadows the original 'meta' and so it should not be considered as "computed".
+        // Otherwise, it would disable several optimizations that needs the condition of no computed
+        // meta.
+        if (elem.fieldName() != timeseries::kBucketMetaFieldName) {
+            computedMetaProjFields.emplace_back(elem.fieldName());
         }
     }
 
-    return boost::none;
+    _bucketUnpacker.addComputedMetaProjFields(computedMetaProjFields);
+    // Insert extracted computed projections before the $_internalUnpackBucket.
+    container->insert(itr,
+                      DocumentSourceAddFields::createFromBson(
+                          BSON("$addFields" << addFieldsSpec).firstElement(), getContext()));
+    // Remove the next stage if it became empty after the field extraction.
+    if (deleteStage) {
+        container->erase(std::next(itr));
+        return std::prev(itr) == container->begin() ? std::prev(itr) : std::prev(std::prev(itr));
+    }
+    return std::prev(itr);
 }
 
 void DocumentSourceInternalUnpackBucket::setEventFilter(BSONObj eventFilterBson,
