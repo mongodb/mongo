@@ -423,6 +423,7 @@ tasks:
         "default",
         "incompatible_inmemory",
         "incompatible_debug_mode",
+        "incompatible_tsan",
         "concurrency",
         "stepdowns",
         "initsync",
