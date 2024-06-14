@@ -154,6 +154,7 @@ public:
 
     const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const;
     const boost::optional<BSONObj>& getLet() const;
+    const OptionalBool& getBypassEmptyTsReplacement() const;
 
     /**
      * Utility which handles evaluating and storing any let parameters based on the request type.

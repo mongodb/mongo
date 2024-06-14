@@ -224,6 +224,9 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
                     UpdateRequest(bulk_write_common::makeUpdateOpEntryFromUpdateOp(updateOp));
                 updateOpWithNamespace.setNamespaceString(nss);
                 updateOpWithNamespace.setLetParameters(bulkWriteRequest->getLet());
+                updateOpWithNamespace.setBypassEmptyTsReplacement(
+                    bulkWriteRequest->getBypassEmptyTsReplacement());
+
                 if (requiresOriginalQuery(opCtx, updateOpWithNamespace) ||
                     nss.isTimeseriesBucketsCollection()) {
                     queryBuilder.appendElementsUnique(updateOp->getFilter());
@@ -285,6 +288,8 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
             auto updateOpWithNamespace = UpdateRequest(updateRequest.getUpdates().front());
             updateOpWithNamespace.setNamespaceString(updateRequest.getNamespace());
             updateOpWithNamespace.setLetParameters(updateRequest.getLet());
+            updateOpWithNamespace.setBypassEmptyTsReplacement(
+                updateRequest.getBypassEmptyTsReplacement());
 
             if (requiresOriginalQuery(opCtx, updateOpWithNamespace) ||
                 nss.isTimeseriesBucketsCollection()) {

@@ -225,12 +225,12 @@ public:
         return _fromOplogApplication;
     }
 
-    void setPreserveEmptyTS(OptionalBool preserveEmptyTS) {
-        _preserveEmptyTS = preserveEmptyTS;
+    void setBypassEmptyTsReplacement(OptionalBool bypassEmptyTsReplacement) {
+        _bypassEmptyTsReplacement = bypassEmptyTsReplacement;
     }
 
-    OptionalBool getPreserveEmptyTS() const {
-        return _preserveEmptyTS;
+    OptionalBool getBypassEmptyTsReplacement() const {
+        return _bypassEmptyTsReplacement;
     }
 
     void setExplain(boost::optional<ExplainOptions::Verbosity> verbosity) {
@@ -390,7 +390,7 @@ private:
 
     OptionalBool _isTimeseriesNamespace;
 
-    OptionalBool _preserveEmptyTS;
+    OptionalBool _bypassEmptyTsReplacement;
 
     // Flags controlling the update.
 

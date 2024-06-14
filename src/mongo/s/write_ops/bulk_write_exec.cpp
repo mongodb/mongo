@@ -1096,6 +1096,8 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
         request.setStmtIds(stmtIds);
     }
 
+    request.setBypassEmptyTsReplacement(_clientRequest.getBypassEmptyTsReplacement());
+
     request.setDbName(DatabaseName::kAdmin);
 
     return request;
@@ -1922,6 +1924,8 @@ int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
         // above with ops, we just put an empty vector as a placeholder for now.
         request.setStmtIds({});
     }
+
+    request.setBypassEmptyTsReplacement(_clientRequest.getBypassEmptyTsReplacement());
 
     BSONObjBuilder builder;
     request.serialize(&builder);

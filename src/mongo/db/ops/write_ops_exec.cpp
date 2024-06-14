@@ -1114,7 +1114,6 @@ void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp) {
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& wholeOp,
                            OperationSource source) {
-
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -1178,14 +1177,18 @@ WriteResult performInserts(OperationContext* opCtx,
     const size_t maxBatchBytes = write_ops::insertVectorMaxBytes;
     batch.reserve(std::min(wholeOp.getDocuments().size(), maxBatchSize));
 
+    // If 'wholeOp.getBypassEmptyTsReplacement()' is true or if 'source' is 'kFromMigrate', set
+    // "bypassEmptyTsReplacement=true" for fixDocumentForInsert().
+    const bool bypassEmptyTsReplacement = (source == OperationSource::kFromMigrate) ||
+        static_cast<bool>(wholeOp.getBypassEmptyTsReplacement());
+
     for (auto&& doc : wholeOp.getDocuments()) {
         const auto currentOpIndex = nextOpIndex++;
         const bool isLastDoc = (&doc == &wholeOp.getDocuments().back());
-        const bool preserveEmptyTimestamps = source == OperationSource::kFromMigrate;
         bool containsDotsAndDollarsField = false;
 
-        auto fixedDoc =
-            fixDocumentForInsert(opCtx, doc, preserveEmptyTimestamps, &containsDotsAndDollarsField);
+        auto fixedDoc = fixDocumentForInsert(
+            opCtx, doc, bypassEmptyTsReplacement, &containsDotsAndDollarsField);
 
         const StmtId stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
         const bool wasAlreadyExecuted = opCtx->isRetryableWrite() &&
@@ -1442,6 +1445,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     const write_ops::UpdateOpEntry& op,
     LegacyRuntimeConstants runtimeConstants,
     const boost::optional<BSONObj>& letParams,
+    const OptionalBool& bypassEmptyTsReplacement,
     const boost::optional<UUID>& sampleId,
     OperationSource source,
     bool forgoOpCounterIncrements) {
@@ -1471,6 +1475,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     if (letParams) {
         request.setLetParameters(std::move(letParams));
     }
+    request.setBypassEmptyTsReplacement(bypassEmptyTsReplacement);
     request.setStmtIds(stmtIds);
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
     request.setSource(source);
@@ -1707,6 +1712,7 @@ WriteResult performUpdates(OperationContext* opCtx,
                                                      singleOp,
                                                      runtimeConstants,
                                                      wholeOp.getLet(),
+                                                     wholeOp.getBypassEmptyTsReplacement(),
                                                      sampleId,
                                                      source,
                                                      forgoOpCounterIncrements);
@@ -2345,6 +2351,8 @@ write_ops::UpdateCommandRequest makeTimeseriesTransformationOp(
     // The schema validation configured in the bucket collection is intended for direct
     // operations by end users and is not applicable here.
     base.setBypassDocumentValidation(true);
+
+    base.setBypassEmptyTsReplacement(request.getBypassEmptyTsReplacement());
 
     // Timeseries compression operation is not a user operation and should not use a
     // statement id from any user op. Set to Uninitialized to bypass.

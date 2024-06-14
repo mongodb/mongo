@@ -351,6 +351,17 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
                 insertRequest.getWriteCommandRequestBase().setEncryptionInformation(
                     encryptionInformation);
 
+                if (sharedBlock->cmdObj.hasField(
+                        write_ops::WriteCommandRequestBase::kBypassEmptyTsReplacementFieldName)) {
+                    auto bypassEmptyTsReplacementField = sharedBlock->cmdObj.getField(
+                        write_ops::WriteCommandRequestBase::kBypassEmptyTsReplacementFieldName);
+
+                    if (bypassEmptyTsReplacementField.type() == BSONType::Bool) {
+                        insertRequest.getWriteCommandRequestBase().setBypassEmptyTsReplacement(
+                            bypassEmptyTsReplacementField.Bool());
+                    }
+                }
+
                 auto writeRes = txnClient.runCRUDOpSync(insertRequest,
                                                         std::vector<StmtId>{kUninitializedStmtId});
 

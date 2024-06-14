@@ -180,6 +180,7 @@ write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
     requestBase.setOrdered(req.getOrdered());
     requestBase.setBypassDocumentValidation(req.getBypassDocumentValidation());
     requestBase.setCollectionUUID(nsInfoEntry.getCollectionUUID());
+    requestBase.setBypassEmptyTsReplacement(req.getBypassEmptyTsReplacement());
 
     return request;
 }
@@ -210,7 +211,8 @@ UpdateRequest makeUpdateRequestFromUpdateOp(OperationContext* opCtx,
                                             const NamespaceInfoEntry& nsEntry,
                                             const BulkWriteUpdateOp* op,
                                             const StmtId& stmtId,
-                                            const boost::optional<BSONObj>& letParameters) {
+                                            const boost::optional<BSONObj>& letParameters,
+                                            const mongo::OptionalBool& bypassEmptyTsReplacement) {
     auto updateRequest = UpdateRequest(bulk_write_common::makeUpdateOpEntryFromUpdateOp(op));
     updateRequest.setNamespaceString(nsEntry.getNs());
     updateRequest.setIsTimeseriesNamespace(nsEntry.getIsTimeseriesNamespace());
@@ -220,6 +222,7 @@ UpdateRequest makeUpdateRequestFromUpdateOp(OperationContext* opCtx,
     updateRequest.setReturnDocs(UpdateRequest::RETURN_NONE);
     updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
     updateRequest.setStmtIds({stmtId});
+    updateRequest.setBypassEmptyTsReplacement(bypassEmptyTsReplacement);
     return updateRequest;
 }
 
@@ -266,6 +269,8 @@ write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
 
     requestBase.setStmtIds(std::vector<StmtId>{stmtId});
     requestBase.setOrdered(req.getOrdered());
+
+    requestBase.setBypassEmptyTsReplacement(req.getBypassEmptyTsReplacement());
 
     return updateCommand;
 }
@@ -321,6 +326,7 @@ BulkWriteCommandRequest makeSingleOpBulkWriteCommandRequest(
     singleOpRequest.setStmtId(bulk_write_common::getStatementId(bulkWriteReq, opIdx));
     singleOpRequest.setDbName(DatabaseName::kAdmin);
     singleOpRequest.setErrorsOnly(bulkWriteReq.getErrorsOnly());
+    singleOpRequest.setBypassEmptyTsReplacement(bulkWriteReq.getBypassEmptyTsReplacement());
     return singleOpRequest;
 }
 

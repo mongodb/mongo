@@ -368,6 +368,12 @@ commands:
                 type: bool
                 default: false
                 stability: stable
+            bypassEmptyTsReplacement:
+                description: "Only applicable for inserts and replacement updates. If set to true,
+                              any empty timestamps (Timestamp(0,0)) in 'documents' or 'u' will not
+                              be replaced by the current time and instead will be preserved as-is."
+                type: optionalBool
+                stability: unstable
             $_originalQuery:
                 description: "The original write query. This is used for updateOne/deleteOne
                               without shard key during the write phase of the two phase protocol in

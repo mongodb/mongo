@@ -217,6 +217,12 @@ structs:
                 type: EncryptionInformation
                 optional: true
                 stability: unstable
+            bypassEmptyTsReplacement:
+                description: "Only applicable for inserts and replacement updates. If set to true,
+                              any empty timestamps (Timestamp(0,0)) in 'documents' or 'u' will not
+                              be replaced by the current time and instead will be preserved as-is."
+                type: optionalBool
+                stability: unstable
             $_originalQuery:
                 description: "The original write query. This is used for updateOne/deleteOne
                               without shard key during the write phase of the two phase protocol in
@@ -591,6 +597,12 @@ commands:
                 description: "Encryption Information schema and other tokens for CRUD commands"
                 type: EncryptionInformation
                 optional: true
+                stability: unstable
+            bypassEmptyTsReplacement:
+                description: "Only applicable when 'update' is a replacement update. If set, any
+                              empty timestamps (Timestamp(0, 0)) in the update will not be replaced
+                              by the current time and instead will be preserved as-is."
+                type: optionalBool
                 stability: unstable
             sampleId:
                 description: "The unique sample id for the operation if it has been chosen for sampling."

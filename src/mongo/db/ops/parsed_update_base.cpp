@@ -253,12 +253,18 @@ void ParsedUpdateBase::parseUpdate() {
     _driver.setCollator(_expCtx->getCollator());
     _driver.setLogOp(true);
     _driver.setFromOplogApplication(_request->isFromOplogApplication());
-    _driver.setPreserveEmptyTS(static_cast<bool>(_request->getPreserveEmptyTS()));
+
+    auto source = _request->source();
+    if ((source == OperationSource::kFromMigrate) || _request->getBypassEmptyTsReplacement()) {
+        _driver.setBypassEmptyTsReplacement(true);
+    }
+
     // Time-series operations will not result in any documents with dots or dollars fields.
-    if (auto source = _request->source(); source == OperationSource::kTimeseriesInsert ||
+    if (source == OperationSource::kTimeseriesInsert ||
         source == OperationSource::kTimeseriesUpdate) {
         _driver.setSkipDotsDollarsCheck(true);
     }
+
     _expCtx->isParsingPipelineUpdate = true;
     _driver.parse(
         *_modification, _arrayFilters, _request->getUpdateConstants(), _request->isMulti());

@@ -833,6 +833,7 @@ write_ops::UpdateCommandRequest buildSingleUpdateOp(const write_ops::UpdateComma
     auto& commandBase = singleUpdateOp.getWriteCommandRequestBase();
     commandBase.setOrdered(wholeOp.getOrdered());
     commandBase.setBypassDocumentValidation(wholeOp.getBypassDocumentValidation());
+    commandBase.setBypassEmptyTsReplacement(wholeOp.getBypassEmptyTsReplacement());
 
     return singleUpdateOp;
 }
