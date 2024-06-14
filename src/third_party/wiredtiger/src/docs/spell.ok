@@ -154,6 +154,7 @@ TXID
 TXT
 Timestamping
 Truncations
+Tsvg
 UBSAN
 UNC
 URIs
@@ -232,10 +233,12 @@ cacheable
 cachesize
 calc
 callbk
+callgraph
 ccache
 cd
 cdb
 cds
+cellpadding
 cfg
 changelog
 checkpointed
@@ -408,6 +411,7 @@ gid
 github
 gnuplot
 graphviz
+hashtable
 hb
 hotbackup
 href
@@ -424,6 +428,7 @@ ie
 iface
 ifdef
 iflag
+img
 incr
 indices
 init
@@ -474,6 +479,7 @@ ln
 loadtext
 loc
 logc
+logmgr
 lookup
 lookups
 loongarch
@@ -545,6 +551,7 @@ nosync
 notgranted
 notyet
 nowait
+nowrap
 nproc
 ns
 nul
@@ -601,6 +608,7 @@ qnx
 qpl
 qqq
 rankdir
+rarr
 rdbms
 rdlock
 readlock
@@ -612,6 +620,7 @@ rebalance
 recno
 recnoN
 recnum
+reconfig
 recoverability
 recs
 rectype
@@ -626,6 +635,7 @@ riscv
 rmw
 ro
 rotn
+rowspan
 rpc
 rts
 runnable
@@ -666,6 +676,7 @@ startuml
 startup
 statlog
 stderr
+stdin
 stdout
 str
 strerror
@@ -687,6 +698,7 @@ syscalls
 sz
 tRuE
 tablename
+tagrex
 tcl
 tcmalloc
 td
@@ -699,6 +711,7 @@ timespan
 timestamp
 timestamping
 timestamps
+tmp
 toc
 todo
 toolchain
@@ -722,6 +735,7 @@ uint
 ul
 umask
 unallocated
+undef
 unencoded
 unencrypted
 unescaped
@@ -756,6 +770,7 @@ workgen
 wrapup
 writelock
 writelocks
+writelsn
 wrlock
 wti
 wtobj

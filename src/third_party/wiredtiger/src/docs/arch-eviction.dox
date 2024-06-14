@@ -86,29 +86,8 @@ cache contains at least this many bytes of updates.
 It is worth noting that for all eviction target and trigger sizes, the target size must be lower
 than its trigger size counterpart.
 
-@section eviction_locking Locking
+@section eviction_related Related pages
 
-Internally eviction uses the following locks:
-
-- \c cache->evict_pass_lock - Guarantees that only one eviction server is running at most.
-- \c cache->evict_walk_lock - Locked when eviction walks a tree.
-- \c cache->evict_queue_lock - Access to cache->evict_queues.
-- \c queue->evict_lock - Access to a specific eviction queue.
-
-Locking order:
-
-- Eviction server:
-  - lock \c cache->evict_pass_lock
-    - trylock \c cache->evict_walk_lock
-      - lock \c cache->evict_queue_lock
-        - lock \c queue->evict_lock
-- Non-eviction server threads:
-  - lock \c cache->evict_walk_lock
-    - lock \c cache->evict_pass_lock
-      - lock \c cache->evict_queue_lock
-        - lock \c queue->evict_lock
-- Eviction queue access:
-  - lock \c cache->evict_queue_lock
-    - lock \c queue->evict_lock
+- @ref arch-locking-hierarchy-cache-and-eviction
 
 */

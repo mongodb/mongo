@@ -225,6 +225,7 @@ EOF
 
     # Copy any needed javascript
     cp ../src/docs/js/* ../docs/
+    cp ../src/docs/*.html ../docs/
 
     # Fix up bad links doxygen generates in navtree.js
     (cd ../docs &&

@@ -165,6 +165,7 @@ of the documentation.
 
 - @subpage arch-toc-int-wt-dev
     - @ref arch-concurrency
+    - @ref arch-locking-hierarchy
 
 - @subpage arch-toc-mem-disk
     - @ref arch-block
@@ -282,6 +283,7 @@ writing it to disk if it is dirty.
 /*! @page arch-toc-int-wt-dev Internal WiredTiger Development
 
 @subpage arch-concurrency
+@subpage arch-locking-hierarchy
 
 */
 

@@ -1,4 +1,4 @@
-/*! @arch_page arch-concurrency WiredTiger concurrency management
+/*! @arch_page arch-concurrency Concurrency management
 
 WiredTiger is a multi-threaded application and needs to manage concurrent access to memory
 locations. Many mechanisms are defined in WiredTiger to allow for safe concurrent access to memory
@@ -25,6 +25,8 @@ There are two types of locks in WiredTiger:
 A correctly used lock takes the lock for each access to the shared memory it guards. WiredTiger
 sometimes deviates from this model and reads variables outside the context of the relevant lock.
 Such instances are only permitted if reading inconsistent data is sufficient for the use case.
+
+More details on lock hierarchy and usage can be found in the @ref arch-locking-hierarchy.
 
 @section generations Generations
 

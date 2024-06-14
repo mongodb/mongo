@@ -1,0 +1,105 @@
+/*! @arch_page arch-locking-hierarchy Locks hierarchy
+
+This page describes the current nested locking hierarchy of WiredTiger.
+
+@section arch-locking-hierarchy-cache-and-eviction Cache and Eviction locks
+
+<table class=lock-hierarchy>
+@row{\c cache->evict_pass_lock, &rarr;, TRY \c cache->evict_walk_lock, &rarr;, \c cache->evict_queue_lock, &rarr;, \c queue->evict_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c cache->evict_walk_lock, &rarr;, \c cache->evict_pass_lock, &rarr;, \c cache->evict_queue_lock, &rarr;, \c queue->evict_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c cache->evict_queue_lock, &rarr;, \c queue->evict_lock}
+</table>
+
+NOTE: A different locking order is used for \c evict_pass_lock and \c evict_walk_lock.
+
+@section arch-locking-hierarchy-log Log locks
+
+<table class=lock-hierarchy>
+@row{\c log_slot_lock, &rarr;, \c log_fs_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c log_slot_lock, &rarr;, \c log_writelsn_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{WRITE \c log_remove_lock, &rarr;, READ \c debug_log_retention_lock}
+</table>
+
+NOTE: Some functions expect \c log_slot_lock to be acquired, then they temporarily release it and re-acquire it.
+
+@section arch-locking-hierarchy-checkpoint-schema Checkpoint and Schema locks
+
+<table class=lock-hierarchy>
+@row{\c checkpoint_lock, &rarr;, \c schema_lock, &rarr;, WRITE \c table_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c checkpoint_lock, &rarr;, \c schema_lock, &rarr;, READ \c table_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c checkpoint_lock, &rarr;, \c schema_lock, &rarr;, \c api_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c checkpoint_lock, &rarr;, \c schema_lock, &rarr;, \c metadata_lock, &rarr;, READ \c table_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c checkpoint_lock, &rarr;, \c schema_lock, &rarr;, \c turtle_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c checkpoint_lock, &rarr;, \c schema_lock, &rarr;, WRITE \c dhandle_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c checkpoint_lock, &rarr;, \c turtle_lock}
+</table>
+
+NOTE: Checkpoint and schema locks are mostly used via \c WT_WITH_*_LOCK and the functions
+are covered with \c WT_ASSERT_SPINLOCK_OWNED statements which make the code easier to read.
+
+@section arch-locking-hierarchy-checkpoint-misc Miscellaneous locks
+
+<table class=lock-hierarchy>
+@row{WRITE \c table_lock, &rarr;, WRITE \c dhandle_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c reconfig_lock, &rarr;, WRITE \c chunkcache->pinned_objects.array_lock}
+</table>
+
+<table class=lock-hierarchy>
+@row{\c reconfig_lock, &rarr;, \c chunkcache->hashtable[*].bucket_lock, &rarr;, READ \c chunkcache->pinned_objects.array_lock}
+</table>
+
+@section arch-locking-hierarchy-examples Examples
+
+@subsection arch-locking-hierarchy-examples-eviction0 Eviction (no queue lock)
+
+@image html locks-evict-example-simple.svg width=900
+<!-- callgraph -f '///evict_walk_lock|evict_pass_lock|WT_WITH_PASS_LOCK' -t '///evict_walk_lock|evict_pass_lock|WT_WITH_PASS_LOCK' -t /_evict_clear_walk -t /_evict_walk_tree -continue -tagrex '/(__wt_spin_[^u]\w++)\({ARG},\s++({ARG})/index($2, "evict") != -1 && index($2, "queue") == -1 ? "$1($2)" : undef' -tag "WT_WITH_PASS_LOCK(evict_pass_lock)=WT_WITH_PASS_LOCK" -x /_curhs_cache -x /_verbose_dump_cache -x /_cache_destroy -x /_cache_create -d 11 -dir td -dot | dot -Tsvg /dev/stdin > src/docs/images/locks-evict-example-simple.svg -->
+
+@subsection arch-locking-hierarchy-examples-eviction Eviction (full)
+
+- [Interactive call graph](locks-eviction.html)
+  <img src="locks-evict-example.svg" style="height: 200px">
+<!-- callgraph -f '///log_lock|log_fs_lock|log_slot_lock|log_sync_lock|log_writelsn_lock|log_remove_lock|debug_log_retention_lock|WT_WITH_SLOT_LOCK' -t '///log_lock|log_fs_lock|log_slot_lock|log_sync_lock|log_writelsn_lock|log_remove_lock|debug_log_retention_lock|WT_WITH_SLOT_LOCK' -continue -tagrex '/^(.*(log_lock|log_fs_lock|log_slot_lock|log_sync_lock|log_writelsn_lock|log_remove_lock|debug_log_retention_lock).*)$/index($1, "log_") != -1 ? $1 : undef' -tag "WT_WITH_SLOT_LOCK(log_slot_lock)=WT_WITH_SLOT_LOCK" -x /_logmgr_create -x /_logmgr_destroy -x /_connection_destroy -x /_connection_init -x /_debug_mode_log_retention_config -x /_log_file_server -x /_wt_log_ckpt -d 20 -svg-html > src/docs/locks-eviction.html -->
+<!-- callgraph -f '///evict_lock|evict_walk_lock|evict_pass_lock|evict_queue_lock|WT_WITH_PASS_LOCK' -t '///evict_lock|evict_walk_lock|evict_pass_lock|evict_queue_lock|WT_WITH_PASS_LOCK' -continue -tagrex '/(__wt_spin_[^u]\w++)\({ARG},\s++({ARG})/index($2, "evict") != -1 ? "$1($2)" : undef' -tag "WT_WITH_PASS_LOCK(evict_pass_lock)=WT_WITH_PASS_LOCK" -x /_curhs_cache -x /_verbose_dump_cache -x /_cache_destroy -x /_cache_create -d 11 -dot -dir td | dot -Tsvg /dev/stdin > src/docs/images/locks-evict-example.svg -->
+
+@subsection arch-locking-hierarchy-examples-log Log
+
+- [Interactive call graph](locks-log.html)
+  <img src="locks-log-example.svg" style="height: 200px">
+<!-- callgraph -f '///log_lock|log_fs_lock|log_slot_lock|log_sync_lock|log_writelsn_lock|log_remove_lock|debug_log_retention_lock|WT_WITH_SLOT_LOCK' -t '///log_lock|log_fs_lock|log_slot_lock|log_sync_lock|log_writelsn_lock|log_remove_lock|debug_log_retention_lock|WT_WITH_SLOT_LOCK' -continue -tagrex '/^(.*(log_lock|log_fs_lock|log_slot_lock|log_sync_lock|log_writelsn_lock|log_remove_lock|debug_log_retention_lock).*)$/index($1, "log_") != -1 ? $1 : undef' -tag "WT_WITH_SLOT_LOCK(log_slot_lock)=WT_WITH_SLOT_LOCK" -x /_logmgr_create -x /_logmgr_destroy -x /_connection_destroy -x /_connection_init -x /_debug_mode_log_retention_config -x /_log_file_server -x /_wt_log_ckpt -d 20 -svg-html > src/docs/locks-log.html -->
+<!-- callgraph -f '///log_lock|log_fs_lock|log_slot_lock|log_sync_lock|log_writelsn_lock|log_remove_lock|debug_log_retention_lock|WT_WITH_SLOT_LOCK' -t '///log_lock|log_fs_lock|log_slot_lock|log_sync_lock|log_writelsn_lock|log_remove_lock|debug_log_retention_lock|WT_WITH_SLOT_LOCK' -continue -tagrex '/^(.*(log_lock|log_fs_lock|log_slot_lock|log_sync_lock|log_writelsn_lock|log_remove_lock|debug_log_retention_lock).*)$/index($1, "log_") != -1 ? $1 : undef' -tag "WT_WITH_SLOT_LOCK(log_slot_lock)=WT_WITH_SLOT_LOCK" -x /_logmgr_create -x /_logmgr_destroy -x /_connection_destroy -x /_connection_init -x /_debug_mode_log_retention_config -x /_log_file_server -x /_wt_log_ckpt -d 20 -dot | dot -Tsvg /dev/stdin > src/docs/images/locks-log-example.svg -->
+
+*/

@@ -2034,7 +2034,7 @@ tasks:
           test_config_filename: configs/bounded_cursor_perf_stress.txt
           test_name: bounded_cursor_perf
 
-  - name: cppsuite-cursor-microbenchmarks-default-perf
+  - name: cppsuite-api-instruction-count-benchmarks-default-perf
     depends_on:
       - name: compile
     # This and the later test only run on ARM as the required harsware counter is missing on x86.
@@ -2046,7 +2046,7 @@ tasks:
           test_config_filename: configs/api_instruction_count_benchmarks_default.txt
           test_name: api_instruction_count_benchmarks
 
-  - name: cppsuite-session-microbenchmarks-default-perf
+  - name: cppsuite-api-timing-benchmarks-default-perf
     depends_on:
       - name: compile
     tags: ["cppsuite-perf-test-arm"]

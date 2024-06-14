@@ -177,4 +177,8 @@ A log cursor can be opened up on a running system and that cursor
 can walk forward through the log.  Log cursors are described in great detail on
 the @ref cursor_log page.
 
+@section log_related Related pages
+
+- @ref arch-locking-hierarchy-log
+
 */

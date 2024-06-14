@@ -554,6 +554,22 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
      */
 
     is_hs = strcmp(uri, WT_HS_URI) == 0;
+
+    /*
+     * We have already pinned the history store checkpoint dhandle when we open the checkpoint
+     * cursor. No need to resolve and open it again. We only need to lock it here. It is also wrong
+     * to read the metadata with the checkpoint transaction.
+     */
+    if (is_hs && session->hs_checkpoint != NULL) {
+        ret = __wt_session_get_dhandle(session, uri, session->hs_checkpoint, cfg, flags);
+        /*
+         * We have already pinned the history store checkpoint dhandle. Therefore, we should be able
+         * to lock it here.
+         */
+        WT_ASSERT(session, ret != EBUSY);
+        return (ret);
+    }
+
     if (is_hs)
         /* We're opening the history store directly, so don't open it twice. */
         hs_dhandlep = NULL;
@@ -561,11 +577,10 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
     /*
      * Applications can use the internal reserved name "WiredTigerCheckpoint" to open the latest
      * checkpoint, but they are not allowed to directly open specific checkpoint versions, such as
-     * "WiredTigerCheckpoint.6". However, internally it is allowed to open the history store with a
-     * specific version.
+     * "WiredTigerCheckpoint.6".
      */
     is_reserved_name = cval.len > strlen(WT_CHECKPOINT) && WT_PREFIX_MATCH(cval.str, WT_CHECKPOINT);
-    if (is_reserved_name && (!is_hs || session->hs_checkpoint == NULL))
+    if (is_reserved_name)
         WT_RET_MSG(
           session, EINVAL, "the prefix \"%s\" for checkpoint cursors is reserved", WT_CHECKPOINT);
 
