@@ -442,12 +442,6 @@ Document DocumentStorage::shred() const {
     return md.freeze();
 }
 
-void DocumentStorage::loadIntoCache() const {
-    for (DocumentStorageIterator it = iterator(); !it.atEnd(); it.advance()) {
-        it.get();
-    }
-}
-
 void DocumentStorage::loadLazyMetadata() const {
     if (_haveLazyLoadedMetadata) {
         return;
