@@ -63,6 +63,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(shardsvrReshardCollectionJoinedExistingOperation);
+
 class ShardsvrReshardCollectionCommand final
     : public TypedCommand<ShardsvrReshardCollectionCommand> {
 public:
@@ -134,6 +136,18 @@ public:
                 shardsvrCollCommand.setShardsvrCreateCollectionRequest(trackCollectionRequest);
                 try {
                     cluster::createCollectionWithRouterLoop(opCtx, shardsvrCollCommand);
+                } catch (const ExceptionFor<ErrorCodes::LockBusy>& ex) {
+                    // If we encounter a lock timeout while trying to track a collection for a
+                    // resharding operation, it may indicate that resharding is already running for
+                    // this collection. Check if the collection is already tracked and attempt to
+                    // join the resharding command if so.
+                    try {
+                        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns());
+                    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                        // If the collection isn't tracked, then moveCollection cannot possibly be
+                        // ongoing, so we just surface the LockBusy error.
+                        throw ex;
+                    }
                 } catch (const ExceptionFor<ErrorCodes::NamespaceExists>&) {
                     // The registration may throw NamespaceExists when the namespace is a view.
                     // Proceed and let resharding return the proper error in that case.
@@ -155,6 +169,8 @@ public:
                         service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
                 return reshardCollectionCoordinator->getCompletionFuture();
             }();
+
+            shardsvrReshardCollectionJoinedExistingOperation.pauseWhileSet();
 
             reshardCollectionCoordinatorCompletionFuture.get(opCtx);
         }
