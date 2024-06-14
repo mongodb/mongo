@@ -42,9 +42,7 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
         // In a single shard cluster, this should be allowed
         assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
     } else {
-        // TODO (SERVER-89891) Change the counter to increment by 1 once warnings are not duplicated
-        directWriteCount += 2;
-        assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
+        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
     }
 
     // Setting the server parameter should cause warnings to be emitted if the cluster only has one
@@ -56,9 +54,7 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
     if (res.ok) {
         assert.commandWorked(userTestDB.getCollection("coll").update(
             {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
-        // TODO (SERVER-89891) Change the counter to increment by 1 once warnings are not duplicated
-        directWriteCount += 2;
-        assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
+        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
         assert.commandWorked(shardAdminDB.runCommand(
             {setParameter: 1, directConnectionChecksWithSingleShard: false}));
         userTestDB.logout();

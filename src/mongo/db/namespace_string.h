@@ -545,6 +545,12 @@ public:
     bool isNamespaceAlwaysUnsharded() const;
 
     /**
+     * Returns whether the specified namespace is shard-local, meaning it exists independently on
+     * each shard.
+     */
+    bool isShardLocalNamespace() const;
+
+    /**
      * Returns whether the specified namespace is config.cache.chunks.<>.
      */
     bool isConfigDotCacheDotChunks() const;

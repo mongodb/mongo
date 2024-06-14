@@ -51,9 +51,6 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
     // Confirm that we are holding the neccessary collection level lock.
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS));
 
-    // Check if this operation is a direct connection and if it is authorized to be one.
-    direct_connection_util::checkDirectShardOperationAllowed(opCtx, _nss.dbName());
-
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);
 
@@ -77,6 +74,9 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
     if (collection->usesCappedSnapshots()) {
         CappedSnapshots::get(opCtx).establish(opCtx, collection);
     }
+
+    // Check if this operation is a direct connection and if it is authorized to be one.
+    direct_connection_util::checkDirectShardOperationAllowed(opCtx, _nss);
 
     // After yielding and reacquiring locks, the preconditions that were used to select our
     // ReadSource initially need to be checked again. We select a ReadSource based on replication

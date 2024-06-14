@@ -53,6 +53,21 @@ constexpr auto fle2EccSuffix = ".ecc"_sd;
 constexpr auto fle2EcocSuffix = ".ecoc"_sd;
 constexpr auto fle2EcocCompactSuffix = ".ecoc.compact"_sd;
 
+// The following are namespaces in the form of config.xxx for which only one instance exist globally
+// within the cluster.
+static const absl::flat_hash_set<NamespaceString> globallyUniqueConfigDbCollections = {
+    NamespaceString::kConfigsvrCollectionsNamespace,
+    NamespaceString::kConfigsvrChunksNamespace,
+    NamespaceString::kConfigDatabasesNamespace,
+    NamespaceString::kConfigsvrShardsNamespace,
+    NamespaceString::kConfigsvrIndexCatalogNamespace,
+    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+    NamespaceString::kConfigChangelogNamespace,
+    NamespaceString::kConfigsvrTagsNamespace,
+    NamespaceString::kConfigVersionNamespace,
+    NamespaceString::kConfigMongosNamespace,
+    NamespaceString::kLogicalSessionsNamespace};
+
 }  // namespace
 
 
@@ -367,6 +382,25 @@ bool NamespaceString::isNamespaceAlwaysUnsharded() const {
         // all the others are always unsharded.
         // This list does not contain 'config.system.sessions' because we already check it above
         return !isTemporaryReshardingCollection() && !isTimeseriesBucketsCollection();
+    }
+
+    return false;
+}
+
+bool NamespaceString::isShardLocalNamespace() const {
+    if (isLocalDB() || isAdminDB()) {
+        return true;
+    }
+
+    if (isConfigDB()) {
+        return !globallyUniqueConfigDbCollections.contains(*this);
+    }
+
+    if (isSystem()) {
+        // Only some db.system.xxx collections are cluster global.
+        const bool isUniqueInstanceSystemCollection =
+            isTemporaryReshardingCollection() || isTimeseriesBucketsCollection();
+        return !isUniqueInstanceSystemCollection;
     }
 
     return false;
