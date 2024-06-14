@@ -203,10 +203,6 @@ public:
         return !_isEphemeral;
     }
 
-    bool supportsOnlineCompaction() const override {
-        return true;
-    }
-
     StatusWith<int64_t> doCompact(OperationContext* opCtx, const CompactOptions& options) final;
 
     void validate(OperationContext* opCtx, bool full, ValidateResults* results) override;
