@@ -110,7 +110,7 @@ buildvariants:
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
     run_on:
-      - "rhel70-perf-atlas-large"
+      - "rhel94-perf-atlas-large"
     tasks:
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
@@ -153,7 +153,7 @@ buildvariants:
       project_dir: *perf_project_dir
       storageEngine: wiredTiger
     run_on:
-      - "rhel70-perf-atlas-large"
+      - "rhel94-perf-atlas-large"
     tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
@@ -193,7 +193,7 @@ buildvariants:
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
     run_on:
-      - "rhel70-perf-single"
+      - "rhel94-perf-single"
     tasks: &standalonetasks
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
@@ -242,7 +242,7 @@ buildvariants:
       compile_variant: amazon2-arm64-compile
       requires_mongocrypt_shlib: true
     run_on:
-      - "rhel70-perf-shard-lite"
+      - "rhel94-perf-shard-lite"
     tasks:
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
@@ -269,7 +269,7 @@ buildvariants:
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
     run_on:
-      - "rhel70-perf-shard"
+      - "rhel94-perf-shard"
     tasks: &linux_3_shard_tasks
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
@@ -314,7 +314,7 @@ buildvariants:
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
     run_on:
-      - "rhel70-perf-replset"
+      - "rhel94-perf-replset"
     tasks:
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
@@ -399,7 +399,7 @@ buildvariants:
       storageEngine: wiredTiger
       compile_variant: amazon2-x86-compile
     run_on:
-      - "rhel70-perf-replset"
+      - "rhel94-perf-replset"
     tasks: &3node-intel-tasks
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
@@ -449,7 +449,7 @@ buildvariants:
       compile_variant: amazon2-arm64-compile
       project_dir: *perf_project_dir
     run_on:
-      - "rhel70-perf-replset"
+      - "rhel94-perf-replset"
     tasks:
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
@@ -474,7 +474,7 @@ buildvariants:
       project_dir: *perf_project_dir
       compile_variant: amazon2-arm64-compile
     run_on:
-      - "rhel70-perf-microbenchmarks"
+      - "rhel94-perf-microbenchmarks"
     tasks:
       - name: big_collection
       - name: genny_scale_InsertRemove
@@ -518,7 +518,7 @@ buildvariants:
       infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
       compile_variant: amazon2-x86-compile
     run_on:
-      - "rhel70-perf-microbenchmarks"
+      - "rhel94-perf-microbenchmarks"
     tasks:
       - name: big_collection
       - name: genny_scale_InsertRemove
