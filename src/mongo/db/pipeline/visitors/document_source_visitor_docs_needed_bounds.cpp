@@ -302,8 +302,10 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSetVariableFromSubP
 }
 
 void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSequentialDocumentCache& source) {
-    // TODO SERVER-88525 Investigate if this stage can be no change.
-    ctx->applyUnknownStage();
+    // No change. If the cache is in the "building" state, it acts as a no-op stage where it saves
+    // each document to the cache (no change to result stream). If the cache is in the "abandoned"
+    // state, it acts as a pure no-op. If the cache is in the "serving" state, this stage must be
+    // the first in the pipeline, where it populates the result stream.
 }
 
 const ServiceContext::ConstructorActionRegisterer docsNeededBoundsRegisterer{
