@@ -1,8 +1,8 @@
 /**
  * Ensures that performing a write in a prepared transaction, followed by a write outside of a
- * transaction, it is possible to specify either '$_internalReadAtClusterTime' or snapshot read
- * concern with 'atClusterTime' as the timestamp of the second write for 'dbHash'. The
- * commands should block until the prepared transaction is committed or aborted.
+ * transaction, it is possible to specify snapshot read concern with 'atClusterTime' as the
+ * timestamp of the second write for 'dbHash'. The commands should block until the prepared
+ * transaction is committed or aborted.
  *
  * @tags: [
  *   uses_prepare_transaction,
@@ -12,22 +12,18 @@
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
-const runDBHashFn = (host, dbName, clusterTime, useSnapshot) => {
+const runDBHashFn = (host, dbName, clusterTime) => {
     const conn = new Mongo(host);
     const db = conn.getDB(dbName);
 
     conn.setSecondaryOk();
-    let cmd;
-    if (useSnapshot) {
-        cmd = {dbHash: 1, readConcern: {level: "snapshot", atClusterTime: eval(clusterTime)}};
-    } else {
-        cmd = {dbHash: 1, $_internalReadAtClusterTime: eval(clusterTime)};
-    }
-    let firstHash = assert.commandWorked(db.runCommand(cmd));
+    const cmd = {dbHash: 1, readConcern: {level: "snapshot", atClusterTime: eval(clusterTime)}};
+
+    const firstHash = assert.commandWorked(db.runCommand(cmd));
     // This code will execute once the prepared transaction is committed as the call above will
     // be blocked until an abort or commit happens. Ensure that running dbHash here yields the
     // same result as above.
-    let secondHash = assert.commandWorked(db.runCommand({dbHash: 1}));
+    const secondHash = assert.commandWorked(db.runCommand({dbHash: 1}));
 
     assert.eq(firstHash.collections, secondHash.collections);
     assert.eq(firstHash.md5, secondHash.md5);
@@ -89,41 +85,24 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 // to the secondary because we're going to read from it at the returned operationTime.
 assert.commandWorked(testDB.getCollection(collName).insert({x: 2}, {writeConcern: {w: 2}}));
 
-// It should be possible to specify either '$_internalReadAtClusterTime' or snapshot read
-// concern with 'atClusterTime' as the timestamp of the
-// second write without an error for dbHash and find.
-let clusterTime = testDB.getSession().getOperationTime();
+// It should be possible to specify snapshot read concern with 'atClusterTime' as the timestamp of
+// the second write without an error for dbHash and find.
+const clusterTime = testDB.getSession().getOperationTime();
 
 // Run dbHash and find while the prepared transaction has not commit or aborted yet.
 // These should block until the prepared transaction commits or aborts if we specify
-// $_internalReadAtClusterTime or snapshot read concern with 'atClusterTime' to be the timestamp of
-// the second write we did, outside of the transaction.
-
-const dbHashInternalClusterTimePrimaryThread =
-    new Thread(runDBHashFn, primary.host, dbName, tojson(clusterTime), false);
-const dbHashInternalClusterTimeSecondaryThread =
-    new Thread(runDBHashFn, secondary.host, dbName, tojson(clusterTime), false);
-
-dbHashInternalClusterTimePrimaryThread.start();
-dbHashInternalClusterTimeSecondaryThread.start();
-
-let curOpObj = {
-    "command.$_internalReadAtClusterTime": {$exists: true},
-    "command.dbHash": {$exists: true},
-};
-
-assertOpHasPrepareConflict(testDB, "dbHash", curOpObj);
-assertOpHasPrepareConflict(testDBSecondary, "dbHash", curOpObj);
+// snapshot read concern with 'atClusterTime' to be the timestamp of the second write we did,
+// outside of the transaction.
 
 const dbHashClusterTimePrimaryThread =
-    new Thread(runDBHashFn, primary.host, dbName, tojson(clusterTime), true);
+    new Thread(runDBHashFn, primary.host, dbName, tojson(clusterTime));
 const dbHashClusterTimeSecondaryThread =
-    new Thread(runDBHashFn, secondary.host, dbName, tojson(clusterTime), true);
+    new Thread(runDBHashFn, secondary.host, dbName, tojson(clusterTime));
 
 dbHashClusterTimePrimaryThread.start();
 dbHashClusterTimeSecondaryThread.start();
 
-curOpObj = {
+const curOpObj = {
     "command.readConcern.atClusterTime": {$exists: true},
     "command.dbHash": {$exists: true},
 };
@@ -148,21 +127,12 @@ assert.commandWorked(
 PrepareHelpers.commitTransaction(session, prepareTimestamp);
 session.endSession();
 
-dbHashInternalClusterTimePrimaryThread.join();
-dbHashInternalClusterTimeSecondaryThread.join();
-
 dbHashClusterTimePrimaryThread.join();
 dbHashClusterTimeSecondaryThread.join();
 
 // Ensure the dbHashes across the replica set match.
-let primaryDBHash = dbHashInternalClusterTimePrimaryThread.returnData();
-let secondaryDBHash = dbHashInternalClusterTimeSecondaryThread.returnData();
-
-assert.eq(primaryDBHash.collections, secondaryDBHash.collections);
-assert.eq(primaryDBHash.md5, secondaryDBHash.md5);
-
-primaryDBHash = dbHashClusterTimePrimaryThread.returnData();
-secondaryDBHash = dbHashClusterTimeSecondaryThread.returnData();
+const primaryDBHash = dbHashClusterTimePrimaryThread.returnData();
+const secondaryDBHash = dbHashClusterTimeSecondaryThread.returnData();
 
 assert.eq(primaryDBHash.collections, secondaryDBHash.collections);
 assert.eq(primaryDBHash.md5, secondaryDBHash.md5);
