@@ -154,7 +154,7 @@ TEST_F(OAuthDiscoveryFactoryFixture, LookupsMustBeSecure) {
     ASSERT_THROWS(factory.acquire("http://idp.example"), DBException);
 }
 
-TEST_F(OAuthDiscoveryFactoryFixture, EndpointsMustBeSecure) {
+TEST_F(OAuthDiscoveryFactoryFixture, IssuerAndJWKSUriMustBeSecure) {
     auto defaultMetadata = makeDefaultMetadata();
 
     for (const auto& field : defaultMetadata.toBSON()) {
@@ -170,9 +170,20 @@ TEST_F(OAuthDiscoveryFactoryFixture, EndpointsMustBeSecure) {
         client->expect(
             {HttpClient::HttpMethod::kGET, "https://idp.example/.well-known/openid-configuration"},
             {200, {}, splicedMetadata.jsonString()});
-
         OAuthDiscoveryFactory factory(std::move(client));
-        ASSERT_THROWS(factory.acquire("https://idp.example"), DBException);
+
+        // If the insecure field is jwks_uri or issuer, then the factory should throw upon
+        // retrieving the well-known document.
+        if (field.fieldName() == "jwks_uri"_sd || field.fieldName() == "issuer"_sd) {
+            ASSERT_THROWS(factory.acquire("https://idp.example"), DBException);
+        } else {
+            // All other endpoints are permitted to not be https since the server will not directly
+            // use them.
+            OAuthAuthorizationServerMetadata precomputedMetadata =
+                OAuthAuthorizationServerMetadata::parse(IDLParserContext("metadata"),
+                                                        splicedMetadata);
+            ASSERT_EQ(precomputedMetadata, factory.acquire("https://idp.example"));
+        }
     }
 }
 
