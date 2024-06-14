@@ -2434,7 +2434,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=amazon2023
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --enterprise-features="audit,encryptdb,fcbis,fips,fle,hot_backups,inmemory,kerberos,vector_search,ldap,live_import,mongohouse,queryable,sasl,search,serverless"
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
