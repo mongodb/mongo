@@ -352,6 +352,8 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: time_series_sort_high_value
         cron: *high-value-workload-cron
+      - name: array_traversal_high_value
+        cron: *high-value-workload-cron
 
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-3-node-replSet-intel.intel.aws.2023-11
