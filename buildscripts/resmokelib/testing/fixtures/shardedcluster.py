@@ -26,7 +26,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                  configsvr_options=None, shard_options=None, cluster_logging_prefix=None,
                  config_shard=None, use_auto_bootstrap_procedure=None, embedded_router=False,
                  replica_set_endpoint=False, random_migrations=False, launch_mongot=False,
-                 set_cluster_parameter=None):
+                 set_cluster_parameter=None,
+                 has_uninitialized_fcv_initial_sync_nodes_in_shards=False):
         """Initialize ShardedClusterFixture with different options for the cluster processes.
 
         :param embedded_router - True if this ShardedCluster is running in "embedded router mode". Today, this means that:
@@ -70,6 +71,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.embedded_router_mode = embedded_router
         self.replica_endpoint_mode = replica_set_endpoint
         self.set_cluster_parameter = set_cluster_parameter
+        self.has_uninitialized_fcv_initial_sync_nodes_in_shards = has_uninitialized_fcv_initial_sync_nodes_in_shards
 
         # Options for roles - shardsvr, configsvr.
         self.configsvr_options = self.fixturelib.make_historic(
@@ -540,6 +542,18 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         else:
             self.logger.info("Adding %s as a shard...", connection_string)
             client.admin.command({"addShard": connection_string})
+
+        # Normally, the initial sync node has already been added to the replica set during the
+        # replica set's setup() function. However, if this cluster is supposed to have an initial
+        # sync node hung in the uninitialized FCV state, we defer adding in the initial sync node
+        # until now.
+        # This is because if the shard is a config shard and needs to run
+        # transitionFromDedicatedConfigServer as part of _add_shard(), the
+        # transitionFromDedicatedConfigServer command is done with {w: all} write concern, which
+        # requires the initial sync node to not be hung, so we can't add the initial sync node to
+        # the shard until after transitionFromDedicatedConfigServer is done.
+        if self.has_uninitialized_fcv_initial_sync_nodes_in_shards:
+            shard.add_initial_sync_node_to_replica_set()
 
 
 class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixture):

@@ -43,9 +43,11 @@ executor:
         initialSyncOplogFetcherBatchSize: 10
     num_shards: 1
     num_rs_nodes_per_shard: 2
+    has_uninitialized_fcv_initial_sync_nodes_in_shards: True
     shard_options:
       start_initial_sync_node: True
       initial_sync_uninitialized_fcv: True
+      initial_sync_uninitialized_fcv_in_shard_svr: True
       # The ReplicaSetFixture automatically sets initial sync nodes as hidden,
       # which causes a mismatch when the replica set is added to the sharded cluster
       # through addShard, because the replica set's internal connection string does

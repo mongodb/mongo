@@ -42,16 +42,16 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS = 60
 
-    def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
-                 dbpath_prefix=None, preserve_dbpath=False, num_nodes=2,
-                 start_initial_sync_node=False, electable_initial_sync_node=False,
-                 write_concern_majority_journal_default=None, auth_options=None,
-                 replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
-                 use_replica_set_connection_string=None, linear_chain=False,
-                 default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
-                 replicaset_logging_prefix=None, replset_name=None,
-                 use_auto_bootstrap_procedure=None, initial_sync_uninitialized_fcv=False,
-                 hide_initial_sync_node_from_conn_string=False, launch_mongot=False):
+    def __init__(
+            self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
+            dbpath_prefix=None, preserve_dbpath=False, num_nodes=2, start_initial_sync_node=False,
+            electable_initial_sync_node=False, write_concern_majority_journal_default=None,
+            auth_options=None, replset_config_options=None, voting_secondaries=True,
+            all_nodes_electable=False, use_replica_set_connection_string=None, linear_chain=False,
+            default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
+            replicaset_logging_prefix=None, replset_name=None, use_auto_bootstrap_procedure=None,
+            initial_sync_uninitialized_fcv=False, hide_initial_sync_node_from_conn_string=False,
+            launch_mongot=False, initial_sync_uninitialized_fcv_in_shard_svr=False):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
@@ -78,6 +78,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.replset_name = replset_name
         self.initial_sync_uninitialized_fcv = initial_sync_uninitialized_fcv
         self.hide_initial_sync_node_from_conn_string = hide_initial_sync_node_from_conn_string
+        self.initial_sync_uninitialized_fcv_in_shard_svr = initial_sync_uninitialized_fcv_in_shard_svr
         # Used by the enhanced multiversion system to signify multiversion mode.
         # None implies no multiversion run.
         self.fcv = None
@@ -87,6 +88,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         linear_chain_option = self.fixturelib.default_if_none(self.config.LINEAR_CHAIN,
                                                               linear_chain)
         self.linear_chain = linear_chain_option if linear_chain_option else linear_chain
+        self.repl_set_config = {}
 
         # By default, we only use a replica set connection string if all nodes are capable of being
         # elected primary.
@@ -179,17 +181,13 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                     # non-voting when this fixture is configured to have voting secondaries.
                     member_info["votes"] = 0
             members.append(member_info)
-        if self.initial_sync_node:
-            member_config = {
-                "_id": self.initial_sync_node_idx,
-                "host": self.initial_sync_node.get_internal_connection_string(),
-            }
-            if not self.electable_initial_sync_node:
-                member_config["hidden"] = 1
-                member_config["votes"] = 0
-                member_config["priority"] = 0
-
-            members.append(member_config)
+        # If this is an initial sync node in a shard server that will be hung in the uninitialized
+        # FCV state, don't add it to the replica set yet. It will be added to the set later after
+        # the shard is added to the cluster, so that if the shard is a config shard, it can transition
+        # to being a config shard properly.
+        if self.initial_sync_node and not self.initial_sync_uninitialized_fcv_in_shard_svr:
+            initial_sync_config = self._create_initial_sync_config()
+            members.append(initial_sync_config)
 
         repl_config = {"_id": self.replset_name, "protocolVersion": 1}
         client = interface.build_client(self.nodes[0], self.auth_options)
@@ -276,6 +274,34 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # to spin up a mongos with a connection to the last launched mongot.
             self.mongot_port = node.mongot_port
 
+    def _create_initial_sync_config(self):
+        """Helper function to create and return the config for an initial sync node."""
+
+        initial_sync_config = {
+            "_id": self.initial_sync_node_idx,
+            "host": self.initial_sync_node.get_internal_connection_string(),
+        }
+        if not self.electable_initial_sync_node:
+            initial_sync_config["hidden"] = 1
+            initial_sync_config["votes"] = 0
+            initial_sync_config["priority"] = 0
+        return initial_sync_config
+
+    def add_initial_sync_node_to_replica_set(self):
+        """Adds the initial sync node to the replica set.
+        
+        This is used so that we can add in the initial sync node after the setup() function at a 
+        later time.
+        """
+
+        self.logger.info("Adding in initial sync node to replica set")
+        initial_sync_config = self._create_initial_sync_config()
+        self.initial_sync_node.await_ready()
+
+        client = interface.build_client(self.nodes[0], self.auth_options)
+        self.repl_set_config["members"].append(initial_sync_config)
+        self._reconfig_repl_set(client, self.repl_set_config)
+
     def _all_mongo_d_s_t(self):
         """Return a list of all `mongo{d,s,t}` `Process` instances in this fixture."""
         nodes = sum([node._all_mongo_d_s_t() for node in self.nodes], [])
@@ -316,6 +342,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                     "replSetReconfig": repl_config,
                     "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
                 })
+                self.repl_set_config = repl_config
                 break
             except pymongo.errors.OperationFailure as err:
                 # These error codes may be transient, and so we retry the reconfig with a
@@ -347,6 +374,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         for attempt in range(1, num_initiate_attempts + 1):
             try:
                 client.admin.command({"replSetInitiate": repl_config})
+                self.repl_set_config = repl_config
                 break
             except pymongo.errors.OperationFailure as err:
                 # Retry on NodeNotFound errors from the "replSetInitiate" command.
