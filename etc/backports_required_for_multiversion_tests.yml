@@ -673,6 +673,8 @@ last-continuous:
     ticket: SERVER-86685
   - test_file: jstests/sharding/change_streams_with_config_transitions.js
     ticket: SERVER-90358
+  - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
+    ticket: SERVER-91114
   - test_file: jstests/aggregation/sources/redact/root_redact.js
     ticket: SERVER-91339
   - test_file: jstests/core/sparse_index_supports_ne_null.js
@@ -1408,6 +1410,8 @@ last-lts:
     ticket: SERVER-86685
   - test_file: jstests/sharding/change_streams_with_config_transitions.js
     ticket: SERVER-90358
+  - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
+    ticket: SERVER-91114
   - test_file: jstests/aggregation/sources/redact/root_redact.js
     ticket: SERVER-91339
   - test_file: jstests/core/sparse_index_supports_ne_null.js
