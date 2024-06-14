@@ -198,7 +198,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       std::vector<bool> fromMigrate,
                                       bool defaultFromMigrate,
                                       OpStateAccumulator* opAccumulator) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
@@ -303,7 +304,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                                      const OplogUpdateEntryArgs& args,
                                      OpStateAccumulator* opAccumulator) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
@@ -472,7 +474,8 @@ void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
                                           BSONObj const& doc,
                                           OplogDeleteEntryArgs* args,
                                           OpStateAccumulator* opAccumulator) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
@@ -490,9 +493,8 @@ void ShardServerOpObserver::onModifyCollectionShardingIndexCatalog(OperationCont
                                                                    const NamespaceString& nss,
                                                                    const UUID& uuid,
                                                                    BSONObj indexDoc) {
-    // If we are in recovery mode (STARTUP2 or ROLLBACK) let the sharding recovery service to take
-    // care of the in-memory state.
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
     LOGV2_DEBUG(6712303,
@@ -608,7 +610,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                      const BSONObj& doc,
                                      const OplogDeleteEntryArgs& args,
                                      OpStateAccumulator* opAccumulator) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
@@ -760,7 +763,8 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
                                                const BSONObj& idIndex,
                                                const OplogSlot& createOpTime,
                                                bool fromMigrate) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
@@ -815,7 +819,8 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                      std::uint64_t numRecords,
                                                      const CollectionDropType dropType,
                                                      bool markFromMigrate) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return {};
     }
 
@@ -841,7 +846,8 @@ void ShardServerOpObserver::onCreateIndex(OperationContext* opCtx,
                                           const UUID& uuid,
                                           BSONObj indexDoc,
                                           bool fromMigrate) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
@@ -854,7 +860,8 @@ void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                               const UUID& indexBuildUUID,
                                               const std::vector<BSONObj>& indexes,
                                               bool fromMigrate) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
@@ -863,7 +870,8 @@ void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
 
 void ShardServerOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx,
                                                          const NamespaceString& nss) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
@@ -872,7 +880,8 @@ void ShardServerOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx
 
 void ShardServerOpObserver::onAbortIndexBuildSinglePhase(OperationContext* opCtx,
                                                          const NamespaceString& nss) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
@@ -884,7 +893,8 @@ void ShardServerOpObserver::onDropIndex(OperationContext* opCtx,
                                         const UUID& uuid,
                                         const std::string& indexName,
                                         const BSONObj& indexInfo) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
@@ -897,7 +907,8 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
                                       const BSONObj& collModCmd,
                                       const CollectionOptions& oldCollOptions,
                                       boost::optional<IndexCollModInfo> indexInfo) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
     abortOngoingMigrationIfNeeded(opCtx, nss);

@@ -675,6 +675,10 @@ public:
 
     boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
 
+    void setConsistentDataAvailable(OperationContext* opCtx, bool isDataMajorityCommitted) override;
+    bool isDataConsistent() const override;
+    void setConsistentDataAvailable_forTest();
+
     class SharedReplSetConfig {
     public:
         struct Lease {
@@ -2023,6 +2027,12 @@ private:
 
     // Pointer to the SplitPrepareSessionManager owned by this ReplicationCoordinator.
     SplitPrepareSessionManager _splitSessionManager;  // (S)
+
+    // Whether data writes are being done on a consistent copy of the data. The value is false until
+    // setConsistentDataAvailable is called - that's after replSetInitiate, after initial sync
+    // completes, after storage recovers from a stable checkpoint, or after replication recovery
+    // from an unstable checkpoint.
+    AtomicWord<bool> _isDataConsistent{false};
 };
 
 extern Atomic64Metric& replicationWaiterListMetric;

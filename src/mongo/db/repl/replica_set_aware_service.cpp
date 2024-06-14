@@ -74,10 +74,11 @@ void ReplicaSetAwareServiceRegistry::onSetCurrentConfig(OperationContext* opCtx)
     });
 }
 
-void ReplicaSetAwareServiceRegistry::onInitialDataAvailable(OperationContext* opCtx,
-                                                            bool isMajorityDataAvailable) {
+void ReplicaSetAwareServiceRegistry::onConsistentDataAvailable(OperationContext* opCtx,
+                                                               bool isMajority,
+                                                               bool isRollback) {
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
-        service->onInitialDataAvailable(opCtx, isMajorityDataAvailable);
+        service->onConsistentDataAvailable(opCtx, isMajority, isRollback);
     });
 }
 
@@ -169,9 +170,9 @@ void ReplicaSetAwareServiceRegistry::onStepDown() {
     });
 }
 
-void ReplicaSetAwareServiceRegistry::onRollback() {
+void ReplicaSetAwareServiceRegistry::onRollbackBegin() {
     std::for_each(_services.begin(), _services.end(), [](ReplicaSetAwareInterface* service) {
-        service->onRollback();
+        service->onRollbackBegin();
     });
 }
 

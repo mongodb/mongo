@@ -258,7 +258,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
         return status;
     }
     _listener->onTransitionToRollback();
-    ReplicaSetAwareServiceRegistry::get(getGlobalServiceContext()).onRollback();
+    ReplicaSetAwareServiceRegistry::get(opCtx->getServiceContext()).onRollbackBegin();
 
     if (MONGO_unlikely(rollbackHangAfterTransitionToRollback.shouldFail())) {
         LOGV2(21591,

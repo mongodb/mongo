@@ -75,7 +75,9 @@ private:
 
     void onSetCurrentConfig(OperationContext* opCtx) final {}
 
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) final {}
 
     void onStepUpBegin(OperationContext* opCtx, long long term) final {}
 
@@ -83,7 +85,7 @@ private:
 
     void onStepDown() final;
 
-    void onRollback() final {}
+    void onRollbackBegin() final {}
 
     void onShutdown() final {}
 

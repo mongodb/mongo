@@ -559,7 +559,7 @@ TEST_F(
                             shardIdentity.toShardIdentityDocument());
     ASSERT(shardingState()->enabled());
 
-    // This call represents the one done by the onInitialDataAvailable. It should be a no-op.
+    // This call represents the one done by the onConsistentDataAvailable. It should be a no-op.
     Lock::GlobalWrite lk(operationContext());
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity);
     ASSERT(shardingState()->enabled());
@@ -585,7 +585,7 @@ TEST_F(ShardingInitializationMongoDTest,
 
     ASSERT(!shardingState()->enabled());
 
-    // This call represents the one done by the onInitialDataAvailable. It should be a no-op.
+    // This call represents the one done by the onConsistentDataAvailable. It should be a no-op.
     Lock::GlobalWrite lk(operationContext());
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity);
 }

@@ -158,7 +158,7 @@ public:
     BSONObj getStats(boost::optional<const UUID&> migrationId = boost::none);
     void getStats(BSONObjBuilder& bob, boost::optional<const UUID&> migrationId = boost::none);
 
-    void onInitialDataAvailable(OperationContext*, bool) final {}
+    void onConsistentDataAvailable(OperationContext*, bool, bool) final {}
 
     void onShutdown() final {
         {
@@ -170,7 +170,7 @@ public:
         _resetMigrationHandle();
     }
 
-    void onRollback() final {
+    void onRollbackBegin() final {
         interruptAll();
         _resetMigrationHandle();
     }

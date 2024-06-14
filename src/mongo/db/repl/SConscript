@@ -922,6 +922,7 @@ env.Library(
         "oplog_buffer_blocking_queue",
         "repl_coordinator_interface",
         "repl_settings",
+        "replica_set_aware_service",
         "replica_set_messages",
         "storage_interface",
     ],

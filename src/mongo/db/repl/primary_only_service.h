@@ -628,13 +628,15 @@ public:
 
     void onStartup(OperationContext*) final;
     void onSetCurrentConfig(OperationContext* opCtx) final {}
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) final {}
     void onShutdown() final;
     void onStepUpBegin(OperationContext*, long long term) final {}
     void onBecomeArbiter() final {}
     void onStepUpComplete(OperationContext*, long long term) final;
     void onStepDown() final;
-    void onRollback() final {}
+    void onRollbackBegin() final {}
     inline std::string getServiceName() const final {
         return "PrimaryOnlyServiceRegistry";
     }

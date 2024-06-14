@@ -379,6 +379,8 @@ TEST_F(ReplCoordTest,
     ASSERT_OK(status);
     ASSERT(getReplCoord()->getSettings().isReplSet());
     ASSERT_TRUE(getExternalState()->threadsStarted());
+    // Test that data is marked consistent after successful replSetInitiate.
+    ASSERT_TRUE(getReplCoord()->isDataConsistent());
 
     // Show that initiate fails after it has already succeeded.
     doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);

@@ -106,9 +106,11 @@ private:
         _lsidsToEagerlyReap.clear();
     }
 
-    void onRollback() final {}
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) final {}
+    void onRollbackBegin() final {}
     void onBecomeArbiter() final {}
     inline std::string getServiceName() const final {
         return "InternalTransactionsReapService";

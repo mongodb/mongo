@@ -111,7 +111,7 @@ public:
      * Recovers critical sections and indexes from disk when either initial sync or startup recovery
      * have completed.
      */
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final;
+    void onConsistentDataAvailable(OperationContext* opCtx, bool isMajority, bool isRollback) final;
 
 private:
     /**
@@ -131,7 +131,7 @@ private:
     void onStepUpBegin(OperationContext* opCtx, long long term) final {}
     void onStepUpComplete(OperationContext* opCtx, long long term) final {}
     void onStepDown() final {}
-    void onRollback() final {}
+    void onRollbackBegin() final {}
     void onBecomeArbiter() final {}
     inline std::string getServiceName() const final {
         return "ShardingRecoveryService";

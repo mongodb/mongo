@@ -702,6 +702,16 @@ public:
      *
      * This method is only applicable to the "rollback to a stable timestamp" algorithm, and is not
      * called when using any other rollback algorithm i.e "rollback via refetch".
+     *
+     * Note: It's not always safe to reload in-memory states in this callback. For in-memory states
+     * that choose to reload here instead of ReplicaSetAwareInterface::onConsistentDataAvailable,
+     * they'd still be reflecting states in the diverged branch of history during the oplog recovery
+     * (from stable timestamp to the common point) phase of rollback. Therefore, we must make sure
+     * the oplog recovery phase of rollback doesn't in turn depend on those states being correct.
+     * Otherwise, the in-memory states should be reconstructed via
+     * ReplicaSetAwareInterface::onConsistentDataAvailable before the oplog recovery phase of
+     * rollback so that oplog recovery can work with the reloaded in-memory states that reflect the
+     * storage rollback. See replica_set_aware_service.h for more details.
      */
     virtual void onReplicationRollback(OperationContext* opCtx,
                                        const RollbackObserverInfo& rbInfo) = 0;

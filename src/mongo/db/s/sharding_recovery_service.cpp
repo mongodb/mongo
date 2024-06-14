@@ -613,8 +613,13 @@ void ShardingRecoveryService::recoverStates(OperationContext* opCtx,
     }
 }
 
-void ShardingRecoveryService::onInitialDataAvailable(OperationContext* opCtx,
-                                                     bool isMajorityDataAvailable) {
+void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
+                                                        bool isMajority,
+                                                        bool isRollback) {
+    // TODO (SERVER-91505): Determine if we should reload in-memory states on rollback.
+    if (isRollback) {
+        return;
+    }
     recoverRecoverableCriticalSections(opCtx);
     recoverIndexesCatalog(opCtx);
 }

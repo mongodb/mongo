@@ -658,5 +658,9 @@ OpTimeAndWallTime ReplicationCoordinatorNoOp::getMyLastWrittenOpTimeAndWallTime(
     MONGO_UNREACHABLE;
 }
 
+bool ReplicationCoordinatorNoOp::isDataConsistent() const {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

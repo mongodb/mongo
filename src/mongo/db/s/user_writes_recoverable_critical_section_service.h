@@ -141,7 +141,13 @@ public:
     void recoverRecoverableCriticalSections(OperationContext* opCtx);
 
 private:
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) final {
+        // TODO (SERVER-91505): Determine if we should reload in-memory states on rollback.
+        if (isRollback) {
+            return;
+        }
         recoverRecoverableCriticalSections(opCtx);
     }
 
@@ -151,7 +157,7 @@ private:
     void onStepUpBegin(OperationContext* opCtx, long long term) final {}
     void onStepUpComplete(OperationContext* opCtx, long long term) final {}
     void onStepDown() final {}
-    void onRollback() final {}
+    void onRollbackBegin() final {}
     void onBecomeArbiter() final {}
     inline std::string getServiceName() const final {
         return "UserWritesRecoverableCriticalSectionService";

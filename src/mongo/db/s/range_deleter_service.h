@@ -264,7 +264,7 @@ public:
     /* ReplicaSetAwareServiceShardSvr implemented methods */
     void onStartup(OperationContext* opCtx) override;
     void onSetCurrentConfig(OperationContext* opCtx) override {}
-    void onRollback() override {}
+    void onRollbackBegin() override {}
     void onStepUpComplete(OperationContext* opCtx, long long term) override;
     void onStepDown() override;
     void onShutdown() override;
@@ -303,7 +303,9 @@ private:
     void _stopService();
 
     /* ReplicaSetAwareServiceShardSvr "empty implemented" methods */
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) final{};
     void onBecomeArbiter() final {}
 };

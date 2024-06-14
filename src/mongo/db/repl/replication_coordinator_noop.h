@@ -407,6 +407,10 @@ public:
 
     boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
 
+    void setConsistentDataAvailable(OperationContext* opCtx,
+                                    bool isDataMajorityCommitted) override {}
+    bool isDataConsistent() const override;
+
 private:
     ServiceContext* const _service;
     ReplSettings const _settings;

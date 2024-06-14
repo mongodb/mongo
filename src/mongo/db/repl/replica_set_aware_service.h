@@ -99,7 +99,7 @@ namespace mongo {
  *     void onStepDown() final {
  *         // ...
  *     }
- *     void onRollback() final {
+ *     void onRollbackBegin() final {
  *         // ...
  *     }
  *     void onBecomeArbiter() final {
@@ -140,17 +140,44 @@ public:
     virtual void onSetCurrentConfig(OperationContext* opCtx) = 0;
 
     /**
-     * Called when either initial sync or startup recovery have completed.
-     * Local reads are always available at this point, with no special restrictions on resource
-     * locks. If the "isMajorityDataAvailable" flag is set, the data read locally is also committed
+     * Called when a consistent (to a point-in-time) copy of data is available. That's:
+     *   - After replSetInitiate
+     *   - After initial sync completes (for both logical and file-copy based initial sync)
+     *   - After rollback to the stable timestamp
+     *   - After storage startup from a stable checkpoint
+     *   - After replication recovery from an unstable checkpoint
+     * Local reads are allowed at this point, with no special restrictions on resource locks. After
+     * this function is called, all writes in the system are guaranteed to be against a consistent
+     * copy of data. In other words, ReplicationCoordinator::isDataConsistent is guaranteed to
+     * return true after this is called. Thus, in-memory states may choose to reconstruct here and
+     * subscribe to future writes from now on (e.g. via OpObservers).
+     *
+     * If the "isMajority" flag is set, the data read locally is also committed
      * to a majority of replica set members. In the opposite case, the local data may be subject to
-     * rollback attempts, which will also crash the server.
-     * This is one of the first hooks that a node will run after starting up and this is expected to
-     * be evoked strictly before any calls to onRollback, although it may be preceded by OpObserver
-     * calls. In-memory state may be reconstructed here, pending the difference in data availability
-     * described above.
+     * rollback attempts. Currently, completing a logical initial sync is the only case
+     * "isMajority" is false because the initial syncing node may sync past the commit
+     * point.
+     *
+     * If the "isRollback" flag is set, it means that this is called after storage rollback to
+     * stable (but before oplog recovery to the common point). Note that, this function can be
+     * invoked multiple times (due to replication rollbacks) in the lifetime of a mongod process but
+     * it's guaranteed to be invoked only once with isRollback set to false. All subsequent
+     * invocations of this function must have isRollback set to true.
+     *
+     * During rollbacks, onRollbackBegin is called first before onConsistentDataAvailable is
+     * called. But onConsistentDataAvailable is called before OpObservers' onReplicationRollback
+     * method is called. The difference is that onConsistentDataAvailable is called after storage
+     * rollback to stable and OpObservers' onReplicationRollback method is called after we finish
+     * oplog recovery to the common point. It is recommended to reconstruct in-memory states in
+     * onConsistentDataAvailable and tail future writes for updates. But it is currently also a
+     * pattern to reconstruct in-memory states using OpObservers' onReplicationRollback method. But
+     * that is safe only if oplog recovery during rollback doesn't rely on those in-memory states.
+     * See onReplicationRollback in op_observer.h for more details. (We have plans to consolidate
+     * these two interfaces in the future but this is what we have for now.)
      */
-    virtual void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) = 0;
+    virtual void onConsistentDataAvailable(OperationContext* opCtx,
+                                           bool isMajority,
+                                           bool isRollback) = 0;
 
     /**
      * Called as part of ReplicationCoordinator shutdown.
@@ -188,7 +215,7 @@ public:
     /**
      * Called after the node has transitioned to ROLLBACK.
      */
-    virtual void onRollback() = 0;
+    virtual void onRollbackBegin() = 0;
 
     /**
      * Called when the node commences being an arbiter.
@@ -248,12 +275,12 @@ public:
 
     void onStartup(OperationContext* opCtx) final;
     void onSetCurrentConfig(OperationContext* opCtx) final;
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final;
+    void onConsistentDataAvailable(OperationContext* opCtx, bool isMajority, bool isRollback) final;
     void onShutdown() final;
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;
     void onStepDown() final;
-    void onRollback() final;
+    void onRollbackBegin() final;
     void onBecomeArbiter() final;
     inline std::string getServiceName() const final {
         return "ReplicaSetAwareServiceRegistry";

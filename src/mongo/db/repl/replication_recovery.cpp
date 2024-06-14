@@ -496,12 +496,6 @@ boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
 
     hangAfterOplogTruncationInRollback.pauseWhileSet();
 
-    // Truncation may need to adjust the initialDataTimestamp so we let it complete first.
-    if (!isRollbackRecovery) {
-        ReplicaSetAwareServiceRegistry::get(getGlobalServiceContext())
-            .onInitialDataAvailable(opCtx, true /* isMajorityDataAvailable */);
-    }
-
     auto topOfOplogSW = _getTopOfOplog(opCtx);
     if (topOfOplogSW.getStatus() == ErrorCodes::CollectionIsEmpty ||
         topOfOplogSW.getStatus() == ErrorCodes::NamespaceNotFound) {
@@ -514,6 +508,14 @@ boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
     const auto topOfOplog = topOfOplogSW.getValue();
 
     if (stableTimestamp) {
+        // For recovery from a stable timestamp, data is already consistent before oplog recovery.
+        // For initial sync, we only mark data consistent when the entire initial sync process
+        // completes.
+        if (!_duringInitialSync) {
+            ReplicationCoordinator::get(opCtx)->setConsistentDataAvailable(
+                opCtx,
+                /*isDataMajorityCommitted=*/true);
+        }
         invariant(supportsRecoveryTimestamp);
         const auto recoveryMode = isRollbackRecovery ? RecoveryMode::kRollbackFromStableTimestamp
                                                      : RecoveryMode::kStartupFromStableTimestamp;
@@ -521,6 +523,14 @@ boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
     } else {
         _recoverFromUnstableCheckpoint(
             opCtx, _consistencyMarkers->getAppliedThrough(opCtx), topOfOplog);
+        // For recovery from an unstable timestamp, data is consistent after oplog recovery.
+        // For initial sync, we only mark data consistent when the entire initial sync process
+        // completes.
+        if (!_duringInitialSync) {
+            ReplicationCoordinator::get(opCtx)->setConsistentDataAvailable(
+                opCtx,
+                /*isDataMajorityCommitted=*/false);
+        }
     }
     return stableTimestamp;
 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& e) {

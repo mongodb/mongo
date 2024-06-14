@@ -60,11 +60,11 @@ class TestService : public ReplicaSetAwareService<ActualService> {
 public:
     int numCallsOnStartup{0};
     int numCallsOnSetCurrentConfig{0};
-    int numCallsonInitialDataAvailable{0};
+    int numCallsOnConsistentDataAvailable{0};
     int numCallsOnStepUpBegin{0};
     int numCallsOnStepUpComplete{0};
     int numCallsOnStepDown{0};
-    int numCallsOnRollback{0};
+    int numCallsOnTransitionToRollback{0};
     int numCallsOnBecomeArbiter{0};
 
 protected:
@@ -76,8 +76,10 @@ protected:
         numCallsOnSetCurrentConfig++;
     }
 
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) override {
-        numCallsonInitialDataAvailable++;
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) override {
+        numCallsOnConsistentDataAvailable++;
     }
 
     void onStepUpBegin(OperationContext* opCtx, long long term) override {
@@ -92,8 +94,8 @@ protected:
         numCallsOnStepDown++;
     }
 
-    void onRollback() override {
-        numCallsOnRollback++;
+    void onRollbackBegin() override {
+        numCallsOnTransitionToRollback++;
     }
 
     void onBecomeArbiter() override {
@@ -184,10 +186,12 @@ private:
         TestService::onSetCurrentConfig(opCtx);
     }
 
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {
-        ASSERT_EQ(numCallsonInitialDataAvailable,
-                  ServiceB::get(getServiceContext())->numCallsonInitialDataAvailable - 1);
-        TestService::onInitialDataAvailable(opCtx, isMajorityDataAvailable);
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) final {
+        ASSERT_EQ(numCallsOnConsistentDataAvailable,
+                  ServiceB::get(getServiceContext())->numCallsOnConsistentDataAvailable - 1);
+        TestService::onConsistentDataAvailable(opCtx, isMajority, false);
     }
 
     void onStepUpBegin(OperationContext* opCtx, long long term) final {
@@ -207,9 +211,10 @@ private:
         TestService::onStepDown();
     }
 
-    void onRollback() final {
-        ASSERT_EQ(numCallsOnRollback, ServiceB::get(getServiceContext())->numCallsOnRollback - 1);
-        TestService::onRollback();
+    void onRollbackBegin() final {
+        ASSERT_EQ(numCallsOnTransitionToRollback,
+                  ServiceB::get(getServiceContext())->numCallsOnTransitionToRollback - 1);
+        TestService::onRollbackBegin();
     }
 
     void onBecomeArbiter() final {
@@ -328,70 +333,70 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
 
     ASSERT_EQ(0, a->numCallsOnStartup);
     ASSERT_EQ(0, a->numCallsOnSetCurrentConfig);
-    ASSERT_EQ(0, a->numCallsonInitialDataAvailable);
+    ASSERT_EQ(0, a->numCallsOnConsistentDataAvailable);
     ASSERT_EQ(0, a->numCallsOnStepUpBegin);
     ASSERT_EQ(0, a->numCallsOnStepUpComplete);
     ASSERT_EQ(0, a->numCallsOnStepDown);
-    ASSERT_EQ(0, a->numCallsOnRollback);
+    ASSERT_EQ(0, a->numCallsOnTransitionToRollback);
     ASSERT_EQ(0, a->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(0, b->numCallsOnStartup);
     ASSERT_EQ(0, b->numCallsOnSetCurrentConfig);
-    ASSERT_EQ(0, b->numCallsonInitialDataAvailable);
+    ASSERT_EQ(0, b->numCallsOnConsistentDataAvailable);
     ASSERT_EQ(0, b->numCallsOnStepUpBegin);
     ASSERT_EQ(0, b->numCallsOnStepUpComplete);
     ASSERT_EQ(0, b->numCallsOnStepDown);
-    ASSERT_EQ(0, b->numCallsOnRollback);
+    ASSERT_EQ(0, b->numCallsOnTransitionToRollback);
     ASSERT_EQ(0, b->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(0, c->numCallsOnStartup);
     ASSERT_EQ(0, c->numCallsOnSetCurrentConfig);
-    ASSERT_EQ(0, c->numCallsonInitialDataAvailable);
+    ASSERT_EQ(0, c->numCallsOnConsistentDataAvailable);
     ASSERT_EQ(0, c->numCallsOnStepUpBegin);
     ASSERT_EQ(0, c->numCallsOnStepUpComplete);
     ASSERT_EQ(0, c->numCallsOnStepDown);
-    ASSERT_EQ(0, c->numCallsOnRollback);
+    ASSERT_EQ(0, c->numCallsOnTransitionToRollback);
     ASSERT_EQ(0, c->numCallsOnBecomeArbiter);
 
     ReplicaSetAwareServiceRegistry::get(sc).onStartup(opCtx);
     ReplicaSetAwareServiceRegistry::get(sc).onSetCurrentConfig(opCtx);
     ReplicaSetAwareServiceRegistry::get(sc).onSetCurrentConfig(opCtx);
-    ReplicaSetAwareServiceRegistry::get(sc).onInitialDataAvailable(opCtx, false
-                                                                   /* isMajorityDataAvailable */);
+    ReplicaSetAwareServiceRegistry::get(sc).onConsistentDataAvailable(
+        opCtx, false /* isMajority */, false /* isRollback */);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepDown();
-    ReplicaSetAwareServiceRegistry::get(sc).onRollback();
+    ReplicaSetAwareServiceRegistry::get(sc).onRollbackBegin();
     ReplicaSetAwareServiceRegistry::get(sc).onBecomeArbiter();
 
     ASSERT_EQ(0, a->numCallsOnStartup);
     ASSERT_EQ(0, a->numCallsOnSetCurrentConfig);
-    ASSERT_EQ(0, a->numCallsonInitialDataAvailable);
+    ASSERT_EQ(0, a->numCallsOnConsistentDataAvailable);
     ASSERT_EQ(0, a->numCallsOnStepUpBegin);
     ASSERT_EQ(0, a->numCallsOnStepUpComplete);
     ASSERT_EQ(0, a->numCallsOnStepDown);
-    ASSERT_EQ(0, a->numCallsOnRollback);
+    ASSERT_EQ(0, a->numCallsOnTransitionToRollback);
     ASSERT_EQ(0, a->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(1, b->numCallsOnStartup);
     ASSERT_EQ(2, b->numCallsOnSetCurrentConfig);
-    ASSERT_EQ(1, b->numCallsonInitialDataAvailable);
+    ASSERT_EQ(1, b->numCallsOnConsistentDataAvailable);
     ASSERT_EQ(3, b->numCallsOnStepUpBegin);
     ASSERT_EQ(2, b->numCallsOnStepUpComplete);
     ASSERT_EQ(1, b->numCallsOnStepDown);
-    ASSERT_EQ(1, b->numCallsOnRollback);
+    ASSERT_EQ(1, b->numCallsOnTransitionToRollback);
     ASSERT_EQ(1, b->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(1, c->numCallsOnStartup);
     ASSERT_EQ(2, c->numCallsOnSetCurrentConfig);
-    ASSERT_EQ(1, c->numCallsonInitialDataAvailable);
+    ASSERT_EQ(1, c->numCallsOnConsistentDataAvailable);
     ASSERT_EQ(3, c->numCallsOnStepUpBegin);
     ASSERT_EQ(2, c->numCallsOnStepUpComplete);
     ASSERT_EQ(1, c->numCallsOnStepDown);
-    ASSERT_EQ(1, c->numCallsOnRollback);
+    ASSERT_EQ(1, c->numCallsOnTransitionToRollback);
     ASSERT_EQ(1, c->numCallsOnBecomeArbiter);
 }
 

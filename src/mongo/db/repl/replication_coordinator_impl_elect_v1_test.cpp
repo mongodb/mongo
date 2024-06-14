@@ -1133,6 +1133,7 @@ TEST_F(ReplCoordTest, StartElectionOnSingleNodeStartup) {
     // Oplog applier attempts to transition the state to Secondary, which triggers
     // election on single node.
     auto opCtx = makeOperationContext();
+    getReplCoord()->setConsistentDataAvailable_forTest();
     getReplCoord()->finishRecoveryIfEligible(opCtx.get());
     // Run pending election operations on executor.
     getNet()->enterNetwork();

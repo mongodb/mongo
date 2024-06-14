@@ -124,8 +124,14 @@ void VectorClockMongoD::onShutdown() {
     _shutdownInitiated.store(true);
 }
 
-void VectorClockMongoD::onInitialDataAvailable(OperationContext* opCtx,
-                                               bool isMajorityDataAvailable) {
+void VectorClockMongoD::onConsistentDataAvailable(OperationContext* opCtx,
+                                                  bool isMajority,
+                                                  bool isRollback) {
+    // TODO (SERVER-91505): Determine if we should reload in-memory states on rollback.
+    if (isRollback) {
+        return;
+    }
+
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         const auto maxTopologyTime{[&opCtx]() -> boost::optional<Timestamp> {
             DBDirectClient client{opCtx};
@@ -144,7 +150,7 @@ void VectorClockMongoD::onInitialDataAvailable(OperationContext* opCtx,
         }()};
 
         if (maxTopologyTime) {
-            if (isMajorityDataAvailable) {
+            if (isMajority) {
                 // The maxTopologyTime is majority committed. Thus, we can start gossiping it.
                 _advanceComponentTimeTo(Component::TopologyTime, LogicalTime(*maxTopologyTime));
             } else {

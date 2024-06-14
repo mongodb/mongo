@@ -744,7 +744,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
         AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         writeReadCriticalSectionDocument(dbName, dbOpReason, false /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
+    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -760,7 +760,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
         AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         writeReadCriticalSectionDocument(dbName, dbOpReason, true /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
+    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(dbName);
@@ -776,7 +776,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
         AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         deleteReadCriticalSectionDocument(dbName, dbOpReason);
     }
-    ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
+    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -794,7 +794,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
         AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         writeReadCriticalSectionDocument(collNss, collOpReason, false /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
+    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -810,7 +810,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
         AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         writeReadCriticalSectionDocument(collNss, collOpReason, true /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
+    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(collNss);
@@ -826,7 +826,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
         AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         deleteReadCriticalSectionDocument(collNss, collOpReason);
     }
-    ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
+    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);

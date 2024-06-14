@@ -69,6 +69,7 @@
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -1765,6 +1766,122 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
     recovery.truncateOplogToTimestamp(opCtx, Timestamp(3, 3));
 }
 
+class TestServiceForRecovery : public ReplicaSetAwareService<TestServiceForRecovery> {
+public:
+    static TestServiceForRecovery* get(ServiceContext* serviceContext);
+    int numCallsOnConsistentDataAvailable{0};
+    SimpleBSONObjSet docsOnConsistentDataAvailable;
+
+protected:
+    void onStartup(OperationContext* opCtx) final {}
+    void onSetCurrentConfig(OperationContext* opCtx) override {}
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) override {
+        numCallsOnConsistentDataAvailable++;
+        docsOnConsistentDataAvailable.clear();
+        if (!StorageInterface::get(opCtx->getServiceContext())
+                 ->getCollectionUUID(opCtx, testNs)
+                 .isOK()) {
+            // No such collection, return early.
+            return;
+        }
+        CollectionReader reader(opCtx, testNs);
+        while (true) {
+            auto swDoc = reader.next();
+            if (!swDoc.isOK()) {
+                ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, swDoc.getStatus());
+                return;
+            }
+            docsOnConsistentDataAvailable.insert(unittest::assertGet(swDoc).getOwned());
+        }
+    }
+    void onStepUpBegin(OperationContext* opCtx, long long term) override {}
+    void onStepUpComplete(OperationContext* opCtx, long long term) override {}
+    void onStepDown() override {}
+    void onRollbackBegin() override {}
+    void onBecomeArbiter() override {}
+    void onShutdown() override {}
+
+private:
+    bool shouldRegisterReplicaSetAwareService() const final {
+        return true;
+    }
+    std::string getServiceName() const final {
+        return "TestServiceForRecovery";
+    }
+};
+
+const auto getTestServiceForRecovery = ServiceContext::declareDecoration<TestServiceForRecovery>();
+TestServiceForRecovery* TestServiceForRecovery::get(ServiceContext* serviceContext) {
+    return &getTestServiceForRecovery(serviceContext);
+}
+const ReplicaSetAwareServiceRegistry::Registerer<TestServiceForRecovery>
+    testServiceForRecoveryRegisterer("TestServiceForRecovery");
+
+void assertDocsOnConsistentDataAvailable(const SimpleBSONObjSet& actualDocs, std::vector<int> ids) {
+    SimpleBSONObjSet expectedDocs;
+    std::transform(ids.begin(),
+                   ids.end(),
+                   std::inserter(expectedDocs, expectedDocs.begin()),
+                   [](int id) { return _makeInsertDocument(id); });
+
+    ASSERT_EQ(actualDocs.size(), expectedDocs.size());
+    auto docIt = expectedDocs.begin();
+    auto docEnd = expectedDocs.end();
+    auto actualIt = actualDocs.begin();
+    for (; docIt != docEnd; ++docIt, ++actualIt) {
+        ASSERT_BSONOBJ_EQ(*docIt, *actualIt);
+    }
+}
+
+TEST_F(ReplicationRecoveryTest, StableRecoveryCallsOnConsistentDataAvailable) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    auto testService = TestServiceForRecovery::get(opCtx->getServiceContext());
+
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4});
+
+    ASSERT_EQ(0, testService->numCallsOnConsistentDataAvailable);
+    recovery.recoverFromOplog(opCtx, boost::none);
+    // The onConsistentDataAvailable hook should be called before oplog replay for stable recovery,
+    // so we should see no documents when the hook is called.
+    assertDocsOnConsistentDataAvailable(testService->docsOnConsistentDataAvailable, {});
+    ASSERT_EQ(1, testService->numCallsOnConsistentDataAvailable);
+}
+
+TEST_F(ReplicationRecoveryTest, UnstableRecoveryCallsOnConsistentDataAvailable) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    auto testService = TestServiceForRecovery::get(opCtx->getServiceContext());
+
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4});
+
+    ASSERT_EQ(0, testService->numCallsOnConsistentDataAvailable);
+    recovery.recoverFromOplog(opCtx, boost::none);
+    // The onConsistentDataAvailable hook should be called after oplog replay for unstable recovery,
+    // so we should see two documents inserted by the oplog replay when the hook is called.
+    assertDocsOnConsistentDataAvailable(testService->docsOnConsistentDataAvailable, {3, 4});
+    ASSERT_EQ(1, testService->numCallsOnConsistentDataAvailable);
+}
+
+TEST_F(ReplicationRecoveryTest, InitialSyncRecoveryDoesNotCallOnConsistentDataAvailable) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    auto testService = TestServiceForRecovery::get(opCtx->getServiceContext());
+
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(4, 4));
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4});
+
+    ASSERT_EQ(0, testService->numCallsOnConsistentDataAvailable);
+    recovery.recoverFromOplogAsStandalone(opCtx, /*duringInitialSync=*/true);
+    ASSERT_EQ(0, testService->numCallsOnConsistentDataAvailable);
+}
 
 TEST_F(ReplicationRecoveryTest, ApplyOplogEntriesForRestore) {
     storageGlobalParams.magicRestore = true;

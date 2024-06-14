@@ -642,8 +642,14 @@ void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
     }
 }
 
-void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCtx,
-                                                          bool isMajorityDataAvailable) {
+void ShardingInitializationMongoD::onConsistentDataAvailable(OperationContext* opCtx,
+                                                             bool isMajority,
+                                                             bool isRollback) {
+    // TODO (SERVER-91505): Determine if we should reload in-memory states on rollback.
+    if (isRollback) {
+        return;
+    }
+
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         initializeGlobalShardingStateForConfigServer(opCtx);
     }

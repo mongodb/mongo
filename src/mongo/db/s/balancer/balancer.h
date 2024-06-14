@@ -198,8 +198,10 @@ private:
      */
     void onStartup(OperationContext* opCtx) final {}
     void onSetCurrentConfig(OperationContext* opCtx) final {}
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
-    void onRollback() final {}
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) final {}
+    void onRollbackBegin() final {}
     void onShutdown() final;
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;

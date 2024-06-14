@@ -249,13 +249,15 @@ public:
 private:
     bool shouldRegisterReplicaSetAwareService() const final;
 
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) final {}
 
     void onStepUpBegin(OperationContext* opCtx, long long term) final {}
 
     void onStepDown() final {}
 
-    void onRollback() final {}
+    void onRollbackBegin() final {}
 
     void onBecomeArbiter() final {}
 

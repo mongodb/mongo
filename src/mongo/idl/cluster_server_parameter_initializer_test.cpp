@@ -104,7 +104,8 @@ public:
      */
     void doInitialSync() {
         auto opCtx = cc().makeOperationContext();
-        _initializer.onInitialDataAvailable(opCtx.get(), false /* isMajorityDataAvailable */);
+        _initializer.onConsistentDataAvailable(
+            opCtx.get(), false /* isMajority */, false /* isRollback */);
     }
 
     /**
@@ -113,7 +114,8 @@ public:
      */
     void doStartupRecovery() {
         auto opCtx = cc().makeOperationContext();
-        _initializer.onInitialDataAvailable(opCtx.get(), true /* isMajorityDataAvailable */);
+        _initializer.onConsistentDataAvailable(
+            opCtx.get(), true /* isMajority */, false /* isRollback */);
     }
 
 protected:

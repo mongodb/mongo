@@ -909,8 +909,8 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
         _topCoord->resetMaintenanceCount();
     }
 
-    ReplicaSetAwareServiceRegistry::get(_service).onInitialDataAvailable(
-        cc().makeOperationContext().get(), false /* isMajorityDataAvailable */);
+    setConsistentDataAvailable(cc().makeOperationContext().get(),
+                               /*isDataMajorityCommitted=*/false);
 
     // Transition from STARTUP2 to RECOVERING and start the producer and the applier.
     // If the member state is REMOVED, this will do nothing until we receive a config with
@@ -4770,6 +4770,9 @@ Status ReplicationCoordinatorImpl::_runReplSetInitiate(const BSONObj& configObj,
             /*stableCheckpoint*/ true);
     }
 
+    // Initial consistent (though empty) data is available after replSetInitiate.
+    setConsistentDataAvailable(opCtx, /*isDataMajorityCommitted=*/true);
+
     _finishReplSetInitiate(opCtx, newConfig, myIndex.getValue());
     // A configuration passed to replSetInitiate() with the current node as an arbiter
     // will fail validation with a "replSet initiate got ... while validating" reason.
@@ -5964,6 +5967,9 @@ void ReplicationCoordinatorImpl::finishRecoveryIfEligible(OperationContext* opCt
         return;
     }
 
+    // Data must be consistent before we transition to SECONDARY.
+    invariant(_isDataConsistent.load());
+
     // Execute the transition to SECONDARY.
     auto status = setFollowerMode(MemberState::RS_SECONDARY);
     if (!status.isOK()) {
@@ -6693,6 +6699,38 @@ boost::optional<UUID> ReplicationCoordinatorImpl::getInitialSyncId(OperationCont
         return initialSyncIdDoc.get_id();
     }
     return boost::none;
+}
+
+void ReplicationCoordinatorImpl::setConsistentDataAvailable(OperationContext* opCtx,
+                                                            bool isDataMajorityCommitted) {
+    // No lock should be held when this is called.
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+
+    _isDataConsistent.store(true);
+
+    if (getSettings().isReplSet()) {
+        // This must be called before, not after, this node transitions to SECONDARY/PRIMARY.
+        invariant(!isInPrimaryOrSecondaryState_UNSAFE());
+        auto isRollback = getMemberState().rollback();
+        LOGV2(9036000,
+              "Initial consistent data is now available",
+              "isDataMajorityCommitted"_attr = isDataMajorityCommitted,
+              "isRollback"_attr = isRollback);
+        if (ReplicationCoordinator::get(opCtx)) {
+            // ReplicationCoordinatorImpl unit tests may not have replication coordinator set up for
+            // the service context. Skip onConsistentDataAvailable call in those unit tests.
+            ReplicaSetAwareServiceRegistry::get(_service).onConsistentDataAvailable(
+                opCtx, isDataMajorityCommitted, isRollback);
+        }
+    }
+}
+
+bool ReplicationCoordinatorImpl::isDataConsistent() const {
+    return _isDataConsistent.load();
+}
+
+void ReplicationCoordinatorImpl::setConsistentDataAvailable_forTest() {
+    _isDataConsistent.store(true);
 }
 
 }  // namespace repl

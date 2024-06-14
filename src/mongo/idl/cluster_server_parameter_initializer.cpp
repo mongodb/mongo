@@ -73,8 +73,13 @@ ClusterServerParameterInitializer* ClusterServerParameterInitializer::get(
     return &getInstance(serviceContext);
 }
 
-void ClusterServerParameterInitializer::onInitialDataAvailable(OperationContext* opCtx,
-                                                               bool isMajorityDataAvailable) {
+void ClusterServerParameterInitializer::onConsistentDataAvailable(OperationContext* opCtx,
+                                                                  bool isMajority,
+                                                                  bool isRollback) {
+    // TODO (SERVER-91506): Determine if we should reload in-memory states on rollback.
+    if (isRollback) {
+        return;
+    }
     synchronizeAllParametersFromDisk(opCtx);
 }
 

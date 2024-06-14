@@ -95,11 +95,13 @@ public:
 
 private:
     void onSetCurrentConfig(OperationContext* opCtx) final {}
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) final {}
     void onBecomeArbiter() final {}
     void onShutdown() final {}
-    void onRollback() final {}
+    void onRollbackBegin() final {}
 
     void onStartup(OperationContext* opCtx) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;

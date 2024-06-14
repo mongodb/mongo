@@ -1277,9 +1277,26 @@ public:
     virtual boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) = 0;
 
     /**
+     * Called when a consistent (to a point-in-time) copy of data is available. That's:
+     *   - After replSetInitiate
+     *   - After initial sync completes (for both logical and file-copy based initial sync)
+     *   - After rollback to stable timestamp
+     *   - After storage startup from a stable checkpoint
+     *   - After replication recovery from an unstable checkpoint
+     */
+    virtual void setConsistentDataAvailable(OperationContext* opCtx,
+                                            bool isDataMajorityCommitted) = 0;
+
+    /**
+     * Returns whether data writes are applied against a consistent copy of the data. This should
+     * start to return true after setConsistentDataAvailable is called.
+     */
+    virtual bool isDataConsistent() const = 0;
+
+    /**
      * Returns true if the node undergoes initial sync or rollback.
      */
-    bool isDataRecovering() const;
+    bool isInInitialSyncOrRollback() const;
 
 protected:
     ReplicationCoordinator();

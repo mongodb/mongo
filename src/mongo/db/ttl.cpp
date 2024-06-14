@@ -326,7 +326,9 @@ public:
 private:
     void onStartup(OperationContext* opCtx) override {}
     void onSetCurrentConfig(OperationContext* opCtx) override {}
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) override {}
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) override {}
     void onShutdown() override {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override {}
     void onStepUpComplete(OperationContext* opCtx, long long term) override {
@@ -338,7 +340,7 @@ private:
         ttlMonitor->onStepUp();
     }
     void onStepDown() override {}
-    void onRollback() override {}
+    void onRollbackBegin() override {}
     void onBecomeArbiter() override {}
     inline std::string getServiceName() const final {
         return "TTLMonitorService";

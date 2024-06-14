@@ -110,7 +110,7 @@ bool ReplicationCoordinator::isOplogDisabledForNS(const NamespaceString& nss) {
     return false;
 }
 
-bool ReplicationCoordinator::isDataRecovering() const {
+bool ReplicationCoordinator::isInInitialSyncOrRollback() const {
     if (!getSettings().isReplSet()) {
         return false;
     }
