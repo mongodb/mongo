@@ -623,6 +623,8 @@ last-continuous:
     ticket: SERVER-90461
   - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_negative.js
     ticket: SERVER-90833
+  - test_file: jstests/aggregation/match_swapping_renamed_fields.js
+    ticket: SERVER-90869
   - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
     ticket: SERVER-91114
   - test_file: jstests/aggregation/sources/redact/root_redact.js
@@ -1304,6 +1306,8 @@ last-lts:
     ticket: SERVER-90833
   - test_file: jstests/sharding/direct_shard_connection_auth.js
     ticket: SERVER-89994
+  - test_file: jstests/aggregation/match_swapping_renamed_fields.js
+    ticket: SERVER-90869
   - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
     ticket: SERVER-91114
   - test_file: jstests/aggregation/sources/redact/root_redact.js
