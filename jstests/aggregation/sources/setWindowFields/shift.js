@@ -246,6 +246,19 @@ verifyResults(result, function(num, baseObj) {
     return baseObj;
 });
 
+// Test $shift with default value.
+coll.drop();
+assert.commandWorked(coll.insert([
+    {_id: 1},
+    {_id: 2},
+]));
+result = coll.aggregate([{
+                 $setWindowFields:
+                     {sortBy: {_id: 1}, output: {a: {$shift: {output: "$b", by: 1, default: "c"}}}}
+             }])
+             .toArray();
+assert.eq([{_id: 1, a: "c"}, {_id: 2, a: "c"}], result, result);
+
 /* Parsing tests */
 
 // "by" is required.

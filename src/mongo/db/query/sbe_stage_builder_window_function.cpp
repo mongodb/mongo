@@ -420,12 +420,13 @@ SbExpr buildWindowFinalizeFirstLast(const WindowOp& op,
     auto inputExpr = std::move(inputs->inputExpr);
     auto defaultVal = std::move(inputs->defaultVal);
 
+    auto thenExpr = b.makeFillEmpty(std::move(inputExpr), defaultVal.clone());
     return b.makeIf(b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
                                    b.makeFunction("exists", b.makeVariable(slots[0])),
                                    b.makeBinaryOp(sbe::EPrimBinary::greater,
                                                   b.makeVariable(slots[0]),
                                                   b.makeInt64Constant(0))),
-                    b.makeFillEmptyNull(std::move(inputExpr)),
+                    std::move(thenExpr),
                     std::move(defaultVal));
 }
 
