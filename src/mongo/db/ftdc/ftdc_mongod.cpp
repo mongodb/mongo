@@ -118,75 +118,108 @@ public:
     }
 };
 
-void registerCollectionStatsCollector(FTDCController* controller,
-                                      StringData statsName,
-                                      StringData collName,
-                                      const DatabaseName& db) {
-    controller->addPeriodicCollector(
-        std::make_unique<FTDCSimpleInternalCommandCollector>(
-            "aggregate",
-            statsName,
-            db,
-            BSON("aggregate" << collName << "cursor" << BSONObj{} << "pipeline"
-                             << BSON_ARRAY(BSON("$collStats"
-                                                << BSON("storageStats" << BSON(
-                                                            "waitForLock" << false << "numericOnly"
-                                                                          << true)))))),
-        ClusterRole::ShardServer);
+static const BSONArray pipelineObj =
+    BSONArrayBuilder{}
+        .append(BSONObjBuilder{}
+                    .append("$collStats",
+                            BSONObjBuilder{}
+                                .append("storageStats",
+                                        BSONObjBuilder{}
+                                            .append("waitForLock", false)
+                                            .append("numericOnly", true)
+                                            .obj())
+                                .obj())
+                    .obj())
+        .arr();
+
+static const BSONObj getParameterQueryObj =
+    BSONObjBuilder{}
+        .append("getParameter",
+                BSONObjBuilder{}.append("allParameters", true).append("setAt", "runtime").obj())
+        .obj();
+
+static const BSONObj getClusterParameterQueryObj =
+    BSONObjBuilder{}.append("getClusterParameter", "*").append("omitInFTDC", true).obj();
+
+static const BSONObj replSetGetStatusObj =
+    BSONObjBuilder{}.append("replSetGetStatus", 1).append("initialSync", 0).obj();
+
+repl::ReplicationCoordinator* getGlobalRC() {
+    return repl::ReplicationCoordinator::get(getGlobalServiceContext());
+}
+
+bool isRepl(const repl::ReplicationCoordinator& rc) {
+    return rc.getSettings().isReplSet();
+}
+
+bool isArbiter(const repl::ReplicationCoordinator& rc) {
+    return isRepl(rc) && rc.getMemberState().arbiter();
+}
+
+bool isDataStoringNode() {
+    auto rc = getGlobalRC();
+    return !(rc && isArbiter(*rc));
+}
+
+std::unique_ptr<FTDCCollectorInterface> makeFilteredCollector(
+    std::function<bool()> pred, std::unique_ptr<FTDCCollectorInterface> collector) {
+    return std::make_unique<FilteredFTDCCollector>(std::move(pred), std::move(collector));
 }
 
 void registerShardCollectors(FTDCController* controller) {
-    registerServerCollectorsForRole(controller, ClusterRole::ShardServer);
+    const auto role = ClusterRole::ShardServer;
+    registerServerCollectorsForRole(controller, role);
 
-    auto rc = repl::ReplicationCoordinator::get(getGlobalServiceContext());
-    bool isRepl = rc->getSettings().isReplSet();
-    // Don't collect collection stats on an arbiter, which doesn't store data.
-    bool isArbiter = isRepl && rc->getMemberState().arbiter();
-
-    // These metrics are only collected if replication is enabled
-    if (isRepl) {
+    if (auto rc = getGlobalRC(); rc && isRepl(*rc)) {
         // CmdReplSetGetStatus
-        controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-                                             "replSetGetStatus",
-                                             "replSetGetStatus",
-                                             DatabaseName::kEmpty,
-                                             BSON("replSetGetStatus" << 1 << "initialSync" << 0)),
-                                         ClusterRole::ShardServer);
+        controller->addPeriodicCollector(
+            std::make_unique<FTDCSimpleInternalCommandCollector>(
+                "replSetGetStatus", "replSetGetStatus", DatabaseName::kEmpty, replSetGetStatusObj),
+            role);
+
 
         // CollectionStats
-        if (!isArbiter) {
-            registerCollectionStatsCollector(
-                controller, "local.oplog.rs.stats", "oplog.rs", DatabaseName::kLocal);
-            registerCollectionStatsCollector(
-                controller, "config.transactions.stats", "transactions", DatabaseName::kConfig);
-            registerCollectionStatsCollector(controller,
-                                             "config.image_collection.stats",
-                                             "image_collection",
-                                             DatabaseName::kConfig);
+        const struct {
+            StringData stat;
+            StringData coll;
+            const DatabaseName& db;
+        } specs[]{
+            {"local.oplog.rs.stats"_sd, "oplog.rs"_sd, DatabaseName::kLocal},
+            {"config.transactions.stats"_sd, "transactions"_sd, DatabaseName::kConfig},
+            {"config.image_collection.stats"_sd, "image_collection"_sd, DatabaseName::kConfig},
+        };
+
+        for (const auto& spec : specs) {
+            controller->addPeriodicCollector(
+                makeFilteredCollector(isDataStoringNode,
+                                      std::make_unique<FTDCSimpleInternalCommandCollector>(
+                                          "aggregate",
+                                          spec.stat,
+                                          spec.db,
+                                          BSONObjBuilder{}
+                                              .append("aggregate", spec.coll)
+                                              .append("cursor", BSONObj{})
+                                              .append("pipeline", pipelineObj)
+                                              .obj())),
+                role);
         }
     }
+
     controller->addPeriodicMetadataCollector(
         std::make_unique<FTDCSimpleInternalCommandCollector>(
-            "getParameter",
-            "getParameter",
-            DatabaseName::kEmpty,
-            BSON("getParameter" << BSON("allParameters" << true << "setAt"
-                                                        << "runtime"))),
-        ClusterRole::ShardServer);
+            "getParameter", "getParameter", DatabaseName::kEmpty, getParameterQueryObj),
+        role);
 
     controller->addPeriodicMetadataCollector(
         std::make_unique<FTDCSimpleInternalCommandCollector>("getClusterParameter",
                                                              "getClusterParameter",
                                                              DatabaseName::kEmpty,
-                                                             BSON("getClusterParameter"
-                                                                  << "*"
-                                                                  << "omitInFTDC" << true)),
-        ClusterRole::ShardServer);
+                                                             getClusterParameterQueryObj),
+        role);
 
-    if (!isArbiter) {
-        controller->addPeriodicCollector(std::make_unique<FTDCCollectionStatsCollector>(),
-                                         ClusterRole::ShardServer);
-    }
+    controller->addPeriodicCollector(
+        makeFilteredCollector(isDataStoringNode, std::make_unique<FTDCCollectionStatsCollector>()),
+        role);
 }
 
 }  // namespace
