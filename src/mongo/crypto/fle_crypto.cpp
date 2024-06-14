@@ -4422,21 +4422,14 @@ std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
     return getEdgesT(aost.value, aost.min, aost.max, sparsity, trimFactor);
 }
 
-std::uint64_t getEdgesLength(const QueryTypeConfig& config) {
-    uassert(8574707,
-            "Unable to determine field type without queryTypeConfig.min/max",
-            config.getMin() && config.getMax());
-    uassert(8574708,
-            "Range QueryTypeConfig mismatch between min and max"_format(
-                typeName(config.getMin()->getType()), typeName(config.getMax()->getType())),
-            config.getMin()->getType() == config.getMax()->getType());
-    const auto fieldType = config.getMin()->getType();
-    const auto sparsity = config.getSparsity().get_value_or(1);
+std::uint64_t getEdgesLength(BSONType fieldType, QueryTypeConfig config) {
+    // validates fieldType & config and sets defaults
+    setRangeDefaults(fieldType, &config);
+
+    const auto sparsity = *config.getSparsity();
     const auto trimFactor = config.getTrimFactor().get_value_or(0);
-    const bool needsPrecision = (fieldType == NumberDouble) || (fieldType == NumberDecimal);
-    uassert(8574709,
-            "Floating point range QueryTypeConfig requires precision argument",
-            !needsPrecision || config.getPrecision());
+    auto precision = config.getPrecision().map(
+        [](auto signedInt) -> uint32_t { return static_cast<uint32_t>(signedInt); });
 
     switch (fieldType) {
         case NumberInt: {
@@ -4450,22 +4443,14 @@ std::uint64_t getEdgesLength(const QueryTypeConfig& config) {
         }
         case NumberDouble: {
             auto min = config.getMin()->getDouble();
-            return getEdgesDouble(min,
-                                  min,
-                                  config.getMax()->getDouble(),
-                                  *config.getPrecision(),
-                                  sparsity,
-                                  trimFactor)
+            return getEdgesDouble(
+                       min, min, config.getMax()->getDouble(), precision, sparsity, trimFactor)
                 ->size();
         }
         case NumberDecimal: {
             auto min = config.getMin()->getDecimal();
-            return getEdgesDecimal128(min,
-                                      min,
-                                      config.getMax()->getDecimal(),
-                                      *config.getPrecision(),
-                                      sparsity,
-                                      trimFactor)
+            return getEdgesDecimal128(
+                       min, min, config.getMax()->getDecimal(), precision, sparsity, trimFactor)
                 ->size();
         }
         case Date: {

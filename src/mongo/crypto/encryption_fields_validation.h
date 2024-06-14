@@ -70,4 +70,6 @@ uint32_t getNumberOfBitsInDomain(BSONType fieldType,
                                  const boost::optional<BSONElement>& min,
                                  const boost::optional<BSONElement>& max,
                                  const boost::optional<uint32_t>& precision);
+
+void setRangeDefaults(BSONType fieldType, QueryTypeConfig* query);
 }  // namespace mongo

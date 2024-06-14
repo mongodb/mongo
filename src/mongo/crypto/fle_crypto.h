@@ -1544,7 +1544,7 @@ std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
 
 // Equivalent to a full edges calculation without creating an intemediate vector.
 // getEdgesT(min, min, max, precision, sparsity, trimFactor).size()
-std::uint64_t getEdgesLength(const QueryTypeConfig& config);
+std::uint64_t getEdgesLength(BSONType fieldType, QueryTypeConfig config);
 
 /**
  * Mincover calculator

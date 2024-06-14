@@ -436,6 +436,7 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
 
 void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              const NamespaceString& escNss,
+                             BSONType fieldType,
                              const QueryTypeConfig& queryTypeConfig,
                              double anchorPaddingFactor,
                              std::size_t uniqueLeaves,
@@ -444,7 +445,7 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              ECStats* escStats) {
     CompactStatsCounter<ECStats> stats(escStats);
     // Compact 4.e, Calculate pathLength := #Edges_SPH(lb, lb, uh, prc, theta)
-    const auto pathLength = getEdgesLength(queryTypeConfig);
+    const auto pathLength = getEdgesLength(fieldType, queryTypeConfig);
     // Compact 4.f, Calculate numPads := ceil( gamma * (pathLength * uniqueLeaves - len(C_f)) )
     const auto numPads =
         std::ceil(anchorPaddingFactor * ((pathLength * uniqueLeaves) - uniqueTokens));
@@ -673,6 +674,7 @@ void processFLECompactV2(OperationContext* opCtx,
         std::size_t uniqueTokens{0};
         boost::optional<AnchorPaddingRootToken> anchorPaddingRootToken;
         QueryTypeConfig queryTypeConfig;
+        BSONType fieldType;
     };
     std::map<StringData, RangeFieldInfo> rangeFields;
     for (auto& ecocDoc : *uniqueEcocEntries) {
@@ -711,6 +713,13 @@ void processFLECompactV2(OperationContext* opCtx,
                     rfIt.first, CompactStructuredEncryptionData::kEncryptionInformationFieldName),
                 fieldConfig != efcFields.end());
             rfIt.second.queryTypeConfig = getQueryType(*fieldConfig, QueryTypeEnum::Range);
+
+            uassert(
+                9107500,
+                "Missing bsonType for range field '{}' in '{}'"_format(
+                    rfIt.first, CompactStructuredEncryptionData::kEncryptionInformationFieldName),
+                fieldConfig->getBsonType().has_value());
+            rfIt.second.fieldType = typeFromName(fieldConfig->getBsonType().value());
         }
     }
 
@@ -775,6 +784,7 @@ void processFLECompactV2(OperationContext* opCtx,
                             auto [escNss, anchorPaddingFactor, rangeField] = *sharedBlock.get();
                             compactOneRangeFieldPad(&queryImpl,
                                                     escNss,
+                                                    rangeField.fieldType,
                                                     rangeField.queryTypeConfig,
                                                     anchorPaddingFactor,
                                                     rangeField.uniqueLeaves,
