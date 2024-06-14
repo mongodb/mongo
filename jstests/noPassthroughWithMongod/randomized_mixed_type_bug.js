@@ -6,7 +6,7 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 const scalars = [fc.string(), fc.double(), fc.boolean(), fc.date(), fc.constant(null)];
 
-const pathComponents = fc.constant("a", "b");
+const pathComponents = fc.constantFrom("a", "b");
 // Define our grammar for documents.
 let documentModel = fc.letrec(
     tie => ({
@@ -44,13 +44,13 @@ let testMixedTypeQuerying = () => {
         ([docs, val, pathArray, compare]) => {
             db.test.drop();
             db.control.drop();
-            db.createCollection("test", {timeseries: {timeField: "t"}});
+            assert.commandWorked(db.createCollection("test", {timeseries: {timeField: "t"}}));
 
             // Insert documents
             docs.forEach(doc => {
                 let date = new ISODate();
-                db.test.insert(Object.assign({t: date}, doc));
-                db.control.insert(Object.assign({t: date}, doc));
+                assert.commandWorked(db.test.insert(Object.assign({t: date}, doc)));
+                assert.commandWorked(db.control.insert(Object.assign({t: date}, doc)));
             });
 
             // Construct the path to query on.

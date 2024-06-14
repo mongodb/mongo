@@ -317,16 +317,20 @@ export function getPlanStage(root, stage) {
  * This helper function can be used for any optimizer.
  */
 export function getRejectedPlans(root) {
-    if (root.queryPlanner.winningPlan.hasOwnProperty("shards")) {
-        const rejectedPlans = [];
-        for (let shard of root.queryPlanner.winningPlan.shards) {
-            for (let rejectedPlan of shard.rejectedPlans) {
-                rejectedPlans.push(Object.assign({shardName: shard.shardName}, rejectedPlan));
+    if (root.hasOwnProperty('queryPlanner')) {
+        if (root.queryPlanner.winningPlan.hasOwnProperty("shards")) {
+            const rejectedPlans = [];
+            for (let shard of root.queryPlanner.winningPlan.shards) {
+                for (let rejectedPlan of shard.rejectedPlans) {
+                    rejectedPlans.push(Object.assign({shardName: shard.shardName}, rejectedPlan));
+                }
             }
+            return rejectedPlans;
         }
-        return rejectedPlans;
+        return root.queryPlanner.rejectedPlans;
+    } else {
+        return root.stages[0]['$cursor'].queryPlanner.rejectedPlans;
     }
-    return root.queryPlanner.rejectedPlans;
 }
 
 /**
