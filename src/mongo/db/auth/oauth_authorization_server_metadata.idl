@@ -49,19 +49,16 @@ structs:
                 description: "URL of the authorization server's authorization endpoint"
                 cpp_name: authorizationEndpoint
                 type: string
-                validator: { callback: 'HttpClient::endpointIsSecure' }
                 optional: true
             token_endpoint:
                 description: "URL of the authorization server's token endpoint"
                 cpp_name: tokenEndpoint
                 type: string
-                validator: { callback: 'HttpClient::endpointIsSecure' }
                 optional: true
             device_authorization_endpoint:
                 description: "URL of the authorization server's device authorization endpoint"
                 cpp_name: deviceAuthorizationEndpoint
                 type: string
-                validator: { callback: 'HttpClient::endpointIsSecure' }
                 optional: true
             jwks_uri:
                 description: "URL of the authorization server's jwks endpoint"
