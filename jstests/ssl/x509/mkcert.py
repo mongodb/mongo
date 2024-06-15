@@ -404,10 +404,25 @@ def convert_cert_to_pkcs12(cert):
     ca = get_cert_path(cert['Issuer'])
     passout = 'pass:' + pkcs12['passphrase']
 
-    args = ['openssl', 'pkcs12', '-export', '-in', src, '-inkey', src, '-out', dest, '-passout', passout, '-certfile', ca]
-    if cert.get('passphrase'):
-        args.append('-passin')
-        args.append('pass:' + cert['passphrase'])
+    args = [
+        "openssl",
+        "pkcs12",
+        "-legacy",
+        "-export",
+        "-in",
+        src,
+        "-inkey",
+        src,
+        "-out",
+        dest,
+        "-passout",
+        passout,
+        "-certfile",
+        ca,
+    ]
+    if cert.get("passphrase"):
+        args.append("-passin")
+        args.append("pass:" + cert["passphrase"])
 
     subprocess.check_call(args)
 
