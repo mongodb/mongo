@@ -33,19 +33,19 @@ jsTestLog("Rename timestamp: " + tojson(renameTS));
 // dbHash at all timestamps should work.
 let res = assert.commandWorked(db.runCommand({
     dbHash: 1,
-    readConcern: {level: "snapshot", atClusterTime: createTS},
+    $_internalReadAtClusterTime: createTS,
 }));
 assert(res.collections.hasOwnProperty(jsTestName()));
 
 res = assert.commandWorked(db.runCommand({
     dbHash: 1,
-    readConcern: {level: "snapshot", atClusterTime: insertTS},
+    $_internalReadAtClusterTime: insertTS,
 }));
 assert(res.collections.hasOwnProperty(jsTestName()));
 
 res = assert.commandWorked(db.runCommand({
     dbHash: 1,
-    readConcern: {level: "snapshot", atClusterTime: renameTS},
+    $_internalReadAtClusterTime: renameTS,
 }));
 assert(res.collections.hasOwnProperty("renamed"));
 
