@@ -358,7 +358,8 @@ buildvariants:
       - rhel80-small
     stepback: false
     activate: true
-    expansions: &enterprise-rhel-80-64-bit-dynamic-replica-set-endpoint-expansions
+    expansions:
+      &enterprise-rhel-80-64-bit-dynamic-replica-set-endpoint-expansions
       <<: *enterprise-rhel-80-64-bit-dynamic-expansions
       test_flags: >-
         --runAllFeatureFlagTests

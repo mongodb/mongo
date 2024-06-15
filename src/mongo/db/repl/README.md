@@ -1581,7 +1581,7 @@ supersede.
 # Rollback: Recover To A Timestamp (RTT)
 
 Rollback is the process whereby a node that diverges from its sync source gets back to a consistent
-point in time on the sync source's branch of history. 
+point in time on the sync source's branch of history.
 
 Situations that require rollback can occur due to network partitions. Consider a scenario where a
 secondary can no longer hear from the primary and subsequently runs for an election. We now have
@@ -2152,7 +2152,7 @@ replication consistently [maintains that](https://github.com/mongodb/mongo/blob/
 **`currentCommittedSnapshot`**: An optime maintained in `ReplicationCoordinator` that is used to
 serve majority reads and is always guaranteed to be <= `lastCommittedOpTime`. This
 is currently [set to the stable optime](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4945).
-Since it is reset every time we recalculate the stable optime, it will also be up to date.  
+Since it is reset every time we recalculate the stable optime, it will also be up to date.
 
 **`initialDataTimestamp`**: A timestamp used to indicate the timestamp at which history “begins”.
 When a node comes out of initial sync, we inform the storage engine that the `initialDataTimestamp`
@@ -2210,7 +2210,7 @@ populated internally from the `currentCommittedSnapshot` timestamp inside `Repli
 checkpoint, which can be thought of as a consistent snapshot of the data. Replication informs the
 storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
 majority committed (other than a specific caveat during restore noted below) so that RTT rollback
-can use it.   
+can use it.  
 The calculation of this value in the replication layer occurs [here](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4824-L4881).
 The replication layer will [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4907-L4921)
 if it is earlier than the `initialDataTimestamp`, since data earlier than that timestamp may be

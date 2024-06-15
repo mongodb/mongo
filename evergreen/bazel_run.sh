@@ -59,3 +59,5 @@ for i in {1..5}; do
   eval $BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${args} ${target} && RET=0 && break || RET=$? && sleep 1
   echo "Bazel failed to execute, retrying..."
 done
+
+exit $RET

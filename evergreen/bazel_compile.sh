@@ -58,3 +58,5 @@ for i in {1..5}; do
   eval $BAZEL_BINARY build --verbose_failures $LOCAL_ARG --//bazel/config:compiler_type=${compiler} ${args} ${targets} && RET=0 && break || RET=$? && sleep 1
   echo "Bazel failed to execute, retrying..."
 done
+
+exit $RET

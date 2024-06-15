@@ -513,7 +513,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
       large_distro_name: amazon2023.0-arm64-large
-      resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
+      resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       # The gcov instrumentation saves the path the .gcno files were created in as the default path
       # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
       # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
@@ -527,9 +527,9 @@ buildvariants:
       num_scons_link_jobs_available: 0.99
       compile_variant: *AL2023-arm64-coverage
     tasks: &AL2023-arm64-coverage-tasks
-    - name: compile_and_package_serial_no_unittests_TG
-      distros:
-      - amazon2023.0-arm64-large
-    - name: compile_test_parallel_unittest_stream_TG
-      distros:
-      - amazon2023.0-arm64-large
+      - name: compile_and_package_serial_no_unittests_TG
+        distros:
+          - amazon2023.0-arm64-large
+      - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - amazon2023.0-arm64-large

@@ -391,9 +391,9 @@ tasks:
     commands:
       - func: "do scons setup"
       - func: "fetch bazel"
-      - func: "bazel compile (gcc)"
+      - func: "bazel compile (clang)"
         vars:
-          compiler: gcc # gcc is required by bazel_compile.sh, but overridden by the --config=clang-tidy flag
+          compiler: clang
           # Note that we only run clang-tidy on the Mongo-authored targets, not on third-party code.
           targets: //src/mongo/...
           args: --config=clang-tidy

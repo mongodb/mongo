@@ -29,6 +29,7 @@ and x86-64. More detailed platform instructions can be found below.
 ## Quick (re)Start
 
 ### Linux Workstation
+
 ```bash
 git clean -fdx # USE WITH CAUTION! Delete every untracked file including .gitignored files (this is basically everything)
 # Close and reopen your terminal to clear out any problems from your old environment
