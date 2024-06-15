@@ -1,4 +1,10 @@
-// Tests how replication handles bulkWrite commands with "Timestamp(0,0)" values.
+/**
+ * Tests how replication handles bulkWrite commands with "Timestamp(0,0)" values.
+ *
+ * @tags: [
+ *   multiversion_incompatible,
+ * ]
+ */
 
 const dbName = "test";
 const collName = "empty_ts_repl_bulk_write";

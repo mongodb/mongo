@@ -1,4 +1,10 @@
-// Test how inserts and updates behave with "Timestamp(0,0)" values.
+/**
+ * Test how inserts and updates behave with "Timestamp(0,0)" values.
+ *
+ * @tags: [
+ *   requires_fcv_81,
+ * ]
+ */
 
 const coll = db.jstests_core_empty_ts;
 const emptyTs = Timestamp(0, 0);

@@ -2,8 +2,8 @@
  * Tests the "bypassEmptyTsReplacement" option used with the bulkWrite command.
  *
  * @tags: [
- *   requires_fcv_81,
  *   not_allowed_with_signed_security_token,
+ *   requires_fcv_81,
  * ]
  */
 

@@ -1,4 +1,10 @@
-// Tests how replication handles inserts and updates with "Timestamp(0,0)" values.
+/**
+ * Tests how replication handles inserts and updates with "Timestamp(0,0)" values.
+ *
+ * @tags: [
+ *   multiversion_incompatible,
+ * ]
+ */
 
 const dbName = "test";
 const collName = "empty_ts_repl";
