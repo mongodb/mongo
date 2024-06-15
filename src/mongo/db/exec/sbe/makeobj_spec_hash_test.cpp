@@ -40,7 +40,7 @@ using MakeObjSpecHash = EExpressionTestFixture;
 using FieldAction = MakeObjSpec::FieldAction;
 using Keep = MakeObjSpec::Keep;
 using Drop = MakeObjSpec::Drop;
-using ValueArg = MakeObjSpec::ValueArg;
+using SetArg = MakeObjSpec::SetArg;
 using LambdaArg = MakeObjSpec::LambdaArg;
 using MakeObj = MakeObjSpec::MakeObj;
 using NonObjInputBehavior = MakeObjSpec::NonObjInputBehavior;
@@ -49,8 +49,8 @@ std::vector<FieldAction> makeFieldActionVector(int depth = 2) {
     std::vector<FieldAction> fi;
     fi.emplace_back(Keep{});
     fi.emplace_back(Drop{});
-    fi.emplace_back(ValueArg{0});
-    fi.emplace_back(ValueArg{1});
+    fi.emplace_back(SetArg{0});
+    fi.emplace_back(SetArg{1});
     fi.emplace_back(LambdaArg{0, false});
     fi.emplace_back(LambdaArg{0, true});
     fi.emplace_back(

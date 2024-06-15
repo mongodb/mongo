@@ -858,7 +858,7 @@ TEST(Path, LowerPathField) {
 
     ASSERT_EXPLAIN_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "  Const [MakeObjSpec([fieldA = MakeObj([fieldB = LambdaArg(0, false)], Open)], Open, "
+        "  Const [MakeObjSpec([fieldA = MakeObj([fieldB = Lambda(0, false)], Open)], Open, "
         "NewObj, 0)]\n"
         "  Variable [rootObj]\n"
         "  Const [false]\n"

@@ -169,8 +169,8 @@ public:
 
         } else if (inner) {
             // This case could happen if we have something like Field "a" Traverse [n] Const c; the
-            // inner path would result in an orphaned ValueArg, but MakeObjSpec does not do
-            // traversals on anything other than MakeObj, so we should fallback to lowering here.
+            // inner path would result in an orphaned SetArg, but MakeObjSpec does not do traversals
+            // on anything other than MakeObj, so we should fallback to lowering here.
             return makeLambdaBuilder(n);
         }
 

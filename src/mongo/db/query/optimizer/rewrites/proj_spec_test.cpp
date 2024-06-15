@@ -43,7 +43,7 @@ using sbe::MakeObjSpec;
 using FieldAction = MakeObjSpec::FieldAction;
 using FieldActions = std::vector<std::pair<StringData, FieldAction>>;
 using MakeObj = MakeObjSpec::MakeObj;
-using ValueArg = MakeObjSpec::ValueArg;
+using SetArg = MakeObjSpec::SetArg;
 using LambdaArg = MakeObjSpec::LambdaArg;
 using NonObjInputBehavior = MakeObjSpec::NonObjInputBehavior;
 
@@ -133,7 +133,7 @@ TEST(ProjSpecTest, SimplePathField) {
         "|   |   |   Const [42]\n"
         "|   |   Const [false]\n"
         "|   Const [{}]\n"
-        "Const [MakeObjSpec([a = Arg(0)], Open, NewObj, 0)]\n",
+        "Const [MakeObjSpec([a = Set(0)], Open, NewObj, 0)]\n",
         tree);
 }
 
@@ -153,7 +153,7 @@ TEST(ProjSpecTest, SimpleNestedPathFieldTraverse) {
         "|   |   |   Const [42]\n"
         "|   |   Const [false]\n"
         "|   Const [{}]\n"
-        "Const [MakeObjSpec([a = MakeObj([b = Arg(0)], Open, NewObj, 1)], Open, NewObj, 0)]\n",
+        "Const [MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 1)], Open, NewObj, 0)]\n",
         tree);
 }
 
@@ -179,7 +179,7 @@ TEST(ProjSpecTest, SimplePathFieldConsecutiveTraverse) {
             "|   |   |   Const [42]\n"
             "|   |   Const [false]\n"
             "|   Const [{}]\n"
-            "Const [MakeObjSpec([a = MakeObj([b = Arg(0)], Open, NewObj, 3)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 3)], Open, NewObj, 0)]\n",
             tree);
     }
     // Infinite traverses override other depths.
@@ -203,7 +203,7 @@ TEST(ProjSpecTest, SimplePathFieldConsecutiveTraverse) {
             "|   |   |   Const [42]\n"
             "|   |   Const [false]\n"
             "|   Const [{}]\n"
-            "Const [MakeObjSpec([a = MakeObj([b = Arg(0)], Open)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([a = MakeObj([b = Set(0)], Open)], Open, NewObj, 0)]\n",
             tree);
     }
     {
@@ -226,7 +226,7 @@ TEST(ProjSpecTest, SimplePathFieldConsecutiveTraverse) {
             "|   |   |   Const [42]\n"
             "|   |   Const [false]\n"
             "|   Const [{}]\n"
-            "Const [MakeObjSpec([a = MakeObj([b = Arg(0)], Open)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([a = MakeObj([b = Set(0)], Open)], Open, NewObj, 0)]\n",
             tree);
     }
     {
@@ -249,7 +249,7 @@ TEST(ProjSpecTest, SimplePathFieldConsecutiveTraverse) {
             "|   |   |   Const [42]\n"
             "|   |   Const [false]\n"
             "|   Const [{}]\n"
-            "Const [MakeObjSpec([a = MakeObj([b = Arg(0)], Open)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([a = MakeObj([b = Set(0)], Open)], Open, NewObj, 0)]\n",
             tree);
     }
 }
@@ -275,7 +275,7 @@ TEST(ProjSpecTest, PathFieldTraverse) {
         "|   |   |   Const [42]\n"
         "|   |   Const [false]\n"
         "|   Variable [foo]\n"
-        "Const [MakeObjSpec([c = MakeObj([b = MakeObj([a = MakeObj([d = Arg(0)], Open, NewObj, "
+        "Const [MakeObjSpec([c = MakeObj([b = MakeObj([a = MakeObj([d = Set(0)], Open, NewObj, "
         "1)], Open, NewObj, 0)], Open)], Open, NewObj, 0)]\n",
         tree);
 }
@@ -394,7 +394,7 @@ TEST(ProjSpecTest, ComposeConstObj) {
         "|   |   |   Const [\"abc\"]\n"
         "|   |   Const [false]\n"
         "|   Variable [foo]\n"
-        "Const [MakeObjSpec([a = Arg(0)], Open, NewObj, 0)]\n",
+        "Const [MakeObjSpec([a = Set(0)], Open, NewObj, 0)]\n",
         tree);
 }
 
@@ -417,7 +417,7 @@ TEST(ProjSpecTest, SimpleComposition) {
             "|   |   |   Const [[]]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([a = Arg(0), b = Arg(1)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([a = Set(0), b = Set(1)], Open, NewObj, 0)]\n",
             tree);
     }
     {
@@ -463,16 +463,16 @@ TEST(ProjSpecTest, TraversalComposition) {
         "|   |   |   FunctionCall [isArray] Variable [inputComposeM_0]\n"
         "|   |   Const [false]\n"
         "|   Variable [foo]\n"
-        "Const [MakeObjSpec([a = LambdaArg(0, false)], Open, NewObj, 0)]\n",
+        "Const [MakeObjSpec([a = Lambda(0, false)], Open, NewObj, 0)]\n",
         tree);
 }
 
-// Tests that a ValueArg on the right overrides the left branch by ConstCompose.
+// Tests that a SetArg on the right overrides the left branch by ConstCompose.
 // Note: all the below tests should set field "same" to [] (result in the same lowered ABT).
 // Furthermore, the left branch must result in behavior kNewObj because the right const branch does,
 // otherwise we will fallback.
 TEST(ProjSpecTest, ConstCompose) {
-    // ValueArg.
+    // SetArg.
     {
         auto tree = Eval(Field("same", Const(Constant::emptyObject())) *
                              Field("same", Const(Constant::emptyArray())),
@@ -490,7 +490,7 @@ TEST(ProjSpecTest, ConstCompose) {
             "|   |   |   Const [[]]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = Arg(0)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
     }
 
@@ -511,7 +511,7 @@ TEST(ProjSpecTest, ConstCompose) {
             "|   |   |   Const [[]]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = Arg(0)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
     }
     {
@@ -531,7 +531,7 @@ TEST(ProjSpecTest, ConstCompose) {
             "|   |   |   Const [[]]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = Arg(0)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
     }
 
@@ -553,7 +553,7 @@ TEST(ProjSpecTest, ConstCompose) {
             "|   |   |   Const [[]]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = Arg(0)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
     }
     {
@@ -577,7 +577,7 @@ TEST(ProjSpecTest, ConstCompose) {
             "|   |   |   Const [[]]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = Arg(0)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
     }
 
@@ -603,7 +603,7 @@ TEST(ProjSpecTest, ConstCompose) {
             "|   |   |   Const [[]]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = Arg(0)], Closed, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Set(0)], Closed, NewObj, 0)]\n",
             tree);
     }
     {
@@ -627,7 +627,7 @@ TEST(ProjSpecTest, ConstCompose) {
             "|   |   |   Const [[]]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = Arg(0)], Open, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
     }
 }
@@ -635,7 +635,7 @@ TEST(ProjSpecTest, ConstCompose) {
 TEST(ProjSpecTest, RightLambdaMerge) {
     // Test that a lambda value arg on the right side results in a fallback.
     {
-        ABTVector branches = {/* ValueArg. */
+        ABTVector branches = {/* SetArg. */
                               Field("same", Const(Constant::emptyObject())),
                               /* LambdaArg. */
                               Field("same", Arr()),
@@ -674,16 +674,16 @@ TEST(ProjSpecTest, RightLambdaMerge) {
             "|   |   |   LambdaAbstraction [id] Variable [id]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = LambdaArg(0, false)], Closed, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Lambda(0, false)], Closed, NewObj, 0)]\n",
             tree);
     }
 }
 
 TEST(ProjSpecTest, RightMakeObjMerge) {
-    // Test that a MakeObj value arg on the right side results in a fallback if we have a ValueArg
+    // Test that a MakeObj value arg on the right side results in a fallback if we have a SetArg
     // or LambdaArg on the left.
     {
-        ABTVector branches = {/* ValueArg. */
+        ABTVector branches = {/* SetArg. */
                               Field("same", Const(Constant::emptyObject())),
                               /* LambdaArg. */
                               Field("same", Arr()),
@@ -775,11 +775,11 @@ TEST(ProjSpecTest, RightMakeObjMerge) {
 TEST(ProjSpecTest, RightKeepMerge) {
     // In the following cases we pick the left FieldAction for "a" and set the field behavior to
     // closed:
-    // - ValueArg: Field "a" Const c * Keep "a" = Field "a" Const c
+    // - SetArg: Field "a" Const c * Keep "a" = Field "a" Const c
     // - LambdaArg: Field "a" Lambda l * Keep "a" = Field "a" Lambda l
     // - MakeObj: Field "a" Field "b" p * Keep "a" = Field "a" Field "b" p
 
-    // ValueArg.
+    // SetArg.
     {
         auto tree =
             Eval(Field("same", Const(Constant::emptyObject())) * Keep({"same"}), Var("foo"));
@@ -796,7 +796,7 @@ TEST(ProjSpecTest, RightKeepMerge) {
             "|   |   |   Const [{}]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = Arg(0)], Closed, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Set(0)], Closed, NewObj, 0)]\n",
             tree);
     }
 
@@ -819,7 +819,7 @@ TEST(ProjSpecTest, RightKeepMerge) {
             "|   |   |   FunctionCall [isArray] Variable [valArr_0]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = LambdaArg(0, false)], Closed, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Lambda(0, false)], Closed, NewObj, 0)]\n",
             tree);
     }
     {
@@ -840,7 +840,7 @@ TEST(ProjSpecTest, RightKeepMerge) {
             "|   |   |   FunctionCall [exists] Variable [valDefault_0]\n"
             "|   |   Const [false]\n"
             "|   Variable [foo]\n"
-            "Const [MakeObjSpec([same = LambdaArg(0, false)], Closed, NewObj, 0)]\n",
+            "Const [MakeObjSpec([same = Lambda(0, false)], Closed, NewObj, 0)]\n",
             tree);
     }
 
@@ -1054,12 +1054,12 @@ TEST(ProjSpecTest, RightKeepMerge) {
 TEST(ProjSpecTest, RightDropMerge) {
     // In the following cases we pick the right FieldAction for "a", as they always evaluate to
     // Drop "a"
-    // - ValueArg: Field "a" Const c * Drop "a"
+    // - SetArg: Field "a" Const c * Drop "a"
     // - LambdaArg: Field "a" Lambda l * Drop "a"
     // - MakeObj: Field "a" Field "b" p * Drop "a"
     // - Drop: Drop "a" * Drop "a"
 
-    // ValueArg.
+    // SetArg.
     {
         auto tree =
             Eval(Field("same", Const(Constant::emptyObject())) * Drop({"same"}), Var("foo"));
@@ -1316,7 +1316,7 @@ TEST(ProjSpecTest, NewObjLeft) {
         "|   |   |   Const [\"abc\"]\n"
         "|   |   Const [false]\n"
         "|   Variable [foo]\n"
-        "Const [MakeObjSpec([a = Arg(0)], Open, NewObj, 0)]\n",
+        "Const [MakeObjSpec([a = Set(0)], Open, NewObj, 0)]\n",
         tree);
 }
 
@@ -1347,7 +1347,7 @@ TEST(ProjSpecTest, LClosedROpen) {
         "|   |   |   Const [42]\n"
         "|   |   Const [false]\n"
         "|   Variable [foo]\n"
-        "Const [MakeObjSpec([a = Arg(0)], Closed, NewObj, 0)]\n",
+        "Const [MakeObjSpec([a = Set(0)], Closed, NewObj, 0)]\n",
         tree);
 }
 

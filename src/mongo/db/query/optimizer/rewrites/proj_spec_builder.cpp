@@ -40,7 +40,7 @@ using Keep = MakeObjSpec::Keep;
 using Drop = MakeObjSpec::Drop;
 using LambdaArg = MakeObjSpec::LambdaArg;
 using MakeObj = MakeObjSpec::MakeObj;
-using ValueArg = MakeObjSpec::ValueArg;
+using SetArg = MakeObjSpec::SetArg;
 using NonObjInputBehavior = MakeObjSpec::NonObjInputBehavior;
 
 namespace {
@@ -86,8 +86,8 @@ bool FieldActionBuilder::absorb(FieldActionBuilder&& other,
         std::swap(_isLambda, other._isLambda);
     };
 
-    if (other.isValueArg()) {
-        // By ConstCompose, p * Const c = c, so we should pick the right ValueArg.
+    if (other.isSetArg()) {
+        // By ConstCompose, p * Const c = c, so we should pick the right SetArg.
         copyOther();
         return true;
 
@@ -129,7 +129,7 @@ FieldAction FieldActionBuilder::build(FieldListScope fieldListScope, ABTVector& 
     } else if (_path) {
         auto va = _isLambda
             ? FieldAction(LambdaArg{args.size(), false /* returnsNothingOnMissingInput */})
-            : FieldAction(ValueArg{args.size()});
+            : FieldAction(SetArg{args.size()});
         args.push_back(*_path);
         return va;
 
@@ -275,15 +275,15 @@ bool ProjSpecBuilder::absorb(std::unique_ptr<ProjSpecBuilder> other) {
                 // We didn't encounter this field among the left field actions, and the left branch
                 // would have dropped it first. Ignore it on the right side.
                 continue;
-            } else if (!rFab.isValueArg()) {
+            } else if (!rFab.isSetArg()) {
                 // We want to fallback if this field is either a LambdaArg or a MakeObj, because in
                 // either case, we know the input will always be Nothing to this path. We could
-                // create a new ValueArg node here where we pass Nothing as input to the path
+                // create a new SetArg node here where we pass Nothing as input to the path
                 // represented by the FieldActionBuilder, but for now it is easier to fall back.
                 return false;
             }
         }
-        // Note that if the left side has FieldListScope::kClosed and right field is a ValueArg,
+        // Note that if the left side has FieldListScope::kClosed and right field is a SetArg,
         // we want to set that field anyway. Proceed to add field/builder to output.
         namedFabs.emplace_back(std::move(rField), std::move(rFab));
     }

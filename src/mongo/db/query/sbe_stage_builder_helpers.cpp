@@ -303,7 +303,7 @@ std::unique_ptr<sbe::EExpression> makeNewBsonObject(std::vector<std::string> fie
 
     std::vector<sbe::MakeObjSpec::FieldAction> fieldActions;
     for (size_t i = 0; i < fields.size(); ++i) {
-        fieldActions.emplace_back(sbe::MakeObjSpec::ValueArg{i});
+        fieldActions.emplace_back(sbe::MakeObjSpec::AddArg{i});
     }
 
     auto makeObjSpec =

@@ -59,8 +59,8 @@ class InputFieldsOnlyCursor {
 public:
     using InputFields = MakeObjCursorInputFields;
 
-    InputFieldsOnlyCursor(const StringListSet& fields, const InputFields& values, size_t numItems)
-        : _values(values), _numItems(numItems) {
+    InputFieldsOnlyCursor(const StringListSet& fields, const InputFields& values)
+        : _values(values), _numItems(values.size()) {
         moveNext(fields);
     }
 
