@@ -115,7 +115,7 @@ CONFIG configuration_list[] = {
 
 {"btree.repeat_data_pct", "duplicate values (percentage)", C_TABLE | C_TYPE_VAR, 0, 90, 90}
 
-{"btree.reverse", "reverse order collation", C_BOOL | C_TABLE | C_TYPE_ROW, 10, 0, 0}
+{"btree.reverse", "reverse order collation", C_BOOL | C_TABLE | C_TYPE_ROW, 20, 0, 0}
 
 {"btree.split_pct", "page split size as a percentage of the maximum page size", C_TABLE, 50, 100, 100}
 

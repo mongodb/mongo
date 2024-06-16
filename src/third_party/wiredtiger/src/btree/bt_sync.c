@@ -422,6 +422,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             }
             tried_eviction = false;
 
+            WT_STAT_INCR(session, btree->dhandle->stats, btree_checkpoint_pages_reconciled);
+
             WT_ERR(__wt_reconcile(session, walk, NULL, rec_flags));
 
             /*

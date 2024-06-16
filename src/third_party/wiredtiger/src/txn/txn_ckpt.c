@@ -1399,6 +1399,13 @@ __txn_checkpoint_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
     WT_STAT_CONN_SET(session, txn_checkpoint_running, 1);
     txn_global->checkpoint_running = true;
 
+    /*
+     * FIXME-WT-11149: Some reading threads rely on the value of checkpoint running flag being
+     * published before the checkpoint generation number (set inside the checkpoint call below).
+     * Introduce a write barrier here to guarantee the right order.
+     */
+    WT_WRITE_BARRIER();
+
     ret = __txn_checkpoint(session, cfg);
 
     WT_STAT_CONN_SET(session, txn_checkpoint_running, 0);

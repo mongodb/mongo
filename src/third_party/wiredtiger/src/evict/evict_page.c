@@ -205,7 +205,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
 
     /* As re-entry into eviction is possible, only clear the statistics on the first entry. */
     if (__wt_session_gen((session), (WT_GEN_EVICT)) == 0) {
-        WT_CLEAR(session->reconcile_timeline);
         WT_CLEAR(session->evict_timeline);
         session->evict_timeline.evict_start = __wt_clock(session);
     } else {
