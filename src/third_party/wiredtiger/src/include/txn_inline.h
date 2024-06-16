@@ -766,6 +766,8 @@ __wt_txn_snap_min_visible(
     /* Not needed since 6.0 doesn't support checkpoint cursors. */
     WT_UNUSED(durable_timestamp);
 
+    WT_ASSERT(session, F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
+
     /* Transaction snapshot minimum check. */
     if (!WT_TXNID_LT(id, session->txn->snap_min))
         return (false);

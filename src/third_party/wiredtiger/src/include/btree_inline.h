@@ -1474,6 +1474,26 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
 }
 
 /*
+ * __wt_get_page_modify_ta --
+ *     Returns the page modify stop time aggregate information if exists.
+ */
+static inline bool
+__wt_get_page_modify_ta(WT_SESSION_IMPL *session, WT_PAGE *page, WT_TIME_AGGREGATE **ta)
+{
+    WT_ASSERT(session, __wt_session_gen(session, WT_GEN_SPLIT) != 0);
+
+    /* If NULL, there is no information. */
+    if (page->modify == NULL)
+        return (false);
+
+    if (page->modify->stop_ta == NULL)
+        return (false);
+
+    WT_ORDERED_READ(*ta, page->modify->stop_ta);
+    return (*ta != NULL);
+}
+
+/*
  * __wt_ref_block_free --
  *     Free the on-disk block for a reference and clear the address.
  */
@@ -2040,11 +2060,16 @@ static inline int
 __wt_btcur_skip_page(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
 {
     WT_ADDR_COPY addr;
+    WT_PAGE_WALK_SKIP_STATS *walk_skip_stats;
+    WT_TIME_AGGREGATE *ta;
     uint8_t previous_state;
-
-    WT_UNUSED(context);
+    bool clean_page;
 
     *skipp = false; /* Default to reading */
+
+    walk_skip_stats = (WT_PAGE_WALK_SKIP_STATS *)context;
+    ta = NULL;
+    clean_page = false;
 
     /*
      * Determine if all records on the page have been deleted and all the tombstones are visible to
@@ -2066,15 +2091,36 @@ __wt_btcur_skip_page(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool 
         return (0);
 
     WT_REF_LOCK(session, ref, &previous_state);
-    if ((previous_state == WT_REF_DISK || previous_state == WT_REF_DELETED ||
-          (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))) &&
-      __wt_ref_addr_copy(session, ref, &addr) && addr.ta.newest_stop_txn != WT_TXN_MAX &&
-      addr.ta.newest_stop_ts != WT_TS_MAX &&
+
+    if (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))
+        clean_page = true;
+
+    /* Look at the disk address, if it exists. */
+    if ((previous_state == WT_REF_DISK || previous_state == WT_REF_DELETED || clean_page) &&
+      __wt_ref_addr_copy(session, ref, &addr)) {
+        /*
+         * Otherwise, check the timestamp information. We base this decision on the aggregate stop
+         * point added to the page during the last reconciliation.
+         */
+        if (WT_TIME_AGGREGATE_HAS_STOP(&addr.ta) &&
+          __wt_txn_snap_min_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts,
+            addr.ta.newest_stop_durable_ts)) {
+            *skipp = true;
+            walk_skip_stats->total_del_pages_skipped++;
+        }
+    } else if (clean_page && __wt_get_page_modify_ta(session, ref->page, &ta) &&
       __wt_txn_snap_min_visible(
-        session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts, addr.ta.newest_stop_durable_ts))
+        session, ta->newest_stop_txn, ta->newest_stop_ts, ta->newest_stop_durable_ts)) {
+        /*
+         * If the reader can see all of the deleted content, they can skip a deleted clean page.
+         * Before determining whether the deleted page is visible, copy the stop time aggregate
+         * information pointer because as part of the checkpoint operation, this pointer can be
+         * released in parallel.
+         */
         *skipp = true;
+        walk_skip_stats->total_inmem_del_pages_skipped++;
+    }
 
     WT_REF_UNLOCK(ref, previous_state);
-
     return (0);
 }
