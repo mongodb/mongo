@@ -772,7 +772,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
     if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER) && !WT_CURSOR_IS_POSITIONED(cbt)) {
         repositioned = true;
         time_start = __wt_clock(session);
-        WT_ERR(__wt_btcur_bounds_position(session, cbt, false, &need_walk));
+        WT_ERR(__wti_btcur_bounds_position(session, cbt, false, &need_walk));
         if (!need_walk) {
             __wt_value_return(cbt, cbt->upd_value);
             goto done;
@@ -783,7 +783,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
      * If we aren't already iterating in the right direction, there's some setup to do.
      */
     if (!F_ISSET(cbt, WT_CBT_ITERATE_PREV))
-        __wt_btcur_iterate_setup(cbt);
+        __wti_btcur_iterate_setup(cbt);
 
     /*
      * Walk any page we're holding until the underlying call returns not-found. Then, move to the
@@ -944,7 +944,7 @@ err:
         if (!F_ISSET(cbt, WT_CBT_ITERATE_RETRY_NEXT)) {
             if (session->txn->isolation == WT_ISO_READ_UNCOMMITTED && newpage)
                 __wt_cursor_key_order_reset(cbt);
-            ret = __wt_cursor_key_order_check(session, cbt, false);
+            ret = __wti_cursor_key_order_check(session, cbt, false);
         }
 
         if (need_walk) {
@@ -986,7 +986,7 @@ err:
     F_CLR(cbt, WT_CBT_ITERATE_RETRY_NEXT);
 
     if (ret == 0)
-        WT_RET(__wt_btcur_evict_reposition(cbt));
+        WT_RET(__wti_btcur_evict_reposition(cbt));
 
     return (ret);
 }

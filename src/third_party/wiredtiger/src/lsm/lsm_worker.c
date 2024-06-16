@@ -12,11 +12,11 @@ static int __lsm_worker_general_op(WT_SESSION_IMPL *, WT_LSM_WORKER_ARGS *, bool
 static WT_THREAD_RET __lsm_worker(void *);
 
 /*
- * __wt_lsm_worker_start --
+ * __wti_lsm_worker_start --
  *     A wrapper around the LSM worker thread start.
  */
 int
-__wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
+__wti_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 {
     __wt_verbose(
       session, WT_VERB_LSM_MANAGER, "Start LSM worker %u type %#" PRIx32, args->id, args->type);
@@ -28,11 +28,11 @@ __wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 }
 
 /*
- * __wt_lsm_worker_stop --
+ * __wti_lsm_worker_stop --
  *     A wrapper around the LSM worker thread stop.
  */
 int
-__wt_lsm_worker_stop(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
+__wti_lsm_worker_stop(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 {
     args->running = false;
     args->tid_set = false;
@@ -57,34 +57,34 @@ __lsm_worker_general_op(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *cookie, bo
     if (!FLD_ISSET(cookie->type, WT_LSM_WORK_GENERAL_OPS))
         return (WT_NOTFOUND);
 
-    if ((ret = __wt_lsm_manager_pop_entry(session, cookie->type, &entry)) != 0 || entry == NULL)
+    if ((ret = __wti_lsm_manager_pop_entry(session, cookie->type, &entry)) != 0 || entry == NULL)
         return (ret);
 
     if (entry->type == WT_LSM_WORK_FLUSH) {
         force = F_ISSET(entry, WT_LSM_WORK_FORCE);
         F_CLR(entry, WT_LSM_WORK_FORCE);
-        WT_ERR(__wt_lsm_get_chunk_to_flush(session, entry->lsm_tree, force, &chunk));
+        WT_ERR(__wti_lsm_get_chunk_to_flush(session, entry->lsm_tree, force, &chunk));
         /*
          * If we got a chunk to flush, checkpoint it.
          */
         if (chunk != NULL) {
             __wt_verbose_debug2(session, WT_VERB_LSM, "Flush%s chunk %" PRIu32 " %s",
               force ? " w/ force" : "", chunk->id, chunk->uri);
-            ret = __wt_lsm_checkpoint_chunk(session, entry->lsm_tree, chunk);
+            ret = __wti_lsm_checkpoint_chunk(session, entry->lsm_tree, chunk);
             WT_ASSERT(session, chunk->refcnt > 0);
             (void)__wt_atomic_sub32(&chunk->refcnt, 1);
             WT_ERR(ret);
         }
     } else if (entry->type == WT_LSM_WORK_DROP)
-        WT_ERR(__wt_lsm_free_chunks(session, entry->lsm_tree));
+        WT_ERR(__wti_lsm_free_chunks(session, entry->lsm_tree));
     else if (entry->type == WT_LSM_WORK_BLOOM)
-        WT_ERR(__wt_lsm_work_bloom(session, entry->lsm_tree));
+        WT_ERR(__wti_lsm_work_bloom(session, entry->lsm_tree));
     else if (entry->type == WT_LSM_WORK_ENABLE_EVICT)
-        WT_ERR(__wt_lsm_work_enable_evict(session, entry->lsm_tree));
+        WT_ERR(__wti_lsm_work_enable_evict(session, entry->lsm_tree));
     *completed = true;
 
 err:
-    __wt_lsm_manager_free_work_unit(session, entry);
+    __wti_lsm_manager_free_work_unit(session, entry);
     return (ret);
 }
 
@@ -114,9 +114,9 @@ __lsm_worker(void *arg)
          * Switches are the highest priority.
          */
         while (FLD_ISSET(cookie->type, WT_LSM_WORK_SWITCH) &&
-          (ret = __wt_lsm_manager_pop_entry(session, WT_LSM_WORK_SWITCH, &entry)) == 0 &&
+          (ret = __wti_lsm_manager_pop_entry(session, WT_LSM_WORK_SWITCH, &entry)) == 0 &&
           entry != NULL)
-            WT_ERR(__wt_lsm_work_switch(session, &entry, &progress));
+            WT_ERR(__wti_lsm_work_switch(session, &entry, &progress));
         /* Flag an error if the pop failed. */
         WT_ERR(ret);
 
@@ -134,10 +134,10 @@ __lsm_worker(void *arg)
          * operations may result in adding merge work to the queue.
          */
         if (FLD_ISSET(cookie->type, WT_LSM_WORK_MERGE) &&
-          (ret = __wt_lsm_manager_pop_entry(session, WT_LSM_WORK_MERGE, &entry)) == 0 &&
+          (ret = __wti_lsm_manager_pop_entry(session, WT_LSM_WORK_MERGE, &entry)) == 0 &&
           entry != NULL) {
             WT_ASSERT(session, entry->type == WT_LSM_WORK_MERGE);
-            ret = __wt_lsm_merge(session, entry->lsm_tree, cookie->id);
+            ret = __wti_lsm_merge(session, entry->lsm_tree, cookie->id);
             if (ret == WT_NOTFOUND) {
                 F_CLR(entry->lsm_tree, WT_LSM_TREE_COMPACTING);
                 ret = 0;
@@ -147,7 +147,7 @@ __lsm_worker(void *arg)
             /* Paranoia: clear session state. */
             session->dhandle = NULL;
 
-            __wt_lsm_manager_free_work_unit(session, entry);
+            __wti_lsm_manager_free_work_unit(session, entry);
             entry = NULL;
             progress = true;
         }
@@ -163,7 +163,7 @@ __lsm_worker(void *arg)
 
     if (ret != 0) {
 err:
-        __wt_lsm_manager_free_work_unit(session, entry);
+        __wti_lsm_manager_free_work_unit(session, entry);
         WT_IGNORE_RET(__wt_panic(session, ret, "Error in LSM worker thread %u", cookie->id));
     }
     return (WT_THREAD_RET_VALUE);

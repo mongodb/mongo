@@ -93,7 +93,7 @@ __wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename, uint32
     }
 
     /* Write out the file's meta-data. */
-    ret = __wt_desc_write(session, fh, allocsize);
+    ret = __wti_desc_write(session, fh, allocsize);
 
     /*
      * Ensure the truncated file has made it to disk, then the upper-level is never surprised.
@@ -135,7 +135,7 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
     WT_TRET(__wt_close(session, &block->fh));
 
     __wt_spin_destroy(session, &block->live_lock);
-    __wt_block_ckpt_destroy(session, &block->live);
+    __wti_block_ckpt_destroy(session, &block->live);
 
     __wt_overwrite_and_free(session, block);
 
@@ -143,11 +143,11 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
- * __wt_block_configure_first_fit --
+ * __wti_block_configure_first_fit --
  *     Configure first-fit allocation.
  */
 void
-__wt_block_configure_first_fit(WT_BLOCK *block, bool on)
+__wti_block_configure_first_fit(WT_BLOCK *block, bool on)
 {
     /*
      * Switch to first-fit allocation so we rewrite blocks at the start of the file; use atomic
@@ -289,11 +289,11 @@ err:
 }
 
 /*
- * __wt_desc_write --
+ * __wti_desc_write --
  *     Write a file's initial descriptor structure.
  */
 int
-__wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
+__wti_desc_write(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 {
     WT_BLOCK_DESC *desc;
     WT_DECL_ITEM(buf);

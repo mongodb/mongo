@@ -74,8 +74,10 @@ existing example in the source code and copy it.
   are longer if possible. This applies to function signatures too
   (exceptions are possible here). If in doubt, Clang-Format will
   handle this for you.
-* Functions used across multiple files begin with a ``__wt_`` prefix,
-  where prefix is a sub-system identifier (e.g log or btree)
+* Functions used across multiple files across directories and sub-systems
+  begin with a ``__wt_`` prefix, where prefix is a sub-system identifier (e.g log or btree)
+* Functions used across multiple files but within a sub-system directory
+  begin with a ``__wti_`` prefix, where prefix is a sub-system identifier (e.g log or btree)
 * Static functions should begin with an `__` prefix, where prefix is a
   sub-system identifier (e.g log or btree)
 * In a function declaration, the return value should be on a separate

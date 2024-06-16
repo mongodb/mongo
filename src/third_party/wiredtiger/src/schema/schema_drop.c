@@ -27,7 +27,7 @@ __drop_file(
     filename = uri;
     WT_PREFIX_SKIP_REQUIRED(session, filename, "file:");
 
-    WT_RET(__wt_schema_backup_check(session, filename));
+    WT_RET(__wti_schema_backup_check(session, filename));
     /* Close all btree handles associated with this file. */
     WT_WITH_HANDLE_LIST_WRITE_LOCK(
       session, ret = __wt_conn_dhandle_close_all(session, uri, true, force, check_visibility));
@@ -83,7 +83,7 @@ __drop_index(
     WT_INDEX *idx;
 
     /* If we can get the index, detach it from the table. */
-    if ((ret = __wt_schema_get_index(session, uri, true, force, &idx)) == 0)
+    if ((ret = __wti_schema_get_index(session, uri, true, force, &idx)) == 0)
         WT_TRET(__wt_schema_drop(session, idx->source, cfg, check_visibility));
 
     WT_TRET(__wt_metadata_remove(session, uri));
@@ -126,7 +126,7 @@ __drop_table(
      * table that are already open must at least be closed before this call proceeds.
      */
     WT_ERR(__wt_schema_get_table_uri(session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
-    WT_ERR(__wt_schema_release_table_gen(session, &table, true));
+    WT_ERR(__wti_schema_release_table_gen(session, &table, true));
     WT_ERR(__wt_schema_get_table_uri(session, uri, true, 0, &table));
 
     if (force && !table->is_simple) {
@@ -161,7 +161,7 @@ __drop_table(
     }
 
     /* Make sure the table data handle is closed. */
-    WT_ERR(__wt_schema_release_table_gen(session, &table, true));
+    WT_ERR(__wti_schema_release_table_gen(session, &table, true));
     WT_ERR(__wt_schema_get_table_uri(session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
     F_SET(&table->iface, WT_DHANDLE_DISCARD);
     if (WT_META_TRACKING(session)) {
@@ -402,8 +402,8 @@ __wt_schema_drop(
      */
     WT_ASSERT(session, __wt_spin_locked(session, &S2C(session)->schema_lock));
 
-    WT_RET(__wt_schema_internal_session(session, &int_session));
+    WT_RET(__wti_schema_internal_session(session, &int_session));
     ret = __schema_drop(int_session, uri, cfg, check_visibility);
-    WT_TRET(__wt_schema_session_release(session, int_session));
+    WT_TRET(__wti_schema_session_release(session, int_session));
     return (ret);
 }

@@ -1318,7 +1318,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      * to reset these transaction ids present on the pages when reading them.
      */
     if (F_ISSET(conn, WT_CONN_RECOVERING))
-        WT_ERR(__wt_metadata_correct_base_write_gen(session));
+        WT_ERR(__wt_meta_correct_base_write_gen(session));
 
     /*
      * Clear the dhandle so the visibility check doesn't get confused about the snap min. Don't

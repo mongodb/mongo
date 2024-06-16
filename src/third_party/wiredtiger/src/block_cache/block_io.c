@@ -85,7 +85,7 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, 
     }
 
     /* Check for mapped blocks. */
-    WT_RET(__wt_blkcache_map_read(session, ip, addr, addr_size, &found));
+    WT_RET(__wti_blkcache_map_read(session, ip, addr, addr_size, &found));
     if (found) {
         skip_cache_put = true;
         if (!expect_conversion)
@@ -159,7 +159,7 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, 
 
     /* Store the decrypted, possibly compressed, block in the block_cache. */
     if (!skip_cache_put)
-        WT_ERR(__wt_blkcache_put(session, ip, addr, addr_size, false));
+        WT_ERR(__wti_blkcache_put(session, ip, addr, addr_size, false));
 
     dsk = ip->data;
     if (F_ISSET(dsk, WT_PAGE_COMPRESSED)) {
@@ -419,7 +419,7 @@ __wt_blkcache_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_
     else if (!blkcache->cache_on_writes)
         WT_STAT_CONN_INCR(session, block_cache_bypass_writealloc);
     else if (!checkpoint)
-        WT_ERR(__wt_blkcache_put(session, compressed ? ctmp : buf, addr, *addr_sizep, true));
+        WT_ERR(__wti_blkcache_put(session, compressed ? ctmp : buf, addr, *addr_sizep, true));
 
 err:
     __wt_scr_free(session, &ctmp);

@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_win_map --
+ * __wti_win_map --
  *     Map a file into memory.
  */
 int
-__wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void **mapped_regionp,
+__wti_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void **mapped_regionp,
   size_t *lenp, void **mapped_cookiep)
 {
     WT_DECL_RET;
@@ -31,7 +31,7 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void **mapped_
      * There's no locking here to prevent the underlying file from changing underneath us, our
      * caller needs to ensure consistency of the mapped region vs. any other file activity.
      */
-    WT_RET(__wt_win_fs_size(file_handle->file_system, wt_session, file_handle->name, &file_size));
+    WT_RET(__wti_win_fs_size(file_handle->file_system, wt_session, file_handle->name, &file_size));
     len = (size_t)file_size;
 
     __wt_verbose(session, WT_VERB_HANDLEOPS, "%s: memory-map: %" WT_SIZET_FMT " bytes",
@@ -71,11 +71,11 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void **mapped_
 }
 
 /*
- * __wt_win_unmap --
+ * __wti_win_unmap --
  *     Remove a memory mapping.
  */
 int
-__wt_win_unmap(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void *mapped_region,
+__wti_win_unmap(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void *mapped_region,
   size_t length, void *mapped_cookie)
 {
     WT_DECL_RET;

@@ -312,11 +312,11 @@ __wt_ref_addr_free(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
- * __wt_free_ref --
+ * __wti_free_ref --
  *     Discard the contents of a WT_REF structure (optionally including the pages it references).
  */
 void
-__wt_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pages)
+__wti_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pages)
 {
     WT_IKEY *ikey;
 
@@ -377,17 +377,18 @@ __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
     uint32_t i;
 
     for (pindex = WT_INTL_INDEX_GET_SAFE(page), i = 0; i < pindex->entries; ++i)
-        __wt_free_ref(session, pindex->index[i], page->type, false);
+        __wti_free_ref(session, pindex->index[i], page->type, false);
 
     __wt_free(session, pindex);
 }
 
 /*
- * __wt_free_ref_index --
+ * __wti_free_ref_index --
  *     Discard a page index and its references.
  */
 void
-__wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pindex, bool free_pages)
+__wti_free_ref_index(
+  WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pindex, bool free_pages)
 {
     WT_REF *ref;
     uint32_t i;
@@ -409,7 +410,7 @@ __wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pind
           __wt_hazard_check_assert(session, ref, false),
           "Attempting to discard ref to a page with hazard pointers");
 
-        __wt_free_ref(session, ref, page->type, free_pages);
+        __wti_free_ref(session, ref, page->type, free_pages);
     }
     __wt_free(session, pindex);
 }

@@ -507,7 +507,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 
     /* Try to move the pinned timestamp forward. */
     if (strict)
-        __wt_txn_update_pinned_timestamp(session, false);
+        __wti_txn_update_pinned_timestamp(session, false);
 
     /*
      * For pure read-only workloads, or if the update isn't forced and the oldest ID isn't too far
@@ -722,7 +722,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, WT_CONF *conf)
     WT_ERR(__wt_conf_gets_def(session, conf, read_timestamp, 0, &cval));
     if (cval.len != 0) {
         WT_ERR(__wt_txn_parse_timestamp(session, "read", &read_ts, &cval));
-        WT_ERR(__wt_txn_set_read_timestamp(session, read_ts));
+        WT_ERR(__wti_txn_set_read_timestamp(session, read_ts));
     }
 
 err:
@@ -761,11 +761,11 @@ __wt_txn_reconfigure(WT_SESSION_IMPL *session, const char *config)
 }
 
 /*
- * __wt_txn_release --
+ * __txn_release --
  *     Release the resources associated with the current transaction.
  */
-void
-__wt_txn_release(WT_SESSION_IMPL *session)
+static void
+__txn_release(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
@@ -798,7 +798,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
         txn->id = WT_TXN_NONE;
     }
 
-    __wt_txn_clear_durable_timestamp(session);
+    __wti_txn_clear_durable_timestamp(session);
 
     /* Free the scratch buffer allocated for logging. */
     __wt_logrec_free(session, &txn->logrec);
@@ -812,7 +812,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
      */
     __wt_txn_release_snapshot(session);
     /* Clear the read timestamp. */
-    __wt_txn_clear_read_timestamp(session);
+    __wti_txn_clear_read_timestamp(session);
     txn->isolation = session->isolation;
 
     txn->rollback_reason = NULL;
@@ -1982,7 +1982,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     else if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
         candidate_durable_timestamp = txn->commit_timestamp;
 
-    __wt_txn_release(session);
+    __txn_release(session);
 
     /* Leave the commit generation after snapshot is released. */
     if (!prepare)
@@ -2309,7 +2309,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
         cursor = NULL;
     }
 
-    __wt_txn_release(session);
+    __txn_release(session);
 
     /*
      * We're between transactions, if we need to block for eviction, it's a good time to do so.
@@ -2496,7 +2496,7 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
     WT_STAT_SET(session, stats, txn_pinned_timestamp_oldest,
       durable_timestamp - txn_global->oldest_timestamp);
 
-    __wt_txn_get_pinned_timestamp(session, &oldest_active_read_timestamp, 0);
+    __wti_txn_get_pinned_timestamp(session, &oldest_active_read_timestamp, 0);
     if (oldest_active_read_timestamp == 0) {
         WT_STAT_SET(session, stats, txn_timestamp_oldest_active_read, 0);
         WT_STAT_SET(session, stats, txn_pinned_timestamp_reader, 0);

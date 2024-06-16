@@ -108,13 +108,13 @@ __logmgr_get_log_version(WT_VERSION version)
 }
 
 /*
- * __wt_logmgr_compat_version --
+ * __wti_logmgr_compat_version --
  *     Set up the compatibility versions in the log manager. This is split out because it is called
  *     much earlier than log subsystem creation on startup so that we can verify the system state in
  *     files before modifying files.
  */
 void
-__wt_logmgr_compat_version(WT_SESSION_IMPL *session)
+__wti_logmgr_compat_version(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
 
@@ -154,7 +154,7 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
     else
         first_record = WT_LOG_END_HEADER;
 
-    __wt_logmgr_compat_version(session);
+    __wti_logmgr_compat_version(session);
 
     /*
      * If the version is the same, there is nothing to do.
@@ -188,11 +188,11 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
 }
 
 /*
- * __wt_logmgr_config --
+ * __wti_logmgr_config --
  *     Parse and setup the logging server options.
  */
 int
-__wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
+__wti_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -347,13 +347,13 @@ __wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 }
 
 /*
- * __wt_logmgr_reconfig --
+ * __wti_logmgr_reconfig --
  *     Reconfigure logging.
  */
 int
-__wt_logmgr_reconfig(WT_SESSION_IMPL *session, const char **cfg)
+__wti_logmgr_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 {
-    WT_RET(__wt_logmgr_config(session, cfg, true));
+    WT_RET(__wti_logmgr_config(session, cfg, true));
     return (__logmgr_version(session, true));
 }
 
@@ -961,11 +961,11 @@ err:
 }
 
 /*
- * __wt_logmgr_create --
+ * __wti_logmgr_create --
  *     Initialize the log subsystem (before running recovery).
  */
 int
-__wt_logmgr_create(WT_SESSION_IMPL *session)
+__wti_logmgr_create(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_LOG *log;
@@ -1022,11 +1022,11 @@ __wt_logmgr_create(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_logmgr_open --
+ * __wti_logmgr_open --
  *     Start the log service threads.
  */
 int
-__wt_logmgr_open(WT_SESSION_IMPL *session)
+__wti_logmgr_open(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     uint64_t now;
@@ -1099,11 +1099,11 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_logmgr_destroy --
+ * __wti_logmgr_destroy --
  *     Destroy the log removal server thread and logging subsystem.
  */
 int
-__wt_logmgr_destroy(WT_SESSION_IMPL *session)
+__wti_logmgr_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;

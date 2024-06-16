@@ -309,7 +309,7 @@ __tiered_restart_work(WT_SESSION_IMPL *session, WT_TIERED *tiered)
             __wt_verbose(session, WT_VERB_TIERED,
               "RESTART_WORK: local object %s has flush time %" PRId64, obj_uri, cval.val);
             if (cval.val == 0)
-                WT_ERR(__wt_tiered_put_flush(session, tiered, i, 0));
+                WT_ERR(__wti_tiered_put_flush(session, tiered, i, 0));
             else
                 WT_ERR(__wt_tiered_put_remove_local(session, tiered, i));
             __wt_free(session, obj_val);
@@ -598,7 +598,7 @@ __tiered_switch(WT_SESSION_IMPL *session, const char *config)
     /* Create the object: entry in the metadata. */
     if (need_object) {
         WT_ERR(__tiered_create_object(session, tiered));
-        WT_ERR(__wt_tiered_put_flush(
+        WT_ERR(__wti_tiered_put_flush(
           session, tiered, tiered->current_id, __wt_gen(session, WT_GEN_CHECKPOINT)));
     }
 
@@ -635,11 +635,11 @@ __wt_tiered_switch(WT_SESSION_IMPL *session, const char *config)
 }
 
 /*
- * __wt_tiered_name_str --
+ * __tiered_name_str --
  *     Given a name and object number generate the URI name of the given type.
  */
-int
-__wt_tiered_name_str(
+static int
+__tiered_name_str(
   WT_SESSION_IMPL *session, const char *name, uint32_t id, uint32_t flags, const char **retp)
 {
     WT_DECL_ITEM(tmp);
@@ -702,7 +702,7 @@ __wt_tiered_name(
         return (0);
     }
 
-    return (__wt_tiered_name_str(session, name, id, flags, retp));
+    return (__tiered_name_str(session, name, id, flags, retp));
 }
 
 /*
@@ -737,7 +737,7 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     if (cval.len == 0)
         tiered->bstorage = S2C(session)->bstorage;
     else
-        WT_ERR(__wt_tiered_bucket_config(session, tiered_cfg, &tiered->bstorage));
+        WT_ERR(__wti_tiered_bucket_config(session, tiered_cfg, &tiered->bstorage));
     WT_ASSERT(session, tiered->bstorage != NULL);
     /* Collapse into one string for later use in switch. */
     WT_ERR(__wt_config_merge(session, tiered_cfg, NULL, &config));
@@ -806,8 +806,8 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
         /* Temp code to keep s_all happy. */
         FLD_SET(unused, WT_TIERED_OBJ_LOCAL | WT_TIERED_TREE_UNUSED);
         FLD_SET(unused, WT_TIERED_WORK_FORCE | WT_TIERED_WORK_FREE);
-        WT_ERR(__wt_tiered_put_remove_shared(session, tiered, tiered->current_id));
-        __wt_tiered_get_remove_shared(session, &entry);
+        WT_ERR(__wti_tiered_put_remove_shared(session, tiered, tiered->current_id));
+        __wti_tiered_get_remove_shared(session, &entry);
     }
 #endif
 

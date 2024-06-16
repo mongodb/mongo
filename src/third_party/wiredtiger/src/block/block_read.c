@@ -37,7 +37,7 @@ __wt_bm_read(
      * In diagnostic mode, verify the block we're about to read isn't on the available list, or for
      * the writable objects, the discard list.
      */
-    WT_ERR(__wt_block_misplaced(session, block, "read", offset, size,
+    WT_ERR(__wti_block_misplaced(session, block, "read", offset, size,
       bm->is_live && block == bm->block, __PRETTY_FUNCTION__, __LINE__));
 #endif
 
@@ -45,7 +45,7 @@ __wt_bm_read(
     WT_ERR(__wt_block_read_off(session, block, buf, objectid, offset, size, checksum));
 
     /* Optionally discard blocks from the system's buffer cache. */
-    WT_ERR(__wt_block_discard(session, block, (size_t)size));
+    WT_ERR(__wti_block_discard(session, block, (size_t)size));
 
 err:
     if (bm->is_multi_handle) {

@@ -9,79 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __rts_check_callback --
- *     Check if a single session has an active transaction or open cursors. Callback from the
- *     session array walk.
- */
-static int
-__rts_check_callback(
-  WT_SESSION_IMPL *session, WT_SESSION_IMPL *array_session, bool *exit_walkp, void *cookiep)
-{
-    WT_RTS_COOKIE *cookie;
-
-    WT_UNUSED(session);
-    cookie = (WT_RTS_COOKIE *)cookiep;
-
-    /* Check if a user session has a running transaction. */
-    if (F_ISSET(array_session->txn, WT_TXN_RUNNING)) {
-        cookie->ret_txn_active = true;
-        *exit_walkp = true;
-    } else if (array_session->ncursors != 0) {
-        /* Check if a user session has an active file cursor. */
-        cookie->ret_cursor_active = true;
-        *exit_walkp = true;
-    }
-    return (0);
-}
-
-/*
- * __wt_rts_check --
- *     Check to the extent possible that the rollback request is reasonable.
- */
-int
-__wt_rts_check(WT_SESSION_IMPL *session)
-{
-    WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
-    WT_RTS_COOKIE cookie;
-
-    WT_CLEAR(cookie);
-    conn = S2C(session);
-
-    WT_STAT_CONN_INCR(session, txn_walk_sessions);
-
-    /*
-     * Help the user comply with the requirement there be no concurrent user operations. It is okay
-     * to have a transaction in the prepared state.
-     *
-     * WT_TXN structures are allocated and freed as sessions are activated and closed. Lock the
-     * session open/close to ensure we don't race. This call is a rarely used RTS-only function,
-     * acquiring the lock shouldn't be an issue.
-     */
-    __wt_spin_lock(session, &conn->api_lock);
-    WT_IGNORE_RET(__wt_session_array_walk(session, __rts_check_callback, true, &cookie));
-    __wt_spin_unlock(session, &conn->api_lock);
-
-    /*
-     * A new cursor may be positioned or a transaction may start after we return from this call and
-     * callers should be aware of this limitation.
-     */
-    if (cookie.ret_cursor_active)
-        WT_RET_MSG(session, EBUSY, "rollback_to_stable illegal with active file cursors");
-    if (cookie.ret_txn_active) {
-        ret = EBUSY;
-        WT_TRET(__wt_verbose_dump_txn(session));
-        WT_RET_MSG(session, ret, "rollback_to_stable illegal with active transactions");
-    }
-    return (0);
-}
-
-/*
- * __wt_rts_progress_msg --
+ * __wti_rts_progress_msg --
  *     Log a verbose message about the progress of the current rollback to stable.
  */
 void
-__wt_rts_progress_msg(WT_SESSION_IMPL *session, WT_TIMER *rollback_start, uint64_t rollback_count,
+__wti_rts_progress_msg(WT_SESSION_IMPL *session, WT_TIMER *rollback_start, uint64_t rollback_count,
   uint64_t max_count, uint64_t *rollback_msg_count, bool walk)
 {
     uint64_t time_diff_ms;
@@ -106,22 +38,22 @@ __wt_rts_progress_msg(WT_SESSION_IMPL *session, WT_TIMER *rollback_start, uint64
 }
 
 /*
- * __wt_rts_thread_chk --
+ * __rts_thread_chk --
  *     Check to decide if the RTS thread should continue running.
  */
-bool
-__wt_rts_thread_chk(WT_SESSION_IMPL *session)
+static bool
+__rts_thread_chk(WT_SESSION_IMPL *session)
 {
     return (F_ISSET(S2C(session), WT_CONN_RTS_THREAD_RUN));
 }
 
 /*
- * __wt_rts_thread_run --
+ * __rts_thread_run --
  *     Entry function for an RTS thread. This is called repeatedly from the thread group code so it
  *     does not need to loop itself.
  */
-int
-__wt_rts_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
+static int
+__rts_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 {
     WT_DECL_RET;
     WT_RTS_WORK_UNIT *entry;
@@ -136,12 +68,12 @@ __wt_rts_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     F_SET(session, WT_SESSION_ROLLBACK_TO_STABLE);
 
     while (!TAILQ_EMPTY(&S2C(session)->rts->rtsqh)) {
-        __wt_rts_pop_work(session, &entry);
+        __wti_rts_pop_work(session, &entry);
         if (entry == NULL)
             break;
 
-        ret = __wt_rts_btree_work_unit(session, entry);
-        __wt_rts_work_free(session, entry);
+        ret = __wti_rts_btree_work_unit(session, entry);
+        __wti_rts_work_free(session, entry);
         WT_ERR(ret);
     }
 
@@ -153,11 +85,11 @@ err:
 }
 
 /*
- * __wt_rts_thread_stop --
+ * __rts_thread_stop --
  *     Shutdown function for an RTS thread.
  */
-int
-__wt_rts_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
+static int
+__rts_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
 {
     WT_UNUSED(thread);
 
@@ -167,11 +99,11 @@ __wt_rts_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
 }
 
 /*
- * __wt_rts_thread_create --
+ * __rts_thread_create --
  *     Start RTS threads.
  */
 static int
-__wt_rts_thread_create(WT_SESSION_IMPL *session)
+__rts_thread_create(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     uint32_t session_flags;
@@ -191,18 +123,18 @@ __wt_rts_thread_create(WT_SESSION_IMPL *session)
     /* Create the RTS thread group. Set the group size to the maximum allowed sessions. */
     session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
     WT_RET(__wt_thread_group_create(session, &conn->rts->thread_group, "rts-threads",
-      conn->rts->threads_num, conn->rts->threads_num, session_flags, __wt_rts_thread_chk,
-      __wt_rts_thread_run, __wt_rts_thread_stop));
+      conn->rts->threads_num, conn->rts->threads_num, session_flags, __rts_thread_chk,
+      __rts_thread_run, __rts_thread_stop));
 
     return (0);
 }
 
 /*
- * __wt_rts_thread_destroy --
+ * __rts_thread_destroy --
  *     Destroy the RTS threads.
  */
 static int
-__wt_rts_thread_destroy(WT_SESSION_IMPL *session)
+__rts_thread_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -230,12 +162,12 @@ __wt_rts_thread_destroy(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_rts_btree_apply_all --
+ * __wti_rts_btree_apply_all --
  *     Perform rollback to stable to all files listed in the metadata, apart from the metadata and
  *     history store files.
  */
 int
-__wt_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
+__wti_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -266,7 +198,7 @@ __wt_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_times
     WT_ERR(__wt_metadata_cursor_release(session, &cursor));
     have_cursor = false;
 
-    WT_ERR(__wt_rts_thread_create(session));
+    WT_ERR(__rts_thread_create(session));
     rts_threads_started = true;
 
     WT_ERR(__wt_metadata_cursor(session, &cursor));
@@ -277,11 +209,11 @@ __wt_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_times
         WT_ERR(cursor->get_value(cursor, &config));
         if (WT_BTREE_PREFIX(uri))
             ++rollback_count;
-        __wt_rts_progress_msg(
+        __wti_rts_progress_msg(
           session, &timer, rollback_count, max_count, &rollback_msg_count, false);
 
         F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
-        ret = __wt_rts_btree_walk_btree_apply(session, uri, config, rollback_timestamp);
+        ret = __wti_rts_btree_walk_btree_apply(session, uri, config, rollback_timestamp);
         F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
 
         WT_ERR(ret);
@@ -295,16 +227,16 @@ __wt_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_times
      */
     if (S2C(session)->rts->threads_num != 0) {
         while (!TAILQ_EMPTY(&S2C(session)->rts->rtsqh)) {
-            __wt_rts_pop_work(session, &entry);
+            __wti_rts_pop_work(session, &entry);
             if (entry == NULL)
                 break;
-            ret = __wt_rts_btree_work_unit(session, entry);
-            __wt_rts_work_free(session, entry);
+            ret = __wti_rts_btree_work_unit(session, entry);
+            __wti_rts_work_free(session, entry);
             WT_ERR(ret);
         }
     }
 
-    WT_ERR(__wt_rts_thread_destroy(session));
+    WT_ERR(__rts_thread_destroy(session));
     rts_threads_started = false;
 
     /*
@@ -322,12 +254,12 @@ __wt_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_times
           "performing final pass of the history store to remove unstable entries with "
           "rollback_timestamp=%s",
           __wt_timestamp_to_string(rollback_timestamp, ts_string));
-        WT_ERR(__wt_rts_history_final_pass(session, rollback_timestamp));
+        WT_ERR(__wti_rts_history_final_pass(session, rollback_timestamp));
     }
 err:
     if (have_cursor)
         WT_TRET(__wt_metadata_cursor_release(session, &cursor));
     if (rts_threads_started)
-        WT_TRET(__wt_rts_thread_destroy(session));
+        WT_TRET(__rts_thread_destroy(session));
     return (ret);
 }

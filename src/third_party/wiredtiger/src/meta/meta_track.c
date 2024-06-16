@@ -399,11 +399,11 @@ __wt_meta_track_checkpoint(WT_SESSION_IMPL *session)
     return (0);
 }
 /*
- * __wt_meta_track_insert --
+ * __wti_meta_track_insert --
  *     Track an insert operation.
  */
 int
-__wt_meta_track_insert(WT_SESSION_IMPL *session, const char *key)
+__wti_meta_track_insert(WT_SESSION_IMPL *session, const char *key)
 {
     WT_DECL_RET;
     WT_META_TRACK *trk;
@@ -420,11 +420,11 @@ err:
 }
 
 /*
- * __wt_meta_track_update --
+ * __wti_meta_track_update --
  *     Track a metadata update operation.
  */
 int
-__wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
+__wti_meta_track_update(WT_SESSION_IMPL *session, const char *key)
 {
     WT_DECL_RET;
     WT_META_TRACK *trk;

@@ -190,13 +190,13 @@ __evict_list_clear_page_locked(WT_SESSION_IMPL *session, WT_REF *ref, bool exclu
 }
 
 /*
- * __wt_evict_list_clear_page --
+ * __wti_evict_list_clear_page --
  *     Check whether a page is present in the LRU eviction list. If the page is found in the list,
  *     remove it. This is called from the page eviction code to make sure there is no attempt to
  *     evict a child page multiple times.
  */
 void
-__wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref)
+__wti_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_CACHE *cache;
 
@@ -279,22 +279,22 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_evict_thread_chk --
+ * __evict_thread_chk --
  *     Check to decide if the eviction thread should continue running.
  */
-bool
-__wt_evict_thread_chk(WT_SESSION_IMPL *session)
+static bool
+__evict_thread_chk(WT_SESSION_IMPL *session)
 {
     return (F_ISSET(S2C(session), WT_CONN_EVICTION_RUN));
 }
 
 /*
- * __wt_evict_thread_run --
+ * __evict_thread_run --
  *     Entry function for an eviction thread. This is called repeatedly from the thread group code
  *     so it does not need to loop itself.
  */
-int
-__wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
+static int
+__evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
@@ -355,11 +355,11 @@ err:
 }
 
 /*
- * __wt_evict_thread_stop --
+ * __evict_thread_stop --
  *     Shutdown function for an eviction thread.
  */
-int
-__wt_evict_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
+static int
+__evict_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
@@ -541,8 +541,8 @@ __wt_evict_create(WT_SESSION_IMPL *session)
      */
     session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
     WT_RET(__wt_thread_group_create(session, &conn->evict_threads, "eviction-server",
-      conn->evict_threads_min, conn->evict_threads_max, session_flags, __wt_evict_thread_chk,
-      __wt_evict_thread_run, __wt_evict_thread_stop));
+      conn->evict_threads_min, conn->evict_threads_max, session_flags, __evict_thread_chk,
+      __evict_thread_run, __evict_thread_stop));
 
 /*
  * Ensure the cache stuck timer is initialized when starting eviction.

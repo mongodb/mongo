@@ -37,6 +37,34 @@ err:
 }
 
 /*
+ * __row_insert_alloc --
+ *     Row-store insert: allocate a WT_INSERT structure and fill it in.
+ */
+static int
+__row_insert_alloc(WT_SESSION_IMPL *session, const WT_ITEM *key, u_int skipdepth, WT_INSERT **insp,
+  size_t *ins_sizep)
+{
+    WT_INSERT *ins;
+    size_t ins_size;
+
+    /*
+     * Allocate the WT_INSERT structure, next pointers for the skip list, and room for the key. Then
+     * copy the key into place.
+     */
+    ins_size = sizeof(WT_INSERT) + skipdepth * sizeof(WT_INSERT *) + key->size;
+    WT_RET(__wt_calloc(session, 1, ins_size, &ins));
+
+    ins->u.key.offset = WT_STORE_SIZE(ins_size - key->size);
+    WT_INSERT_KEY_SIZE(ins) = WT_STORE_SIZE(key->size);
+    memcpy(WT_INSERT_KEY(ins), key->data, key->size);
+
+    *insp = ins;
+    if (ins_sizep != NULL)
+        *ins_sizep = ins_size;
+    return (0);
+}
+
+/*
  * __wt_row_modify --
  *     Row-store insert, update and delete.
  */
@@ -193,7 +221,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
          * Allocate a WT_INSERT/WT_UPDATE pair and transaction ID, and update the cursor to
          * reference it (the WT_INSERT_HEAD might be allocated, the WT_INSERT was allocated).
          */
-        WT_ERR(__wt_row_insert_alloc(session, key, skipdepth, &ins, &ins_size));
+        WT_ERR(__row_insert_alloc(session, key, skipdepth, &ins, &ins_size));
         cbt->ins_head = ins_head;
         cbt->ins = ins;
 
@@ -302,34 +330,6 @@ err:
     }
 
     return (ret);
-}
-
-/*
- * __wt_row_insert_alloc --
- *     Row-store insert: allocate a WT_INSERT structure and fill it in.
- */
-int
-__wt_row_insert_alloc(WT_SESSION_IMPL *session, const WT_ITEM *key, u_int skipdepth,
-  WT_INSERT **insp, size_t *ins_sizep)
-{
-    WT_INSERT *ins;
-    size_t ins_size;
-
-    /*
-     * Allocate the WT_INSERT structure, next pointers for the skip list, and room for the key. Then
-     * copy the key into place.
-     */
-    ins_size = sizeof(WT_INSERT) + skipdepth * sizeof(WT_INSERT *) + key->size;
-    WT_RET(__wt_calloc(session, 1, ins_size, &ins));
-
-    ins->u.key.offset = WT_STORE_SIZE(ins_size - key->size);
-    WT_INSERT_KEY_SIZE(ins) = WT_STORE_SIZE(key->size);
-    memcpy(WT_INSERT_KEY(ins), key->data, key->size);
-
-    *insp = ins;
-    if (ins_sizep != NULL)
-        *ins_sizep = ins_size;
-    return (0);
 }
 
 /*

@@ -135,13 +135,13 @@ __tiered_queue_peek_empty(WT_CONNECTION_IMPL *conn)
 }
 
 /*
- * __wt_tiered_pop_work --
+ * __tiered_pop_work --
  *     Pop a work unit of the given type from the queue. If a maximum value is given, only return a
  *     work unit that is less than the maximum value. The caller is responsible for freeing the
  *     returned work unit structure.
  */
-void
-__wt_tiered_pop_work(
+static void
+__tiered_pop_work(
   WT_SESSION_IMPL *session, uint32_t type, uint64_t maxval, WT_TIERED_WORK_UNIT **entryp)
 {
     WT_CONNECTION_IMPL *conn;
@@ -214,7 +214,7 @@ __wt_tiered_flush_work_wait(WT_SESSION_IMPL *session, uint32_t timeout)
 void
 __wt_tiered_get_flush_finish(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp)
 {
-    __wt_tiered_pop_work(session, WT_TIERED_WORK_FLUSH_FINISH, 0, entryp);
+    __tiered_pop_work(session, WT_TIERED_WORK_FLUSH_FINISH, 0, entryp);
     return;
 }
 
@@ -227,7 +227,7 @@ __wt_tiered_get_flush_finish(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **ent
 void
 __wt_tiered_get_flush(WT_SESSION_IMPL *session, uint64_t generation, WT_TIERED_WORK_UNIT **entryp)
 {
-    __wt_tiered_pop_work(session, WT_TIERED_WORK_FLUSH, generation, entryp);
+    __tiered_pop_work(session, WT_TIERED_WORK_FLUSH, generation, entryp);
     return;
 }
 
@@ -239,18 +239,18 @@ __wt_tiered_get_flush(WT_SESSION_IMPL *session, uint64_t generation, WT_TIERED_W
 void
 __wt_tiered_get_remove_local(WT_SESSION_IMPL *session, uint64_t now, WT_TIERED_WORK_UNIT **entryp)
 {
-    __wt_tiered_pop_work(session, WT_TIERED_WORK_REMOVE_LOCAL, now, entryp);
+    __tiered_pop_work(session, WT_TIERED_WORK_REMOVE_LOCAL, now, entryp);
     return;
 }
 
 /*
- * __wt_tiered_get_remove_shared --
+ * __wti_tiered_get_remove_shared --
  *     Get a remove shared work unit. The caller is responsible for freeing the work unit.
  */
 void
-__wt_tiered_get_remove_shared(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp)
+__wti_tiered_get_remove_shared(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp)
 {
-    __wt_tiered_pop_work(session, WT_TIERED_WORK_REMOVE_SHARED, 0, entryp);
+    __tiered_pop_work(session, WT_TIERED_WORK_REMOVE_SHARED, 0, entryp);
     return;
 }
 
@@ -294,11 +294,11 @@ __wt_tiered_put_remove_local(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32
 }
 
 /*
- * __wt_tiered_put_remove_shared --
+ * __wti_tiered_put_remove_shared --
  *     Add a remove shared work unit for the given ID to the queue.
  */
 int
-__wt_tiered_put_remove_shared(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
+__wti_tiered_put_remove_shared(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
 {
     WT_TIERED_WORK_UNIT *entry;
 
@@ -311,12 +311,13 @@ __wt_tiered_put_remove_shared(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint3
 }
 
 /*
- * __wt_tiered_put_flush --
+ * __wti_tiered_put_flush --
  *     Add a flush work unit to the queue. We're single threaded so the tiered structure's id
  *     information cannot change between our caller and here.
  */
 int
-__wt_tiered_put_flush(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, uint64_t generation)
+__wti_tiered_put_flush(
+  WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, uint64_t generation)
 {
     WT_TIERED_WORK_UNIT *entry;
 

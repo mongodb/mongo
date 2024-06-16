@@ -603,7 +603,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
          * Read the auxiliary header. Because pages that fail verify are tossed before salvage, we
          * shouldn't fail.
          */
-        WT_RET(__wt_col_fix_read_auxheader(session, dsk, &auxhdr));
+        WT_RET(__wti_col_fix_read_auxheader(session, dsk, &auxhdr));
 
         switch (auxhdr.version) {
         case WT_COL_FIX_VERSION_NIL:
@@ -689,7 +689,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
          * Page flags are 0 because we aren't releasing the memory used to read the page into memory
          * and we don't want page discard to free it.
          */
-        WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, &page, NULL));
+        WT_ERR(__wti_page_inmem(session, NULL, dsk, 0, &page, NULL));
         WT_ERR(__wt_row_leaf_key_copy(session, page, &page->pg_row[0], &trk->row_start));
         WT_ERR(
           __wt_row_leaf_key_copy(session, page, &page->pg_row[page->entries - 1], &trk->row_stop));
@@ -1749,7 +1749,7 @@ __slvg_row_trk_update_start(WT_SESSION_IMPL *session, WT_ITEM *stop, uint32_t sl
      */
     WT_RET(__wt_scr_alloc(session, trk->trk_size, &dsk));
     WT_ERR(__wt_blkcache_read(session, dsk, trk->trk_addr, trk->trk_addr_size));
-    WT_ERR(__wt_page_inmem(session, NULL, dsk->data, 0, &page, NULL));
+    WT_ERR(__wti_page_inmem(session, NULL, dsk->data, 0, &page, NULL));
 
     /*
      * Walk the page, looking for a key sorting greater than the specified stop key -- that's our
@@ -1855,7 +1855,7 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
             WT_ERR(__slvg_row_build_leaf(session, trk, ref, ss));
         } else {
             WT_ERR(
-              __wt_row_ikey_incr(session, page, 0, trk->row_start.data, trk->row_start.size, ref));
+              __wti_row_ikey_incr(session, page, 0, trk->row_start.data, trk->row_start.size, ref));
 
             WT_ERR(__slvg_ovfl_ref_all(session, trk));
         }
@@ -1967,7 +1967,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref, WT_S
      */
     rip = page->pg_row + skip_start;
     WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
-    WT_ERR(__wt_row_ikey_incr(session, ref->home, 0, key->data, key->size, ref));
+    WT_ERR(__wti_row_ikey_incr(session, ref->home, 0, key->data, key->size, ref));
 
     /* Set the referenced flag on overflow pages we're using. */
     if (trk->trk_ovfl_cnt != 0)

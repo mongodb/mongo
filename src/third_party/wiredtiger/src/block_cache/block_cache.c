@@ -385,11 +385,11 @@ __wt_blkcache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_siz
 }
 
 /*
- * __wt_blkcache_put --
+ * __wti_blkcache_put --
  *     Put a block into the cache.
  */
 int
-__wt_blkcache_put(
+__wti_blkcache_put(
   WT_SESSION_IMPL *session, WT_ITEM *data, const uint8_t *addr, size_t addr_size, bool write)
 {
     WT_BLKCACHE *blkcache;
@@ -503,11 +503,11 @@ err:
 }
 
 /*
- * __wt_blkcache_remove --
+ * __wti_blkcache_remove --
  *     Remove a block from the cache.
  */
 void
-__wt_blkcache_remove(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
+__wti_blkcache_remove(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ITEM *blkcache_item;

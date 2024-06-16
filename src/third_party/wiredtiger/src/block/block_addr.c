@@ -159,7 +159,7 @@ __wt_block_addr_invalid(
      * discard list. This only applies if the block is in this object.
      */
     if (objectid == block->objectid)
-        WT_RET(__wt_block_misplaced(
+        WT_RET(__wti_block_misplaced(
           session, block, "addr-valid", offset, size, live, __PRETTY_FUNCTION__, __LINE__));
 #endif
 
@@ -254,11 +254,11 @@ __block_ckpt_unpack(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *ck
 }
 
 /*
- * __wt_block_ckpt_unpack --
+ * __wti_block_ckpt_unpack --
  *     Convert a checkpoint cookie into its components, block manager version.
  */
 int
-__wt_block_ckpt_unpack(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *ckpt,
+__wti_block_ckpt_unpack(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *ckpt,
   size_t ckpt_size, WT_BLOCK_CKPT *ci)
 {
     return (__block_ckpt_unpack(session, block, ckpt, ckpt_size, ci));
@@ -279,11 +279,11 @@ __wt_block_ckpt_decode(WT_SESSION *wt_session, WT_BLOCK *block, const uint8_t *c
 }
 
 /*
- * __wt_block_ckpt_pack --
+ * __wti_block_ckpt_pack --
  *     Convert the components into its checkpoint cookie.
  */
 int
-__wt_block_ckpt_pack(
+__wti_block_ckpt_pack(
   WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t **pp, WT_BLOCK_CKPT *ci, bool skip_avail)
 {
     uint64_t a;
@@ -326,12 +326,12 @@ __wt_block_ckpt_pack(
 }
 
 /*
- * __wt_ckpt_verbose --
+ * __wti_ckpt_verbose --
  *     Display a printable string representation of a checkpoint.
  */
 void
-__wt_ckpt_verbose(WT_SESSION_IMPL *session, WT_BLOCK *block, const char *tag, const char *ckpt_name,
-  const uint8_t *ckpt_string, size_t ckpt_size)
+__wti_ckpt_verbose(WT_SESSION_IMPL *session, WT_BLOCK *block, const char *tag,
+  const char *ckpt_name, const uint8_t *ckpt_string, size_t ckpt_size)
 {
     WT_BLOCK_CKPT *ci, _ci;
     WT_DECL_ITEM(tmp);
@@ -346,8 +346,8 @@ __wt_ckpt_verbose(WT_SESSION_IMPL *session, WT_BLOCK *block, const char *tag, co
 
     /* Initialize the checkpoint, crack the cookie. */
     ci = &_ci;
-    WT_ERR(__wt_block_ckpt_init(session, ci, "string"));
-    WT_ERR(__wt_block_ckpt_unpack(session, block, ckpt_string, ckpt_size, ci));
+    WT_ERR(__wti_block_ckpt_init(session, ci, "string"));
+    WT_ERR(__wti_block_ckpt_unpack(session, block, ckpt_string, ckpt_size, ci));
 
     WT_ERR(__wt_scr_alloc(session, 0, &tmp));
     WT_ERR(__wt_buf_fmt(session, tmp, "version=%" PRIu8, ci->version));
@@ -389,5 +389,5 @@ __wt_ckpt_verbose(WT_SESSION_IMPL *session, WT_BLOCK *block, const char *tag, co
 
 err:
     __wt_scr_free(session, &tmp);
-    __wt_block_ckpt_destroy(session, ci);
+    __wti_block_ckpt_destroy(session, ci);
 }

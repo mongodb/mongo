@@ -49,11 +49,11 @@ __log_slot_dump(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_log_slot_activate --
+ * __wti_log_slot_activate --
  *     Initialize a slot to become active.
  */
 void
-__wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
+__wti_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
     WT_CONNECTION_IMPL *conn;
     WT_LOG *log;
@@ -268,7 +268,7 @@ __log_slot_new(WT_SESSION_IMPL *session)
                 /*
                  * Acquire our starting position in the log file. Assume the full buffer size.
                  */
-                WT_RET(__wt_log_acquire(session, log->slot_buf_size, slot));
+                WT_RET(__wti_log_acquire(session, log->slot_buf_size, slot));
                 /*
                  * We have a new, initialized slot to use. Set it as the active slot.
                  */
@@ -372,7 +372,7 @@ __log_slot_switch_internal(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool for
          * slot switch needs to be sure that any earlier slot switches have completed, including
          * writing out the buffer contents of earlier slots.
          */
-        WT_RET(__wt_log_release(session, slot, &free_slot));
+        WT_RET(__wti_log_release(session, slot, &free_slot));
         F_CLR(myslot, WT_MYSLOT_NEEDS_RELEASE);
         if (free_slot)
             __wt_log_slot_free(session, slot);
@@ -381,11 +381,11 @@ __log_slot_switch_internal(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool for
 }
 
 /*
- * __wt_log_slot_switch --
+ * __wti_log_slot_switch --
  *     Switch out the current slot and set up a new one.
  */
 int
-__wt_log_slot_switch(
+__wti_log_slot_switch(
   WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool retry, bool forced, bool *did_work)
 {
     WT_DECL_RET;
@@ -471,7 +471,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session, bool alloc)
      * except around a log file switch.
      */
     WT_ASSIGN_LSN(&slot->slot_release_lsn, &log->alloc_lsn);
-    __wt_log_slot_activate(session, slot);
+    __wti_log_slot_activate(session, slot);
     log->active_slot = slot;
     log->pool_index = 0;
 
@@ -518,11 +518,11 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_log_slot_join --
+ * __wti_log_slot_join --
  *     Join a consolidated logging slot.
  */
 void
-__wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, WT_MYSLOT *myslot)
+__wti_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, WT_MYSLOT *myslot)
 {
     WT_CONNECTION_IMPL *conn;
     WT_LOG *log;
@@ -639,12 +639,12 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, WT
 }
 
 /*
- * __wt_log_slot_release --
+ * __wti_log_slot_release --
  *     Each thread in a consolidated group releases its portion to signal it has completed copying
  *     its piece of the log into the memory buffer.
  */
 int64_t
-__wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
+__wti_log_slot_release(WT_MYSLOT *myslot, int64_t size)
 {
     WT_LOGSLOT *slot;
     wt_off_t cur_offset, my_start;

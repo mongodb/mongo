@@ -43,7 +43,7 @@ __wt_curstat_index_init(
     WT_DECL_RET;
     WT_INDEX *idx;
 
-    WT_RET(__wt_schema_get_index(session, uri, false, false, &idx));
+    WT_RET(__wti_schema_get_index(session, uri, false, false, &idx));
 
     WT_RET(__wt_scr_alloc(session, 0, &buf));
     WT_ERR(__wt_buf_fmt(session, buf, "statistics:%s", idx->source));

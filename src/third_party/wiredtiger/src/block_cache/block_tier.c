@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_blkcache_tiered_open --
+ * __wti_blkcache_tiered_open --
  *     Open a tiered object.
  */
 int
-__wt_blkcache_tiered_open(
+__wti_blkcache_tiered_open(
   WT_SESSION_IMPL *session, const char *uri, uint32_t objectid, WT_BLOCK **blockp)
 {
     WT_BLOCK *block;
@@ -133,7 +133,7 @@ __blkcache_find_open_handle(WT_BM *bm, uint32_t objectid, bool reading, WT_BLOCK
             }
 
     if (reading && *blockp != NULL)
-        __wt_blkcache_get_read_handle(*blockp);
+        __wti_blkcache_get_read_handle(*blockp);
 }
 
 /*
@@ -161,7 +161,7 @@ __wt_blkcache_get_handle(
         return (0);
 
     /* Open a handle for the object. */
-    WT_RET(__wt_blkcache_tiered_open(session, NULL, objectid, &new_handle));
+    WT_RET(__wti_blkcache_tiered_open(session, NULL, objectid, &new_handle));
 
     /* We need a write lock to add a new entry to the handle array. */
     __wt_writelock(session, &bm->handle_array_lock);
@@ -179,7 +179,7 @@ __wt_blkcache_get_handle(
           session, &bm->handle_array_allocated, bm->handle_array_next + 1, &bm->handle_array));
 
         if (reading)
-            __wt_blkcache_get_read_handle(new_handle);
+            __wti_blkcache_get_read_handle(new_handle);
 
         bm->handle_array[bm->handle_array_next++] = new_handle;
         *blockp = new_handle;
@@ -190,17 +190,17 @@ err:
     __wt_writeunlock(session, &bm->handle_array_lock);
 
     if (new_handle != NULL)
-        WT_TRET(__wt_bm_close_block(session, new_handle));
+        WT_TRET(__wti_bm_close_block(session, new_handle));
 
     return (ret);
 }
 
 /*
- * __wt_blkcache_get_read_handle --
+ * __wti_blkcache_get_read_handle --
  *     Update block handle when a read operation begins.
  */
 void
-__wt_blkcache_get_read_handle(WT_BLOCK *block)
+__wti_blkcache_get_read_handle(WT_BLOCK *block)
 {
     __wt_atomic_add32(&block->read_count, 1);
 }

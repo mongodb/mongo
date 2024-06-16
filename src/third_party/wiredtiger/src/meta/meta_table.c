@@ -197,7 +197,7 @@ __wt_metadata_insert(WT_SESSION_IMPL *session, const char *key, const char *valu
     cursor->set_value(cursor, value);
     WT_ERR(cursor->insert(cursor));
     if (WT_META_TRACKING(session))
-        WT_ERR(__wt_meta_track_insert(session, key));
+        WT_ERR(__wti_meta_track_insert(session, key));
 err:
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));
     return (ret);
@@ -220,12 +220,12 @@ __wt_metadata_update(WT_SESSION_IMPL *session, const char *key, const char *valu
       __metadata_turtle(key) ? "" : "not ");
 
     if (__metadata_turtle(key)) {
-        WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_update(session, key, value));
+        WT_WITH_TURTLE_LOCK(session, ret = __wti_turtle_update(session, key, value));
         return (ret);
     }
 
     if (WT_META_TRACKING(session))
-        WT_RET(__wt_meta_track_update(session, key));
+        WT_RET(__wti_meta_track_update(session, key));
 
     WT_RET(__wt_metadata_cursor(session, &cursor));
     /* This cursor needs to have overwrite semantics. */
@@ -268,7 +268,7 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
     WT_ERR(__wt_metadata_cursor_release(session, &cursor));
 
     if (WT_META_TRACKING(session))
-        WT_ERR(__wt_meta_track_update(session, key));
+        WT_ERR(__wti_meta_track_update(session, key));
 
     WT_ERR(__wt_metadata_cursor(session, &cursor));
     cursor->set_key(cursor, key);
@@ -304,7 +304,7 @@ __wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep)
          * otherwise. The code path is used enough that Coverity complains a lot, add an error check
          * to get some peace and quiet.
          */
-        WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_read(session, key, valuep));
+        WT_WITH_TURTLE_LOCK(session, ret = __wti_turtle_read(session, key, valuep));
         if (ret != 0)
             __wt_free(session, *valuep);
         return (ret);

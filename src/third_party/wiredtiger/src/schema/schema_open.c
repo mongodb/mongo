@@ -9,12 +9,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_schema_colgroup_name --
+ * __schema_colgroup_name --
  *     Get the URI for a column group. This is used for metadata lookups. The only complexity here
  *     is that simple tables (with a single column group) use a simpler naming scheme.
  */
-int
-__wt_schema_colgroup_name(
+static int
+__schema_colgroup_name(
   WT_SESSION_IMPL *session, WT_TABLE *table, const char *cgname, size_t len, WT_ITEM *buf)
 {
     const char *tablename;
@@ -40,11 +40,11 @@ __wt_schema_tiered_shared_colgroup_name(
 }
 
 /*
- * __wt_schema_open_colgroups --
+ * __wti_schema_open_colgroups --
  *     Open the column groups for a table.
  */
 int
-__wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
+__wti_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
     WT_COLGROUP *colgroup;
     WT_CONFIG cparser;
@@ -77,14 +77,14 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
          * Always open from scratch: we may have failed part of the way through opening a table, or
          * column groups may have changed.
          */
-        __wt_schema_destroy_colgroup(session, &table->cgroups[i]);
+        __wti_schema_destroy_colgroup(session, &table->cgroups[i]);
 
         WT_ERR(__wt_buf_init(session, buf, 0));
         if (table->is_tiered_shared)
             WT_ERR(__wt_schema_tiered_shared_colgroup_name(
               session, table->iface.name, i == 0 ? true : false, buf));
         else
-            WT_ERR(__wt_schema_colgroup_name(session, table, ckey.str, ckey.len, buf));
+            WT_ERR(__schema_colgroup_name(session, table, ckey.str, ckey.len, buf));
         if ((ret = __wt_metadata_search(session, buf->data, &cgconfig)) != 0) {
             /* It is okay if the table is incomplete. */
             if (ret == WT_NOTFOUND)
@@ -104,7 +104,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
     }
 
     if (!table->is_simple) {
-        WT_ERR(__wt_table_check(session, table));
+        WT_ERR(__wti_table_check(session, table));
 
         WT_ERR(__wt_buf_init(session, buf, 0));
         WT_ERR(__wt_struct_plan(session, table, table->colconf.str, table->colconf.len, true, buf));
@@ -115,7 +115,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 err:
     __wt_scr_free(session, &buf);
-    __wt_schema_destroy_colgroup(session, &colgroup);
+    __wti_schema_destroy_colgroup(session, &colgroup);
     __wt_free(session, cgconfig);
     return (ret);
 }
@@ -222,7 +222,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 
     /* Set up the cursor key format (the visible columns). */
     WT_ERR(__wt_buf_init(session, buf, 0));
-    WT_ERR(__wt_struct_truncate(session, idx->key_format, npublic_cols, buf));
+    WT_ERR(__wti_struct_truncate(session, idx->key_format, npublic_cols, buf));
     WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->idxkey_format));
 
     /*
@@ -286,7 +286,7 @@ __schema_open_index(
              * longer exist.
              */
             while (i < table->nindices) {
-                WT_TRET(__wt_schema_destroy_index(session, &table->indices[table->nindices - 1]));
+                WT_TRET(__wti_schema_destroy_index(session, &table->indices[table->nindices - 1]));
                 table->indices[--table->nindices] = NULL;
             }
             break;
@@ -306,7 +306,7 @@ __schema_open_index(
         cmp = 0;
         while (table->indices[i] != NULL && (cmp = strcmp(uri, table->indices[i]->name)) > 0) {
             /* Index no longer exists, remove it. */
-            WT_ERR(__wt_schema_destroy_index(session, &table->indices[i]));
+            WT_ERR(__wti_schema_destroy_index(session, &table->indices[i]));
             memmove(&table->indices[i], &table->indices[i + 1],
               (table->nindices - i) * sizeof(WT_INDEX *));
             table->indices[--table->nindices] = NULL;
@@ -334,7 +334,7 @@ __schema_open_index(
              * save the index: it will need to be reopened once the table is complete.
              */
             if (!table->cg_complete) {
-                WT_ERR(__wt_schema_destroy_index(session, &idx));
+                WT_ERR(__wti_schema_destroy_index(session, &idx));
                 if (idxname != NULL)
                     break;
                 continue;
@@ -368,7 +368,7 @@ __schema_open_index(
 
 err:
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));
-    WT_TRET(__wt_schema_destroy_index(session, &idx));
+    WT_TRET(__wti_schema_destroy_index(session, &idx));
 
     __wt_scr_free(session, &tmp);
     return (ret);
@@ -444,7 +444,7 @@ __schema_open_table(WT_SESSION_IMPL *session)
 
     /* Check that the columns match the key and value formats. */
     if (!table->is_simple)
-        WT_RET(__wt_schema_colcheck(session, table->key_format, table->value_format,
+        WT_RET(__wti_schema_colcheck(session, table->key_format, table->value_format,
           &table->colconf, &table->nkey_columns, NULL));
 
     WT_RET(__wt_config_gets(session, table_cfg, "colgroups", &table->cgconf));
@@ -464,7 +464,7 @@ __schema_open_table(WT_SESSION_IMPL *session)
     WT_RET_NOTFOUND_OK(ret);
 
     WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
-    WT_RET(__wt_schema_open_colgroups(session, table));
+    WT_RET(__wti_schema_open_colgroups(session, table));
 
     return (0);
 }
@@ -515,11 +515,11 @@ __wt_schema_get_colgroup(
 }
 
 /*
- * __wt_schema_get_index --
+ * __wti_schema_get_index --
  *     Find an index by URI.
  */
 int
-__wt_schema_get_index(
+__wti_schema_get_index(
   WT_SESSION_IMPL *session, const char *uri, bool invalidate, bool quiet, WT_INDEX **indexp)
 {
     WT_DECL_RET;

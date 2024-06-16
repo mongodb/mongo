@@ -9,64 +9,22 @@
 #include "wt_internal.h"
 
 /*
- * __wt_prefetch_create --
- *     Start the pre-fetch server.
- */
-int
-__wt_prefetch_create(WT_SESSION_IMPL *session, const char *cfg[])
-{
-    WT_CONFIG_ITEM cval;
-    WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
-    uint32_t session_flags;
-
-    conn = S2C(session);
-
-    /*
-     * This might have already been parsed and set during connection configuration, but do it here
-     * as well, in preparation for the functionality being runtime configurable.
-     */
-    WT_RET(__wt_config_gets(session, cfg, "prefetch.available", &cval));
-    conn->prefetch_available = cval.val != 0;
-
-    /*
-     * Pre-fetch functionality isn't runtime configurable, so don't bother starting utility threads
-     * if it isn't available.
-     */
-    if (!conn->prefetch_available)
-        return (0);
-
-    F_SET(conn, WT_CONN_PREFETCH_RUN);
-
-    session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
-    WT_ERR(__wt_thread_group_create(session, &conn->prefetch_threads, "prefetch-server",
-      WT_PREFETCH_THREAD_COUNT, WT_PREFETCH_THREAD_COUNT, session_flags, __wt_prefetch_thread_chk,
-      __wt_prefetch_thread_run, NULL));
-    return (0);
-
-err:
-    /* Quit the prefetch server. */
-    WT_TRET(__wt_prefetch_destroy(session));
-    return (ret);
-}
-
-/*
- * __wt_prefetch_thread_chk --
+ * __prefetch_thread_chk --
  *     Check to decide if the pre-fetch thread should continue running.
  */
-bool
-__wt_prefetch_thread_chk(WT_SESSION_IMPL *session)
+static bool
+__prefetch_thread_chk(WT_SESSION_IMPL *session)
 {
     return (F_ISSET(S2C(session), WT_CONN_PREFETCH_RUN));
 }
 
 /*
- * __wt_prefetch_thread_run --
+ * __prefetch_thread_run --
  *     Entry function for a prefetch thread. This is called repeatedly from the thread group code so
  *     it does not need to loop itself.
  */
-int
-__wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
+static int
+__prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(tmp);
@@ -147,6 +105,48 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
 err:
     __wt_scr_free(session, &tmp);
+    return (ret);
+}
+
+/*
+ * __wti_prefetch_create --
+ *     Start the pre-fetch server.
+ */
+int
+__wti_prefetch_create(WT_SESSION_IMPL *session, const char *cfg[])
+{
+    WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    uint32_t session_flags;
+
+    conn = S2C(session);
+
+    /*
+     * This might have already been parsed and set during connection configuration, but do it here
+     * as well, in preparation for the functionality being runtime configurable.
+     */
+    WT_RET(__wt_config_gets(session, cfg, "prefetch.available", &cval));
+    conn->prefetch_available = cval.val != 0;
+
+    /*
+     * Pre-fetch functionality isn't runtime configurable, so don't bother starting utility threads
+     * if it isn't available.
+     */
+    if (!conn->prefetch_available)
+        return (0);
+
+    F_SET(conn, WT_CONN_PREFETCH_RUN);
+
+    session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
+    WT_ERR(__wt_thread_group_create(session, &conn->prefetch_threads, "prefetch-server",
+      WT_PREFETCH_THREAD_COUNT, WT_PREFETCH_THREAD_COUNT, session_flags, __prefetch_thread_chk,
+      __prefetch_thread_run, NULL));
+    return (0);
+
+err:
+    /* Quit the prefetch server. */
+    WT_TRET(__wti_prefetch_destroy(session));
     return (ret);
 }
 
@@ -256,11 +256,11 @@ __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
 }
 
 /*
- * __wt_prefetch_destroy --
+ * __wti_prefetch_destroy --
  *     Destroy the pre-fetch threads.
  */
 int
-__wt_prefetch_destroy(WT_SESSION_IMPL *session)
+__wti_prefetch_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;

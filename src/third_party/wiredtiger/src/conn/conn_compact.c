@@ -646,11 +646,11 @@ err:
 }
 
 /*
- * __wt_background_compact_server_create --
+ * __wti_background_compact_server_create --
  *     Start the compact thread.
  */
 int
-__wt_background_compact_server_create(WT_SESSION_IMPL *session)
+__wti_background_compact_server_create(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     uint64_t i;
@@ -690,11 +690,11 @@ __wt_background_compact_server_create(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_background_compact_server_destroy --
+ * __wti_background_compact_server_destroy --
  *     Destroy the background compaction server thread.
  */
 int
-__wt_background_compact_server_destroy(WT_SESSION_IMPL *session)
+__wti_background_compact_server_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;

@@ -59,6 +59,62 @@ static int __json_pack_size(
     } while (0)
 
 /*
+ * __json_unpack_char --
+ *     Unpack a single character into JSON escaped format. Can be called with NULL buf for sizing,
+ *     and won't overwrite the buffer end in any case.
+ */
+static size_t
+__json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
+  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+    u_char abbrev;
+
+    if (!force_unicode) {
+        /* We treat all non-ASCII characters as non-printable. */
+        if (__wt_isascii(ch) && __wt_isprint(ch) && ch != '\\' && ch != '"') {
+            if (bufsz >= 1)
+                *buf = ch;
+            return (1);
+        }
+        abbrev = '\0';
+        switch (ch) {
+        case '\\':
+        case '"':
+            abbrev = ch;
+            break;
+        case '\f':
+            abbrev = 'f';
+            break;
+        case '\n':
+            abbrev = 'n';
+            break;
+        case '\r':
+            abbrev = 'r';
+            break;
+        case '\t':
+            abbrev = 't';
+            break;
+        }
+        if (abbrev != '\0') {
+            if (bufsz >= 2) {
+                *buf++ = '\\';
+                *buf = abbrev;
+            }
+            return (2);
+        }
+    }
+    if (bufsz >= 6) {
+        *buf++ = '\\';
+        *buf++ = 'u';
+        *buf++ = '0';
+        *buf++ = '0';
+        *buf++ = __wt_hex((ch & 0xf0) >> 4);
+        *buf++ = __wt_hex(ch & 0x0f);
+    }
+    return (6);
+}
+
+/*
  * __json_unpack_put --
  *     Calculate the size of a packed byte string as formatted for JSON.
  */
@@ -94,7 +150,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv, u_char *buf, size_t bu
         if (pv->type == 's' || pv->havesize) {
             end = p + pv->size;
             for (; p < end; p++) {
-                n = __wt_json_unpack_char(*p, buf, bufsz, false);
+                n = __json_unpack_char(*p, buf, bufsz, false);
                 if (n > bufsz)
                     bufsz = 0;
                 else {
@@ -105,7 +161,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv, u_char *buf, size_t bu
             }
         } else
             for (; *p; p++) {
-                n = __wt_json_unpack_char(*p, buf, bufsz, false);
+                n = __json_unpack_char(*p, buf, bufsz, false);
                 if (n > bufsz)
                     bufsz = 0;
                 else {
@@ -128,7 +184,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv, u_char *buf, size_t bu
             bufsz--;
         }
         for (; p < end; p++) {
-            n = __wt_json_unpack_char(*p, buf, bufsz, true);
+            n = __json_unpack_char(*p, buf, bufsz, true);
             if (n > bufsz)
                 bufsz = 0;
             else {
@@ -259,11 +315,11 @@ __json_struct_unpackv(WT_SESSION_IMPL *session, const void *buffer, size_t size,
 }
 
 /*
- * __wt_json_alloc_unpack --
+ * __wti_json_alloc_unpack --
  *     Allocate space for, and unpack an entry into JSON format.
  */
 int
-__wt_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt,
+__wti_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt,
   WT_CURSOR_JSON *json, bool iskey, va_list ap)
 {
     WT_CONFIG_ITEM *names;
@@ -287,11 +343,11 @@ __wt_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size
 }
 
 /*
- * __wt_json_close --
+ * __wti_json_close --
  *     Release any json related resources.
  */
 void
-__wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
+__wti_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
     WT_CURSOR_JSON *json;
 
@@ -305,62 +361,6 @@ __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 }
 
 /*
- * __wt_json_unpack_char --
- *     Unpack a single character into JSON escaped format. Can be called with NULL buf for sizing,
- *     and won't overwrite the buffer end in any case.
- */
-size_t
-__wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
-  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
-{
-    u_char abbrev;
-
-    if (!force_unicode) {
-        /* We treat all non-ASCII characters as non-printable. */
-        if (__wt_isascii(ch) && __wt_isprint(ch) && ch != '\\' && ch != '"') {
-            if (bufsz >= 1)
-                *buf = ch;
-            return (1);
-        }
-        abbrev = '\0';
-        switch (ch) {
-        case '\\':
-        case '"':
-            abbrev = ch;
-            break;
-        case '\f':
-            abbrev = 'f';
-            break;
-        case '\n':
-            abbrev = 'n';
-            break;
-        case '\r':
-            abbrev = 'r';
-            break;
-        case '\t':
-            abbrev = 't';
-            break;
-        }
-        if (abbrev != '\0') {
-            if (bufsz >= 2) {
-                *buf++ = '\\';
-                *buf = abbrev;
-            }
-            return (2);
-        }
-    }
-    if (bufsz >= 6) {
-        *buf++ = '\\';
-        *buf++ = 'u';
-        *buf++ = '0';
-        *buf++ = '0';
-        *buf++ = __wt_hex((ch & 0xf0) >> 4);
-        *buf++ = __wt_hex(ch & 0x0f);
-    }
-    return (6);
-}
-
-/*
  * __wt_json_unpack_str --
  *     Unpack a string into JSON escaped format. Can be called with NULL buf for sizing and won't
  *     overwrite the buffer end in any case.
@@ -371,7 +371,7 @@ __wt_json_unpack_str(u_char *dest, size_t dest_len, const u_char *src, size_t sr
     size_t n, total;
 
     for (total = 0; src_len > 0; ++src, --src_len, total += n) {
-        n = __wt_json_unpack_char(*src, dest, dest_len, false);
+        n = __json_unpack_char(*src, dest, dest_len, false);
         if (dest_len >= n) {
             dest_len -= n;
             dest += n;
@@ -383,11 +383,11 @@ __wt_json_unpack_str(u_char *dest, size_t dest_len, const u_char *src, size_t sr
 }
 
 /*
- * __wt_json_column_init --
+ * __wti_json_column_init --
  *     Set json_key_names, json_value_names to comma separated lists of column names.
  */
 int
-__wt_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat,
+__wti_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat,
   const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf)
 {
     WT_CURSOR_JSON *json;
@@ -806,12 +806,12 @@ __json_pack_size(WT_SESSION_IMPL *session, const char *fmt, WT_CONFIG_ITEM *name
 }
 
 /*
- * __wt_json_to_item --
+ * __wti_json_to_item --
  *     Convert a JSON input string for either key/value to a raw WT_ITEM. Checks that the input
  *     matches the expected format.
  */
 int
-__wt_json_to_item(WT_SESSION_IMPL *session, const char *jstr, const char *format,
+__wti_json_to_item(WT_SESSION_IMPL *session, const char *jstr, const char *format,
   WT_CURSOR_JSON *json, bool iskey, WT_ITEM *item)
 {
     size_t sz;

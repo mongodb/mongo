@@ -9,12 +9,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_rts_visibility_has_stable_update --
+ * __wti_rts_visibility_has_stable_update --
  *     Check if an update chain has a stable update on it. Assume the update chain has already been
  *     processed so all we need to do is look for a valid, non-aborted entry.
  */
 bool
-__wt_rts_visibility_has_stable_update(WT_UPDATE *upd)
+__wti_rts_visibility_has_stable_update(WT_UPDATE *upd)
 {
     while (upd != NULL &&
       (upd->type == WT_UPDATE_INVALID || upd->txnid == WT_TXN_ABORTED ||
@@ -24,11 +24,11 @@ __wt_rts_visibility_has_stable_update(WT_UPDATE *upd)
 }
 
 /*
- * __wt_rts_visibility_txn_visible_id --
+ * __wti_rts_visibility_txn_visible_id --
  *     Check if the transaction id is visible or not.
  */
 bool
-__wt_rts_visibility_txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
+__wti_rts_visibility_txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
 {
     WT_CONNECTION_IMPL *conn;
 
@@ -68,12 +68,12 @@ __rts_visibility_get_ref_max_durable_timestamp(WT_SESSION_IMPL *session, WT_TIME
 }
 
 /*
- * __wt_rts_visibility_page_needs_abort --
+ * __wti_rts_visibility_page_needs_abort --
  *     Check whether the page needs rollback, returning true if the page has modifications newer
  *     than the given timestamp.
  */
 bool
-__wt_rts_visibility_page_needs_abort(
+__wti_rts_visibility_page_needs_abort(
   WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t rollback_timestamp)
 {
     WT_ADDR *addr;

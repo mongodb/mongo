@@ -206,11 +206,11 @@ __page_inmem_prepare_update_col(WT_SESSION_IMPL *session, WT_REF *ref, WT_CURSOR
 }
 
 /*
- * __wt_page_inmem_prepare --
+ * __wti_page_inmem_prepare --
  *     Instantiate prepared updates.
  */
 int
-__wt_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
+__wti_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_BTREE *btree;
     WT_CELL *cell;
@@ -330,11 +330,11 @@ err:
 }
 
 /*
- * __wt_page_inmem --
+ * __wti_page_inmem --
  *     Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32_t flags,
+__wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32_t flags,
   WT_PAGE **pagep, bool *preparedp)
 {
     WT_CELL_UNPACK_ADDR unpack_addr;
@@ -469,7 +469,7 @@ err:
 }
 
 /*
- * __wt_col_fix_read_auxheader --
+ * __wti_col_fix_read_auxheader --
  *     Read the auxiliary header following the bitmap data, if any. This code is used by verify and
  *     needs to be accordingly careful. It is also used by mainline reads so it must also not crash
  *     or print on behalf of verify, and it should not waste time on checks that inmem doesn't need.
@@ -479,7 +479,7 @@ err:
  *     needn't bother. Salvage is protected by verify and doesn't need to check any of it.
  */
 int
-__wt_col_fix_read_auxheader(
+__wti_col_fix_read_auxheader(
   WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_COL_FIX_AUXILIARY_HEADER *auxhdr)
 {
     WT_BTREE *btree;
@@ -555,7 +555,7 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp, size_t
 
     page->pg_fix_bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
 
-    WT_RET(__wt_col_fix_read_auxheader(session, dsk, &auxhdr));
+    WT_RET(__wti_col_fix_read_auxheader(session, dsk, &auxhdr));
     WT_ASSERT(session, auxhdr.dataoffset <= dsk->mem_size);
 
     switch (auxhdr.version) {
@@ -871,7 +871,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
              */
             WT_ERR(__wt_dsk_cell_data_ref_addr(session, page->type, &unpack, current));
 
-            WT_ERR(__wt_row_ikey_incr(session, page, WT_PAGE_DISK_OFFSET(page, unpack.cell),
+            WT_ERR(__wti_row_ikey_incr(session, page, WT_PAGE_DISK_OFFSET(page, unpack.cell),
               current->data, current->size, ref));
 
             *sizep += sizeof(WT_IKEY) + current->size;

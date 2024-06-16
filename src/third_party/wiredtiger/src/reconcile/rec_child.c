@@ -185,11 +185,11 @@ __rec_child_deleted(
 }
 
 /*
- * __wt_rec_child_modify --
+ * __wti_rec_child_modify --
  *     Return if the internal page's child references any modifications.
  */
 int
-__wt_rec_child_modify(
+__wti_rec_child_modify(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_CHILD_MODIFY_STATE *cmsp)
 {
     WT_DECL_RET;

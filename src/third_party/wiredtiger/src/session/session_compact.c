@@ -414,11 +414,11 @@ __wt_compact_check_eligibility(WT_SESSION_IMPL *session, const char *uri)
 }
 
 /*
- * __wt_session_compact --
+ * __wti_session_compact --
  *     WT_SESSION.compact method.
  */
 int
-__wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
+__wti_session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 {
     WT_COMPACT_STATE compact;
     WT_CONFIG_ITEM cval;
@@ -590,11 +590,11 @@ done:
 }
 
 /*
- * __wt_session_compact_readonly --
+ * __wti_session_compact_readonly --
  *     WT_SESSION.compact method; readonly version.
  */
 int
-__wt_session_compact_readonly(WT_SESSION *wt_session, const char *uri, const char *config)
+__wti_session_compact_readonly(WT_SESSION *wt_session, const char *uri, const char *config)
 {
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
@@ -606,7 +606,7 @@ __wt_session_compact_readonly(WT_SESSION *wt_session, const char *uri, const cha
     SESSION_API_CALL_NOCONF(session, compact);
 
     WT_STAT_CONN_INCR(session, session_table_compact_fail);
-    ret = __wt_session_notsup(session);
+    ret = __wti_session_notsup(session);
 err:
     API_END_RET(session, ret);
 }

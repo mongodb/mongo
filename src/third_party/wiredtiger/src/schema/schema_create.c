@@ -327,11 +327,11 @@ err:
 }
 
 /*
- * __wt_schema_colgroup_source --
+ * __schema_colgroup_source --
  *     Get the URI of the data source for a column group.
  */
-int
-__wt_schema_colgroup_source(
+static int
+__schema_colgroup_source(
   WT_SESSION_IMPL *session, WT_TABLE *table, const char *cgname, const char *config, WT_ITEM *buf)
 {
     WT_CONFIG_ITEM cval;
@@ -594,7 +594,7 @@ __create_colgroup(WT_SESSION_IMPL *session, const char *name, bool exclusive, co
             WT_ERR(__wt_buf_fmt(session, &confbuf, "source=\"%s\"", source));
             *cfgp++ = confbuf.data;
         } else {
-            WT_ERR(__wt_schema_colgroup_source(session, table, cgname, config, &namebuf));
+            WT_ERR(__schema_colgroup_source(session, table, cgname, config, &namebuf));
             source = namebuf.data;
             WT_ERR(__wt_buf_fmt(session, &confbuf, "source=\"%s\"", source));
             *cfgp++ = confbuf.data;
@@ -625,7 +625,7 @@ __create_colgroup(WT_SESSION_IMPL *session, const char *name, bool exclusive, co
 
         if (!exists) {
             WT_ERR(__wt_metadata_insert(session, name, cgconf));
-            WT_ERR(__wt_schema_open_colgroups(session, table));
+            WT_ERR(__wti_schema_open_colgroups(session, table));
         }
 
         /* Reset the last filled configuration for the next column group. */
@@ -647,11 +647,11 @@ err:
 }
 
 /*
- * __wt_schema_index_source --
+ * __schema_index_source --
  *     Get the URI of the data source for an index.
  */
-int
-__wt_schema_index_source(
+static int
+__schema_index_source(
   WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, const char *config, WT_ITEM *buf)
 {
     WT_CONFIG_ITEM cval;
@@ -692,7 +692,7 @@ __fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
     wt_session = &session->iface;
     tcur = NULL;
     icur = NULL;
-    WT_RET(__wt_schema_open_colgroups(session, table));
+    WT_RET(__wti_schema_open_colgroups(session, table));
 
     /*
      * If the column groups have not been completely created, there cannot be data inserted yet, and
@@ -790,7 +790,7 @@ __create_index(WT_SESSION_IMPL *session, const char *name, bool exclusive, const
         WT_ERR(__wt_buf_fmt(session, &namebuf, "%.*s", (int)cval.len, cval.str));
         source = namebuf.data;
     } else {
-        WT_ERR(__wt_schema_index_source(session, table, idxname, config, &namebuf));
+        WT_ERR(__schema_index_source(session, table, idxname, config, &namebuf));
         source = namebuf.data;
 
         /* Add the source name to the index config before collapsing. */
@@ -1068,12 +1068,11 @@ __create_object(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const
 }
 
 /*
- * __wt_tiered_tree_create --
+ * __create_tiered_tree --
  *     Create a tiered tree structure for the given name.
  */
-int
-__wt_tiered_tree_create(
-  WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
+static int
+__create_tiered_tree(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
 {
     const char *cfg[] = {WT_CONFIG_BASE(session, tier_meta), NULL, NULL};
 
@@ -1139,7 +1138,7 @@ __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const
 
         WT_ERR(__wt_metadata_insert(session, uri, metadata));
     }
-    WT_ERR(__wt_schema_get_tiered_uri(session, uri, WT_DHANDLE_EXCLUSIVE, &tiered));
+    WT_ERR(__wti_schema_get_tiered_uri(session, uri, WT_DHANDLE_EXCLUSIVE, &tiered));
     if (WT_META_TRACKING(session)) {
         WT_WITH_DHANDLE(session, &tiered->iface, ret = __wt_meta_track_handle_lock(session, true));
         WT_ERR(ret);
@@ -1147,7 +1146,7 @@ __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const
     }
 
 err:
-    WT_TRET(__wt_schema_release_tiered(session, &tiered));
+    WT_TRET(__wti_schema_release_tiered(session, &tiered));
     __wt_scr_free(session, &tmp);
     __wt_free(session, meta_value);
     if (free_metadata)
@@ -1436,7 +1435,7 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
     else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __create_table(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "tier:"))
-        ret = __wt_tiered_tree_create(session, uri, exclusive, config);
+        ret = __create_tiered_tree(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "tiered:"))
         ret = __create_tiered(session, uri, exclusive, config);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
@@ -1485,8 +1484,8 @@ __wt_schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config
      */
     WT_ASSERT(session, __wt_spin_locked(session, &S2C(session)->schema_lock));
 
-    WT_RET(__wt_schema_internal_session(session, &int_session));
+    WT_RET(__wti_schema_internal_session(session, &int_session));
     ret = __schema_create(int_session, uri, config);
-    WT_TRET(__wt_schema_session_release(session, int_session));
+    WT_TRET(__wti_schema_session_release(session, int_session));
     return (ret);
 }

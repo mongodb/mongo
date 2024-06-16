@@ -162,11 +162,11 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 }
 
 /*
- * __wt_checkpoint_server_create --
+ * __wti_checkpoint_server_create --
  *     Configure and start the checkpoint server.
  */
 int
-__wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
+__wti_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONNECTION_IMPL *conn;
     bool start;
@@ -183,7 +183,7 @@ __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
      * we're updating, and it's not expected that reconfiguration will happen a lot.
      */
     if (conn->ckpt_session != NULL)
-        WT_RET(__wt_checkpoint_server_destroy(session));
+        WT_RET(__wti_checkpoint_server_destroy(session));
 
     WT_RET(__ckpt_server_config(session, cfg, &start));
     if (start)
@@ -193,11 +193,11 @@ __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wt_checkpoint_server_destroy --
+ * __wti_checkpoint_server_destroy --
  *     Destroy the checkpoint server thread.
  */
 int
-__wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
+__wti_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;

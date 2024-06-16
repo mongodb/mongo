@@ -52,7 +52,7 @@ __rts_btree_walk_page_skip(
       WT_REF_CAS_STATE(session, ref, WT_REF_DELETED, WT_REF_LOCKED)) {
         page_del = ref->page_del;
         if (page_del == NULL ||
-          (__wt_rts_visibility_txn_visible_id(session, page_del->txnid) &&
+          (__wti_rts_visibility_txn_visible_id(session, page_del->txnid) &&
             page_del->durable_timestamp <= rollback_timestamp)) {
             /*
              * We should never see a prepared truncate here; not at recovery time because prepared
@@ -99,7 +99,7 @@ __rts_btree_walk_page_skip(
      * that is, eviction ignores WT_REF_DISK pages and no other thread is reading pages, this page
      * cannot change state from on-disk to something else.
      */
-    if (!__wt_rts_visibility_page_needs_abort(session, ref, rollback_timestamp)) {
+    if (!__wti_rts_visibility_page_needs_abort(session, ref, rollback_timestamp)) {
         *skipp = true;
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_STABLE_PG_WALK_SKIP "ref=%p: stable page walk skipped", (void *)ref);
@@ -136,31 +136,31 @@ __rts_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
          &rollback_timestamp,
          WT_READ_NO_EVICT | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED | WT_READ_SEE_DELETED)) == 0 &&
       ref != NULL) {
-        __wt_rts_progress_msg(session, &timer, 0, 0, &msg_count, true);
+        __wti_rts_progress_msg(session, &timer, 0, 0, &msg_count, true);
 
         if (F_ISSET(ref, WT_REF_FLAG_LEAF))
-            WT_RET(__wt_rts_btree_abort_updates(session, ref, rollback_timestamp));
+            WT_RET(__wti_rts_btree_abort_updates(session, ref, rollback_timestamp));
     }
     return (ret);
 }
 
 /*
- * __wt_rts_work_free --
+ * __wti_rts_work_free --
  *     Free a work unit and account.
  */
 void
-__wt_rts_work_free(WT_SESSION_IMPL *session, WT_RTS_WORK_UNIT *entry)
+__wti_rts_work_free(WT_SESSION_IMPL *session, WT_RTS_WORK_UNIT *entry)
 {
     __wt_free(session, entry->uri);
     __wt_free(session, entry);
 }
 
 /*
- * __wt_rts_pop_work --
+ * __wti_rts_pop_work --
  *     Pop a work unit from the queue.
  */
 void
-__wt_rts_pop_work(WT_SESSION_IMPL *session, WT_RTS_WORK_UNIT **entryp)
+__wti_rts_pop_work(WT_SESSION_IMPL *session, WT_RTS_WORK_UNIT **entryp)
 {
     WT_CONNECTION_IMPL *conn;
     WT_RTS_WORK_UNIT *entry;
@@ -188,11 +188,11 @@ __wt_rts_pop_work(WT_SESSION_IMPL *session, WT_RTS_WORK_UNIT **entryp)
 }
 
 /*
- * __wt_rts_push_work --
+ * __rts_push_work --
  *     Push a work unit to the queue.
  */
-int
-__wt_rts_push_work(WT_SESSION_IMPL *session, const char *uri, wt_timestamp_t rollback_timestamp)
+static int
+__rts_push_work(WT_SESSION_IMPL *session, const char *uri, wt_timestamp_t rollback_timestamp)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -229,7 +229,7 @@ __rts_btree_int(WT_SESSION_IMPL *session, const char *uri, wt_timestamp_t rollba
     if (ret != 0)
         WT_RET_MSG(session, ret, "%s: unable to open handle%s", uri,
           ret == EBUSY ? ", error indicates handle is unavailable due to concurrent use" : "");
-    ret = __wt_rts_btree_walk_btree(session, rollback_timestamp);
+    ret = __wti_rts_btree_walk_btree(session, rollback_timestamp);
     WT_TRET(__wt_session_release_dhandle(session));
     return (ret);
 }
@@ -259,21 +259,21 @@ __rts_btree(WT_SESSION_IMPL *session, const char *uri, wt_timestamp_t rollback_t
 }
 
 /*
- * __wt_rts_btree_work_unit --
+ * __wti_rts_btree_work_unit --
  *     Perform rollback to stable on a single work unit.
  */
 int
-__wt_rts_btree_work_unit(WT_SESSION_IMPL *session, WT_RTS_WORK_UNIT *entry)
+__wti_rts_btree_work_unit(WT_SESSION_IMPL *session, WT_RTS_WORK_UNIT *entry)
 {
     return (__rts_btree(session, entry->uri, entry->rollback_timestamp));
 }
 
 /*
- * __wt_rts_btree_walk_btree_apply --
+ * __wti_rts_btree_walk_btree_apply --
  *     Perform rollback to stable on a single file.
  */
 int
-__wt_rts_btree_walk_btree_apply(
+__wti_rts_btree_walk_btree_apply(
   WT_SESSION_IMPL *session, const char *uri, const char *config, wt_timestamp_t rollback_timestamp)
 {
     WT_CONFIG ckptconf;
@@ -398,7 +398,7 @@ __wt_rts_btree_walk_btree_apply(
         if (S2C(session)->rts->threads_num == 0)
             WT_RET(__rts_btree(session, uri, rollback_timestamp));
         else
-            WT_RET(__wt_rts_push_work(session, uri, rollback_timestamp));
+            WT_RET(__rts_push_work(session, uri, rollback_timestamp));
         file_skipped = false;
     } else
         __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_2,
@@ -424,18 +424,18 @@ __wt_rts_btree_walk_btree_apply(
       !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
         WT_RET(__wt_config_getones(session, config, "id", &cval));
         btree_id = (uint32_t)cval.val;
-        WT_RET(__wt_rts_history_btree_hs_truncate(session, btree_id));
+        WT_RET(__wti_rts_history_btree_hs_truncate(session, btree_id));
     }
 
     return (0);
 }
 
 /*
- * __wt_rts_btree_walk_btree --
+ * __wti_rts_btree_walk_btree --
  *     Called for each object handle - choose to either skip or wipe the commits
  */
 int
-__wt_rts_btree_walk_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
+__wti_rts_btree_walk_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
 {
     WT_BTREE *btree;
     WT_CONNECTION_IMPL *conn;

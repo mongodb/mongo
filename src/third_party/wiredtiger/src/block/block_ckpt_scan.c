@@ -35,11 +35,11 @@
  */
 
 /*
- * __wt_block_checkpoint_final --
+ * __wti_block_checkpoint_final --
  *     Append metadata and checkpoint information to a buffer.
  */
 int
-__wt_block_checkpoint_final(
+__wti_block_checkpoint_final(
   WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint8_t **file_sizep)
 {
     WT_CKPT *ckpt;
@@ -176,25 +176,25 @@ __block_checkpoint_update(WT_SESSION_IMPL *session, WT_BLOCK *block, struct save
     checkpoint = info->checkpoint;
 
     if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_2))
-        __wt_ckpt_verbose(
+        __wti_ckpt_verbose(
           session, block, "import original", NULL, checkpoint->mem, checkpoint->size);
 
     /*
      * Convert the final checkpoint data blob to a WT_BLOCK_CKPT structure, update it with the avail
      * list information, and convert it back to a data blob.
      */
-    WT_RET(__wt_block_ckpt_unpack(session, block, checkpoint->data, checkpoint->size, &ci));
+    WT_RET(__wti_block_ckpt_unpack(session, block, checkpoint->data, checkpoint->size, &ci));
     ci.avail.offset = info->offset;
     ci.avail.size = info->size;
     ci.avail.checksum = info->checksum;
     ci.file_size = (wt_off_t)info->file_size;
     WT_RET(__wt_buf_extend(session, checkpoint, WT_BLOCK_CHECKPOINT_BUFFER));
     endp = checkpoint->mem;
-    WT_RET(__wt_block_ckpt_pack(session, block, &endp, &ci, false));
+    WT_RET(__wti_block_ckpt_pack(session, block, &endp, &ci, false));
     checkpoint->size = WT_PTRDIFF(endp, checkpoint->mem);
 
     if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_2))
-        __wt_ckpt_verbose(
+        __wti_ckpt_verbose(
           session, block, "import replace", NULL, checkpoint->mem, checkpoint->size);
 
     return (0);
@@ -283,7 +283,7 @@ __wt_block_checkpoint_last(WT_SESSION_IMPL *session, WT_BLOCK *block, char **met
          * that. Ignore problems, subsequent file verification can deal with any corruption. If the
          * block isn't valid, skip to the next possible block.
          */
-        if (__wt_block_offset_invalid(block, offset, size) ||
+        if (__wti_block_offset_invalid(block, offset, size) ||
           __wt_block_read_off(session, block, tmp, objectid, offset, size, checksum) != 0) {
             size = WT_BTREE_MIN_ALLOC_SIZE;
             continue;

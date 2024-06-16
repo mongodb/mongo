@@ -549,7 +549,7 @@ __debug_cell_int(WT_DBG *ds, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK_ADDR *unp
 
     session = ds->session;
 
-    WT_RET(ds->f(ds, "\t%s: len: %" PRIu32, __wt_cell_type_string(unpack->raw), unpack->size));
+    WT_RET(ds->f(ds, "\t%s: len: %" PRIu32, __wti_cell_type_string(unpack->raw), unpack->size));
 
     /* Dump the cell's per-disk page type information. */
     switch (dsk->type) {
@@ -627,7 +627,7 @@ __debug_cell_kv(
         WT_RET(ds->f(ds,
           "\t"
           "cell_type: %s | len: %" PRIu32,
-          __wt_cell_type_string(unpack->raw), unpack->size));
+          __wti_cell_type_string(unpack->raw), unpack->size));
     else if (F_ISSET(ds, WT_DEBUG_UNREDACT_KEYS)) {
         if (unpack->raw == WT_CELL_KEY || unpack->raw == WT_CELL_KEY_PFX ||
           unpack->raw == WT_CELL_KEY_OVFL || unpack->raw == WT_CELL_KEY_SHORT ||
@@ -635,17 +635,17 @@ __debug_cell_kv(
             WT_RET(ds->f(ds,
               "\t"
               "cell_type: %s | len: %" PRIu32,
-              __wt_cell_type_string(unpack->raw), unpack->size));
+              __wti_cell_type_string(unpack->raw), unpack->size));
         else
             WT_RET(ds->f(ds,
               "\t"
               "cell_type: %s | len: {REDACTED}",
-              __wt_cell_type_string(unpack->raw)));
+              __wti_cell_type_string(unpack->raw)));
     } else
         WT_RET(ds->f(ds,
           "\t"
           "cell_type: %s | len: {REDACTED}",
-          __wt_cell_type_string(unpack->raw)));
+          __wti_cell_type_string(unpack->raw)));
 
     /* Dump per-disk page type information. */
     switch (page_type) {
@@ -745,7 +745,7 @@ __debug_dsk_col_fix(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
 
     btree = S2BT(ds->session);
 
-    WT_RET(__wt_col_fix_read_auxheader(ds->session, dsk, &auxhdr));
+    WT_RET(__wti_col_fix_read_auxheader(ds->session, dsk, &auxhdr));
 
     WT_RET(ds->f(ds, "\t> "));
     switch (auxhdr.version) {

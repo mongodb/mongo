@@ -28,11 +28,11 @@ err:
     return (ret);
 }
 /*
- * __wt_schema_get_tiered_uri --
+ * __wti_schema_get_tiered_uri --
  *     Get the tiered handle for the named table.
  */
 int
-__wt_schema_get_tiered_uri(
+__wti_schema_get_tiered_uri(
   WT_SESSION_IMPL *session, const char *uri, uint32_t flags, WT_TIERED **tieredp)
 {
     WT_DECL_RET;
@@ -42,11 +42,11 @@ __wt_schema_get_tiered_uri(
 }
 
 /*
- * __wt_schema_release_tiered --
+ * __wti_schema_release_tiered --
  *     Release a tiered handle.
  */
 int
-__wt_schema_release_tiered(WT_SESSION_IMPL *session, WT_TIERED **tieredp)
+__wti_schema_release_tiered(WT_SESSION_IMPL *session, WT_TIERED **tieredp)
 {
     WT_DECL_RET;
     WT_TIERED *tiered;
@@ -113,11 +113,11 @@ err:
 }
 
 /*
- * __wt_schema_release_table_gen --
+ * __wti_schema_release_table_gen --
  *     Release a table handle.
  */
 int
-__wt_schema_release_table_gen(WT_SESSION_IMPL *session, WT_TABLE **tablep, bool check_visibility)
+__wti_schema_release_table_gen(WT_SESSION_IMPL *session, WT_TABLE **tablep, bool check_visibility)
 {
     WT_DECL_RET;
     WT_TABLE *table;
@@ -139,15 +139,15 @@ __wt_schema_release_table_gen(WT_SESSION_IMPL *session, WT_TABLE **tablep, bool 
 int
 __wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
 {
-    return (__wt_schema_release_table_gen(session, tablep, false));
+    return (__wti_schema_release_table_gen(session, tablep, false));
 }
 
 /*
- * __wt_schema_destroy_colgroup --
+ * __wti_schema_destroy_colgroup --
  *     Free a column group handle.
  */
 void
-__wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp)
+__wti_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp)
 {
     WT_COLGROUP *colgroup;
 
@@ -162,11 +162,11 @@ __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp)
 }
 
 /*
- * __wt_schema_destroy_index --
+ * __wti_schema_destroy_index --
  *     Free an index handle.
  */
 int
-__wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp)
+__wti_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp)
 {
     WT_DECL_RET;
     WT_INDEX *idx;
@@ -217,12 +217,12 @@ __wt_schema_close_table(WT_SESSION_IMPL *session, WT_TABLE *table)
     __wt_free(session, table->value_format);
     if (table->cgroups != NULL) {
         for (i = 0; i < WT_COLGROUPS(table); i++)
-            __wt_schema_destroy_colgroup(session, &table->cgroups[i]);
+            __wti_schema_destroy_colgroup(session, &table->cgroups[i]);
         __wt_free(session, table->cgroups);
     }
     if (table->indices != NULL) {
         for (i = 0; i < table->nindices; i++)
-            WT_TRET(__wt_schema_destroy_index(session, &table->indices[i]));
+            WT_TRET(__wti_schema_destroy_index(session, &table->indices[i]));
         __wt_free(session, table->indices);
     }
     table->idx_alloc = 0;

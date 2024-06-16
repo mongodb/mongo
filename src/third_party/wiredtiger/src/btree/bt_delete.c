@@ -99,11 +99,11 @@
  */
 
 /*
- * __wt_delete_page --
+ * __wti_delete_page --
  *     If deleting a range, try to delete the page without instantiating it.
  */
 int
-__wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
+__wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
     WT_ADDR_COPY addr;
     WT_DECL_RET;
@@ -372,11 +372,11 @@ __wt_delete_redo_window_cleanup(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_delete_page_skip --
+ * __wti_delete_page_skip --
  *     If iterating a cursor, skip deleted pages that are either visible to us or globally visible.
  */
 bool
-__wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
+__wti_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 {
     bool discard, skip;
 
@@ -591,7 +591,7 @@ __instantiate_row(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_DELETED *page_d
     /* Walk the page entries, giving each one a tombstone. */
     WT_ROW_FOREACH (page, rip, i) {
         /* Retrieve the stop time point from the page's row. */
-        __wt_read_row_time_window(session, page, rip, &tw);
+        __wti_read_row_time_window(session, page, rip, &tw);
 
         WT_RET(__instantiate_tombstone(session, page_del, update_list, countp, &tw, &upd, &size));
         if (upd != NULL) {
@@ -616,11 +616,11 @@ err:
 }
 
 /*
- * __wt_delete_page_instantiate --
+ * __wti_delete_page_instantiate --
  *     Instantiate an entirely deleted row-store leaf page.
  */
 int
-__wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
+__wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_DECL_RET;
     WT_PAGE *page;
