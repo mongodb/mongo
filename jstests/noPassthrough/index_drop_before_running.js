@@ -59,8 +59,11 @@ assert.commandWorked(coll.dropIndexes());
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build failing');
 
-// Assert index does not exist.
+// Assert index does not exist on primary.
 IndexBuildTest.assertIndexes(coll, 1, ['_id_'], []);
+
+// Assert index does not exist on secondary.
+rst.awaitReplication();
 IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_'], []);
 
 disableFailpointAfterDrop();
