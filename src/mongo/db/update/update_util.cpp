@@ -101,7 +101,8 @@ void generateNewDocumentFromSuppliedDoc(OperationContext* opCtx,
         write_ops::UpdateModification(suppliedDoc, write_ops::UpdateModification::ReplacementTag{}),
         {});
     replacementDriver.setLogOp(false);
-    replacementDriver.setPreserveEmptyTS(static_cast<bool>(request->getPreserveEmptyTS()));
+    replacementDriver.setBypassEmptyTsReplacement(
+        static_cast<bool>(request->getBypassEmptyTsReplacement()));
 
     // We do not validate for storage, as we will validate the full document before inserting.
     // However, we ensure that no immutable fields are modified.
@@ -193,6 +194,7 @@ void makeUpdateRequest(OperationContext* opCtx,
 
     requestOut->setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
     requestOut->setIsTimeseriesNamespace(request.getIsTimeseriesNamespace());
+    requestOut->setBypassEmptyTsReplacement(request.getBypassEmptyTsReplacement());
 }
 
 }  // namespace update

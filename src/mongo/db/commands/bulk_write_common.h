@@ -98,7 +98,8 @@ UpdateRequest makeUpdateRequestFromUpdateOp(OperationContext* opCtx,
                                             const NamespaceInfoEntry& nsEntry,
                                             const BulkWriteUpdateOp* op,
                                             const StmtId& stmtId,
-                                            const boost::optional<BSONObj>& letParameters);
+                                            const boost::optional<BSONObj>& letParameters,
+                                            const mongo::OptionalBool& bypassEmptyTsReplacement);
 
 /**
  * Helper function to build a DeleteRequest based off the BulkWriteDeleteOp passed in and its

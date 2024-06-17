@@ -681,6 +681,12 @@ last-continuous:
     ticket: SERVER-37164
   - test_file: jstests/sharding/move_collection_joins_existing_operation.js
     ticket: SERVER-90846
+  - test_file: jstests/core/write/bypass_empty_ts_replacement.js
+    ticket: SERVER-88750
+  - test_file: jstests/core/write/bypass_empty_ts_replacement_bulk_write.js
+    ticket: SERVER-88750
+  - test_file: jstests/core/write/bypass_empty_ts_replacement_timeseries.js
+    ticket: SERVER-88750
   - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
     ticket: SERVER-90995
   suites: null
@@ -1420,6 +1426,12 @@ last-lts:
     ticket: SERVER-37164
   - test_file: jstests/sharding/move_collection_joins_existing_operation.js
     ticket: SERVER-90846
+  - test_file: jstests/core/write/bypass_empty_ts_replacement.js
+    ticket: SERVER-88750
+  - test_file: jstests/core/write/bypass_empty_ts_replacement_bulk_write.js
+    ticket: SERVER-88750
+  - test_file: jstests/core/write/bypass_empty_ts_replacement_timeseries.js
+    ticket: SERVER-88750
   - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
     ticket: SERVER-90995
   suites: null

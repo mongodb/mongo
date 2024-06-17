@@ -782,16 +782,19 @@ bool handleGroupedInserts(OperationContext* opCtx,
     const size_t maxBatchBytes = write_ops::insertVectorMaxBytes;
     batch.reserve(std::min(numOps, maxBatchSize));
 
+    // If 'req.getBypassEmptyTsReplacement()' is true, set "bypassEmptyTsReplacement=true" for
+    // fixDocumentForInsert().
+    const bool bypassEmptyTsReplacement = static_cast<bool>(req.getBypassEmptyTsReplacement());
+
     for (size_t i = 0; i < numOps; i++) {
         const bool isLastDoc = (i == numOps - 1);
 
         auto idx = firstOpIdx + i;
         auto& doc = insertDocs[i];
-        const bool preserveEmptyTimestamps = false;
         bool containsDotsAndDollarsField = false;
 
-        auto fixedDoc =
-            fixDocumentForInsert(opCtx, doc, preserveEmptyTimestamps, &containsDotsAndDollarsField);
+        auto fixedDoc = fixDocumentForInsert(
+            opCtx, doc, bypassEmptyTsReplacement, &containsDotsAndDollarsField);
 
         auto stmtId = opCtx->isRetryableWrite() ? bulk_write_common::getStatementId(req, idx)
                                                 : kUninitializedStmtId;
@@ -1027,6 +1030,7 @@ BSONObj makeSingleOpSampledBulkWriteCommandRequest(OperationContext* opCtx,
     singleOpRequest.setLet(req.getLet());
     singleOpRequest.setStmtId(bulk_write_common::getStatementId(req, opIdx));
     singleOpRequest.setDbName(DatabaseName::kAdmin);
+    singleOpRequest.setBypassEmptyTsReplacement(req.getBypassEmptyTsReplacement());
 
     return singleOpRequest.toBSON(
         BSON(BulkWriteCommandRequest::kDbNameFieldName << DatabaseNameUtil::serialize(
@@ -1184,6 +1188,7 @@ void explainUpdateOp(OperationContext* opCtx,
     updateRequest.setSort(op->getSort().value_or(BSONObj()));
     updateRequest.setHint(op->getHint());
     updateRequest.setCollation(op->getCollation().value_or(BSONObj()));
+    updateRequest.setBypassEmptyTsReplacement(req.getBypassEmptyTsReplacement());
     updateRequest.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
     updateRequest.setUpsert(op->getUpsert());
     updateRequest.setUpsertSuppliedDocument(op->getUpsertSupplied().value_or(false));
@@ -1665,9 +1670,8 @@ bool handleUpdateOp(OperationContext* opCtx,
 
         // Handle non-retryable normal and timeseries updates, as well as retryable normal
         // updates that were not already executed.
-
         auto updateRequest = bulk_write_common::makeUpdateRequestFromUpdateOp(
-            opCtx, nsEntry, op, stmtId, req.getLet());
+            opCtx, nsEntry, op, stmtId, req.getLet(), req.getBypassEmptyTsReplacement());
 
         if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
                 opCtx,
