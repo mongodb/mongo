@@ -113,27 +113,6 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
 
-TEST(ReplSetHeartbeatArgs, AcceptsUnknownField) {
-    ReplSetHeartbeatArgsV1 hbArgs;
-    hbArgs.setConfigTerm(1);
-    hbArgs.setConfigVersion(1);
-    hbArgs.setHeartbeatVersion(1);
-    hbArgs.setTerm(1);
-    hbArgs.setSenderHost(HostAndPort("host:1"));
-    hbArgs.setSetName("replSet");
-    BSONObjBuilder bob;
-    hbArgs.addToBSON(&bob);
-    bob.append("unknownField", 1);  // append an unknown field.
-    BSONObj cmdObj = bob.obj();
-    ASSERT_OK(hbArgs.initialize(cmdObj));
-
-    // The serialized object should be the same as the original except for the unknown field.
-    BSONObjBuilder bob2;
-    hbArgs.addToBSON(&bob2);
-    bob2.append("unknownField", 1);
-    ASSERT_BSONOBJ_EQ(bob2.obj(), cmdObj);
-}
-
 auto makePrimaryHeartbeatResponseFrom(const ReplSetConfig& rsConfig,
                                       const std::string& setName = "mySet") {
     // Construct the heartbeat response containing the newer config.
