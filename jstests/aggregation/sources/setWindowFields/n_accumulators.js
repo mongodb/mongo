@@ -107,7 +107,8 @@ for (const acc of Object.keys(nAccumulators)) {
         testError({window: {documents: [-1, 1]}}, ErrorCodes.FailedToParse);
         testError({[acc]: {n: 2, sortBy}, window: {documents: [-1, 1]}}, 5788004);
         testError({[acc]: {output, sortBy}, window: {documents: [-1, 1]}}, 5788003);
-        testError({[acc]: {output, sortBy, n: 2.1}, window: {documents: [-1, 1]}}, 5787903);
+        testError({[acc]: {output, sortBy, n: 2.1}, window: {documents: [-1, 1]}},
+                  [5787903, 8178107]);
 
         // Missing sortBy.
         testError({[acc]: {output, n: 2}, window: {documents: [-1, 1]}}, 5788005);
