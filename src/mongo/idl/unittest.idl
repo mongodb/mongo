@@ -1004,7 +1004,7 @@ structs:
                 validator: { lte: 0.0 }
             range_double:
                 type: double
-                validator: { gte: -12345678901234500000, lte: 12345678901234500000 }
+                validator: { gte: -12345678901234500000., lte: 12345678901234500000. }
 
     callback_validators:
         description: Struct using fields with callback validators
