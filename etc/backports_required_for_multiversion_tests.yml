@@ -681,6 +681,8 @@ last-continuous:
     ticket: SERVER-37164
   - test_file: jstests/sharding/move_collection_joins_existing_operation.js
     ticket: SERVER-90846
+  - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
+    ticket: SERVER-90995
   suites: null
 last-lts:
   all:
@@ -1418,4 +1420,6 @@ last-lts:
     ticket: SERVER-37164
   - test_file: jstests/sharding/move_collection_joins_existing_operation.js
     ticket: SERVER-90846
+  - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
+    ticket: SERVER-90995
   suites: null

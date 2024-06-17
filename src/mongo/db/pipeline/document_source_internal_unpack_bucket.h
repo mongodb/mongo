@@ -393,6 +393,10 @@ private:
     bool _triedLastpointRewrite = false;
     bool _triedLimitPushDown = false;
 
+    // The $project or $addFields stages which we have tried to apply the computed meta project push
+    // down optimization to.
+    std::vector<DocumentSource*> _triedComputedMetaPushDownFor;
+
     // Caches the SBE-compatibility status result of this stage.
     boost::optional<bool> _isSbeCompatible = boost::none;
     boost::optional<SbeCompatibility> _isEventFilterSbeCompatible = boost::none;
