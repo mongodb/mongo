@@ -451,6 +451,8 @@ error_codes:
 
     - {code: 388, name: TransactionTooLargeForCache}
 
+    - {code: 372, name: CloseConnectionForShutdownCommand, categories: [CloseConnectionError,InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
