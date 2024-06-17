@@ -505,16 +505,6 @@ functions:
       args:
         - "./src/evergreen/functions/wiredtiger_develop_use.sh"
 
-  "shared scons cache pruning":
-    - *f_expansions_write
-    - command: subprocess.exec
-      display_name: "shared scons cache pruning"
-      type: system
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/functions/shared_scons_cache_pruning.sh"
-
   "umount shared scons directory": &umount_shared_scons_directory
     command: subprocess.exec
     display_name: "shared scons directory umount"
