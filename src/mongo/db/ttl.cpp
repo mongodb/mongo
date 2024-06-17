@@ -869,7 +869,7 @@ bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
                                         Milliseconds(serverGlobalParams.slowMS.load()))
                 .first) {
             LOGV2(5400702,
-                  "Deleted expired documents using collection scan",
+                  "Deleted expired documents using clustered index scan",
                   logAttrs(collection.nss()),
                   "numDeleted"_attr = numDeleted,
                   "duration"_attr = duration);
