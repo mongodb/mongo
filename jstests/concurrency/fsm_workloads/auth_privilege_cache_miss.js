@@ -3,7 +3,7 @@
  *
  * Validate user permission consistency during cache miss and slow load.
  *
- * @tags: [incompatible_with_concurrency_simultaneous]
+ * @tags: [incompatible_with_concurrency_simultaneous,multiversion_incompatible]
  */
 
 // Use the auth_privilege_consistency workload as a base.
@@ -26,7 +26,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         const cacheBypass = {configureFailPoint: 'authUserCacheBypass', mode: 'alwaysOn'};
         const getUser = {
-            configureFailPoint: 'authLocalGetUser',
+            configureFailPoint: 'authLocalGetSubRoles',
             mode: 'alwaysOn',
             data: {resolveRolesDelayMS: NumberInt(kResolveRolesDelayMS)}
         };
@@ -43,7 +43,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.teardown = function(db, collName, cluster) {
         const cacheBypass = {configureFailPoint: 'authUserCacheBypass', mode: 'off'};
-        const getUser = {configureFailPoint: 'authLocalGetUser', mode: 'off'};
+        const getUser = {configureFailPoint: 'authLocalGetSubRoles', mode: 'off'};
 
         cluster.executeOnMongosNodes(function(nodeAdminDB) {
             assert.commandWorked(nodeAdminDB.runCommand(cacheBypass));
