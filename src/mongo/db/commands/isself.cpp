@@ -37,9 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_admission_context.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
@@ -72,15 +69,13 @@ public:
         return "{ _isSelf : 1 } INTERNAL ONLY";
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj&) const override {
-        AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
-        if (!authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::internal)) {
-            return {ErrorCodes::Unauthorized, "unauthorized for _isSelf command"};
-        }
+    bool requiresAuth() const override {
+        return false;
+    }
 
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
         return Status::OK();
     }
 

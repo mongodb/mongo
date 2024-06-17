@@ -5194,17 +5194,6 @@ export const authCommandsLib = {
           ]
         },
         {
-          testname: "_isSelf",
-          command: {_isSelf: 1},
-          testcases: [
-            {
-              runOnDb: adminDbName,
-              roles: {__system: 1},
-              privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-            },
-          ]
-        },
-        {
           testname: "insert",
           command: {insert: "foo", documents: [{data: 5}]},
           testcases: [
