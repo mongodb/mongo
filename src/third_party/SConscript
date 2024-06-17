@@ -35,7 +35,7 @@ thirdPartyEnvironmentModifications = {
         # SAFEINT_USE_INTRINSICS=0 for overflow-safe constexpr multiply. See comment in SafeInt.hpp.
         'CPPDEFINES': [('SAFEINT_USE_INTRINSICS', 0)],
     },
-    'timelib': {'CPPPATH': ['#/src/third_party/timelib/dist'], },
+    'timelib': {'CPPPATH': ['#/src/third_party/timelib'], },
     'unwind': {},
     'mozjs': {
         'CPPPATH': [

@@ -7,7 +7,7 @@ functions:
       params:
         working_dir: src
         script: |
-          cd src/third_party/timelib/dist/zones
+          cd src/third_party/timelib/zones
           make timezonedb.zip CFLAGS=-DHAVE_SNPRINTF=1
           cp timezonedb.zip timezonedb-latest.zip
 
@@ -17,7 +17,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_files_include_filter:
-          - src/src/third_party/timelib/dist/zones/timezonedb-*.zip
+          - src/src/third_party/timelib/zones/timezonedb-*.zip
         remote_file: olson_tz_db/
         bucket: downloads.mongodb.org
         permissions: public-read
