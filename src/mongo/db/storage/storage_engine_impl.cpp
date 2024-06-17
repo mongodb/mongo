@@ -41,6 +41,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/operation_context.h"
@@ -1235,12 +1236,12 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
             }
 
             try {
-                auto opCtx = client->getOperationContext();
-                mongo::ServiceContext::UniqueOperationContext uOpCtx;
-                if (!opCtx) {
-                    uOpCtx = client->makeOperationContext();
-                    opCtx = uOpCtx.get();
-                }
+                auto uniqueOpCtx = client->makeOperationContext();
+                auto opCtx = uniqueOpCtx.get();
+
+                // The TimestampMonitor is an important background cleanup task for the storage
+                // engine and needs to be able to make progress to free up resources.
+                SkipTicketAcquisitionForLock skipTicketAcquisition(opCtx);
 
                 Timestamp checkpoint;
                 Timestamp oldest;
