@@ -421,6 +421,12 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _isOplogReader = false;
     _oplogVisibleTs = boost::none;
     _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
+    // Reset the kLastApplied read source back to the default of kNoTimestamp. Any reader requiring
+    // kLastApplied will set the read source again before reading. Resetting this read source
+    // simplifies the handling when stepup happens concurrently with read operations.
+    if (_timestampReadSource == ReadSource::kLastApplied) {
+        _timestampReadSource = ReadSource::kNoTimestamp;
+    }
 }
 
 Status WiredTigerRecoveryUnit::majorityCommittedSnapshotAvailable() const {
