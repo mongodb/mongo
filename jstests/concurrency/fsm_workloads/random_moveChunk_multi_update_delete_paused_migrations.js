@@ -149,6 +149,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         })();
         const shardKeyField = this.shardKeyField[collName];
         query[shardKeyField] = chooseRandomMapValue(documents)[shardKeyField];
+        // Upsert will use the fields in the query to create the document, and the initial documents
+        // use an _id that matches the shard key.
+        query["_id"] = query[shardKeyField];
         return query;
     };
 
@@ -200,6 +203,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         return map;
     };
 
+    $config.data.verifyOnDiskState = function verifyOnDiskState(db, collName) {
+        const onDisk = this.readOwnedDocuments(db, collName);
+        for (const key of this.expectedDocs.keys()) {
+            const expected = this.expectedDocs.get(key);
+            const actual = onDisk.get(key);
+            assert.docEq(expected, actual);
+        }
+    };
+
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
         setPauseMigrationsClusterParameter(db, cluster, true);
@@ -242,6 +254,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     this.incrementCounterForDoc(key);
                 }
             }
+            this.verifyOnDiskState(db, collName);
             assert.eq(totalUpdates, result.n);
             assert.eq(totalUpdates - totalUpserts, result.nModified);
         });
@@ -262,6 +275,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     this.expectedDocs.delete(key);
                 }
             }
+            this.verifyOnDiskState(db, collName);
             assert.eq(uniqueDeletes.size, result.n);
 
             if (this.expectedDocs.size > 0) {
@@ -277,19 +291,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         });
     };
 
-    $config.states.verify = function verify(db, collName, connCache) {
-        ignoreErrorsIfInNonTransactionalStepdownSuite(() => {
-            assert.eq(this.expectedDocs, this.readOwnedDocuments(db, collName));
-        });
-    };
-
-    const weights = {moveChunk: 0.2, multiUpdate: 0.35, multiDelete: 0.35, verify: 0.1};
+    const weights = {moveChunk: 0.2, multiUpdate: 0.4, multiDelete: 0.4};
     $config.transitions = {
         init: weights,
         moveChunk: weights,
         multiUpdate: weights,
         multiDelete: weights,
-        verify: weights,
     };
 
     return $config;
