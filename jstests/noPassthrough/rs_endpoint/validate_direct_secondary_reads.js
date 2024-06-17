@@ -95,6 +95,7 @@ const secondary3TestDB = secondaries[3].getDB(dbName);
     assert.gt(getTotalNumProfilerDocs(numProfilerDocsPerHost), 0);
 
     assert.commandWorked(primaryTestDB.runCommand({dropDatabase: 1}));
+    rst.awaitReplication();
 }
 
 {
@@ -117,6 +118,7 @@ const secondary3TestDB = secondaries[3].getDB(dbName);
     assert.gt(getTotalNumProfilerDocs(numProfilerDocsPerHost), 0);
 
     assert.commandWorked(primaryTestDB.runCommand({dropDatabase: 1}));
+    rst.awaitReplication();
 }
 
 {
@@ -139,6 +141,7 @@ const secondary3TestDB = secondaries[3].getDB(dbName);
     assert.gt(getTotalNumProfilerDocs(numProfilerDocsPerHost), 0);
 
     assert.commandWorked(primaryTestDB.runCommand({dropDatabase: 1}));
+    rst.awaitReplication();
 }
 
 {
@@ -188,6 +191,7 @@ const secondary3TestDB = secondaries[3].getDB(dbName);
     assert.gt(getTotalNumProfilerDocs(numProfilerDocsPerHost), 0);
 
     assert.commandWorked(primaryTestDB.runCommand({dropDatabase: 1}));
+    rst.awaitReplication();
 }
 
 rst.stopSet();
