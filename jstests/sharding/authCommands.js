@@ -1,5 +1,6 @@
 /**
  * This tests using DB commands with authentication enabled when sharded.
+ * @tags: [multiversion_incompatible]
  */
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
@@ -233,9 +234,9 @@ var checkAdminOps = function(hasAuth) {
         checkCommandFailed(adminDB, {getCmdLineOpts: 1});
         checkCommandFailed(adminDB, {serverStatus: 1});
         checkCommandFailed(adminDB, {listShards: 1});
+        checkCommandFailed(adminDB, {whatsmyuri: 1});
+        checkCommandFailed(adminDB, {isdbgrid: 1});
         // whatsmyuri, isdbgrid, ismaster, and hello don't require any auth
-        checkCommandSucceeded(adminDB, {whatsmyuri: 1});
-        checkCommandSucceeded(adminDB, {isdbgrid: 1});
         checkCommandSucceeded(adminDB, {ismaster: 1});
         checkCommandSucceeded(adminDB, {hello: 1});
         checkCommandFailed(adminDB, {split: 'test.foo', find: {i: 1, j: 1}});

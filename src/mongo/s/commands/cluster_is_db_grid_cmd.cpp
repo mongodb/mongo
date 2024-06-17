@@ -44,10 +44,6 @@ class IsDbGridCmd : public BasicCommand {
 public:
     IsDbGridCmd() : BasicCommand("isdbgrid") {}
 
-    bool requiresAuth() const override {
-        return false;
-    }
-
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -59,7 +55,8 @@ public:
     Status checkAuthForOperation(OperationContext*,
                                  const DatabaseName&,
                                  const BSONObj&) const override {
-        return Status::OK();  // No auth required
+        // No explicit privileges required.  Any authenticated user may call.
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,

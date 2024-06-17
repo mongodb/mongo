@@ -60,14 +60,11 @@ public:
         return "{whatsmyuri:1}";
     }
 
-    bool requiresAuth() const override {
-        return false;
-    }
-
     Status checkAuthForOperation(OperationContext*,
                                  const DatabaseName&,
                                  const BSONObj&) const override {
-        return Status::OK();  // No auth required
+        // No explicit privileges required.  Any authenticated user may call.
+        return Status::OK();
     }
 
     bool run(OperationContext*,
