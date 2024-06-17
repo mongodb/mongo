@@ -119,8 +119,6 @@ last-continuous:
       ticket: SERVER-90358
     - test_file: jstests/sharding/txn_participant_adds_additional_participants.js
       ticket: SERVER-89806
-    - test_file: jstests/sharding/database_versioning_all_commands.js
-      ticket: SERVER-90092
     - test_file: jstests/aggregation/match_swapping_renamed_fields.js
       ticket: SERVER-90869
     - test_file: jstests/core/timeseries/timeseries_ixscan_clusteredidxscan_union.js
@@ -256,8 +254,6 @@ last-lts:
       ticket: SERVER-90358
     - test_file: jstests/sharding/txn_participant_adds_additional_participants.js
       ticket: SERVER-89806
-    - test_file: jstests/sharding/database_versioning_all_commands.js
-      ticket: SERVER-90092
     - test_file: jstests/aggregation/match_swapping_renamed_fields.js
       ticket: SERVER-90869
     - test_file: jstests/core/timeseries/timeseries_ixscan_clusteredidxscan_union.js

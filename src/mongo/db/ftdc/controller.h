@@ -60,10 +60,18 @@ class FTDCController {
     FTDCController& operator=(const FTDCController&) = delete;
 
 public:
+    class Env {
+    public:
+        virtual ~Env() = default;
+        virtual void onStartLoop() {}
+    };
+
     FTDCController(boost::filesystem::path path,
                    FTDCConfig config,
-                   UseMultiServiceSchema multiServiceSchema)
-        : _path(std::move(path)),
+                   UseMultiServiceSchema multiServiceSchema,
+                   std::unique_ptr<Env> env = _makeDefaultEnv())
+        : _env(std::move(env)),
+          _path(std::move(path)),
           _config(std::move(config)),
           _configTemp(_config),
           _multiServiceSchema(multiServiceSchema) {}
@@ -179,6 +187,10 @@ public:
     void triggerRotate();
 
 private:
+    static std::unique_ptr<Env> _makeDefaultEnv() {
+        return std::make_unique<Env>();
+    }
+
     /**
      * Do periodic statistics collection, and all other work on the background thread.
      */
@@ -216,6 +228,8 @@ private:
         kDone,
     };
 
+    std::unique_ptr<Env> _env;
+
     // state
     State _state{State::kNotStarted};
 
@@ -226,8 +240,9 @@ private:
     Mutex _mutex = MONGO_MAKE_LATCH("FTDCController::_mutex");
     stdx::condition_variable _condvar;
 
-    // Indicates that a rotate should be triggered before the next FTDC log is written.
-    Atomic<bool> _triggerRotate = false;
+    // Indicates that a rotate should be triggered before the next FTDC log is collected and
+    // written.
+    Atomic<bool> _shouldRotateBeforeNextSample = false;
 
     // Config settings that are used by controller, file manager, and all other classes.
     // Copied from _configTemp periodically to get a consistent snapshot.
