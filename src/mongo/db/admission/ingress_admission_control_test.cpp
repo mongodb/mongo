@@ -26,33 +26,42 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/db/admission/ingress_admission_controller.h"
+
+#include "mongo/util/assert_util.h"
+#include <cmath>
+#include <functional>
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
-class OperationContext;
+class IngressAdmissionControllerTest : public ServiceContextTest {};
 
-/**
- * Stores state and statistics related to ingress admission for a given transactional context.
- */
-class IngressAdmissionContext : public AdmissionContext {
-public:
-    IngressAdmissionContext() = default;
+DEATH_TEST_F(IngressAdmissionControllerTest,
+             SameOpCannotAcquireMultipleTickets,
+             "Tripwire assertion") {
+    auto opCtx = makeOperationContext();
+    auto& admissionController = IngressAdmissionController::get(opCtx.get());
+    auto ticket = admissionController.admitOperation(opCtx.get());
 
-    /**
-     * Retrieve the IngressAdmissionContext decoration the provided OperationContext
-     */
-    static IngressAdmissionContext& get(OperationContext* opCtx);
+    // The way ingress admission works, one ticket should cover _all_ the work for the operation.
+    // Therefore, if the operation has already been admitted by IngressAdmissionController, all
+    // subsequent admissions of the same operation should be exempt and not take tickets out of the
+    // pool.
+    ASSERT_THROWS_CODE(
+        admissionController.admitOperation(opCtx.get()), AssertionException, 9143000);
+}
 
-    /**
-     * Returns true if the operation is already holding a ticket.
-     */
-    bool isHoldingTicket() const {
-        // TODO(SERVER-91502): Move to AdmissionContext and replace with a general implementation.
-        return getAdmissions() > 0;
-    }
-};
-
+}  // namespace
 }  // namespace mongo

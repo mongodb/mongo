@@ -36,6 +36,18 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target="ingress_admission_control_test",
+    source=[
+        "ingress_admission_control_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "$BUILD_DIR/mongo/unittest/unittest",
+        "ingress_admission_control",
+    ],
+)
+
 env.Library(
     target="execution_control_feature_flags",
     source=[
