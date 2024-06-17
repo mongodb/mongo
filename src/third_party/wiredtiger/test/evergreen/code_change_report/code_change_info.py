@@ -28,12 +28,11 @@
 #
 
 import argparse
-import csv
 import json
+import logging
 from pygit2 import discover_repository, Repository, Diff
 from pygit2 import GIT_SORT_NONE
-from change_info import ChangeInfo
-from code_change_helpers import is_useful_line
+from code_change_helpers import is_useful_line, diff_to_change_list, read_complexity_data, preprocess_complexity_data
 
 
 # read_coverage_data reads a gcovr json file into a dict and returns it
@@ -43,91 +42,23 @@ def read_coverage_data(coverage_data_path: str) -> dict:
         return data
 
 
-# read_complexity_data reads complexity data from a .csv file written by Metrix++ and returns as a list of dicts
-def read_complexity_data(complexity_data_path: str) -> list:
-    complexity_data = []
-    with open(complexity_data_path) as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            complexity_data.append(row)
-    return complexity_data
-
-
-# preprocess_complexity_data normalises file paths in complexity data and includes only functions in the output
-def preprocess_complexity_data(complexity_data: list) -> dict:
-    preprocessed_complexity_data = dict()
-
-    for complexity_item in complexity_data:
-        # Strip any (leading) './' and replace with 'src/'
-        filename = complexity_item["file"].replace("./", "src/")
-        complexity_item["file"] = filename
-
-        if filename not in preprocessed_complexity_data:
-            preprocessed_complexity_data[filename] = {}
-
-        if complexity_item["type"] == "function":
-            function_name = complexity_item["region"]
-            preprocessed_complexity_data[filename][function_name] = complexity_item
-
-    return preprocessed_complexity_data
-
-
-# diff_to_change_list converts a git diff into a list of changes
-def diff_to_change_list(diff: Diff, verbose: bool) -> dict:
-    change_list = dict()
-    for patch in diff:
-        if verbose:
-            print('    {}: {}'.format(patch.delta.status_char(), patch.delta.new_file.path))
-            if patch.delta.new_file.path != patch.delta.old_file.path:
-                print('      (was {})'.format(patch.delta.old_file.path))
-
-        hunks = patch.hunks
-        hunk_list = list()
-        for hunk in hunks:
-            if verbose:
-                print('      Hunk:')
-                print('        old_start: {}, old_lines: {}'.format(hunk.old_start, hunk.old_lines))
-                print('        new_start: {}, new_lines: {}'.format(hunk.new_start, hunk.new_lines))
-
-            change = ChangeInfo(status=patch.delta.status_char(),
-                                new_file_path=patch.delta.new_file.path,
-                                old_file_path=patch.delta.old_file.path,
-                                new_start=hunk.new_start,
-                                new_lines=hunk.new_lines,
-                                old_start=hunk.old_start,
-                                old_lines=hunk.old_lines,
-                                lines=hunk.lines)
-            hunk_list.append(change)
-
-        change_list[patch.delta.new_file.path] = hunk_list
-
-    return change_list
-
-
 # get_git_diff analyses the git working directory and returns a diff from the latest commit to the previous commit
-def get_git_diff(git_working_tree_dir: str, verbose: bool):
+def get_git_diff(git_working_tree_dir: str):
     repository_path = discover_repository(git_working_tree_dir)
     assert repository_path is not None
 
     repo = Repository(repository_path)
     latest_commit = repo.head.target
     commits = list(repo.walk(latest_commit, GIT_SORT_NONE))
-
-    if verbose:
-        print("Num commits found:{}".format(len(commits)))
-
+    logging.debug("Num commits found:{}".format(len(commits)))
     commit = commits[0]
 
     message_lines = commit.message.splitlines()
     message_first_line = message_lines[0]
-
-    if verbose:
-        print("{}: {}".format(commit.hex, message_first_line))
+    logging.debug("{}: {}".format(commit.hex, message_first_line))
 
     commit_url = 'https://github.com/wiredtiger/wiredtiger/commit/{}'.format(commit.id)
-
-    if verbose:
-        print("  Files changed in {} ({})".format(commit.short_id, commit_url))
+    logging.debug("  Files changed in {} ({})".format(commit.short_id, commit_url))
 
     prev_commit = commit.parents[0]
     diff = prev_commit.tree.diff_to_tree(commit.tree)
@@ -365,16 +296,15 @@ def main():
     preprocessed_complexity_data = None
     preprocessed_prev_complexity_data = None
 
-    if verbose:
-        print('Code Coverage Analysis')
-        print('======================')
-        print('Configuration:')
-        print('  Coverage data file:  {}'.format(args.coverage))
-        print('  Complexity data file: {}'.format(complexity_data_file))
-        print('  Complexity data file: {}'.format(complexity_data_file))
-        print('  Git root path:  {}'.format(git_working_tree_dir))
-        print('  Git diff path:  {}'.format(git_diff))
-        print('  Output file:  {}'.format(args.outfile))
+    logging.debug('Code Coverage Analysis')
+    logging.debug('======================')
+    logging.debug('Configuration:')
+    logging.debug('  Coverage data file:        {}'.format(args.coverage))
+    logging.debug('  Complexity data file:      {}'.format(complexity_data_file))
+    logging.debug('  Prev complexity data file: {}'.format(prev_complexity_data_file))
+    logging.debug('  Git root path:             {}'.format(git_working_tree_dir))
+    logging.debug('  Git diff path:             {}'.format(git_diff))
+    logging.debug('  Output file:               {}'.format(args.outfile))
 
     coverage_data = read_coverage_data(args.coverage)
 
@@ -385,13 +315,13 @@ def main():
     preprocessed_prev_complexity_data = preprocess_complexity_data(complexity_data=prev_complexity_data)
 
     if git_diff is None:
-        diff = get_git_diff(git_working_tree_dir=git_working_tree_dir, verbose=verbose)
+        diff = get_git_diff(git_working_tree_dir=git_working_tree_dir)
     else:
         file = open(git_diff, mode="r")
         data = file.read()
         diff = Diff.parse_diff(data)
 
-    change_list = diff_to_change_list(diff=diff, verbose=verbose)
+    change_list = diff_to_change_list(diff=diff)
     report_info = create_report_info(change_list=change_list,
                                      coverage_data=coverage_data,
                                      preprocessed_complexity_data=preprocessed_complexity_data,

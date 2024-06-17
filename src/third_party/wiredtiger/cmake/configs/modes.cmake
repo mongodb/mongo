@@ -53,6 +53,14 @@ function(define_build_mode mode)
         set(CMAKE_REQUIRED_LIBRARIES "${DEFINE_BUILD_LIBS}")
         list(APPEND linker_flags "${DEFINE_BUILD_LIBS}")
     endif()
+
+    # FIXME-WT-13103 MSan reports false positives when using *stat functions, so we override 
+    # the wrap the functions with a custom implementation that suppresses the issue.
+    # Once the correction to MSan is available in LLVM 14 we can remove these flags.
+    if("${CMAKE_BUILD_TYPE}" MATCHES "^MSan$")
+        list(APPEND linker_flags "-Wl,--wrap=fstat, -Wl,--wrap=stat")
+    endif()
+
     # Check if the compiler flags are available to ensure its a valid build mode.
     if(DEFINE_BUILD_C_COMPILER_FLAGS)
         check_c_compiler_flag("${DEFINE_BUILD_C_COMPILER_FLAGS}" HAVE_BUILD_MODE_C_FLAGS)

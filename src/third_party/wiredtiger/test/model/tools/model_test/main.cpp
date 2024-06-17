@@ -65,6 +65,12 @@ extern char *__wt_optarg;
 #define REDUCTION_HOME "REDUCE"
 
 /*
+ * The file names for workloads.
+ */
+#define MAIN_WORKLOAD_FILE "model_test.workload"
+#define REDUCED_WORKLOAD_FILE "reduced.workload"
+
+/*
  * Table configuration: Use small pages to force WiredTiger to generate deeper trees with less
  * effort than we would have generated otherwise.
  */
@@ -93,7 +99,7 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
 
     /* Create the database directory and save the workload. */
     testutil_recreate_dir(home.c_str());
-    std::string workload_file = home + DIR_DELIM_STR + "WORKLOAD";
+    std::string workload_file = home + DIR_DELIM_STR + MAIN_WORKLOAD_FILE;
     std::ofstream workload_out;
     workload_out.open(workload_file);
     if (!workload_out.is_open())
@@ -281,8 +287,8 @@ load_workload(const char *file)
  *     Try to find a smaller workload that reproduces a failure.
  */
 static void
-reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::string &home,
-  const std::string &conn_config, const std::string &table_config)
+reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::string &main_home,
+  const std::string &reduce_home, const std::string &conn_config, const std::string &table_config)
 {
     /*
      * Separate the workload back into sequences, where a sequence is a transaction or just a single
@@ -404,12 +410,12 @@ reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::s
 
         /* Clean up the previous database directory, if it exists. */
         if (!skip)
-            testutil_remove(home.c_str());
+            testutil_remove(reduce_home.c_str());
 
         /* Try the reduced workload. */
         try {
             if (!skip)
-                run_and_verify(w, home, conn_config, table_config);
+                run_and_verify(w, reduce_home, conn_config, table_config);
             else
                 std::cout << "Counterexample reduction: Skip running a malformed workload"
                           << std::endl;
@@ -434,7 +440,7 @@ reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::s
 
     /* Save the reduced workload. */
     if (reduced) {
-        std::string workload_file = home + DIR_DELIM_STR + "REDUCED-WORKLOAD";
+        std::string workload_file = main_home + DIR_DELIM_STR + REDUCED_WORKLOAD_FILE;
         std::ofstream workload_out;
         workload_out.open(workload_file);
         if (!workload_out.is_open())
@@ -610,7 +616,8 @@ main(int argc, char *argv[])
                 if (reduce)
                     try {
                         std::string reduce_home = home + DIR_DELIM_STR + REDUCTION_HOME;
-                        reduce_counterexample(workload, reduce_home, conn_config, table_config);
+                        reduce_counterexample(
+                          workload, home, reduce_home, conn_config, table_config);
                     } catch (std::exception &e) {
                         std::cerr << e.what() << std::endl;
                     }
@@ -653,7 +660,8 @@ main(int argc, char *argv[])
                 if (reduce)
                     try {
                         std::string reduce_home = home + DIR_DELIM_STR + REDUCTION_HOME;
-                        reduce_counterexample(workload, reduce_home, conn_config, table_config);
+                        reduce_counterexample(
+                          workload, home, reduce_home, conn_config, table_config);
                     } catch (std::exception &e) {
                         std::cerr << e.what() << std::endl;
                     }

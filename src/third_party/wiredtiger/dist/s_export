@@ -29,6 +29,8 @@ check()
     # Functions beginning with __ut are intentionally exposed to support unit testing when
     # Wiredtiger is compiled with HAVE_UNITTEST=1.
     grep -E -v '^__ut' |
+    # __wrap_f?stat functions suppress MSan false positives. They're only present when compiled with MSan.
+    grep -E -v '^__wrap_f?stat' |
     # MSan injected symbol present when origin tracking is enabled.
     grep -E -v '^__msan_track_origins' |
     grep -E -vi '^__wt') |

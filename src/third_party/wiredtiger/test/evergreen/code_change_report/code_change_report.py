@@ -29,6 +29,7 @@
 
 import argparse
 import json
+import logging
 import html
 import requests
 import textwrap
@@ -474,6 +475,7 @@ def generate_html_report_as_text(code_change_info: dict, verbose: bool):
 
     return report
 
+
 def build_pr_comment(code_change_info: dict) -> str | None:
     # Do nothing if the PR has no relevant changes.
     if int(code_change_info['summary_info']['num_lines']) == 0:
@@ -544,6 +546,7 @@ def build_pr_comment(code_change_info: dict) -> str | None:
 
     return message
 
+
 def post_pr_comment(fq_repo, pr_id, token, body):
     url = f"https://api.github.com/repos/{fq_repo}/issues/{pr_id}/comments"
     magic_string = "<!-- STICKY_COMMENT:CODE_QUALITY -->"
@@ -579,6 +582,7 @@ def post_pr_comment(fq_repo, pr_id, token, body):
         resp = requests.post(url, json=data, headers=headers)
     resp.raise_for_status()
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--code_change_info', required=True, help='Path to the code change info file')
@@ -590,6 +594,7 @@ def main():
     args = parser.parse_args()
 
     verbose = args.verbose
+    logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
     leave_pr_comment = bool(args.github_pr_number and args.github_token)
 
     if verbose:

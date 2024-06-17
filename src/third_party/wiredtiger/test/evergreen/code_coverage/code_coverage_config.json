@@ -50,6 +50,8 @@
     "./wt -h WT_HOME_COVERAGE printlog -?",
     "./wt -h WT_HOME_COVERAGE read",
     "./wt -h WT_HOME_COVERAGE read -?",
+    "./wt -h WT_HOME_COVERAGE rename",
+    "./wt -h WT_HOME_COVERAGE rename -?",
     "./wt -h WT_HOME_COVERAGE salvage",
     "./wt -h WT_HOME_COVERAGE salvage -?",
     "./wt -h WT_HOME_COVERAGE stat",
