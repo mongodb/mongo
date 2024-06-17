@@ -100,7 +100,7 @@ private:
      */
     long long _getNextBatchSize(long long prevBatchNumReceived);
 
-    // TODO SERVER-86736 Remove _calcDocsNeededFn and replace with pointer to SharedSearchState
+    // TODO SERVER-86736 Remove _calcDocsNeededFn and replace with pointer to SearchIdLookupMetrics
     // to compute docs needed within the cursor.
     // Set to nullptr if docsRequested should not be set on getMore requests.
     std::function<boost::optional<long long>()> _calcDocsNeededFn;

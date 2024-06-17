@@ -50,7 +50,7 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is
     // part of a $lookup sub-pipeline, the sub-pipeline gets parsed anew for every document the
     // stage processes, but each parse uses the same expression context.
-    pExpCtx->sharedSearchState.resetIdLookupMetrics();
+    _searchIdLookupMetrics->resetIdLookupMetrics();
 }
 
 DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
@@ -61,7 +61,7 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is
     // part of a $lookup sub-pipeline, the sub-pipeline gets parsed anew for every document the
     // stage processes, but each parse uses the same expression context.
-    pExpCtx->sharedSearchState.resetIdLookupMetrics();
+    _searchIdLookupMetrics->resetIdLookupMetrics();
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBson(
@@ -94,7 +94,7 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
 DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() {
     boost::optional<Document> result;
     Document inputDoc;
-    if (_limit != 0 && pExpCtx->sharedSearchState.getDocsReturnedByIdLookup() >= _limit) {
+    if (_limit != 0 && _searchIdLookupMetrics->getDocsReturnedByIdLookup() >= _limit) {
         return DocumentSource::GetNextResult::makeEOF();
     }
     while (!result) {
@@ -103,7 +103,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
             return nextInput;
         }
 
-        pExpCtx->sharedSearchState.incrementDocsSeenByIdLookup();
+        _searchIdLookupMetrics->incrementDocsSeenByIdLookup();
         inputDoc = nextInput.releaseDocument();
         auto documentId = inputDoc["_id"];
 
@@ -139,7 +139,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
 
     // Transfer searchScore metadata from inputDoc to the result.
     output.copyMetaDataFrom(inputDoc);
-    pExpCtx->sharedSearchState.incrementDocsReturnedByIdLookup();
+    _searchIdLookupMetrics->incrementDocsReturnedByIdLookup();
     return output.freeze();
 }
 

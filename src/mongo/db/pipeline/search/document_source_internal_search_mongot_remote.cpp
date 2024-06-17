@@ -162,8 +162,13 @@ boost::optional<long long> DocumentSourceInternalSearchMongotRemote::calcDocsNee
         // for each document that gets returned by the $idLookup stage. If a document gets
         // filtered out, docsReturnedByIdLookup will not change and so docsNeeded will stay the
         // same.
+        tassert(91262,
+                str::stream() << "The query is not from stored source "
+                              << "(reaches out to mongot remotely), but the searchIdLookupMetrics "
+                              << "pointer is null, which is unexpected.",
+                _searchIdLookupMetrics != nullptr);
         return _spec.getMongotDocsRequested().get() -
-            pExpCtx->sharedSearchState.getDocsReturnedByIdLookup();
+            _searchIdLookupMetrics->getDocsReturnedByIdLookup();
     }
 }
 

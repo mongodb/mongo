@@ -117,8 +117,9 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
     // DocumentSourceInternalSearchMongotRemote.
     spec.setMergingPipeline(boost::none);
 
-    desugaredPipeline.push_back(make_intrusive<DocumentSourceInternalSearchMongotRemote>(
-        std::move(spec), pExpCtx, executor));
+    auto mongoTRemoteStage = make_intrusive<DocumentSourceInternalSearchMongotRemote>(
+        std::move(spec), pExpCtx, executor);
+    desugaredPipeline.push_back(mongoTRemoteStage);
 
     // If 'returnStoredSource' is true, we don't want to do idLookup. Instead, promote the fields in
     // 'storedSource' to root.
@@ -135,9 +136,12 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
     } else {
         // idLookup must always be immediately after the $mongotRemote stage, which is always first
         // in the pipeline.
-        desugaredPipeline.insert(std::next(desugaredPipeline.begin()),
-                                 make_intrusive<DocumentSourceInternalSearchIdLookUp>(
-                                     pExpCtx, _spec.getLimit().value_or(0)));
+        auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
+            pExpCtx, _spec.getLimit().value_or(0));
+        desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
+        // In this case, connect the shared search state of these two stages of the pipeline
+        // for batch size tuning.
+        mongoTRemoteStage->setSearchIdLookupMetrics(idLookupStage->getSearchIdLookupMetrics());
     }
 
     return desugaredPipeline;

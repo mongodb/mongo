@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
@@ -290,6 +291,48 @@ TEST_F(InternalSearchIdLookupTest, RedactsCorrectly) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSearchIdLookup":{"limit":"?number"}})",
         vec[0].getDocument().toBson());
+}
+
+TEST_F(InternalSearchIdLookupTest, TestSearchIdLookupMetricsGetLookupSuccessRate) {
+    // Test the expected / in-bounds modes of the 'getDocsLookupByIdSuccessRate()' function.
+    DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics searchIdLookupMetrics;
+
+    // First, check that with zero documents seen that the success rate is 0.
+    ASSERT_EQUALS(double(0), searchIdLookupMetrics.getIdLookupSuccessRate());
+
+    // Now, add some docs as seen.
+    for (int i = 0; i < 6; i++) {
+        searchIdLookupMetrics.incrementDocsSeenByIdLookup();
+    }
+
+    // Ensure that the success rate remains 0.
+    ASSERT_EQUALS(double(0), searchIdLookupMetrics.getIdLookupSuccessRate());
+
+    // Now, add some docs successfully found.
+    for (int i = 0; i < 3; i++) {
+        searchIdLookupMetrics.incrementDocsReturnedByIdLookup();
+    }
+
+    // Lastly, ensure that the sucess rate is as expected.
+    ASSERT_EQUALS(double(0.5), searchIdLookupMetrics.getIdLookupSuccessRate());
+}
+
+DEATH_TEST_F(InternalSearchIdLookupTest,
+             TestSearchIdLookupMetricsGetLookupSuccessRateTAssert,
+             "9074400") {
+    // Check the (should be impossible) case where the number of documents
+    // that are found by id is greater than the number of document seen
+    // (indicating an error in how / where the metrics are being tracked).
+    DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics searchIdLookupMetrics;
+    for (int i = 0; i < 5; i++) {
+        searchIdLookupMetrics.incrementDocsSeenByIdLookup();
+        searchIdLookupMetrics.incrementDocsReturnedByIdLookup();
+    }
+    // More docs returned than seen.
+    searchIdLookupMetrics.incrementDocsReturnedByIdLookup();
+
+    // Expect tassert to be tripped here.
+    searchIdLookupMetrics.getIdLookupSuccessRate();
 }
 
 }  // namespace

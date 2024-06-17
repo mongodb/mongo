@@ -95,6 +95,74 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    /**
+     * This is state that is to be shared between the DocumentInternalSearchMongotRemote and
+     * DocumentInternalSearchIdLookup stages (these stages are the result of desugaring $search)
+     * during runtime.
+     */
+    class SearchIdLookupMetrics {
+    public:
+        SearchIdLookupMetrics() {}
+
+        long long getDocsReturnedByIdLookup() const {
+            return _docsReturnedByIdLookup;
+        }
+
+        void incrementDocsSeenByIdLookup() {
+            _docsSeenByIdLookup++;
+        }
+
+        void incrementDocsReturnedByIdLookup() {
+            _docsReturnedByIdLookup++;
+        }
+
+        /**
+         * Sets the value of _docsSeenByIdLookup & _docsReturnedByLookup to 0.
+         */
+        void resetIdLookupMetrics() {
+            _docsSeenByIdLookup = 0;
+            _docsReturnedByIdLookup = 0;
+        }
+
+        /**
+         * Returns the "success rate" of finding docs by id in the idLookup phase as
+         * a floating point number between 0 and 1, where 0 is 0% and 1 is 100%.
+         * For example, if idLookup has seen 6 documents and 3 were found,
+         * this function would return 0.5 = 50%.
+         */
+        double getIdLookupSuccessRate() const {
+            // Ensure division by zero never occurs if no docs have been seen yet
+            if (_docsSeenByIdLookup == 0) {
+                return 0;
+            }
+
+            tassert(9074400,
+                    str::stream() << "_docsReturnedByIdLookup must not be greater than "
+                                  << "_docsSeenByIdLookup in SearchIdLookupMetrics, but "
+                                     "_docsReturnedByIdLookup = '"
+                                  << _docsReturnedByIdLookup << "' and _docsSeenByIdLookup = '"
+                                  << _docsSeenByIdLookup << "'.",
+                    !(_docsSeenByIdLookup < _docsReturnedByIdLookup));
+
+            return double(_docsReturnedByIdLookup) / double(_docsSeenByIdLookup);
+        }
+
+    private:
+        // Number of documents that have been passed through the idLookup phase
+        // (regardless of whether they were found or not).
+        long long _docsSeenByIdLookup = 0;
+
+        // When there is an extractable limit in the query, DocumentInternalSearchMongotRemote sends
+        // a getMore to mongot that specifies how many more documents it needs to fulfill that
+        // limit, and it incorporates the amount of documents returned by the
+        // DocumentInternalSearchIdLookup stage into that value.
+        long long _docsReturnedByIdLookup = 0;
+    };
+
+    std::shared_ptr<SearchIdLookupMetrics> getSearchIdLookupMetrics() {
+        return _searchIdLookupMetrics;
+    }
+
 protected:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) override;
@@ -103,6 +171,9 @@ private:
     DocumentSource::GetNextResult doGetNext() final;
 
     long long _limit = 0;
+
+    std::shared_ptr<SearchIdLookupMetrics> _searchIdLookupMetrics =
+        std::make_shared<SearchIdLookupMetrics>();
 };
 
 }  // namespace mongo
