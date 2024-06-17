@@ -77,7 +77,7 @@ function read(insertTS, enableCausal, updatedValue, retries) {
     // not because we cannot pass updateTS to the shells after they have started. The only guarantee
     // (modulo a bug) is that we have reached insertTS. Therefore, we retry the read until we see
     // the update.
-    if (firstResult["x"] === null) {
+    if (!firstResult.hasOwnProperty("x")) {
         const sleepMS = 1000;
         jsTestLog(`Wait ${sleepMS}ms for the clusterTime to catch up (retries: ${retries})`);
         sleep(sleepMS);
