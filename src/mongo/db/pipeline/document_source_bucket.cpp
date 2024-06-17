@@ -95,10 +95,10 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
             groupByField = argument;
 
             const bool groupByIsExpressionInObject = groupByField.type() == BSONType::Object &&
-                groupByField.embeddedObject().firstElementFieldName()[0] == '$';
+                groupByField.embeddedObject().firstElementFieldNameStringData().starts_with('$');
 
-            const bool groupByIsPrefixedPath =
-                groupByField.type() == BSONType::String && groupByField.valueStringData()[0] == '$';
+            const bool groupByIsPrefixedPath = groupByField.type() == BSONType::String &&
+                groupByField.valueStringData().starts_with('$');
             uassert(40202,
                     str::stream() << "The $bucket 'groupBy' field must be defined as a $-prefixed "
                                      "path or an expression, but found: "

@@ -233,6 +233,21 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWithMultipleBoundaryValues) {
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
 
+TEST_F(BucketReturnsGroupAndSort, BucketWithEmptyGroupByStrDoesNotAccessPastEndOfString) {
+    // Verify that {groupBy: ''} is rejected _without_ attempting to read past the end of the empty
+    // string.
+    const auto spec =
+        fromjson("{$bucket : {groupBy : '', boundaries : [ 1, 5, 8 ], default : 'other'}}");
+
+    // Under a debug build, this would previously fail if an empty str for groupBy led to access
+    // past the end of the string, with pos() > size() in StringData::operator[].
+    // Verify that this reaches the intended uassert, rejecting the empty string, _without_ first
+    // trying to read past the end of the string.
+    ASSERT_THROWS_CODE(DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       40202);
+}
+
 class InvalidBucketSpec : public AggregationContextFixture {
 public:
     list<intrusive_ptr<DocumentSource>> createBucket(BSONObj bucketSpec) {
