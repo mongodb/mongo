@@ -53,7 +53,7 @@ a notice will be included in
 | [scons]                    | MIT                                                            | 3.1.2                                              |                      |                                 |
 | [Snappy]                   | BSD-3-Clause                                                   | 1.1.10                                             |          ✗           |                ✗                |
 | [TCMalloc]                 | Apache-2.0                                                     | 093ba93 + changes                                  |                      |                ✗                |
-| [timelib]                  | MIT                                                            | 2022.04                                            |                      |                ✗                |
+| [timelib]                  | MIT                                                            | 2022.10                                            |                      |                ✗                |
 | [TomCrypt]                 | Public Domain                                                  | 1.18.2                                             |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015                                               | 8.0.0                                              |          ✗           |                ✗                |
 | [libunwind]                | MIT                                                            | 1.6.2 + changes                                    |                      |                ✗                |
