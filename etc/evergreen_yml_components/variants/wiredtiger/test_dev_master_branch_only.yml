@@ -131,11 +131,11 @@ buildvariants:
       - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
 
   - name: &enterprise-windows-wtdevelop enterprise-windows-wtdevelop
-    display_name: "~ Enterprise Windows WiredTiger develop"
+    display_name: "~ Enterprise Windows Server 2022 WiredTiger develop"
     tags: []
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - windows-vsCurrent-small
+      - windows-2022-small
     modules:
       - wtdevelop
     expansions:
@@ -160,7 +160,7 @@ buildvariants:
       multiversion_platform: windows
       multiversion_edition: enterprise
       jstestfuzz_num_generated_files: 35
-      large_distro_name: windows-vsCurrent-large
+      large_distro_name: windows-2022-large
       test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
       external_auth_jobs_max: 1
       use_wt_develop: true
@@ -168,10 +168,10 @@ buildvariants:
     tasks:
       - name: compile_test_serial_TG
         distros:
-          - windows-vsCurrent-xlarge
+          - windows-2022-xlarge
       - name: compile_test_parallel_unittest_stream_TG
         distros:
-          - windows-vsCurrent-xlarge
+          - windows-2022-xlarge
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen

@@ -1640,6 +1640,7 @@ tasks:
         "release_critical",
         "misc_js",
         "non_win_dbg",
+        "requires_large_host",
       ]
     commands:
       - func: "do setup"

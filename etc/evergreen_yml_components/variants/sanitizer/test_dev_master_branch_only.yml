@@ -203,11 +203,11 @@ buildvariants:
   ###########################################
 
   - name: &windows-debug-suggested windows-debug-suggested
-    display_name: "* Windows DEBUG"
+    display_name: "* Windows Server 2022 DEBUG"
     tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - windows-vsCurrent-small
+      - windows-2022-small
     expansions:
       exe: ".exe"
       content_type: application/zip
@@ -225,7 +225,7 @@ buildvariants:
       scons_cache_scope: shared
       multiversion_platform: windows
       multiversion_edition: enterprise
-      large_distro_name: windows-vsCurrent-large
+      large_distro_name: windows-2022-large
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_windows_tls
         --enableEnterpriseTests=off
@@ -234,28 +234,28 @@ buildvariants:
     tasks:
       - name: compile_test_serial_TG
         distros:
-          - windows-vsCurrent-xxlarge
+          - windows-2022-xxlarge
       - name: compile_test_parallel_unittest_stream_TG
         distros:
-          - windows-vsCurrent-xxlarge
+          - windows-2022-xxlarge
       - name: compile_integration_and_test_no_audit_parallel_stream_TG
         distros:
-          - windows-vsCurrent-xlarge
+          - windows-2022-xlarge
       - name: .development_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
         distros:
-          - windows-vsCurrent-large
+          - windows-2022-large
       - name: .release_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
       - name: .release_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
         distros:
-          - windows-vsCurrent-large
+          - windows-2022-large
 
   - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
-    display_name: "Enterprise Windows DEBUG (Unoptimized)"
+    display_name: "Enterprise Windows Server 2022 DEBUG (Unoptimized)"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - windows-vsCurrent-small
+      - windows-2022-small
     expansions:
       compile_variant: *enterprise-windows-debug-unoptimized
       additional_package_targets: >-
@@ -287,10 +287,10 @@ buildvariants:
       # timing-sensitive tests to fail.
       - name: compile_and_archive_dist_test_TG
         distros:
-          - windows-vsCurrent-xxlarge
+          - windows-2022-xxlarge
       - name: compile_build_tools_next_TG
         distros:
-          - windows-vsCurrent-xxlarge
+          - windows-2022-xxlarge
       - name: audit
     # Do not add more tasks to this list.
 

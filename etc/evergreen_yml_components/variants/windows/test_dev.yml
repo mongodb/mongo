@@ -37,7 +37,7 @@ variables:
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
     max_sub_suites: 5
-    large_distro_name: windows-vsCurrent-large
+    large_distro_name: windows-2022-large
     push_path: windows
     push_bucket: downloads.10gen.com
     push_name: windows
@@ -47,10 +47,10 @@ variables:
 
 buildvariants:
   - name: &windows-compile-required windows-compile-required
-    display_name: "! Windows Enterprise Compile"
+    display_name: "! Windows Server 2022 Enterprise Compile"
     tags: ["required", "bazel_check"]
     run_on:
-      - windows-vsCurrent-xxlarge
+      - windows-2022-xxlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     expansions:
       exe: ".exe"
@@ -81,20 +81,20 @@ buildvariants:
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch
         distros:
-          - windows-vsCurrent-xxlarge
+          - windows-2022-xxlarge
       - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
         distros:
-          - windows-vsCurrent-xxlarge
+          - windows-2022-xxlarge
 
   - &enterprise-windows-all-feature-flags-required-template
     <<: *windows_compile_variant_dependency
     name: &enterprise-windows-all-feature-flags-required enterprise-windows-all-feature-flags-required
-    display_name: "! Enterprise Windows (all feature flags)"
+    display_name: "! Enterprise Windows Server 2022 (all feature flags)"
     tags: ["required"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - windows-vsCurrent-small
+      - windows-2022-small
     expansions:
       <<: *windows_expansions
       burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
@@ -107,7 +107,7 @@ buildvariants:
       jstestfuzz_num_generated_files: 35
       target_resmoke_time: 20
       max_sub_suites: 5
-      large_distro_name: windows-vsCurrent-large
+      large_distro_name: windows-2022-large
       # To force disable feature flags even on the all feature flags variant, please use this file:
       # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
       test_flags: >-
@@ -129,8 +129,8 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
         distros:
-          - windows-vsCurrent-large
+          - windows-2022-large
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
         distros:
-          - windows-vsCurrent-large
+          - windows-2022-large

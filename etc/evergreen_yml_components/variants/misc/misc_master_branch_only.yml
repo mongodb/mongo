@@ -20,7 +20,7 @@ buildvariants:
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - windows-vsCurrent-small
+      - windows-2022-small
     stepback: false
     expansions:
       python: "/cygdrive/c/python/python310/python.exe"

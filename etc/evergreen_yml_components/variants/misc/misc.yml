@@ -52,7 +52,7 @@ buildvariants:
         priority: 50
 
   - name: enterprise-windows-ninja
-    display_name: "Ninja Build: Enterprise Windows"
+    display_name: "Ninja Build: Enterprise Windows Server 2022"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
@@ -67,10 +67,10 @@ buildvariants:
     tasks:
       - name: compile_ninja_next_TG
         distros:
-          - windows-vsCurrent-xlarge
+          - windows-2022-xlarge
       - name: compile_ninja_TG
         distros:
-          - windows-vsCurrent-xlarge
+          - windows-2022-xlarge
 
   - name: macos-enterprise-ninja
     display_name: "Ninja Build: macOS Enterprise"
@@ -117,7 +117,7 @@ buildvariants:
       - name: compile_ninja_compiledb_profile_TG
 
   - name: windows-ninja-build-profiles
-    display_name: "Ninja Build Profiles: Windows"
+    display_name: "Ninja Build Profiles: Windows Server 2022"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
@@ -131,16 +131,16 @@ buildvariants:
     tasks:
       - name: compile_ninja_default_profile_TG
         distros:
-          - windows-vsCurrent-xlarge
+          - windows-2022-xlarge
       - name: compile_ninja_opt_profile_TG
         distros:
-          - windows-vsCurrent-xlarge
+          - windows-2022-xlarge
       - name: compile_ninja_fast_profile_TG
         distros:
-          - windows-vsCurrent-xxlarge
+          - windows-2022-xxlarge
       - name: compile_ninja_compiledb_profile_TG
         distros:
-          - windows-vsCurrent-xxlarge
+          - windows-2022-xxlarge
 
   - name: ubuntu1804-ninja-build-profiles
     display_name: "Ninja Build Profiles: Ubuntu 18.04"

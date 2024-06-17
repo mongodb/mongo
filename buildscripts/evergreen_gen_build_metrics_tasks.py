@@ -180,7 +180,7 @@ def main():
         )
         variant.add_task_group(
             create_task_group("windows", tasks["windows_tasks"]["static"]),
-            ["windows-vsCurrent-xlarge"],
+            ["windows-2022-xlarge"],
         )
     elif sys.platform == "darwin":
         variant = BuildVariant(

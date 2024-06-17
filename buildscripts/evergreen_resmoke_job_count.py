@@ -44,6 +44,9 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
     "rhel80-debug-aubsan-all-feature-flags": [
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
     ],
+    # TODO(SERVER-91466): figure out why noPassthrough tests are taking up more memory after switching
+    # from Windows Server 2019 to Windows Server 2022
+    "enterprise-windows-all-feature-flags-required": [{"task": "noPassthrough", "factor": 0.5}],
 }
 
 TASKS_FACTORS = [{"task": r"replica_sets.*", "factor": 0.5}, {"task": r"sharding.*", "factor": 0.5}]

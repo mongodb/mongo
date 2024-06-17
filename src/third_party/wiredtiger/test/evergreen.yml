@@ -5703,7 +5703,7 @@ buildvariants:
     - name: configure-combinations
 
 - name: windows
-  display_name: "! Windows"
+  display_name: "! Windows Server 2022"
   run_on:
   - windows-2022-small
   expansions:
