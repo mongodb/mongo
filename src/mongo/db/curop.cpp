@@ -1010,38 +1010,35 @@ void CurOp::reportState(BSONObjBuilder* builder,
                         durationCount<Milliseconds>(elapsedTimeTotal));
     }
 
-    // (Ignore FCV check): This feature flag is not FCV gated (shouldBeFCVGated is false)
-    if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe()) {
-        boost::optional<std::tuple<std::string, Microseconds>> currentQueue;
-        BSONObjBuilder queuesBuilder(builder->subobjStart("queues"));
-        for (auto&& [queueName, lookup] : gQueueMetricsRegistry) {
-            AdmissionContext* admCtx = lookup(opCtx);
-            Microseconds totalTimeQueuedMicros = admCtx->totalTimeQueuedMicros();
+    boost::optional<std::tuple<std::string, Microseconds>> currentQueue;
+    BSONObjBuilder queuesBuilder(builder->subobjStart("queues"));
+    for (auto&& [queueName, lookup] : gQueueMetricsRegistry) {
+        AdmissionContext* admCtx = lookup(opCtx);
+        Microseconds totalTimeQueuedMicros = admCtx->totalTimeQueuedMicros();
 
-            if (auto startQueueingTime = admCtx->startQueueingTime()) {
-                Microseconds currentQueueTimeQueuedMicros = computeElapsedTimeTotal(
-                    *startQueueingTime, opCtx->getServiceContext()->getTickSource()->getTicks());
-                totalTimeQueuedMicros += currentQueueTimeQueuedMicros;
-                currentQueue = std::make_tuple(queueName, currentQueueTimeQueuedMicros);
-            }
-
-            BSONObjBuilder queueMetricsBuilder(queuesBuilder.subobjStart(queueName));
-            queueMetricsBuilder.append("admissions", admCtx->getAdmissions());
-            queueMetricsBuilder.append("totalTimeQueuedMicros",
-                                       durationCount<Microseconds>(totalTimeQueuedMicros));
-            queueMetricsBuilder.done();
+        if (auto startQueueingTime = admCtx->startQueueingTime()) {
+            Microseconds currentQueueTimeQueuedMicros = computeElapsedTimeTotal(
+                *startQueueingTime, opCtx->getServiceContext()->getTickSource()->getTicks());
+            totalTimeQueuedMicros += currentQueueTimeQueuedMicros;
+            currentQueue = std::make_tuple(queueName, currentQueueTimeQueuedMicros);
         }
-        queuesBuilder.done();
 
-        if (currentQueue) {
-            BSONObjBuilder currentQueueBuilder(builder->subobjStart("currentQueue"));
-            currentQueueBuilder.append("name", std::get<0>(*currentQueue));
-            currentQueueBuilder.append("timeQueuedMicros",
-                                       durationCount<Microseconds>(std::get<1>(*currentQueue)));
-            currentQueueBuilder.done();
-        } else {
-            builder->appendNull("currentQueue");
-        }
+        BSONObjBuilder queueMetricsBuilder(queuesBuilder.subobjStart(queueName));
+        queueMetricsBuilder.append("admissions", admCtx->getAdmissions());
+        queueMetricsBuilder.append("totalTimeQueuedMicros",
+                                   durationCount<Microseconds>(totalTimeQueuedMicros));
+        queueMetricsBuilder.done();
+    }
+    queuesBuilder.done();
+
+    if (currentQueue) {
+        BSONObjBuilder currentQueueBuilder(builder->subobjStart("currentQueue"));
+        currentQueueBuilder.append("name", std::get<0>(*currentQueue));
+        currentQueueBuilder.append("timeQueuedMicros",
+                                   durationCount<Microseconds>(std::get<1>(*currentQueue)));
+        currentQueueBuilder.done();
+    } else {
+        builder->appendNull("currentQueue");
     }
 }
 
@@ -1383,20 +1380,17 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    // (Ignore FCV check): This feature flag is not FCV gated (shouldBeFCVGated is false)
-    if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe()) {
-        BSONObjBuilder queuesBuilder;
-        for (auto&& [queueName, lookup] : gQueueMetricsRegistry) {
-            AdmissionContext* admCtx = lookup(opCtx);
-            BSONObjBuilder bb;
-            bb.append("admissions", admCtx->getAdmissions());
-            bb.append("totalTimeQueuedMicros",
-                      durationCount<Microseconds>(admCtx->totalTimeQueuedMicros()));
-            queuesBuilder.append(queueName, bb.obj());
-        }
-
-        pAttrs->add("queues", queuesBuilder.obj());
+    BSONObjBuilder queuesBuilder;
+    for (auto&& [queueName, lookup] : gQueueMetricsRegistry) {
+        AdmissionContext* admCtx = lookup(opCtx);
+        BSONObjBuilder bb;
+        bb.append("admissions", admCtx->getAdmissions());
+        bb.append("totalTimeQueuedMicros",
+                  durationCount<Microseconds>(admCtx->totalTimeQueuedMicros()));
+        queuesBuilder.append(queueName, bb.obj());
     }
+
+    pAttrs->add("queues", queuesBuilder.obj());
 
     if (gFeatureFlagLogSlowOpsBasedOnTimeWorking.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {

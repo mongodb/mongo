@@ -145,11 +145,6 @@ feature_flags:
         cpp_varname: gFeatureFlagOnlineTransitionToSharded
         default: false
         shouldBeFCVGated: true
-    featureFlagIngressAdmissionControl:
-        description: "Feature flag to enable data node ingress admission control"
-        cpp_varname: gFeatureFlagIngressAdmissionControl
-        default: true
-        shouldBeFCVGated: false
     # TODO SERVER-89999 remove once the version becomes last LTS
     featureFlagDisallowBucketCollectionWithoutTimeseriesOptions:
         description: "Disallow creation of timeseries bucket collection without timeseries options"

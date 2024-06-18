@@ -58,6 +58,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/admission/ingress_admission_context.h"
+#include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/action_type.h"
@@ -1804,8 +1805,7 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     }
 
-    // (Ignore FCV check): This feature flag is not FCV gated (shouldBeFCVGated is false)
-    if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe()) {
+    if (gIngressAdmissionControlEnabled.load()) {
         boost::optional<ScopedAdmissionPriority<IngressAdmissionContext>> admissionPriority;
         if (!_invocation->isSubjectToIngressAdmissionControl() ||
             IngressAdmissionContext::get(opCtx).isHoldingTicket()) {
