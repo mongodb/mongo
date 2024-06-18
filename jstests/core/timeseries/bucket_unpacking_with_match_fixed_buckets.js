@@ -13,7 +13,6 @@
  *     does_not_support_stepdowns,
  *     # The `simulate_atlas_proxy` override cannot deep copy very large or small dates.
  *     simulate_atlas_proxy_incompatible,
- *     featureFlagTSBucketingParametersUnchanged,
  * ]
  */
 
