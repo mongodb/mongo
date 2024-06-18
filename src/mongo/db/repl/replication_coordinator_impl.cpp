@@ -111,7 +111,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/testing_proctor.h"
@@ -2537,17 +2536,10 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
                 opCtx->lockState()->getLockerInfo(CurOp::get(opCtx)->getLockStatsBase());
             BSONObjBuilder lockRep;
             lockerInfo->stats.report(&lockRep);
-            LOGV2_FATAL_CONTINUE(
-                5675600,
-                "Time out exceeded waiting for RSTL, stepUp/stepDown is not possible "
-                "thus calling abort() to allow cluster to progress.",
-                "lockRep"_attr = lockRep.obj());
-
-#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
-            // Dump the stack of each thread.
-            printAllThreadStacksBlocking();
-#endif
-            fassertFailedNoTrace(7152000);
+            LOGV2_FATAL(5675600,
+                        "Time out exceeded waiting for RSTL, stepUp/stepDown is not possible "
+                        "thus calling abort() to allow cluster to progress.",
+                        "lockRep"_attr = lockRep.obj());
         }
         // Rethrow to keep processing as before at a higher layer.
         throw;
