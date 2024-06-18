@@ -758,7 +758,7 @@ public:
                 LOGV2_DEBUG(8276400,
                             4,
                             "Stopping the planningTime timer",
-                            "query"_attr = redact(_cq->toStringShort()));
+                            "query"_attr = redact(_queryStringForDebugLog));
                 curOp->stopQueryPlanningTimer();
             }
         }
