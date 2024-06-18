@@ -1,5 +1,8 @@
 /**
  * Verifies that the internal collection catalog parameter is correctly cleanup after downgrade.
+ * @tags: [
+ *     featureFlagTSBucketingParametersUnchanged,
+ * ]
  */
 
 import "jstests/multiVersion/libs/multi_rs.js";

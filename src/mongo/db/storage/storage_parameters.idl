@@ -244,6 +244,5 @@ feature_flags:
     featureFlagTSBucketingParametersUnchanged:
         description: "Enable storing the 'timeseriesBucketingParametersHaveChanged' parameter on disk"
         cpp_varname: feature_flags::gTSBucketingParametersUnchanged
-        default: true
-        version: 7.1
+        default: false
         shouldBeFCVGated: true

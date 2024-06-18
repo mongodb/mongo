@@ -2,6 +2,9 @@
  * Tests that the query rewrites for fixed bucketing can successfully be handled by a mixed cluster.
  * The primary shard rewrites the query and sends it to the secondary shard that can handle running
  * the rewritten query, even though the secondary shard's FCV is downgraded to 7.0.
+ * @tags: [
+ *     featureFlagTSBucketingParametersUnchanged,
+ * ]
  */
 import "jstests/multiVersion/libs/multi_cluster.js";
 
