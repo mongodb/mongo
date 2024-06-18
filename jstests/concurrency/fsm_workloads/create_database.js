@@ -33,7 +33,7 @@ export const $config = (function() {
         },
 
         checkWriteResult: function checkWriteResult(mayFailWithDatabaseDifferCase, res) {
-            let expectedWriteErrors = [ErrorCodes.NoProgressMade];
+            let expectedWriteErrors = [ErrorCodes.NoProgressMade, ErrorCodes.MovePrimaryInProgress];
             if (mayFailWithDatabaseDifferCase) {
                 expectedWriteErrors.push(ErrorCodes.DatabaseDifferCase);
             }
