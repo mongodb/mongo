@@ -52,7 +52,8 @@ using namespace fmt::literals;
  * This test fixture does not create any resharding POSs and should be preferred to
  * `ReshardingDonorRecipientCommonTest` when they are not required.
  */
-class ReshardingDonorRecipientCommonInternalsTest : public ShardServerTestFixture {
+class ReshardingDonorRecipientCommonInternalsTest
+    : public ShardServerTestFixtureWithCatalogCacheMock {
 public:
     const UUID kExistingUUID = UUID::gen();
     const Timestamp kExistingTimestamp = Timestamp(10, 5);
@@ -133,7 +134,10 @@ protected:
                                                          true,
                                                          {std::move(chunk)})),
                         boost::none);
-
+        getCatalogCacheMock()->setDatabaseReturnValue(
+            nss.dbName(),
+            CatalogCacheMock::makeDatabaseInfo(
+                nss.dbName(), shardThatChunkExistsOn, DatabaseVersion(uuid, timestamp)));
         return CollectionMetadata(std::move(cm), kThisShard.getShardId());
     }
 
@@ -297,7 +301,7 @@ private:
 class ReshardingDonorRecipientCommonTest : public ReshardingDonorRecipientCommonInternalsTest {
 public:
     void setUp() override {
-        ShardServerTestFixture::setUp();
+        ShardServerTestFixtureWithCatalogCacheMock::setUp();
 
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
@@ -324,7 +328,7 @@ public:
 
         Grid::get(operationContext())->clearForUnitTests();
 
-        ShardServerTestFixture::tearDown();
+        ShardServerTestFixtureWithCatalogCacheMock::tearDown();
     }
 
     void stepUp() {

@@ -49,6 +49,29 @@ StatusWith<CollectionRoutingInfo> CatalogCacheMock::getCollectionRoutingInfo(
     return CollectionRoutingInfo(std::move(cm), boost::none);
 }
 
+void CatalogCacheMock::setDatabaseReturnValue(const DatabaseName& dbName,
+                                              CachedDatabaseInfo databaseInfo) {
+    _dbCache[dbName] = databaseInfo;
+}
+
+StatusWith<CachedDatabaseInfo> CatalogCacheMock::getDatabase(OperationContext* opCtx,
+                                                             StringData dbName) {
+    const auto it = _dbCache.find(DatabaseName(dbName));
+    if (it != _dbCache.end()) {
+        return it->second;
+    } else {
+        return Status(ErrorCodes::InternalError,
+                      fmt::format("CatalogCacheMock: No mocked value for database '{}'", dbName));
+    }
+}
+
+CachedDatabaseInfo CatalogCacheMock::makeDatabaseInfo(const DatabaseName& dbName,
+                                                      const ShardId& dbPrimaryShard,
+                                                      const DatabaseVersion& dbVersion) {
+    DatabaseType dbInfo(dbName.toString(), dbPrimaryShard, dbVersion);
+    return CachedDatabaseInfo(std::move(dbInfo), ComparableDatabaseVersion());
+}
+
 void CatalogCacheMock::setChunkManagerReturnValue(StatusWith<ChunkManager> statusWithChunks) {
     _swChunkManagerReturnValue = statusWithChunks;
 }

@@ -50,6 +50,10 @@ public:
                                                                const NamespaceString& nss,
                                                                bool allowLocks) override;
 
+    void setDatabaseReturnValue(const DatabaseName& dbName, CachedDatabaseInfo databaseInfo);
+
+    StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx, StringData dbName) override;
+
     void setChunkManagerReturnValue(StatusWith<ChunkManager> statusWithChunks);
     void clearChunkManagerReturnValue();
 
@@ -57,7 +61,13 @@ public:
 
     static const Status kChunkManagerInternalErrorStatus;
 
+    static CachedDatabaseInfo makeDatabaseInfo(const DatabaseName& dbName,
+                                               const ShardId& dbPrimaryShard,
+                                               const DatabaseVersion& dbVersion);
+
 private:
+    stdx::unordered_map<DatabaseName, CachedDatabaseInfo> _dbCache;
+
     StatusWith<ChunkManager> _swChunkManagerReturnValue{kChunkManagerInternalErrorStatus};
 };
 

@@ -163,7 +163,7 @@ public:
      * and returns it. If the database was not in cache, all the sharded collections will be in the
      * 'needsRefresh' state.
      */
-    StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx, StringData dbName);
+    virtual StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx, StringData dbName);
 
     /**
      * Blocking method to get both the placement information and the index information for a
