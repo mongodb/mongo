@@ -3028,7 +3028,11 @@ tasks:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            test/evergreen/code_coverage/coverage-report-per-test.sh ${is_patch|false} ${num_jobs|1}
+            if [ ${is_patch|false} = true ]; then
+              test/evergreen/code_coverage/coverage-report-per-test.sh true ${num_jobs|1}
+            else
+              test/evergreen/code_coverage/coverage-report-per-test.sh false ${num_jobs|1}
+            fi
       - func: "code coverage publish report"
   - name: coverage-report-catch2
     # This task measures code coverage achieved by only the Catch2-based unit tests.
@@ -5810,6 +5814,7 @@ buildvariants:
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
+    - name: ".lint"
     - name: compile
     - name: make-check-test
     - name: unit-test
