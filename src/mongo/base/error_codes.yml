@@ -808,6 +808,35 @@ error_codes:
       name: StreamProcessorInvalidOptions,
       categories: [StreamProcessorUserError],
     }
+  # The stream processor could not connect to the target Atlas cluster.
+  - {
+      code: 421,
+      name: StreamProcessorAtlasConnectionError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+  - {
+      code: 422,
+      name: StreamProcessorAtlasUnauthorizedError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+  # The document from the stream processor's source was too large.
+  - {
+      code: 423,
+      name: StreamProcessorSourceDocTooLarge,
+      categories: [StreamProcessorUserError],
+    }
+  # Too many unique outputs in a dynamic $merge or $emit stage.
+  - {
+      code: 424,
+      name: StreamProcessorTooManyOutputTargets,
+      categories: [StreamProcessorUserError],
+    }
+  # The stream processor cannot resume from its $source.
+  - {
+      code: 425,
+      name: StreamProcessorCannotResumeFromSource,
+      categories: [StreamProcessorUserError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
