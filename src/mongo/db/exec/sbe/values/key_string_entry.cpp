@@ -66,9 +66,9 @@ void KeyStringEntry::serialize(BufBuilder& buf) const {
 
 KeyStringEntry* KeyStringEntry::deserialize(BufReader& buf) {
     auto version = static_cast<key_string::Version>(buf.read<uint8_t>());
-    auto key = buf.readBytes(buf.read<StringData::size_type>());
-    auto typeBits = buf.readBytes(buf.read<StringData::size_type>());
-    auto rid = buf.readBytes(buf.read<StringData::size_type>());
+    auto key = buf.readBytes(buf.read<LittleEndian<StringData::size_type>>());
+    auto typeBits = buf.readBytes(buf.read<LittleEndian<StringData::size_type>>());
+    auto rid = buf.readBytes(buf.read<LittleEndian<StringData::size_type>>());
     return new KeyStringEntry{key_string::Value::makeValue(version, key, rid, typeBits)};
 }
 
