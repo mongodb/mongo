@@ -56,7 +56,7 @@ DB.prototype.createCollection = function(collName, opts) {
         if (kUnsupportedOptions.has(optName)) {
             unsupportedOption = true;
         }
-    })
+    });
 
     if (unsupportedOption || !FixtureHelpers.isMongos(this) ||
         ShardingOverrideCommon.nssCanBeTrackedByShardingCatalog(collName)) {
@@ -79,7 +79,7 @@ DB.prototype.getCollection = function() {
     }
 
     if (ShardingOverrideCommon.nssCanBeTrackedByShardingCatalog(collection.getFullName())) {
-        return collection
+        return collection;
     }
 
     if (!FixtureHelpers.isMongos(this)) {
@@ -161,7 +161,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, runCommandOriginal, m
     let options = Object.merge({}, cmdObj);
     let nss = options['create'];
     if (ShardingOverrideCommon.nssCanBeTrackedByShardingCatalog(nss)) {
-        unsupportedOption = true
+        unsupportedOption = true;
     }
     delete options['create'];
 
@@ -170,7 +170,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, runCommandOriginal, m
         if (kUnsupportedOptions.has(optName)) {
             unsupportedOption = true;
         }
-    })
+    });
 
     if (unsupportedOption) {
         return runCommandOriginal.apply(conn, makeFuncArgs(cmdObj));

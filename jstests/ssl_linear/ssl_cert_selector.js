@@ -3,7 +3,7 @@
  * server.
  */
 
-import {getPython3Binary} from "jstests/libs/python.js"
+import {getPython3Binary} from "jstests/libs/python.js";
 import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider('windows', function() {

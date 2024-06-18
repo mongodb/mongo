@@ -11,7 +11,7 @@
  * ]
  */
 
-import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js"
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 function checkTemporarilyUnavailableRetriedOnSecondary(rst, isPrepared) {
     jsTestLog("checkTemporarilyUnavailableRetriedOnSecondary: isPrepared=" + isPrepared);

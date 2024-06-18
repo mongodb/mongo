@@ -60,7 +60,7 @@ function runTest({expectedQueryShapeConfiguration, assertionFunc}) {
     const representativeDataPoint = allDataPoints[0];
     assert(
         allDataPoints.every((dataPoint) => bsonWoCompare(dataPoint, representativeDataPoint) == 0),
-        "Expected all data points to be equal.")
+        "Expected all data points to be equal.");
     assertionFunc(representativeDataPoint);
 }
 

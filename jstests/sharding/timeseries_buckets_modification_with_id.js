@@ -95,6 +95,6 @@ runTest({
         multi: false
     }]
 },
-        updateValidateFn)
+        updateValidateFn);
 
 st.stop();

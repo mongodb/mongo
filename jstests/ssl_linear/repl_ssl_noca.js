@@ -7,7 +7,7 @@
 // TODO BUILD-17503 Remove this tag
 // @tags: [incompatible_with_macos]
 
-import {getPython3Binary} from "jstests/libs/python.js"
+import {getPython3Binary} from "jstests/libs/python.js";
 
 if (_isWindows()) {
     assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
@@ -61,15 +61,15 @@ try {
         return ret;
     };
 
-    jsTest.log("Testing with no ssl specification...")
+    jsTest.log("Testing with no ssl specification...");
     var noMentionSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}`;
     assert.neq(checkShell(noMentionSSLURL), 0, "shell correctly failed to connect without SSL");
 
-    jsTest.log("Testing with ssl specified false...")
+    jsTest.log("Testing with ssl specified false...");
     var disableSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}&ssl=false`;
     assert.neq(checkShell(disableSSLURL), 0, "shell correctly failed to connect without SSL");
 
-    jsTest.log("Testing with ssl specified true...")
+    jsTest.log("Testing with ssl specified true...");
     var useSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}&ssl=true`;
     assert.eq(checkShell(useSSLURL), 0, "successfully connected with SSL");
 

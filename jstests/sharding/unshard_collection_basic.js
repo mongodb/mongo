@@ -38,7 +38,7 @@ assert.commandWorked(coll.insert({oldKey: 50}));
 assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
 
 // Fail if unsplittable tracked collection.
-const unsplittableCollName = "foo_unsplittable"
+const unsplittableCollName = "foo_unsplittable";
 const unsplittableCollNs = dbName + '.' + unsplittableCollName;
 assert.commandWorked(
     st.s.getDB(dbName).runCommand({createUnsplittableCollection: unsplittableCollName}));
@@ -77,8 +77,8 @@ assert.eq(1, unshardedChunk.length);
 assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns}),
                              ErrorCodes.NamespaceNotSharded);
 
-const newCollName = "foo1"
-const newCollNs = dbName + '.' + newCollName
+const newCollName = "foo1";
+const newCollNs = dbName + '.' + newCollName;
 assert.commandWorked(mongos.adminCommand({shardCollection: newCollNs, key: {oldKey: 1}}));
 
 assert.commandWorked(mongos.adminCommand({split: newCollNs, middle: {oldKey: 0}}));
@@ -109,7 +109,7 @@ for (let i = -30; i < 30; ++i) {
     assert.commandWorked(coll.insert({_id: i}));
 }
 
-assert(st.rs0.getPrimary().getCollection(newCollNs).countDocuments({}) == 30)
+assert(st.rs0.getPrimary().getCollection(newCollNs).countDocuments({}) == 30);
 
 // Unshard collection should succeed when collection's original shard key is _id.
 assert.commandWorked(mongos.adminCommand({unshardCollection: newCollNs}));

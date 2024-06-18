@@ -130,58 +130,57 @@ await runHistogramsTest(async function testSampleHistogram() {
     const totSampleErr = {absError: 0, relError: 0, selError: 0};
     const totBaseErr = {absError: 0, relError: 0, selError: 0};
 
-    const runTest =
-        () => {
-            let count = 0;
-            // Sort the values to ensure a stable test result.
-            const values =
-                baseColl.find({_id: {$in: [3, 123, 405]}}, projection).sort(sortFields).toArray();
-            for (const field of fields) {
-                for (let i = 1; i < values.length; i++) {
-                    const prev = values[i - 1][field];
-                    const cur = values[i][field];
+    const runTest = () => {
+        let count = 0;
+        // Sort the values to ensure a stable test result.
+        const values =
+            baseColl.find({_id: {$in: [3, 123, 405]}}, projection).sort(sortFields).toArray();
+        for (const field of fields) {
+            for (let i = 1; i < values.length; i++) {
+                const prev = values[i - 1][field];
+                const cur = values[i][field];
 
-                    const min = prev < cur ? prev : cur;
-                    const max = prev > cur ? prev : cur;
+                const min = prev < cur ? prev : cur;
+                const max = prev > cur ? prev : cur;
 
-                    // Test a variety of queries.
-                    testMatchPredicate(baseColl,
-                                       sampleColl,
-                                       {[field]: {$gte: min, $lte: max}},
-                                       collSize,
-                                       totSampleErr,
-                                       totBaseErr);
-                    testMatchPredicate(baseColl,
-                                       sampleColl,
-                                       {[field]: {$lt: min}},
-                                       collSize,
-                                       totSampleErr,
-                                       totBaseErr);
-                    testMatchPredicate(baseColl,
-                                       sampleColl,
-                                       {[field]: {$eq: min}},
-                                       collSize,
-                                       totSampleErr,
-                                       totBaseErr);
-                    count += 3;
-                }
+                // Test a variety of queries.
+                testMatchPredicate(baseColl,
+                                   sampleColl,
+                                   {[field]: {$gte: min, $lte: max}},
+                                   collSize,
+                                   totSampleErr,
+                                   totBaseErr);
+                testMatchPredicate(baseColl,
+                                   sampleColl,
+                                   {[field]: {$lt: min}},
+                                   collSize,
+                                   totSampleErr,
+                                   totBaseErr);
+                testMatchPredicate(baseColl,
+                                   sampleColl,
+                                   {[field]: {$eq: min}},
+                                   collSize,
+                                   totSampleErr,
+                                   totBaseErr);
+                count += 3;
             }
-
-            const avgBaseErr = {
-                absError: round2(totBaseErr.absError / count),
-                relError: round2(totBaseErr.relError / count),
-                selError: round2(totBaseErr.selError / count)
-            };
-            const avgSampleErr = {
-                absError: round2(totSampleErr.absError / count),
-                relError: round2(totSampleErr.relError / count),
-                selError: round2(totSampleErr.selError / count)
-            };
-
-            jsTestLog(`Average errors (${count} queries):`);
-            print(`Average base error: ${tojson(avgBaseErr)}\n`);
-            print(`Average sample error: ${tojson(avgSampleErr)}`);
         }
+
+        const avgBaseErr = {
+            absError: round2(totBaseErr.absError / count),
+            relError: round2(totBaseErr.relError / count),
+            selError: round2(totBaseErr.selError / count)
+        };
+        const avgSampleErr = {
+            absError: round2(totSampleErr.absError / count),
+            relError: round2(totSampleErr.relError / count),
+            selError: round2(totSampleErr.selError / count)
+        };
+
+        jsTestLog(`Average errors (${count} queries):`);
+        print(`Average base error: ${tojson(avgBaseErr)}\n`);
+        print(`Average sample error: ${tojson(avgSampleErr)}`);
+    };
 
     forceCE("histogram");
     // Sargable nodes and Filter nodes get different CEs. Repeat test with/without sargable rewrite.

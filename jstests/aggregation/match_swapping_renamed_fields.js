@@ -211,7 +211,7 @@ assert.eq(2, matchStages.length);
 
 // Test that we correctly match using the '$elemMatch' expression on renamed subfields. Designed to
 // reproduce HELP-59485.
-coll.drop()
+coll.drop();
 assert.commandWorked(coll.insertMany([
     {
         _id: 0,

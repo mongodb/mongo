@@ -19,14 +19,14 @@ assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}
 
 // Make sure split is correctly disabled for unsplittable collection
 if (FeatureFlagUtil.isPresentAndEnabled(mongos, "TrackUnshardedCollectionsOnShardingCatalog")) {
-    jsTest.log("Trying to split an unsplittable collection ...")
+    jsTest.log("Trying to split an unsplittable collection ...");
     const collNameUnsplittable = "unsplittable_bar";
     const nsUnsplittable = dbname + '.' + collNameUnsplittable;
     assert.commandWorked(
         mongos.getDB(dbname).runCommand({createUnsplittableCollection: collNameUnsplittable}));
     assert.commandFailedWithCode(admin.runCommand({split: nsUnsplittable, middle: {_id: 0}}),
                                  ErrorCodes.NamespaceNotSharded);
-    jsTest.log("Trying to merge an unsplittable collection ...")
+    jsTest.log("Trying to merge an unsplittable collection ...");
     assert.commandFailedWithCode(
         admin.runCommand({mergeChunks: nsUnsplittable, bounds: [{_id: 90}, {_id: MaxKey}]}),
         ErrorCodes.NamespaceNotSharded);

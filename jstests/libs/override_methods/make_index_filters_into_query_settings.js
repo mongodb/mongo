@@ -27,7 +27,7 @@ function populateIndexFilterSetIfQuerySettingsArePresent(response) {
 function processAggregateResponse(cmdObj, response) {
     if (cmdObj.pipeline.some(stage => stage.hasOwnProperty("$planCacheStats"))) {
         for (let cacheEntry of response.cursor.firstBatch) {
-            cacheEntry.indexFilterSet = cacheEntry.hasOwnProperty('querySettings')
+            cacheEntry.indexFilterSet = cacheEntry.hasOwnProperty('querySettings');
         }
     }
 
@@ -130,7 +130,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     if (cmdName == "drop") {
         // Remove all query settings associated with that collection upon collection drop. This is
         // the semantics of index filters.
-        planCacheClearFiltersToRemoveAllQuerySettings(conn, {planCacheClearFilters: cmdObj.drop})
+        planCacheClearFiltersToRemoveAllQuerySettings(conn, {planCacheClearFilters: cmdObj.drop});
 
         // Drop the collection.
         return clientFunction.apply(conn, makeFuncArgs(cmdObj));

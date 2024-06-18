@@ -7,7 +7,7 @@ import {
     getShardQueryPlans,
     getWinningPlanFromExplain,
     runOnAllTopLevelExplains
-} from "jstests/libs/analyze_plan.js"
+} from "jstests/libs/analyze_plan.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {
     leftmostLeafStage,
@@ -454,19 +454,19 @@ function runTest(db, coll, isSharded) {
     explain = coll.find().explain();
     analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {
         "filter": {}
-    } /* expectedParsedQuery */)
+    } /* expectedParsedQuery */);
 
     explain = coll.explain().aggregate();
     analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {
         "pipeline": []
-    } /* expectedParsedQuery */)
+    } /* expectedParsedQuery */);
 
     // Test that the parsedQuery field is correct for a more complex query.
     explain = coll.find({$or: [{a: 1}, {a: {$lt: 1}}]}, {a: 1}).explain();
     analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {
         "filter": {"$or": [{"a": {"$eq": 1}}, {"a": {"$lt": 1}}]},
         "projection": {"a": true, "_id": true}
-    })
+    });
 
     explain = coll.explain().aggregate([{$match: {$and: [{a: {$lt: 5}}, {a: 5}]}}]);
     analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {

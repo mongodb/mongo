@@ -7,7 +7,7 @@
 // TODO BUILD-17503 Remove this tag
 // @tags: [incompatible_with_macos]
 
-import {getPython3Binary} from "jstests/libs/python.js"
+import {getPython3Binary} from "jstests/libs/python.js";
 
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 jsTest.log("HOST_TYPE = " + HOST_TYPE);

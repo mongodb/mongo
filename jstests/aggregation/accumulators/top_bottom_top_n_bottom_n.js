@@ -330,7 +330,7 @@ assert.eq([2, 3, 4], embeddedResult[0].result);
 
 // Sort on array
 assert(coll.drop());
-const makeArray = (i) => [i, i + 1, i + 2]
+const makeArray = (i) => [i, i + 1, i + 2];
 assert.commandWorked(coll.insertMany([4, 2, 3, 1].map((i) => ({a: makeArray(i)}))));
 const nestedResult =
     coll.aggregate({$group: {_id: "", result: {$bottomN: {n: 3, output: "$a", sortBy: {"a": 1}}}}})

@@ -75,12 +75,11 @@ export const clearHealthLog = (replSet) => {
     replSet.awaitReplication();
 };
 
-export const logEveryBatch =
-    (replSet) => {
-        forEachNonArbiterNode(replSet, conn => {
-            conn.adminCommand({setParameter: 1, "dbCheckHealthLogEveryNBatches": 1});
-        })
-    }
+export const logEveryBatch = (replSet) => {
+    forEachNonArbiterNode(replSet, conn => {
+        conn.adminCommand({setParameter: 1, "dbCheckHealthLogEveryNBatches": 1});
+    });
+};
 
 export const dbCheckCompleted = (db) => {
     const inprog = db.getSiblingDB("admin").currentOp().inprog;
@@ -203,7 +202,7 @@ export const insertDocsWithMissingIndexKeys =
             assert.eq(Object.keys(doc).length + 1,
                       node.getDB(dbName)[collName].getIndexes().length);
         });
-    }
+    };
 
 // Run dbCheck with given parameters and potentially wait for completion.
 export const runDbCheck = (replSet,

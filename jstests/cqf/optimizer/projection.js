@@ -230,7 +230,7 @@ function testInputOutputPipeline({input, pipeline, expectedOutput, interestingIn
         expectedOutput:
             [{_id: 0, a: 2}, {_id: 1, a: 2}, {_id: 2, a: 2}, {_id: 3, a: 2}, {_id: 4, a: 2}],
         interestingIndexes: []
-    })
+    });
 
     testInputOutputPipeline({
         input: docs,
@@ -243,5 +243,5 @@ function testInputOutputPipeline({input, pipeline, expectedOutput, interestingIn
             {_id: 4, a: {b: 2}}
         ],
         interestingIndexes: []
-    })
+    });
 }());

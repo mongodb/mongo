@@ -28,7 +28,7 @@ function insertDocs(coll) {
 insertDocs(collSBE);
 
 function testPaginationInLookup(mongotConn, db, coll) {
-    const searchQuery = {query: "cake", path: "titles"}
+    const searchQuery = {query: "cake", path: "titles"};
 
     let collUUID = getUUIDFromListCollections(db, coll.getName());
     const searchCmd = {

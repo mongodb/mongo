@@ -8,7 +8,7 @@
  * ]
  */
 
-import {getWinningPlanFromExplain} from 'jstests/libs/analyze_plan.js'
+import {getWinningPlanFromExplain} from 'jstests/libs/analyze_plan.js';
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,

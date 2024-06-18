@@ -210,7 +210,7 @@ sampleDocSize = Object.bsonsize(sampleDocFull);
 // Get default batched size byte limit to verify the current limit
 serverParam = assert.commandWorked(
     srcDb.adminCommand({getParameter: 1, maxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes: 1}));
-jsTestLog("Default batch size limit for renames across databases:" + tojson(serverParam))
+jsTestLog("Default batch size limit for renames across databases:" + tojson(serverParam));
 
 defaultMaxBatchSize = serverParam["maxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes"];
 jsTestLog("defaultMaxBatchSize: " + defaultMaxBatchSize);

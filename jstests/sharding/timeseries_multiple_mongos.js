@@ -153,7 +153,7 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
                     filter,
                     {op: 'bulkWrite', "command.insert": {$exists: true}},
                 ]
-            }
+            };
         }
 
         // Filter out the profiler entries with $indexStats pipeline stage, as the

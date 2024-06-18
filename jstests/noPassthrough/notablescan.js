@@ -67,7 +67,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
 }
 
 {  // Run the testcase with a clustered index.
-    assertDropAndRecreateCollection(db, colName, {clusteredIndex: {key: {_id: 1}, unique: true}})
+    assertDropAndRecreateCollection(db, colName, {clusteredIndex: {key: {_id: 1}, unique: true}});
     coll = db.getCollection(colName);
     assert.commandWorked(coll.insert({_id: 22}));
     assert.eq(1, coll.find({_id: 22}).itcount());

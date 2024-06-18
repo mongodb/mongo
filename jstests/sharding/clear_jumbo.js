@@ -133,8 +133,9 @@ let chunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(chunk.jumbo, tojson(chunk));
 assert.eq(st.shard0.shardName, chunk.shard);
 
-st.forEachConfigServer((conn) => {assert.commandWorked(conn.adminCommand(
-                           {setParameter: 1, balancerMigrationsThrottlingMs: 200}))});
+st.forEachConfigServer((conn) => {
+    assert.commandWorked(conn.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 200}));
+});
 
 runBalancer(testColl);
 

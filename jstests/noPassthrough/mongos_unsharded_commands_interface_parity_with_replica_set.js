@@ -308,7 +308,7 @@ const tests = [
 ];
 
 function runAndAssertTestCaseWithForcedWriteConcern(testCase, testFixture) {
-    testFixture.stopReplication(testFixture.mongoConfig)
+    testFixture.stopReplication(testFixture.mongoConfig);
     testCase.command.writeConcern = {w: "majority", wtimeout: 1};
     const result = testFixture.db.runCommand(testCase.command);
     assertWriteConcernError(result);
@@ -370,14 +370,14 @@ function assertMongosAndReplicaSetInterfaceParity(test, testCase, forceWriteConc
         mongoConfig: rst,
         stopReplication: stopReplicationOnSecondaries,
         restartReplication: restartReplicationOnSecondaries,
-    }
+    };
 
     const mongosTestFixture = {
         db: mongosDb,
         mongoConfig: st,
         stopReplication: stopReplicationOnSecondariesOfAllShards,
         restartReplication: restartReplicationOnAllShards,
-    }
+    };
 
     const replSetResultKeys = Object.keys(runTestCase(
         test,

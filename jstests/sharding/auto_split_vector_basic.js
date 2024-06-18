@@ -13,18 +13,18 @@ var st = new ShardingTest({shards: 2, mongos: 2});
 var mongos0 = st.s0;
 var mongos1 = st.s1;
 const kDbName = "test";
-var db = mongos0.getDB(kDbName)
+var db = mongos0.getDB(kDbName);
 const kCollName = jsTestName();
 const kNs = kDbName + "." + kCollName;
-const kUnshardedCollName = jsTestName() + "_unsharded"
-const kNonExistingCollName = jsTestName() + "_nonExisting"
+const kUnshardedCollName = jsTestName() + "_unsharded";
+const kNonExistingCollName = jsTestName() + "_nonExisting";
 
 assert.commandWorked(mongos0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.name}));
 assert.commandWorked(mongos0.adminCommand({shardCollection: kNs, key: {a: 1}}));
 var shardedColl = db.getCollection(kCollName);
 
 // Assert only 2 chunks exist.
-assert.eq(2, st.config.chunks.count())
+assert.eq(2, st.config.chunks.count());
 
 function insert10MbOfDummyData(coll) {
     // Insert some dummy data (10Mb).
@@ -39,7 +39,7 @@ function insert10MbOfDummyData(coll) {
     assert.commandWorked(bulk.execute());
 }
 
-insert10MbOfDummyData(shardedColl)
+insert10MbOfDummyData(shardedColl);
 
 jsTest.log(
     "Testing autoSplitVector can correctly suggest to split 10Mb of data given 1Mb of maxChunkSize");
@@ -53,7 +53,7 @@ jsTest.log(
         max: {a: MaxKey},
         maxChunkSizeBytes: 1024 * 1024  // 1Mb
     }));
-    assert.eq(10, result.splitKeys.length)
+    assert.eq(10, result.splitKeys.length);
 }
 
 jsTest.log("Having the range over 2 shards should return InvalidOptions");
@@ -122,7 +122,7 @@ jsTest.log("Running on a stale mongos1 should correctly return InvalidOptions");
 }
 
 let collUnsharded = mongos0.getDB(kDbName).getCollection(kUnshardedCollName);
-insert10MbOfDummyData(collUnsharded)
+insert10MbOfDummyData(collUnsharded);
 
 jsTest.log(
     "Running on an unsharded collection should fail if an index was not found for the queried shard key");

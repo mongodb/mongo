@@ -12,7 +12,7 @@ function isTimeToWake(waitFor) {
             return false;
         }
     } else {
-        jsTestLog("Was not given a termination condition. Will keep looping forever.")
+        jsTestLog("Was not given a termination condition. Will keep looping forever.");
     }
     return false;
 }
@@ -47,7 +47,7 @@ export function hangTestToAttachGDB(st, opts) {
             jsTestLog("Here are the ports to connect to");
             logClusterPorts(st);
         }
-        jsTestLog("Test is sleeping waiting for you to connect")
+        jsTestLog("Test is sleeping waiting for you to connect");
         if (opts.waitFor && isTimeToWake(opts.waitFor)) {
             jsTestLog("Breaking sleep loop");
             break;

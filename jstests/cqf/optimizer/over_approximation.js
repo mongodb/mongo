@@ -21,7 +21,7 @@ assert.commandWorked(t.insert({
             }
         }
     }
-}))
+}));
 
 const res =
     t.aggregate({
@@ -43,4 +43,4 @@ const res =
          }
      }).toArray();
 
-assert.eq([], res, "No documents should match")
+assert.eq([], res, "No documents should match");

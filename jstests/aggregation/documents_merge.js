@@ -9,7 +9,7 @@
 import {
     dropWithoutImplicitRecreate,
     withEachMergeMode
-} from "jstests/aggregation/extras/merge_helpers.js"
+} from "jstests/aggregation/extras/merge_helpers.js";
 
 const outColl = db[`${jsTest.name()}_out`];
 const outCollName = outColl.getName();

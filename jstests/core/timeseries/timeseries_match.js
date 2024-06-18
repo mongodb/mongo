@@ -17,7 +17,7 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 TimeseriesTest.run((insert) => {
@@ -140,7 +140,7 @@ TimeseriesTest.run((insert) => {
 
         // Check results.
         {
-            const results = coll.aggregate(pipe).toArray().map((x) => x._id)
+            const results = coll.aggregate(pipe).toArray().map((x) => x._id);
             results.sort();
             assert.eq(testCase.ids, results, () => "Test case " + tojson(testCase));
         }
@@ -179,7 +179,7 @@ TimeseriesTest.run((insert) => {
             {$match: {"measurement": "cpu"}},
             {$project: {_id: 1}}
         ];
-        const res = coll.aggregate(pipe).toArray()
+        const res = coll.aggregate(pipe).toArray();
         assert.eq(res.length, coll.count());
     }
 });

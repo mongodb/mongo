@@ -37,10 +37,11 @@ function assertBucketsAreCompressed(db, bucketsColl) {
     }
 
     const bucketDocs = bucketsColl.find().toArray();
-    bucketDocs.forEach(
-        bucketDoc => {assert.eq(TimeseriesTest.BucketVersion.kCompressed,
-                                bucketDoc.control.version,
-                                `Expected bucket to be compressed: ${tojson(bucketDoc)}`)});
+    bucketDocs.forEach(bucketDoc => {
+        assert.eq(TimeseriesTest.BucketVersion.kCompressed,
+                  bucketDoc.control.version,
+                  `Expected bucket to be compressed: ${tojson(bucketDoc)}`);
+    });
 }
 
 function prepareCompressedBucket() {

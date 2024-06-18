@@ -62,13 +62,13 @@ function runTest({pipeline, expectedEngine}) {
 runTest({
     pipeline: [{$match: {m: 17}}],
     expectedEngine: "classic",
-})
+});
 
 // 'kInclude' pipelines cannot be lowered if there is a sort on the time field.
 runTest({
     pipeline: [{$sort: {t: 1}}, {$project: {t: 1}}],
     expectedEngine: "classic",
-})
+});
 
 // In most other cases the prefix of the pipeline, including bucket unpacking should be lowered to
 // SBE. We'll sanity test a pipeline that should be lowered fully.
@@ -78,7 +78,7 @@ runTest({
         {$group: {_id: "$a", n: {$sum: "$b"}}},
     ],
     expectedEngine: "sbe",
-})
+});
 
 // The full rewrite of a group might avoid unpacking. Let's check that these are fully lowered.
 runTest({
@@ -87,7 +87,7 @@ runTest({
         {$group: {_id: "$m", min: {$min: "$a"}}},
     ],
     expectedEngine: "sbe",
-})
+});
 
 // Bucket unpacking should not be lowered when there is an eventFilter with a full match
 // expression that is not supported in SBE. This entire pipeline should run in classic.

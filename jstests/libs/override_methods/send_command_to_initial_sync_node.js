@@ -67,7 +67,7 @@ function maybeSendCommandToInitialSyncNodes(
     try {
         topology = DiscoverTopology.findConnectedNodes(conn);
     } catch (exp) {
-        jsTestLog("Unable to run findConnectedNodes: " + tojson(exp))
+        jsTestLog("Unable to run findConnectedNodes: " + tojson(exp));
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 

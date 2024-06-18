@@ -62,7 +62,7 @@ export class QuerySettingsUtils {
      * Return queryShapeHash for a given query from querySettings.
      */
     getQueryHashFromQuerySettings(shape) {
-        print("looking for hash for the shape: \n" + tojson(shape))
+        print("looking for hash for the shape: \n" + tojson(shape));
         const settings = this.adminDB
                              .aggregate([
                                  {$querySettings: {showDebugQueryShape: true}},

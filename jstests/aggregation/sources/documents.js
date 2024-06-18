@@ -141,12 +141,12 @@ assert.throwsWithCode(() => {
 }, ErrorCodes.InvalidNamespace);
 
 // $unionWith must fail because it requires a collection even when database does not exist
-assert.throwsWithCode(
-    () => {nonExistingDB.aggregate([{
+assert.throwsWithCode(() => {
+    nonExistingDB.aggregate([{
         $unionWith:
             {pipeline: [{$documents: {$map: {input: {$range: [0, 5]}, in : {x: "$$this"}}}}]}
-    }])},
-    ErrorCodes.InvalidNamespace);
+    }]);
+}, ErrorCodes.InvalidNamespace);
 
 // $unionWith must fail due to no $document
 assert.throwsWithCode(() => {

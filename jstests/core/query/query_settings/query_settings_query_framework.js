@@ -57,7 +57,7 @@ function testQueryFramework({query, settings, expectedEngine}) {
     // Then, check that the query used the appropriate engine and the hinted index.
     const {$db: _, ...queryWithoutDollarDb} = query;
     const explain = assert.commandWorked(db.runCommand({explain: queryWithoutDollarDb}));
-    const engine = getEngine(explain)
+    const engine = getEngine(explain);
     assert.eq(
         engine, expectedEngine, `Expected engine to be ${expectedEngine} but found ${engine}`);
     assertHintedIndexWasUsed(explain);

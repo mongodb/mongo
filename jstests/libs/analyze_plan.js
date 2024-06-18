@@ -34,7 +34,7 @@ export function getQueryPlanner(explain) {
     assert(explain.hasOwnProperty("stages"), explain);
     const stage = explain.stages[0];
     assert(stage.hasOwnProperty("$cursor"), explain);
-    const cursorStage = stage.$cursor
+    const cursorStage = stage.$cursor;
     assert(cursorStage.hasOwnProperty("queryPlanner"), explain);
     return cursorStage.queryPlanner;
 }
@@ -87,7 +87,7 @@ export function getWinningPlan(queryPlanner) {
 }
 
 export function getWinningSBEPlan(queryPlanner) {
-    assert(queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan"), queryPlanner)
+    assert(queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan"), queryPlanner);
     return queryPlanner.winningPlan.slotBasedPlan;
 }
 
@@ -273,7 +273,7 @@ export function getAllPlanStages(root) {
  * This helper function can be used for any optimizer.
  */
 export function getPlanStage(root, stage) {
-    assert(stage, "Stage was not defined in getPlanStage.")
+    assert(stage, "Stage was not defined in getPlanStage.");
     var planStageList = getPlanStages(root, stage);
 
     if (planStageList.length === 0) {
@@ -619,7 +619,7 @@ export function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
  * This helper function can be used for any optimizer.
  */
 export function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
-    assert(stage, "Stage was not defined in getAggPlanStage.")
+    assert(stage, "Stage was not defined in getAggPlanStage.");
     let planStageList = getAggPlanStages(root, stage, useQueryPlannerSection);
 
     if (planStageList.length === 0) {
@@ -653,7 +653,7 @@ export function aggPlanHasStage(root, stage) {
  * on one node's query plan, an error will be thrown.
  */
 export function planHasStage(db, root, stage) {
-    assert(stage, "Stage was not defined in planHasStage.")
+    assert(stage, "Stage was not defined in planHasStage.");
     const matchingStages = getPlanStages(root, stage);
 
     // If we are executing against a mongos, we may get more than one occurrence of the stage.
@@ -887,7 +887,7 @@ export function assertCoveredQueryAndCount({collection, query, project, count}) 
                    "Winning plan was not covered: " + tojson(explain.queryPlanner.winningPlan));
             break;
         default:
-            break
+            break;
     }
 
     // Same query as a count command should also be covered.
@@ -901,7 +901,7 @@ export function assertCoveredQueryAndCount({collection, query, project, count}) 
             assertExplainCount({explainResults: explain, expectedCount: count});
             break;
         default:
-            break
+            break;
     }
 }
 

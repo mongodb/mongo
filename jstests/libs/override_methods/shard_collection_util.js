@@ -155,7 +155,7 @@ export var ShardingOverrideCommon = (function() {
     function nssCanBeTrackedByShardingCatalog(nss) {
         for (const ns of denylistedNamespaces) {
             if (nss.match(ns)) {
-                return true
+                return true;
             }
         }
         return false;

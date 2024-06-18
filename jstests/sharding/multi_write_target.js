@@ -54,7 +54,7 @@ assert.commandWorked(staleColl.update({_id: 0}, {$set: {updatedById: true}}, {mu
 if (FeatureFlagUtil.isPresentAndEnabled(st.s, "UpdateOneWithIdWithoutShardKey")) {
     // Ensure _id update goes to at least one shard
     assert(st.shard0.getCollection(coll.toString()).findOne({updatedById: true}) != null ||
-           st.shard2.getCollection(coll.toString()).findOne({updatedById: true}) != null)
+           st.shard2.getCollection(coll.toString()).findOne({updatedById: true}) != null);
 } else {
     // Ensure _id update goes to all shards
     assert.neq(null, st.shard0.getCollection(coll.toString()).findOne({updatedById: true}));

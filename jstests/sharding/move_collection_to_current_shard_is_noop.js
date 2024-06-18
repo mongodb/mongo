@@ -23,7 +23,7 @@ const st = new ShardingTest({
 });
 
 const dbName = 'db';
-const unsplittableCollName = "foo_unsplittable"
+const unsplittableCollName = "foo_unsplittable";
 const ns = dbName + '.' + unsplittableCollName;
 let shard0 = st.shard0.shardName;
 

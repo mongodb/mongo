@@ -6,12 +6,12 @@
 // ]
 //
 
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js"
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const collName = jsTestName();
 
-const qsutils = new QuerySettingsUtils(db, collName)
+const qsutils = new QuerySettingsUtils(db, collName);
 
 const querySettingsA = {
     indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
