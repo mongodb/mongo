@@ -2,6 +2,7 @@
  * Tests for the $$NOW and $$CLUSTER_TIME system variable.
  */
 import "jstests/libs/sbe_assert_error_override.js";
+import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db[jsTest.name()];
@@ -200,4 +201,16 @@ if (checkSbeFullFeatureFlagEnabled(db)) {
     assert.soon(() => {
         return pastColl.find({$expr: {$lt: ["$timeField", "$$NOW"]}}).itcount() == 1;
     }, "$$NOW should catch up after 3 seconds");
+
+    // Test that $$NOW is able to use index.
+    // TODO SERVER-91535: Enable this test with SBE plan cache.
+    if (!checkSbeFullFeatureFlagEnabled(db)) {
+        assert.commandWorked(futureColl.createIndex({timeField: 1}));
+        const explainResults =
+            futureColl.find({$expr: {$lt: ["$timeField", {$subtract: ["$$NOW", 100]}]}})
+                .explain("queryPlanner");
+        const winningPlan = getWinningPlan(explainResults.queryPlanner);
+        assert(isIxscan(db, winningPlan),
+               `Expected winningPlan to be index scan plan: ${tojson(winningPlan)}`);
+    }
 }

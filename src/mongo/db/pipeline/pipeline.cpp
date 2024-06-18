@@ -877,6 +877,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     MakePipelineOptions opts) {
     auto pipeline = Pipeline::parse(rawPipeline, expCtx, opts.validator);
 
+    expCtx->initializeReferencedSystemVariables();
+
     bool alreadyOptimized = opts.alreadyOptimized;
 
     if (opts.optimize) {
@@ -890,8 +892,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
         pipeline = expCtx->mongoProcessInterface->preparePipelineForExecution(
             pipeline.release(), opts.shardTargetingPolicy, std::move(opts.readConcern));
     }
-
-    expCtx->initializeReferencedSystemVariables();
 
     return pipeline;
 }

@@ -221,7 +221,11 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
          .extensionsCallback = ExtensionsCallbackReal(opCtx, &nss),
          .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
+    // Initialize system variables before constructing CanonicalQuery as the constructor
+    // performs constant-folding optimizations which depend on these agg variables being
+    // properly initialized.
     expCtx->initializeReferencedSystemVariables();
+
     // Register query stats collection. Exclude queries against collections with encrypted fields.
     // It is important to do this before canonicalizing and optimizing the query, each of which
     // would alter the query shape.
@@ -480,12 +484,15 @@ public:
                  .extensionsCallback = ExtensionsCallbackReal(opCtx, &_ns),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
+            // Initialize system variables before constructing CanonicalQuery as the constructor
+            // performs constant-folding optimizations which depend on these agg variables being
+            // properly initialized.
+            expCtx->initializeReferencedSystemVariables();
+
             expCtx->setQuerySettingsIfNotPresent(
                 query_settings::lookupQuerySettingsForFind(expCtx, *parsedRequest, _ns));
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedRequest)});
-
-            cq->getExpCtx()->initializeReferencedSystemVariables();
 
             // If we are running a query against a view redirect this query through the aggregation
             // system.
