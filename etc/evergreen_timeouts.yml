@@ -75,6 +75,14 @@ overrides:
   enterprise-windows-all-feature-flags-required:
     - task: buildscripts_test
       exec_timeout: 15
+    - task: aggregation_read_concern_majority_passthrough
+      exec_timeout: 180 # 3 hours
+    - task: aggregation_sharded_collections_passthrough
+      exec_timeout: 180 # 3 hours
+    - task: causally_consistent_hedged_reads_jscore_passthrough
+      exec_timeout: 180 # 3 hours
+    - task: external_auth
+      exec_timeout: 180 # 3 hours
 
   windows-debug-suggested:
     - task: buildscripts_test
