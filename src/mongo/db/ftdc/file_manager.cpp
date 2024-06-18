@@ -357,12 +357,7 @@ Status FTDCFileManager::writePeriodicMetadataSampleAndRotateIfNeeded(Client* cli
 
 Status FTDCFileManager::writeSampleAndRotateIfNeeded(Client* client,
                                                      const BSONObj& sample,
-                                                     Date_t date,
-                                                     bool triggerRotate) {
-    if (triggerRotate) {
-        Status s = rotate(client);
-        iassert(s);
-    }
+                                                     Date_t date) {
     Status s = _writer.writeSample(sample, date);
 
     if (!s.isOK()) {

@@ -158,7 +158,7 @@ BSONObj FTDCController::getMostRecentPeriodicDocument() {
 }
 
 void FTDCController::triggerRotate() {
-    _triggerRotate.store(true);
+    _shouldRotateBeforeNextSample.store(true);
 }
 
 void FTDCController::start(Service* service) {
@@ -237,6 +237,8 @@ void FTDCController::doLoop(Service* service) {
     std::uint64_t metadataCaptureFrequencyCountdown = 1;
 
     while (true) {
+        _env->onStartLoop();
+
         // Compute the next interval to run regardless of how we were woken up
         // Skipping an interval due to a race condition with a config signal is harmless.
         auto now = getGlobalServiceContext()->getPreciseClockSource()->now();
@@ -273,41 +275,42 @@ void FTDCController::doLoop(Service* service) {
 
         // TODO: consider only running this thread if we are enabled
         // for now, we just keep an idle thread as it is simpler
-        if (_config.enabled) {
-            // Delay initialization of FTDCFileManager until we are sure the user has enabled
-            // FTDC
-            if (!_mgr) {
-                auto swMgr = FTDCFileManager::create(
-                    &_config, _path, &_rotateCollectors, client, _multiServiceSchema);
+        if (!_config.enabled) {
+            continue;
+        }
 
-                _mgr = uassertStatusOK(std::move(swMgr));
-            }
+        // Delay initialization of FTDCFileManager until we are sure the user has enabled
+        // FTDC
+        if (!_mgr) {
+            auto swMgr = FTDCFileManager::create(
+                &_config, _path, &_rotateCollectors, client, _multiServiceSchema);
 
-            auto collectSample = _periodicCollectors.collect(client, _multiServiceSchema);
+            _mgr = uassertStatusOK(std::move(swMgr));
+        }
 
-            bool triggerRequested = true;
-            Status s = _mgr->writeSampleAndRotateIfNeeded(
-                client,
-                std::get<0>(collectSample),
-                std::get<1>(collectSample),
-                _triggerRotate.compareAndSwap(&triggerRequested, false));
+        if (bool req = true; _shouldRotateBeforeNextSample.compareAndSwap(&req, false)) {
+            iassert(_mgr->rotate(client));
+        }
 
-            uassertStatusOK(s);
+        auto collectSample = _periodicCollectors.collect(client, _multiServiceSchema);
 
-            // Store a reference to the most recent document from the periodic collectors
-            {
-                stdx::lock_guard<Latch> lock(_mutex);
-                _mostRecentPeriodicDocument = std::get<0>(collectSample);
-            }
+        Status s = _mgr->writeSampleAndRotateIfNeeded(
+            client, std::get<0>(collectSample), std::get<1>(collectSample));
 
-            if (--metadataCaptureFrequencyCountdown == 0) {
-                metadataCaptureFrequencyCountdown = _config.metadataCaptureFrequency;
-                auto collectSample =
-                    _periodicMetadataCollectors.collect(client, _multiServiceSchema);
-                Status s = _mgr->writePeriodicMetadataSampleAndRotateIfNeeded(
-                    client, std::get<0>(collectSample), std::get<1>(collectSample));
-                iassert(s);
-            }
+        uassertStatusOK(s);
+
+        // Store a reference to the most recent document from the periodic collectors
+        {
+            stdx::lock_guard<Latch> lock(_mutex);
+            _mostRecentPeriodicDocument = std::get<0>(collectSample);
+        }
+
+        if (--metadataCaptureFrequencyCountdown == 0) {
+            metadataCaptureFrequencyCountdown = _config.metadataCaptureFrequency;
+            auto collectSample = _periodicMetadataCollectors.collect(client, _multiServiceSchema);
+            Status s = _mgr->writePeriodicMetadataSampleAndRotateIfNeeded(
+                client, std::get<0>(collectSample), std::get<1>(collectSample));
+            iassert(s);
         }
     }
 }

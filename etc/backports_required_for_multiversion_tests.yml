@@ -667,8 +667,6 @@ last-continuous:
     ticket: SERVER-90818
   - test_file: jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
     ticket: SERVER-90157
-  - test_file: jstests/sharding/database_versioning_all_commands.js
-    ticket: SERVER-90092
   - test_file: jstests/replsets/majority_writes_wait_for_all_durable_timestamp.js
     ticket: SERVER-86685
   - test_file: jstests/sharding/change_streams_with_config_transitions.js
@@ -1412,8 +1410,6 @@ last-lts:
     ticket: SERVER-90818
   - test_file: jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
     ticket: SERVER-90157
-  - test_file: jstests/sharding/database_versioning_all_commands.js
-    ticket: SERVER-90092
   - test_file: jstests/replsets/majority_writes_wait_for_all_durable_timestamp.js
     ticket: SERVER-86685
   - test_file: jstests/sharding/change_streams_with_config_transitions.js

@@ -31,6 +31,7 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -46,45 +47,64 @@
 #include "mongo/db/ftdc/ftdc_test.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/clock_source.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace mongo {
 namespace {
 
-class FTDCControllerTest : public FTDCTest {
+class Checkpoint {
 public:
-    FTDCControllerTest(uint64_t metadataCaptureFrequency = 1)
-        : _metadataCaptureFrequency(metadataCaptureFrequency) {}
-    void setMetadataCaptureFrequency(uint64_t metadataCaptureFrequency) {
-        _metadataCaptureFrequency = metadataCaptureFrequency;
+    void arrive() {
+        stdx::unique_lock lk{_mutex};
+        if (_released)
+            return;
+
+        ++_progress;
+        _cv.notify_all();
+        _cv.wait(lk, [&] { return _progress < _limit; });
     }
 
-protected:
-    void testFull(UseMultiServiceSchema multiServiceSchema, int numRotations = 0);
-    void testStartAsDisabled(UseMultiServiceSchema multiServiceSchema);
+    void wait() {
+        stdx::unique_lock lk{_mutex};
+        _cv.wait(lk, [&] { return _progress == _limit; });
+    }
+
+    void advance() {
+        stdx::unique_lock lk{_mutex};
+        ++_limit;
+        _cv.notify_all();
+    }
+
+    void release() {
+        stdx::unique_lock lk{_mutex};
+        _released = true;
+        _progress = 0;
+        _cv.notify_all();
+    }
 
 private:
-    uint64_t _metadataCaptureFrequency;
+    stdx::mutex _mutex;  // NOLINT
+    stdx::condition_variable _cv;
+    bool _released = false;
+    uint64_t _progress = 0;
+    uint64_t _limit = 1;
 };
 
-class FTDCMetricsCollectorMockTee : public FTDCCollectorInterface {
+class MockCollector : public FTDCCollectorInterface {
 public:
-    ~FTDCMetricsCollectorMockTee() override {
-        ASSERT_TRUE(_state == State::kStarted);
-    }
-
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) final {
         _state = State::kStarted;
 
-        stdx::unique_lock<Latch> lck(_mutex);
-
-        ++_counter;
+        ++_collectorWrites;
 
         // Generate document to return for collector
-        generateDocument(builder, _counter);
+        generateDocument(builder, _collectorWrites);
 
         // Generate an entire document as if the FTDCCollector generates it
         {
@@ -99,7 +119,7 @@ public:
                 subObjBuilder.appendDate(kFTDCCollectStartField,
                                          getGlobalServiceContext()->getPreciseClockSource()->now());
 
-                generateExpectedDocument(subObjBuilder, _counter);
+                generateExpectedDocument(subObjBuilder, _collectorWrites);
                 subObjBuilder.appendDate(kFTDCCollectEndField,
                                          getGlobalServiceContext()->getPreciseClockSource()->now());
             }
@@ -108,10 +128,6 @@ public:
                           getGlobalServiceContext()->getPreciseClockSource()->now());
 
             _docs.emplace_back(b2.obj());
-        }
-
-        if (_counter == _wait) {
-            _condvar.notify_all();
         }
     }
 
@@ -123,20 +139,9 @@ public:
 
     virtual void generateExpectedDocument(BSONObjBuilder& builder, std::uint32_t counter) {
         // Identical to generateDocument when the BSON is not compressed (e.g. for Periodic Metadata
-        // in FTDCMetricsCollectorMockPeriodicMetadata)
+        // in MockPeriodicMetadataCollector)
         generateDocument(builder, counter);
     };
-
-    void setSignalOnCount(int c) {
-        _wait = c;
-    }
-
-    void wait() {
-        stdx::unique_lock<Latch> lck(_mutex);
-        while (_counter < _wait) {
-            _condvar.wait(lck);
-        }
-    }
 
     std::vector<BSONObj>& getDocs() {
         return _docs;
@@ -154,16 +159,12 @@ private:
     // state
     State _state{State::kNotStarted};
 
-    std::uint32_t _counter{0};
+    std::uint32_t _collectorWrites = 0;
 
     std::vector<BSONObj> _docs;
-
-    Mutex _mutex = MONGO_MAKE_LATCH("FTDCMetricsCollectorMockTee::_mutex");
-    stdx::condition_variable _condvar;
-    std::uint32_t _wait{0};
 };
 
-class FTDCMetricsCollectorMock2 : public FTDCMetricsCollectorMockTee {
+class MockPeriodicCollector : public MockCollector {
 public:
     void generateDocument(BSONObjBuilder& builder, std::uint32_t counter) final {
         builder.append("name", "joe");
@@ -172,11 +173,10 @@ public:
     }
 };
 
-class FTDCMetricsCollectorMockPeriodicMetadata : public FTDCMetricsCollectorMockTee {
+class MockPeriodicMetadataCollector : public MockCollector {
 public:
-    FTDCMetricsCollectorMockPeriodicMetadata(UseMultiServiceSchema multiServiceSchema,
-                                             boost::filesystem::path dir)
-        : _multiService(std::move(multiServiceSchema)), _dir(std::move(dir)) {}
+    explicit MockPeriodicMetadataCollector(UseMultiServiceSchema multiServiceSchema)
+        : _multiService(std::move(multiServiceSchema)) {}
 
     void generateDocument(BSONObjBuilder& builder, std::uint32_t counter) final {
         builder.append("name", "joeconfig");
@@ -188,7 +188,6 @@ public:
         int32_t newKey3 = 10 * counter + 2;
         double newKey4 = counter * static_cast<int>(log10f(counter));
 
-        checkForRotate();
         if (newName != _nameCache) {
             _nameCache = newName;
             builder.append("name", _nameCache);
@@ -204,23 +203,6 @@ public:
     }
 
 private:
-    void checkForRotate() {
-        auto files = scanDirectory(_dir);
-        size_t numFiles = 0;
-        for (const auto& file : files) {
-            if (!file.string().ends_with("interim")) {
-                numFiles++;
-            }
-        }
-        if (numFiles > _numFiles) {
-            _nameCache = "-1";
-            _key3Cache = -1;
-            _key4Cache = -1;
-
-            _numFiles = numFiles;
-        }
-    }
-
     bool _multiService;
     boost::filesystem::path _dir;
     size_t _numFiles = 1;
@@ -231,7 +213,7 @@ private:
     double _key4Cache = -1;
 };
 
-class FTDCMetricsCollectorMockRotate : public FTDCMetricsCollectorMockTee {
+class MockRotateCollector : public MockCollector {
 public:
     void generateDocument(BSONObjBuilder& builder, std::uint32_t counter) final {
         builder.append("name", "joerotate");
@@ -253,110 +235,233 @@ std::vector<BSONObj> insertNewSchemaDocuments(const std::vector<BSONObj>& docs, 
     return newDocs;
 }
 
-// Test a run of the controller and the data it logs to log file
-void FTDCControllerTest::testFull(UseMultiServiceSchema multiServiceSchema, int numRotations) {
+/**
+ * Used to sync the flow of the FTDCController with its test. FTDCController calls onStartLoop() at
+ * the start of each collection loop and it will block until the test calls
+ * loopCheckpoint.advance(). Calling loopCheckpoint.wait() after a loopCheckpoint.advance() will
+ * block the test until the controller finishes its loop body. A call to loopCheckpoint.release()
+ * will make the FTDCController run async.
+ */
+class MockControllerEnv : public FTDCController::Env {
+public:
+    void onStartLoop() override {
+        loopCheckpoint.arrive();
+    }
+
+    Checkpoint loopCheckpoint;
+};
+
+class FTDCControllerTest : public FTDCTest {
+public:
+    explicit FTDCControllerTest(uint64_t metadataCaptureFrequency = 1)
+        : _metadataCaptureFrequency(metadataCaptureFrequency) {}
+
+    void setMetadataCaptureFrequency(uint64_t metadataCaptureFrequency) {
+        _metadataCaptureFrequency = metadataCaptureFrequency;
+    }
+
+protected:
+    void testPeriodicCollector(UseMultiServiceSchema multiServiceSchema,
+                               bool enabled,
+                               std::unique_ptr<MockCollector> collector);
+    void testRotateCollector(UseMultiServiceSchema multiServiceSchema,
+                             int numRotations,
+                             std::unique_ptr<MockCollector> collector);
+
+private:
+    uint64_t _metadataCaptureFrequency;
+};
+
+auto toMetadataCollector(MockCollector* collector) {
+    return dynamic_cast<MockPeriodicMetadataCollector*>(collector);
+}
+
+// Test a run of the controller with a single periodicCollector and the data it logs to log file
+void FTDCControllerTest::testPeriodicCollector(UseMultiServiceSchema multiServiceSchema,
+                                               bool enabled,
+                                               std::unique_ptr<MockCollector> collector) {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path dir(tempdir.path());
 
     createDirectoryClean(dir);
 
     FTDCConfig config;
-    config.enabled = true;
+    config.enabled = enabled;
     config.period = Milliseconds(1);
     config.metadataCaptureFrequency = _metadataCaptureFrequency;
     config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
     config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
 
-    FTDCController c(dir, config, multiServiceSchema);
+    auto env = std::make_unique<MockControllerEnv>();
+    Checkpoint& checkpoint = env->loopCheckpoint;
 
-    uint64_t numCollections, numCollectionsPerIteration = 100;
-    numCollections = numCollectionsPerIteration;
+    FTDCController c(dir, config, multiServiceSchema, std::move(env));
 
-    auto c1 = std::make_unique<FTDCMetricsCollectorMock2>();
-    auto c1Ptr = c1.get();
-    c1Ptr->setSignalOnCount(numCollections);
+    uint64_t numCollections = 3;
 
-    auto c2 = std::make_unique<FTDCMetricsCollectorMockPeriodicMetadata>(multiServiceSchema, dir);
-    auto c2Ptr = c2.get();
-    c2Ptr->setSignalOnCount(numCollections / _metadataCaptureFrequency);
-
-    auto c3 = std::make_unique<FTDCMetricsCollectorMockRotate>();
-    auto c3Ptr = c3.get();
-
-    c.addPeriodicCollector(std::move(c1), ClusterRole::None);
-    c.addPeriodicMetadataCollector(std::move(c2), ClusterRole::None);
-    c.addOnRotateCollector(std::move(c3), ClusterRole::ShardServer);
+    auto collectorPtr = collector.get();
+    if (toMetadataCollector(collectorPtr)) {
+        c.addPeriodicMetadataCollector(std::move(collector), ClusterRole::None);
+    } else {
+        c.addPeriodicCollector(std::move(collector), ClusterRole::None);
+    }
 
     c.start(getClient()->getService());
+    if (!enabled) {
+        auto files = scanDirectory(dir);
+        ASSERT_EQUALS(files.size(), 0);
+        ASSERT_OK(c.setEnabled(true));
+    }
+
+    checkpoint.wait();
+
+    auto doCollection = [&](uint64_t n = 1) {
+        while (n--) {
+            checkpoint.advance();
+            checkpoint.wait();
+        }
+    };
 
     // Wait for numCollections samples to have occured
-    c1Ptr->wait();
-    c2Ptr->wait();
+    LOGV2_DEBUG(9129201, 0, "Collecting");
 
-    for (int iterations = numRotations; iterations; iterations--) {
-        c.triggerRotate();
+    auto collectUntilDocCount = [&](auto& collectorPtr, size_t docs) {
+        while (collectorPtr->getDocs().size() < docs)
+            doCollection(1);
+    };
 
-        c1Ptr->setSignalOnCount(numCollections += numCollectionsPerIteration);
-        c2Ptr->setSignalOnCount((numCollections += numCollectionsPerIteration) /
-                                _metadataCaptureFrequency);
-
-        c1Ptr->wait();
-        c2Ptr->wait();
-    }
-
+    collectUntilDocCount(collectorPtr, numCollections);
+    checkpoint.release();
     c.stop();
 
-    auto docsPeriodic = c1Ptr->getDocs();
-    ASSERT_GREATER_THAN_OR_EQUALS(docsPeriodic.size(), numCollectionsPerIteration * numRotations);
-    auto docsPeriodicMetadata = c2Ptr->getDocs();
-    ASSERT_GREATER_THAN_OR_EQUALS(docsPeriodicMetadata.size(),
-                                  (numCollectionsPerIteration * numRotations) /
-                                      _metadataCaptureFrequency);
-    auto docsRotate = c3Ptr->getDocs();
-    ASSERT_EQUALS(docsRotate.size(), 1 + numRotations);
-
+    auto docs = collectorPtr->getDocs();
+    ASSERT_GTE(docs.size(),
+               toMetadataCollector(collectorPtr) ? numCollections
+                                                 : numCollections / _metadataCaptureFrequency);
 
     if (multiServiceSchema) {
-        docsRotate = insertNewSchemaDocuments(docsRotate, "shard");
-        docsPeriodicMetadata = insertNewSchemaDocuments(docsPeriodicMetadata, "common");
-        docsPeriodic = insertNewSchemaDocuments(docsPeriodic, "common");
+        docs = insertNewSchemaDocuments(docs, "common");
     }
 
+    auto files = scanDirectory(dir);
+    ASSERT_EQUALS(files.size(), 1);
+
+    decltype(docs) metaDocs;
+    if (toMetadataCollector(collectorPtr))
+        std::swap(metaDocs, docs);
+    ValidateDocumentListByType(files, {}, docs, metaDocs, FTDCValidationMode::kStrict);
+}
+
+void FTDCControllerTest::testRotateCollector(UseMultiServiceSchema multiServiceSchema,
+                                             int numRotations,
+                                             std::unique_ptr<MockCollector> collector) {
+    unittest::TempDir tempdir("metrics_testpath");
+    boost::filesystem::path dir(tempdir.path());
+
+    createDirectoryClean(dir);
+
+    auto env = std::make_unique<MockControllerEnv>();
+    Checkpoint& checkpoint = env->loopCheckpoint;
+
+    auto collectorPtr = collector.get();
+
+    FTDCConfig config;
+    config.period = Milliseconds(100);
+
+    FTDCController c(dir, config, multiServiceSchema, std::move(env));
+    c.addOnRotateCollector(std::move(collector), ClusterRole::ShardServer);
+    c.start(getClient()->getService());
+    checkpoint.wait();
+
+    for (int i = numRotations; i--;) {
+        c.triggerRotate();
+        checkpoint.advance();
+        checkpoint.wait();
+    }
+    checkpoint.release();
+    c.stop();
+
+    // A rotation closes the current file and creates a new one so if we rotate n times we have 1 +
+    // n total files.
+    auto expectedNumFiles = 1 + numRotations;
+
+    auto docs = collectorPtr->getDocs();
+    ASSERT_EQUALS(docs.size(), expectedNumFiles);
+
+    if (multiServiceSchema) {
+        docs = insertNewSchemaDocuments(docs, "shard");
+    }
 
     auto files = scanDirectory(dir);
+    ASSERT_EQUALS(files.size(), expectedNumFiles);
 
-    ASSERT_EQUALS(files.size(), 1 + numRotations);
-
-    ValidateDocumentListByType(
-        files, docsRotate, docsPeriodic, docsPeriodicMetadata, FTDCValidationMode::kStrict);
+    ValidateDocumentListByType(files, docs, {}, {}, FTDCValidationMode::kStrict);
 }
 
-TEST_F(FTDCControllerTest, TestFullSingleServiceSchema) {
-    setMetadataCaptureFrequency(1);
-    testFull(UseMultiServiceSchema{false});
+TEST_F(FTDCControllerTest, TestPeriodicStartingEnabledWithMultiversion) {
+    testPeriodicCollector(
+        UseMultiServiceSchema{true}, true, std::make_unique<MockPeriodicCollector>());
+}
 
+TEST_F(FTDCControllerTest, TestMetadataStartingEnabledWithMultiversion) {
     setMetadataCaptureFrequency(3);
-    testFull(UseMultiServiceSchema{false});
+    UseMultiServiceSchema multiServiceSchema{true};
+    testPeriodicCollector(multiServiceSchema,
+                          true,
+                          std::make_unique<MockPeriodicMetadataCollector>(multiServiceSchema));
 }
 
-TEST_F(FTDCControllerTest, TestFullMultiServiceSchema) {
-    setMetadataCaptureFrequency(1);
-    testFull(UseMultiServiceSchema{true});
+TEST_F(FTDCControllerTest, TestPeriodicStartingEnabledWithoutMultiversion) {
+    testPeriodicCollector(
+        UseMultiServiceSchema{false}, true, std::make_unique<MockPeriodicCollector>());
+}
 
+TEST_F(FTDCControllerTest, TestMetadataStartingEnabledWithoutMultiversion) {
     setMetadataCaptureFrequency(3);
-    testFull(UseMultiServiceSchema{true});
+    UseMultiServiceSchema multiServiceSchema{false};
+    testPeriodicCollector(multiServiceSchema,
+                          true,
+                          std::make_unique<MockPeriodicMetadataCollector>(multiServiceSchema));
 }
 
-TEST_F(FTDCControllerTest, TestTriggerRotateSingleServiceSchema) {
-    setMetadataCaptureFrequency(1);
-    testFull(UseMultiServiceSchema{false}, 1);
-    testFull(UseMultiServiceSchema{false}, 20);
+TEST_F(FTDCControllerTest, TestPeriodicStartingDisabledWithMultiversion) {
+    testPeriodicCollector(
+        UseMultiServiceSchema{true}, false, std::make_unique<MockPeriodicCollector>());
 }
 
-TEST_F(FTDCControllerTest, TestTriggerRotateMultiServiceSchema) {
-    setMetadataCaptureFrequency(1);
-    testFull(UseMultiServiceSchema{true}, 1);
-    testFull(UseMultiServiceSchema{true}, 20);
+TEST_F(FTDCControllerTest, TestMetadataStartingDisabledWithMultiversion) {
+    setMetadataCaptureFrequency(3);
+    UseMultiServiceSchema multiServiceSchema{true};
+    testPeriodicCollector(multiServiceSchema,
+                          false,
+                          std::make_unique<MockPeriodicMetadataCollector>(multiServiceSchema));
+}
+
+TEST_F(FTDCControllerTest, TestPeriodicStartingDisabledWithoutMultiversion) {
+    testPeriodicCollector(
+        UseMultiServiceSchema{false}, false, std::make_unique<MockPeriodicCollector>());
+}
+
+TEST_F(FTDCControllerTest, TestMetadataStartingDisabledWithoutMultiversion) {
+    setMetadataCaptureFrequency(3);
+    UseMultiServiceSchema multiServiceSchema{false};
+    testPeriodicCollector(multiServiceSchema,
+                          false,
+                          std::make_unique<MockPeriodicMetadataCollector>(multiServiceSchema));
+}
+
+TEST_F(FTDCControllerTest, TestRotate1WithMultiversion) {
+    testRotateCollector(UseMultiServiceSchema{true}, 1, std::make_unique<MockRotateCollector>());
+}
+TEST_F(FTDCControllerTest, TestRotate20WithMultiversion) {
+    testRotateCollector(UseMultiServiceSchema{true}, 20, std::make_unique<MockRotateCollector>());
+}
+
+TEST_F(FTDCControllerTest, TestRotate1WithoutMultiversion) {
+    testRotateCollector(UseMultiServiceSchema{false}, 1, std::make_unique<MockRotateCollector>());
+}
+TEST_F(FTDCControllerTest, TestRotate20WithoutMultiversion) {
+    testRotateCollector(UseMultiServiceSchema{false}, 20, std::make_unique<MockRotateCollector>());
 }
 
 // Test we can start and stop the controller in quick succession, make sure it succeeds without
@@ -379,86 +484,6 @@ TEST_F(FTDCControllerTest, TestStartStop) {
     c.start(getClient()->getService());
 
     c.stop();
-}
-
-// Test we can start the controller as disabled, the directory is empty, and then we can succesfully
-// enable it
-void FTDCControllerTest::testStartAsDisabled(UseMultiServiceSchema multiServiceSchema) {
-    unittest::TempDir tempdir("metrics_testpath");
-    boost::filesystem::path dir(tempdir.path());
-
-    createDirectoryClean(dir);
-
-    FTDCConfig config;
-    config.enabled = false;
-    config.period = Milliseconds(1);
-    config.metadataCaptureFrequency = _metadataCaptureFrequency;
-    config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
-    config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
-
-    auto c1 = std::make_unique<FTDCMetricsCollectorMock2>();
-    auto c2 = std::make_unique<FTDCMetricsCollectorMockPeriodicMetadata>(multiServiceSchema, dir);
-
-    auto c1Ptr = c1.get();
-    auto c2Ptr = c2.get();
-
-    FTDCController c(dir, config, multiServiceSchema);
-
-    c.addPeriodicCollector(std::move(c1), ClusterRole::ShardServer);
-    c.addPeriodicMetadataCollector(std::move(c2), ClusterRole::ShardServer);
-
-    c.start(getClient()->getService());
-
-    auto files0 = scanDirectory(dir);
-
-    ASSERT_EQUALS(files0.size(), 0);
-
-    ASSERT_OK(c.setEnabled(true));
-
-    uint64_t numCollections = 50;
-    c1Ptr->setSignalOnCount(numCollections);
-    c2Ptr->setSignalOnCount(numCollections / _metadataCaptureFrequency);
-
-    // Wait for numCollections samples to have occured
-    c1Ptr->wait();
-    c2Ptr->wait();
-
-    c.stop();
-
-    auto docsPeriodic = c1Ptr->getDocs();
-    ASSERT_GREATER_THAN_OR_EQUALS(docsPeriodic.size(), numCollections);
-
-    auto docsPeriodicMetadata = c2Ptr->getDocs();
-    ASSERT_GREATER_THAN_OR_EQUALS(docsPeriodicMetadata.size(),
-                                  numCollections / _metadataCaptureFrequency);
-
-    if (multiServiceSchema) {
-        docsPeriodic = insertNewSchemaDocuments(docsPeriodic, "shard");
-        docsPeriodicMetadata = insertNewSchemaDocuments(docsPeriodicMetadata, "shard");
-    }
-
-    auto files = scanDirectory(dir);
-
-    ASSERT_EQUALS(files.size(), 1);
-
-    ValidateDocumentListByType(
-        files, {}, docsPeriodic, docsPeriodicMetadata, FTDCValidationMode::kStrict);
-}
-
-TEST_F(FTDCControllerTest, TestStartAsDisabledSingleServiceSchema) {
-    setMetadataCaptureFrequency(1);
-    testStartAsDisabled(UseMultiServiceSchema{false});
-
-    setMetadataCaptureFrequency(3);
-    testStartAsDisabled(UseMultiServiceSchema{false});
-}
-
-TEST_F(FTDCControllerTest, TestStartAsDisabledMultiserviceSchema) {
-    setMetadataCaptureFrequency(1);
-    testStartAsDisabled(UseMultiServiceSchema{true});
-
-    setMetadataCaptureFrequency(3);
-    testStartAsDisabled(UseMultiServiceSchema{true});
 }
 
 }  // namespace
