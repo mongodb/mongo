@@ -1061,11 +1061,21 @@ private:
         return runCommand(cbh, std::move(rcr));
     }
 
-    void _waitForServerToRunCommand(const HostAndPort& server, std::string command) {
+    bool _waitForServerToRunCommand(const HostAndPort& server, std::string command) {
         ClockSource::StopWatch stopwatch;
-        while (!isCommandRunning(command, server) && stopwatch.elapsed() < kMaxWait) {
+        while (!isCommandRunning(command, server)) {
+            if (auto elapsed = stopwatch.elapsed(); elapsed >= kMaxWait) {
+                LOGV2(9155800,
+                      "Target server did not run command within time limit",
+                      "targetHostAndPort"_attr = server,
+                      "cmd"_attr = command,
+                      "timeElapsedMs"_attr = elapsed);
+                return false;
+            }
             sleepmillis(100);
         }
+
+        return true;
     }
 
     void _waitForServersToStartRunningEcho() {
@@ -1073,8 +1083,7 @@ private:
         const auto cmd = "echo";
         auto servers = fixture().getServers();
         for (auto& server : servers) {
-            _waitForServerToRunCommand(server, cmd);
-            ASSERT_TRUE(isCommandRunning(cmd, server));
+            ASSERT_TRUE(_waitForServerToRunCommand(server, cmd));
         }
     }
 
@@ -1084,8 +1093,7 @@ private:
         auto servers = fixture().getServers();
         size_t idx = (mode == CancellationMode::kAfterCompletion) ? 1 : 0;
         for (; idx < servers.size(); idx++) {
-            _waitForServerToRunCommand(servers[idx], cmd);
-            ASSERT_TRUE(isCommandRunning(cmd, servers[idx]));
+            ASSERT_TRUE(_waitForServerToRunCommand(servers[idx], cmd));
         }
     }
 };
