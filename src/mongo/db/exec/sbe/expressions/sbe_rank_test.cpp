@@ -82,13 +82,87 @@ TEST_F(SBERankTest, ComputeRank) {
         denseRankAccessor.reset(tag, val);
 
         std::tie(tag, val) = runCompiledExpression(finalCompiledRankExpr.get());
-        ASSERT_EQUALS(value::TypeTags::NumberInt64, tag);
-        ASSERT_EQUALS(value::bitcastTo<int64_t>(val), ranks[i]);
+        ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
+        ASSERT_EQUALS(value::bitcastTo<int32_t>(val), ranks[i]);
 
         std::tie(tag, val) = runCompiledExpression(finalCompiledDenseRankExpr.get());
-        ASSERT_EQUALS(value::TypeTags::NumberInt64, tag);
-        ASSERT_EQUALS(value::bitcastTo<int64_t>(val), denseRanks[i]);
+        ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
+        ASSERT_EQUALS(value::bitcastTo<int32_t>(val), denseRanks[i]);
     }
+}
+
+TEST_F(SBERankTest, ComputeRankBeyond32Bit) {
+    value::OwnedValueAccessor rankAccessor;
+    value::OwnedValueAccessor denseRankAccessor;
+    value::OwnedValueAccessor argAccessor;
+    auto rankSlot = bindAccessor(&rankAccessor);
+    auto denseRankSlot = bindAccessor(&denseRankAccessor);
+    auto argSlot = bindAccessor(&argAccessor);
+    auto rankExpr = sbe::makeE<sbe::EFunction>(
+        "aggRank",
+        sbe::makeEs(
+            makeE<EVariable>(argSlot),
+            makeE<EConstant>(sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(true))));
+    auto compiledRankExpr = compileAggExpression(*rankExpr, &rankAccessor);
+    auto denseRankExpr = sbe::makeE<sbe::EFunction>(
+        "aggDenseRank",
+        sbe::makeEs(
+            makeE<EVariable>(argSlot),
+            makeE<EConstant>(sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(true))));
+    auto compiledDenseRankExpr = compileAggExpression(*denseRankExpr, &denseRankAccessor);
+    auto finalRankExpr =
+        sbe::makeE<sbe::EFunction>("aggRankFinalize", sbe::makeEs(makeE<EVariable>(rankSlot)));
+    auto finalCompiledRankExpr = compileExpression(*finalRankExpr);
+    auto finalDenseRankExpr =
+        sbe::makeE<sbe::EFunction>("aggRankFinalize", sbe::makeEs(makeE<EVariable>(denseRankSlot)));
+    auto finalCompiledDenseRankExpr = compileExpression(*finalDenseRankExpr);
+
+    auto setInt32MaxRankState = [](value::OwnedValueAccessor& accessor) {
+        auto [newStateTag, newStateVal] = value::makeNewArray();
+        auto newState = value::getArrayView(newStateVal);
+        newState->push_back(value::TypeTags::NumberInt32, 0);  // kLastValue
+        newState->push_back(value::TypeTags::Boolean,
+                            value::bitcastFrom<bool>(false));  // kLastValueIsNothing
+        newState->push_back(value::TypeTags::NumberInt64,
+                            std::numeric_limits<int32_t>::max());  // kLastRank
+        newState->push_back(value::TypeTags::NumberInt64, 1);      // kSameRankCount
+        auto sortSpec = std::make_unique<SortSpec>(BSON("sortKey" << 1));
+        newState->push_back(value::TypeTags::sortSpec,
+                            value::bitcastFrom<SortSpec*>(sortSpec.release()));  // kSortSpec
+        accessor.reset(newStateTag, newStateVal);
+    };
+    setInt32MaxRankState(rankAccessor);
+    setInt32MaxRankState(denseRankAccessor);
+
+    // int32 max - rank should return NumberInt32
+    argAccessor.reset(value::TypeTags::NumberInt32, 0);
+    auto [tag, val] = runCompiledExpression(compiledRankExpr.get());
+    rankAccessor.reset(tag, val);
+    std::tie(tag, val) = runCompiledExpression(compiledDenseRankExpr.get());
+    denseRankAccessor.reset(tag, val);
+
+    std::tie(tag, val) = runCompiledExpression(finalCompiledRankExpr.get());
+    ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
+    ASSERT_EQUALS(value::bitcastTo<int32_t>(val), std::numeric_limits<int32_t>::max());
+
+    std::tie(tag, val) = runCompiledExpression(finalCompiledDenseRankExpr.get());
+    ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
+    ASSERT_EQUALS(value::bitcastTo<int32_t>(val), std::numeric_limits<int32_t>::max());
+
+    // int32 max + 1 - rank should return NumberInt64
+    argAccessor.reset(value::TypeTags::NumberInt32, 1);
+    std::tie(tag, val) = runCompiledExpression(compiledRankExpr.get());
+    rankAccessor.reset(tag, val);
+    std::tie(tag, val) = runCompiledExpression(compiledDenseRankExpr.get());
+    denseRankAccessor.reset(tag, val);
+
+    std::tie(tag, val) = runCompiledExpression(finalCompiledRankExpr.get());
+    ASSERT_EQUALS(value::TypeTags::NumberInt64, tag);
+    ASSERT_EQUALS(value::bitcastTo<int64_t>(val), std::numeric_limits<int32_t>::max() + 2ll);
+
+    std::tie(tag, val) = runCompiledExpression(finalCompiledDenseRankExpr.get());
+    ASSERT_EQUALS(value::TypeTags::NumberInt64, tag);
+    ASSERT_EQUALS(value::bitcastTo<int64_t>(val), std::numeric_limits<int32_t>::max() + 1ll);
 }
 
 TEST_F(SBERankTest, ComputeRankWithCollation) {
@@ -139,12 +213,12 @@ TEST_F(SBERankTest, ComputeRankWithCollation) {
         denseRankAccessor.reset(tag, val);
 
         std::tie(tag, val) = runCompiledExpression(finalCompiledRankExpr.get());
-        ASSERT_EQUALS(value::TypeTags::NumberInt64, tag);
-        ASSERT_EQUALS(value::bitcastTo<int64_t>(val), ranks[i]);
+        ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
+        ASSERT_EQUALS(value::bitcastTo<int32_t>(val), ranks[i]);
 
         std::tie(tag, val) = runCompiledExpression(finalCompiledDenseRankExpr.get());
-        ASSERT_EQUALS(value::TypeTags::NumberInt64, tag);
-        ASSERT_EQUALS(value::bitcastTo<int64_t>(val), denseRanks[i]);
+        ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
+        ASSERT_EQUALS(value::bitcastTo<int32_t>(val), denseRanks[i]);
     }
 }
 }  // namespace mongo::sbe
