@@ -167,6 +167,14 @@ public:
     virtual RecordStore* getRecordStore() = 0;
 
     /**
+     * First tries to return the in-memory entry. If not found, e.g. when collection is dropped
+     * after the provided timestamp, loads the entry from the persisted catalog at the provided
+     * timestamp.
+     */
+    virtual NamespaceString getNSSFromCatalog(OperationContext* opCtx,
+                                              const RecordId& catalogId) const = 0;
+
+    /**
      * Create an entry in the catalog for an orphaned collection found in the
      * storage engine. Return the generated ns of the collection.
      * Note that this function does not recreate the _id index on the for non-clustered collections

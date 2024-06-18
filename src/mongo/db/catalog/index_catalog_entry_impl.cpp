@@ -393,7 +393,7 @@ void IndexCatalogEntryImpl::setIdent(std::shared_ptr<Ident> newIdent) {
 // ----
 
 NamespaceString IndexCatalogEntryImpl::getNSSFromCatalog(OperationContext* opCtx) const {
-    return DurableCatalog::get(opCtx)->getEntry(_shared->_catalogId).nss;
+    return DurableCatalog::get(opCtx)->getNSSFromCatalog(opCtx, _shared->_catalogId);
 }
 
 bool IndexCatalogEntryImpl::isReadyInMySnapshot(OperationContext* opCtx) const {

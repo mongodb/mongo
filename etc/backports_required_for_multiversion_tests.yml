@@ -507,6 +507,8 @@ last-continuous:
     ticket: SERVER-90173
   - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
     ticket: SERVER-86674
+  - test_file: jstests/replsets/snapshot_read_drop_collection.js
+    ticket: SERVER-91178
   - test_file: jstests/sharding/direct_shard_connection_auth.js
     ticket: SERVER-89994
   - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_negative.js
@@ -1068,6 +1070,8 @@ last-lts:
     ticket: SERVER-90173
   - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
     ticket: SERVER-86674
+  - test_file: jstests/replsets/snapshot_read_drop_collection.js
+    ticket: SERVER-91178
   - test_file: jstests/sharding/direct_shard_connection_auth.js
     ticket: SERVER-89994
   - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_negative.js

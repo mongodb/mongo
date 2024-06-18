@@ -72,6 +72,8 @@ public:
 
     EntryIdentifier getEntry(const RecordId& catalogId) const;
 
+    NamespaceString getNSSFromCatalog(OperationContext* opCtx, const RecordId& catalogId) const;
+
     std::string getCollectionIdent(const RecordId& catalogId) const;
 
     std::string getIndexIdent(OperationContext* opCtx,
