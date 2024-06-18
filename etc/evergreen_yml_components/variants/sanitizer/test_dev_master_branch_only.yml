@@ -129,6 +129,8 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-expansions
     compile_variant: *enterprise-rhel-80-64-bit-dynamic-debug-mode
+    test_flags: >-
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel80
@@ -288,6 +290,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_windows_tls
       --enableEnterpriseTests=off
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     compile_variant: *windows-debug-suggested
   tasks:
   - name: compile_test_serial_TG
@@ -332,6 +335,7 @@ buildvariants:
     scons_cache_scope: shared
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_windows_tls
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
   tasks:
   # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
   # It has a minimal amount of tasks because unoptimized builds are slow, which causes
@@ -361,6 +365,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_macos
       --enableEnterpriseTests=off
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: >-
@@ -387,7 +392,9 @@ buildvariants:
   - macos-1100
   expansions:
     compile_variant: *enterprise-macos
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
+    test_flags: >-
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+      --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: >-
       --ssl
@@ -446,6 +453,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible
       --runAllFeatureFlagTests
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
@@ -472,6 +480,7 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --runAllFeatureFlagTests
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
   tasks:
   - name: jsCore
   - name: jsCore_txns
@@ -489,6 +498,7 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --runAllFeatureFlagTests
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
   tasks:
   # TODO: DEVPROD-5173
   # Add !.incompatible_all_feature_flags back when the tag is added to any task or DEVPROD-5173 is completed.
@@ -546,6 +556,7 @@ buildvariants:
     multiversion_edition: enterprise
     test_flags: >-
       --excludeWithAnyTags=tsan_incompatible
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
   tasks:
   - name: compile_test_serial_TG
   - name: compile_test_parallel_unittest_stream_TG
@@ -658,6 +669,8 @@ buildvariants:
       --linker=gold
       --link-model=dynamic
       --use-diagnostic-latches=on
+    test_flags: >-
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99

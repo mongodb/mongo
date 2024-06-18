@@ -125,6 +125,8 @@ buildvariants:
   expansions:
     <<: *linux_debug_community_compile_expansions
     compile_variant: *linux-x86-dynamic-debug-compile-required
+    test_flags: >-
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
   tasks:
   - name: compile_test_parallel_core_stream_TG
   - name: compile_test_parallel_unittest_stream_TG
@@ -150,6 +152,8 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
     compile_variant: *linux-debug-aubsan-compile-required
+    test_flags: >-
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
   tasks:
   - name: compile_test_parallel_core_stream_TG
   - name: compile_test_parallel_unittest_stream_TG
@@ -169,6 +173,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_http_client
       --enableEnterpriseTests=off
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     target_resmoke_time: 15
     max_sub_suites: 5
     large_distro_name: rhel80-medium
@@ -188,7 +193,9 @@ buildvariants:
   - rhel80-build
   expansions:
     <<: *aubsan-lite-required-expansions
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: >-
+      --excludeWithAnyTags=requires_increased_memlock_limits
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
   tasks:
   - name: jsCore
   - name: jsCore_txns
@@ -256,6 +263,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_fast_memory,requires_increased_memlock_limits,corrupts_data
       --benchmarkRepetitions=1
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
@@ -348,6 +356,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_increased_memlock_limits,corrupts_data
       --benchmarkRepetitions=1
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
@@ -434,7 +443,9 @@ buildvariants:
       --ssl
       -j$(grep -c ^processor /proc/cpuinfo)
       --use-diagnostic-latches=on
-    test_flags: --excludeWithAnyTags=corrupts_data
+    test_flags: >-
+      --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+      --excludeWithAnyTags=corrupts_data
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
