@@ -1022,7 +1022,7 @@ tasks:
 
 - <<: *task_template
   name: serial_run
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "misc_js", "non_win_dbg"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "misc_js", "non_win_dbg", "requires_large_host"]
   commands:
   - func: "do setup"
   - func: "run tests"

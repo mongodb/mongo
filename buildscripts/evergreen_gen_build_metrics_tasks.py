@@ -171,8 +171,7 @@ def main():
             activate=True,
         )
         variant.add_task_group(
-            create_task_group('windows', tasks['windows_tasks']['static']),
-            ['windows-vsCurrent-xlarge'])
+            create_task_group('windows', tasks['windows_tasks']['static']), ['windows-2022-xlarge'])
     elif sys.platform == 'darwin':
         variant = BuildVariant(
             name="macos-enterprise-build-metrics",
