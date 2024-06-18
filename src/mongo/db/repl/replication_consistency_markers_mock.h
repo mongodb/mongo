@@ -62,9 +62,6 @@ public:
     void setInitialSyncFlag(OperationContext* opCtx) override;
     void clearInitialSyncFlag(OperationContext* opCtx) override;
 
-    OpTime getMinValid(OperationContext* opCtx) const override;
-    void setMinValid(OperationContext* opCtx, const OpTime& minValid) override;
-
     void ensureFastCountOnOplogTruncateAfterPoint(OperationContext* opCtx) override;
 
     void setOplogTruncateAfterPoint(OperationContext* opCtx, const Timestamp& timestamp) override;

@@ -129,27 +129,6 @@ public:
      */
     virtual void clearInitialSyncFlag(OperationContext* opCtx) = 0;
 
-    // -------- MinValid ----------
-
-    /**
-     * The minValid value is the earliest (minimum) OpTime that must be applied in order to
-     * consider the dataset consistent.
-     *
-     * Returns the minValid OpTime.
-     */
-    virtual OpTime getMinValid(OperationContext* opCtx) const = 0;
-
-    /**
-     * Sets the minValid OpTime to 'minValid'. This can set minValid backwards, which is necessary
-     * in rollback when the OpTimes in the oplog may move backwards. We usually only call this
-     * function in rollback via refetch, so we need to check the storage engine's rollback method to
-     * enforce that via an invariant. However, there are exceptions where we need to set the
-     * minValid document outside of rollback with an untimestamped write. In that case, we can
-     * ignore the storage engine's rollback method by setting the 'alwaysAllowUntimestampedWrite'
-     * parameter to true.
-     */
-    virtual void setMinValid(OperationContext* opCtx, const OpTime& minValid) = 0;
-
     // -------- Oplog Truncate After Point ----------
 
     /**

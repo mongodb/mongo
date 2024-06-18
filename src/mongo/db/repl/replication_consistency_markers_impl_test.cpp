@@ -159,7 +159,7 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
     ASSERT_FALSE(consistencyMarkers.getInitialSyncFlag(opCtx));
 }
 
-TEST_F(ReplicationConsistencyMarkersTest, GetMinValidAfterSettingInitialSyncFlagWorks) {
+TEST_F(ReplicationConsistencyMarkersTest, GetMarkersAfterSettingInitialSyncFlagWorks) {
     ReplicationConsistencyMarkersImpl consistencyMarkers(
         getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
     auto opCtx = getOperationContext();
@@ -173,7 +173,6 @@ TEST_F(ReplicationConsistencyMarkersTest, GetMinValidAfterSettingInitialSyncFlag
     consistencyMarkers.setInitialSyncFlag(opCtx);
     ASSERT_TRUE(consistencyMarkers.getInitialSyncFlag(opCtx));
 
-    ASSERT(consistencyMarkers.getMinValid(opCtx).isNull());
     ASSERT(consistencyMarkers.getAppliedThrough(opCtx).isNull());
     ASSERT(consistencyMarkers.getOplogTruncateAfterPoint(opCtx).isNull());
 }
@@ -209,19 +208,16 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     consistencyMarkers.initializeMinValidDocument(opCtx);
 
     // MinValid boundaries should all be null after initializing a new storage engine.
-    ASSERT(consistencyMarkers.getMinValid(opCtx).isNull());
     ASSERT(consistencyMarkers.getAppliedThrough(opCtx).isNull());
     ASSERT(consistencyMarkers.getOplogTruncateAfterPoint(opCtx).isNull());
 
-    // Setting min valid boundaries should affect getMinValid() result.
+    // Setting min valid boundaries should affect get*() result.
     OpTime startOpTime({Seconds(123), 0}, 1LL);
     OpTime endOpTime({Seconds(456), 0}, 1LL);
     consistencyMarkers.setAppliedThrough(opCtx, startOpTime);
-    consistencyMarkers.setMinValid(opCtx, endOpTime);
     consistencyMarkers.setOplogTruncateAfterPoint(opCtx, endOpTime.getTimestamp());
 
     ASSERT_EQ(consistencyMarkers.getAppliedThrough(opCtx), startOpTime);
-    ASSERT_EQ(consistencyMarkers.getMinValid(opCtx), endOpTime);
     ASSERT_EQ(consistencyMarkers.getOplogTruncateAfterPoint(opCtx), endOpTime.getTimestamp());
 
     // Check min valid document using storage engine interface.
@@ -231,18 +227,9 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     ASSERT_EQUALS(startOpTime,
                   unittest::assertGet(OpTime::parseFromOplogEntry(
                       minValidDocument[MinValidDocument::kAppliedThroughFieldName].Obj())));
-    ASSERT_EQUALS(endOpTime, unittest::assertGet(OpTime::parseFromOplogEntry(minValidDocument)));
 
     // Check oplog truncate after point document.
     ASSERT_EQUALS(endOpTime.getTimestamp(), consistencyMarkers.getOplogTruncateAfterPoint(opCtx));
-
-    // Set min valid without waiting for the changes to be durable.
-    OpTime endOpTime2({Seconds(789), 0}, 1LL);
-    consistencyMarkers.setMinValid(opCtx, endOpTime2);
-    consistencyMarkers.clearAppliedThrough(opCtx);
-    ASSERT_EQUALS(consistencyMarkers.getAppliedThrough(opCtx), OpTime());
-    ASSERT_EQUALS(consistencyMarkers.getMinValid(opCtx), endOpTime2);
-    ASSERT_FALSE(getJournalListener()->onDurableCalled);
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, InitialSyncId) {

@@ -344,14 +344,6 @@ void ReplicationRecoveryImpl::_assertNoRecoveryNeededOnUnstableCheckpoint(Operat
             "oplog has not been fully applied",
             "appliedThrough"_attr = appliedThrough.toString());
     }
-
-    const auto minValid = _consistencyMarkers->getMinValid(opCtx);
-    if (minValid > topOfOplog) {
-        LOGV2_FATAL_NOTRACE(31366,
-                            "Unexpected recovery needed, top of oplog is not consistent",
-                            "topOfOplog"_attr = topOfOplog,
-                            "minValid"_attr = minValid);
-    }
 }
 
 void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opCtx,

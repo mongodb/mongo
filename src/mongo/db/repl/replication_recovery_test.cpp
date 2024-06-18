@@ -1667,21 +1667,6 @@ DEATH_TEST_REGEX_F(
     recovery.recoverFromOplogAsStandalone(opCtx);
 }
 
-DEATH_TEST_REGEX_F(
-    ReplicationRecoveryTest,
-    RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithHighMinValid,
-    "Fatal assertion.*31366") {
-    gTakeUnstableCheckpointOnShutdown = true;
-
-    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
-    auto opCtx = getOperationContext();
-
-    _setUpOplog(opCtx, getStorageInterface(), {5});
-    getConsistencyMarkers()->setMinValid(opCtx, OpTime(Timestamp(20, 20), 1));
-
-    recovery.recoverFromOplogAsStandalone(opCtx);
-}
-
 TEST_F(ReplicationRecoveryTest, RecoverStartFromClosestLTEEntryIfRecoveryTsNotInOplog) {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();

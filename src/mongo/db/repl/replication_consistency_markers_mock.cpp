@@ -68,17 +68,6 @@ void ReplicationConsistencyMarkersMock::clearInitialSyncFlag(OperationContext* o
     _initialSyncFlag = false;
 }
 
-OpTime ReplicationConsistencyMarkersMock::getMinValid(OperationContext* opCtx) const {
-    stdx::lock_guard<Latch> lock(_minValidBoundariesMutex);
-    return _minValid;
-}
-
-void ReplicationConsistencyMarkersMock::setMinValid(OperationContext* opCtx,
-                                                    const OpTime& minValid) {
-    stdx::lock_guard<Latch> lock(_minValidBoundariesMutex);
-    _minValid = minValid;
-}
-
 void ReplicationConsistencyMarkersMock::ensureFastCountOnOplogTruncateAfterPoint(
     OperationContext* opCtx) {}
 

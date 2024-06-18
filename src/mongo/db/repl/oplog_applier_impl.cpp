@@ -681,9 +681,8 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
             pauseBatchApplicationAfterWritingOplogEntries.pauseWhileSet(opCtx);
         }
 
-        // Read `minValid` prior to it possibly being written to.
-        const bool isDataConsistent =
-            _consistencyMarkers->getMinValid(opCtx) < ops.front().getOpTime();
+        // Compare with _minValid Optime.
+        const bool isDataConsistent = getMinValid() < ops.front().getOpTime();
 
         {
             std::vector<Status> statusVector(_workerPool->getStats().options.maxThreads,

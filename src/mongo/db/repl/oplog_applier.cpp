@@ -151,6 +151,14 @@ const OplogApplier::Options& OplogApplier::getOptions() const {
     return _options;
 }
 
+const OpTime& OplogApplier::getMinValid() {
+    return _minValid;
+}
+
+void OplogApplier::setMinValid(const OpTime& minValid) {
+    _minValid = minValid;
+}
+
 std::unique_ptr<ThreadPool> makeReplWorkerPool() {
     // Reduce content pinned in cache by single oplog batch on small machines by reducing the number
     // of threads of ReplWriter to reduce the number of concurrent open WT transactions.

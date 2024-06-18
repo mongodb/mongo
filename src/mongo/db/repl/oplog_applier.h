@@ -176,10 +176,6 @@ public:
      * If the batch application is successful, returns the optime of the last op applied, which
      * should be the last op in the batch.
      * Returns ErrorCodes::CannotApplyOplogWhilePrimary if the node has become primary.
-     *
-     * To provide crash resilience, this function will advance the persistent value of 'minValid'
-     * to at least the last optime of the batch. If 'minValid' is already greater than or equal
-     * to the last optime of this batch, it will not be updated.
      */
     StatusWith<OpTime> applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
 
@@ -192,6 +188,18 @@ public:
         Milliseconds waitToFillBatch = Milliseconds(0));
 
     const Options& getOptions() const;
+
+    /**
+     * The minValid value is the earliest (minimum) OpTime that must be applied in order to
+     * consider the dataset consistent.
+     * Returns the _minValid OpTime.
+     */
+    const OpTime& getMinValid();
+
+    /**
+     * Sets the minValid OpTime to '_minValid'.
+     */
+    void setMinValid(const OpTime& minValid);
 
 private:
     /**
@@ -226,6 +234,9 @@ private:
 
     // Configures this OplogApplier.
     const Options _options;
+
+    // minValid Optime;
+    OpTime _minValid;
 
 protected:
     // Handles consuming oplog entries from the OplogBuffer for oplog application.
