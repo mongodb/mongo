@@ -277,7 +277,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                     privileges,
                     &tempResults,
                     PipelineDataSource::kNormal,
-                    expCtx->eligibleForSampling()));
+                    expCtx->eligibleForSampling(),
+                    false /* requestQueryStatsFromRemotes */));
                 break;
             }
 
