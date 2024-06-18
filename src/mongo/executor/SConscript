@@ -421,6 +421,7 @@ env.CppUnitTest(
         "mock_network_fixture_test.cpp",
         "network_interface_mock_test.cpp",
         "network_interface_mock_test_fixture.cpp",
+        "pending_cmd_ref_test.cpp",
         "pinned_connection_task_executor_test.cpp",
         "scoped_task_executor_test.cpp",
         "split_timer_test.cpp",

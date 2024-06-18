@@ -164,6 +164,37 @@ public:
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout) override;
 
+    /*
+     * RAII for guaranteed executors in shutdown
+     *
+     * Must be acquired before the initial inShutdown() check, and
+     * held until command completion.
+     */
+    class PendingCmdRef final {
+    public:
+        explicit PendingCmdRef(NetworkInterfaceTL& nitl) : _nitl(nitl) {
+            _nitl._pendingCmdCount.fetchAndAdd(1);
+        }
+
+        ~PendingCmdRef() {
+            if (_nitl._pendingCmdCount.fetchAndSubtract(1) == 1) {
+                std::lock_guard lk(_nitl._stateMutex);
+                if (_nitl._state == kStopping || _nitl._state == kStopped) {
+                    _nitl._stoppedCV.notify_one();
+                }
+            }
+        }
+
+        PendingCmdRef(const PendingCmdRef&) = delete;
+        PendingCmdRef(PendingCmdRef&&) = delete;
+
+        PendingCmdRef& operator=(const PendingCmdRef&) = delete;
+        PendingCmdRef& operator=(PendingCmdRef&&) = delete;
+
+    private:
+        NetworkInterfaceTL& _nitl;
+    };
+
 private:
     struct RequestState;
     struct RequestManager;
@@ -259,6 +290,8 @@ private:
 
         // Total time spent waiting for connections that eventually time out.
         Milliseconds connTimeoutWaitTime{0};
+
+        std::unique_ptr<PendingCmdRef> pendingCmdRef;
     };
 
     struct CommandState final : public CommandStateBase {
@@ -429,7 +462,7 @@ private:
     std::string _instanceName;
     ServiceContext* _svcCtx = nullptr;
     transport::TransportLayerManager* _tl = nullptr;
-    // Will be created if ServiceContext is null, or if no TransportLayer was configured at startup
+    // Will be created if ServiceContext is null, or if no TransportLayer was configured at startup.
     std::unique_ptr<transport::TransportLayerManager> _ownedTransportLayer;
     transport::ReactorHandle _reactor;
 
@@ -469,6 +502,14 @@ private:
     mutable stdx::mutex _stateMutex;  // NOLINT
     stdx::condition_variable _stoppedCV;
     State _state;
+
+    // We must drain GuaranteedExecutor work before drain()ing the
+    // reactor in shutdown. All GuaranteedExecutor work is done in
+    // the context of a CommandStateBase instance, so we only bump
+    // the refcnt for each CommandStateBase, instead of bumping it
+    // both for the initial request work, and the work scheduled
+    // in RequestState::resolve().
+    Atomic<std::uint32_t> _pendingCmdCount;
 
     stdx::thread _ioThread;
 

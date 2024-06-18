@@ -311,14 +311,17 @@ void NetworkInterfaceTL::_run() {
 void NetworkInterfaceTL::shutdown() {
 
     {
-        stdx::lock_guard lk(_stateMutex);
+        stdx::unique_lock lk(_stateMutex);
         switch (_state) {
             case kDefault:
                 _state = kStopped;
+                // If we never started, there aren't any commands running.
+                invariant(_pendingCmdCount.load() == 0);
                 _stoppedCV.notify_one();
                 return;
             case kStarted:
                 _state = kStopping;
+                _stoppedCV.wait(lk, [&] { return _pendingCmdCount.load() == 0; });
                 break;
             case kStopping:
             case kStopped:
@@ -334,6 +337,7 @@ void NetworkInterfaceTL::shutdown() {
     const ScopeGuard finallySetStopped = [&] {
         stdx::lock_guard lk(_stateMutex);
         _state = kStopped;
+        invariant(_pendingCmdCount.load() == 0);
         _stoppedCV.notify_one();
     };
 
@@ -591,6 +595,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                                         RemoteCommandRequestOnAny& request,
                                         RemoteCommandCompletionFn&& onFinish,
                                         const BatonHandle& baton) try {
+    auto pendingCmdRef = std::make_unique<PendingCmdRef>(*this);
+
     if (inShutdown()) {
         return kNetworkInterfaceShutdownInProgress;
     }
@@ -619,6 +625,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     }
 
     auto [cmdState, future] = CommandState::make(this, request, cbHandle);
+    cmdState->pendingCmdRef = std::move(pendingCmdRef);
     if (cmdState->requestOnAny.timeout != cmdState->requestOnAny.kNoTimeout) {
         cmdState->deadline = cmdState->stopwatch.start() + cmdState->requestOnAny.timeout;
     }
@@ -1194,6 +1201,8 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
                                                RemoteCommandRequestOnAny& request,
                                                RemoteCommandOnReplyFn&& onReply,
                                                const BatonHandle& baton) try {
+    auto pendingCmdRef = std::make_unique<PendingCmdRef>(*this);
+
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
     }
@@ -1207,6 +1216,7 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
     }
 
     auto cmdState = ExhaustCommandState::make(this, request, cbHandle, std::move(onReply), baton);
+    cmdState->pendingCmdRef = std::move(pendingCmdRef);
     if (cmdState->requestOnAny.timeout != cmdState->requestOnAny.kNoTimeout) {
         cmdState->deadline = cmdState->stopwatch.start() + cmdState->requestOnAny.timeout;
     }
@@ -1284,6 +1294,9 @@ Status NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill, size
 
     auto cbHandle = executor::TaskExecutor::CallbackHandle();
     auto [killOpCmdState, future] = CommandState::make(this, killOpRequest, cbHandle);
+    // The ToKill state is currently blocking shutdown, but we need to
+    // keep blocking through executing the response to trySend().
+    killOpCmdState->pendingCmdRef = std::make_unique<PendingCmdRef>(*this);
     killOpCmdState->deadline = killOpCmdState->stopwatch.start() + killOpRequest.timeout;
 
     std::move(future).getAsync(
