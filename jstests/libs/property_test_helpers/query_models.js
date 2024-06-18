@@ -98,15 +98,13 @@ const groupArb =
 // Arbitrary for single stage.
 function getAggStageArb(allowOrs) {
     // TODO SERVER-91164 include $limit
-    return fc.oneof(
-        // TODO SERVER-91405 re-enable projections in model.
-        // projectArb,
-        getMatchArb(allowOrs),
-        addFieldsConstArb,
-        computedProjectArb,
-        addFieldsVarArb,
-        sortArb,
-        groupArb);
+    return fc.oneof(projectArb,
+                    getMatchArb(allowOrs),
+                    addFieldsConstArb,
+                    computedProjectArb,
+                    addFieldsVarArb,
+                    sortArb,
+                    groupArb);
 }
 
 // Our full model for aggregation pipelines. Length 6 seems long enough to cover interactions

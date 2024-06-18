@@ -59,12 +59,15 @@ void ProjectionNode::addProjectionForPath(const FieldPath& path) {
 void ProjectionNode::_addProjectionForPath(const FieldPath& path) {
     makeOptimizationsStale();
     if (path.getPathLength() == 1) {
-        auto it = _projectedFields.insert(_projectedFields.end(), path.fullPath());
-        _projectedFieldsSet.insert(StringData(*it));
-        return;
+        // Add to projection unless we already have `path` as a projection.
+        if (!_projectedFieldsSet.contains(path.fullPath())) {
+            auto it = _projectedFields.insert(_projectedFields.end(), path.fullPath());
+            _projectedFieldsSet.insert(StringData(*it));
+        }
+    } else {
+        // FieldPath can't be empty, so it is safe to obtain the first path component here.
+        addOrGetChild(path.getFieldName(0).toString())->_addProjectionForPath(path.tail());
     }
-    // FieldPath can't be empty, so it is safe to obtain the first path component here.
-    addOrGetChild(path.getFieldName(0).toString())->_addProjectionForPath(path.tail());
 }
 
 void ProjectionNode::addExpressionForPath(const FieldPath& path,

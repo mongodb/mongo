@@ -122,6 +122,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::
         projection_executor::ExclusionNode& thisExclusionNode = getExclusionNode();
         projection_executor::ExclusionNode& nextExclusionNode =
             nextSingleDocTransform->getExclusionNode();
+
         auto isDotted = [](auto path) {
             return path.find('.') != std::string::npos;
         };
@@ -130,6 +131,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::
         if (std::any_of(thisExcludedPaths.begin(), thisExcludedPaths.end(), isDotted)) {
             return std::next(itr);
         }
+
         OrderedPathSet nextExcludedPaths;
         nextExclusionNode.reportProjectedPaths(&nextExcludedPaths);
         if (std::any_of(nextExcludedPaths.begin(), nextExcludedPaths.end(), isDotted)) {
