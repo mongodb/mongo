@@ -526,8 +526,7 @@ void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
 
         auto swRegistryData = grid->shardRegistry()->_getDataAsync().getNoThrow(opCtx);
         if (!swRegistryData.isOK()) {
-            LOGV2_DEBUG(6791401,
-                        1,
+            LOGV2_ERROR(6791401,
                         "Error updating replica set on config server. Failed to fetch shard."
                         "registry data",
                         "replicaSetConnectionStr"_attr = connStr,
@@ -537,8 +536,7 @@ void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
 
         auto shard = swRegistryData.getValue()->findByRSName(connStr.getSetName());
         if (!shard) {
-            LOGV2_DEBUG(6791402,
-                        1,
+            LOGV2_ERROR(6791402,
                         "Error updating replica set on config server. Couldn't find shard.",
                         "replicaSetConnectionStr"_attr = connStr);
             return Status::OK();
