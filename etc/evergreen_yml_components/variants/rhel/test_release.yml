@@ -202,7 +202,7 @@ buildvariants:
         --ssl MONGO_DISTMOD=rhel82
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer,resource_intensive
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
         -Wl,--no-gnu-unique"
