@@ -343,11 +343,14 @@ public:
      * and 'needsMerge' fields.
      */
     boost::intrusive_ptr<ExpressionContext> copyForSubPipeline(
-        NamespaceString nss, boost::optional<UUID> uuid = boost::none) const {
+        NamespaceString nss, boost::optional<UUID> uuid = boost::none) {
         uassert(ErrorCodes::MaxSubPipelineDepthExceeded,
                 str::stream() << "Maximum number of nested sub-pipelines exceeded. Limit is "
                               << internalMaxSubPipelineViewDepth.load(),
                 subPipelineDepth < internalMaxSubPipelineViewDepth.load());
+        // Initialize any referenced system variables now so that the subpipeline has the same
+        // values for these variables.
+        this->initializeReferencedSystemVariables();
         auto newCopy = copyWith(std::move(nss), uuid);
         newCopy->subPipelineDepth += 1;
         // The original expCtx might have been attached to an aggregation pipeline running on the

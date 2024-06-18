@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -201,7 +202,9 @@ TEST(FieldPath, NoOptimizationOnVariableWithMissingValue) {
     ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
 }
 
-TEST(FieldPath, NoOptimizationOnCertainVariables) {
+TEST(FieldPath, NoOptimizationOnCertainVariablesUnderSbeFull) {
+    RAIIServerParameterControllerForTest sbe("featureFlagSbeFull", true);
+
     auto expCtx = ExpressionContextForTest{};
 
     {
