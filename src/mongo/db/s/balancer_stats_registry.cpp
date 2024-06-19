@@ -76,16 +76,6 @@ namespace {
 const auto balancerStatsRegistryDecorator =
     ServiceContext::declareDecoration<BalancerStatsRegistry>();
 
-/**
- * Constructs the default options for the private thread pool used for asyncronous initialization
- */
-ThreadPool::Options makeDefaultThreadPoolOptions() {
-    ThreadPool::Options options;
-    options.poolName = "BalancerStatsRegistry";
-    options.minThreads = 0;
-    options.maxThreads = 1;
-    return options;
-}
 }  // namespace
 
 const ReplicaSetAwareServiceRegistry::Registerer<BalancerStatsRegistry>
@@ -101,7 +91,13 @@ BalancerStatsRegistry* BalancerStatsRegistry::get(OperationContext* opCtx) {
 }
 
 void BalancerStatsRegistry::onStartup(OperationContext* opCtx) {
-    _threadPool = std::make_shared<ThreadPool>(makeDefaultThreadPoolOptions());
+    _threadPool = std::make_shared<ThreadPool>([] {
+        ThreadPool::Options options;
+        options.poolName = "BalancerStatsRegistry";
+        options.minThreads = 0;
+        options.maxThreads = 1;
+        return options;
+    }());
     _threadPool->startup();
 }
 
@@ -109,10 +105,10 @@ void BalancerStatsRegistry::onStepUpComplete(OperationContext* opCtx, long long 
     dassert(_state.load() == State::kSecondary);
     _state.store(State::kPrimaryIdle);
 
-    initializeAsync(opCtx);
+    _initializeAsync(opCtx);
 }
 
-void BalancerStatsRegistry::initializeAsync(OperationContext* opCtx) {
+void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
     ExecutorFuture<void>(_threadPool)
         .then([this] {
             ThreadClient tc("BalancerStatsRegistry::asynchronousInitialization",
@@ -170,7 +166,7 @@ void BalancerStatsRegistry::initializeAsync(OperationContext* opCtx) {
         .getAsync([](auto) {});
 }
 
-void BalancerStatsRegistry::terminate() {
+void BalancerStatsRegistry::_terminate() {
     {
         stdx::lock_guard lk{_stateMutex};
         _state.store(State::kTerminating);
@@ -180,12 +176,11 @@ void BalancerStatsRegistry::terminate() {
         }
     }
 
-    // Wait for the  asynchronous initialization to complete
+    // Wait for the asynchronous initialization to complete
     _threadPool->waitForIdle();
 
     {
         // Clear the stats
-        stdx::lock_guard lk{_mutex};
         _collStatsMap.clear();
     }
 
@@ -195,8 +190,33 @@ void BalancerStatsRegistry::terminate() {
 }
 
 void BalancerStatsRegistry::onStepDown() {
-    terminate();
+    // Different threads can notify stepdown and shutdown events concurrently.
+    stdx::lock_guard lk{_mutex};
+
+    if (!_threadPool) {
+        // The registry service has already been shut down.
+        return;
+    }
+
+    _terminate();
     _state.store(State::kSecondary);
+}
+
+void BalancerStatsRegistry::onShutdown() {
+    // Different threads can notify stepdown and shutdown events concurrently.
+    stdx::lock_guard lk{_mutex};
+
+    if (!_threadPool) {
+        // The registry service was never started (the startup event was not notified so the thread
+        // pool was not initialized) or has already been shut down (the shutdown event can be
+        // notified more than once).
+        return;
+    }
+
+    _terminate();
+    _threadPool->shutdown();
+    _threadPool->join();
+    _threadPool.reset();
 }
 
 long long BalancerStatsRegistry::getCollNumOrphanDocs(const UUID& collectionUUID) const {
@@ -246,7 +266,6 @@ long long BalancerStatsRegistry::getCollNumOrphanDocsFromDiskIfNeeded(
         return std::max(0LL, numOrphans.exactNumberLong());
     }
 }
-
 
 void BalancerStatsRegistry::onRangeDeletionTaskInsertion(const UUID& collectionUUID,
                                                          long long numOrphanDocs) {
@@ -332,7 +351,6 @@ void BalancerStatsRegistry::updateOrphansCount(const UUID& collectionUUID, long 
         }
     }
 }
-
 
 void BalancerStatsRegistry::_loadOrphansCount(OperationContext* opCtx) {
     static constexpr auto kNumOrphanDocsLabel = "numOrphanDocs"_sd;
