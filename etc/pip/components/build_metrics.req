@@ -1,5 +1,5 @@
 psutil
 jsonschema
 memory_profiler
-puremagic
+puremagic <= 1.23
 tabulate
