@@ -5707,7 +5707,7 @@ buildvariants:
     - name: configure-combinations
 
 - name: windows
-  display_name: "! Windows Server 2022"
+  display_name: "! Windows"
   run_on:
   - windows-2022-small
   expansions:

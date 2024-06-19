@@ -1943,6 +1943,7 @@ static const char *const __stats_connection_desc[] = {
   "prefetch: pre-fetch page not on disk when reading",
   "prefetch: pre-fetch pages queued",
   "prefetch: pre-fetch pages read in background",
+  "prefetch: pre-fetch skipped reading in a page due to harmless error",
   "prefetch: pre-fetch triggered by page read",
   "reconciliation: VLCS pages explicitly reconciled as empty",
   "reconciliation: approximate byte size of timestamps in pages written",
@@ -2011,6 +2012,8 @@ static const char *const __stats_connection_desc[] = {
   "session: table create with import successful calls",
   "session: table drop failed calls",
   "session: table drop successful calls",
+  "session: table rename failed calls",
+  "session: table rename successful calls",
   "session: table salvage failed calls",
   "session: table salvage successful calls",
   "session: table truncate failed calls",
@@ -2689,6 +2692,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->prefetch_pages_fail = 0;
     stats->prefetch_pages_queued = 0;
     stats->prefetch_pages_read = 0;
+    stats->prefetch_skipped_error_ok = 0;
     stats->prefetch_attempts = 0;
     stats->rec_vlcs_emptied_pages = 0;
     stats->rec_time_window_bytes_ts = 0;
@@ -2755,6 +2759,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing session_table_create_import_success */
     /* not clearing session_table_drop_fail */
     /* not clearing session_table_drop_success */
+    /* not clearing session_table_rename_fail */
+    /* not clearing session_table_rename_success */
     /* not clearing session_table_salvage_fail */
     /* not clearing session_table_salvage_success */
     /* not clearing session_table_truncate_fail */
@@ -3509,6 +3515,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->prefetch_pages_fail += WT_STAT_CONN_READ(from, prefetch_pages_fail);
     to->prefetch_pages_queued += WT_STAT_CONN_READ(from, prefetch_pages_queued);
     to->prefetch_pages_read += WT_STAT_CONN_READ(from, prefetch_pages_read);
+    to->prefetch_skipped_error_ok += WT_STAT_CONN_READ(from, prefetch_skipped_error_ok);
     to->prefetch_attempts += WT_STAT_CONN_READ(from, prefetch_attempts);
     to->rec_vlcs_emptied_pages += WT_STAT_CONN_READ(from, rec_vlcs_emptied_pages);
     to->rec_time_window_bytes_ts += WT_STAT_CONN_READ(from, rec_time_window_bytes_ts);
@@ -3588,6 +3595,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, session_table_create_import_success);
     to->session_table_drop_fail += WT_STAT_CONN_READ(from, session_table_drop_fail);
     to->session_table_drop_success += WT_STAT_CONN_READ(from, session_table_drop_success);
+    to->session_table_rename_fail += WT_STAT_CONN_READ(from, session_table_rename_fail);
+    to->session_table_rename_success += WT_STAT_CONN_READ(from, session_table_rename_success);
     to->session_table_salvage_fail += WT_STAT_CONN_READ(from, session_table_salvage_fail);
     to->session_table_salvage_success += WT_STAT_CONN_READ(from, session_table_salvage_success);
     to->session_table_truncate_fail += WT_STAT_CONN_READ(from, session_table_truncate_fail);

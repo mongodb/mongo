@@ -138,28 +138,29 @@ struct __wt_config_parser_impl {
 #define WT_CONFIG_ENTRY_WT_SESSION_prepare_transaction 30
 #define WT_CONFIG_ENTRY_WT_SESSION_query_timestamp 31
 #define WT_CONFIG_ENTRY_WT_SESSION_reconfigure 32
-#define WT_CONFIG_ENTRY_WT_SESSION_reset 33
-#define WT_CONFIG_ENTRY_WT_SESSION_reset_snapshot 34
-#define WT_CONFIG_ENTRY_WT_SESSION_rollback_transaction 35
-#define WT_CONFIG_ENTRY_WT_SESSION_salvage 36
-#define WT_CONFIG_ENTRY_WT_SESSION_strerror 37
-#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction 38
-#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction_uint 39
-#define WT_CONFIG_ENTRY_WT_SESSION_truncate 40
-#define WT_CONFIG_ENTRY_WT_SESSION_verify 41
-#define WT_CONFIG_ENTRY_colgroup_meta 42
-#define WT_CONFIG_ENTRY_file_config 43
-#define WT_CONFIG_ENTRY_file_meta 44
-#define WT_CONFIG_ENTRY_index_meta 45
-#define WT_CONFIG_ENTRY_lsm_meta 46
-#define WT_CONFIG_ENTRY_object_meta 47
-#define WT_CONFIG_ENTRY_table_meta 48
-#define WT_CONFIG_ENTRY_tier_meta 49
-#define WT_CONFIG_ENTRY_tiered_meta 50
-#define WT_CONFIG_ENTRY_wiredtiger_open 51
-#define WT_CONFIG_ENTRY_wiredtiger_open_all 52
-#define WT_CONFIG_ENTRY_wiredtiger_open_basecfg 53
-#define WT_CONFIG_ENTRY_wiredtiger_open_usercfg 54
+#define WT_CONFIG_ENTRY_WT_SESSION_rename 33
+#define WT_CONFIG_ENTRY_WT_SESSION_reset 34
+#define WT_CONFIG_ENTRY_WT_SESSION_reset_snapshot 35
+#define WT_CONFIG_ENTRY_WT_SESSION_rollback_transaction 36
+#define WT_CONFIG_ENTRY_WT_SESSION_salvage 37
+#define WT_CONFIG_ENTRY_WT_SESSION_strerror 38
+#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction 39
+#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction_uint 40
+#define WT_CONFIG_ENTRY_WT_SESSION_truncate 41
+#define WT_CONFIG_ENTRY_WT_SESSION_verify 42
+#define WT_CONFIG_ENTRY_colgroup_meta 43
+#define WT_CONFIG_ENTRY_file_config 44
+#define WT_CONFIG_ENTRY_file_meta 45
+#define WT_CONFIG_ENTRY_index_meta 46
+#define WT_CONFIG_ENTRY_lsm_meta 47
+#define WT_CONFIG_ENTRY_object_meta 48
+#define WT_CONFIG_ENTRY_table_meta 49
+#define WT_CONFIG_ENTRY_tier_meta 50
+#define WT_CONFIG_ENTRY_tiered_meta 51
+#define WT_CONFIG_ENTRY_wiredtiger_open 52
+#define WT_CONFIG_ENTRY_wiredtiger_open_all 53
+#define WT_CONFIG_ENTRY_wiredtiger_open_basecfg 54
+#define WT_CONFIG_ENTRY_wiredtiger_open_usercfg 55
 
 extern const char __WT_CONFIG_CHOICE_NULL[]; /* not set in configuration */
 extern const char __WT_CONFIG_CHOICE_DRAM[];
@@ -256,6 +257,7 @@ extern const char __WT_CONFIG_CHOICE_ordered[];
 extern const char __WT_CONFIG_CHOICE_out_of_order[];
 extern const char __WT_CONFIG_CHOICE_overflow[];
 extern const char __WT_CONFIG_CHOICE_pinned[];
+extern const char __WT_CONFIG_CHOICE_prefetch[];
 extern const char __WT_CONFIG_CHOICE_prefetch_delay[];
 extern const char __WT_CONFIG_CHOICE_prefix_compare[];
 extern const char __WT_CONFIG_CHOICE_prepare[];
