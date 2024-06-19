@@ -143,8 +143,11 @@ boost::optional<Document> DocumentSourceRedact::redactObject(const Document& roo
         return boost::optional<Document>();
     } else if (simpleValueCmp.evaluate(expressionResult == descendVal)) {
         const Document in = variables.getDocument(_currentId, root);
+        in.loadIntoCache();
+
         MutableDocument out;
         out.copyMetaDataFrom(in);
+
         FieldIterator fields(in);
         while (fields.more()) {
             const Document::FieldPair field(fields.next());
