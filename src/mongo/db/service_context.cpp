@@ -296,6 +296,16 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     auto opCtx = std::make_unique<OperationContext>(
         client, OperationIdManager::get(this).issueForClient(client));
 
+    // If there's an egress transport layer and it can produce a
+    // nonnull `BatonHandle`, let it do so. Otherwise, we'll use a
+    // `DefaultBaton` as a fallback.
+    opCtx->setBaton([&]() -> BatonHandle {
+        if (_transportLayerManager)
+            if (auto baton = _transportLayerManager->getEgressLayer()->makeBaton(opCtx.get()))
+                return baton;
+        return std::make_shared<DefaultBaton>(opCtx.get());
+    }());
+
     // We must prevent changing the storage engine while setting a new opCtx on the client.
     auto lk = _storageChangeMutex.readLock();
 
@@ -305,12 +315,6 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     if (!opCtx->recoveryUnit_DO_NOT_USE()) {
         opCtx->setRecoveryUnit_DO_NOT_USE(std::make_unique<RecoveryUnitNoop>(),
                                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    }
-    // The baton must be attached before attaching to a client
-    if (_transportLayerManager) {
-        _transportLayerManager->getEgressLayer()->makeBaton(opCtx.get());
-    } else {
-        makeBaton(opCtx.get());
     }
 
     ScopeGuard batonGuard([&] { opCtx->getBaton()->detach(); });
@@ -554,15 +558,6 @@ void ServiceContext::ServiceContextDeleter::operator()(ServiceContext* sc) const
 void Service::ServiceDeleter::operator()(Service* service) const {
     onDestroy(service, ConstructorActionRegisterer::registeredConstructorActions());
     delete service;
-}
-
-BatonHandle ServiceContext::makeBaton(OperationContext* opCtx) const {
-    invariant(!opCtx->getBaton());
-
-    auto baton = std::make_shared<DefaultBaton>(opCtx);
-    opCtx->setBaton(baton);
-
-    return baton;
 }
 
 }  // namespace mongo
