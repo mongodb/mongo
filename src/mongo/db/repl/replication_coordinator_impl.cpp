@@ -2578,7 +2578,9 @@ long long ReplicationCoordinatorImpl::_calculateRemainingQuiesceTimeMillis() con
 }
 
 std::shared_ptr<HelloResponse> ReplicationCoordinatorImpl::_makeHelloResponse(
-    boost::optional<StringData> horizonString, WithLock lock, const bool hasValidConfig) const {
+    const boost::optional<std::string>& horizonString,
+    WithLock lock,
+    const bool hasValidConfig) const {
 
     uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
             kQuiesceModeShutdownMessage,
@@ -2626,7 +2628,7 @@ SharedSemiFuture<ReplicationCoordinatorImpl::SharedHelloResponse>
 ReplicationCoordinatorImpl::_getHelloResponseFuture(
     WithLock lk,
     const SplitHorizon::Parameters& horizonParams,
-    boost::optional<StringData> horizonString,
+    const boost::optional<std::string>& horizonString,
     boost::optional<TopologyVersion> clientTopologyVersion) {
 
     uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
@@ -2690,11 +2692,11 @@ ReplicationCoordinatorImpl::getHelloResponseFuture(
     return _getHelloResponseFuture(lk, horizonParams, horizonString, clientTopologyVersion);
 }
 
-boost::optional<StringData> ReplicationCoordinatorImpl::_getHorizonString(
+boost::optional<std::string> ReplicationCoordinatorImpl::_getHorizonString(
     WithLock lk, const SplitHorizon::Parameters& horizonParams) const {
     const auto myState = _topCoord->getMemberState();
     const bool hasValidConfig = _rsConfig.getConfig(lk).isInitialized() && !myState.removed();
-    boost::optional<StringData> horizonString;
+    boost::optional<std::string> horizonString;
     if (hasValidConfig) {
         const auto& self = _rsConfig.getConfig(lk).getMemberAt(_selfIndex);
         horizonString = self.determineHorizon(horizonParams);
@@ -4867,7 +4869,7 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
                 Status(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
                        kQuiesceModeShutdownMessage));
         } else {
-            StringData horizonString = iter->first;
+            boost::optional<std::string> horizonString = iter->first;
             auto response = _makeHelloResponse(horizonString, lock, hasValidConfig);
             // Fulfill the promise and replace with a new one for future waiters.
             iter->second->emplaceValue(response);
@@ -4887,7 +4889,8 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
                                    "The original request horizon parameter does not exist in the "
                                    "current replica set config"});
             } else {
-                const auto horizon = sni.empty() ? SplitHorizon::kDefaultHorizon : iter->second;
+                const boost::optional<std::string> horizon =
+                    sni.empty() ? SplitHorizon::kDefaultHorizon.toString() : iter->second;
                 const auto response = _makeHelloResponse(horizon, lock, hasValidConfig);
                 promise->emplaceValue(response);
             }
