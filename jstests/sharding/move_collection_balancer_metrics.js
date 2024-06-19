@@ -52,7 +52,7 @@ assert.commandWorked(configsvr.adminCommand({
     writeConcern: {w: "majority"}
 }));
 
-const shardingMetrics = configsvr.getDB('admin').serverStatus({}).shardingStatistics
+const shardingMetrics = configsvr.getDB('admin').serverStatus({}).shardingStatistics;
 assert.eq(shardingMetrics.moveCollection, undefined);
 const balancerMetrics = shardingMetrics.balancerMoveCollection;
 

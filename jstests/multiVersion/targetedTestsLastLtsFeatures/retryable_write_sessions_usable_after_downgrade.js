@@ -70,7 +70,7 @@ assert(!FeatureFlagUtil.isEnabled(admin, "ReplicateVectoredInsertsTransactionall
 // Downgrade the set to the last-lts version.
 delete replSet.nodeOptions['n0'].setParameter.featureFlagReplicateVectoredInsertsTransactionally;
 delete replSet.nodeOptions['n1'].setParameter.featureFlagReplicateVectoredInsertsTransactionally;
-replSet.upgradeSet({binVersion: 'last-lts'})
+replSet.upgradeSet({binVersion: 'last-lts'});
 
 primary = replSet.getPrimary();
 testDB = primary.getDB('test');

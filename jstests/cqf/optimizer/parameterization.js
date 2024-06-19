@@ -103,24 +103,36 @@ runWithParams(
 
         // Collection has no indexes except default _id index
         // Verify that queries are parameterized correctly for M2 Bonsai-eligible FIND queries
-        cmds.forEach(
-            cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], find, assertPhysicalScan)});
-        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], find, assertParamerized)});
+        cmds.forEach(cmdEl => {
+            verifyCommandCorrectness(cmdEl[0], cmdEl[1], find, assertPhysicalScan);
+        });
+        cmds.forEach(cmdEl => {
+            verifyCommandParameterization(cmdEl[0], find, assertParamerized);
+        });
 
         // Verify that queries are parameterized correctly for M2 Bonsai-eligible AGG queries
-        cmds.forEach(
-            cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], agg, assertPhysicalScan)});
-        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], agg, assertParamerized)});
+        cmds.forEach(cmdEl => {
+            verifyCommandCorrectness(cmdEl[0], cmdEl[1], agg, assertPhysicalScan);
+        });
+        cmds.forEach(cmdEl => {
+            verifyCommandParameterization(cmdEl[0], agg, assertParamerized);
+        });
 
         assert.commandWorked(coll.createIndex({'a.b': 1}));
         // Collection has indexes
         // Verify that queries are not parameterized for M2 Bonsai-ineligible FIND queries
-        cmds.forEach(
-            cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], find, !assertPhysicalScan)});
-        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], find, !assertParamerized)});
+        cmds.forEach(cmdEl => {
+            verifyCommandCorrectness(cmdEl[0], cmdEl[1], find, !assertPhysicalScan);
+        });
+        cmds.forEach(cmdEl => {
+            verifyCommandParameterization(cmdEl[0], find, !assertParamerized);
+        });
 
         // Verify that queries are not parameterized for M2 Bonsai-ineligible AGG queries
-        cmds.forEach(
-            cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], agg, !assertPhysicalScan)});
-        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], agg, !assertParamerized)});
+        cmds.forEach(cmdEl => {
+            verifyCommandCorrectness(cmdEl[0], cmdEl[1], agg, !assertPhysicalScan);
+        });
+        cmds.forEach(cmdEl => {
+            verifyCommandParameterization(cmdEl[0], agg, !assertParamerized);
+        });
     });

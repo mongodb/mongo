@@ -99,7 +99,7 @@ runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", val
         const serverStatusBefore = db.serverStatus();
 
         for (let val = 0; val < 5; ++val) {
-            const pipeline = getPipeline(val)
+            const pipeline = getPipeline(val);
             assert.eq(coll.aggregate(pipeline).toArray().length, 5 - val);
         }
         const planCacheStats = coll.aggregate([{$planCacheStats: {}}]).toArray();

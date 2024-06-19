@@ -23,7 +23,7 @@ import {
     blockProcessingTestCases,
     generateMetaVals
 } from "jstests/libs/block_processing_test_cases.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeStatus,

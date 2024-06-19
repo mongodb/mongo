@@ -35,8 +35,9 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
 
     // Test batched insert with multiple batches on shard 0, let it be one batch on shard 1.
     const rst0 = reshardingTest.getReplSetForShard(donorShardNames[0]);
-    rst0.nodes.forEach(node => {assert.commandWorked(
-                           node.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}))});
+    rst0.nodes.forEach(node => {
+        assert.commandWorked(node.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
+    });
 
     assert.commandWorked(sourceCollection.insert([
         {_id: "stays on shard0", oldKey: -10, newKey: -10, counter: 0},

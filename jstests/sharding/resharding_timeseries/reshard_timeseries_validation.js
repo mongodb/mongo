@@ -27,13 +27,13 @@ assert.commandWorked(st.s.adminCommand({
     timeseries: timeseriesOptions,
 }));
 
-const kBucketCollName = "system.buckets.foo"
+const kBucketCollName = "system.buckets.foo";
 const kBucketNss = kDbName + "." + kBucketCollName;
 
-let timeseriesCollDoc = st.config.collections.findOne({_id: kBucketNss})
-assert.eq(timeseriesCollDoc.timeseriesFields.timeField, timeseriesOptions.timeField)
-assert.eq(timeseriesCollDoc.timeseriesFields.metaField, timeseriesOptions.metaField)
-assert.eq(timeseriesCollDoc.key, {meta: 1})
+let timeseriesCollDoc = st.config.collections.findOne({_id: kBucketNss});
+assert.eq(timeseriesCollDoc.timeseriesFields.timeField, timeseriesOptions.timeField);
+assert.eq(timeseriesCollDoc.timeseriesFields.metaField, timeseriesOptions.metaField);
+assert.eq(timeseriesCollDoc.key, {meta: 1});
 
 const sDB = st.s.getDB(kDbName);
 
@@ -58,20 +58,20 @@ assert.commandFailedWithCode(
 function reshardAndVerifyShardKeyAndIndexes(
     newKey, indexIdx, expectedViewIndexKey, expectedBucketIndexKey, expectedBucketShardKey) {
     jsTestLog("Resharding to new key:");
-    printjson(newKey)
+    printjson(newKey);
 
     assert.commandWorked(mongos.adminCommand({reshardCollection: ns, key: newKey}));
 
     const viewIndexes =
         assert.commandWorked(sDB.getCollection(kCollName).runCommand({listIndexes: kCollName}));
-    assert.eq(viewIndexes.cursor.firstBatch[indexIdx]["key"], expectedViewIndexKey)
+    assert.eq(viewIndexes.cursor.firstBatch[indexIdx]["key"], expectedViewIndexKey);
 
     const bucketIndexes = assert.commandWorked(
         sDB.getCollection(kBucketCollName).runCommand({listIndexes: kBucketCollName}));
-    assert.eq(bucketIndexes.cursor.firstBatch[indexIdx]["key"], expectedBucketIndexKey)
+    assert.eq(bucketIndexes.cursor.firstBatch[indexIdx]["key"], expectedBucketIndexKey);
 
-    let configCollectionsBucketsEntry = st.config.collections.findOne({_id: kBucketNss})
-    assert.eq(configCollectionsBucketsEntry["key"], expectedBucketShardKey)
+    let configCollectionsBucketsEntry = st.config.collections.findOne({_id: kBucketNss});
+    assert.eq(configCollectionsBucketsEntry["key"], expectedBucketShardKey);
 }
 
 // Success scenarios.
@@ -79,18 +79,18 @@ reshardAndVerifyShardKeyAndIndexes({[timeFieldName]: 1},
                                    1,
                                    {[timeFieldName]: 1},
                                    {"control.min.time": 1, "control.max.time": 1},
-                                   {"control.min.time": 1})
+                                   {"control.min.time": 1});
 reshardAndVerifyShardKeyAndIndexes(
-    {'hostId.x': "hashed"}, 2, {"hostId.x": "hashed"}, {"meta.x": "hashed"}, {"meta.x": "hashed"})
+    {'hostId.x': "hashed"}, 2, {"hostId.x": "hashed"}, {"meta.x": "hashed"}, {"meta.x": "hashed"});
 reshardAndVerifyShardKeyAndIndexes({[metaFieldName]: 1},
                                    0,
                                    {[metaFieldName]: 1, [timeFieldName]: 1},
                                    {"meta": 1, "control.min.time": 1, "control.max.time": 1},
-                                   {"meta": 1})
+                                   {"meta": 1});
 reshardAndVerifyShardKeyAndIndexes({'hostId.y': 1, [timeFieldName]: 1},
                                    3,
                                    {"hostId.y": 1, [timeFieldName]: 1},
                                    {"meta.y": 1, "control.min.time": 1, "control.max.time": 1},
-                                   {"meta.y": 1, "control.min.time": 1})
+                                   {"meta.y": 1, "control.min.time": 1});
 
 st.stop();

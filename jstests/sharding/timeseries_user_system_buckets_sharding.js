@@ -35,9 +35,9 @@ const tsOptions2 = {
     metaField: "metadata2"
 };
 
-const kDbName = "test"
-const kColl = "coll"
-const kBucket = "system.buckets.coll"
+const kDbName = "test";
+const kColl = "coll";
+const kBucket = "system.buckets.coll";
 
 var db = st.getDB(kDbName);
 
@@ -60,11 +60,10 @@ function createFailed(collName, tsOptions, errorCode) {
 }
 
 function shardCollectionWorked(collName, tsOptions = {}) {
-    let nss = kDbName + "." + collName
+    let nss = kDbName + "." + collName;
     if (Object.keys(tsOptions).length === 0) {
         assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {x: 1}}));
-    }
-    else {
+    } else {
         assert.commandWorked(
             st.s.adminCommand({shardCollection: nss, key: {timestamp: 1}, timeseries: tsOptions}));
     }
@@ -72,12 +71,11 @@ function shardCollectionWorked(collName, tsOptions = {}) {
 }
 
 function shardCollectionFailed(collName, tsOptions, errorCode) {
-    let nss = kDbName + "." + collName
+    let nss = kDbName + "." + collName;
     if (Object.keys(tsOptions).length === 0) {
         assert.commandFailedWithCode(st.s.adminCommand({shardCollection: nss, key: {x: 1}}),
                                      errorCode);
-    }
-    else {
+    } else {
         assert.commandFailedWithCode(
             st.s.adminCommand({shardCollection: nss, key: {timestamp: 1}, timeseries: tsOptions}),
             errorCode);
@@ -92,7 +90,7 @@ function runTest(testCase, minRequiredVersion = null) {
             return;
         }
     }
-    testCase()
+    testCase();
     db.dropDatabase();
 }
 

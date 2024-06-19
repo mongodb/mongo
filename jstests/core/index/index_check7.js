@@ -42,5 +42,5 @@ switch (getOptimizer(explainResult)) {
         break;
     }
     default:
-        break
+        break;
 }

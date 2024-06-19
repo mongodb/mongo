@@ -60,7 +60,7 @@ function testDocOnBoundsPartitioned() {
         {"time": ISODate("2023-09-15T06:00:00Z")},
         {"time": ISODate("2023-09-15T12:00:00Z")},
         {"time": ISODate("2023-09-15T18:00:00Z")}
-    ]
+    ];
     assert(arrayEq(resultArray, expected), buildErrorString(resultArray, expected));
 }
 
@@ -110,7 +110,7 @@ function testDocOnBoundsNotPartitioned() {
         {"time": ISODate("2023-09-15T06:00:00Z")},
         {"time": ISODate("2023-09-15T12:00:00Z")},
         {"time": ISODate("2023-09-15T18:00:00Z")}
-    ]
+    ];
     assert(arrayEq(resultArray, expected), buildErrorString(resultArray, expected));
 }
 
@@ -175,7 +175,7 @@ function testDocOnAndOffFullBound() {
         {"time": ISODate("2023-09-15T12:00:00Z")},
         {"time": ISODate("2023-09-15T18:00:00Z")},
         {"time": ISODate("2023-09-15T18:00:00Z"), "orig": true}
-    ]
+    ];
     assert(arrayEq(resultArray, expected), buildErrorString(resultArray, expected));
 }
 
@@ -213,7 +213,7 @@ function testFullNoPartition() {
         {"time": ISODate("2023-09-14T12:00:00Z")},
         {"time": ISODate("2023-09-14T18:00:00Z")},
         {"time": ISODate("2023-09-15T00:00:00Z"), "orig": true},
-    ]
+    ];
     assert(arrayEq(resultArray, expected), buildErrorString(resultArray, expected));
 }
 testDocOnBoundsPartitioned();

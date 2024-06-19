@@ -22,7 +22,7 @@ function runTest(conn) {
     // Ensure users can specify query settings.
     assertQuerySettingsCount(qsutils, 0);
     assert.commandWorked(testDB.adminCommand(
-        {setQuerySettings: {find: "test", $db: "db"}, settings: {queryFramework: "sbe"}}))
+        {setQuerySettings: {find: "test", $db: "db"}, settings: {queryFramework: "sbe"}}));
     assertQuerySettingsCount(qsutils, 1);
 
     // Downgrade the FCV.

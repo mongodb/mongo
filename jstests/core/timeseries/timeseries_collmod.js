@@ -167,7 +167,7 @@ assert.commandWorked(db.runCommand({
 }));
 
 // Setting prepareUnique should return an error on a time-series collection index.
-assert.commandWorked(coll.createIndex({"prepareUniqueIndex": 1}))
+assert.commandWorked(coll.createIndex({"prepareUniqueIndex": 1}));
 assert.commandFailedWithCode(db.runCommand({
     "collMod": collName,
     "index": {"keyPattern": {"prepareUniqueIndex": 1}, "prepareUnique": true}

@@ -102,7 +102,7 @@ let oplogDocId;
 if (oplogDoc.ns == 'test.coll') {
     oplogDocId = oplogDoc.o._id;
 } else {
-    const opArray = oplogDoc.o.applyOps
+    const opArray = oplogDoc.o.applyOps;
     oplogDocId = opArray[opArray.length - 1].o._id;
 }
 

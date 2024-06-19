@@ -37,7 +37,7 @@ const topology = DiscoverTopology.findConnectedNodes(db);
 
 if (topology.type == Topology.kReplicaSet) {
     const conn = db.getMongo();
-    const dbPathPrefix = MongoRunner.dataPath + '../magicRestore/node0'
+    const dbPathPrefix = MongoRunner.dataPath + '../magicRestore/node0';
     let [cursor, metadata] = takeBackup(conn, dbPathPrefix);
     writeMetadataInfo(conn, metadata.checkpointTimestamp);
     cursor.close();
@@ -52,7 +52,7 @@ if (topology.type == Topology.kReplicaSet) {
     let maxCheckpointTimestamp = Timestamp();
 
     // Take configsvr backup.
-    const path = MongoRunner.dataPath + '../magicRestore/configsvr/node0'
+    const path = MongoRunner.dataPath + '../magicRestore/configsvr/node0';
     restorePaths.push(path);
 
     let nodeMongo = new Mongo(topology.configsvr.nodes[0]);

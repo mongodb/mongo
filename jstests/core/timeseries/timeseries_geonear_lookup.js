@@ -24,7 +24,7 @@ assert.commandWorked(testDB.createCollection(
 
 assert.commandWorked(tsColl.createIndex({'tags.loc': '2dsphere'}));
 
-tsColl.insert({time: ISODate(), tags: {loc: [40, 40], descr: 0}, value: 0})
+tsColl.insert({time: ISODate(), tags: {loc: [40, 40], descr: 0}, value: 0});
 
 const coll2 = db.getCollection("store_min_max_values");
 coll2.drop();

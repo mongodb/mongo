@@ -64,8 +64,8 @@ function runUnindexedLookupPipelineTest(conn, localColl) {
         as: "lookedUp",
         localField: "v",
         foreignField: "v",
-    }}
-    const shape = { pipeline: [lookup] };
+    }};
+    const shape = {pipeline: [lookup]};
 
     const queryStatsKey = getAggregateQueryStatsKey(
         conn,
@@ -132,9 +132,9 @@ function runUnindexedUnoptimizedLookupPipelineTest(conn, localColl) {
         as: "lookedUp",
         localField: "v",
         foreignField: "v",
-    }}
-    const pipeline = [{$_internalInhibitOptimization: {}}, lookup]
-    const shape = { pipeline: pipeline };
+    }};
+    const pipeline = [{$_internalInhibitOptimization: {}}, lookup];
+    const shape = {pipeline: pipeline};
 
     const queryStatsKey = getAggregateQueryStatsKey(
         conn,

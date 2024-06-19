@@ -658,12 +658,12 @@ DBCollection.prototype.createSearchIndex = function(keys, blockUntilSearchIndexQ
             Object.keys(blockUntilSearchIndexQueryable).length != 1 ||
             !blockUntilSearchIndexQueryable.hasOwnProperty('blockUntilSearchIndexQueryable')) {
             throw new Error(
-                "createSearchIndex only accepts index definition object and blockUntilSearchIndexQueryable object")
+                "createSearchIndex only accepts index definition object and blockUntilSearchIndexQueryable object");
         }
 
         blockOnIndexQueryable = blockUntilSearchIndexQueryable["blockUntilSearchIndexQueryable"];
         if (typeof blockOnIndexQueryable != "boolean") {
-            throw new Error("'blockUntilSearchIndexQueryable' argument must be a boolean")
+            throw new Error("'blockUntilSearchIndexQueryable' argument must be a boolean");
         }
     }
 

@@ -117,7 +117,7 @@ ShardingTest.prototype._restartBinariesForUpgrade = function(
 
     if (options.upgradeOneShard) {
         // Upgrade one shard.
-        let rs = options.upgradeOneShard
+        let rs = options.upgradeOneShard;
         rs.upgradeSet(upgradeOptions);
     }
 
@@ -271,7 +271,7 @@ ShardingTest.prototype._restartBinariesForDowngrade = function(
 
     if (options.downgradeOneShard) {
         // Downgrade one shard.
-        let rs = options.downgradeOneShard
+        let rs = options.downgradeOneShard;
         rs.upgradeSet(downgradeOptions);
     }
 

@@ -48,7 +48,7 @@ assert.commandWorked(coll.createIndex({b: 1}));
 function getAssertCount(count) {
     return function assertCount(cursor) {
         assert.eq(count, cursor.itcount());
-    }
+    };
 }
 
 function testFn(

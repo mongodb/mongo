@@ -30,7 +30,7 @@ assert.commandWorked(
 const measurements = [
     {_id: 0, [timeFieldName]: ISODate("2024-02-15T10:10:10.000Z"), a: 1},
     {_id: 1, [timeFieldName]: ISODate("2024-02-15T10:10:20.000Z"), a: 2}
-]
+];
 
 // Insert first measurement.
 assert.commandWorked(coll.insert(measurements[1]));

@@ -22,8 +22,8 @@ import {getNLatestProfilerEntries} from "jstests/libs/profiler.js";
 var testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
-const collName1 = jsTestName() + "_1"
-const collName2 = jsTestName() + "_2"
+const collName1 = jsTestName() + "_1";
+const collName2 = jsTestName() + "_2";
 const coll1 = testDB.getCollection(collName1);
 const coll2 = testDB.getCollection(collName2);
 

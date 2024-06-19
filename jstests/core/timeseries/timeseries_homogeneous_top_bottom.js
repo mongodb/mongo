@@ -124,7 +124,7 @@ TimeseriesTest.run((insert) => {
                                 acc: {[accumulator]: {n: nVal, sortBy: sortBy, output: "$_id"}}
                             }
                         }
-                    ])
+                    ]);
                 }
             }
         }

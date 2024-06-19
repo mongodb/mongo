@@ -347,7 +347,7 @@ function hasValueAtPath(object, dottedPath) {
     let nestedFields = dottedPath.split(".");
     for (const nestedField of nestedFields) {
         if (!object.hasOwnProperty(nestedField)) {
-            return false
+            return false;
         }
         object = object[nestedField];
     }
@@ -363,7 +363,7 @@ export function getValueAtPath(object, dottedPath) {
     let nestedFields = dottedPath.split(".");
     for (const nestedField of nestedFields) {
         if (!object.hasOwnProperty(nestedField)) {
-            return false
+            return false;
         }
         object = object[nestedField];
     }

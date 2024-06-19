@@ -139,8 +139,7 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
         return doc1Json < doc2Json ? -1 : (doc1Json > doc2Json ? 1 : 0);
     };
 
-    const normalizeNaN =
-        function(arg) {
+    const normalizeNaN = function(arg) {
         if (Number.isNaN(arg)) {
             return NumberDecimal("NaN");
         } else if (arg !== null && (arg.constructor === Object || Array.isArray(arg))) {
@@ -151,7 +150,7 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
             return newArg;
         }
         return arg;
-    }
+    };
 
     scalarResults = normalizeNaN(scalarResults);
     bpResults = normalizeNaN(bpResults);

@@ -19,11 +19,11 @@ let paramTwo = assert.commandWorked(
 assert.eq(paramOne["mongotHost"], paramTwo["searchIndexManagementHostAndPort"]);
 
 // If a name is not specified during search index creation, mongot will name it default.
-coll.createSearchIndex({name: "foo-block", definition: {"mappings": {"dynamic": true}}})
+coll.createSearchIndex({name: "foo-block", definition: {"mappings": {"dynamic": true}}});
 // createSearchIndex shell command default behavior is to block returning until mongot lists the new
 // index as queryable eg blockUntilSearchIndexQueryable is true by default.
 coll.createSearchIndex({name: "foo-non-block", definition: {"mappings": {"dynamic": true}}},
-                       {blockUntilSearchIndexQueryable: false})
+                       {blockUntilSearchIndexQueryable: false});
 var searchIndexes = coll.aggregate([{"$listSearchIndexes": {}}]).toArray();
 assert.eq(searchIndexes.length, 2, searchIndexes);
 

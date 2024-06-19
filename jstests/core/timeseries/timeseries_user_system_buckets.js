@@ -26,8 +26,8 @@ const tsOptions2 = {
     timeField: "timestamp",
     metaField: "metadata2"
 };
-const kColl = "coll"
-const kBucket = "system.buckets.coll"
+const kColl = "coll";
+const kBucket = "system.buckets.coll";
 
 function createWorked(collName, tsOptions = {}) {
     if (Object.keys(tsOptions).length === 0) {
@@ -70,12 +70,12 @@ function runTest(testCase, minRequiredVersion = null) {
             return;
         }
     }
-    testCase()
+    testCase();
     db.dropDatabase();
 }
 
 // Reset any previous run state.
-db.dropDatabase()
+db.dropDatabase();
 
 // Case prexisting collection: standard.
 {
@@ -153,14 +153,13 @@ db.dropDatabase()
 {
     jsTest.log("Case collection: bucket timeseries / collection: standard.");
     runTest(() => {
-        createWorked(kBucket, tsOptions)
+        createWorked(kBucket, tsOptions);
         if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
             // TODO SERVER-87189 Replace this with commandFailed. Now we always pass from the
             // coordinator to create a collection which will prevent from using the main namespace
             // if a bucket nss already exists.
             createWorkedOrFailedWithCode(kColl, {}, ErrorCodes.NamespaceExists);
-        }
-        else {
+        } else {
             // TODO SERVER-85855 creating a normal collection with an already created bucket
             // timeseries should fail.
             createWorked(kColl);
@@ -170,7 +169,7 @@ db.dropDatabase()
     jsTest.log("Case collection: bucket timeseries / collection: timeseries.");
     runTest(
         () => {
-            createWorked(kBucket, tsOptions)
+            createWorked(kBucket, tsOptions);
             createWorked(kColl, tsOptions);
         },
         // Creation of bucket namespace is not idempotent before 8.0 (SERVER-89827)
@@ -180,14 +179,14 @@ db.dropDatabase()
     jsTest.log(
         "Case collection: bucket timeseries / collection: timeseries with different options.");
     runTest(() => {
-        createWorked(kBucket, tsOptions)
+        createWorked(kBucket, tsOptions);
         createFailed(kColl, tsOptions2, ErrorCodes.NamespaceExists);
     });
 
     jsTest.log(
         "Case collection: bucket timeseries / collection: bucket timeseries with different options.");
     runTest(() => {
-        createWorked(kBucket, tsOptions)
+        createWorked(kBucket, tsOptions);
         createFailed(kBucket, tsOptions2, ErrorCodes.NamespaceExists);
     });
 

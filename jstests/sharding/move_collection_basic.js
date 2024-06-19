@@ -34,7 +34,7 @@ assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}
 // Fail if collection is sharded.
 assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
 
-const unsplittableCollName = "foo_unsplittable"
+const unsplittableCollName = "foo_unsplittable";
 const unsplittableCollNs = dbName + '.' + unsplittableCollName;
 assert.commandWorked(st.s.getDB(dbName).runCommand({create: unsplittableCollName}));
 

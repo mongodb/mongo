@@ -74,7 +74,7 @@ winningPlan = getWinningPlan(explain.queryPlanner);
 assert(!isIdhackOrExpress(db, winningPlan), winningPlan);
 
 // Express is an 8.0+ feature.
-const hasExpress = isExpress(db, getWinningPlan(t.find({_id: 1}).explain().queryPlanner))
+const hasExpress = isExpress(db, getWinningPlan(t.find({_id: 1}).explain().queryPlanner));
 if (hasExpress) {
     // Express is used for simple _id queries.
     explain = t.find({_id: 1}).explain();

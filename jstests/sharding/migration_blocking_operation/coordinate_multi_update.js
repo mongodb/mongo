@@ -43,7 +43,7 @@ function assertCoordinateMultiUpdateReturns(connection, code) {
         assert.eq(underlyingUpdateResult["n"], 2);
         assert.eq(underlyingUpdateResult["ok"], 1);
     } else {
-        assert.commandFailedWithCode(response, code)
+        assert.commandFailedWithCode(response, code);
     }
 }
 

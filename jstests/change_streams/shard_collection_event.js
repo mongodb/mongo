@@ -194,7 +194,7 @@ function runTest(startChangeStream) {
                 "capped": false,
                 "collation": {"locale": "simple"}
             }
-        })
+        });
 }
 
 assert.commandWorked(db.adminCommand({enableSharding: dbName}));

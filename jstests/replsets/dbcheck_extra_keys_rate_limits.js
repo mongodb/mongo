@@ -39,7 +39,7 @@ const recordDoesNotMatchQuery = {
 const infoBatchQuery = {
     "severity": "info",
     "operation": "dbCheckBatch"
-}
+};
 
 const replSet = new ReplSetTest({
     name: jsTestName(),
@@ -167,7 +167,7 @@ function exceedMaxSize(nDocs, batchSize, maxSize, docSuffix) {
     // keystring is 4 or 5 (the first keystring has size 4 and the rest have size 5), which is used
     // to keep track of bytesSeen.
     // maximum number of documents that should be checked:
-    const maxCount = Math.ceil((maxSize - 4) / 5 + 1)
+    const maxCount = Math.ceil((maxSize - 4) / 5 + 1);
 
     jsTestLog("Testing that dbcheck terminates after seeing more than " + maxSize +
               " bytes: nDocs: " + nDocs + ", batchSize: " + batchSize +

@@ -68,7 +68,7 @@ const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 if (FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponMoveCollection") ||
     FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponCreation")) {
-    st.stop()
+    st.stop();
     quit();
 }
 runTest(st, st.s.getDB("out_drop_temp"), st.s.port);

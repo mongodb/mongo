@@ -150,8 +150,8 @@ function runDeepBranchingPipelineTest(conn, coll1) {
         as: "lookedUp",
         localField: "y",
         foreignField: "y",
-    }}
-    const lookupShape = { pipeline: [ lookup ]};
+    }};
+    const lookupShape = {pipeline: [lookup]};
 
     // Collection scan over coll2 - 7 docs and 0 keys.
     const unionWithLookup = {
@@ -223,7 +223,7 @@ function runDeepBranchingPipelineTest(conn, coll1) {
     };
 
     {
-        const otherNssUnion = otherNss.concat({db: "test", coll: coll1.getName()})
+        const otherNssUnion = otherNss.concat({db: "test", coll: coll1.getName()});
         const expectedDocs = 17;
         for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
             clearPlanCacheAndQueryStatsStore(conn, coll1);

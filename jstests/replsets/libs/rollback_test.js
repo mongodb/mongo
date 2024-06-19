@@ -123,11 +123,11 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
                 dbConn.getMongo()._setSecurityToken(_createTenantToken({tenant: tenantId}));
                 assert.commandWorked(dbConn.runCommand(cmdObj));
                 dbConn.getMongo()._setSecurityToken(undefined);
-            }
+            };
         } else {
             return function(dbConn, cmdObj) {
                 assert.commandWorked(dbConn.runCommand(cmdObj));
-            }
+            };
         }
     })();
 

@@ -62,8 +62,8 @@ function runLookupForeignShardedPipelineTest(st) {
         as: "lookedUp",
         localField: "v",
         foreignField: "y",
-    }}
-    const shape = { pipeline: [ lookup ]};
+    }};
+    const shape = {pipeline: [lookup]};
 
     const queryStatsKey = getAggregateQueryStatsKey(
         conn,

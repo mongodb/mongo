@@ -15,7 +15,7 @@ const originalAssertEq = assert.eq;
 
 // The name of the implicitly added timestamp field.
 const timeFieldName = "overrideTimeFieldName";
-const metaFieldName = "metaFieldName"
+const metaFieldName = "metaFieldName";
 
 const denylistedNamespaces = [
     /^admin\./,
@@ -188,7 +188,7 @@ function cleanUpResultCursor(result, batchName) {
     }
     result["cursor"][batchName].forEach(doc => {
         delete doc[timeFieldName];
-    })
+    });
 }
 
 /**

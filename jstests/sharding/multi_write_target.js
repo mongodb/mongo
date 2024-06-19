@@ -53,7 +53,7 @@ assert.commandWorked(staleColl.update({_id: 0}, {$set: {updatedById: true}}, {mu
 
 // Ensure _id update goes to at least one shard
 assert(st.shard0.getCollection(coll.toString()).findOne({updatedById: true}) != null ||
-       st.shard2.getCollection(coll.toString()).findOne({updatedById: true}) != null)
+       st.shard2.getCollection(coll.toString()).findOne({updatedById: true}) != null);
 
 jsTest.log("Testing multi-delete...");
 

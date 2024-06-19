@@ -10,7 +10,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 const collection = db.jstests_sortj;
 collection.drop();
 
-assert.commandWorked(collection.createIndex({a: 1}))
+assert.commandWorked(collection.createIndex({a: 1}));
 
 const numShards = FixtureHelpers.numberOfShardsForCollection(collection);
 

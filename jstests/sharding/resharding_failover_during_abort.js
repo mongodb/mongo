@@ -50,7 +50,7 @@ reshardingTest.withReshardingInBackground(
             recipient.getCollection('config.localReshardingOperations.recipient').findOne({
                 ns: "reshardingDb.coll"
             });
-        assert(recipientDoc != null)
+        assert(recipientDoc != null);
         assert(recipientDoc.mutableState.state === "done");
         assert(recipientDoc.mutableState.abortReason != null);
         assert(recipientDoc.mutableState.abortReason.code === ErrorCodes.ReshardCollectionAborted);

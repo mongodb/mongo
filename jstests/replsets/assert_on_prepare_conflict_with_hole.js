@@ -83,10 +83,10 @@ const triggerPrepareConflictThread = new Thread(function(host, dbName, collName)
     const session = conn.startSession({retryWrites: true});
     const collection = session.getDatabase(dbName).getCollection(collName);
     jsTestLog("Inserting a conflicting operation while keeping a hole open.");
-    assert.throwsWithCode(
-        () => {collection.findAndModify(
-            {query: {a: 3}, update: {a: 2, fromFindAndModify: true}, upsert: true})},
-        ErrorCodes.DuplicateKey);
+    assert.throwsWithCode(() => {
+        collection.findAndModify(
+            {query: {a: 3}, update: {a: 2, fromFindAndModify: true}, upsert: true});
+    }, ErrorCodes.DuplicateKey);
 }, primary.host, db.getName(), collName);
 
 triggerPrepareConflictThread.start();

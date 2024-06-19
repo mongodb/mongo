@@ -182,4 +182,4 @@ function testCreateCollection(config) {
 }
 
 testCreateCollection({setParameter: {featureFlagQERangeV2: false}});
-testCreateCollection({setParameter: {featureFlagQERangeV2: true}})
+testCreateCollection({setParameter: {featureFlagQERangeV2: true}});

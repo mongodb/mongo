@@ -23,7 +23,7 @@ export function runWithEncryption(edb, func) {
 
         assert(!edb.getMongo().isAutoEncryptionEnabled(),
                "Cannot switch to encrypted connection on already encrypted connection. Do not " +
-                   "nest calls to runWithEncryption.")
+                   "nest calls to runWithEncryption.");
 
         edb.getMongo().toggleAutoEncryption(true);
 
@@ -91,7 +91,9 @@ DB.prototype.eadminCommand = function(cmd, params) {
 };
 
 DBCollection.prototype.ecount = function(filter) {
-    return runWithEncryption(this, () => {return this.find(filter).toArray().length});
+    return runWithEncryption(this, () => {
+        return this.find(filter).toArray().length;
+    });
 };
 
 // Note that efind does not exist since find executes

@@ -14,9 +14,9 @@ const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || fals
 
 const testDB = db.getSiblingDB("agg_hint");
 assert.commandWorked(testDB.dropDatabase());
-const collName = jsTestName() + "_col"
+const collName = jsTestName() + "_col";
 const coll = testDB.getCollection(collName);
-const viewName = jsTestName() + "_view"
+const viewName = jsTestName() + "_view";
 const view = testDB.getCollection(viewName);
 
 function confirmWinningPlanUsesExpectedIndex(

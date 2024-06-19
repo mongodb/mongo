@@ -270,7 +270,7 @@ function instantiateTestCasesNoSecondaryView(...testCases) {
 
 if (FixtureHelpers.isSharded(coll) || FixtureHelpers.isSharded(secondaryColl)) {
     // TODO: SERVER-88883 Report 'indexesUsed' for $lookup over sharded collections.
-    instantiateTestCases(testAggregateQuerySettingsApplicationWithGraphLookup)
+    instantiateTestCases(testAggregateQuerySettingsApplicationWithGraphLookup);
 
     instantiateTestCasesNoSecondaryView(
         testAggregateQuerySettingsApplicationWithoutSecondaryCollections,

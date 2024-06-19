@@ -12,7 +12,7 @@
  * ]
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 

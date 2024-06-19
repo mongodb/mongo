@@ -97,7 +97,7 @@ const shardPipelineWithUnknownFields = {
         metadataMergeProtocolVersion: protocolVersion,
         unknownField: "cake carrots apple kale",
     }
-}
+};
 
 const commandObj = {
     aggregate: collName,

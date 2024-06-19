@@ -92,7 +92,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         cluster.getReplicaSets().forEach(rst => {
             while (true) {
                 try {
-                    checkClusterParameter(rst, hasTwoOrMoreShards)
+                    checkClusterParameter(rst, hasTwoOrMoreShards);
                     return;
                 } catch (e) {
                     if (RetryableWritesUtil.isRetryableCode(e.code)) {

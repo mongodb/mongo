@@ -14,7 +14,7 @@ const timeFieldName = "time";
 const metaFieldName = "tags";
 
 const tsColl = db.getCollection("ts_coll");
-const normColl = db.getCollection("normal_coll")
+const normColl = db.getCollection("normal_coll");
 
 function setUpCollection(coll, options) {
     coll.drop();

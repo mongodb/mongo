@@ -18,7 +18,7 @@ const ns = dbName + "." + collName;
 const timeseriesInfo = {
     timeField: 'ts',
     metaField: 'meta'
-}
+};
 
 const donorShardNames = reshardingTest.donorShardNames;
 

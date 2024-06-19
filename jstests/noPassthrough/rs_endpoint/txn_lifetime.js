@@ -192,4 +192,4 @@ function runTest(hasDirectShardOperationPrivilege) {
 }
 
 runTest(true /* hasDirectShardOperationPrivilege */);
-runTest(false /* hasDirectShardOperationPrivilege */)
+runTest(false /* hasDirectShardOperationPrivilege */);

@@ -161,7 +161,7 @@ expectedEvents.push({operationType: "dropDatabase"},
 // Helper function to assert on the given event fields.
 function assertEventMatches(event, expectedEvent, errorMsg) {
     for (const k in expectedEvent) {
-        assert.docEq(expectedEvent[k], event[k], errorMsg + `: value mismatch for field '${k}'`)
+        assert.docEq(expectedEvent[k], event[k], errorMsg + `: value mismatch for field '${k}'`);
     }
 }
 

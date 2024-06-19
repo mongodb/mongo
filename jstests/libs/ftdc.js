@@ -52,7 +52,7 @@ export function verifyGetDiagnosticData(adminDb, logData = true, assumeMultiserv
                 TestData.testingReplicaSetEndpoint) {
                 const hasKnownData =
                     (data.hasOwnProperty("shard") && data.shard.hasOwnProperty("serverStatus")) ||
-                    (data.hasOwnProperty("router") && data.router.hasOwnProperty("connPoolStats"))
+                    (data.hasOwnProperty("router") && data.router.hasOwnProperty("connPoolStats"));
                 assert(hasKnownData,
                        "does not have 'shard.serverStatus' nor 'router.connPoolStats' in '" +
                            tojson(data) + "'");

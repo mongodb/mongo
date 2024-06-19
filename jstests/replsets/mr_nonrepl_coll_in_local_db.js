@@ -42,7 +42,7 @@ assert.commandWorked(result);
 const logLines = checkLog.getGlobalLog(primaryDB);
 let createdCollections = [];
 logLines.forEach(function(line) {
-    const matchResult = line.match(/createCollection: (.+) with/)
+    const matchResult = line.match(/createCollection: (.+) with/);
     if (matchResult) {
         createdCollections.push(matchResult[1]);
     }

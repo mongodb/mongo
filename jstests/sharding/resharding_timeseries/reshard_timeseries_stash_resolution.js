@@ -18,7 +18,7 @@ const recipientShardNames = reshardingTest.recipientShardNames;
 const timeseriesInfo = {
     timeField: 'ts',
     metaField: 'meta'
-}
+};
 
 const timeseriesCollection = reshardingTest.createShardedCollection({
     ns: ns,

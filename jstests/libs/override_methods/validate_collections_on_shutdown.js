@@ -114,9 +114,7 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
                       }
                       assert.commandWorked(res);
                       dbs = res.databases.map(dbInfo => {
-                          return {
-                              name: dbInfo.name, tenant: dbInfo.tenantId
-                          }
+                          return {name: dbInfo.name, tenant: dbInfo.tenantId};
                       });
                   })
             .execute();

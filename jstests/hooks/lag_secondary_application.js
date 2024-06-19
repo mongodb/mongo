@@ -9,7 +9,7 @@ const MAX_MS = 1000;
 
 /* Pick a random millisecond value between 400 and 1000 for the lag value */
 function randomMSFromInterval(minMS, maxMS) {  // min and max included
-    return Math.floor(Math.random() * (maxMS - minMS + 1) + minMS)
+    return Math.floor(Math.random() * (maxMS - minMS + 1) + minMS);
 }
 
 /* Returns true if the error code indicates the node is currently shutting down. */

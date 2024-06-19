@@ -22,7 +22,7 @@ for (let i = 0; i < numDocs / 2; ++i) {
     bulk.insert({foo: i, bar: i, applyDiscount: false, word: "ghjk"});
 }
 assert.commandWorked(bulk.execute());
-coll.createIndex({foo: 1})
+coll.createIndex({foo: 1});
 
 // Tests that $meta is re-parsed correctly by ensuring the metaDataKeyword is not serialized as
 // string literal.

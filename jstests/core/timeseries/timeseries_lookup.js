@@ -282,7 +282,7 @@ TimeseriesTest.run((insert) => {
             ],
             as: "joined"
           }};
-        const result = testDB.local.aggregate(lookupStage)
+        const result = testDB.local.aggregate(lookupStage);
         assertArrayEq({
             actual: result.toArray(),
             expected: [

@@ -263,7 +263,7 @@ let resumeToken = cursor.postBatchResumeToken._data;
 assert.soon(() => {
     assert.commandWorked(db.t1.insert({a: 2}));
     cursor = cst.assertNoChange(cursor);
-    return resumeToken != cursor.postBatchResumeToken._data
+    return resumeToken != cursor.postBatchResumeToken._data;
 });
 
 // With trivially false predicates
@@ -273,7 +273,7 @@ resumeToken = cursor.postBatchResumeToken._data;
 assert.soon(() => {
     assert.commandWorked(db.t1.insert({a: 2}));
     cursor = cst.assertNoChange(cursor);
-    return resumeToken != cursor.postBatchResumeToken._data
+    return resumeToken != cursor.postBatchResumeToken._data;
 });
 
 cst.cleanUp();

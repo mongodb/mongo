@@ -30,10 +30,10 @@ const collection = reshardingTest.createShardedCollection({
     collOptions: {collation: {locale: "simple"}},
 });
 
-const idxSimpleCollationName = "idxSimpleCollation"
+const idxSimpleCollationName = "idxSimpleCollation";
 assert.commandWorked(
     collection.createIndex({x: 1}, {name: idxSimpleCollationName, collation: {locale: "simple"}}));
-const idx2Name = "idx2"
+const idx2Name = "idx2";
 assert.commandWorked(collection.createIndex({x: 1}, {name: idx2Name}));
 
 const preReshardingIndexes = collection.getIndexes();

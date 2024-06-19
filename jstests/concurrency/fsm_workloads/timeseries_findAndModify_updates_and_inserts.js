@@ -44,7 +44,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         init: {findAndUpdateMany: 0.25, insert: 0.75},
         findAndUpdateMany: {findAndUpdateMany: 0.5, insert: 0.5},
         insert: {findAndUpdateMany: 0.5, insert: 0.5}
-    }
+    };
 
     return $config;
 });

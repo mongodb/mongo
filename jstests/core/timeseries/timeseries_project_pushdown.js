@@ -33,7 +33,7 @@ function runTest({docs, pipeline, expectedResults}) {
         docs: [{_id: 1, [timeField]: new Date(), [metaField]: 2}],
         pipeline: [{$project: {new: {$getField: metaField}, _id: 0}}],
         expectedResults: [{new: 2}]
-    })
+    });
 })();
 
 // $getField does not traverse objects, and should not be rewritten when it relies on a mix of
@@ -46,7 +46,7 @@ function runTest({docs, pipeline, expectedResults}) {
         ],
         pipeline: [{$project: {new: {$add: [`$${metaField}`, {$getField: "a.b"}]}}}],
         expectedResults: [{_id: 1, new: 5}, {_id: 2, new: null}]
-    })
+    });
 })();
 
 //
@@ -61,7 +61,7 @@ function runTest({docs, pipeline, expectedResults}) {
         ],
         pipeline: [{$project: {new: {$add: [`$${metaField}`, {$getField: {$literal: "a.$b"}}]}}}],
         expectedResults: [{_id: 1, new: 5}, {_id: 2, new: null}]
-    })
+    });
 }());
 
 // There is a difference between the metaField "meta1", and "$meta1". Field paths are allowed to
@@ -75,7 +75,7 @@ function runTest({docs, pipeline, expectedResults}) {
         ],
         pipeline: [{$project: {new: {$add: [`$${metaField}`, {$getField: {$literal: "$meta1"}}]}}}],
         expectedResults: [{_id: 1, new: null}, {_id: 2, new: 5}]
-    })
+    });
 })();
 
 //
@@ -93,7 +93,7 @@ function runTest({docs, pipeline, expectedResults}) {
             }
         }],
         expectedResults: [{_id: 1, new: 4}, {_id: 2, new: 8}]
-    })
+    });
 })();
 
 // When we rely on both the metaField and a measurementField we should not perform the rewrite and
@@ -109,7 +109,7 @@ function runTest({docs, pipeline, expectedResults}) {
                 {new: {$add: [`$${metaField}`, {$getField: {$cond: [false, null, "a.b.c"]}}]}}
         }],
         expectedResults: [{_id: 1, new: null}, {_id: 2, new: 5}]
-    })
+    });
 })();
 
 //
@@ -124,7 +124,7 @@ function runTest({docs, pipeline, expectedResults}) {
         ],
         pipeline: [{$project: {new: {$getField: {input: `$${metaField}`, field: "b"}}}}],
         expectedResults: [{_id: 1, new: 4}, {_id: 2}]
-    })
+    });
 })();
 
 // Validate the correct results are returned when there is a field with '$' inside the metaField.
@@ -137,7 +137,7 @@ function runTest({docs, pipeline, expectedResults}) {
         ],
         pipeline: [{$project: {new: {$getField: {input: `$${metaField}`, field: "a.$b"}}}}],
         expectedResults: [{_id: 1, new: 4}, {_id: 2}]
-    })
+    });
 })();
 
 // When we rely on both the metaField and a measurementField we should not perform the rewrite and
@@ -157,7 +157,7 @@ function runTest({docs, pipeline, expectedResults}) {
             }
         }],
         expectedResults: [{_id: 1, new: 6}, {_id: 2, new: null}]
-    })
+    });
 })();
 
 // same test as above but with $addFields and not $project.
@@ -179,7 +179,7 @@ function runTest({docs, pipeline, expectedResults}) {
             {[timeField]: time, [metaField]: 2, a: {"$meta1": 4}, _id: 1, new: 6},
             {[timeField]: time, [metaField]: 2, a: {c: 5}, _id: 2, new: null}
         ]
-    })
+    });
 })();
 
 //
@@ -203,7 +203,7 @@ function runTest({docs, pipeline, expectedResults}) {
             }
         }],
         expectedResults: [{_id: 1, new: 3}, {_id: 2}]
-    })
+    });
 })();
 
 // When we rely on both the metaField and a measurementField we should not perform the rewrite and
@@ -230,7 +230,7 @@ function runTest({docs, pipeline, expectedResults}) {
             }
         }],
         expectedResults: [{_id: 1, new: 5}, {_id: 2, new: null}]
-    })
+    });
 })();
 
 // This test validates that $project with '$$ROOT' which requires the whole document returns the
@@ -247,7 +247,7 @@ function runTest({docs, pipeline, expectedResults}) {
             {_id: 1, new: {_id: 1, [timeField]: time, [metaField]: 2, a: 2}},
             {_id: 2, new: {_id: 2, [timeField]: time, [metaField]: 2, b: 3}}
         ]
-    })
+    });
 })();
 
 (function testAddFields_WithROOT() {
@@ -274,5 +274,5 @@ function runTest({docs, pipeline, expectedResults}) {
                 new: {_id: 2, [timeField]: time, [metaField]: 2, b: 3}
             }
         ]
-    })
+    });
 })();

@@ -14,7 +14,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
 
     const dbName = "testDB";
     const collName1 = "testColl1";
-    const collName2 = "testColl2"
+    const collName2 = "testColl2";
     const namespace1 = `${dbName}.${collName1}`;
     const namespace2 = `${dbName}.${collName2}`;
     const session = isMongos ? cluster.s.startSession() : cluster.getPrimary().startSession();

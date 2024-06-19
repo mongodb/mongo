@@ -61,7 +61,7 @@ TimeseriesTest.run((insert) => {
         [timeFieldName]: new Date(datePrefix + 300),
         [metaFieldName]: "gpu",
         length: -2,
-    })
+    });
 
     // Computing a field on a dotted path which is an array, then grouping on it. Note that the
     // semantics for setting a computed field on a dotted array path are particularly strange, but

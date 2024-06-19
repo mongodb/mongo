@@ -29,7 +29,7 @@ assert.eq(1,
                       {b: {$gte: 0}},
                       {
                           $where: function() {
-                              return true
+                              return true;
                           }
                       }
                   ]
@@ -43,7 +43,7 @@ assert.eq(1,
                       {b: {$gte: 0}},
                       {
                           $where: function() {
-                              return true
+                              return true;
                           }
                       }
                   ]
@@ -64,7 +64,7 @@ assert.eq(20,
                       {b: {$gte: 0}},
                       {
                           $where: function() {
-                              return true
+                              return true;
                           }
                       }
                   ]

@@ -205,20 +205,19 @@ assert.eq(stringValues.slice(0, 2), ["Value", "vAlue"]);
 // transaction, they effectively occur at exactly the same time.
 assert.sameMembers(stringValues.slice(2, 4), ["vaLue", "valUe"]);
 
-const verifyOnChangeStream =
-    (matchExpression, hasEntriesReturned) => {
-        const string = JSON.stringify(matchExpression);
-        const changeStream = coll.aggregate([{$changeStream: {}}, {$match: matchExpression}]);
-        assert.commandWorked(coll.insert({string}));
-        if (hasEntriesReturned) {
-            assert.soon(() => changeStream.hasNext());
-            const event = changeStream.next();
-            assert.eq(event.fullDocument.string, string, event);
-        } else {
-            assert(!changeStream.hasNext());
-        }
-        changeStream.close();
+const verifyOnChangeStream = (matchExpression, hasEntriesReturned) => {
+    const string = JSON.stringify(matchExpression);
+    const changeStream = coll.aggregate([{$changeStream: {}}, {$match: matchExpression}]);
+    assert.commandWorked(coll.insert({string}));
+    if (hasEntriesReturned) {
+        assert.soon(() => changeStream.hasNext());
+        const event = changeStream.next();
+        assert.eq(event.fullDocument.string, string, event);
+    } else {
+        assert(!changeStream.hasNext());
     }
+    changeStream.close();
+};
 
 // Run a change stream with empty field path match expression to match null. Expect to return all
 // the oplog entries as the field "" is not set in oplogs.

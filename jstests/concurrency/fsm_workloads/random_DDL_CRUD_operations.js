@@ -261,7 +261,7 @@ export const $config = (function() {
                 // Check guarantees IF NO CONCURRENT DROP is running.
                 // If a concurrent rename came in, then either the full operation succeded (meaning
                 // there will be 0 documents left) or the insert came in first.
-                assert.contains(currentDocs, [0, numDocs], threadInfos)
+                assert.contains(currentDocs, [0, numDocs], threadInfos);
 
                 jsTestLog('CRUD - Update ' + threadInfos);
                 res = coll.update({generation: generation}, {$set: {updated: true}}, {multi: true});

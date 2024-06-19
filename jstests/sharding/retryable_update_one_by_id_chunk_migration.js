@@ -48,7 +48,7 @@ const deleteCmd = {
     deletes: [{q: {_id: 0}, limit: 1}],
     ordered: true,
     txnNumber: NumberLong(1),
-}
+};
 
 const updateCmdUnordered = {
     updates: [

@@ -53,7 +53,7 @@ export function usedBonsaiOptimizer(explain) {
                 return false;
             }
         }
-        return true
+        return true;
     }
 
     // This section handles the explain output for unsharded queries.

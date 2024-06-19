@@ -68,7 +68,7 @@ switch (getOptimizer(plan)) {
         // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
         break;
     default:
-        break
+        break;
 }
 
 // Test in query
@@ -86,6 +86,6 @@ switch (getOptimizer(plan)) {
         // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
         break;
     default:
-        break
+        break;
 }
 print('all tests pass');

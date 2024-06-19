@@ -29,10 +29,10 @@ function runDowngradeTest(phase) {
     const dbPrimaryRsPrimary = st.getPrimaryShard(dbName).rs.getPrimary();
 
     function downgradeFcvFromParallelShell() {
-        return startParallelShell(
-            () => {assert.commandWorked(
-                db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}))},
-            st.s.port);
+        return startParallelShell(() => {
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        }, st.s.port);
     }
 
     function coordinateMultiUpdateFromParallelShell() {

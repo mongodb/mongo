@@ -137,7 +137,7 @@ function runTests(db, coll) {
             pipeline: [{$project: {x: {$add: [6, "$item"]}}}],
             cursor: {}
         }));
-    }, ["$project"])
+    }, ["$project"]);
 }
 
 // Standalone

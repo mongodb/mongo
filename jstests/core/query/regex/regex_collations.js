@@ -11,7 +11,7 @@ import {
     isCollscan,
     isIxscan
 } from "jstests/libs/analyze_plan.js";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js"
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 function assertIXScanTightBounds(explain) {
     const winningPlan = getWinningPlanFromExplain(explain);

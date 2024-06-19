@@ -51,7 +51,7 @@ assert.eq(0, st.s.getCollection('config.chunks').countDocuments({uuid: collUUID}
 
 // Make sure that persisted cached metadata was removed from the primary shard.
 const chunksCollName = 'cache.chunks.' + kNss;
-const configDb = st.shard0.getDB("config")
+const configDb = st.shard0.getDB("config");
 assert.eq(
     0,
     configDb.cache.collections.countDocuments({_id: kNss}),

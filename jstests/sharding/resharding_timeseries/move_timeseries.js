@@ -20,7 +20,7 @@ const st = reshardingTest._st;
 const timeseriesInfo = {
     timeField: 'ts',
     metaField: 'meta'
-}
+};
 
 const timeseriesCollection = reshardingTest.createUnshardedCollection({
     ns: ns,
@@ -58,12 +58,12 @@ reshardingTest.withMoveCollectionInBackground({toShard: st.shard2.shardName}, ()
     ]));
 });
 
-let timeseriesCollDocPostResharding = st.config.collections.findOne({_id: bucketNss})
+let timeseriesCollDocPostResharding = st.config.collections.findOne({_id: bucketNss});
 // Resharding keeps timeseries fields.
-assert.eq(timeseriesCollDocPostResharding.timeseriesFields.timeField, timeseriesInfo.timeField)
-assert.eq(timeseriesCollDocPostResharding.timeseriesFields.metaField, timeseriesInfo.metaField)
+assert.eq(timeseriesCollDocPostResharding.timeseriesFields.timeField, timeseriesInfo.timeField);
+assert.eq(timeseriesCollDocPostResharding.timeseriesFields.metaField, timeseriesInfo.metaField);
 // Resharding has updated shard key.
-assert.eq(timeseriesCollDocPostResharding.key, {"_id": 1})
+assert.eq(timeseriesCollDocPostResharding.key, {"_id": 1});
 assert.eq(timeseriesCollDocPostResharding.unsplittable, true);
 
 assert.eq(5, st.rs2.getPrimary().getCollection(bucketNss).countDocuments({}));

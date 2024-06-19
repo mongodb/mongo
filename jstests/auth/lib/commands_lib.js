@@ -7377,7 +7377,7 @@ export const authCommandsLib = {
               apiParameters: {version: "1", strict: true}
           },
           setup: function(db) {
-              const collName = "validate_db_metadata_command_specific_db"
+              const collName = "validate_db_metadata_command_specific_db";
               assert.commandWorked(db.getSiblingDB(firstDbName).createCollection(collName));
               assert.commandWorked(db.getSiblingDB(secondDbName).createCollection(collName));
               assert.commandWorked(db.getSiblingDB("ThirdDB").createCollection(collName));
@@ -7411,7 +7411,7 @@ export const authCommandsLib = {
           testname: "validate_db_metadata_command_all_dbs",
           command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}},
           setup: function(db) {
-              const collName = "validate_db_metadata_command_all_dbs"
+              const collName = "validate_db_metadata_command_all_dbs";
               assert.commandWorked(db.getSiblingDB(firstDbName).createCollection(collName));
               assert.commandWorked(db.getSiblingDB(secondDbName).createCollection(collName));
           },
