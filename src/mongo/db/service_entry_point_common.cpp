@@ -183,6 +183,7 @@
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -2170,8 +2171,9 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     }
     appendClusterAndOperationTime(opCtx, &_extraFieldsBuilder, &metadataBob, _startOperationTime);
 
+    const auto logLevel = MONGO_unlikely(TestingProctor::instance().isEnabled()) ? 0 : 1;
     LOGV2_DEBUG(21962,
-                1,
+                logLevel,
                 "Assertion while executing command",
                 "command"_attr = _execContext.getRequest().getCommandName(),
                 "db"_attr = _execContext.getRequest().readDatabaseForLogging(),
