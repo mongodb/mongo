@@ -120,7 +120,7 @@ public:
 
         if (grid->isInitialized()) {
             auto configServerInShardCache = grid->shardRegistry()->cachedClusterHasConfigShard();
-            result.appendBool("configServerInShardCache", configServerInShardCache);
+            result.appendBool("configServerInShardCache", configServerInShardCache.value_or(false));
         }
 
         return result.obj();

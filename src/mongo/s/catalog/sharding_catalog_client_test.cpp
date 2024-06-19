@@ -95,13 +95,6 @@ const int kMaxCommandRetry = 3;
 const NamespaceString kNamespace =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
-BSONObj getReplSecondaryOkMetadata() {
-    BSONObjBuilder o;
-    ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);
-    o.append(rpc::kReplSetMetadataFieldName, 1);
-    return o.obj();
-}
-
 using ShardingCatalogClientTest = ShardingTestFixture;
 
 TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
@@ -122,8 +115,6 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
 
     onFindWithMetadataCommand(
         [this, &expectedColl, newOpTime](const RemoteCommandRequest& request) {
-            ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
             auto opMsg = static_cast<OpMsgRequest>(request);
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
@@ -200,8 +191,6 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
     });
 
     onFindWithMetadataCommand([this, &expectedDb, newOpTime](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
@@ -337,8 +326,6 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
     });
 
     onFindCommand([this, &s1, &s2, &s3](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
@@ -399,8 +386,6 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithDrainingShard) {
     });
 
     onFindCommand([this](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
         const auto opMsg = static_cast<OpMsgRequest>(request);
         const auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
@@ -471,8 +456,6 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
 
     onFindWithMetadataCommand(
         [this, &chunksQuery, chunkA, chunkB, newOpTime](const RemoteCommandRequest& request) {
-            ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
             auto opMsg = static_cast<OpMsgRequest>(request);
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
@@ -535,8 +518,6 @@ TEST_F(ShardingCatalogClientTest, GetChunksForUUIDNoSortNoLimit) {
     });
 
     onFindCommand([this, &chunksQuery](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
@@ -868,8 +849,6 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     });
 
     onFindWithMetadataCommand([this, coll1, coll2, newOpTime](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
@@ -926,8 +905,6 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
     });
 
     onFindCommand([this, coll1, coll2](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
@@ -970,8 +947,6 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
     validColl.setUnique(true);
 
     onFindCommand([this, validColl](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
@@ -1011,8 +986,6 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
     });
 
     onFindCommand([this, dbt1, dbt2](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
@@ -1082,8 +1055,6 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
     });
 
     onFindCommand([this, tagA, tagB](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 

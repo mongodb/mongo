@@ -73,6 +73,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/idl/idl_parser.h"
@@ -108,11 +109,62 @@ namespace {
 
 using namespace fmt::literals;
 
-const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
-const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
-                                                            TagSet{});
+const ReadPreferenceSetting kConfigNearestReadPreference(ReadPreference::Nearest, TagSet{});
+const ReadPreferenceSetting kConfigPrimaryPreferredReadPreference(ReadPreference::PrimaryPreferred,
+                                                                  TagSet{});
 const int kMaxReadRetry = 3;
 const int kMaxWriteRetry = 3;
+
+
+/**
+ * This function returns `true` if the `configServerReadPreferenceForCatalogQueries`
+ * cluster server parameter exists and is set to indicate that the nearest read preference
+ * must always be used. If the parameter is not known or is set to false, it returns `false`.
+ */
+bool forceUsageOfNearestReadPreference() {
+    auto* configServerReadPreferenceForCatalogQueriesParam =
+        ServerParameterSet::getClusterParameterSet()
+            ->getIfExists<
+                ClusterParameterWithStorage<ConfigServerReadPreferenceForCatalogQueriesParam>>(
+                "configServerReadPreferenceForCatalogQueries");
+
+    if (!configServerReadPreferenceForCatalogQueriesParam) {
+        return false;
+    }
+
+    return configServerReadPreferenceForCatalogQueriesParam->getValue(boost::none)
+        .getMustAlwaysUseNearest();
+}
+
+/**
+ * Returns the appropriate read preference for queries targeting the config server:
+ * - If the read preference cluster server parameter is set, it returns 'nearest'.
+ * - For clusters with a config shard, it returns 'primaryPreferred'.
+ * - For clusters with a dedicated config server, it returns 'nearest'.
+ *
+ * To check if the cluster has a config shard, the cached data is consulted without causal
+ * consistency. This is because we don't want to introduce extra latency to queries targeting the
+ * config server to determine a read preference.
+ *
+ * Note: The selection of the read preference only makes sense when using the remote catalog client
+ * and not the local one.
+ * TODO (SERVER-91526): Make an early exit when using the local catalog client.
+ */
+ReadPreferenceSetting getConfigReadPreference(OperationContext* opCtx) {
+    if (forceUsageOfNearestReadPreference()) {
+        return kConfigNearestReadPreference;
+    }
+
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    const auto optClusterHasConfigShard = shardRegistry->cachedClusterHasConfigShard();
+
+    if (!optClusterHasConfigShard) {
+        return kConfigPrimaryPreferredReadPreference;
+    }
+
+    return *optClusterHasConfigShard ? kConfigPrimaryPreferredReadPreference
+                                     : kConfigNearestReadPreference;
+}
 
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
@@ -433,7 +485,7 @@ StatusWith<std::vector<KeyDocumentType>> _getNewKeys(OperationContext* opCtx,
     queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
 
     auto findStatus = shard->exhaustiveFindOnConfig(opCtx,
-                                                    kConfigReadSelector,
+                                                    getConfigReadPreference(opCtx),
                                                     readConcernLevel,
                                                     nss,
                                                     queryBuilder.obj(),
@@ -480,7 +532,8 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
         return DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
 
-    auto result = _fetchDatabaseMetadata(opCtx, dbName, kConfigReadSelector, readConcernLevel);
+    auto result =
+        _fetchDatabaseMetadata(opCtx, dbName, getConfigReadPreference(opCtx), readConcernLevel);
     if (result == ErrorCodes::NamespaceNotFound) {
         // If we failed to find the database metadata on the 'nearest' config server, try again
         // against the primary, in case the database was recently created.
@@ -498,7 +551,7 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
 std::vector<DatabaseType> ShardingCatalogClientImpl::getAllDBs(OperationContext* opCtx,
                                                                repl::ReadConcernLevel readConcern) {
     auto dbs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
-                                                       kConfigReadSelector,
+                                                       getConfigReadPreference(opCtx),
                                                        readConcern,
                                                        NamespaceString::kConfigDatabasesNamespace,
                                                        BSONObj(),
@@ -590,7 +643,7 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
 
     const auto readPref = [&]() -> ReadPreferenceSetting {
         const auto vcTime = VectorClock::get(opCtx)->getTime();
-        ReadPreferenceSetting readPref{kConfigReadSelector};
+        ReadPreferenceSetting readPref = getConfigReadPreference(opCtx);
         readPref.minClusterTime = vcTime.configTime().asTimestamp();
         return readPref;
     }();
@@ -634,7 +687,7 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
     auto collDoc =
         uassertStatusOK(_exhaustiveFindOnConfig(
                             opCtx,
-                            kConfigReadSelector,
+                            getConfigReadPreference(opCtx),
                             readConcernLevel,
                             CollectionType::ConfigNS,
                             BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
@@ -654,7 +707,7 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
                                                         repl::ReadConcernLevel readConcernLevel) {
     auto collDoc =
         uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
-                                                kConfigReadSelector,
+                                                getConfigReadPreference(opCtx),
                                                 readConcernLevel,
                                                 CollectionType::ConfigNS,
                                                 BSON(CollectionType::kUuidFieldName << uuid),
@@ -682,7 +735,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getShardedCollections(
     b.append(CollectionType::kUnsplittableFieldName, BSON("$ne" << true));
 
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
-                                                            kConfigReadSelector,
+                                                            getConfigReadPreference(opCtx),
                                                             readConcernLevel,
                                                             CollectionType::ConfigNS,
                                                             b.obj(),
@@ -710,7 +763,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
     }
 
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
-                                                            kConfigReadSelector,
+                                                            getConfigReadPreference(opCtx),
                                                             readConcernLevel,
                                                             CollectionType::ConfigNS,
                                                             b.obj(),
@@ -737,7 +790,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getShardedCollectionName
     b.append(CollectionTypeBase::kUnsplittableFieldName, BSON("$ne" << true));
 
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
-                                                            kConfigReadSelector,
+                                                            getConfigReadPreference(opCtx),
                                                             readConcern,
                                                             CollectionType::ConfigNS,
                                                             b.obj(),
@@ -783,7 +836,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getUnsplittableCollectio
     b.append(CollectionTypeBase::kUnsplittableFieldName, true);
 
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
-                                                            kConfigReadSelector,
+                                                            getConfigReadPreference(opCtx),
                                                             readConcern,
                                                             CollectionType::ConfigNS,
                                                             b.obj(),
@@ -826,7 +879,7 @@ ShardingCatalogClientImpl::getUnsplittableCollectionNamespacesForDbOutsideOfShar
 StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContext* opCtx,
                                                                  StringData key) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
-                                              kConfigReadSelector,
+                                              getConfigReadPreference(opCtx),
                                               repl::ReadConcernLevel::kMajorityReadConcern,
                                               NamespaceString::kConfigSettingsNamespace,
                                               BSON("_id" << key),
@@ -849,7 +902,7 @@ StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContex
 StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
     auto findStatus = _getConfigShard(opCtx)->exhaustiveFindOnConfig(opCtx,
-                                                                     kConfigReadSelector,
+                                                                     getConfigReadPreference(opCtx),
                                                                      readConcern,
                                                                      VersionType::ConfigNS,
                                                                      BSONObj(),
@@ -893,7 +946,7 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogClientImpl::getDatabasesFor
     OperationContext* opCtx, const ShardId& shardId) {
     auto findStatus =
         _exhaustiveFindOnConfig(opCtx,
-                                kConfigReadSelector,
+                                getConfigReadPreference(opCtx),
                                 repl::ReadConcernLevel::kMajorityReadConcern,
                                 NamespaceString::kConfigDatabasesNamespace,
                                 BSON(DatabaseType::kPrimaryFieldName << shardId.toString()),
@@ -935,8 +988,14 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
 
     // Convert boost::optional<int> to boost::optional<long long>.
     auto longLimit = limit ? boost::optional<long long>(*limit) : boost::none;
-    auto findStatus = _exhaustiveFindOnConfig(
-        opCtx, kConfigReadSelector, readConcern, ChunkType::ConfigNS, query, sort, longLimit, hint);
+    auto findStatus = _exhaustiveFindOnConfig(opCtx,
+                                              getConfigReadPreference(opCtx),
+                                              readConcern,
+                                              ChunkType::ConfigNS,
+                                              query,
+                                              sort,
+                                              longLimit,
+                                              hint);
     if (!findStatus.isOK()) {
         return findStatus.getStatus().withContext("Failed to load chunks");
     }
@@ -1054,7 +1113,7 @@ ShardingCatalogClientImpl::getCollectionAndShardingIndexCatalogEntries(
 StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollection(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
-                                              kConfigReadSelector,
+                                              getConfigReadPreference(opCtx),
                                               repl::ReadConcernLevel::kMajorityReadConcern,
                                               TagsType::ConfigNS,
                                               BSON(TagsType::ns(NamespaceStringUtil::serialize(
@@ -1144,7 +1203,7 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::
     OperationContext* opCtx, repl::ReadConcernLevel readConcern, bool excludeDraining) {
     const auto& findRes = uassertStatusOK(
         _exhaustiveFindOnConfig(opCtx,
-                                kConfigReadSelector,
+                                getConfigReadPreference(opCtx),
                                 readConcern,
                                 NamespaceString::kConfigsvrShardsNamespace,
                                 excludeDraining ? BSON(ShardType::draining.ne(true)) : BSONObj(),
@@ -1262,7 +1321,7 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* o
                                                              BSONObjBuilder* result) {
     auto resultStatus = _getConfigShard(opCtx)->runCommandWithFixedRetryAttempts(
         opCtx,
-        kConfigPrimaryPreferredSelector,
+        kConfigPrimaryPreferredReadPreference,
         dbname,
         cmdObj,
         Milliseconds(defaultConfigCommandTimeoutMS.load()),
@@ -1800,7 +1859,7 @@ bool ShardingCatalogClientImpl::anyShardRemovedSince(OperationContext* opCtx,
     auto loggedRemoveShardEvents =
         uassertStatusOK(
             _exhaustiveFindOnConfig(opCtx,
-                                    kConfigPrimaryPreferredSelector,
+                                    kConfigPrimaryPreferredReadPreference,
                                     repl::ReadConcernLevel::kMajorityReadConcern,
                                     NamespaceString::kConfigsvrShardRemovalLogNamespace,
                                     BSON("_id" << ShardingCatalogClient::kLatestShardRemovalLogId

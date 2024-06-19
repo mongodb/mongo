@@ -357,12 +357,16 @@ public:
     bool isConfigServer(const HostAndPort& host) const;
 
     /**
-     * Returns true if the config server is in the shard registry as a shard, and false otherwise.
-     * This function should only be used for serverStatus metric reporting where a result that is
-     * stale by a few seconds is okay. This function will not refresh the shard registry or
-     * otherwise perform any network traffic.
+     * Returns an optional boolean indicating whether the config server is in the shard registry as
+     * a shard.
+     * - If there is cached data available, returns true if the config server is in the shard
+     * registry, and false otherwise.
+     * - If there is no cached data, returns boost::none.
+     *
+     * Note: This function does not refresh the shard registry or perform any network traffic. It is
+     * a non-causally consistent call to the cached data from the shard registry.
      */
-    bool cachedClusterHasConfigShard() const;
+    boost::optional<bool> cachedClusterHasConfigShard() const;
 
     // TODO SERVER-50206: Remove usage of these non-causally consistent accessors.
     //

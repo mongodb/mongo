@@ -610,10 +610,10 @@ ShardRegistry::Cache::ValueHandle ShardRegistry::_getCachedData() const {
     return _cache->peekLatestCached(_kSingleton);
 }
 
-bool ShardRegistry::cachedClusterHasConfigShard() const {
+boost::optional<bool> ShardRegistry::cachedClusterHasConfigShard() const {
     auto data = _getCachedData();
     if (!data) {
-        return false;
+        return boost::none;
     }
 
     return data->findShard(ShardId::kConfigServerId) != nullptr;

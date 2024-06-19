@@ -60,6 +60,22 @@ structs:
         type: bool
         default: false
 
+  ConfigServerReadPreferenceForCatalogQueriesParam:
+    description: >-
+      Cluster parameter to always use nearest as the read preference for catalog queries targeting
+      the config server.
+    inline_chained_structs: true
+    chained_structs:
+      ClusterServerParameter: clusterServerParameter
+    fields:
+      mustAlwaysUseNearest:
+        description: >-
+          When true, catalog queries targeting the config server will always use nearest as read
+          preference. Otherwise, the read preference for all those queries is chosen depending on
+          whether the cluster has a config shard (primaryPreferred) or not (nearest).
+        type: bool
+        default: false
+
 server_parameters:
     shardedClusterCardinalityForDirectConns:
         description: >-
@@ -70,6 +86,7 @@ server_parameters:
         cpp_vartype: ShardedClusterCardinalityParam
         cpp_varname: shardedClusterCardinalityForDirectConns
         redact: false
+
     addOrRemoveShardInProgress:
       description: >-
         Reflects whether there is a sharding topology change (e.g. addShard, removeShard) currently
@@ -82,3 +99,14 @@ server_parameters:
       condition:
         min_fcv: 8.0
 
+    configServerReadPreferenceForCatalogQueries:
+      description: >-
+        Cluster parameter to always use nearest as the read preference for catalog queries targeting
+        the config server.
+      set_at: cluster
+      omit_in_ftdc: false
+      cpp_vartype: ConfigServerReadPreferenceForCatalogQueriesParam
+      cpp_varname: configServerReadPreferenceForCatalogQueries
+      redact: false
+      condition:
+        min_fcv: 8.1

@@ -88,13 +88,6 @@ using unittest::assertGet;
 
 const KeyPattern kKeyPattern(BSON("_id" << 1));
 
-BSONObj getReplSecondaryOkMetadata() {
-    BSONObjBuilder o;
-    ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);
-    o.append(rpc::kReplSetMetadataFieldName, 1);
-    return o.obj();
-}
-
 class RemoveShardTest : public ConfigServerTestFixture {
 protected:
     /**

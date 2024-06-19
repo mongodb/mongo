@@ -74,14 +74,6 @@ boost::gregorian::date currentDate() {
     return now.date();
 }
 
-
-BSONObj getReplSecondaryOkMetadata() {
-    BSONObjBuilder o;
-    ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);
-    o.append(rpc::kReplSetMetadataFieldName, 1);
-    return o.obj();
-}
-
 class BalancerConfigurationTestFixture : public ShardingTestFixture {
 protected:
     /**
@@ -90,8 +82,6 @@ protected:
      */
     void expectSettingsQuery(StringData key, StatusWith<boost::optional<BSONObj>> result) {
         onFindCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(), request.metadata);
-
             auto opMsg = static_cast<OpMsgRequest>(request);
             auto findCommand = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
