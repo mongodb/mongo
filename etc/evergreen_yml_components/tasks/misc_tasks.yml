@@ -1509,12 +1509,15 @@ tasks:
         params:
           binary: bash
           args:
-            - "./src/evergreen/commit_message_validate.sh"
+            - "./src/evergreen/run_python_script.sh"
+            - "buildscripts/validate_commit_message.py"
           env:
             JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
             JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
             JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
             JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
+            IS_COMMIT_QUEUE: ${is_commit_queue}
+            BRANCH_NAME: ${branch_name}
 
   - name: version_burn_in_gen
     run_on: ubuntu2004-medium

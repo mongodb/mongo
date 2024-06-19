@@ -28,49 +28,103 @@
 #
 """Validate that the commit message is ok."""
 
-import argparse
 import re
-import sys
-import logging
+import pathlib
+import structlog
+import subprocess
+import typer
+from typing_extensions import Annotated
+from git import Commit, Repo
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = structlog.get_logger(__name__)
 
 STATUS_OK = 0
 STATUS_ERROR = 1
 
+repo_root = pathlib.Path(
+    subprocess.run(
+        "git rev-parse --show-toplevel", shell=True, text=True, capture_output=True
+    ).stdout.strip()
+)
 
-def main(argv=None):
-    """Execute Main function to validate commit messages."""
-    parser = argparse.ArgumentParser(
-        usage="Validate the commit message. "
-        "It validates the latest message when no arguments are provided."
-    )
-    parser.add_argument(
-        "message",
-        metavar="commit message",
-        nargs="*",
-        help="The commit message to validate",
-    )
-    args = parser.parse_args(argv)
+pr_template = ""
+with open(repo_root / ".github" / "pull_request_template.md", "r") as r:
+    pr_template = r.read().strip()
 
-    if not args.message:
-        LOGGER.error("Must specify non-empty value for --message")
-        return STATUS_ERROR
-    message = " ".join(args.message)
+BANNED_STRINGS = ["https://spruce.mongodb.com", "https://evergreen.mongodb.com", pr_template]
 
+VALID_SUMMARY = re.compile(r'(Revert ")?(SERVER-[0-9]+|Import wiredtiger)')
+
+
+def is_valid_commit(commit: Commit) -> bool:
     # Valid values look like:
     # 1. SERVER-\d+
     # 2. Revert "SERVER-\d+
     # 3. Import wiredtiger
     # 4. Revert "Import wiredtiger
-    valid_pattern = re.compile(r'(Revert ")?(SERVER-[0-9]+|Import wiredtiger)')
+    if not VALID_SUMMARY.match(commit.summary):
+        LOGGER.error(
+            "Commit did not contain a valid summary",
+            commit_hexsha=commit.hexsha,
+            commit_summary=commit.summary,
+        )
+        return False
 
-    if valid_pattern.match(message):
-        return STATUS_OK
-    else:
-        LOGGER.error(f"Found a commit without a ticket\n{message}")  # pylint: disable=logging-fstring-interpolation
-        return STATUS_ERROR
+    for banned_string in BANNED_STRINGS:
+        if banned_string in commit.message:
+            LOGGER.error(
+                "Commit contains banned string",
+                banned_string=banned_string,
+                commit_hexsha=commit.hexsha,
+                commit_message=commit.message,
+            )
+            return False
+
+    return True
+
+
+def main(
+    branch_name: Annotated[
+        str,
+        typer.Option(envvar="BRANCH_NAME", help="Name of the branch to compare against HEAD"),
+    ],
+    is_commit_queue: Annotated[
+        str,
+        typer.Option(
+            envvar="IS_COMMIT_QUEUE",
+            help="If this is being run in the commit/merge queue. Set to anything to be considered part of the commit/merge queue.",
+        ),
+    ] = "",
+):
+    """
+    Validate the commit message.
+
+    It validates the latest message when no arguments are provided.
+    """
+
+    if not is_commit_queue:
+        LOGGER.info("Exiting early since this is not running in the commit/merge queue")
+        raise typer.Exit(code=STATUS_OK)
+
+    diff_commits = subprocess.run(
+        ["git", "log", '--pretty=format:"%H"', f"{branch_name}...HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    # Comes back like "hash1"\n"hash2"\n...
+    commit_hashs: list[str] = diff_commits.stdout.replace('"', "").splitlines()
+    LOGGER.info("Diff commit hashes", commit_hashs=commit_hashs)
+    repo = Repo(repo_root)
+
+    for commit_hash in commit_hashs:
+        commit = repo.commit(commit_hash)
+        if not is_valid_commit(commit):
+            LOGGER.error("Found an invalid commit", commit=commit)
+            raise typer.Exit(code=STATUS_ERROR)
+
+    return
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    typer.run(main)
