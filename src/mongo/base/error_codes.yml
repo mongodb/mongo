@@ -917,3 +917,8 @@ error_codes:
       name: IDLUnknownFieldPossibleMongocryptd,
       categories: [IDLParseError],
     }
+  - {
+      code: 91331,
+      name: RemoteCommandFailed,
+      categories: [Interruption, RetriableError],
+    }
