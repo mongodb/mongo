@@ -671,7 +671,10 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                    "using the setDefaultRWConcern command and try again."};
     }
 
-    if (resHello.hasField(HelloCommandReply::kCwwcFieldName)) {
+    // If a config shard is being added, then we can skip comparing the CWWC on the shard and on the
+    // config server. Doing this check can introduce a race condition where the CWWC on the config
+    // server changes while it transitions to a config shard, causing an operation failure.
+    if (!isConfigShard && resHello.hasField(HelloCommandReply::kCwwcFieldName)) {
         auto cwwcOnShard =
             WriteConcernOptions::parse(resHello.getObjectField(HelloCommandReply::kCwwcFieldName))
                 .getValue()
