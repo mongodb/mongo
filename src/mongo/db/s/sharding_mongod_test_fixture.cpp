@@ -91,7 +91,6 @@ namespace mongo {
 using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
-using repl::ReplicationCoordinator;
 using repl::ReplicationCoordinatorMock;
 using repl::ReplSettings;
 

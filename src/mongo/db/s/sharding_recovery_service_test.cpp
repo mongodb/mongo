@@ -37,7 +37,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -68,6 +67,7 @@
 #include "mongo/unittest/framework.h"
 
 namespace mongo {
+namespace {
 
 class ShardingRecoveryServiceTest : public ShardServerTestFixture {
 public:
@@ -83,15 +83,6 @@ public:
 
     inline static const BSONObj differentOpReason = BSON("Yet another dummy operation" << true);
 
-    void setUp() override {
-        ShardServerTestFixture::setUp();
-        _opCtx = operationContext();
-    }
-
-    OperationContext* opCtx() {
-        return _opCtx;
-    }
-
     OpObserver& opObserver() {
         return _opObserver;
     }
@@ -102,7 +93,7 @@ public:
         findOp.setFilter(
             BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString_forTest()));
 
-        DBDirectClient dbClient(opCtx());
+        DBDirectClient dbClient(operationContext());
         auto cursor = dbClient.find(std::move(findOp));
 
         if (!cursor->more()) {
@@ -126,7 +117,7 @@ public:
         if (!doc) {
             doc = CollectionCriticalSectionDocument(nss, reason, blockReads);
 
-            DBDirectClient dbClient(opCtx());
+            DBDirectClient dbClient(operationContext());
             dbClient.insert(NamespaceString::kCollectionCriticalSectionsNamespace, doc->toBSON());
 
             return;
@@ -135,7 +126,7 @@ public:
         // The document exists, so the blockReads should change.
         ASSERT_NE(doc->getBlockReads(), blockReads);
 
-        DBDirectClient dbClient(opCtx());
+        DBDirectClient dbClient(operationContext());
         dbClient.update(
             NamespaceString::kCollectionCriticalSectionsNamespace,
             BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString_forTest()),
@@ -147,7 +138,7 @@ public:
         // The document must exist.
         ASSERT(readCriticalSectionDocument(nss, reason));
 
-        DBDirectClient dbClient(opCtx());
+        DBDirectClient dbClient(operationContext());
         dbClient.remove(
             NamespaceString::kCollectionCriticalSectionsNamespace,
             BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString_forTest()),
@@ -156,54 +147,55 @@ public:
 
     void assertCriticalSectionCatchUpEnteredInMemory(const NamespaceString& nss) {
         if (nss.isDbOnly()) {
-            AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
-            const auto scopedDss =
-                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());
+            AutoGetDb db(operationContext(), nss.dbName(), MODE_IS);
+            const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(
+                operationContext(), nss.dbName());
             ASSERT(scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
             ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
-            AutoGetCollection coll(opCtx(), nss, MODE_IS);
-            const auto csr =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx(), nss);
-            ASSERT(
-                csr->getCriticalSectionSignal(opCtx(), ShardingMigrationCriticalSection::kWrite));
-            ASSERT(
-                !csr->getCriticalSectionSignal(opCtx(), ShardingMigrationCriticalSection::kRead));
+            AutoGetCollection coll(operationContext(), nss, MODE_IS);
+            const auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
+                operationContext(), nss);
+            ASSERT(csr->getCriticalSectionSignal(operationContext(),
+                                                 ShardingMigrationCriticalSection::kWrite));
+            ASSERT(!csr->getCriticalSectionSignal(operationContext(),
+                                                  ShardingMigrationCriticalSection::kRead));
         }
     }
 
     void assertCriticalSectionCommitEnteredInMemory(const NamespaceString& nss) {
         if (nss.isDbOnly()) {
-            AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
-            const auto scopedDss =
-                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());
+            AutoGetDb db(operationContext(), nss.dbName(), MODE_IS);
+            const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(
+                operationContext(), nss.dbName());
             ASSERT(scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
             ASSERT(scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
-            AutoGetCollection coll(opCtx(), nss, MODE_IS);
-            const auto csr =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx(), nss);
-            ASSERT(
-                csr->getCriticalSectionSignal(opCtx(), ShardingMigrationCriticalSection::kWrite));
-            ASSERT(csr->getCriticalSectionSignal(opCtx(), ShardingMigrationCriticalSection::kRead));
+            AutoGetCollection coll(operationContext(), nss, MODE_IS);
+            const auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
+                operationContext(), nss);
+            ASSERT(csr->getCriticalSectionSignal(operationContext(),
+                                                 ShardingMigrationCriticalSection::kWrite));
+            ASSERT(csr->getCriticalSectionSignal(operationContext(),
+                                                 ShardingMigrationCriticalSection::kRead));
         }
     }
 
     void assertCriticalSectionLeftInMemory(const NamespaceString& nss) {
         if (nss.isDbOnly()) {
-            AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
-            const auto scopedDss =
-                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());
+            AutoGetDb db(operationContext(), nss.dbName(), MODE_IS);
+            const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(
+                operationContext(), nss.dbName());
             ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
             ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
-            AutoGetCollection coll(opCtx(), nss, MODE_IS);
-            const auto csr =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx(), nss);
-            ASSERT(
-                !csr->getCriticalSectionSignal(opCtx(), ShardingMigrationCriticalSection::kWrite));
-            ASSERT(
-                !csr->getCriticalSectionSignal(opCtx(), ShardingMigrationCriticalSection::kRead));
+            AutoGetCollection coll(operationContext(), nss, MODE_IS);
+            const auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
+                operationContext(), nss);
+            ASSERT(!csr->getCriticalSectionSignal(operationContext(),
+                                                  ShardingMigrationCriticalSection::kWrite));
+            ASSERT(!csr->getCriticalSectionSignal(operationContext(),
+                                                  ShardingMigrationCriticalSection::kRead));
         }
     }
 
@@ -226,7 +218,6 @@ public:
     }
 
 private:
-    OperationContext* _opCtx;
     ShardServerOpObserver _opObserver;
 };
 
@@ -245,17 +236,18 @@ public:
     void setUp() override {
         ShardingRecoveryServiceTest::setUp();
 
-        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
-        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
-
         // Create and lock the `config.collection_critical_sections` collection to allow
         // notifications on the operation observer.
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx());
-        ASSERT_OK(createCollection(
-            opCtx(), CreateCommand(NamespaceString::kCollectionCriticalSectionsNamespace)));
+            operationContext());
+        ASSERT_OK(
+            createCollection(operationContext(),
+                             CreateCommand(NamespaceString::kCollectionCriticalSectionsNamespace)));
         _criticalSectionColl.emplace(
-            opCtx(), NamespaceString::kCollectionCriticalSectionsNamespace, MODE_IX);
+            operationContext(), NamespaceString::kCollectionCriticalSectionsNamespace, MODE_IX);
+
+        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
     }
 
     void tearDown() override {
@@ -280,9 +272,10 @@ public:
         // Create the `config.collection_critical_sections` collection to allow notifications on the
         // operation observer.
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx());
-        ASSERT_OK(createCollection(
-            opCtx(), CreateCommand(NamespaceString::kCollectionCriticalSectionsNamespace)));
+            operationContext());
+        ASSERT_OK(
+            createCollection(operationContext(),
+                             CreateCommand(NamespaceString::kCollectionCriticalSectionsNamespace)));
     }
 };
 
@@ -295,8 +288,9 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnDatabase
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -308,8 +302,9 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnDatabase
     // Block read/write operations (commit phase)
     //////////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(dbName);
@@ -321,8 +316,9 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnDatabase
     // Unblock read/write operations
     /////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->releaseRecoverableCriticalSection(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->releaseRecoverableCriticalSection(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -336,11 +332,13 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -352,11 +350,13 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
     // Block read/write operations (commit phase)
     //////////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
-    ShardingRecoveryService::get(opCtx())->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(dbName);
@@ -368,11 +368,13 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
     // Unblock read/write operations
     /////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->releaseRecoverableCriticalSection(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->releaseRecoverableCriticalSection(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
-    ShardingRecoveryService::get(opCtx())->releaseRecoverableCriticalSection(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->releaseRecoverableCriticalSection(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -388,11 +390,15 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), dbName, differentOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(operationContext(),
+                                                       dbName,
+                                                       differentOpReason,
+                                                       ShardingCatalogClient::kLocalWriteConcern);
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
@@ -402,15 +408,20 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
     //////////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx(), dbName, differentOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+            operationContext(),
+            dbName,
+            differentOpReason,
+            ShardingCatalogClient::kLocalWriteConcern);
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
@@ -420,22 +431,27 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
     //////////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     /////////////////////////////////
     // Unblock read/write operations
     /////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->releaseRecoverableCriticalSection(
-        opCtx(), dbName, differentOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->releaseRecoverableCriticalSection(operationContext(),
+                                            dbName,
+                                            differentOpReason,
+                                            ShardingCatalogClient::kLocalWriteConcern);
 }
 
 TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollection) {
@@ -443,8 +459,9 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollecti
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -456,8 +473,9 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollecti
     // Block read/write operations (commit phase)
     //////////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(collNss);
@@ -469,8 +487,9 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollecti
     // Unblock read/write operations
     /////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->releaseRecoverableCriticalSection(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->releaseRecoverableCriticalSection(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
@@ -484,11 +503,13 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -500,11 +521,13 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
     // Block read/write operations (commit phase)
     //////////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
-    ShardingRecoveryService::get(opCtx())->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(collNss);
@@ -516,11 +539,13 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
     // Unblock read/write operations
     /////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->releaseRecoverableCriticalSection(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->releaseRecoverableCriticalSection(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
-    ShardingRecoveryService::get(opCtx())->releaseRecoverableCriticalSection(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->releaseRecoverableCriticalSection(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
@@ -536,11 +561,15 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), collNss, differentOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(operationContext(),
+                                                       collNss,
+                                                       differentOpReason,
+                                                       ShardingCatalogClient::kLocalWriteConcern);
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
@@ -550,15 +579,20 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
     //////////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx(), collNss, differentOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+            operationContext(),
+            collNss,
+            differentOpReason,
+            ShardingCatalogClient::kLocalWriteConcern);
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
@@ -568,22 +602,27 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
     //////////////////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
 
     /////////////////////////////////
     // Unblock read/write operations
     /////////////////////////////////
 
-    ShardingRecoveryService::get(opCtx())->releaseRecoverableCriticalSection(
-        opCtx(), collNss, differentOpReason, ShardingCatalogClient::kLocalWriteConcern);
+    ShardingRecoveryService::get(operationContext())
+        ->releaseRecoverableCriticalSection(operationContext(),
+                                            collNss,
+                                            differentOpReason,
+                                            ShardingCatalogClient::kLocalWriteConcern);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -601,9 +640,9 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
         std::vector<InsertStatement> inserts;
         inserts.emplace_back(doc.toBSON());
 
-        WriteUnitOfWork wuow(opCtx());
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
-        opObserver().onInserts(opCtx(),
+        WriteUnitOfWork wuow(operationContext());
+        AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
+        opObserver().onInserts(operationContext(),
                                criticalSectionColl(),
                                inserts.begin(),
                                inserts.end(),
@@ -630,9 +669,9 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
         updateArgs.updatedDoc = doc.toBSON();
         OplogUpdateEntryArgs update(&updateArgs, criticalSectionColl());
 
-        WriteUnitOfWork wuow(opCtx());
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
-        opObserver().onUpdate(opCtx(), update);
+        WriteUnitOfWork wuow(operationContext());
+        AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
+        opObserver().onUpdate(operationContext(), update);
         wuow.commit();
     }
 
@@ -646,12 +685,12 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
     // Simulate an delete notification on the `config.collection_critical_sections` collection, that
     // is what a secondary node would receive when the primary node leaves the critical section.
     {
-        WriteUnitOfWork wuow(opCtx());
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
+        WriteUnitOfWork wuow(operationContext());
+        AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
         OplogDeleteEntryArgs args;
-        opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON(), &args);
+        opObserver().aboutToDelete(operationContext(), criticalSectionColl(), doc.toBSON(), &args);
         opObserver().onDelete(
-            opCtx(), criticalSectionColl(), kUninitializedStmtId, doc.toBSON(), args);
+            operationContext(), criticalSectionColl(), kUninitializedStmtId, doc.toBSON(), args);
         wuow.commit();
     }
 
@@ -673,9 +712,9 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
         std::vector<InsertStatement> inserts;
         inserts.emplace_back(doc.toBSON());
 
-        WriteUnitOfWork wuow(opCtx());
-        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
-        opObserver().onInserts(opCtx(),
+        WriteUnitOfWork wuow(operationContext());
+        AutoGetCollection coll(operationContext(), collNss, MODE_IX);
+        opObserver().onInserts(operationContext(),
                                criticalSectionColl(),
                                inserts.begin(),
                                inserts.end(),
@@ -701,9 +740,9 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
         updateArgs.updatedDoc = doc.toBSON();
         OplogUpdateEntryArgs update(&updateArgs, criticalSectionColl());
 
-        WriteUnitOfWork wuow(opCtx());
-        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
-        opObserver().onUpdate(opCtx(), update);
+        WriteUnitOfWork wuow(operationContext());
+        AutoGetCollection coll(operationContext(), collNss, MODE_IX);
+        opObserver().onUpdate(operationContext(), update);
         wuow.commit();
     }
 
@@ -717,12 +756,12 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
     // Simulate an delete notification on the `config.collection_critical_sections` collection, that
     // is what a secondary node would receive when the primary node leaves the critical section.
     {
-        WriteUnitOfWork wuow(opCtx());
-        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
+        WriteUnitOfWork wuow(operationContext());
+        AutoGetCollection coll(operationContext(), collNss, MODE_IX);
         OplogDeleteEntryArgs args;
-        opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON(), &args);
+        opObserver().aboutToDelete(operationContext(), criticalSectionColl(), doc.toBSON(), &args);
         opObserver().onDelete(
-            opCtx(), criticalSectionColl(), kUninitializedStmtId, doc.toBSON(), args);
+            operationContext(), criticalSectionColl(), kUninitializedStmtId, doc.toBSON(), args);
         wuow.commit();
     }
 
@@ -741,10 +780,11 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
     // entering the catch-up phase of the critical section for a database, then react to an
     // hypothetical availability of initial data.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
+        AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
         writeReadCriticalSectionDocument(dbName, dbOpReason, false /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
+    ShardingRecoveryService::get(operationContext())
+        ->onConsistentDataAvailable(operationContext(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -757,10 +797,11 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
     // entering the commit phase of the critical section for the database, then react to an
     // hypothetical availability of initial data.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
+        AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
         writeReadCriticalSectionDocument(dbName, dbOpReason, true /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
+    ShardingRecoveryService::get(operationContext())
+        ->onConsistentDataAvailable(operationContext(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(dbName);
@@ -773,10 +814,11 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
     // leaving the critical section for the database, then react to an hypothetical availability of
     // initial data.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
+        AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
         deleteReadCriticalSectionDocument(dbName, dbOpReason);
     }
-    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
+    ShardingRecoveryService::get(operationContext())
+        ->onConsistentDataAvailable(operationContext(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -791,10 +833,11 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
     // entering the catch-up phase of the critical section for a collection, then react to an
     // hypothetical  availability of initial data.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
+        AutoGetCollection coll(operationContext(), collNss, MODE_IX);
         writeReadCriticalSectionDocument(collNss, collOpReason, false /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
+    ShardingRecoveryService::get(operationContext())
+        ->onConsistentDataAvailable(operationContext(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -807,10 +850,11 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
     // entering the commit phase of the critical section for the collection, then react to an
     // hypothetical  availability of initial data.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
+        AutoGetCollection coll(operationContext(), collNss, MODE_IX);
         writeReadCriticalSectionDocument(collNss, collOpReason, true /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
+    ShardingRecoveryService::get(operationContext())
+        ->onConsistentDataAvailable(operationContext(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(collNss);
@@ -823,10 +867,11 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
     // leaving the critical section for the collection, then react to an hypothetical  availability
     // of initial data.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
+        AutoGetCollection coll(operationContext(), collNss, MODE_IX);
         deleteReadCriticalSectionDocument(collNss, collOpReason);
     }
-    ShardingRecoveryService::get(opCtx())->onConsistentDataAvailable(opCtx(), false, false);
+    ShardingRecoveryService::get(operationContext())
+        ->onConsistentDataAvailable(operationContext(), false, false);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
@@ -843,11 +888,12 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
     // entering the catch-up phase of the critical section for a database, then react to an
     // hypothetical replication rollback.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
+        AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
         writeReadCriticalSectionDocument(dbName, dbOpReason, false /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->recoverStates(
-        opCtx(), {NamespaceString::kCollectionCriticalSectionsNamespace});
+    ShardingRecoveryService::get(operationContext())
+        ->recoverStates(operationContext(),
+                        {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -860,11 +906,12 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
     // entering the commit phase of the critical section for the database, then react to an
     // hypothetical replication rollback.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
+        AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
         writeReadCriticalSectionDocument(dbName, dbOpReason, true /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->recoverStates(
-        opCtx(), {NamespaceString::kCollectionCriticalSectionsNamespace});
+    ShardingRecoveryService::get(operationContext())
+        ->recoverStates(operationContext(),
+                        {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(dbName);
@@ -877,11 +924,12 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
     // leaving the critical section for the database, then react to an hypothetical replication
     // rollback.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
+        AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
         deleteReadCriticalSectionDocument(dbName, dbOpReason);
     }
-    ShardingRecoveryService::get(opCtx())->recoverStates(
-        opCtx(), {NamespaceString::kCollectionCriticalSectionsNamespace});
+    ShardingRecoveryService::get(operationContext())
+        ->recoverStates(operationContext(),
+                        {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -896,11 +944,12 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
     // entering the catch-up phase of the critical section for a collection, then react to an
     // hypothetical replication rollback.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
+        AutoGetCollection coll(operationContext(), collNss, MODE_IX);
         writeReadCriticalSectionDocument(collNss, collOpReason, false /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->recoverStates(
-        opCtx(), {NamespaceString::kCollectionCriticalSectionsNamespace});
+    ShardingRecoveryService::get(operationContext())
+        ->recoverStates(operationContext(),
+                        {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -913,11 +962,12 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
     // entering the commit phase of the critical section for the collection, then react to an
     // hypothetical replication rollback.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
+        AutoGetCollection coll(operationContext(), collNss, MODE_IX);
         writeReadCriticalSectionDocument(collNss, collOpReason, true /* blockReads */);
     }
-    ShardingRecoveryService::get(opCtx())->recoverStates(
-        opCtx(), {NamespaceString::kCollectionCriticalSectionsNamespace});
+    ShardingRecoveryService::get(operationContext())
+        ->recoverStates(operationContext(),
+                        {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(collNss);
@@ -930,14 +980,16 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
     // leaving the critical section for the collection, then react to an hypothetical replication
     // rollback.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
+        AutoGetCollection coll(operationContext(), collNss, MODE_IX);
         deleteReadCriticalSectionDocument(collNss, collOpReason);
     }
-    ShardingRecoveryService::get(opCtx())->recoverStates(
-        opCtx(), {NamespaceString::kCollectionCriticalSectionsNamespace});
+    ShardingRecoveryService::get(operationContext())
+        ->recoverStates(operationContext(),
+                        {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
 }
 
+}  // namespace
 }  // namespace mongo

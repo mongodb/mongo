@@ -37,7 +37,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog_cache.h"
@@ -61,7 +60,7 @@ std::shared_ptr<RemoteCommandTargeterMock> ShardServerTestFixture::configTargete
 void ShardServerTestFixture::setUp() {
     ShardingMongoDTestFixture::setUp();
 
-    replicationCoordinator()->alwaysAllowWrites(true);
+    ASSERT_OK(replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
     ShardingState::get(getServiceContext())
         ->setRecoveryCompleted({OID::gen(),
@@ -82,8 +81,6 @@ void ShardServerTestFixture::setUp() {
     configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
 }
 
-// Sets the catalog cache loader for mocking. This must be called before the setUp function is
-// invoked.
 void ShardServerTestFixture::setCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> loader) {
     invariant(loader && !_catalogCacheLoader);
     _catalogCacheLoader = std::move(loader);

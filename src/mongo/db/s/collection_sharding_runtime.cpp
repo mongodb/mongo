@@ -163,6 +163,8 @@ CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* service, Na
                         ? MetadataType::kUntracked
                         : MetadataType::kUnknown) {}
 
+CollectionShardingRuntime::~CollectionShardingRuntime() = default;
+
 CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime
 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(OperationContext* opCtx,
                                                                   const NamespaceString& nss) {

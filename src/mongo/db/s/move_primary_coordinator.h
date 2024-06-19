@@ -144,11 +144,6 @@ private:
      */
     void clearDbMetadataOnPrimary(OperationContext* opCtx) const;
 
-    /*
-     * Clears the filtering metadata in the local catalog cache for every cloned collection.
-     */
-    void clearFilteringMetadata(OperationContext* opCtx) const;
-
     /**
      * Drops stale collections on the donor.
      */
