@@ -5,8 +5,14 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
-const st = new ShardingTest(
-    {name: jsTestName(), keyFile: "jstests/libs/key1", shards: 2, rs0: {nodes: 3}});
+const st = new ShardingTest({
+    name: jsTestName(),
+    keyFile: "jstests/libs/key1",
+    shards: 2,
+    // Disallow chaining so that when testing replSetAbortPrimaryCatchUp we have the guarantee that
+    // the secondary is syncing from the primary.
+    rs0: {nodes: 3, settings: {chainingAllowed: false}},
+});
 
 const shardConn = st.rs0.getPrimary();
 const shardAdminDB = shardConn.getDB("admin");
@@ -49,7 +55,9 @@ jsTest.log("Testing replSetStepDown and replSetStepUp");
         st.rs0.awaitNodesAgreeOnPrimary();
         st.rs0.awaitSecondaryNodes();
     });
-    assert.commandWorked(secondaryConn.adminCommand({replSetStepDown: 0, force: true}));
+    // {replSetStepDown: 0} defaults to 60 seconds rather than 0, so specify 1 here and unfreeze the
+    // node later in the test if it will be stepped up to primary.
+    assert.commandWorked(secondaryConn.adminCommand({replSetStepDown: 1, force: true}));
     authutil.asCluster(st.rs0.nodes, "jstests/libs/key1", function() {
         st.rs0.awaitNodesAgreeOnPrimary();
         st.rs0.awaitSecondaryNodes();
@@ -93,6 +101,8 @@ jsTest.log("Testing replSetAbortPrimaryCatchUp");
     let primaryConn = setupConn(primary, "user", "y");
     let secondary1Conn = setupConn(secondary1, "user", "y");
     let secondary2Conn = setupConn(secondary2, "user", "y");
+    // Ensure the secondary we plan to step up isn't frozen from a prior step down
+    assert.commandWorked(secondary1Conn.adminCommand({replSetFreeze: 0}));
 
     // Reconfig to make the catchup timeout infinite.
     let newConfig = assert.commandWorked(primaryConn.adminCommand({replSetGetConfig: 1})).config;
