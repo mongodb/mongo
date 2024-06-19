@@ -107,7 +107,10 @@ if (FeatureFlagUtil.getStatus(
 // TODO: SERVER-79766 Run also on sharded clusters. Right now it cannot because TransactionRouter
 // ignores the client-provided atClusterTime.
 // Skip on causal-consistency suites because we cannot use 'atClusterTime' there.
-if (!db.getMongo().isCausalConsistency() && !session.getClient().isMongos()) {
+if (FeatureFlagUtil.getStatus(
+        db, "PointInTimeCatalogLookups", /*user=*/ undefined, /*ignoreFCV=*/ true) ==
+        FeatureFlagUtil.FlagStatus.kEnabled &&
+    !db.getMongo().isCausalConsistency() && !session.getClient().isMongos()) {
     sessionCollA.drop();
     sessionCollB.drop();
 
