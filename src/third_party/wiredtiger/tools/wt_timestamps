@@ -29,7 +29,7 @@
 # Return global timestamps for a WT directory
 
 import os, sys
-from wt_tools_common import wiredtiger_open
+from py_common.wiredtiger_util import wiredtiger_open
 
 # There are two more listed in documentation: 'oldest_timestamp' and 'stable_timestamp',
 # theses are aliases for 'oldest' and 'stable', so they are not listed here.
@@ -58,7 +58,7 @@ while len(args) > 1 and args[0][0] == '-':
         usage_exit()
 
 if len(args) < 1:
-    usage()
+    usage_exit()
 
 if query == []:
     query = default_query

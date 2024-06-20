@@ -36,7 +36,7 @@
 # ------------------------------------------------------------------------------
 import os, re, sys
 from contextlib import redirect_stdout
-from wt_tools_common import wiredtiger_open
+from py_common.wiredtiger_util import wiredtiger_open
 from wt_cmp_uri import wiredtiger_compare_uri
 
 # Print usage and exit with a failure status.

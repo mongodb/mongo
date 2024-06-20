@@ -29,7 +29,7 @@
 # Compare WT data files in two different home directories.
 
 import sys
-from wt_tools_common import wiredtiger_open
+from py_common.wiredtiger_util import wiredtiger_open
 from wiredtiger import WT_NOTFOUND, wiredtiger_strerror
 
 def usage_exit():
@@ -111,7 +111,7 @@ def show_kv(kv):
 # when custom collation is behind, we don't really know how to 'recover' in the general case.
 # test/format uses custom collation, but only with a "reverse" collator - if we detect keys
 # are going in reverse, we take note of that.
-# 
+#
 def compare_cursors(cc1, cc2, version):
     nrecords = 0
     verbose('{}: next'.format(cc1.name))
@@ -189,7 +189,7 @@ def compare_cursors(cc1, cc2, version):
 
         if abs(missing) >= 10:
             print(' total of {} missing entries here'.format(abs(missing)))
-            
+
         # At this point, the keys are the same
         if v1 != v2:
             print('for key={}, value is different: {}: {}, {}: {}'.format(show_kv(k1), cc1.name, show_kv(v1), cc2.name, show_kv(v2)))

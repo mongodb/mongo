@@ -30,8 +30,11 @@
 
 import os, sys
 
-# Set the system path to include the python build directory if we can find it.
+
 def setup_python_path():
+    '''
+    Set the system path to include the python build directory if we can find it.
+    '''
     # Assuming we're somewhere in a build directory, walk the tree up
     # looking for the wt program.
     curdir = os.getcwd()
@@ -48,14 +51,18 @@ def setup_python_path():
         print('Cannot find wt, must run this from a build directory')
         sys.exit(1)
 
-# Import the wiredtiger directory and return the wiredtiger_open function.
+
 def import_wiredtiger():
+    '''
+    Import the wiredtiger directory and return the wiredtiger_open function.
+    '''
     try:
         from wiredtiger import wiredtiger_open
     except:
         setup_python_path()
         from wiredtiger import wiredtiger_open
     return wiredtiger_open
+
 
 # This name will be exported
 wiredtiger_open = import_wiredtiger()

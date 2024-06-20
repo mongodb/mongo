@@ -38,7 +38,7 @@ class test_util22(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Skip 'copyright', which does not process options
     commands = ['alter', 'backup', 'compact', 'create', 'downgrade', 'drop', 'dump', 'list', 'load',
-                'loadtext', 'printlog', 'read', 'salvage', 'stat', 'truncate', 'verify', 'write']
+                'loadtext', 'printlog', 'read', 'rename', 'salvage', 'stat', 'truncate', 'verify', 'write']
 
     def test_help_option(self):
         errfilename = "errfile.txt"
