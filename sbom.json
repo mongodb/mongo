@@ -295,7 +295,7 @@
                 "name": ""
             },
             "name": "derickr/timelib",
-            "version": "Unknown",
+            "version": "2022.10",
             "licenses": [
                 {
                     "license": {
@@ -319,7 +319,7 @@
                 ]
             },
             "scope": "required",
-            "purl": "pkg:github/derickr/timelib"
+            "purl": "pkg:github/derickr/timelib@2022.10"
         },
         {
             "supplier": {
