@@ -134,6 +134,32 @@ std::vector<BSONObj> generateIntegers(int num, int skipPercentage) {
     return ints;
 }
 
+// Biases toward a specific table bits in simple8b, but is not strict
+std::vector<BSONObj> generateTableTargets(int num, int tableBits) {
+    std::mt19937 gen(seedGen());
+    int maxDeltaForTable = (1 << (tableBits - 1)) - 1;
+    int tableRadius = 1 << (tableBits - 3);
+    int tableCenter = maxDeltaForTable - tableRadius;
+    // set distance to different table sizes at 3 stddev
+    std::normal_distribution<> d((double)tableCenter, ((double)tableRadius) / 3);
+    std::uniform_int_distribution neg(0, 1);
+
+    std::vector<BSONObj> ints;
+
+    int32_t lastValue = 0;
+    for (int i = 0; i < num; ++i) {
+        BSONObjBuilder builder;
+        int32_t diff = std::lround(d(gen));
+        if (neg(gen) == 1)
+            diff *= -1;
+        lastValue += diff;
+        builder.append(""_sd, lastValue);
+        ints.push_back(builder.obj());
+    }
+
+    return ints;
+}
+
 std::vector<BSONObj> generateDoubles(int num, int skipPercentage, int decimals) {
     std::mt19937 gen(seedGen());
     std::normal_distribution<> d(100, 10);
@@ -494,6 +520,22 @@ void BM_decompressIntegers(benchmark::State& state, int skipPercentage, Decompre
     }
 }
 
+void BM_decompressTableTargets(benchmark::State& state, int tableBits, DecompressMode mode) {
+    BSONObj compressed = buildCompressed(generateTableTargets(10000, tableBits));
+    switch (mode) {
+        case kBlockBSON:
+            benchmarkBlockBasedDecompression(state, compressed.firstElement(), sizeof(int32_t));
+            break;
+        case kBlockSBE:
+            benchmarkBlockBasedDecompression_SBE(state, compressed.firstElement(), sizeof(int32_t));
+            break;
+        case kIterator:
+        default:
+            benchmarkDecompression(state, compressed.firstElement(), sizeof(int32_t));
+            break;
+    }
+}
+
 void BM_decompressDoubles(benchmark::State& state,
                           int decimals,
                           int skipPercentage,
@@ -667,6 +709,14 @@ void BM_reopenNaiveIntegers(benchmark::State& state, int skipPercentage, int num
 BENCHMARK_CAPTURE(BM_decompressIntegers, Block API BSON Skip = 0 %, 0, kBlockBSON);
 BENCHMARK_CAPTURE(BM_decompressIntegers, Block API BSON Skip = 50 %, 50, kBlockBSON);
 BENCHMARK_CAPTURE(BM_decompressIntegers, Block API BSON Skip = 99 %, 99, kBlockBSON);
+
+// Only benchmarking table performance for block decompression, and only in ranges where we
+// are unsure whether or not to use table decompression
+BENCHMARK_CAPTURE(BM_decompressTableTargets, Block API BSON Bits = 8, 8, kBlockBSON);
+BENCHMARK_CAPTURE(BM_decompressTableTargets, Block API BSON Bits = 10, 10, kBlockBSON);
+BENCHMARK_CAPTURE(BM_decompressTableTargets, Block API BSON Bits = 12, 12, kBlockBSON);
+BENCHMARK_CAPTURE(BM_decompressTableTargets, Block API BSON Bits = 15, 15, kBlockBSON);
+BENCHMARK_CAPTURE(BM_decompressTableTargets, Block API BSON Bits = 20, 20, kBlockBSON);
 
 BENCHMARK_CAPTURE(BM_decompressObjects, Block API BSON Objects Small, 1, kBlockBSON);
 BENCHMARK_CAPTURE(BM_decompressObjects, Block API BSON Objects Large, 10, kBlockBSON);
