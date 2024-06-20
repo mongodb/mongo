@@ -69,12 +69,6 @@ public:
 
     ~DocumentSourceMatch() override = default;
 
-    boost::intrusive_ptr<DocumentSource> clone(
-        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
-        // Raw new is needed to access non-public constructors.
-        return new DocumentSourceMatch(*this, newExpCtx);
-    }
-
     static constexpr StringData kStageName = "$match"_sd;
     /**
      * Convenience method for creating a $match stage.

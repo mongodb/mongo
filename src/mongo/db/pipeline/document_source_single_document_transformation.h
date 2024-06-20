@@ -68,14 +68,6 @@ namespace mongo {
  */
 class DocumentSourceSingleDocumentTransformation final : public DocumentSource {
 public:
-    boost::intrusive_ptr<DocumentSource> clone(
-        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
-        auto list = DocumentSource::parse(newExpCtx ? newExpCtx : pExpCtx,
-                                          serialize().getDocument().toBson());
-        invariant(list.size() == 1);
-        return list.front();
-    }
-
     DocumentSourceSingleDocumentTransformation(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         std::unique_ptr<TransformerInterface> parsedTransform,
