@@ -4,6 +4,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");                   // For checkSbeFullyEnabled.
 load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
@@ -156,42 +157,50 @@ runTestsExpectFailure(baseCollectionClusterTimeAgg);
 runTestsExpectFailure(fromViewWithClusterTime);
 runTestsExpectFailure(withExprClusterTime);
 
-if (checkSbeFullyEnabled(db)) {
-    function verifyPlanCacheSize(query) {
-        coll.getPlanCache().clear();
-
-        query().toArray();
-        // It can take two executions of a query for a plan to get cached.
-        query().toArray();
-
-        const caches = coll.getPlanCache().list();
-        assert.eq(caches.length, 1, caches);
-        assert.eq(caches[0].cachedPlan.stages.includes("Date"), false, caches);
+{
+    // Verify queries referencing $$NOW do not run with SBE.
+    function assertEngineUsed(query, isSBE) {
+        const explain = coll.explain().aggregate(query);
+        const expectedExplainVersion = isSBE ? "2" : "1";
+        assert(explain.hasOwnProperty("explainVersion"), explain);
+        assert.eq(explain.explainVersion, expectedExplainVersion, explain);
     }
 
-    // Query with $$NOW will be cached.
-    verifyPlanCacheSize(projWithNow);
-    verifyPlanCacheSize(aggWithNow);
-    // $$NOW is not in SBE query.
-    verifyPlanCacheSize(fromViewWithNow);
-    verifyPlanCacheSize(withExprNow);
-    // $$NOW could not be pushed down into SBE.
-    verifyPlanCacheSize(baseCollectionNowAgg);
-    verifyPlanCacheSize(aggWithNowNotPushedDown);
+    // Verify that SBE eligible group query referencing $$NOW doesn't use SBE.
+    assertEngineUsed(
+        [{$match: {$expr: {$gt: ["$timeField", 100]}}}, {$group: {_id: null, count: {$sum: 1}}}],
+        true);
+    assertEngineUsed(
+        [
+            {$match: {$expr: {$gt: ["$timeField", "$$NOW"]}}},
+            {$group: {_id: null, count: {$sum: 1}}}
+        ],
+        false);
 }
 
-// Insert an doc with a future time.
-const futureColl = db[coll.getName() + "_future"];
-futureColl.drop();
-const time = new Date();
-time.setSeconds(time.getSeconds() + 3);
-assert.commandWorked(futureColl.insert({timeField: time}));
+{
+    // Insert a doc with a future time.
+    const futureColl = db[coll.getName() + "_future"];
+    futureColl.drop();
+    const time = new Date();
+    time.setSeconds(time.getSeconds() + 3);
+    assert.commandWorked(futureColl.insert({timeField: time}));
 
-// The 'timeField' value is later than '$$NOW' in '$expr'.
-assert.eq(0, futureColl.find({$expr: {$lt: ["$timeField", "$$NOW"]}}).itcount());
-// The '$$NOW' in '$expr' should advance its value after sleeping for 3 second, the 'timeField'
-// value should be earlier than it now.
-assert.soon(() => {
-    return futureColl.find({$expr: {$lt: ["$timeField", "$$NOW"]}}).itcount() == 1;
-}, "$$NOW should catch up after 3 seconds");
+    // The 'timeField' value is later than '$$NOW' in '$expr'.
+    assert.eq(0, futureColl.find({$expr: {$lt: ["$timeField", "$$NOW"]}}).itcount());
+    // The '$$NOW' in '$expr' should advance its value after sleeping for 3 second, the 'timeField'
+    // value should be earlier than it now.
+    assert.soon(() => {
+        return futureColl.find({$expr: {$lt: ["$timeField", "$$NOW"]}}).itcount() == 1;
+    }, "$$NOW should catch up after 3 seconds");
+
+    // Test that $$NOW is able to use index.
+    assert.commandWorked(futureColl.createIndex({timeField: 1}));
+    const explainResults =
+        futureColl.find({$expr: {$lt: ["$timeField", {$subtract: ["$$NOW", 100]}]}})
+            .explain("queryPlanner");
+    const winningPlan = getWinningPlan(explainResults.queryPlanner);
+    assert(isIxscan(db, winningPlan),
+           `Expected winningPlan to be index scan plan: ${tojson(winningPlan)}`);
+}
 }());

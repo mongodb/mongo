@@ -2476,6 +2476,13 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(ExpressionContext*
             expCtx->setSystemVarReferencedInQuery(varId);
         }
 
+        // SBE is unable to handle expressions with system variables when the SBE plan cache is
+        // enabled (SERVER-91625).
+        if (varId == Variables::kNowId || varId == Variables::kClusterTimeId ||
+            varId == Variables::kUserRolesId) {
+            expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        }
+
         return new ExpressionFieldPath(expCtx, fieldPath.toString(), varId);
     } else {
         return new ExpressionFieldPath(expCtx,
@@ -2512,15 +2519,6 @@ intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
     if (_variable == Variables::kRemoveId) {
         // The REMOVE system variable optimizes to a constant missing value.
         return ExpressionConstant::create(getExpressionContext(), Value());
-    }
-
-    if (_variable == Variables::kNowId || _variable == Variables::kClusterTimeId ||
-        _variable == Variables::kUserRolesId) {
-        // The agg system is allowed to replace the ExpressionFieldPath with an ExpressionConstant,
-        // which in turn would result in a plan cache entry that inlines the value of a system
-        // variable. However, the values of these system variables are not guaranteed to be constant
-        // across different executions of the same query shape, so we prohibit the optimization.
-        return intrusive_ptr<Expression>(this);
     }
 
     if (getExpressionContext()->variables.hasConstantValue(_variable)) {
