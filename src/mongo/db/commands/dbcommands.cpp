@@ -802,10 +802,6 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    bool requiresAuth() const final {
-        return true;
-    }
-
     bool adminOnly() const final {
         return false;
     }
@@ -818,12 +814,10 @@ public:
         return false;
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
+    Status checkAuthForOperation(OperationContext*,
                                  const DatabaseName&,
                                  const BSONObj&) const override {
-        auto* as = AuthorizationSession::get(opCtx->getClient());
-        uassert(ErrorCodes::Unauthorized, "Unauthorized", as->isAuthenticated());
-
+        // No explicit privileges required. Any authenticated user may call.
         return Status::OK();
     }
 
