@@ -123,25 +123,17 @@ bool DocumentSourceGroup::pushDotRenamedMatch(Pipeline::SourceContainer::iterato
         return false;
     }
 
-    stdx::unordered_set<std::string> groupingFields;
-    StringMap<std::string> relevantRenames;
-
-    auto itsGroup = dynamic_cast<DocumentSourceGroup*>(itr->get());
-
-    auto idFields = itsGroup->getIdFields();
-    for (auto& idFieldsItr : idFields) {
+    StringSet groupingFields;
+    for (auto& idFieldsItr : getIdFields()) {
         groupingFields.insert(idFieldsItr.first);
     }
 
     GetModPathsReturn paths = prospectiveProjection->getModifiedPaths();
-
     for (const auto& thisComplexRename : paths.complexRenames) {
-
         // Check if the dotted renaming is done on a grouping field.
         // This ensures that the top level is flat i.e., no arrays.
-        if (groupingFields.find(thisComplexRename.second) != groupingFields.end()) {
-            relevantRenames.insert(std::pair<std::string, std::string>(thisComplexRename.first,
-                                                                       thisComplexRename.second));
+        if (groupingFields.contains(thisComplexRename.second)) {
+            paths.renames[thisComplexRename.first] = thisComplexRename.second;
         }
     }
 
@@ -151,8 +143,6 @@ bool DocumentSourceGroup::pushDotRenamedMatch(Pipeline::SourceContainer::iterato
 
     auto currentMatchCopyDocumentMatch =
         dynamic_cast<DocumentSourceMatch*>(currentMatchCopyDocument.get());
-
-    paths.renames = std::move(relevantRenames);
 
     // Translate predicate statements based on the projection renames.
     auto matchSplitForProject = currentMatchCopyDocumentMatch->splitMatchByModifiedFields(
