@@ -583,6 +583,76 @@ TEST(OplogEntryTest, StatementIDParseAndSerialization) {
         << rtOplogEntryWithSingletonStmtId;
 }
 
+TEST(OplogEntryParserTest, ParseOpTimeSuccess) {
+    repl::OpTime opTime{Timestamp{2}, 1};
+    auto const oplogEntry = opTime.toBSON();
+    OplogEntryParserNonStrict parser{oplogEntry};
+    ASSERT_EQ(opTime, parser.getOpTime()) << oplogEntry.toString();
+}
+
+TEST(OplogEntryParserTest, ParseOpTimeFailure) {
+    auto const oplogEntry = BSON("a" << 1);
+    OplogEntryParserNonStrict parser{oplogEntry};
+    ASSERT_THROWS_CODE_AND_WHAT(parser.getOpTime(),
+                                AssertionException,
+                                ErrorCodes::IDLFailedToParse,
+                                "Failed to parse opTime :: caused by :: "
+                                "BSON field 'OpTimeBase.ts' is missing but a required field");
+}
+
+TEST(OplogEntryParserTest, ParseOpTypeSuccess) {
+    auto const oplogEntry =
+        BSON(OplogEntry::kOpTypeFieldName << OpType_serializer(repl::OpTypeEnum::kDelete));
+    OplogEntryParserNonStrict parser{oplogEntry};
+    ASSERT_EQ(repl::OpTypeEnum::kDelete, parser.getOpType());
+}
+
+TEST(OplogEntryParserTest, ParseOpTypeFailure) {
+    {
+        auto const oplogEntry = BSON(OplogEntry::kOpTypeFieldName << "zz");
+        OplogEntryParserNonStrict parser{oplogEntry};
+        ASSERT_THROWS_CODE_AND_WHAT(
+            parser.getOpType(),
+            AssertionException,
+            ErrorCodes::BadValue,
+            "Enumeration value 'zz' for field 'ChangeStreamEntry.op' is not a valid value.");
+    }
+    {
+        auto const oplogEntry = BSON(OplogEntry::kOpTypeFieldName << 1);
+        OplogEntryParserNonStrict parser{oplogEntry};
+        ASSERT_THROWS_CODE_AND_WHAT(parser.getOpType(),
+                                    AssertionException,
+                                    8881100,
+                                    "Invalid 'op' field type (expected String)");
+    }
+}
+
+TEST(OplogEntryParserTest, ParseObjectSuccess) {
+    auto const objectFieldValue = BSON("a" << 1);
+    auto const oplogEntry = BSON(OplogEntry::kObjectFieldName << objectFieldValue);
+    OplogEntryParserNonStrict parser{oplogEntry};
+    ASSERT_BSONOBJ_BINARY_EQ(objectFieldValue, parser.getObject());
+}
+
+TEST(OplogEntryParserTest, ParseObjectFailure) {
+    {
+        auto const oplogEntry = BSON(OplogEntry::kObjectFieldName << "string");
+        OplogEntryParserNonStrict parser{oplogEntry};
+        ASSERT_THROWS_CODE_AND_WHAT(parser.getObject(),
+                                    AssertionException,
+                                    8881101,
+                                    "Invalid 'o' field type (expected Object)");
+    }
+    {
+        auto const oplogEntry = BSON("a" << 1);
+        OplogEntryParserNonStrict parser{oplogEntry};
+        ASSERT_THROWS_CODE_AND_WHAT(parser.getObject(),
+                                    AssertionException,
+                                    8881101,
+                                    "Invalid 'o' field type (expected Object)");
+    }
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
