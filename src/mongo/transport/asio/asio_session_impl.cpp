@@ -127,7 +127,7 @@ CommonAsioSession::CommonAsioSession(
 
         _localAddr = endpointToSockAddr(_socket.local_endpoint());
     } catch (...) {
-        LOGV2_DEBUG(307471,
+        LOGV2_DEBUG(9079001,
                     1,
                     "Exception in CommonAsioSession constructor",
                     "error"_attr = describeActiveException());
@@ -149,7 +149,7 @@ CommonAsioSession::CommonAsioSession(
             _isFromLoadBalancer = _local.port() == *tl->loadBalancerPort();
         }
     } catch (...) {
-        LOGV2_DEBUG(307472,
+        LOGV2_DEBUG(9079002,
                     1,
                     "Exception in CommonAsioSession constructor",
                     "error"_attr = describeActiveException());
@@ -160,7 +160,7 @@ CommonAsioSession::CommonAsioSession(
         _remote = HostAndPort(_remoteAddr.toString(true));
         _restrictionEnvironment = RestrictionEnvironment(_remoteAddr, _localAddr);
     } catch (...) {
-        LOGV2_DEBUG(307473,
+        LOGV2_DEBUG(9079003,
                     1,
                     "Exception in CommonAsioSession constructor",
                     "error"_attr = describeActiveException());
