@@ -3,9 +3,15 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, List
 
+import os
 import structlog
+import sys
 import typer
 from typing_extensions import Annotated
+
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from buildscripts.client.jiraclient import JiraAuth, JiraClient
 from buildscripts.monitor_build_status.bfs_report import BFsReport
@@ -61,7 +67,7 @@ class MonitorBuildStatusOrchestrator:
         self.jira_service = jira_service
         self.evg_service = evg_service
 
-    def evaluate_build_redness(self, repo: str, branch: str) -> None:
+    def evaluate_build_redness(self, repo: str, branch: str, notify: bool) -> None:
         failures = []
 
         LOGGER.info("Getting Evergreen projects data")
@@ -99,6 +105,15 @@ class MonitorBuildStatusOrchestrator:
 
         for failure in failures:
             LOGGER.error(failure)
+
+        if notify:
+            LOGGER.info("Notifying channel with results")
+            # Send verbatim report for now. We'll want to tweak this to give
+            # us the most relevant information as that becmoes more clear.
+            self.evg_service.evg_api.send_slack_message(
+                target="#10gen-mongo-code-lockdown",
+                msg="\n".join(failures),
+            )
 
     def _make_bfs_report(self, evg_projects_info: EvgProjectsInfo) -> BFsReport:
         query = (
@@ -305,6 +320,12 @@ def main(
     branch: Annotated[
         str, typer.Option(help="Branch name that Evergreen projects track")
     ] = DEFAULT_BRANCH,
+    is_patch: Annotated[
+        str,
+        typer.Option(
+            help="Is this script being called from a patch build. This should align with the `is_patch` environment variable set within Evergreen"
+        ),
+    ] = "true",  # default to the more "quiet" setting
 ) -> None:
     """
     Analyze Jira BFs count and Evergreen redness data.
@@ -333,7 +354,11 @@ def main(
     orchestrator = MonitorBuildStatusOrchestrator(
         jira_service=jira_service, evg_service=evg_service
     )
-    orchestrator.evaluate_build_redness(github_repo, branch)
+
+    # Notify when this is not being run in a patch.
+    # Explicitly match "false" instead of not "true" (the default), so that developer iterations at the command line won't so easily spam the channel.
+    notify = is_patch == "false"
+    orchestrator.evaluate_build_redness(github_repo, branch, notify)
 
 
 if __name__ == "__main__":
