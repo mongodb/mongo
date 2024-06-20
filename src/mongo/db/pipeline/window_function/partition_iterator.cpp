@@ -216,15 +216,6 @@ optional<int> numericBound(WindowBounds::Bound<int> bound) {
                  bound);
 }
 
-// Assumes both arguments are numeric, and performs Decimal128 addition on them.
-Value decimalAdd(const Value& left, const Value& right) {
-    // Widening to Decimal128 is a convenient way to avoid having many cases for different numeric
-    // types. The 'threshold' values we compute are only used to choose a set of documents; the
-    // user can't observe the type.
-    return Value(left.coerceToDecimal().add(right.coerceToDecimal()));
-}
-
-
 }  // namespace
 
 void PartitionIterator::advanceToNextPartition() {
@@ -243,6 +234,8 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
     const WindowBounds::RangeBased& range, const optional<std::pair<int, int>>& hint) {
 
     tassert(5429404, "Missing _sortExpr with range-based bounds", _sortExpr != boost::none);
+
+    auto lessThan = _expCtx->getValueComparator().getLessThan();
 
     Value base = (*_sortExpr)->evaluate(*(*this)[0], &_expCtx->variables);
     if (range.unit) {
@@ -268,7 +261,18 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
                 dateAdd(base.coerceToDate(), *range.unit, delta.coerceToInt(), TimeZone())};
         } else {
             tassert(5429406, "Range-based bounds are specified as a number", delta.numeric());
-            return decimalAdd(base, delta);
+            if (base.getType() == BSONType::NumberDouble) {
+                // When we compare a double and a Decimal128, we convert the Decimal128 to double
+                // and compare two double values. Since converting a double to Decimal128 is
+                // expensive and since during the comparison we will convert the Decimal128 to
+                // double, we compute the threshold as double from the beginning when the base
+                // value is already a double.
+                return Value(base.getDouble() + delta.coerceToDouble());
+            }
+            // Widening to Decimal128 is a convenient way to avoid having many cases for different
+            // numeric types. The 'threshold' values we compute are only used to choose a set of
+            // documents; the user can't observe the type.
+            return Value(base.coerceToDecimal().add(delta.coerceToDecimal()));
         }
     };
     auto hasExpectedType = [&](const Value& v) -> bool {
@@ -277,20 +281,6 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
         } else {
             return v.numeric();
         }
-    };
-    auto lessThan = [&](const Value& docValue, const Value& thresholdValue) {
-        auto lessThanFunc = _expCtx->getValueComparator().getLessThan();
-
-        if (docValue.numeric() && thresholdValue.numeric()) {
-            // The threshold was computed using the decimalAdd method above. This method
-            // converts all arguments to Decimal128 before doing the addition. Converting a
-            // double to Decimal128 might result in loss in precisions. To make sure that the
-            // comparison of the document value is done under the same circumstances this method
-            // converts both arguments to Decimal128 before comparing them.
-            return lessThanFunc(Value{docValue.coerceToDecimal()},
-                                Value{thresholdValue.coerceToDecimal()});
-        }
-        return lessThanFunc(docValue, thresholdValue);
     };
 
     // 'lower' is the smallest offset in the partition that's within the lower bound of the window.

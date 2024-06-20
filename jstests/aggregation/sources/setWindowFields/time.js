@@ -231,3 +231,57 @@ assert.sameMembers(res, [
     {"res": 36472996377170790000},
     {"res": 36472996377170790000}
 ]);
+
+// Test with large bound over large data values
+const res2 =
+    coll.aggregate([
+            {
+                $setWindowFields: {
+                    partitionBy: "$str",
+                    sortBy: {"any": -1},
+                    output: {"num": {$sum: {$pow: [8, 20]}}}
+                }
+            },
+            {
+                $setWindowFields: {
+                    sortBy: {"num": 1},
+                    output:
+                        {"res": {$max: "$num", window: {range: [-{$pow: [9, 20]}, "current"]}}}
+                }
+            },
+            {$project: {res: 1, _id: 0}},
+        ])
+        .toArray();
+
+assert.sameMembers(res2, [
+    {"res": 1152921504606847000},
+    {"res": 2305843009213694000},
+    {"res": 2305843009213694000},
+    {"res": 3458764513820541000},
+    {"res": 3458764513820541000},
+    {"res": 3458764513820541000}
+]);
+
+// Test with large bound over small data values
+const res3 =
+    coll.aggregate([
+            {
+                $setWindowFields: {
+                    partitionBy: "$str",
+                    sortBy: {"any": -1},
+                    output: {"num": {$sum: {$pow: [2, 2]}}}
+                }
+            },
+            {
+                $setWindowFields: {
+                    sortBy: {"num": 1},
+                    output:
+                        {"res": {$max: "$num", window: {range: [-{$pow: [9, 20]}, "current"]}}}
+                }
+            },
+            {$project: {res: 1, _id: 0}},
+        ])
+        .toArray();
+
+assert.sameMembers(res3,
+                   [{"res": 4}, {"res": 8}, {"res": 8}, {"res": 12}, {"res": 12}, {"res": 12}]);
