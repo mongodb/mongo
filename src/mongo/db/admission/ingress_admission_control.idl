@@ -33,6 +33,13 @@ global:
 
 
 server_parameters:
+  ingressAdmissionControlEnabled:
+    description: Controls whether ingress admission control mechanism is enabled.
+    set_at: [ startup, runtime ]
+    cpp_varname: gIngressAdmissionControlEnabled
+    cpp_vartype: AtomicWord<bool>
+    default: true
+    redact: false
   ingressAdmissionControllerTicketPoolSize:
     description: >-
         Controls the maximum number of tickets in the ingress admission control ticket pool. Note
