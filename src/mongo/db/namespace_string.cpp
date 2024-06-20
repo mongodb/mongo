@@ -432,10 +432,6 @@ bool NamespaceString::isOutTmpBucketsCollection() const {
         getTimeseriesViewNamespace().coll().startsWith(kOutTmpCollectionPrefix);
 }
 
-bool NamespaceString::isLastVoteCollection() const {
-    return ns() == kLastVoteNamespace.ns();
-}
-
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
     return {dbName(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
 }
