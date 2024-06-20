@@ -2,6 +2,7 @@
  * Tests dbHash collisions in WT with full validation.
  * dbHash should not experience races on data, or EBUSY errors in the storage engine.
  * @tags: [
+ *   requires_persistence,
  *   requires_wiredtiger,
  *   requires_replication,
  *   uses_full_validation,
@@ -23,8 +24,10 @@ export const $config = (function() {
                     .operationTime;
             jsTestLog("dbHash opTime:" + tojson(opTime));
             jsTestLog("dbHash begin opTime:" + tojson(opTime));
-            let dbHashRes = assert.commandWorked(db.collName.runCommand(
-                {dbHash: 1, $_internalReadAtClusterTime: Timestamp(opTime['t'], opTime['i'])}));
+            let dbHashRes = assert.commandWorked(db.collName.runCommand({
+                dbHash: 1,
+                readConcern: {level: "snapshot", atClusterTime: Timestamp(opTime['t'], opTime['i'])}
+            }));
             jsTestLog("dbHash done" + dbHashRes.timeMillis);
         },
         fullValidation: function(db, collName) {
