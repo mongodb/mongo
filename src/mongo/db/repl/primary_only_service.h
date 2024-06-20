@@ -376,6 +376,15 @@ protected:
                                                                    bool checkOptions = true);
 
     /**
+     * Return the executor where Instances of this PrimaryOnlyService are executed
+     *
+     * Tasks running on this executor will not survive a step down - step up cycle.
+     * This executor is shut down when this node steps down and joined on step up before rebuilding
+     * new instances.
+     */
+    std::shared_ptr<executor::ScopedTaskExecutor> getInstanceExecutor() const;
+
+    /**
      * Since, scoped task executor shuts down on stepdown, we might need to run some instance work,
      * like cleanup, even while the node is not primary. So, use the parent executor in that case.
      */
@@ -465,6 +474,11 @@ private:
         std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
         return ExecutorFuture<void>(**executor, Status::OK());
     };
+
+    /**
+     * Called as part of the POS onStepUp hook before rebuilding the service.
+     */
+    virtual void _onServiceInitialization() {}
 
     /**
      * Called as part of the POS onStepDown/onShutdown hooks before interrupting instances.
