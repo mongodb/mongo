@@ -111,6 +111,9 @@ void NamespaceMetadataChangeNotifications::_unregisterNotificationToken(
 void NamespaceMetadataChangeNotifications::_unregisterNotificationToken_inlock(
     WithLock lk, const NotificationToken& token) {
     auto mapIt = _notificationsList.find(token.nss);
+    if (mapIt == _notificationsList.end()) {
+        return;
+    }
     auto& notifList = mapIt->second.second;
     notifList.erase(*token.itToErase);
 
