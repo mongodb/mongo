@@ -7,6 +7,10 @@
  * must be fetched to support the SHARDING_FILTER stage.
  * @tags: [
  *   assumes_unsharded_collection,
+ *   # When the config fuzzer changes 'internalQueryFindCommandBatchSize' to a value < 6,
+ *   # 'cursor.firstBatch' is too small to have all the expected results.
+ *   # TODO(SERVER-91719): unblock if test is rewritten to account for small batch size.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 import {getWinningPlan, isIndexOnly, planHasStage} from "jstests/libs/analyze_plan.js";

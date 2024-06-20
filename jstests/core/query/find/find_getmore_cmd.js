@@ -10,7 +10,9 @@ var coll = db[collName];
 
 const findCommandBatchSize = assert.commandWorked(db.adminCommand(
     {getParameter: 1, internalQueryFindCommandBatchSize: 1}))["internalQueryFindCommandBatchSize"];
-const kLimit = Math.min(10, findCommandBatchSize - 1);
+
+// The limit should be less than the find command batch size but at least 1.
+const kLimit = Math.min(10, Math.max(1, findCommandBatchSize - 1));
 
 coll.drop();
 for (var i = 0; i < findCommandBatchSize + 50; i++) {

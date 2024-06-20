@@ -13,6 +13,10 @@
 //   tenant_migration_incompatible,
 //   # This test depends on the strict argument since 6.1.
 //   requires_fcv_61,
+//   # When the config fuzzer changes 'internalQueryFindCommandBatchSize' to a value < 3,
+//   # 'cursor.firstBatch' is too small to have all the expected results.
+//   # TODO(SERVER-91719): unblock if test is rewritten to account for small batch size.
+//   does_not_support_config_fuzzer,
 // ]
 
 // function argument overwritten won't affect original value and it can be run in parallel tests

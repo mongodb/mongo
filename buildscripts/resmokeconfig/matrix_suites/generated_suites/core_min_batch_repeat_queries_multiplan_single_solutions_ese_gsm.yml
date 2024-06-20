@@ -51,6 +51,7 @@ selector:
   - jstests/core/**/express.js
   - jstests/core/computed_projections.js
   - jstests/core/query/sort/sortk.js
+  - jstests/core/query/sort/sorth.js
   - jstests/core/index/covered/covered_index_sort_no_fetch_optimization.js
   - jstests/core/index/index_bounds_pipe.js
   exclude_with_any_tags:
