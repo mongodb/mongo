@@ -7,6 +7,12 @@ set -o errexit
 set -o verbose
 # We get the raw version string (r1.2.3-45-gabcdef) from git
 MONGO_VERSION=$(git describe --abbrev=7)
+
+# If the project is sys-perf (or related), add the string -sys-perf to the version
+if [[ "${project}" == sys-perf* ]]; then
+  MONGO_VERSION="$MONGO_VERSION-sys-perf"
+fi
+
 # If this is a patch build, we add the patch version id to the version string so we know
 # this build was a patch, and which evergreen task it came from
 if [ "${is_patch}" = "true" ]; then
