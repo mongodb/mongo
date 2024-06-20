@@ -102,18 +102,8 @@ public:
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, req.getToShard()),
                 "Could not find destination shard");
 
-            try {
-                uassertStatusOK(Balancer::get(opCtx)->moveRange(
-                    opCtx, nss, req, true /* issuedByRemoteUser */));
-            } catch (ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>& ex) {
-                // Rewrite `InterruptedDueToReplStateChange` with `RemoteCommandFailed` to ensure it
-                // is not forwarded to remote callers. Until we can expose the error origins, we
-                // should rewrite this error to ensure this failure doesn't involve the RSM.
-                // TODO SERVER-91633: remove this rewriting once error origins are known.
-                Status error(ErrorCodes::RemoteCommandFailed, "Encountered a replication event");
-                error.addContext(ex.toString());
-                iasserted(error);
-            }
+            uassertStatusOK(
+                Balancer::get(opCtx)->moveRange(opCtx, nss, req, true /* issuedByRemoteUser */));
         }
 
     private:
