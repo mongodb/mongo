@@ -91,13 +91,6 @@ protected:
         ShardServerTestFixture::tearDown();
     }
 
-    /**
-     * Forces KeyManager to refresh cache and generate new keys.
-     */
-    void refreshKeyManager() {
-        _keyManager->refreshNow(operationContext());
-    }
-
 private:
     std::shared_ptr<KeysCollectionManager> _keyManager;
 };
@@ -170,7 +163,6 @@ TEST_F(VectorClockShardServerTest, GossipOutInternal) {
     auto vc = VectorClockMutable::get(sc);
 
     LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
-    refreshKeyManager();
 
     const auto clusterTime = vc->tickClusterTime(1);
 
@@ -195,7 +187,6 @@ TEST_F(VectorClockShardServerTest, GossipOutExternal) {
     auto vc = VectorClockMutable::get(sc);
 
     LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
-    refreshKeyManager();
 
     const auto clusterTime = vc->tickClusterTime(1);
 

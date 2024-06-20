@@ -102,13 +102,6 @@ protected:
         ShardingMongoDTestFixture::tearDown();
     }
 
-    /**
-     * Forces KeyManager to refresh cache and generate new keys.
-     */
-    void refreshKeyManager() {
-        _keyManager->refreshNow(operationContext());
-    }
-
     void setupOpObservers() override {
         auto opObserverRegistry =
             checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
@@ -187,7 +180,6 @@ TEST_F(VectorClockMongoDTest, GossipOutInternal) {
     auto vc = VectorClockMutable::get(sc);
 
     LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
-    refreshKeyManager();
 
     const auto clusterTime = vc->tickClusterTime(1);
 
@@ -208,7 +200,6 @@ TEST_F(VectorClockMongoDTest, GossipOutExternal) {
     auto vc = VectorClockMutable::get(sc);
 
     LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
-    refreshKeyManager();
 
     const auto clusterTime = vc->tickClusterTime(1);
 

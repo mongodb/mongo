@@ -231,6 +231,187 @@ TEST_F(KeysManagerShardedTest, GetKeyWithoutRefreshShouldReturnRightKey) {
     }
 }
 
+TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetSingleRequest) {
+    keyManager()->startMonitoring(getServiceContext());
+    // Wait for the initial refresh to complete so it doesn't interfere with the refresh later in
+    // the test.
+    auto keyStatus =
+        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+    ASSERT_EQ(keyStatus.getStatus(), ErrorCodes::KeyNotFound);
+
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
+
+    auto getKeysForValidation = [&](OperationContext* opCtx) {
+        auto keyStatus =
+            keyManager()->getKeysForValidation(opCtx, 1, LogicalTime(Timestamp(100, 0)));
+        ASSERT_OK(keyStatus.getStatus());
+        auto key = keyStatus.getValue().front();
+        ASSERT_EQ(1, key.getKeyId());
+        ASSERT_EQ(origKey1.getKey(), key.getKey());
+        ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+    };
+
+    // Force the next refresh to fail with ReadConcernMajorityNotAvailableYet.
+    auto failRefreshFp =
+        globalFailPointRegistry().find("keyRefreshFailWithReadConcernMajorityNotAvailableYet");
+    auto timesEnteredBefore = failRefreshFp->setMode(FailPoint::nTimes, 1);
+
+    stdx::thread t{[&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        getKeysForValidation(opCtx.get());
+    }};
+
+    failRefreshFp->waitForTimesEntered(timesEnteredBefore + 1);
+    ClockSourceMock clock;
+    // The wait time after the failed refresh is kRefreshIntervalIfErrored * 2 because
+    // this is the second failed refresh.
+    clock.advance(KeysCollectionManager::kRefreshIntervalIfErrored * 2);
+    t.join();
+
+    auto timesEnteredAfter = failRefreshFp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredAfter, timesEnteredBefore + 1);
+}
+
+TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetMultipleRequests) {
+    keyManager()->startMonitoring(getServiceContext());
+    // Wait for the initial refresh to complete so it doesn't interfere with the refreshes later in
+    // the test.
+    auto keyStatus =
+        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+    ASSERT_EQ(keyStatus.getStatus(), ErrorCodes::KeyNotFound);
+
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
+
+    auto getKeysForValidation = [&](OperationContext* opCtx) {
+        auto keyStatus =
+            keyManager()->getKeysForValidation(opCtx, 1, LogicalTime(Timestamp(100, 0)));
+        ASSERT_OK(keyStatus.getStatus());
+        auto key = keyStatus.getValue().front();
+        ASSERT_EQ(1, key.getKeyId());
+        ASSERT_EQ(origKey1.getKey(), key.getKey());
+        ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+    };
+
+    // Force the next refresh to fail with ReadConcernMajorityNotAvailableYet.
+    auto failRefreshFp =
+        globalFailPointRegistry().find("keyRefreshFailWithReadConcernMajorityNotAvailableYet");
+    auto timesEnteredBefore = failRefreshFp->setMode(FailPoint::nTimes, 1);
+
+    stdx::thread t1{[&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        getKeysForValidation(opCtx.get());
+    }};
+    stdx::thread t2{[&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        getKeysForValidation(opCtx.get());
+    }};
+
+    failRefreshFp->waitForTimesEntered(timesEnteredBefore + 1);
+    ClockSourceMock clock;
+    // The wait time after the failed refresh is kRefreshIntervalIfErrored * 2 because
+    // this is the second failed refresh.
+    clock.advance(KeysCollectionManager::kRefreshIntervalIfErrored * 2);
+    t1.join();
+    t2.join();
+
+    auto timesEnteredAfter = failRefreshFp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredBefore + 1, timesEnteredAfter);
+}
+
+TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetDeadline) {
+    keyManager()->startMonitoring(getServiceContext());
+    // Wait for the initial refresh to complete so it doesn't interfere with the refresh later in
+    // the test.
+    auto keyStatus =
+        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+    ASSERT_EQ(keyStatus.getStatus(), ErrorCodes::KeyNotFound);
+
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
+
+    // Force the next refresh to fail with ReadConcernMajorityNotAvailableYet.
+    auto failRefreshFp =
+        globalFailPointRegistry().find("keyRefreshFailWithReadConcernMajorityNotAvailableYet");
+    auto timesEnteredBefore = failRefreshFp->setMode(FailPoint::nTimes, 1);
+
+    stdx::thread t{[&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        opCtx->setDeadlineAfterNowBy(KeysCollectionManager::kRefreshIntervalIfErrored / 2,
+                                     ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(
+            keyManager()->getKeysForValidation(opCtx.get(), 1, LogicalTime(Timestamp(100, 0))),
+            DBException,
+            ErrorCodes::MaxTimeMSExpired);
+    }};
+
+    failRefreshFp->waitForTimesEntered(timesEnteredBefore + 1);
+    ClockSourceMock clock;
+    // The wait time after the failed refresh is kRefreshIntervalIfErrored * 2 because
+    // this is the second failed refresh.
+    clock.advance(KeysCollectionManager::kRefreshIntervalIfErrored * 2);
+    t.join();
+
+    auto timesEnteredAfter = failRefreshFp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredAfter, timesEnteredBefore + 1);
+}
+
+TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetMaxTries) {
+    keyManager()->startMonitoring(getServiceContext());
+    // Wait for the initial refresh to complete so it doesn't interact with the refreshes later in
+    // the test.
+    auto keyStatus =
+        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+    ASSERT_EQ(keyStatus.getStatus(), ErrorCodes::KeyNotFound);
+
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
+
+    // Force the next maxTries+1 refreshes to fail with ReadConcernMajorityNotAvailableYet.
+    auto failRefreshFp =
+        globalFailPointRegistry().find("keyRefreshFailWithReadConcernMajorityNotAvailableYet");
+    auto timesToEnter = KeysCollectionManager::kReadConcernMajorityNotAvailableYetMaxTries + 1;
+    auto timesEnteredBefore = failRefreshFp->setMode(FailPoint::nTimes, timesToEnter);
+
+    stdx::thread t{[&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        auto keyStatus =
+            keyManager()->getKeysForValidation(opCtx.get(), 1, LogicalTime(Timestamp(100, 0)));
+        ASSERT_EQ(keyStatus.getStatus(), ErrorCodes::KeyNotFound);
+    }};
+
+    unsigned timesEntered = 0;
+    while (timesEntered < KeysCollectionManager::kReadConcernMajorityNotAvailableYetMaxTries) {
+        failRefreshFp->waitForTimesEntered(timesEnteredBefore + timesEntered + 1);
+        timesEntered++;
+        ClockSourceMock clock;
+        clock.advance(Milliseconds{KeysCollectionManager::kRefreshIntervalIfErrored.count() *
+                                   (timesEntered + 1)});
+    }
+    t.join();
+
+    auto timesEnteredAfter = failRefreshFp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredBefore + timesToEnter, timesEnteredAfter);
+}
+
 TEST_F(KeysManagerShardedTest, GetKeyForSigningShouldReturnRightKey) {
     keyManager()->startMonitoring(getServiceContext());
 

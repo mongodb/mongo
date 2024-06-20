@@ -120,6 +120,9 @@ if (isShardSvrRst) {
     }, tmpTestData);
 }
 
+const isMultiversion =
+    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
+
 for (let session of sessions) {
     // Reconnect and re-authenticate after the network connection was closed due to restart.
     const error = assert.throws(() => session.getDatabase("admin").runCommand("hello"));
@@ -128,16 +131,21 @@ for (let session of sessions) {
 
     // Verify that the application is able to use a signed cluster time although the addShard
     // or transitionFromDedicatedConfigServer command has not been run.
-    assert.soon(() => {
-        const res = session.getDatabase("admin").runCommand("hello");
-        // TODO (SERVER-78909): KeysCollectionManager::getKeysForValidation() should retry
-        // refreshing if the refresh failed with ReadConcernMajorityNotAvailableYet
-        if (res.code == ErrorCodes.KeyNotFound) {
-            return false;
-        }
-        assert.commandWorked(res);
-        return true;
-    });
+    if (isMultiversion) {
+        // Prior to 8.1, if a client runs a command inside a session against a node right after it
+        // restarts, the command can fail clusterTime key validation with KeyNotFound if no
+        // majority committed snapshot was taken before the restart.
+        assert.soon(() => {
+            const res = session.getDatabase("admin").runCommand("hello");
+            if (res.code == ErrorCodes.KeyNotFound) {
+                return false;
+            }
+            assert.commandWorked(res);
+            return true;
+        });
+    } else {
+        assert.commandWorked(session.getDatabase("admin").runCommand("hello"));
+    }
     assert.eq(session.getClusterTime().signature.keyId, lastClusterTime.signature.keyId);
 }
 

@@ -75,6 +75,8 @@ Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
  */
 class KeysCollectionManager {
 public:
+    static const unsigned kReadConcernMajorityNotAvailableYetMaxTries;
+    static const Milliseconds kRefreshIntervalIfErrored;
     static const std::string kKeyManagerPurposeString;
 
     KeysCollectionManager(std::string purpose,
