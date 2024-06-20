@@ -1,7 +1,11 @@
 /**
  * Test that a replica set member can process basic CRUD operations after switching from being
  * a shardsvr and back to non shardsvr.
- * @tags: [requires_persistence]
+ * @tags: [
+ *  requires_persistence,
+ *  # This test is too resource-intensive to reliably run on PowerPC.
+ *  ppc64le_incompatible,
+ * ]
  */
 (function() {
 "use strict";
