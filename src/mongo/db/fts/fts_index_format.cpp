@@ -56,6 +56,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(enableCompoundTextIndexes);
+
 namespace fts {
 
 using std::string;
@@ -99,6 +101,10 @@ BSONElement extractNonFTSKeyElement(const BSONObj& obj, StringData path) {
     MultikeyComponents arrayComponents;
     dps::extractAllElementsAlongPath(
         obj, path, indexedElements, expandArrayOnTrailingField, &arrayComponents);
+
+    if (MONGO_unlikely(enableCompoundTextIndexes.shouldFail())) {
+        return nullElt;
+    }
     uassert(ErrorCodes::CannotBuildIndexKeys,
             str::stream() << "Field '" << path
                           << "' of text index contains an array in document: " << obj,
