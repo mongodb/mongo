@@ -68,5 +68,15 @@ void logNotCachingNoData(std::string&& solution) {
                 "Not caching query because this solution has no cache data",
                 "solutions"_attr = redact(solution));
 }
+
+void logNotCachingOneWorkesAndZeroResults(std::string&& query, double score, std::string winnerPlanSummary) {
+    LOGV2_DEBUG(20570,
+                1,
+                "Winning plan had zero results, and only one work, skip caching",
+                "query"_attr = redact(query),
+                "winnerScore"_attr = score,
+                "winnerPlanSummary"_attr = winnerPlanSummary);
+
+}
 }  // namespace log_detail
 }  // namespace mongo::plan_cache_util
