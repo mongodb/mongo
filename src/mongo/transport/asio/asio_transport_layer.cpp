@@ -1494,7 +1494,7 @@ AsioTransportLayer::createTransientSSLContext(const TransientSSLParams& transien
 
         return _createSSLContext(manager, sslMode(), true /* asyncOCSPStaple */);
     } catch (...) {
-        LOGV2_DEBUG(307470,
+        LOGV2_DEBUG(9079000,
                     1,
                     "Exception in createTransientSSLContext",
                     "error"_attr = describeActiveException());
