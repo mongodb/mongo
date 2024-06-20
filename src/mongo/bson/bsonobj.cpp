@@ -953,7 +953,7 @@ BSONArrayIteratorSorted::BSONArrayIteratorSorted(const BSONArray& array)
 /**
  * Types used to represent BSONObj and BSONArray memory in the Visual Studio debugger
  */
-#if defined(_MSC_VER) && defined(_DEBUG)
+#if defined(_MSC_VER)
 struct BSONObjData {
     int32_t size;
 } bsonObjDataInstance;
@@ -961,6 +961,6 @@ struct BSONObjData {
 struct BSONArrayData {
     int32_t size;
 } bsonObjArrayInstance;
-#endif  // defined(_MSC_VER) && defined(_DEBUG)
+#endif  // defined(_MSC_VER)
 
 }  // namespace mongo
