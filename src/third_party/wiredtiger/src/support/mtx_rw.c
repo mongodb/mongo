@@ -148,14 +148,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
         return (__wt_set_return(session, EBUSY));
 
     /* We rely on this atomic operation to provide a barrier. */
-    WT_RET(__wt_atomic_casv64(&l->u.v, old.u.v, new.u.v) ? 0 : EBUSY);
-
-#ifdef TSAN_BUILD
-    /* Perform a dummy read to inform TSan this function does in fact have acquire semantics. */
-    (void)__atomic_load_n(&l->tsan_sync, __ATOMIC_ACQUIRE);
-#endif
-
-    return (0);
+    return (__wt_atomic_casv64(&l->u.v, old.u.v, new.u.v) ? 0 : EBUSY);
 }
 
 /*
@@ -277,11 +270,6 @@ stall:
      */
     WT_ACQUIRE_BARRIER();
 
-#ifdef TSAN_BUILD
-    /* Perform a dummy read to inform TSan this function does in fact have acquire semantics. */
-    (void)__atomic_load_n(&l->tsan_sync, __ATOMIC_ACQUIRE);
-#endif
-
     /* Sanity check that we (still) have the lock. */
     WT_ASSERT(session,
       ticket == __wt_atomic_loadv8(&l->u.s.current) &&
@@ -296,11 +284,6 @@ void
 __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
     WT_RWLOCK new, old;
-
-#ifdef TSAN_BUILD
-    /* Perform a dummy write to inform TSan this function does in fact have release semantics. */
-    __atomic_store_n(&l->tsan_sync, 1, __ATOMIC_RELEASE);
-#endif
 
     do {
         old.u.v = __wt_atomic_loadv64(&l->u.v);
@@ -356,14 +339,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
      */
     new.u.v = old.u.v;
     new.u.s.next++;
-    WT_RET(__wt_atomic_casv64(&l->u.v, old.u.v, new.u.v) ? 0 : EBUSY);
-
-#ifdef TSAN_BUILD
-    /* Perform a dummy write to inform TSan this function does in fact have acquire semantics. */
-    (void)__atomic_load_n(&l->tsan_sync, __ATOMIC_ACQUIRE);
-#endif
-
-    return (0);
+    return (__wt_atomic_casv64(&l->u.v, old.u.v, new.u.v) ? 0 : EBUSY);
 }
 
 /*
@@ -463,11 +439,6 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
      */
     WT_ACQUIRE_BARRIER();
 
-#ifdef TSAN_BUILD
-    /* Perform a dummy read to inform TSan this function does in fact have acquire semantics. */
-    (void)__atomic_load_n(&l->tsan_sync, __ATOMIC_ACQUIRE);
-#endif
-
     /* Sanity check that we (still) have the lock. */
     WT_ASSERT(session,
       ticket == __wt_atomic_loadv8(&l->u.s.current) &&
@@ -482,11 +453,6 @@ void
 __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
     WT_RWLOCK new, old;
-
-#ifdef TSAN_BUILD
-    /* Perform a dummy write to inform TSan this function does in fact have release semantics. */
-    __atomic_store_n(&l->tsan_sync, 1, __ATOMIC_RELEASE);
-#endif
 
     do {
         old.u.v = __wt_atomic_loadv64(&l->u.v);

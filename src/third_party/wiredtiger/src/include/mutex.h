@@ -58,17 +58,6 @@ struct __wt_rwlock { /* Read/write lock */
 
     WT_CONDVAR *cond_readers; /* Blocking readers */
     WT_CONDVAR *cond_writers; /* Blocking writers */
-
-#ifdef TSAN_BUILD
-    /*
-     * Our read/write locks provide thread safety via barriers, but TSan instrumentation doesn't
-     * recognize the assembly instructions our barriers use. As a result TSan reports data races on
-     * memory locations that are correctly protected by locks. To address this each of our rwlock
-     * functions performs a dummy acquire read or release write to this field which communicates the
-     * correct acquire/release semantics to TSan.
-     */
-    uint64_t tsan_sync;
-#endif
 };
 
 /*
