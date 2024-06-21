@@ -15,17 +15,63 @@ requireSSLProvider('apple', function() {
     'use strict';
 
     const CLIENT =
-        'C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=Trusted Kernel Test Client';
+        'CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
     const SERVER =
-        'C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=Trusted Kernel Test Server';
+        'CN=Trusted Kernel Test Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
     const INVALID = null;
 
+    function getCertificateSHA1BySubject(subject) {
+        clearRawMongoProgramOutput();
+        // security find-certificate prints out info about certificates matching the given search
+        // criteria. In this case, we use -c, matching common name, and -Z, which includes SHA-1 and
+        // SHA-256 thumbprints in the output.
+        assert.eq(0, runNonMongoProgram("security", "find-certificate", "-c", subject, "-Z"));
+        const out = rawMongoProgramOutput();
+
+        const kSearchStr = "SHA-1 hash: ";
+        const kHashHexitLen = 40;
+
+        const searchIdx = out.indexOf(kSearchStr);
+        assert.neq(searchIdx, -1, "SHA-1 hash not found in command output!");
+
+        return out.substr(searchIdx + kSearchStr.length, kHashHexitLen);
+    }
+
+    // Using the thumbprint of the certificate stored in the keychain should always work as a
+    // selector. Uppercase everything so we don't fail on unmatching case.
+    const trusted_server_thumbprint =
+        getCertificateSHA1BySubject("Trusted Kernel Test Server").toUpperCase();
+    const trusted_client_thumbprint =
+        getCertificateSHA1BySubject("Trusted Kernel Test Client").toUpperCase();
+
+    const expected_server_thumbprint =
+        cat("jstests/libs/trusted-server.pem.digest.sha1").toUpperCase();
+    const expected_client_thumbprint =
+        cat("jstests/libs/trusted-client.pem.digest.sha1").toUpperCase();
+
+    // If we fall into this case, our trusted certificates are not installed on the machine's
+    // certificate keychain. This probably means that certificates have just been renewed, but have
+    // not been installed in MacOS machines yet.
+    if (expected_server_thumbprint !== trusted_server_thumbprint ||
+        expected_client_thumbprint !== trusted_client_thumbprint) {
+        print("****************");
+        print("****************");
+        print(
+            "macOS host has an unexpected version of the trusted server certificate (jstests/libs/trusted-server.pem) or trusted client certificate (jstests/libs/trusted-client.pem) installed.");
+        print("Expecting server thumbprint: " + expected_server_thumbprint +
+              ", got: " + trusted_server_thumbprint);
+        print("Expecting client thumbprint: " + expected_client_thumbprint +
+              ", got: " + trusted_client_thumbprint);
+        print("****************");
+        print("****************");
+    }
+
     const testCases = [
-        {selector: 'thumbprint=D7421F7442CA313821E19EE0509721F4D60B25A8', name: SERVER},
+        {selector: 'thumbprint=' + trusted_server_thumbprint, name: SERVER},
         {selector: 'subject=Trusted Kernel Test Server', name: SERVER},
-        {selector: 'thumbprint=9CA511552F14D3FC2009D425873599BF77832238', name: CLIENT},
+        {selector: 'thumbprint=' + trusted_client_thumbprint, name: CLIENT},
         {selector: 'subject=Trusted Kernel Test Client', name: CLIENT},
-        {selector: 'thumbprint=D7421F7442CA313821E19EE0509721F4D60B25A9', name: INVALID},
+        {selector: 'thumbprint=DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF', name: INVALID},
         {selector: 'subject=Unknown Test Client', name: INVALID}
     ];
 
@@ -61,8 +107,15 @@ requireSSLProvider('apple', function() {
         }
     }
 
+    // Test each possible combination of server/cluster certificate selectors. Make sure we only use
+    // the trusted-server certificate as the server certificate, and only use the trusted-client
+    // certificate as the cluster certificate.
     testCases.forEach(cert => {
+        if (cert.name === CLIENT)
+            return;
         testCases.forEach(cluster => {
+            if (cluster.name === SERVER)
+                return;
             test(cert, cluster);
         });
     });
