@@ -7,7 +7,17 @@ load("jstests/libs/collection_drop_recreate.js");  // For 'assert[Drop|Create]Co
 
 const kLargeStringSize = 15 * 1024 * 1024;
 
-const st = new ShardingTest({shards: 2, config: 1, other: {rs: {nodes: 2}}});
+const st = new ShardingTest({
+    shards: 2,
+    config: 1,
+    other: {
+        rs: {
+            nodes: 2,
+            // Reserving enough of oplog space to accommodate 4 nearly 16MB-large changes.
+            oplogSize: 16 * 5
+        }
+    }
+});
 
 let testDB = st.s.getDB(jsTestName());
 let testColl = testDB["test"];
