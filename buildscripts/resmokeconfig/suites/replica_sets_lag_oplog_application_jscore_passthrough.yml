@@ -38,9 +38,6 @@ selector:
     - jstests/core/txns/prepare_conflict.js
     - jstests/core/txns/prepare_conflict_aggregation_behavior.js
 
-    # TODO (SERVER-86917): Index DDL operations have concurrency issues with validate command
-    - jstests/core/ddl/collmod_convert_index_uniqueness.js
-
   exclude_with_any_tags:
     - assumes_standalone_mongod
     # After SERVER-80339, the server runs a "listIndexes" command on the background, which could show
