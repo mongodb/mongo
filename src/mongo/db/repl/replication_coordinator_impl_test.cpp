@@ -4970,6 +4970,8 @@ TEST_F(ReplCoordTest, AwaitHelloRespondsCorrectlyWhenNodeRemovedAndReadded) {
     waitForHelloFailPoint->waitForTimesEntered(timesEnteredFailPoint + 2);
 
     auto lastHorizonBeforeReconfig = getReplCoord()->getLastHorizonChange_forTest();
+    ASSERT_EQUALS(lastHorizonBeforeReconfig, -1);
+
     const auto newHorizonNodeOne = "newhorizon.com:100";
     const auto newHorizonNodeTwo = "newhorizon.com:200";
 
@@ -4995,6 +4997,10 @@ TEST_F(ReplCoordTest, AwaitHelloRespondsCorrectlyWhenNodeRemovedAndReadded) {
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
 
+    ASSERT_OK(
+        getReplCoord()->waitForMemberState(opCtx.get(), MemberState::RS_SECONDARY, Seconds(1)));
+    getHelloThread.join();
+
     ASSERT_GREATER_THAN(getReplCoord()->getLastHorizonChange_forTest(), lastHorizonBeforeReconfig);
     // Send hello with a TopologyVersion older than the TopologyVersion of the last horizon change.
     auto requestTopologyVersion =
@@ -5005,10 +5011,6 @@ TEST_F(ReplCoordTest, AwaitHelloRespondsCorrectlyWhenNodeRemovedAndReadded) {
     ASSERT_THROWS_CODE(awaitHelloWithNewOpCtx(getReplCoord(), requestTopologyVersion, {}, deadline),
                        DBException,
                        ErrorCodes::SplitHorizonChange);
-
-    ASSERT_OK(
-        getReplCoord()->waitForMemberState(opCtx.get(), MemberState::RS_SECONDARY, Seconds(1)));
-    getHelloThread.join();
 
     stdx::thread getHelloThreadNewHorizon([&] {
         const auto expectedTopologyVersion = getTopoCoord().getTopologyVersion();
