@@ -744,9 +744,9 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
     auto bucketId = bucket.bucketId;
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.collectionUUID);
-    TrackingContext trackingContext;
+    TrackingContexts trackingContexts;
     auto batch =
-        std::make_shared<WriteBatch>(trackingContext,
+        std::make_shared<WriteBatch>(trackingContexts,
                                      BucketHandle{bucketId, info1.stripeNumber},
                                      info1.key,
                                      0,
@@ -770,9 +770,9 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.collectionUUID);
-    TrackingContext trackingContext;
+    TrackingContexts trackingContexts;
     auto batch =
-        std::make_shared<WriteBatch>(trackingContext,
+        std::make_shared<WriteBatch>(trackingContexts,
                                      BucketHandle{bucketId, info1.stripeNumber},
                                      info1.key,
                                      0,

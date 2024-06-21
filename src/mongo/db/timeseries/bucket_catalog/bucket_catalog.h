@@ -65,6 +65,7 @@
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
+#include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/views/view.h"
@@ -74,7 +75,6 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo::timeseries::bucket_catalog {
@@ -183,7 +183,7 @@ struct Stripe {
         BucketHasher>
         outstandingReopeningRequests;
 
-    Stripe(TrackingContext& trackingContext);
+    Stripe(TrackingContexts& trackingContextOpenId);
 };
 
 /**
@@ -201,7 +201,7 @@ public:
 
     // Stores an accurate count of the bytes allocated and deallocated for all the data held by
     // tracked members of the BucketCatalog.
-    TrackingContext trackingContext;
+    TrackingContexts trackingContexts;
 
     // Stores state information about all buckets managed by the catalog, across stripes.
     BucketStateRegistry bucketStateRegistry;
@@ -243,6 +243,11 @@ BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& bucket);
  * usage, and the tracked memory usage from the TrackingAllocator.
  */
 uint64_t getMemoryUsage(const BucketCatalog& catalog);
+
+/**
+ * Adds a 'memoryUsageDetails' section to the builder if details are available (debug builds only).
+ */
+void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builder);
 
 /**
  * Tries to insert 'doc' into a suitable bucket. If an open bucket is full (or has incompatible

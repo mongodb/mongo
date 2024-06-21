@@ -50,6 +50,7 @@
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
+#include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/platform/atomic_word.h"
@@ -83,7 +84,7 @@ public:
 
     using NewFieldNames = boost::container::small_vector<StringMapHashedKey, kNumStaticNewFields>;
 
-    Bucket(TrackingContext&,
+    Bucket(TrackingContexts&,
            const BucketId& bucketId,
            BucketKey bucketKey,
            StringData timeField,
@@ -214,7 +215,7 @@ bool schemaIncompatible(Bucket& bucket,
  * adding one more measurement over the limit won't be much, especially as it will get compressed on
  * commit. After committing, the Bucket is updated with the compressed size.
  */
-void calculateBucketFieldsAndSizeChange(TrackingContext&,
+void calculateBucketFieldsAndSizeChange(TrackingContexts&,
                                         const Bucket& bucket,
                                         const BSONObj& doc,
                                         boost::optional<StringData> metaField,
@@ -224,7 +225,7 @@ void calculateBucketFieldsAndSizeChange(TrackingContext&,
 /**
  * Return a pointer to the current, open batch for the operation. Opens a new batch if none exists.
  */
-std::shared_ptr<WriteBatch> activeBatch(TrackingContext& trackingContext,
+std::shared_ptr<WriteBatch> activeBatch(TrackingContexts& trackingContexts,
                                         Bucket& bucket,
                                         OperationId opId,
                                         std::uint8_t stripe,

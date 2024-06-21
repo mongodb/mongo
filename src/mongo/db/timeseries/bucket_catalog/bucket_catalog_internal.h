@@ -359,7 +359,7 @@ Bucket& rollover(OperationContext* opCtx,
  */
 std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     OperationContext* opCtx,
-    TrackingContext&,
+    TrackingContexts&,
     const BSONObj& doc,
     InsertContext& info,
     Bucket& bucket,

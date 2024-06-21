@@ -45,6 +45,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/stdx/unordered_set.h"
@@ -169,7 +170,11 @@ void TimeSeriesOpObserver::onReplicationRollback(OperationContext* opCtx,
 
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
     tracked_vector<UUID> clearedCollectionUUIDs = make_tracked_vector<UUID>(
-        bucketCatalog.trackingContext, rbInfo.rollbackUUIDs.begin(), rbInfo.rollbackUUIDs.end());
+        timeseries::bucket_catalog::getTrackingContext(
+            bucketCatalog.trackingContexts,
+            timeseries::bucket_catalog::TrackingScope::kBucketStateRegistry),
+        rbInfo.rollbackUUIDs.begin(),
+        rbInfo.rollbackUUIDs.end());
     timeseries::bucket_catalog::clear(bucketCatalog, std::move(clearedCollectionUUIDs));
 }
 
