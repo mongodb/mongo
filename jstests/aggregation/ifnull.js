@@ -15,7 +15,8 @@ assert.commandWorked(t.insertOne({
     my_null: null,
     my_undefined: undefined,
     my_obj: {},
-    my_list: []
+    my_list: [],
+    my_nested: {zero: 0, null: null, undefined: undefined}
 }));
 
 function assertError(expectedErrorCode, ifNullSpec) {
@@ -23,8 +24,12 @@ function assertError(expectedErrorCode, ifNullSpec) {
 }
 
 function assertResult(expectedResult, ifNullSpec) {
-    const res = t.aggregate({$project: {_id: 0, a: {$ifNull: ifNullSpec}}}).toArray()[0];
+    let res = t.aggregate({$project: {_id: 0, a: {$ifNull: ifNullSpec}}}).toArray()[0];
     assert.docEq({a: expectedResult}, res);
+    res = t.aggregate({
+               $group: {_id: 0, a: {$push: {$let: {vars: {x: {$ifNull: ifNullSpec}}, in : "$$x"}}}}
+           }).toArray()[0];
+    assert.docEq({_id: 0, a: [expectedResult]}, res);
 }
 
 // Wrong number of args.
@@ -33,6 +38,7 @@ assertError(1257300, ['$one']);
 assertError(1257300, ['$my_null']);
 
 // First arg non null.
+assertResult(0, ['$my_nested.zero', '$one']);
 assertResult(1, ['$one', '$two']);
 assertResult(2, ['$two', '$one']);
 assertResult(false, ['$my_false', '$one']);
@@ -48,6 +54,7 @@ assertResult(1, ['$one', '$two', null]);
 assertResult(2, ['$two', '$my_undefined', null]);
 
 // First arg null.
+assertResult(0, ['$my_nested.null', '$my_nested.zero']);
 assertResult(2, ['$my_null', '$two']);
 assertResult(1, ['$my_null', '$one']);
 assertResult(null, ['$my_null', '$my_null']);
@@ -59,6 +66,7 @@ assertResult(null, ['$my_null', '$my_null', null]);
 assertResult(undefined, ['$my_null', '$my_null', undefined]);
 
 // First arg undefined.
+assertResult(0, ['$my_nested.undefined', '$my_nested.zero']);
 assertResult(2, ['$my_undefined', '$two']);
 assertResult(1, ['$my_undefined', '$one']);
 assertResult(null, ['$my_undefined', '$my_null']);

@@ -2122,11 +2122,51 @@ public:
 
         std::vector<EvalExprStagePair> branches;
         branches.reserve(numChildren);
+        auto childStageCount = 0;
         for (size_t i = 0; i < numChildren; ++i) {
             auto [expr, stage] = _context->popFrame();
+            if (stage.stage.get() != nullptr) {
+                childStageCount++;
+            }
             branches.emplace_back(std::move(expr), std::move(stage));
         }
         std::reverse(branches.begin(), branches.end());
+
+        // If there is no separate child stage branch, then we can implement $ifNull as a simple
+        // projection of SBE if expression, instead of with union stages.
+        if (childStageCount == 0) {
+            auto stage = _context->extractCurrentEvalStage();
+
+            std::vector<sbe::value::SlotId> slots;
+            slots.reserve(branches.size());
+            sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+            for (auto& branch : branches) {
+                if (branch.first.getSlot()) {
+                    slots.push_back(*branch.first.getSlot());
+                } else {
+                    auto slot = _context->state.slotId();
+                    slots.push_back(slot);
+                    projects.emplace(slot, branch.first.extractExpr());
+                }
+            }
+            if (!projects.empty()) {
+                stage = makeProject(std::move(stage), std::move(projects), _context->planNodeId);
+            }
+
+            auto expr = sbe::makeE<sbe::EVariable>(slots[slots.size() - 1]);
+            for (int i = slots.size() - 2; i >= 0; i--) {
+                auto thenExpr = sbe::makeE<sbe::EVariable>(slots[i]);
+                auto condExpr = makeNot(generateNullOrMissing(thenExpr->clone()));
+                expr =
+                    sbe::makeE<sbe::EIf>(std::move(condExpr), std::move(thenExpr), std::move(expr));
+            }
+
+            auto outSlot = _context->state.slotId();
+            stage = makeProject(std::move(stage), _context->planNodeId, outSlot, std::move(expr));
+
+            _context->pushExpr(outSlot, std::move(stage));
+            return;
+        }
 
         // Prepare to create limit-1/union with N branches (where N is the number of operands). Each
         // branch will be evaluated from left to right until one of the branches produces a value.
