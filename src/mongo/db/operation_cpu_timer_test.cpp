@@ -65,11 +65,15 @@ public:
         return getGlobalServiceContext()->getService()->makeClient("AlternativeClient");
     }
 
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
     OperationCPUTimers* getTimers() const {
         return OperationCPUTimers::get(_opCtx.get());
     }
 
-    std::unique_ptr<OperationCPUTimer> makeTimer() const {
+    boost::optional<OperationCPUTimer> makeTimer() const {
         return getTimers()->makeTimer();
     }
 
@@ -177,10 +181,10 @@ TEST_F(OperationCPUTimerTest, MultipleTimers) {
         ASSERT_GT(timer1->getElapsed(), Nanoseconds(0));
         ASSERT_GT(timer2->getElapsed(), Nanoseconds(0));
 
-        ASSERT_EQ(2, getTimers()->count());
+        ASSERT_EQ(2, getTimers()->runningCount());
     }
 
-    ASSERT_EQ(1, getTimers()->count());
+    ASSERT_EQ(1, getTimers()->runningCount());
 
     timer1->stop();
 
@@ -201,6 +205,8 @@ TEST_F(OperationCPUTimerTest, MultipleTimersOutOfOrder) {
     ASSERT_GT(timer1->getElapsed(), Nanoseconds(0));
     ASSERT_GT(timer2->getElapsed(), Nanoseconds(0));
 
+    ASSERT_EQ(2, getTimers()->runningCount());
+
     // Note that there should be no restriction against stopping the first timer first.
     timer1->stop();
 
@@ -216,14 +222,21 @@ TEST_F(OperationCPUTimerTest, MultipleTimersOutOfOrder) {
     elapsedAfterSleep = timer2->getElapsed();
     ASSERT_EQ(elapsedAfterSleep, elapsedAfterStop);
 
-    ASSERT_EQ(2, getTimers()->count());
+    ASSERT_EQ(0, getTimers()->runningCount());
 }
 
-TEST_F(OperationCPUTimerTest, TestOpCtxDestruction) {
-    auto timer = makeTimer();
-    timer->start();
+namespace {
+struct TestDecoration {
+    boost::optional<OperationCPUTimer> timer;
+};
+auto getTestDecoration = OperationContext::declareDecoration<TestDecoration>();
+}  // namespace
+
+TEST_F(OperationCPUTimerTest, TestOpCtxDecorationDestruction) {
+    auto& testDecoration = getTestDecoration(opCtx());
+    testDecoration.timer = makeTimer();
+    testDecoration.timer->start();
     resetOpCtx();
-    timer->stop();
 }
 
 DEATH_TEST_F(OperationCPUTimerTest, StopTimerBeforeStart, "Timer is not running") {
@@ -237,20 +250,26 @@ DEATH_TEST_F(OperationCPUTimerTest, StartTimerMultipleTimes, "Timer has already 
     timer->start();
 }
 
-DEATH_TEST_F(OperationCPUTimerTest, OnAttachForAttachedTimer, "Timer has already been attached") {
+DEATH_TEST_F(OperationCPUTimerTest,
+             OnAttachForAttachedTimer,
+             "PosixOperationCPUTimers has already been attached") {
     auto timer = makeTimer();
     timer->start();
-    timer->onThreadAttach();
+    getTimers()->onThreadAttach();
 }
 
-DEATH_TEST_F(OperationCPUTimerTest, OnDetachForDetachedTimer, "Timer is not attached") {
+DEATH_TEST_F(OperationCPUTimerTest,
+             OnDetachForDetachedTimer,
+             "PosixOperationCPUTimers is not attached to current thread") {
     auto timer = makeTimer();
     timer->start();
     auto client = Client::releaseCurrent();
-    timer->onThreadDetach();
+    getTimers()->onThreadDetach();
 }
 
-DEATH_TEST_F(OperationCPUTimerTest, GetElapsedForPausedTimer, "Not attached to current thread") {
+DEATH_TEST_F(OperationCPUTimerTest,
+             GetElapsedForPausedTimer,
+             "PosixOperationCPUTimers is not attached to current thread") {
     auto timer = makeTimer();
     timer->start();
     auto client = Client::releaseCurrent();

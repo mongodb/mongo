@@ -63,6 +63,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/inline_memory.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/lockable_adapter.h"
 #include "mongo/util/time_support.h"
@@ -90,6 +91,36 @@ extern FailPoint maxTimeAlwaysTimeOut;
 extern FailPoint maxTimeNeverTimeOut;
 
 /**
+ * This class encapsulates the OperationContext state, that must be initialized before all the
+ * decorations and destroyed after all the decorations.
+ */
+class OperationContextBase {
+    // Initial size of the monotic buffer. This size may need to be adjusted when additional use
+    // cases for monotonic buffer are added.
+    static constexpr size_t kMonotonicBufferInlineSize = 32;
+
+public:
+    using MonotonicAllocator = inline_memory::ResourceAllocator<
+        void,
+        inline_memory::ExternalResource<inline_memory::MonotonicBufferResource<>>>;
+    /**
+     * Returns the memory buffer that can be used to monotonically allocate memory.
+     * The memory will be freed at the time when OperationContext is destroyed.
+     * Note:
+     * This buffer *should not* be used for ephemeral allocations, as they will not be reclaimed
+     * until OperationContext is destroyed. And similarly this buffer *must not* be used for
+     * allocations that may be referenced after OperationContext is destroyed.
+     */
+    MonotonicAllocator monotonicAllocator() {
+        return _monotonicBuffer.makeAllocator<void>();
+    }
+
+private:
+    inline_memory::MemoryBuffer<kMonotonicBufferInlineSize, alignof(std::max_align_t)>
+        _monotonicBuffer;
+};
+
+/**
  * This class encompasses the state required by an operation and lives from the time a network
  * operation is dispatched until its execution is finished. Note that each "getmore" on a cursor
  * is a separate operation. On construction, an OperationContext associates itself with the
@@ -100,7 +131,9 @@ extern FailPoint maxTimeNeverTimeOut;
  * (RecoveryUnitState) to reduce complexity and duplication in the storage-engine specific
  * RecoveryUnit and to allow better invariant checking.
  */
-class OperationContext final : public Interruptible, public Decorable<OperationContext> {
+class OperationContext final : public OperationContextBase,
+                               public Interruptible,
+                               public Decorable<OperationContext> {
     OperationContext(const OperationContext&) = delete;
     OperationContext& operator=(const OperationContext&) = delete;
 

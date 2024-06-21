@@ -232,7 +232,7 @@ public:
         WriteMetrics writeMetrics;
 
         // Records CPU time consumed by this operation.
-        std::unique_ptr<OperationCPUTimer> cpuTimer;
+        boost::optional<OperationCPUTimer> cpuTimer;
     };
 
     /**

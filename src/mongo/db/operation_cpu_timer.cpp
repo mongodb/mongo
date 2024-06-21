@@ -32,6 +32,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+#include <memory>
 #include <string>
 #include <sys/types.h>
 #include <thread>
@@ -56,7 +57,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
 
 using namespace fmt::literals;
@@ -65,13 +65,19 @@ using namespace fmt::literals;
 
 namespace {
 
-// Reads the thread timer, and throws with `InternalError` if that fails.
-Nanoseconds getThreadCPUTime() {
+// Reads the thread timer, if available. If not available, results in fatal failure,
+// if abortOnFailure was specified.
+template <bool abortOnFailure = true>
+boost::optional<Nanoseconds> getThreadCPUTime() {
     struct timespec t;
-    if (auto ret = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t); ret != 0) {
-        auto ec = lastSystemError();
-        iassert(
-            Status(ErrorCodes::InternalError, "Unable to get time: {}"_format(errorMessage(ec))));
+    if (MONGO_unlikely(clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t) != 0)) {
+        if constexpr (abortOnFailure) {
+            auto ec = lastSystemError();
+            LOGV2_FATAL(4744601,
+                        "Failed to read the CPU time for the current thread",
+                        "error"_attr = errorMessage(ec));
+        }
+        return {};
     }
     return Seconds(t.tv_sec) + Nanoseconds(t.tv_nsec);
 }
@@ -79,104 +85,136 @@ Nanoseconds getThreadCPUTime() {
 MONGO_FAIL_POINT_DEFINE(hangCPUTimerAfterOnThreadAttach);
 MONGO_FAIL_POINT_DEFINE(hangCPUTimerAfterOnThreadDetach);
 
-class PosixTimer final : public OperationCPUTimer {
+class PosixOperationCPUTimers final : public OperationCPUTimers {
 public:
-    PosixTimer(const std::shared_ptr<OperationCPUTimers>& timers) : OperationCPUTimer(timers) {}
-    ~PosixTimer() override = default;
+    explicit PosixOperationCPUTimers(OperationContext* opCtx);
+    ~PosixOperationCPUTimers() override;
 
-    Nanoseconds getElapsed() const override;
-
-    void start() override;
-    void stop() override;
+    OperationCPUTimer makeTimer() override;
 
     void onThreadAttach() override;
     void onThreadDetach() override;
 
+    size_t runningCount() const override {
+        return _runningCount;
+    }
+
 private:
-    bool _timerIsRunning() const;
-    bool _isAttachedToCurrentThread() const;
+    Nanoseconds _getOperationThreadTime() const override;
+    void _onTimerStart() override;
+    void _onTimerStop() override;
 
-    // Returns the elapsed time since the creation of the current thread.
-    Nanoseconds _getThreadTime() const;
+    bool _isAttachedToCurrentThread() const {
+        return _threadId && *_threadId == stdx::this_thread::get_id();
+    }
 
-    // Holds the value returned by `_getThreadTime()` at the time of starting/resuming the timer.
-    boost::optional<Nanoseconds> _startedOn;
+    Nanoseconds _getThreadTime() const {
+        return getThreadCPUTime<true>().get();
+    }
+
+    // Storage for the self pointer as long as this object is valid. The storage is allocated using
+    // monotonic allocator in OperationContext, and remain valid until after all decorations are
+    // destroyed.
+    // The self pointer will be stored here when PosixOperationCPUTimers is constructed and unset
+    // when PosixOperationCPUTimers is destroyed.
+    OperationCPUTimers** _selfPtr;
+
+    // The id of the attached thread, if any. Any access to current cpu thread time must be
+    // done from this thread, as otherwise the value will be meaningless.
     boost::optional<stdx::thread::id> _threadId;
-    Nanoseconds _elapsedBeforeInterrupted = Nanoseconds(0);
+
+    // Total time adjustments accumulated so far. Includes the time spent when thread was detached
+    // as negative.
+    Nanoseconds _threadTimeAdjustment{0};
+
+    // Count of currently running timers.
+    size_t _runningCount{0};
 };
 
-Nanoseconds PosixTimer::getElapsed() const {
-    invariant(_isAttachedToCurrentThread(), "Not attached to current thread");
-    auto elapsed = _elapsedBeforeInterrupted;
-    if (_timerIsRunning())
-        elapsed += _getThreadTime() - _startedOn.get();
-    return elapsed;
+template <typename A, typename T>
+T* allocateCopy(A&& alloc, T v) {
+    using RebindAllocator =
+        typename std::allocator_traits<std::decay_t<A>>::template rebind_alloc<T>;
+    using RebindAllocatorTraits = std::allocator_traits<RebindAllocator>;
+    auto rebindAlloc = RebindAllocator(alloc);
+    auto p = RebindAllocatorTraits::allocate(rebindAlloc, 1);
+    RebindAllocatorTraits::construct(rebindAlloc, p, std::move(v));
+    return p;
 }
 
-bool PosixTimer::_timerIsRunning() const {
-    return _startedOn.has_value();
+PosixOperationCPUTimers::PosixOperationCPUTimers(OperationContext* opCtx)
+    // Allocate storage for self pointer using monotonic allocator and assign in to self pointer
+    : _selfPtr(allocateCopy(opCtx->monotonicAllocator(), (OperationCPUTimers*)this)) {}
+
+PosixOperationCPUTimers::~PosixOperationCPUTimers() {
+    // Reset the self pointer, but don't destroy it's storage. It will be automatically deallocated
+    // by the monotonic allocator.
+    *_selfPtr = nullptr;
 }
 
-bool PosixTimer::_isAttachedToCurrentThread() const {
-    return _threadId.has_value() && _threadId.get() == stdx::this_thread::get_id();
+OperationCPUTimer PosixOperationCPUTimers::makeTimer() {
+    return OperationCPUTimer(_selfPtr);
 }
 
-void PosixTimer::start() {
-    invariant(!_timerIsRunning(), "Timer has already started");
-
-    _startedOn = _getThreadTime();
-    _threadId = stdx::this_thread::get_id();
-    _elapsedBeforeInterrupted = Nanoseconds(0);
-}
-
-void PosixTimer::stop() {
-    invariant(_timerIsRunning(), "Timer is not running");
-    invariant(_isAttachedToCurrentThread());
-
-    _elapsedBeforeInterrupted = getElapsed();
-    _startedOn.reset();
-}
-
-void PosixTimer::onThreadAttach() {
-    if (!_timerIsRunning())
+void PosixOperationCPUTimers::onThreadAttach() {
+    if (!_runningCount) {
         return;
+    }
 
-    invariant(!_threadId.has_value(), "Timer has already been attached");
+    invariant(!_threadId, "PosixOperationCPUTimers has already been attached");
     _threadId = stdx::this_thread::get_id();
-    _startedOn = _getThreadTime();
+    _threadTimeAdjustment -= _getThreadTime();
 
     hangCPUTimerAfterOnThreadAttach.pauseWhileSet();
 }
 
-void PosixTimer::onThreadDetach() {
-    if (!_timerIsRunning())
+void PosixOperationCPUTimers::onThreadDetach() {
+    if (!_runningCount) {
         return;
+    }
 
-    invariant(_threadId.has_value(), "Timer is not attached");
+    invariant(_isAttachedToCurrentThread(),
+              "PosixOperationCPUTimers is not attached to current thread");
     _threadId.reset();
-    _elapsedBeforeInterrupted += _getThreadTime() - _startedOn.get();
+    _threadTimeAdjustment += _getThreadTime();
 
     hangCPUTimerAfterOnThreadDetach.pauseWhileSet();
 }
 
-Nanoseconds PosixTimer::_getThreadTime() const try {
-    return getThreadCPUTime();
-} catch (const ExceptionFor<ErrorCodes::InternalError>& ex) {
-    // Abort the process as the timer cannot account for the elapsed time. This path is only
-    // reachable if the platform supports CPU time measurement at startup, but returns an error
-    // for a subsequent attempt to get thread-specific CPU consumption.
-    LOGV2_FATAL(4744601, "Failed to read the CPU time for the current thread", "error"_attr = ex);
+Nanoseconds PosixOperationCPUTimers::_getOperationThreadTime() const {
+    invariant(_isAttachedToCurrentThread(),
+              "PosixOperationCPUTimers is not attached to current thread");
+    return _getThreadTime() + _threadTimeAdjustment;
 }
 
-// Set of timers created by this OperationContext.
+void PosixOperationCPUTimers::_onTimerStart() {
+    if (!_runningCount) {
+        _threadId = stdx::this_thread::get_id();
+    }
+    ++_runningCount;
+}
+
+void PosixOperationCPUTimers::_onTimerStop() {
+    --_runningCount;
+    if (!_runningCount) {
+        _threadId = {};
+    }
+}
+
 static auto getCPUTimers =
-    OperationContext::declareDecoration<std::shared_ptr<OperationCPUTimers>>();
+    OperationContext::declareDecoration<boost::optional<PosixOperationCPUTimers>>();
 
-}  // namespace
+class OperationCPUTimersClientObserver final : public ServiceContext::ClientObserver {
+public:
+    void onCreateClient(Client* client) override {}
+    void onDestroyClient(Client* client) override {}
+    void onCreateOperationContext(OperationContext* opCtx) override;
+    void onDestroyOperationContext(OperationContext* opCtx) override {}
+};
 
-OperationCPUTimers* OperationCPUTimers::get(OperationContext* opCtx) {
-    // Checks for time support on POSIX platforms. In particular, it checks for support in presence
-    // of SMP systems.
+void OperationCPUTimersClientObserver::onCreateOperationContext(OperationContext* opCtx) {
+    // Checks for time support on POSIX platforms. In particular, it checks for support in
+    // presence of SMP systems.
     static bool isTimeSupported = [] {
         clockid_t cid;
         if (clock_getcpuclockid(0, &cid) != 0)
@@ -192,68 +230,86 @@ OperationCPUTimers* OperationCPUTimers::get(OperationContext* opCtx) {
         return true;
     }();
 
-    if (!isTimeSupported)
-        return nullptr;
-
-    auto& timers = getCPUTimers(opCtx);
-    if (!timers) {
-        timers = std::make_shared<OperationCPUTimers>();
+    if (!isTimeSupported) {
+        return;
     }
-    return timers.get();
+
+    // Construct the PosixOperationCPUTimers
+    getCPUTimers(opCtx).emplace(opCtx);
 }
 
-std::unique_ptr<OperationCPUTimer> OperationCPUTimers::makeTimer() {
-    return std::make_unique<PosixTimer>(shared_from_this());
+// Register ConstructorAction to initialize the OperationCPUTimersHolder right after
+// OperationContext is ready.
+ServiceContext::ConstructorActionRegisterer operationCPUTimersClientObserverRegisterer{
+    "OperationCPUTimersClientObserver", [](ServiceContext* service) {
+        service->registerClientObserver(std::make_unique<OperationCPUTimersClientObserver>());
+    }};
+}  // namespace
+
+OperationCPUTimers* OperationCPUTimers::get(OperationContext* opCtx) {
+    return &*getCPUTimers(opCtx);
 }
 
 #else  // not defined(__linux__)
+
+namespace {
+
+class CPUTimersClientObserver final : public ServiceContext::ClientObserver {
+public:
+    void onCreateClient(Client* client) override {}
+    void onDestroyClient(Client* client) override {}
+    void onCreateOperationContext(OperationContext* opCtx) override {}
+    void onDestroyOperationContext(OperationContext* opCtx) override {}
+};
+
+ServiceContext::ConstructorActionRegisterer cpuTimersClientObserverRegisterer{
+    "CPUTimersClientObserver", [](ServiceContext* service) {
+        service->registerClientObserver(std::make_unique<CPUTimersClientObserver>());
+    }};
+}  // namespace
 
 OperationCPUTimers* OperationCPUTimers::get(OperationContext*) {
     return nullptr;
 }
 
-std::unique_ptr<OperationCPUTimer> OperationCPUTimers::makeTimer() {
-    MONGO_UNREACHABLE;
-}
-
 #endif  // defined(__linux__)
 
-OperationCPUTimer::OperationCPUTimer(const std::shared_ptr<OperationCPUTimers>& timers)
-    : _timers(timers) {
-    _it = timers->_add(this);
-}
+OperationCPUTimer::OperationCPUTimer(OperationCPUTimers** timers)
+    : _timers(timers), _timerIsRunning(false), _elapsedAdjustment(0) {}
 
 OperationCPUTimer::~OperationCPUTimer() {
-    // It is possible for an OperationCPUTimer to outlive the OperationCPUTimers container that is
-    // decorated on the OperationContext. For example, a Timer can be owned by an OperationContext
-    // decoration, and may be destructed after the Timers container, an order which we cannot
-    // control. Therefore we must ensure the weak_ptr we hold is still valid.
-    if (auto timers = _timers.lock()) {
-        timers->_remove(_it);
+    if (_timerIsRunning) {
+        if (auto timers = getTimers()) {
+            timers->_onTimerStop();
+        }
     }
 }
 
-OperationCPUTimers::Iterator OperationCPUTimers::_add(OperationCPUTimer* timer) {
-    return _timers.insert(_timers.end(), timer);
-}
-
-void OperationCPUTimers::_remove(OperationCPUTimers::Iterator it) {
-    _timers.erase(it);
-}
-
-size_t OperationCPUTimers::count() const {
-    return _timers.size();
-}
-
-void OperationCPUTimers::onThreadAttach() {
-    for (auto& timer : _timers) {
-        timer->onThreadAttach();
+Nanoseconds OperationCPUTimer::getElapsed() const {
+    if (_timerIsRunning) {
+        auto timers = getTimers();
+        invariant(timers, "Underlying OperationCPUTimers has already been destroyed");
+        return timers->_getOperationThreadTime() + _elapsedAdjustment;
+    } else {
+        return _elapsedAdjustment;
     }
 }
 
-void OperationCPUTimers::onThreadDetach() {
-    for (auto& timer : _timers) {
-        timer->onThreadDetach();
+void OperationCPUTimer::start() {
+    invariant(!_timerIsRunning, "Timer has already started");
+    _timerIsRunning = true;
+    if (auto timers = getTimers()) {
+        timers->_onTimerStart();
+        _elapsedAdjustment = -timers->_getOperationThreadTime();
+    }
+}
+
+void OperationCPUTimer::stop() {
+    invariant(_timerIsRunning, "Timer is not running");
+    _timerIsRunning = false;
+    if (auto timers = getTimers()) {
+        _elapsedAdjustment += timers->_getOperationThreadTime();
+        timers->_onTimerStop();
     }
 }
 
