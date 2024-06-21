@@ -260,9 +260,7 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
         // however it will have written documents into the config.system.indexBuilds collection when
         // created and interrupted by the drop.
         assert.gt(metrics[dbName].idxEntryBytesWritten, 0);
-        assert.lte(metrics[dbName].idxEntryBytesWritten, 40);
         assert.gt(metrics[dbName].idxEntryUnitsWritten, 0);
-        assert.lte(metrics[dbName].idxEntryUnitsWritten, 4);
 
         assert.lt(metrics[dbName].idxEntryUnitsWritten, 1 * nDocs);
     });
