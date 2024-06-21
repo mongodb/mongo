@@ -553,6 +553,7 @@ public:
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;
     bool hasWhereClause = false;
+    bool isUpsert = false;
 
     NamespaceString ns;
 

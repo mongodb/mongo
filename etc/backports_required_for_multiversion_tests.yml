@@ -105,6 +105,8 @@ last-continuous:
       ticket: SERVER-90334
     - test_file: jstests/sharding/change_streams_survive_move_primary.js
       ticket: SERVER-69933
+    - test_file: jstests/core/write/update/upsert_nor.js
+      ticket: SERVER-91700
     - test_file: jstests/aggregation/group_by_objectid.js
       ticket: SERVER-90173
     - test_file: jstests/aggregation/unwind_sort.js
@@ -250,6 +252,8 @@ last-lts:
       ticket: SERVER-90334
     - test_file: jstests/sharding/change_streams_survive_move_primary.js
       ticket: SERVER-69933
+    - test_file: jstests/core/write/update/upsert_nor.js
+      ticket: SERVER-91700
     - test_file: jstests/aggregation/group_by_objectid.js
       ticket: SERVER-90173
     - test_file: jstests/aggregation/unwind_sort.js

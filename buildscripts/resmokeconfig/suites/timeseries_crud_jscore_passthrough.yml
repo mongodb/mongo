@@ -121,6 +121,7 @@ selector:
     - jstests/core/write/update/update_setOnInsert.js
     - jstests/core/write/update/upsert_fields.js
     - jstests/core/write/update/upsert_fields_duplicate_or.js
+    - jstests/core/write/update/upsert_nor.js
     - jstests/core/write/write_error_message_truncation.js
     - jstests/core/write/write_result.js
     # Time-series collections may generate different profiling entries from regular ones.
