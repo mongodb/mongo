@@ -2039,12 +2039,18 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
 
+            auto involvedShards = *_doc.getShardIds();
+            auto addIfNotPresent = [&](const ShardId& shard) {
+                if (std::find(involvedShards.begin(), involvedShards.end(), shard) ==
+                    involvedShards.end())
+                    involvedShards.push_back(shard);
+            };
+
             // The filtering information has been cleared on all participant shards. Here we issue a
             // best effort refresh on all shards involved in the operation to install the correct
             // filtering information.
-            auto involvedShards = *_doc.getShardIds();
-            involvedShards.push_back(ShardingState::get(opCtx)->shardId());
-            involvedShards.push_back(*_doc.getOriginalDataShard());
+            addIfNotPresent(ShardingState::get(opCtx)->shardId());
+            addIfNotPresent(*_doc.getOriginalDataShard());
             sharding_util::triggerFireAndForgetShardRefreshes(opCtx, involvedShards, nss());
 
             if (_firstExecution) {
