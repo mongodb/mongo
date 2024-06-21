@@ -134,7 +134,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(const Source&
 
 void SBEExpressionLowering::prepare(const Let& let) {
     // Assign a frame ID for the local variable bound by this Let expression.
-    _letMap[&let] = ++_frameCounter;
+    _letMap[&let] = generateFrameId();
 }
 
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
@@ -151,7 +151,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
 
 void SBEExpressionLowering::prepare(const LambdaAbstraction& lam) {
     // Assign a frame ID for the local variable bound by this LambdaAbstraction.
-    _lambdaMap[&lam] = ++_frameCounter;
+    _lambdaMap[&lam] = generateFrameId();
 }
 
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
