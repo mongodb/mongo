@@ -1,8 +1,13 @@
 // Test explaining a delete command against a non-existent collection.
 //
-// @tags: [requires_non_retryable_writes, requires_fastcount,
-// assumes_no_implicit_collection_creation_after_drop]
-import {planHasStage} from "jstests/libs/analyze_plan.js";
+// @tags: [
+//    requires_non_retryable_writes,
+//    requires_fastcount,
+//    assumes_no_implicit_collection_creation_after_drop,
+//    requires_fcv_81,
+//]
+//
+import {getPlanStages, planHasStage} from "jstests/libs/analyze_plan.js";
 
 function assertCollectionDoesNotExist(collName) {
     const collectionList = db.getCollectionInfos({name: collName});
@@ -17,6 +22,8 @@ coll.drop();
 let explain = assert.commandWorked(
     db.runCommand({explain: {delete: collName, deletes: [{q: {a: 1}, limit: 0}]}}));
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"), explain);
+let eofStages = getPlanStages(explain.queryPlanner.winningPlan, "EOF");
+eofStages.forEach(stage => assert.eq(stage.type, "nonExistentNamespace"));
 assert(!planHasStage(db, explain.queryPlanner.winningPlan, "DELETE"), explain);
 
 assertCollectionDoesNotExist(collName);
@@ -25,6 +32,8 @@ assertCollectionDoesNotExist(collName);
 explain = assert.commandWorked(db.runCommand(
     {explain: {update: collName, updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: false}]}}));
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"), explain);
+eofStages = getPlanStages(explain.queryPlanner.winningPlan, "EOF");
+eofStages.forEach(stage => assert.eq(stage.type, "nonExistentNamespace"));
 assert(!planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"), explain);
 assertCollectionDoesNotExist(collName);
 
@@ -32,5 +41,7 @@ assertCollectionDoesNotExist(collName);
 explain = assert.commandWorked(db.runCommand(
     {explain: {update: collName, updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: true}]}}));
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"), explain);
+eofStages = getPlanStages(explain.queryPlanner.winningPlan, "EOF");
+eofStages.forEach(stage => assert.eq(stage.type, "nonExistentNamespace"));
 assert(!planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"), explain);
 assertCollectionDoesNotExist(collName);

@@ -1742,7 +1742,7 @@ void EofNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> EofNode::clone() const {
-    auto copy = std::make_unique<EofNode>();
+    auto copy = std::make_unique<EofNode>(this->type);
     cloneBaseData(copy.get());
     return copy;
 }

@@ -2,12 +2,19 @@
 // expected.
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
+//   requires_fcv_81,
 // ]
 
 /**
  * This test ensures that explain on the distinct command works.
  */
-import {getPlanStage, getWinningPlan, isCollscan, planHasStage} from "jstests/libs/analyze_plan.js";
+import {
+    getPlanStage,
+    getPlanStages,
+    getWinningPlan,
+    isCollscan,
+    planHasStage
+} from "jstests/libs/analyze_plan.js";
 
 const collName = "jstests_explain_distinct";
 const coll = db[collName];
@@ -34,6 +41,8 @@ let explain = runDistinctExplain(coll, 'a', {});
 assert.commandWorked(explain);
 let winningPlan = getWinningPlan(explain.queryPlanner);
 assert(planHasStage(db, winningPlan, "EOF"));
+const eofStages = getPlanStages(winningPlan, "EOF");
+eofStages.forEach(stage => assert.eq(stage.type, "nonExistentNamespace", explain));
 
 // Insert the data to perform distinct() on.
 for (let i = 0; i < 10; i++) {

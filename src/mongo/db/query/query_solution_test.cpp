@@ -48,6 +48,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval.h"
@@ -1871,12 +1872,12 @@ TEST(QuerySolutionTest, ShouldCacheEofPlanTree) {
 
     // QuerySolution with root EOF node is eligible for the plan cache.
     auto solution1 = std::make_unique<QuerySolution>();
-    solution1->setRoot(std::make_unique<EofNode>());
+    solution1->setRoot(std::make_unique<EofNode>(eof_node::EOFType::PredicateEvalsToFalse));
     ASSERT_TRUE(solution1->isEligibleForPlanCache());
 
     // QuerySolution with child EOF node is eligible for the plan cache.
     std::vector<std::unique_ptr<QuerySolutionNode>> indexScanList;
-    indexScanList.push_back(std::make_unique<EofNode>());
+    indexScanList.push_back(std::make_unique<EofNode>(eof_node::EOFType::NonExistentNamespace));
     auto orNode = std::make_unique<OrNode>();
     orNode->addChildren(std::move(indexScanList));
 

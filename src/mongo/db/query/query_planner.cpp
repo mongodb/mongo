@@ -81,6 +81,7 @@
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
@@ -843,7 +844,7 @@ std::unique_ptr<QuerySolution> tryEofSoln(const CanonicalQuery& query) {
         return nullptr;
     }
     auto soln = std::make_unique<QuerySolution>();
-    soln->setRoot(std::make_unique<EofNode>());
+    soln->setRoot(std::make_unique<EofNode>(eof_node::EOFType::PredicateEvalsToFalse));
     return soln;
 }
 

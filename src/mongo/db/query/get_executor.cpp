@@ -114,6 +114,7 @@
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/cqf_fast_paths.h"
 #include "mongo/db/query/cqf_get_executor.h"
+#include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -465,7 +466,7 @@ public:
                         "canonicalQuery"_attr = redact(_queryStringForDebugLog));
 
             auto solution = std::make_unique<QuerySolution>();
-            solution->setRoot(std::make_unique<EofNode>());
+            solution->setRoot(std::make_unique<EofNode>(eof_node::EOFType::NonExistentNamespace));
             if (std::is_same_v<KeyType, sbe::PlanCacheKey>) {
                 planCacheCounters.incrementSbeSkippedCounter();
             } else {
@@ -1780,13 +1781,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                     "Collection does not exist. Using EOF stage",
                     logAttrs(nss),
                     "query"_attr = redact(request->getQuery()));
-        return plan_executor_factory::make(expCtx,
-                                           std::move(ws),
-                                           std::make_unique<EOFStage>(expCtx.get()),
-                                           coll,
-                                           parsedDelete->yieldPolicy(),
-                                           false, /* whether we must return owned data */
-                                           nss);
+        return plan_executor_factory::make(
+            expCtx,
+            std::move(ws),
+            std::make_unique<EOFStage>(expCtx.get(), eof_node::EOFType::NonExistentNamespace),
+            coll,
+            parsedDelete->yieldPolicy(),
+            false, /* whether we must return owned data */
+            nss);
     }
 
     if (!parsedDelete->hasParsedQuery()) {
@@ -1955,13 +1957,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                     "Collection does not exist. Using EOF stage",
                     logAttrs(nss),
                     "query"_attr = redact(request->getQuery()));
-        return plan_executor_factory::make(expCtx,
-                                           std::move(ws),
-                                           std::make_unique<EOFStage>(expCtx.get()),
-                                           &CollectionPtr::null,
-                                           policy,
-                                           false, /* whether owned BSON must be returned */
-                                           nss);
+        return plan_executor_factory::make(
+            expCtx,
+            std::move(ws),
+            std::make_unique<EOFStage>(expCtx.get(), eof_node::EOFType::NonExistentNamespace),
+            &CollectionPtr::null,
+            policy,
+            false, /* whether owned BSON must be returned */
+            nss);
     }
 
     if (!parsedUpdate->hasParsedQuery()) {
@@ -2254,7 +2257,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         // machinery always assumes that the root stage for a count operation is a CountStage, so in
         // this case we put a CountStage on top of an EOFStage.
         std::unique_ptr<PlanStage> root = std::make_unique<CountStage>(
-            expCtx.get(), collection, limit, skip, ws.get(), new EOFStage(expCtx.get()));
+            expCtx.get(),
+            collection,
+            limit,
+            skip,
+            ws.get(),
+            new EOFStage(expCtx.get(), eof_node::EOFType::NonExistentNamespace));
         return plan_executor_factory::make(expCtx,
                                            std::move(ws),
                                            std::move(root),

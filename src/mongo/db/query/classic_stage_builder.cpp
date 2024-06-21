@@ -404,7 +404,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             return std::make_unique<CountScan>(expCtx, _collection, std::move(params), _ws);
         }
         case STAGE_EOF: {
-            return std::make_unique<EOFStage>(expCtx);
+            const EofNode* eofn = static_cast<const EofNode*>(root);
+            return std::make_unique<EOFStage>(expCtx, eofn->type);
         }
         case STAGE_VIRTUAL_SCAN: {
             const auto* vsn = static_cast<const VirtualScanNode*>(root);

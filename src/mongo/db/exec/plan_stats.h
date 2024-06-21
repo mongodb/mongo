@@ -37,6 +37,7 @@
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/record_id_bound.h"
@@ -1288,5 +1289,27 @@ struct SpoolStats : public SpecificStats {
 
     // The amount of data that has been spilled to the spill file, or 0 if no spilling occurred.
     uint64_t spilledUncompressedDataSize = 0u;
+};
+
+struct EofStats : public SpecificStats {
+    EofStats(eof_node::EOFType type) : type(type) {}
+
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<EofStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const override {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    eof_node::EOFType type;
 };
 }  // namespace mongo

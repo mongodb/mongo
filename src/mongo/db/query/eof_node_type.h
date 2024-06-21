@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,43 +29,21 @@
 
 #pragma once
 
-#include <memory>
+#include <string>
 
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/eof_node_type.h"
-#include "mongo/db/query/stage_types.h"
-#include "mongo/db/record_id.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
-
-/**
- * This stage just returns EOF immediately.
- */
-class EOFStage final : public PlanStage {
-public:
-    EOFStage(ExpressionContext* expCtx, eof_node::EOFType type);
-
-    ~EOFStage() override;
-
-    bool isEOF() final;
-    StageState doWork(WorkingSetID* out) final;
-
-
-    StageType stageType() const final {
-        return STAGE_EOF;
+namespace eof_node {
+enum EOFType { NonExistentNamespace, PredicateEvalsToFalse };
+static std::string typeStr(const eof_node::EOFType& type) {
+    switch (type) {
+        case eof_node::EOFType::NonExistentNamespace:
+            return "nonExistentNamespace";
+        case eof_node::EOFType::PredicateEvalsToFalse:
+            return "predicateEvalsToFalse";
     }
-
-    std::unique_ptr<PlanStageStats> getStats() override;
-
-    const SpecificStats* getSpecificStats() const final;
-
-    static const char* kStageType;
-
-private:
-    EofStats _specificStats;
-};
-
+    MONGO_UNREACHABLE;
+}
+}  // namespace eof_node
 }  // namespace mongo

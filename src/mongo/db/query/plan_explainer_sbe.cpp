@@ -47,6 +47,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
@@ -345,6 +346,11 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("isSearchMeta", sn->isSearchMeta);
             bob->appendNumber("remoteCursorId", static_cast<long long>(sn->remoteCursorId));
             bob->append("searchQuery", sn->searchQuery);
+            break;
+        }
+        case STAGE_EOF: {
+            auto eofn = static_cast<const EofNode*>(node);
+            bob->append("type", eof_node::typeStr(eofn->type));
             break;
         }
         default:

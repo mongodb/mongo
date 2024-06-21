@@ -70,6 +70,7 @@
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
@@ -254,7 +255,8 @@ public:
             params.canonicalQuery = cq.get();
 
             auto ws = std::make_unique<WorkingSet>();
-            auto eofStage = std::make_unique<EOFStage>(_expCtx.get());
+            auto eofStage =
+                std::make_unique<EOFStage>(_expCtx.get(), eof_node::EOFType::NonExistentNamespace);
 
             auto updateStage = std::make_unique<UpsertStage>(
                 _expCtx.get(), params, ws.get(), collection, eofStage.release());

@@ -15,11 +15,12 @@
  *   assumes_balancer_off,
  *   assumes_unsharded_collection,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
- *   tenant_migration_incompatible
+ *   tenant_migration_incompatible,
+ *   requires_fcv_81,
  * ]
  */
 
-import {getQueryPlanner, planHasStage} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getQueryPlanner, planHasStage} from "jstests/libs/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
 const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
@@ -65,6 +66,8 @@ let explain = coll.find({"$text": {"$search": ""}}).explain("executionStats");
 let winningPlan = getQueryPlanner(explain).winningPlan;
 assert.eq(true, winningPlan.isCached);
 assert(planHasStage(db, explain, "EOF"));
+let eofStages = getPlanStages(winningPlan, "EOF");
+eofStages.forEach(stage => assert.eq(stage.type, "predicateEvalsToFalse"));
 
 // Query with a space as its search string and eof child node is cached.
 coll.find({"$text": {"$search": " "}}).toArray();
@@ -75,3 +78,5 @@ explain = coll.find({"$text": {"$search": " "}}).explain("executionStats");
 winningPlan = getQueryPlanner(explain).winningPlan;
 assert.eq(true, winningPlan.isCached);
 assert(planHasStage(db, explain, "EOF"));
+eofStages = getPlanStages(winningPlan, "EOF");
+eofStages.forEach(stage => assert.eq(stage.type, "predicateEvalsToFalse"));

@@ -364,6 +364,7 @@ void ClusterExplain::buildEOFExplainResult(OperationContext* opCtx,
     BSONObjBuilder queryPlanBob(winningPlanBob.subobjStart("queryPlan"));
     queryPlanBob.append("stage", "EOF");
     queryPlanBob.appendNumber("planNodeId", 1);
+    queryPlanBob.append("type", eof_node::typeStr(eof_node::EOFType::NonExistentNamespace));
     queryPlanBob.doneFast();
     winningPlanBob.doneFast();
 

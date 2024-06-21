@@ -69,6 +69,7 @@
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -1016,7 +1017,8 @@ void buildTextSubPlan(TextMatchNode* tn) {
     // In case the query didn't have any search term, we can simply use an EOF sub-plan, as no
     // results can be returned in this case anyway.
     if (indexScanList.empty()) {
-        indexScanList.push_back(std::make_unique<EofNode>());
+        indexScanList.push_back(
+            std::make_unique<EofNode>(eof_node::EOFType::PredicateEvalsToFalse));
     }
 
     // Build the union of the index scans as a TEXT_OR or an OR stage, depending on whether the

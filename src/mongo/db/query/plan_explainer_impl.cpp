@@ -567,6 +567,10 @@ void statsToBSON(const PlanStageStats& stats,
             bob->appendNumber("spilledUncompressedDataSize",
                               static_cast<long long>(spec->spilledUncompressedDataSize));
         }
+    } else if (STAGE_EOF == stats.stageType) {
+        EofStats* spec = static_cast<EofStats*>(stats.specific.get());
+
+        bob->append("type", eof_node::typeStr(spec->type));
     }
 
     // We're done if there are no children.

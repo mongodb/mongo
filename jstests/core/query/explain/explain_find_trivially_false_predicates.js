@@ -1,13 +1,13 @@
 /**
  * Tests for optimizations applied to trivially false predicates.
  * @tags: [
- *   requires_fcv_73,
+ *   requires_fcv_81,
  *   # Explain command does not support read concerns other than local
  *   assumes_read_concern_local
  * ]
  */
 
-import {getWinningPlanFromExplain, isEofPlan} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain, isEofPlan} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const collName = "jstests_explain_find_trivially_false_predicates";
@@ -27,9 +27,13 @@ const collName = "jstests_explain_find_trivially_false_predicates";
     let explain = coll.find({$alwaysFalse: 1}).explain();
     let winningPlan = getWinningPlanFromExplain(explain);
     assert(isEofPlan(db, winningPlan));
+    let eofStages = getPlanStages(winningPlan, "EOF");
+    eofStages.forEach(stage => assert.eq(stage.type, "predicateEvalsToFalse"));
 
     // It also uses EOF for queries including projection, sorting, limit and skip arguments.
     explain = coll.find({$alwaysFalse: 1}, {_id: 0, a: 1}).skip(1).limit(2).explain();
     winningPlan = getWinningPlanFromExplain(explain);
     assert(isEofPlan(db, winningPlan));
+    eofStages = getPlanStages(winningPlan, "EOF");
+    eofStages.forEach(stage => assert.eq(stage.type, "predicateEvalsToFalse"));
 });

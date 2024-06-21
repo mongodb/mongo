@@ -53,6 +53,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/exec/eof.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -66,6 +67,7 @@
 #include "mongo/db/pipeline/window_function/window_function_statement.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_hint.h"
@@ -1624,7 +1626,7 @@ struct CountScanNode : public QuerySolutionNodeWithSortSet {
 };
 
 struct EofNode : public QuerySolutionNodeWithSortSet {
-    EofNode() {}
+    EofNode(eof_node::EOFType type) : type(type) {}
 
     StageType getType() const override {
         return STAGE_EOF;
@@ -1645,6 +1647,8 @@ struct EofNode : public QuerySolutionNodeWithSortSet {
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    eof_node::EOFType type;
 };
 
 struct TextOrNode : public OrNode {
