@@ -75,11 +75,11 @@ function assertPipelineOptimization(pipeline, expectedStageSequence) {
         for (const shardName in explain.shards) {
             let stageSequenceTuple =
                 getStageSequenceToCompare(explain.shards[shardName], queryEngine);
-            assert.eq(stageSequenceTuple[0], expectedStageSequence[stageSequenceTuple[1]]);
+            assert.eq(stageSequenceTuple[0], expectedStageSequence[stageSequenceTuple[1]], explain);
         }
     } else {
         let stageSequenceTuple = getStageSequenceToCompare(explain, queryEngine);
-        assert.eq(stageSequenceTuple[0], expectedStageSequence[stageSequenceTuple[1]]);
+        assert.eq(stageSequenceTuple[0], expectedStageSequence[stageSequenceTuple[1]], explain);
     }
 }
 
@@ -87,7 +87,7 @@ function assertPipelineOptimization(pipeline, expectedStageSequence) {
 // The function requires access to the collection to run the query.
 function assertQueryResult(pipeline, expectedResult) {
     const actualResult = coll.aggregate(pipeline).toArray();
-    assert.sameMembers(expectedResult, actualResult);
+    assert.sameMembers(expectedResult, actualResult, coll.explain().aggregate(pipeline));
 }
 
 const coll = db.grouped_match_push_down;
@@ -145,6 +145,36 @@ assertPipelineOptimizationAndResult({
         [SingleStage]: ["MATCH", "PROJECTION_DEFAULT", "GROUP", "COLLSCAN"]
     },
     expectedResult: [{"_id": {"c": {"d": 2}}, "m": 2}]
+});
+
+// Asserts that the optimization over group, addFields, match over a renamed dotted path will not
+// lose other dependencies between stages.
+assertPipelineOptimizationAndResult({
+    pipeline: [
+        {$group: {_id: "$d", c: {$sum: {$const: 1}}}},
+        {$addFields: {c: '$_id'}},
+        {$match: {c: {$eq: 2}}}
+    ],
+    expectedStageSequence: {
+        [MultiStageSBE]: ["$cursor", "$addFields"],
+        [MultiStageClassic]: ["$cursor", "$group", "$addFields"],
+        [SingleStage]: ["PROJECTION_DEFAULT", "GROUP", "COLLSCAN"]
+    },
+    expectedResult: [{_id: 2, c: 2}]
+});
+
+assertPipelineOptimizationAndResult({
+    pipeline: [
+        {$group: {_id: "$d", c: {$sum: {$const: 1}}}},
+        {$addFields: {d: '$c'}},
+        {$match: {d: {$eq: 1}}}
+    ],
+    expectedStageSequence: {
+        [MultiStageSBE]: ["$cursor", "$match", "$addFields"],
+        [MultiStageClassic]: ["$cursor", "$group", "$match", "$addFields"],
+        [SingleStage]: ["PROJECTION_DEFAULT", "MATCH", "GROUP", "COLLSCAN"]
+    },
+    expectedResult: [{_id: 2, c: 1, d: 1}]
 });
 
 MongoRunner.stopMongod(conn);
