@@ -132,4 +132,6 @@ private:
 /** The singleton ActiveExceptionWitness. */
 ActiveExceptionWitness& globalActiveExceptionWitness();
 
+std::string describeActiveException();
+
 }  // namespace mongo

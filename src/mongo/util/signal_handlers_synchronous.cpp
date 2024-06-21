@@ -39,6 +39,7 @@
 #include <fmt/format.h>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <streambuf>
 #include <typeinfo>
 
@@ -431,6 +432,12 @@ void ActiveExceptionWitness::_exceptionTypeBlurb(const std::type_info& ex, std::
 ActiveExceptionWitness& globalActiveExceptionWitness() {
     static StaticImmortal<ActiveExceptionWitness> v;
     return *v;
+}
+
+std::string describeActiveException() {
+    std::ostringstream oss;
+    globalActiveExceptionWitness().describe(oss);
+    return oss.str();
 }
 
 }  // namespace mongo
