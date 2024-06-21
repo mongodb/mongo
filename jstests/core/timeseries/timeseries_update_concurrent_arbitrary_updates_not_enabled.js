@@ -1,6 +1,7 @@
 /**
  * Tests running the update command on a time-series collection with concurrent modifications to the
- * collection when the feature flag for time-series arbitrary updates is enabled.
+ * collection when the feature flag for time-series arbitary updates is not enabled. Split off from
+ * jstests//core/timeseries/timeseries_update_concurrent.js, see SERVER-78202 for more context.
  * @tags: [
  *   # Fail points in this test do not exist on mongos.
  *   assumes_against_mongod_not_mongos,
@@ -22,8 +23,8 @@
  *   # Multi clients cannot share global fail points. When one client turns off a fail point, other
  *   # clients waiting on the fail point will get failed.
  *   multi_clients_incompatible,
- *   # We expect the feature flag for time-series arbitrary updates to be enabled.
- *   featureFlagTimeseriesUpdatesSupport,
+ *   # We expect the feature flag for time-series arbitrary updates to be disabled.
+ *   featureFlagTimeseriesUpdatesSupport_incompatible,
  * ]
  */
 
@@ -104,17 +105,13 @@ const docs = [
     {_id: 2, [timeFieldName]: ISODate(), [metaFieldName]: {a: "B"}},
 ];
 
-// Attempt to update a document in a collection that has been dropped.
-validateUpdateIndex(
-    docs,
-    [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
-    testCases.DROP_COLLECTION,
-    [ErrorCodes.NamespaceNotFound, 8555700, 8555701]);  // TODO (SERVER-85548): revisit error codes
-
-// Attempt to update a document in a collection that has been replaced with a non-time-series
-// collection.
-validateUpdateIndex(
-    docs,
-    [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
-    testCases.REPLACE_COLLECTION,
-    [ErrorCodes.NamespaceNotFound, 8555700, 8555701]);  // TODO (SERVER-85548): revisit error codes
+// Attempt to update a document in a collection that has been replaced with a new time-series
+// collection with a different metaField.
+if (!TimeseriesTest.arbitraryUpdatesEnabled(db)) {
+    validateUpdateIndex(
+        docs,
+        [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
+        testCases.REPLACE_METAFIELD,
+        ErrorCodes.InvalidOptions,
+        "meta");
+}

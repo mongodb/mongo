@@ -66,16 +66,6 @@ selector:
     # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
     - jstests/core/api/api_version_unstable_indexes.js
 
-    # TODO (SERVER-78202): Investigate failing timeseries tests in the fcv jscore passthrough suite.
-    - jstests/core/timeseries/timeseries_update.js
-    - jstests/core/timeseries/timeseries_update_concurrent.js
-    - jstests/core/timeseries/timeseries_update_one.js
-    - jstests/core/timeseries/timeseries_update_multi.js
-    - jstests/core/timeseries/timeseries_find_and_modify_update.js
-    - jstests/core/timeseries/timeseries_delete_compressed_buckets.js
-    - jstests/core/timeseries/timeseries_bucket_limit_count.js
-    - jstests/core/timeseries/timeseries_insert_after_update.js
-
     # These timeseries tests rely on specific bucketing behaviour that is not guaranteed across FCV
     # upgrade/downgrade
     # TODO SERVER-70605: remove this block.
@@ -269,6 +259,7 @@ selector:
     - featureFlagQuerySettings
     # TODO: SERVER-66393 Remove Feature Flag for PM-2919.
     - featureFlagTimeseriesUpdatesSupport
+    - featureFlagTimeseriesUpdatesSupport_incompatible
     # TODO: SERVER-78068 Remove Feature Flag for PM-2983
     - featureFlagRecordIdsReplicated
     # Transactions are aborted upon fcv upgrade or downgrade.
