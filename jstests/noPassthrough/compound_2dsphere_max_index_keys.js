@@ -54,7 +54,8 @@ const runTest = (indexDefinition) => {
 
     // We should also get a warning when we try to validate.
     const validation = assert.commandWorked(coll.validate());
-    assert.eq(validation.warnings.length, 2);
+    assert.eq(validation.warnings.length, 1);
+    assert(validation.warnings[0].includes('CannotBuildIndexKeys'));
 
     // We should be able to remove a problem document.
     assert.commandWorked(coll.deleteOne({_id: 'problem1'}));
