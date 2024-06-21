@@ -340,7 +340,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_initial_sync_gen
-  tags: ["assigned_to_jira_team_server_repl", "default", "concurrency", "stepdowns", "initsync", "large", "sharded", "no_debug_mode", "requires_wt"]
+  tags: ["assigned_to_jira_team_server_repl", "default", "concurrency", "stepdowns", "initsync", "large", "sharded", "no_debug_mode", "requires_wt", "incompatible_tsan"]
   commands:
   - func: "generate resmoke tasks"
     vars:
