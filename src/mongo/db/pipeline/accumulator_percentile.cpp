@@ -56,11 +56,24 @@ REGISTER_ACCUMULATOR(median, AccumulatorMedian::parseArgs);
 REGISTER_STABLE_EXPRESSION(median, AccumulatorMedian::parseExpression);
 
 Status AccumulatorPercentile::validatePercentileMethod(StringData method) {
-    if (method != kApproximate) {
-        return {ErrorCodes::BadValue,
-                "Currently only 'approximate' can be used as percentile 'method'."};
+    if (feature_flags::gFeatureFlagAccuratePercentiles.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (method == kDiscrete || method == kContinuous) {
+            return {ErrorCodes::InternalErrorNotSupported, "Not implemented."};
+        }
+        if (method != kApproximate) {
+            return {ErrorCodes::BadValue,
+                    "Currently only 'approximate', 'discrete', and 'continuous' "
+                    "can be used as percentile 'method'."};
+        }
+        return Status::OK();
+    } else {
+        if (method != kApproximate) {
+            return {ErrorCodes::BadValue,
+                    "Currently only 'approximate' can be used as percentile 'method'."};
+        }
+        return Status::OK();
     }
-    return Status::OK();
 }
 
 namespace {

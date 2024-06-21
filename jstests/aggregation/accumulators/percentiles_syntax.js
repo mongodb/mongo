@@ -1,18 +1,24 @@
 /**
  * Tests for the $percentile accumulator syntax.
  * @tags: [
- *   requires_fcv_70,
+ *   requires_fcv_81,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const coll = db[jsTestName()];
 coll.drop();
 // These tests don't validate the computed $percentile but we need a result to be produced in
 // order to check its format.
 coll.insert({x: 42});
 
-function assertInvalidSyntax({pSpec, letSpec, msg}) {
+function assertInvalidSyntax({pSpec, letSpec, errorCode, msg}) {
     let command = {pipeline: [{$group: {_id: null, p: pSpec}}], let : letSpec, cursor: {}};
-    assert.commandFailed(coll.runCommand("aggregate", command), msg);
+    if (errorCode) {
+        assert.commandFailedWithCode(coll.runCommand("aggregate", command), errorCode, msg);
+    } else {
+        assert.commandFailed(coll.runCommand("aggregate", command), msg);
+    }
 }
 
 function assertValidSyntax({pSpec, letSpec, msg}) {
@@ -116,15 +122,32 @@ assertInvalidSyntax({
     msg: "$percentile should fail if 'method' isn't one of _predefined_ strings"
 });
 
-assertInvalidSyntax({
-    pSpec: {$percentile: {p: [0.5, 0.7], input: "$x", method: "discrete"}},
-    msg: "$percentile should fail because discrete 'method' isn't supported yet"
-});
+if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
+    assertInvalidSyntax({
+        pSpec: {$percentile: {p: [0.5, 0.7], input: "$x", method: "discrete"}},
+        errorCode: ErrorCodes.InternalErrorNotSupported,
+        msg: "$percentile should fail because discrete 'method' isn't implemented yet"
+    });
 
-assertInvalidSyntax({
-    pSpec: {$percentile: {p: [0.5, 0.7], input: "$x", method: "continuous"}},
-    msg: "$percentile should fail because continuous 'method' isn't supported yet"
-});
+    assertInvalidSyntax({
+        pSpec: {$percentile: {p: [0.5, 0.7], input: "$x", method: "continuous"}},
+        errorCode: ErrorCodes.InternalErrorNotSupported,
+        msg: "$percentile should fail because continuous 'method' isn't implemented yet"
+    });
+
+} else {
+    assertInvalidSyntax({
+        pSpec: {$percentile: {p: [0.5, 0.7], input: "$x", method: "discrete"}},
+        errorCode: ErrorCodes.BadValue,
+        msg: "$percentile should fail because discrete 'method' isn't supported yet"
+    });
+
+    assertInvalidSyntax({
+        pSpec: {$percentile: {p: [0.5, 0.7], input: "$x", method: "continuous"}},
+        errorCode: ErrorCodes.BadValue,
+        msg: "$percentile should fail because continuous 'method' isn't supported yet"
+    });
+}
 
 /**
  * Tests for invalid $median.
@@ -151,6 +174,33 @@ assertInvalidSyntax({
     pSpec: {$median: {input: "$x", method: "fancy"}},
     msg: "$median should fail if 'method' isn't one of the _predefined_ strings"
 });
+
+if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
+    assertInvalidSyntax({
+        pSpec: {$median: {input: "$x", method: "discrete"}},
+        errorCode: ErrorCodes.InternalErrorNotSupported,
+        msg: "$median should fail because discrete 'method' isn't implemented yet"
+    });
+
+    assertInvalidSyntax({
+        pSpec: {$median: {input: "$x", method: "continuous"}},
+        errorCode: ErrorCodes.InternalErrorNotSupported,
+        msg: "$median should fail because continuous 'method' isn't implemented yet"
+    });
+
+} else {
+    assertInvalidSyntax({
+        pSpec: {$median: {input: "$x", method: "discrete"}},
+        errorCode: ErrorCodes.BadValue,
+        msg: "$median should fail because discrete 'method' isn't supported yet"
+    });
+
+    assertInvalidSyntax({
+        pSpec: {$median: {input: "$x", method: "continuous"}},
+        errorCode: ErrorCodes.BadValue,
+        msg: "$median should fail because continuous 'method' isn't supported yet"
+    });
+}
 
 assertInvalidSyntax({
     pSpec: {$median: {input: "$x", method: "discrete"}},

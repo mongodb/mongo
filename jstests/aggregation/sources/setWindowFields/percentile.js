@@ -1,13 +1,14 @@
 /**
  * Test that $percentile and $median work as window functions.
  *  @tags: [
- *   requires_fcv_70,
+ *   requires_fcv_81,
  * ]
  */
 import {
     seedWithTickerData,
     testAccumAgainstGroup
 } from "jstests/aggregation/extras/window_function_helpers.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -141,19 +142,28 @@ testError({$median: "not an object"}, 7436100);
 
 testError({$percentile: {p: [0.1, 0.6], input: "$str", method: false}}, ErrorCodes.TypeMismatch);
 testError({$median: {input: "$str", method: false}}, ErrorCodes.TypeMismatch);
-testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
-testError({$median: {input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
-testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "continuous"}}, ErrorCodes.BadValue);
-testError({$median: {input: "$str", method: "continuous"}}, ErrorCodes.BadValue);
-
+if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
+    testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "discrete"}},
+              ErrorCodes.InternalErrorNotSupported);
+    testError({$median: {input: "$str", method: "discrete"}}, ErrorCodes.InternalErrorNotSupported);
+    testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "continuous"}},
+              ErrorCodes.InternalErrorNotSupported);
+    testError({$median: {input: "$str", method: "continuous"}},
+              ErrorCodes.InternalErrorNotSupported);
+} else {
+    testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "discrete"}},
+              ErrorCodes.BadValue);
+    testError({$median: {input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
+    testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "continuous"}},
+              ErrorCodes.BadValue);
+    testError({$median: {input: "$str", method: "continuous"}}, ErrorCodes.BadValue);
+}
 // invalid expressions or variables for 'p'
-testError({$percentile: {p: "$$ps", input: "$price", method: "continuous"}},
-          ErrorCodes.BadValue /* non-numeric 'p' value in the variable */,
+testError({$percentile: {p: "$$ps", input: "$price", method: "approximate"}},
+          7750301 /* non-numeric 'p' value in the variable */,
           {ps: "foo"} /* letSpec */);
-
-testError({$percentile: {p: ["$price"], input: "$str", method: "continuous"}},
-          ErrorCodes.BadValue /* non-const 'p' expression */);
-
+testError({$percentile: {p: ["$price"], input: "$str", method: "approximate"}},
+          7750300 /* non-const 'p' expression */);
 testError({$percentile: {input: "$str", method: "approximate"}},
           ErrorCodes.IDLFailedToParse /* IDL required field error */);
 testError({$median: {p: [0.1, 0.6], input: "$str", method: "approximate"}},

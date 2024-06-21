@@ -1,17 +1,23 @@
 /**
  * Tests for the $percentile expression syntax.
  * @tags: [
- *   requires_fcv_70,
+ *   requires_fcv_81,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const coll = db.expression_percentile;
 coll.drop();
 
 assert.commandWorked(coll.insert([{_id: 0, k1: 3, k2: 2, k3: "hi", k4: [1, 2, 3]}]));
 
-function assertInvalidSyntax({pSpec, letSpec, msg}) {
+function assertInvalidSyntax({pSpec, letSpec, errorCode, msg}) {
     let command = {pipeline: [{$project: {p: pSpec}}], let : letSpec, cursor: {}};
-    assert.commandFailed(coll.runCommand("aggregate", command), msg);
+    if (errorCode) {
+        assert.commandFailedWithCode(coll.runCommand("aggregate", command), errorCode, msg);
+    } else {
+        assert.commandFailed(coll.runCommand("aggregate", command), msg);
+    }
 }
 
 function assertValidSyntax({pSpec, letSpec, msg}) {
@@ -118,15 +124,32 @@ assertInvalidSyntax({
     msg: "$percentile should fail if 'method' isn't one of the _predefined_ strings"
 });
 
-assertInvalidSyntax({
-    pSpec: {$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "continuous"}},
-    msg: "$percentile should fail because continuous 'method' isn't supported yet"
-});
+if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
+    assertInvalidSyntax({
+        pSpec: {$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "discrete"}},
+        errorCode: ErrorCodes.InternalErrorNotSupported,
+        msg: "$percentile should fail because discrete 'method' isn't implemented yet"
+    });
 
-assertInvalidSyntax({
-    pSpec: {$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "discrete"}},
-    msg: "$percentile should fail because discrete 'method' isn't supported yet"
-});
+    assertInvalidSyntax({
+        pSpec: {$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "continuous"}},
+        errorCode: ErrorCodes.InternalErrorNotSupported,
+        msg: "$percentile should fail because continuous 'method' isn't implemented yet"
+    });
+
+} else {
+    assertInvalidSyntax({
+        pSpec: {$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "continuous"}},
+        errorCode: ErrorCodes.BadValue,
+        msg: "$percentile should fail because continuous 'method' isn't supported yet"
+    });
+
+    assertInvalidSyntax({
+        pSpec: {$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "discrete"}},
+        errorCode: ErrorCodes.BadValue,
+        msg: "$percentile should fail because discrete 'method' isn't supported yet"
+    });
+}
 
 /**
  * Tests for $median.
@@ -156,15 +179,32 @@ assertInvalidSyntax({
     msg: "$median should fail if 'method' isn't one of the _predefined_ strings"
 });
 
-assertInvalidSyntax({
-    pSpec: {$median: {input: ["$k1", "$k2"], method: "continuous"}},
-    msg: "$median should fail because continuous 'method' isn't supported yet"
-});
+if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
+    assertInvalidSyntax({
+        pSpec: {$median: {input: ["$k1", "$k2"], method: "discrete"}},
+        errorCode: ErrorCodes.InternalErrorNotSupported,
+        msg: "$median should fail because discrete 'method' isn't implemented yet"
+    });
 
-assertInvalidSyntax({
-    pSpec: {$median: {input: ["$k1", "$k2"], method: "discrete"}},
-    msg: "$median should fail because discrete 'method' isn't supported yet"
-});
+    assertInvalidSyntax({
+        pSpec: {$median: {input: ["$k1", "$k2"], method: "continuous"}},
+        errorCode: ErrorCodes.InternalErrorNotSupported,
+        msg: "$median should fail because continuous 'method' isn't implemented yet"
+    });
+
+} else {
+    assertInvalidSyntax({
+        pSpec: {$median: {input: ["$k1", "$k2"], method: "discrete"}},
+        errorCode: ErrorCodes.BadValue,
+        msg: "$median should fail because discrete 'method' isn't supported yet"
+    });
+
+    assertInvalidSyntax({
+        pSpec: {$median: {input: ["$k1", "$k2"], method: "continuous"}},
+        errorCode: ErrorCodes.BadValue,
+        msg: "$median should fail because continuous 'method' isn't supported yet"
+    });
+}
 
 /**
  * Test that valid $percentile specifications are accepted. The results, i.e. semantics, are
