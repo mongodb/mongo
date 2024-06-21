@@ -27,7 +27,7 @@ assert.eq(
 assert.eq(
     1, t.find({name: /^\./}).explain(true).executionStats.totalKeysExamined, "index explain 4");
 assert.eq(
-    5, t.find({name: /^./}).explain(true).executionStats.totalDocsExamined, "index explain 5");
+    5, t.find({name: /^./}).explain(true).executionStats.totalKeysExamined, "index explain 5");
 
 // SERVER-2862
 assert.eq(0, t.find({name: /^\Qblah\E/}).count(), "index explain 6");

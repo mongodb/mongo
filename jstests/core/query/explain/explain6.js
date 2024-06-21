@@ -38,4 +38,4 @@ t.save({a: '0', b: '1'});
 t.save({a: '1', b: '0'});
 explain = t.find({a: /0/, b: /1/}).explain(true);
 assert.eq(1, explain.executionStats.nReturned);
-assert.eq(2, explain.executionStats.totalDocsExamined);
+assert.eq(2, explain.executionStats.totalKeysExamined);

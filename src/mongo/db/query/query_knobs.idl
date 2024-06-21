@@ -440,6 +440,15 @@ server_parameters:
     default: false
     redact: false
 
+  internalQueryPlannerIgnoreIndexWithCollationForRegex:
+    description: "Do we want to leverage indexes with collation for regex predicates?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlannerIgnoreIndexWithCollationForRegex"
+    cpp_vartype: AtomicWord<bool>
+    default: true
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+    redact: false
+
   #
   # Query execution
   #

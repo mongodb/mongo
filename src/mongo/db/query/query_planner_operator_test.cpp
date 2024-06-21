@@ -903,36 +903,48 @@ TEST_F(QueryPlannerTest, NonPrefixRegex) {
     addIndex(BSON("a" << 1));
     runQuery(fromjson("{a: /foo/}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1, filter: {a: /foo/}}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: {a: /foo/}, pattern: {a: 1}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NonPrefixRegexCovering) {
     addIndex(BSON("a" << 1));
     runQuerySortProj(fromjson("{a: /foo/}"), BSONObj(), fromjson("{_id: 0, a: 1}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: "
         "{cscan: {dir: 1, filter: {a: /foo/}}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: "
+        "{ixscan: {filter: {a: /foo/}, pattern: {a: 1}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NonPrefixRegexAnd) {
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuery(fromjson("{a: /foo/, b: 2}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1, filter: {$and: [{b: 2}, {a: /foo/}]}}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: "
+        "{filter: {a: /foo/}, pattern: {a: 1, b: 1}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NonPrefixRegexAndCovering) {
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuerySortProj(fromjson("{a: /foo/, b: 2}"), BSONObj(), fromjson("{_id: 0, a: 1, b: 1}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1, b: 1}, node: "
         "{cscan: {dir: 1, filter: {$and: [{b: 2}, {a: /foo/}]}}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1}, node: "
+        "{ixscan: {filter: {a: /foo/}, pattern: {a: 1, b: 1}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NonPrefixRegexOrCovering) {
@@ -966,10 +978,13 @@ TEST_F(QueryPlannerTest, TwoRegexCompoundIndexCovering) {
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuerySortProj(fromjson("{a: /0/, b: /1/}"), BSONObj(), fromjson("{_id: 0, a: 1, b: 1}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1, b: 1}, node: "
         "{cscan: {dir: 1, filter: {$and:[{a:/0/},{b:/1/}]}}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1}, node: "
+        "{ixscan: {filter: {$and:[{a:/0/},{b:/1/}]}, pattern: {a: 1, b: 1}}}}}");
 }
 
 TEST_F(QueryPlannerTest, TwoRegexSameFieldCovering) {
@@ -977,10 +992,13 @@ TEST_F(QueryPlannerTest, TwoRegexSameFieldCovering) {
     runQuerySortProj(
         fromjson("{$and: [{a: /0/}, {a: /1/}]}"), BSONObj(), fromjson("{_id: 0, a: 1}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: "
         "{cscan: {dir: 1, filter: {$and:[{a:/0/},{a:/1/}]}}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: "
+        "{ixscan: {filter: {$and:[{a:/0/},{a:/1/}]}, pattern: {a: 1}}}}}");
 }
 
 TEST_F(QueryPlannerTest, ThreeRegexSameFieldCovering) {
@@ -988,10 +1006,13 @@ TEST_F(QueryPlannerTest, ThreeRegexSameFieldCovering) {
     runQuerySortProj(
         fromjson("{$and: [{a: /0/}, {a: /1/}, {a: /2/}]}"), BSONObj(), fromjson("{_id: 0, a: 1}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: "
         "{cscan: {dir: 1, filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: "
+        "{ixscan: {filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}, pattern: {a: 1}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NonPrefixRegexMultikey) {
@@ -999,8 +1020,11 @@ TEST_F(QueryPlannerTest, NonPrefixRegexMultikey) {
     addIndex(BSON("a" << 1), true);
     runQuery(fromjson("{a: /foo/}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
     assertSolutionExists("{cscan: {filter: {a: /foo/}, dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: /foo/}, node: {ixscan: "
+        "{pattern: {a: 1}, filter: null}}}}");
 }
 
 TEST_F(QueryPlannerTest, ThreeRegexSameFieldMultikey) {
@@ -1008,8 +1032,20 @@ TEST_F(QueryPlannerTest, ThreeRegexSameFieldMultikey) {
     addIndex(BSON("a" << 1), true);
     runQuery(fromjson("{$and: [{a: /0/}, {a: /1/}, {a: /2/}]}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(4U);
     assertSolutionExists("{cscan: {filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}, dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}, node: {ixscan: "
+        "{pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['', {}, true, false], [/0/, /0/, true, true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$and:[{a:/1/},{a:/0/},{a:/2/}]}, node: {ixscan: "
+        "{pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['', {}, true, false], [/1/, /1/, true, true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$and:[{a:/2/},{a:/0/},{a:/1/}]}, node: {ixscan: "
+        "{pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['', {}, true, false], [/2/, /2/, true, true]]}}}}}");
 }
 
 //

@@ -71,6 +71,8 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
                       internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load());
     auto queryControl = expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
     out->append("internalQueryFrameworkControl", QueryFrameworkControl_serializer(queryControl));
+    out->appendNumber("internalQueryPlannerIgnoreIndexWithCollationForRegex",
+                      internalQueryPlannerIgnoreIndexWithCollationForRegex.load());
 }
 
 bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {

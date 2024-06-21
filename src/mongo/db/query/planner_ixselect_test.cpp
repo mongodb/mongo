@@ -1425,12 +1425,12 @@ TEST(QueryPlannerIXSelectTest, UsesIndexIfRequiredByTheQuery) {
                     true /* must use index */);
 }
 
-TEST(QueryPlannerIXSelectTest, CannotUseIndexWithSimpleCollatorForNonPrefixRegexFilter) {
+TEST(QueryPlannerIXSelectTest, CanUseIndexWithSimpleCollatorForNonPrefixRegexFilter) {
     auto index = buildSimpleIndexEntry(BSON("a" << 1));
     index.collator = kSimpleCollator;
     std::vector<IndexEntry> indices;
     indices.push_back(index);
-    std::set<size_t> expectedIndices = {};
+    std::set<size_t> expectedIndices = {0};
     testRateIndices("{a: { $regex: \"John\"}}", "", kSimpleCollator, indices, "a", expectedIndices);
 }
 /*

@@ -687,6 +687,16 @@ last-continuous:
     ticket: SERVER-88750
   - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
     ticket: SERVER-90995
+  - test_file: jstests/core/index/index_bounds_pipe.js
+    ticket: SERVER-91616
+  - test_file: jstests/core/query/and/and3.js
+    ticket: SERVER-91616
+  - test_file: jstests/core/query/explain/explain6.js
+    ticket: SERVER-91616
+  - test_file: jstests/core/query/regex/regex6.js
+    ticket: SERVER-91616
+  - test_file: jstests/core/query/regex/regex3.js
+    ticket: SERVER-91616
   suites: null
 last-lts:
   all:
@@ -1430,4 +1440,14 @@ last-lts:
     ticket: SERVER-88750
   - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
     ticket: SERVER-90995
+  - test_file: jstests/core/index/index_bounds_pipe.js
+    ticket: SERVER-91616
+  - test_file: jstests/core/query/and/and3.js
+    ticket: SERVER-91616
+  - test_file: jstests/core/query/explain/explain6.js
+    ticket: SERVER-91616
+  - test_file: jstests/core/query/regex/regex6.js
+    ticket: SERVER-91616
+  - test_file: jstests/core/query/regex/regex3.js
+    ticket: SERVER-91616
   suites: null
