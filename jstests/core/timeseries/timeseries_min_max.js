@@ -9,8 +9,8 @@
  *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
- *   # collection to insert more documents then expected by the test.
+ *   # Buckets being closed during moveCollection can cause more buckets with different min-max
+ *   # ranges than the test expects.
  *   assumes_balancer_off,
  * ]
  */

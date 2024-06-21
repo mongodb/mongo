@@ -32,8 +32,7 @@
  *   # "Explain of a resolved view must be executed by mongos"
  *   directly_against_shardsvrs_incompatible,
  *   tenant_migration_incompatible,
- *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
- *   # collection to insert more documents then expected by the test.
+ *   # Buckets being closed during resharding can cause the bucket ranges in this test to vary.
  *   assumes_balancer_off,
  * ]
  *

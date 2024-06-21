@@ -13,9 +13,6 @@
  *   # thus different buckets.
  *   does_not_support_stepdowns,
  *   tenant_migration_incompatible,
- *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
- *   # collection to insert more documents then expected by the test.
- *   assumes_balancer_off,
  * ]
  */
 
@@ -67,26 +64,44 @@ function prepareCompressedBucket() {
 
     // Check the bucket collection to make sure that it generated the buckets we expect.
     const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
-    assert.eq(2, bucketDocs.length, tojson(bucketDocs));
-    assert.eq(0,
-              bucketDocs[0].control.min.f,
-              "Expected first bucket to start at 0. " + tojson(bucketDocs));
-    assert.eq(bucketMaxCount - 1,
-              bucketDocs[0].control.max.f,
-              `Expected first bucket to end at ${bucketMaxCount - 1}. ${tojson(bucketDocs)}`);
-    assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
-           `Expected first bucket to be compressed. ${tojson(bucketDocs)}`);
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
-               `Expected second bucket to be compressed. ${tojson(bucketDocs)}`);
+    if (!TestData.runningWithBalancer) {
+        assert.eq(2, bucketDocs.length, tojson(bucketDocs));
+        assert.eq(0,
+                  bucketDocs[0].control.min.f,
+                  "Expected first bucket to start at 0. " + tojson(bucketDocs));
+        assert.eq(bucketMaxCount - 1,
+                  bucketDocs[0].control.max.f,
+                  `Expected first bucket to end at ${bucketMaxCount - 1}. ${tojson(bucketDocs)}`);
+        assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
+               `Expected first bucket to be compressed. ${tojson(bucketDocs)}`);
+        if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+            assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
+                   `Expected second bucket to be compressed. ${tojson(bucketDocs)}`);
+        } else {
+            assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
+                      bucketDocs[1].control.version,
+                      `Expected second bucket not to be compressed. ${tojson(bucketDocs)}`);
+        }
+        assert.eq(bucketMaxCount,
+                  bucketDocs[1].control.min.f,
+                  `Expected second bucket to start at ${bucketMaxCount}. ${tojson(bucketDocs)}`);
     } else {
-        assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
-                  bucketDocs[1].control.version,
-                  `Expected second bucket not to be compressed. ${tojson(bucketDocs)}`);
+        // If we are running with moveCollection in the background, we may run into the issue
+        // described by SERVER-89349 which can result in more bucket documents than needed.
+        // However, we still want to check that the number of documents is within the acceptable
+        // range.
+        assert.lte(2, bucketDocs.length, tojson(bucketDocs));
+        let currMin = 0;
+        bucketDocs.forEach((doc) => {
+            assert.eq(currMin,
+                      doc.control.min.f,
+                      `Expected bucket to start at ${currMin}. ${tojson(bucketDocs)}`);
+            if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+                assert(TimeseriesTest.isBucketCompressed(doc.control.version));
+            }
+            currMin = doc.control.max.f + 1;
+        });
     }
-    assert.eq(bucketMaxCount,
-              bucketDocs[1].control.min.f,
-              `Expected second bucket to start at ${bucketMaxCount}. ${tojson(bucketDocs)}`);
 }
 
 // Update many records. This will hit both the compressed and uncompressed buckets.

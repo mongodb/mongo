@@ -8,8 +8,8 @@
  *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
- *   # collection to insert more # documents then expected by the test.
+ *   # This test uses a non-default collation which can cause bucket reopening to be sub-optimal
+ *   # when moveCollection is running in the background.
  *   assumes_balancer_off,
  * ]
  */

@@ -10,9 +10,6 @@
  *   # We assume that all nodes in a mixed-mode replica set are using compressed inserts to a
  *   # time-series collection.
  *   requires_fcv_71,
- *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
- *   # collection to insert more documents then expected by the test.
- *   assumes_balancer_off,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
@@ -65,60 +62,90 @@ TimeseriesTest.run((insert) => {
 
         // Check bucket collection.
         const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
-        assert.eq(2, bucketDocs.length, bucketDocs);
 
         // Check both buckets.
         // First bucket should be not contain both documents because the time of the second
         // measurement is ahead of the first document by more than 'bucketMaxTimeRangeHours'.
-        assert.eq(0,
-                  bucketDocs[0].control.min._id,
-                  'invalid control.min for _id in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(0,
-                  bucketDocs[0].control.min.x,
-                  'invalid control.min for x in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(docTimes[0],
-                  bucketDocs[0].control.min[timeFieldName],
-                  'invalid control.min for time in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(2,
-                  bucketDocs[0].control.max._id,
-                  'invalid control.max for _id in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(2,
-                  bucketDocs[0].control.max.x,
-                  'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(docTimes[2],
-                  bucketDocs[0].control.max[timeFieldName],
-                  'invalid control.max for time in first bucket: ' + tojson(bucketDocs[0].control));
-        assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
-               'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+        if (!TestData.runningWithBalancer) {
+            assert.eq(2, bucketDocs.length, bucketDocs);
+            assert.eq(
+                0,
+                bucketDocs[0].control.min._id,
+                'invalid control.min for _id in first bucket: ' + tojson(bucketDocs[0].control));
+            assert.eq(
+                0,
+                bucketDocs[0].control.min.x,
+                'invalid control.min for x in first bucket: ' + tojson(bucketDocs[0].control));
+            assert.eq(
+                docTimes[0],
+                bucketDocs[0].control.min[timeFieldName],
+                'invalid control.min for time in first bucket: ' + tojson(bucketDocs[0].control));
+            assert.eq(
+                2,
+                bucketDocs[0].control.max._id,
+                'invalid control.max for _id in first bucket: ' + tojson(bucketDocs[0].control));
+            assert.eq(
+                2,
+                bucketDocs[0].control.max.x,
+                'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
+            assert.eq(
+                docTimes[2],
+                bucketDocs[0].control.max[timeFieldName],
+                'invalid control.max for time in first bucket: ' + tojson(bucketDocs[0].control));
+            assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
+                   'unexpected control.version in first bucket: ' + tojson(bucketDocs));
 
-        // Second bucket should contain the remaining document.
-        assert.eq(numDocs - 1,
-                  bucketDocs[1].control.min._id,
-                  'invalid control.min for _id in second bucket: ' + tojson(bucketDocs[1].control));
-        assert.eq(numDocs - 1,
-                  bucketDocs[1].control.min.x,
-                  'invalid control.min for x in second bucket: ' + tojson(bucketDocs[1].control));
-        assert.eq(
-            docTimes[numDocs - 1],
-            bucketDocs[1].control.min[timeFieldName],
-            'invalid control.min for time in second bucket: ' + tojson(bucketDocs[1].control));
-        assert.eq(numDocs - 1,
-                  bucketDocs[1].control.max._id,
-                  'invalid control.max for _id in second bucket: ' + tojson(bucketDocs[1].control));
-        assert.eq(numDocs - 1,
-                  bucketDocs[1].control.max.x,
-                  'invalid control.max for x in second bucket: ' + tojson(bucketDocs[1].control));
-        assert.eq(
-            docTimes[numDocs - 1],
-            bucketDocs[1].control.max[timeFieldName],
-            'invalid control.max for time in second bucket: ' + tojson(bucketDocs[1].control));
-        if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-            assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
-                   'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+            // Second bucket should contain the remaining document.
+            assert.eq(
+                numDocs - 1,
+                bucketDocs[1].control.min._id,
+                'invalid control.min for _id in second bucket: ' + tojson(bucketDocs[1].control));
+            assert.eq(
+                numDocs - 1,
+                bucketDocs[1].control.min.x,
+                'invalid control.min for x in second bucket: ' + tojson(bucketDocs[1].control));
+            assert.eq(
+                docTimes[numDocs - 1],
+                bucketDocs[1].control.min[timeFieldName],
+                'invalid control.min for time in second bucket: ' + tojson(bucketDocs[1].control));
+            assert.eq(
+                numDocs - 1,
+                bucketDocs[1].control.max._id,
+                'invalid control.max for _id in second bucket: ' + tojson(bucketDocs[1].control));
+            assert.eq(
+                numDocs - 1,
+                bucketDocs[1].control.max.x,
+                'invalid control.max for x in second bucket: ' + tojson(bucketDocs[1].control));
+            assert.eq(
+                docTimes[numDocs - 1],
+                bucketDocs[1].control.max[timeFieldName],
+                'invalid control.max for time in second bucket: ' + tojson(bucketDocs[1].control));
+            if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+                assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
+                       'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+            } else {
+                assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
+                          bucketDocs[1].control.version,
+                          'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+            }
         } else {
-            assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
-                      bucketDocs[1].control.version,
-                      'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+            // In suites running moveCollection in the background, it is possible to hit the issue
+            // described by SERVER-89349 which will result in more bucket documents being created.
+            // However, we should still guarantee the time limit range for buckets.
+            assert.lte(2, bucketDocs.length, bucketDocs);
+            bucketDocs.forEach((bucketDoc) => {
+                let bucketRangeMillis =
+                    bucketDoc.control.max[timeFieldName] - bucketDoc.control.min[timeFieldName];
+                assert.gte(1000 * 60 * 60, bucketRangeMillis);
+                if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+                    assert(TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
+                           'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+                } else {
+                    assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
+                              bucketDoc.control.version,
+                              'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+                }
+            });
         }
     };
 

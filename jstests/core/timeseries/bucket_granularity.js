@@ -11,9 +11,6 @@
  *   # This test calls "find" with a filter on "_id" whose value is a namespace string. We cannot
  *   # test it as the override does not inject tenant prefix to this special namespace.
  *   simulate_atlas_proxy_incompatible,
- *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
- *   # collection to insert more documents then expected by the test.
- *   assumes_balancer_off,
  * ]
  */
 
@@ -28,6 +25,14 @@ function verifyViewPipeline(coll) {
               `expected view pipeline 'bucketMaxSpanSeconds' to match timeseries options`);
 }
 
+function getDateOutsideBucketRange(coll, spanMS) {
+    const newestBucketDoc = coll.find().sort({"control.min.t": -1}).limit(1).toArray()[0];
+    let newDate = new Date(Date.parse(newestBucketDoc.control.min.t) + spanMS);
+    return ISODate(newDate.toISOString());
+}
+
+const dayInMS = 1000 * 60 * 60 * 24;
+
 (function testSeconds() {
     let coll = db.bucket_granularity_granularitySeconds;
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
@@ -35,6 +40,13 @@ function verifyViewPipeline(coll) {
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
+    if (TestData.runningWithBalancer) {
+        // In suites running moveCollection in the background, it is possible to hit the issue
+        // described by SERVER-89349 which will result in more bucket documents being created.
+        // Creating an index on the time field allows the buckets to be reopened, allowing the
+        // counts in this test to be accurate.
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
 
     // All measurements land in the same bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:00.000Z")}));
@@ -57,6 +69,9 @@ function verifyViewPipeline(coll) {
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
 
     // All measurements land in the same bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:00.000Z")}));
@@ -79,6 +94,9 @@ function verifyViewPipeline(coll) {
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: 't', granularity: 'hours'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
 
     // All measurements land in the same bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T00:00:00.000Z")}));
@@ -101,6 +119,9 @@ function verifyViewPipeline(coll) {
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
     verifyViewPipeline(coll);
 
     // All measurements land in the same bucket.
@@ -121,16 +142,26 @@ function verifyViewPipeline(coll) {
         db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'minutes'}}));
     verifyViewPipeline(coll);
 
-    // All measurements land in the same bucket.
+    // If resharding is running in the background, it could be that neither of the buckets are in
+    // memory here. If this is the case, the first insert will load the first bucket into memory but
+    // not the second. This can cause the third insert to attempt to insert into the first bucket
+    // rather than the second, creating 3 buckets rather than keeping 2.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:22:02.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:59:59.999Z")}));
-    assert.eq(2, bucketsColl.find().itcount());
+    let bucketCount = bucketsColl.find().itcount();
+    if (TestData.runningWithBalancer) {
+        assert.lte(2, bucketCount);
+    } else {
+        assert.eq(2, bucketCount);
+    }
 
     // Expect bucket max span to be one day. A new measurement outside of this range should create
-    // a new bucket.
-    assert.commandWorked(coll.insert({t: ISODate("2021-04-23T21:00:00.000Z")}));
-    assert.eq(3, bucketsColl.find().itcount());
+    // a new bucket. Don't hardcode this because if the balancer is on, we may have more than 2
+    // buckets.
+    let newDate = getDateOutsideBucketRange(bucketsColl, dayInMS);
+    assert.commandWorked(coll.insert({t: newDate}));
+    assert.eq(bucketCount + 1, bucketsColl.find().itcount());
 
     // Make sure when we query, we use the new bucket max span to make sure we get all matches
     assert.eq(4, coll.find({t: {$gt: ISODate("2021-04-23T19:00:00.000Z")}}).itcount());
@@ -143,6 +174,9 @@ function verifyViewPipeline(coll) {
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
     verifyViewPipeline(coll);
 
     // All measurements land in the same bucket.
@@ -166,12 +200,18 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T00:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T18:11:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T20:59:59.999Z")}));
-    assert.eq(2, bucketsColl.find().itcount());
+    let bucketCount = bucketsColl.find().itcount();
+    if (TestData.runningWithBalancer) {
+        assert.lte(2, bucketCount);
+    } else {
+        assert.eq(2, bucketCount);
+    }
 
     // Expect bucket max span to be 30 days. A new measurement outside of this range should create
     // a new bucket.
-    assert.commandWorked(coll.insert({t: ISODate("2021-05-22T21:00:00.001Z")}));
-    assert.eq(3, bucketsColl.find().itcount());
+    let newDate = getDateOutsideBucketRange(bucketsColl, dayInMS * 30);
+    assert.commandWorked(coll.insert({t: newDate}));
+    assert.eq(bucketCount + 1, bucketsColl.find().itcount());
 
     // Make sure when we query, we use the new bucket max span to make sure we get all matches
     assert.eq(4, coll.find({t: {$gt: ISODate("2021-05-21T00:00:00.000Z")}}).itcount());
@@ -184,6 +224,9 @@ function verifyViewPipeline(coll) {
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
     verifyViewPipeline(coll);
 
     // All measurements land in the same bucket.
@@ -207,12 +250,18 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T00:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T18:11:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T19:59:59.999Z")}));
-    assert.eq(2, bucketsColl.find().itcount());
+    let bucketCount = bucketsColl.find().itcount();
+    if (TestData.runningWithBalancer) {
+        assert.lte(2, bucketCount);
+    } else {
+        assert.eq(2, bucketCount);
+    }
 
     // Expect bucket max span to be 30 days. A new measurement outside of this range should create
     // a new bucket.
-    assert.commandWorked(coll.insert({t: ISODate("2021-05-23T20:00:00.001Z")}));
-    assert.eq(3, bucketsColl.find().itcount());
+    let newDate = getDateOutsideBucketRange(bucketsColl, dayInMS * 30);
+    assert.commandWorked(coll.insert({t: newDate}));
+    assert.eq(bucketCount + 1, bucketsColl.find().itcount());
 
     // Make sure when we query, we use the new bucket max span to make sure we get all matches
     assert.eq(4, coll.find({t: {$gt: ISODate("2021-05-22T00:00:00.000Z")}}).itcount());
@@ -224,6 +273,9 @@ function verifyViewPipeline(coll) {
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
 
     // Decreasing minutes -> seconds shouldn't work.
     assert.commandFailed(

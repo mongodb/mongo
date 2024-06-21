@@ -14,9 +14,6 @@
  *   requires_timeseries,
  *   # This test depends on stats read from the primary node in replica sets.
  *   assumes_read_preference_unchanged,
- *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
- *   # collection to insert more documents then expected by the test.
- *   assumes_balancer_off,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
@@ -50,7 +47,13 @@ const checkIfBucketReopened = function(
     stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
     assert.eq(stats.timeseries['bucketCount'], expectedBucketCount);
-    assert.eq(stats.timeseries['numBucketsReopened'], expectedReopenedBuckets);
+    if (TestData.runningWithBalancer) {
+        // When resharding is happening in the background, it can cause errors that result in
+        // operations being retried and the bucket reopening count being too high.
+        assert.gte(stats.timeseries['numBucketsReopened'], expectedReopenedBuckets);
+    } else {
+        assert.eq(stats.timeseries['numBucketsReopened'], expectedReopenedBuckets);
+    }
 };
 
 (function expectNoBucketReopening() {
@@ -711,8 +714,9 @@ const checkIfBucketReopened = function(
     assert(metaTimeIndex.length == 0);
 
     // If the collection is sharded, there will be an index on control.min.time that can satisfy the
-    // reopening query, otherwise we can do some further tests.
-    if (!FixtureHelpers.isSharded(bucketsColl)) {
+    // reopening query, otherwise we can do some further tests. With moveCollection running in the
+    // background, when buckets are closed and reopened may change.
+    if (!FixtureHelpers.isSharded(bucketsColl) && !TestData.runningWithBalancer) {
         // Create a partial index on time.
         assert.commandWorked(coll.createIndex(
             {[timeField]: 1}, {name: "partialTimeIndex", partialFilterExpression: {b: {$lt: 12}}}));
