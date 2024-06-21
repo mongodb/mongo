@@ -114,6 +114,7 @@ ParsedUpdateBase::ParsedUpdateBase(OperationContext* opCtx,
         _expCtx->enabledCounters = false;
     }
     _expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+    _expCtx->isUpsert = request->isUpsert();
 
     tassert(
         7655104, "timeseries collection must already exist", _collection || !isRequestToTimeseries);
