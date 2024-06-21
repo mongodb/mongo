@@ -206,7 +206,8 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
                                        repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
                                        optReceivedShardVersion,
                                        true /* preserveRange */,
-                                       supportNonVersionedOperations);
+                                       supportNonVersionedOperations,
+                                       true /* treatTimestampChangeAsRetryableError */);
 
     return {std::move(metadata)};
 }
@@ -218,7 +219,9 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     return _getMetadataWithVersionCheckAt(opCtx,
                                           repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
                                           receivedShardVersion,
-                                          true /* preserveRange */);
+                                          true /* preserveRange */,
+                                          false /* supportNonVersionedOperations */,
+                                          true /* treatTimestampChangeAsRetryableError */);
 }
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
@@ -266,14 +269,28 @@ boost::optional<CollectionMetadata> CollectionShardingRuntime::getCurrentMetadat
 void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx) const {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
     if (optReceivedShardVersion) {
-        checkShardVersionOrThrow(opCtx, *optReceivedShardVersion);
+        checkShardVersionOrThrowForAcquire(opCtx, *optReceivedShardVersion);
     }
 }
 
-void CollectionShardingRuntime::checkShardVersionOrThrow(
-    OperationContext* opCtx, const ShardVersion& receivedShardVersion) const {
-    (void)_getMetadataWithVersionCheckAt(
-        opCtx, boost::none, receivedShardVersion, false /* preserveRange */);
+void CollectionShardingRuntime::checkShardVersionOrThrowForAcquire(
+    OperationContext* opCtx, const ShardVersion& shardVersionSentByRouter) const {
+    (void)_getMetadataWithVersionCheckAt(opCtx,
+                                         boost::none,
+                                         shardVersionSentByRouter,
+                                         false /* preserveRange */,
+                                         false /* supportNonVersionedOperations */,
+                                         true /* treatTimestampChangeAsRetryableError */);
+}
+
+void CollectionShardingRuntime::checkShardVersionOrThrowForRestoreFromYield(
+    OperationContext* opCtx, const ShardVersion& shardVersionAtYield) const {
+    (void)_getMetadataWithVersionCheckAt(opCtx,
+                                         boost::none,
+                                         shardVersionAtYield,
+                                         false /* preserveRange */,
+                                         false /* supportNonVersionedOperations */,
+                                         false /* treatTimestampChangeAsRetryableError */);
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const BSONObj& reason) {
@@ -478,7 +495,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     const boost::optional<mongo::LogicalTime>& atClusterTime,
     const boost::optional<ShardVersion>& optReceivedShardVersion,
     bool preserveRange,
-    bool supportNonVersionedOperations) const {
+    bool supportNonVersionedOperations,
+    bool treatTimestampChangeAsRetryableError) const {
     if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
         repl::ReadConcernLevel::kAvailableReadConcern)
         return kUntrackedCollection;
@@ -575,10 +593,17 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     StaleConfigInfo sci(
         _nss, receivedShardVersion, wantedShardVersion, ShardingState::get(opCtx)->shardId());
 
-    uassert(std::move(sci),
-            str::stream() << "timestamp mismatch detected for " << _nss.toStringForErrorMsg(),
-            isPlacementVersionIgnored ||
-                wantedPlacementVersion.isSameCollection(receivedPlacementVersion));
+    if (!isPlacementVersionIgnored &&
+        !wantedPlacementVersion.isSameCollection(receivedPlacementVersion)) {
+        if (treatTimestampChangeAsRetryableError)
+            uasserted(std::move(sci),
+                      str::stream()
+                          << "timestamp mismatch detected for " << _nss.toStringForErrorMsg());
+        else
+            uasserted(ErrorCodes::QueryPlanKilled,
+                      str::stream()
+                          << "timestamp mismatch detected for " << _nss.toStringForErrorMsg());
+    }
 
     if (isPlacementVersionIgnored ||
         (!wantedPlacementVersion.isSet() && receivedPlacementVersion.isSet())) {

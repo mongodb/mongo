@@ -1390,18 +1390,10 @@ TEST_F(ShardRoleTest, RestoreForWriteInvalidatesAcquisitionIfPlacementConcernTim
                    kMyShardName)});
 
     // Try to restore the resources should fail because placement concern is no longer met.
-    ASSERT_THROWS_WITH_CHECK(restoreTransactionResourcesToOperationContext(
-                                 operationContext(), std::move(yieldedTransactionResources)),
-                             ExceptionFor<ErrorCodes::StaleConfig>,
-                             [&](const DBException& ex) {
-                                 const auto exInfo = ex.extraInfo<StaleConfigInfo>();
-                                 ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
-                                 ASSERT_EQ(shardVersionShardedCollection1,
-                                           exInfo->getVersionReceived());
-                                 ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
-                                 ASSERT_EQ(kMyShardName, exInfo->getShardId());
-                                 ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
-                             });
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           operationContext(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
 
     ASSERT_FALSE(shard_role_details::getLocker(operationContext())
                      ->isDbLockedForMode(nss.dbName(), MODE_IX));

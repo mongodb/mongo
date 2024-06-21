@@ -56,7 +56,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/direct_connection_util.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -258,9 +257,9 @@ void verifyDbAndCollection(OperationContext* opCtx,
     }
 }
 
-void checkPlacementVersion(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           const PlacementConcern& placementConcern) {
+void checkPlacementVersionForAcquire(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const PlacementConcern& placementConcern) {
     const auto& receivedDbVersion = placementConcern.dbVersion;
     if (receivedDbVersion) {
         const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, nss.dbName());
@@ -270,7 +269,18 @@ void checkPlacementVersion(OperationContext* opCtx,
     const auto& receivedShardVersion = placementConcern.shardVersion;
     if (receivedShardVersion) {
         const auto scopedCSS = CollectionShardingState::acquire(opCtx, nss);
-        scopedCSS->checkShardVersionOrThrow(opCtx, *receivedShardVersion);
+        scopedCSS->checkShardVersionOrThrowForAcquire(opCtx, *receivedShardVersion);
+    }
+}
+
+void checkAllPlacementVersionsForAcquire(
+    OperationContext* opCtx, const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
+    for (const auto& ar : acquisitionRequests) {
+        // We only have to check placement for collections that come from a router, which
+        // will have the namespace set.
+        if (ar.nssOrUUID.isNamespaceString()) {
+            checkPlacementVersionForAcquire(opCtx, ar.nssOrUUID.nss(), ar.placementConcern);
+        }
     }
 }
 
@@ -535,17 +545,6 @@ void validateRequests(const CollectionOrViewAcquisitionRequests& acquisitionRequ
                                           DatabaseName::DollarInDbNameBehavior::Allow));
         } else {
             MONGO_UNREACHABLE;
-        }
-    }
-}
-
-void checkShardingPlacement(OperationContext* opCtx,
-                            const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
-    for (const auto& ar : acquisitionRequests) {
-        // We only have to check placement for collections that come from a router, which
-        // will have the namespace set.
-        if (ar.nssOrUUID.isNamespaceString()) {
-            checkPlacementVersion(opCtx, ar.nssOrUUID.nss(), ar.placementConcern);
         }
     }
 }
@@ -1081,7 +1080,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
     // check it again after opening it to make sure it is consistent. This is specially
     // important in secondaries since they can be lagging and might not be aware of the latests
     // routing changes.
-    checkShardingPlacement(opCtx, acquisitionRequests);
+    checkAllPlacementVersionsForAcquire(opCtx, acquisitionRequests);
 
     // Open a consistent catalog snapshot if needed.
     bool openSnapshot = !shard_role_details::getRecoveryUnit(opCtx)->isActive();
@@ -1090,7 +1089,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
 
     try {
         // Second sharding placement check.
-        checkShardingPlacement(opCtx, acquisitionRequests);
+        checkAllPlacementVersionsForAcquire(opCtx, acquisitionRequests);
 
         auto sortedAcquisitionRequests = shard_role_details::generateSortedAcquisitionRequests(
             opCtx, *catalog, acquisitionRequests, lockFreeReadsResources);
@@ -1171,7 +1170,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
             sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
         });
 
-        checkShardingPlacement(opCtx, acquisitionRequests);
+        checkAllPlacementVersionsForAcquire(opCtx, acquisitionRequests);
 
         // Recheck UUIDs. We only do this for resolutions performed via UUID exclusively as
         // otherwise we have the correct mapping between nss <-> uuid since the nss is already the
@@ -1476,9 +1475,21 @@ void restoreTransactionResourcesToOperationContext(
             } else {
                 // Make sure that the placement is still correct.
                 if (holds_alternative<PlacementConcern>(prerequisites.placementConcern)) {
-                    checkPlacementVersion(opCtx,
-                                          prerequisites.nss,
-                                          get<PlacementConcern>(prerequisites.placementConcern));
+                    const auto& placementConcern =
+                        get<PlacementConcern>(prerequisites.placementConcern);
+
+                    if (const auto& dbVersion = placementConcern.dbVersion) {
+                        const auto scopedDss =
+                            DatabaseShardingState::acquireShared(opCtx, prerequisites.nss.dbName());
+                        scopedDss->assertMatchingDbVersion(opCtx, *dbVersion);
+                    }
+
+                    if (const auto& shardVersion = placementConcern.shardVersion) {
+                        const auto scopedCSS =
+                            CollectionShardingState::acquire(opCtx, prerequisites.nss);
+                        scopedCSS->checkShardVersionOrThrowForRestoreFromYield(opCtx,
+                                                                               *shardVersion);
+                    }
                 }
 
                 auto reacquiredServicesSnapshot =

@@ -161,8 +161,11 @@ public:
 
     void checkShardVersionOrThrow(OperationContext* opCtx) const override;
 
-    void checkShardVersionOrThrow(OperationContext* opCtx,
-                                  const ShardVersion& receivedShardVersion) const override;
+    void checkShardVersionOrThrowForAcquire(
+        OperationContext* opCtx, const ShardVersion& shardVersionSentByRouter) const override;
+
+    void checkShardVersionOrThrowForRestoreFromYield(
+        OperationContext* opCtx, const ShardVersion& shardVersionAtYield) const override;
 
     void appendShardVersion(BSONObjBuilder* builder) const override;
 
@@ -339,7 +342,8 @@ private:
         const boost::optional<mongo::LogicalTime>& atClusterTime,
         const boost::optional<ShardVersion>& optReceivedShardVersion,
         bool preserveRange,
-        bool supportNonVersionedOperations = false) const;
+        bool supportNonVersionedOperations,
+        bool treatTimestampChangeAsRetryableError) const;
 
     /**
      * Auxiliary function used to implement the different flavours of clearFilteringMetadata.
