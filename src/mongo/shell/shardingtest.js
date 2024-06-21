@@ -590,11 +590,27 @@ var ShardingTest = function ShardingTest(params) {
 
     ShardingTest.prototype.restartAllConfigServers = function(opts) {
         this.configRS.startSet(opts, true);
+        this.configRS.nodes.forEach((node) => {
+            // node.routerPort is undefined if this node doesn't expose an embedded router, so this
+            // loop only applies for embedded routers.
+            const routerN = this._findRouterByPort(node.routerPort);
+            if (routerN !== undefined) {
+                this.reconnectToEmbeddedRouter(routerN);
+            }
+        });
     };
 
     ShardingTest.prototype.restartAllShards = function(opts) {
         this._rs.forEach((rs) => {
             rs.test.startSet(opts, true);
+            rs.test.nodes.forEach((node) => {
+                // node.routerPort is undefined if this node doesn't expose an embedded router, so
+                // this loop only applies for embedded routers.
+                const routerN = this._findRouterByPort(node.routerPort);
+                if (routerN !== undefined) {
+                    this.reconnectToEmbeddedRouter(routerN);
+                }
+            });
         });
     };
 
@@ -1074,6 +1090,22 @@ var ShardingTest = function ShardingTest(params) {
             nodeInfo.rs.restart(nodeInfo.index, opts);
         }
 
+        this.reconnectToEmbeddedRouter(n);
+
+        // Wait for any election to succeed.
+        nodeInfo.rs.awaitNodesAgreeOnPrimary();
+    };
+
+    ShardingTest.prototype.reconnectToEmbeddedRouter = function(n) {
+        const routerConn = (() => {
+            if (this._useBridge) {
+                return this._unbridgedMongos[n];
+            } else {
+                return this["s" + n];
+            }
+        })();
+        const nodeInfo = routerConn.nodeInfo;
+
         const mongodConn = nodeInfo.rs.nodes[nodeInfo.index];
         const newConn =
             MongoRunner.awaitConnection({pid: mongodConn.pid, port: mongodConn.routerPort});
@@ -1093,9 +1125,18 @@ var ShardingTest = function ShardingTest(params) {
             this.admin = this._mongos[n].getDB('admin');
             this.config = this._mongos[n].getDB('config');
         }
+    };
 
-        // Wait for any election to succeed.
-        nodeInfo.rs.awaitNodesAgreeOnPrimary();
+    ShardingTest.prototype._findRouterByPort = function(port) {
+        if (port === undefined) {
+            return undefined;
+        }
+        for (let n = 0; n < this._mongos.length; n++) {
+            if (this._mongos[n].port == port) {
+                return n;
+            }
+        }
+        return undefined;
     };
 
     /**
