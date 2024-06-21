@@ -32,8 +32,7 @@ assert.commandWorked(t.save({name: "c"}));
 assert.eq(3, t.find({name: /^aa*/}).itcount(), "B ni");
 assert.commandWorked(t.createIndex({name: 1}));
 assert.eq(3, t.find({name: /^aa*/}).itcount(), "B i 1");
-assert.eq(4, t.find({name: /^aa*/}).explain(true).executionStats.totalDocsExamined, "B i 1 e");
-assert.eq(4, t.find({name: /^a.*/}).explain(true).executionStats.totalKeysExamined, "B i 1 e");
+assert.eq(4, t.find({name: /^aa*/}).explain(true).executionStats.totalKeysExamined, "B i 1 e");
 
 assert.eq(2, t.find({name: /^a[ab]/}).itcount(), "B i 2");
 assert.eq(2, t.find({name: /^a[bc]/}).itcount(), "B i 3");

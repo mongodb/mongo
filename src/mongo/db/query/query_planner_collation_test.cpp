@@ -253,13 +253,16 @@ TEST_F(QueryPlannerTest, PrefixOnlyRegexCanUseAnIndexWithoutACollatorWithTightBo
         "{a: [['simple', 'simplf', true, false], [/^simple/, /^simple/, true, true]]}}}}}");
 }
 
-TEST_F(QueryPlannerTest, NonSimpleRegexCanNotUseAnIndexWithoutACollator) {
+TEST_F(QueryPlannerTest, NonPrefixRegexCanUseAnIndexWithoutACollatorAsInexactCovered) {
     addIndex(fromjson("{a: 1}"));
 
     runQueryAsCommand(fromjson("{find: 'testns', filter: {a: /nonsimple/}}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {pattern: {a: 1}, filter: {a: /nonsimple/}, bounds: "
+        "{a: [['', {}, true, false], [/nonsimple/, /nonsimple/, true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, AccessPlannerCorrectlyCombinesComparisonKeyBounds) {

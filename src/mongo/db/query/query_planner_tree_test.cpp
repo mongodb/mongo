@@ -1061,7 +1061,7 @@ TEST_F(QueryPlannerTest, TooManyToExplodeOr) {
 TEST_F(QueryPlannerTest, ExplodeIxscanWithFilter) {
     addIndex(BSON("a" << 1 << "b" << 1));
 
-    runQuerySortProj(fromjson("{$and: [{b: { $in: [/0/, /1/]}},"
+    runQuerySortProj(fromjson("{$and: [{b: {$regex: 'foo', $options: 'i'}},"
                               "{a: {$in: [1, 2]}}]}"),
                      BSON("b" << 1),
                      BSONObj());
@@ -1073,9 +1073,9 @@ TEST_F(QueryPlannerTest, ExplodeIxscanWithFilter) {
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a:1, b:1},"
-        "filter: {b: {$in:[/0/, /1/]}}}},"
+        "filter: {b: {$regex: 'foo', $options: 'i'}}}},"
         "{ixscan: {pattern: {a:1, b:1},"
-        "filter: {b: {$in:[/0/, /1/]}}}}]}}}}");
+        "filter: {b: {$regex: 'foo', $options: 'i'}}}}]}}}}");
 }
 
 // Verifies that a OR > FETCH > IXSCAN plan is exploded for sort.
