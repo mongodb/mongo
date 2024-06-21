@@ -101,7 +101,8 @@ public:
         sbe::InputParamToSlotMap& inputParamToSlotMap,
         const Metadata* metadata = nullptr,
         const NodeProps* np = nullptr,
-        ComparisonOpSemantics compOpSemantics = ComparisonOpSemantics::kTotalOrder)
+        ComparisonOpSemantics compOpSemantics = ComparisonOpSemantics::kTotalOrder,
+        sbe::value::FrameIdGenerator* frameIdGenerator = nullptr)
         : _env(env),
           _varResolver(vr),
           _providedSlots(providedSlots),
@@ -109,6 +110,7 @@ public:
           _inputParamToSlotMap(inputParamToSlotMap),
           _metadata(metadata),
           _np(np),
+          _frameIdGenerator(frameIdGenerator),
           _comparisonOpSemantics(compOpSemantics) {}
 
     // The default noop transport.
@@ -154,6 +156,14 @@ private:
         std::vector<std::unique_ptr<sbe::EExpression>>& args,
         std::string name);
 
+    sbe::FrameId generateFrameId() {
+        if (_frameIdGenerator) {
+            return _frameIdGenerator->generate();
+        } else {
+            return _localFrameIdGenerator.generate();
+        }
+    }
+
     const VariableEnvironment& _env;
     VarResolver _varResolver;
     SlotsProvider& _providedSlots;
@@ -165,7 +175,11 @@ private:
     const Metadata* _metadata;
     const NodeProps* _np;
 
-    sbe::FrameId _frameCounter{100};
+    // If '_frameIdGenerator' is not null then we use it to generate frame IDs, otherwise we
+    // use '_localFrameIdGenerator' to generate frame IDs.
+    sbe::value::FrameIdGenerator* const _frameIdGenerator;
+    sbe::value::FrameIdGenerator _localFrameIdGenerator{100};
+
     stdx::unordered_map<const Let*, sbe::FrameId> _letMap;
     stdx::unordered_map<const LambdaAbstraction*, sbe::FrameId> _lambdaMap;
     // Allow SBE stage builders to specify a different meaning for comparison operations. This is
