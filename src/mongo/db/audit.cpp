@@ -45,19 +45,26 @@ std::function<void()> shutdownSynchronizeJob;
 std::function<void(OperationContext*, boost::optional<Timestamp>)> migrateOldToNew;
 std::function<void(OperationContext*)> removeOldConfig;
 std::function<void(OperationContext*)> updateAuditConfigOnDowngrade;
+std::function<void(ServiceContext*)> setAuditInterface;
 
 #if !MONGO_ENTERPRISE_AUDIT
+
 ImpersonatedClientAttrs::ImpersonatedClientAttrs(Client* client) {}
+
 void rotateAuditLog() {}
+
 #endif
+
 
 namespace {
 const auto getAuditInterface = ServiceContext::declareDecoration<std::unique_ptr<AuditInterface>>();
+
 ServiceContext::ConstructorActionRegisterer registerCreateNoopAudit{
-    "initializeNoopAuditInterface", [](ServiceContext* svcCtx) {
-        AuditInterface::set(svcCtx, std::make_unique<AuditNoOp>());
+    "CreateNoopAudit", [](ServiceContext* service) {
+        AuditInterface::set(service, std::make_unique<AuditNoOp>());
     }};
 }  // namespace
+
 
 AuditInterface* AuditInterface::get(ServiceContext* service) {
     return getAuditInterface(service).get();

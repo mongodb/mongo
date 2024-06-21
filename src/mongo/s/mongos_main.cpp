@@ -1110,6 +1110,10 @@ ExitCode mongos_main(int argc, char* argv[]) {
     // on ServiceContext before any other threads can get and use it.
     service->setFastClockSource(FastClockSourceFactory::create(Milliseconds{10}));
 
+    if (audit::setAuditInterface) {
+        audit::setAuditInterface(service);
+    }
+
     // Attempt to rotate the audit log pre-emptively on startup to avoid any potential conflicts
     // with existing log state. If this rotation fails, then exit nicely with failure
     try {
