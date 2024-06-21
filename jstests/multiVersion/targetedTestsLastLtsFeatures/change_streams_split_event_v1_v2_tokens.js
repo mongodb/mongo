@@ -20,7 +20,11 @@ const st = new ShardingTest({
         rsOptions: {
             binVersion: "last-lts",
         },
-        rs: {nodes: 2},
+        rs: {
+            nodes: 2,
+            // Reserving enough of oplog space to accommodate 4 nearly 16MB-large changes.
+            oplogSize: 16 * 5
+        }
     }
 });
 
