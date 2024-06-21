@@ -1814,11 +1814,7 @@ std::pair<Key, Value> BoundedSorter<Key, Value, Comparator, BoundMaker>::next() 
         _heap.pop();
 
         auto memUsage = result.first.memUsageForSorter() + result.second.memUsageForSorter();
-        if (static_cast<int64_t>(memUsage) > static_cast<int64_t>(this->_stats.memUsage())) {
-            this->_stats.resetMemUsage();
-        } else {
-            this->_stats.decrementMemUsage(memUsage);
-        }
+        this->_stats.decrementMemUsage(memUsage);
     };
 
     auto pullFromSpilled = [this, &result]() {
