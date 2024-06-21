@@ -212,6 +212,21 @@ static_assert(
     "Make sure that the struct has been align- and padding-optimized. "
     "If the struct's members have changed, this assert may need to be updated with a new value.");
 
+
+/**
+ * A sub-class used for commmands without any specific key components, such as count and distinct.
+ */
+struct EmptyCmdComponents : public SpecificKeyComponents {
+    EmptyCmdComponents(){};
+
+    std::size_t size() const override {
+        return sizeof(EmptyCmdComponents);
+    }
+
+    void HashValue(absl::HashState state) const final {}
+};
+
+
 /**
  * An abstract base class representing a query stats store key for a given request. All query stats
  * store entries should include some common elements, tracked in `_universalComponents`.  For
