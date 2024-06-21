@@ -179,9 +179,9 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     _findCommand = std::move(parsedFind->findCommandRequest);
 
     if (optimizeMatchExpression) {
+        const bool enableSimplification = !_expCtx->inLookup && !_expCtx->isUpsert;
         _primaryMatchExpression =
-            MatchExpression::normalize(std::move(parsedFind->filter),
-                                       /* enableSimplification*/ !_expCtx->inLookup);
+            MatchExpression::normalize(std::move(parsedFind->filter), enableSimplification);
     } else {
         _primaryMatchExpression = std::move(parsedFind->filter);
     }
