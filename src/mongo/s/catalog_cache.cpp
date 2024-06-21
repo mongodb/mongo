@@ -302,6 +302,16 @@ StatusWith<CachedDatabaseInfo> CatalogCache::_getDatabase(OperationContext* opCt
             allowLocks || !shard_role_details::getLocker(opCtx) ||
                 !shard_role_details::getLocker(opCtx)->isLocked());
 
+    if (dbName.isAdminDB() || dbName.isConfigDB()) {
+        // The 'admin' and 'config' databases are known to always be in the config server, there is
+        // no need to make a request to the DatabaseCache. This prevents a potential deadlock on
+        // config shard nodes issuing aggregations on 'config' to themselves during a refresh, and
+        // finding the CatalogCache thread pool is full when the aggregation itself needs to refresh
+        // the cache (i.e. $unionWith).
+        return CachedDatabaseInfo{
+            DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed())};
+    }
+
     Timer t{};
     ScopeGuard finishTiming([&] {
         CurOp::get(opCtx)->debug().catalogCacheDatabaseLookupMillis += Milliseconds(t.millis());
@@ -382,6 +392,15 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
         });
 
         const auto dbInfo = std::move(swDbInfo.getValue());
+
+        if (nss.isNamespaceAlwaysUntracked()) {
+            // If the collection is known to always be untracked, there is no need to request it to
+            // the CollectionCache.
+            return ChunkManager(dbInfo->getPrimary(),
+                                dbInfo->getVersion(),
+                                OptionalRoutingTableHistory(),
+                                atClusterTime);
+        }
 
         auto collEntryFuture =
             _collectionCache.acquireAsync(nss, CacheCausalConsistency::kLatestKnown);
@@ -982,7 +1001,19 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
     const ComparableChunkVersion& timeInStore) {
     const bool isIncremental(existingHistory && existingHistory->optRt);
     _updateRefreshesStats(isIncremental, true);
-    blockCollectionCacheLookup.pauseWhileSet(opCtx);
+
+    blockCollectionCacheLookup.executeIf(
+        [&](const BSONObj& data) {
+            LOGV2(9131800, "Hanging before refreshing cached collection entry", "nss"_attr = nss);
+            blockCollectionCacheLookup.pauseWhileSet();
+        },
+        [&](const BSONObj& data) {
+            if (data.isEmpty())
+                return true;  // If there is no data, always hang.
+
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss");
+            return fpNss == nss || (fpNss.isDbOnly() && fpNss.isEqualDb(nss));
+        });
 
     // This object will define the new time of the routing info obtained by this refresh
     auto newComparableVersion =
