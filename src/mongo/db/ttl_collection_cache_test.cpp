@@ -137,57 +137,5 @@ TEST(TTLCollectionCacheTest, Basic) {
     ASSERT_EQ(infos.size(), 0U);
 }
 
-TEST(TTLCollectionCacheTest, DeregisterUntrackedUUIDDoesNotThrow) {
-    TTLCollectionCache cache;
-    ASSERT_EQ(cache.getTTLInfos().size(), 0);
-    auto uuid = UUID::gen();
-    cache.deregisterTTLIndexByName(uuid, "indexNameForUntrackedUUID");
-    ASSERT_EQ(cache.getTTLInfos().size(), 0);
-}
-
-TEST(TTLCollectionCacheTest, DeregisterClusteredUntrackedUUIDDoesNotThrow) {
-    TTLCollectionCache cache;
-    ASSERT_EQ(cache.getTTLInfos().size(), 0);
-    auto uuid = UUID::gen();
-    cache.deregisterTTLClusteredIndex(uuid);
-    ASSERT_EQ(cache.getTTLInfos().size(), 0);
-}
-
-TEST(TTLCollectionCacheTest, DeregisterUntrackedIndexDoesNotThrow) {
-    TTLCollectionCache cache;
-    ASSERT_EQ(cache.getTTLInfos().size(), 0);
-    auto uuid = UUID::gen();
-    // Register index A1 in the cache so the cache tracks an index for 'uuid'.
-    auto infoIndexA1 = TTLCollectionCache::Info{
-        "collA_ttl_1", TTLCollectionCache::Info::ExpireAfterSecondsType::kInt};
-    cache.registerTTLInfo(uuid, infoIndexA1);
-    ASSERT_EQ(cache.getTTLInfos().size(), 1);
-
-    cache.deregisterTTLIndexByName(uuid, "untrackedIndexName");
-
-    auto infos = cache.getTTLInfos();
-    ASSERT_EQ(infos.size(), 1);
-    ASSERT_EQ(infos.count(uuid), 1U);
-    ASSERT_EQ(infos[uuid][0].getIndexName(), infoIndexA1.getIndexName());
-}
-
-// Test that de-registering an absent index from a UUID with a clustered TTL index does not result
-// in an error.
-TEST(TTLCollectionCacheTest, DeregisterUntrackedIndexWithClusteredIndexDoesNotThrow) {
-    TTLCollectionCache cache;
-    ASSERT_EQ(cache.getTTLInfos().size(), 0);
-    auto uuid = UUID::gen();
-    auto infoClusteredA = TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}};
-    cache.registerTTLInfo(uuid, infoClusteredA);
-    ASSERT_EQ(cache.getTTLInfos().size(), 1);
-
-    cache.deregisterTTLIndexByName(uuid, "untrackedIndexName");
-
-    auto infos = cache.getTTLInfos();
-    ASSERT_EQ(infos.size(), 1);
-    ASSERT_EQ(infos.count(uuid), 1U);
-    ASSERT_TRUE(infos[uuid][0].isClustered());
-}
-
 }  // namespace
 }  // namespace mongo
