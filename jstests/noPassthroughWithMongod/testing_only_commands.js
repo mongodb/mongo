@@ -6,17 +6,7 @@
  * ]
  */
 
-var testOnlyCommands = [
-    'configureFailPoint',
-    '_hashBSONElement',
-    'replSetTest',
-    'godinsert',
-    'sleep',
-    'cpuload',
-    'captrunc',
-    'emptycapped',
-    'sysprofile'
-];
+import {testOnlyCommands} from "jstests/auth/test_only_commands_list.js";
 
 var assertCmdNotFound = function(db, cmdName) {
     var res = db.runCommand(cmdName);

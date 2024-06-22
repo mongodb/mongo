@@ -19,23 +19,33 @@ export const AllCommandsTest = (function() {
      *
      * @param {Object} conn The shell connection to run the suite over.
      * @param {map} cmdMap A map of all commands, with their invocations and expected behavior.
+     * @param {function} skipfn A user-defined optional function is run to decide whether the
+     *     specific command should be skipped.
      */
-    function checkCommandCoverage(conn, cmdMap) {
+    function checkCommandCoverage(conn, cmdMap, skipfn) {
         const res = assert.commandWorked(conn.adminCommand({listCommands: 1}));
         const commandsInListCommands = Object.keys(res.commands);
         let missingCommands = [];
+        let includedCommands = [];
 
         // Make sure that all valid commands are covered in the cmdMap.
         for (const command of commandsInListCommands) {
+            if (skipfn !== undefined) {
+                if (skipfn(command)) {
+                    continue;
+                }
+            }
             if (!cmdMap[command]) {
                 missingCommands.push(command);
+            } else {
+                includedCommands.push(command);
             }
         }
         if (missingCommands.length !== 0) {
             throw new Error("Command map is missing entries for " + missingCommands);
         }
 
-        return commandsInListCommands;
+        return includedCommands;
     }
 
     /**
