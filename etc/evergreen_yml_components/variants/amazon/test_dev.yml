@@ -508,7 +508,7 @@ buildvariants:
         --opt=off
         --dbg=on
         --ssl
-        MONGO_DISTMOD=rhel82
+        MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic

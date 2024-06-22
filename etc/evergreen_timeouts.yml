@@ -34,7 +34,7 @@ overrides:
     - task: replica_sets_jscore_passthrough
       exec_timeout: 150 # 2.5 hours
 
-  enterprise-rhel-80-64-bit-dynamic-all-feature-flags:
+  enterprise-rhel-88-64-bit-dynamic-all-feature-flags:
     - task: cursor_hints_to_query_settings_replset_passthrough
       exec_timeout: 240 # 4 hours
     - task: cursor_hints_to_query_settings_sharded_collections_passthrough
@@ -42,7 +42,7 @@ overrides:
     - task: cursor_hints_to_query_settings_unsharded_collections_passthrough
       exec_timeout: 240 # 4 hours
 
-  enterprise-rhel80-debug-tsan:
+  enterprise-rhel88-debug-tsan:
     - task: aggregation_expression_multiversion_fuzzer
       exec_timeout: 600 # 10 hours
     - task: aggregation_multiversion_fuzzer
@@ -112,7 +112,7 @@ overrides:
     - task: replica_sets_jscore_passthrough
       exec_timeout: 150 # 2.5 hours
 
-  rhel80-asan:
+  rhel88-asan:
     - task: aggregation_timeseries_fuzzer
       exec_timeout: 360 # 6 hours
     - task: aggregation_blockprocessing_fuzzer
@@ -124,11 +124,11 @@ overrides:
     - task: aggregation_multiversion_fuzzer_last_lts
       exec_timeout: 300 # 5 hours
 
-  rhel80-debug-ubsan-classic-engine:
+  rhel88-debug-ubsan-classic-engine:
     - task: update_timeseries_fuzzer
       exec_timeout: 150 # 2.5 hours
 
-  rhel80-debug-aubsan-all-feature-flags:
+  rhel88-debug-aubsan-all-feature-flags:
     - task: update_timeseries_fuzzer
       exec_timeout: 180 # 3 hours
     - task: change_stream_serverless_no_optimization_fuzzer
@@ -138,7 +138,7 @@ overrides:
     - task: change_stream_optimization_fuzzer
       exec_timeout: 300 # 5 hours
 
-  rhel80-debug-aubsan:
+  rhel88-debug-aubsan:
     - task: change_stream_serverless_no_optimization_fuzzer
       exec_timeout: 300 # 5 hours
     - task: change_stream_serverless_fuzzer
@@ -146,7 +146,7 @@ overrides:
     - task: change_stream_optimization_fuzzer
       exec_timeout: 300 # 5 hours
 
-  rhel80-debug-aubsan-classic-engine:
+  rhel88-debug-aubsan-classic-engine:
     - task: update_timeseries_fuzzer
       exec_timeout: 180 # 3 hours
 

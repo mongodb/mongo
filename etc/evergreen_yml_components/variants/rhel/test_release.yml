@@ -15,7 +15,7 @@ buildvariants:
       resmoke_jobs_factor: 1
       disable_shared_scons_cache: true
       compile_flags: >-
-        MONGO_DISTMOD=rhel80
+        MONGO_DISTMOD=rhel88
         --opt=on
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
@@ -29,27 +29,27 @@ buildvariants:
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
-          - rhel80-large
+          - rhel8.8-large
       - name: jsCore
       - name: sharding_gen
       - name: replica_sets_gen
       - name: generate_buildid_to_debug_symbols_mapping
         distros:
-          - rhel80-large
+          - rhel8.8-large
 
-  - name: rhel80
-    display_name: RHEL 8.0
+  - name: rhel88
+    display_name: RHEL 8.8
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel80-build
+      - rhel8.8-large
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
       push_name: linux
-      push_arch: x86_64-rhel80
+      push_arch: x86_64-rhel88
       compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel80
+        --ssl MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
@@ -61,15 +61,15 @@ buildvariants:
       has_packages: true
       packager_script: packager.py
       packager_arch: x86_64
-      packager_distro: rhel80
+      packager_distro: rhel88
       repo_edition: org
       scons_cache_scope: shared
-      large_distro_name: rhel80-build
-      compile_variant: rhel80
+      large_distro_name: rhel8.8-large
+      compile_variant: rhel88
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - rhel80-build
+          - rhel8.8-large
       - name: test_packages
         distros:
           - ubuntu2204-large
@@ -77,28 +77,28 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.incompatible_community
       - name: .development_critical .requires_large_host !.incompatible_community
         distros:
-          - rhel80-large
+          - rhel8.8-large
       - name: .release_critical !.requires_large_host !.incompatible_community
       - name: .release_critical .requires_large_host !.incompatible_community
         distros:
-          - rhel80-large
+          - rhel8.8-large
 
-  - name: enterprise-rhel-80-64-bit
-    display_name: "Enterprise RHEL 8.0"
+  - name: enterprise-rhel-88-64-bit
+    display_name: "Enterprise RHEL 8.8"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel80-small
-    expansions: &enterprise-rhel-80-64-bit-expansions
+      - rhel8.8-small
+    expansions: &enterprise-rhel-88-64-bit-expansions
       additional_package_targets: >-
         archive-mongocryptd
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
-      push_arch: x86_64-enterprise-rhel80
+      push_arch: x86_64-enterprise-rhel88
       compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel80
+        --ssl MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
@@ -117,17 +117,17 @@ buildvariants:
       jstestfuzz_concurrent_num_files: 10
       target_resmoke_time: 10
       max_sub_suites: 3
-      large_distro_name: rhel80-medium
+      large_distro_name: rhel8.8-medium
       # TODO SERVER-64479 remove external_auth_jobs_max once resolved
       external_auth_jobs_max: 1
-      compile_variant: enterprise-rhel-80-64-bit
+      compile_variant: enterprise-rhel-88-64-bit
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - rhel80-large
+          - rhel8.8-large
       - name: compile_integration_and_test_parallel_stream_TG
         distros:
-          - rhel80-large
+          - rhel8.8-large
       - name: test_packages
         distros:
           - ubuntu2204-large
@@ -135,25 +135,25 @@ buildvariants:
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
-          - rhel80-large
+          - rhel8.8-large
       - name: .release_critical !.requires_large_host
       - name: .release_critical .requires_large_host
         distros:
-          - rhel80-large
+          - rhel8.8-large
 
-  - name: rhel-82-arm64
-    display_name: RHEL 8.2 arm64
+  - name: rhel-88-arm64
+    display_name: RHEL 8.8 arm64
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     tags: ["bazel_check"]
     run_on:
-      - rhel82-arm64-small
+      - rhel8.8-arm64-small
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
       push_name: linux
-      push_arch: aarch64-rhel82
+      push_arch: aarch64-rhel88
       compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel82
+        --ssl MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
@@ -163,33 +163,33 @@ buildvariants:
       has_packages: true
       packager_script: packager.py
       packager_arch: aarch64
-      packager_distro: rhel82
+      packager_distro: rhel88
       repo_edition: org
       scons_cache_scope: shared
-      large_distro_name: rhel82-arm64-large
-      compile_variant: rhel-82-arm64
+      large_distro_name: rhel8.8-arm64-large
+      compile_variant: rhel-88-arm64
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - rhel82-arm64-large
+          - rhel8.8-arm64-large
       - name: test_packages
         distros:
           - ubuntu1804-arm64-build
       - name: .development_critical !.requires_large_host !.incompatible_community
       - name: .development_critical .requires_large_host !.incompatible_community
         distros:
-          - rhel82-arm64-large
+          - rhel8.8-arm64-large
       - name: .release_critical !.requires_large_host !.incompatible_community
       - name: .release_critical .requires_large_host !.incompatible_community
         distros:
-          - rhel82-arm64-large
+          - rhel8.8-arm64-large
 
-  - name: enterprise-rhel-82-arm64
-    display_name: "Enterprise RHEL 8.2 arm64"
+  - name: enterprise-rhel-88-arm64
+    display_name: "Enterprise RHEL 8.8 arm64"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel82-arm64-small
+      - rhel8.8-arm64-small
     expansions:
       additional_package_targets: >-
         archive-mongocryptd
@@ -197,9 +197,9 @@ buildvariants:
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
-      push_arch: aarch64-enterprise-rhel82
+      push_arch: aarch64-enterprise-rhel88
       compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel82
+        --ssl MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer,resource_intensive
@@ -210,27 +210,27 @@ buildvariants:
       has_packages: true
       packager_script: packager_enterprise.py
       packager_arch: aarch64
-      packager_distro: rhel82
+      packager_distro: rhel88
       repo_edition: enterprise
       scons_cache_scope: shared
       # TODO SERVER-64479 remove external_auth_jobs_max once resolved
       external_auth_jobs_max: 1
-      compile_variant: enterprise-rhel-82-arm64
+      compile_variant: enterprise-rhel-88-arm64
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - rhel82-arm64-large
+          - rhel8.8-arm64-large
       - name: test_packages
         distros:
           - ubuntu1804-arm64-build
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
-          - rhel82-arm64-large
+          - rhel8.8-arm64-large
       - name: .release_critical !.requires_large_host
       - name: .release_critical .requires_large_host
         distros:
-          - rhel82-arm64-large
+          - rhel8.8-arm64-large
 
   - name: rhel90
     display_name: RHEL 9.0
@@ -417,12 +417,12 @@ buildvariants:
         distros:
           - rhel90-arm64-large
 
-  - name: enterprise-rhel-82-arm64-grpc
-    display_name: "Enterprise RHEL 8.2 arm64 GRPC"
+  - name: enterprise-rhel-88-arm64-grpc
+    display_name: "Enterprise RHEL 8.8 arm64 GRPC"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel82-arm64-large
+      - rhel8.8-arm64-large
     stepback: false
     expansions:
       test_flags: >-
@@ -431,12 +431,12 @@ buildvariants:
       compile_flags: >-
         --ssl
         --dbg=on
-        MONGO_DISTMOD=rhel80
+        MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
         ENABLE_GRPC_BUILD=1
-      compile_variant: enterprise-rhel-82-arm64-grpc
+      compile_variant: enterprise-rhel-88-arm64-grpc
       scons_cache_scope: shared
     tasks:
       - name: compile_test_parallel_unittest_stream_TG
