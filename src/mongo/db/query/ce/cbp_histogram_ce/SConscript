@@ -1,0 +1,34 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target="histogram_helpers",
+    source=[
+        "scalar_histogram_helpers.cpp",
+        "array_histogram_helpers.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/ce/ce_utils",
+        "$BUILD_DIR/mongo/db/query/stats/stats_histograms",
+    ],
+)
+
+env.Library(
+    target="cbp_ce_histogram_estimation",
+    source=[
+        "histogram_predicate_estimation.cpp",
+    ],
+    LIBDEPS=["$BUILD_DIR/mongo/db/query/stats/stats_histograms", "histogram_helpers"],
+)
+
+env.CppUnitTest(
+    target="cbp_histogram_estimation_test",
+    source=[
+        "histogram_estimation_test.cpp",
+        "test_helpers.cpp",
+    ],
+    LIBDEPS=["$BUILD_DIR/mongo/db/query/ce/test_utils", "cbp_ce_histogram_estimation"],
+)
