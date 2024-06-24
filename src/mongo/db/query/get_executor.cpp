@@ -647,6 +647,9 @@ public:
                                     "query"_attr = redact(_cq->toStringShort()));
                     }
 
+                    PlanCache* cache = CollectionQueryInfo::get(_collection).getPlanCache();
+                    cache->increaseCacheQueryCounters(*_cq);
+
                     return buildCachedPlan(
                         std::move(querySolution), plannerParams, cs->decisionWorks);
                 }
