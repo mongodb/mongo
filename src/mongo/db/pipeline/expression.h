@@ -803,7 +803,7 @@ public:
                 // Delegate to the accumulator. Note: it would be more efficient to use the
                 // percentile algorithms directly rather than an accumulator, as it would reduce
                 // heap alloc, virtual calls and avoid unnecessary for expressions memory tracking.
-                // This path currently cannot be executed as we only support continuous percentiles.
+                // This path currently cannot be executed as we only support discrete percentiles.
                 TAccumulator accum(this->getExpressionContext(), _ps, _method);
                 for (const auto& item : input.getArray()) {
                     accum.process(item, false /* merging */);
