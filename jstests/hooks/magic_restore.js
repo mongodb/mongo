@@ -9,7 +9,7 @@ import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 // Starts up a new node on dbpath where a backup cursor has already been written from sourceConn.
 // sourceConn must also contain a timestamp in `test.magic_restore_checkpointTimestamp` of when the
 // backup was taken.
-function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
+function performRestore(sourceConn, expectedConfig, nodeType, dbpath, name, options) {
     // Read checkpointTimestamp from source cluster.
     const checkpointTimestamp = sourceConn.getDB("magic_restore_metadata")
                                     .getCollection("magic_restore_checkpointTimestamp")
@@ -46,7 +46,7 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
         let currentBatchSize = 0;
 
         const metadataDocument = {
-            "nodeType": "replicaSet",
+            "nodeType": nodeType,
             "replicaSetConfig": expectedConfig,
             "maxCheckpointTs": checkpointTimestamp,
             // Restore to the timestamp of the last oplog entry on the source cluster.
@@ -91,7 +91,7 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
         }
     } else {
         const objs = [{
-            "nodeType": "replicaSet",
+            "nodeType": nodeType,
             "replicaSetConfig": expectedConfig,
             "maxCheckpointTs": checkpointTimestamp,
         }];
@@ -106,6 +106,13 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
 // Helper function to retrieve the databases and collections on a node. The result is a map of
 // database names to lists of collections in that database.
 function getDatabasesAndCollectionsSnapshot(node, consistencyTs) {
+    // Magic restore explicitly drops these collections from the config database.
+    const excludedCollections = [
+        "clusterParameters",
+        "mongos",
+        "cache.collections",
+        "cache.databases",
+    ];
     return node.getDB("admin")
         .aggregate([{$listCatalog: {}}],
                    {readConcern: {level: 'snapshot', atClusterTime: consistencyTs}})
@@ -122,6 +129,21 @@ function getDatabasesAndCollectionsSnapshot(node, consistencyTs) {
                           db + "." + name + ".");
                 return acc;
             }
+
+            // We drop cached metadata during restore. There could be cached metadata for different
+            // namespaces produced by the tests, so we must match any name to "cache.chunks.*".
+            if (db === "config" &&
+                (excludedCollections.includes(name) || name.startsWith("cache.chunks"))) {
+                return acc;
+            }
+
+            // Magic restore will drop and re-insert the shard identity document on config servers,
+            // which will alter the field ordering. We manually check the shard identity document
+            // elsewhere.
+            if (db === "admin" && name === "system.version") {
+                return acc;
+            }
+
             if (!acc[db]) {
                 acc[db] = [];
             }
@@ -145,6 +167,20 @@ function dataConsistencyCheck(sourceNode, restoreNode, consistencyTs) {
                         tojson(Object.keys(sourceDatabases)) +
                         ". restore database names: " + tojson(Object.keys(restoreDatabases)));
     }
+
+    // Check the shard identity documents.
+    let sourceShardIdentity =
+        sourceNode.getDB("admin").getCollection("system.version").findOne({_id: "shardIdentity"});
+    let destShardIdentity =
+        sourceNode.getDB("admin").getCollection("system.version").findOne({_id: "shardIdentity"});
+    // On replica set nodes, output of 'findOne' will be null as the shard identity document should
+    // not exist. On shard and config servers, the documents may have different field orderings but
+    // the contents should match.
+    assert((sourceShardIdentity === null && destShardIdentity === null) ||
+               bsonUnorderedFieldsCompare(sourceShardIdentity, destShardIdentity) === 0,
+           "shard identity documents do not match. source shard identity: " +
+               tojson(sourceShardIdentity) +
+               " destination shard identity: " + tojson(destShardIdentity));
 
     Object.keys(sourceDatabases).forEach((dbName) => {
         // Ignore the `local` db.
@@ -222,7 +258,7 @@ function dataConsistencyCheck(sourceNode, restoreNode, consistencyTs) {
     });
 }
 
-function performMagicRestore(sourceNode, dbPath, name, options) {
+function performMagicRestore(sourceNode, dbPath, nodeType, name, options) {
     jsTestLog("Magic Restore: Beginning magic restore for node " + sourceNode.host + ".");
 
     let rst = new ReplSetTest({nodes: 1});
@@ -245,7 +281,8 @@ function performMagicRestore(sourceNode, dbPath, name, options) {
     options.setParameter = {minSnapshotHistoryWindowInSeconds: snapshotHistory};
 
     // performRestore returns a read timestamp for snapshot reads in consistency checks.
-    const consistencyTs = performRestore(sourceNode, expectedConfig, dbPath, name, options);
+    const consistencyTs =
+        performRestore(sourceNode, expectedConfig, nodeType, dbPath, name, options);
 
     jsTestLog(
         "Magic Restore: Starting restore cluster for data consistency check at snapshot timestamp " +
@@ -274,18 +311,34 @@ if (topology.type == Topology.kShardedCluster) {
     // Perform restore for the config server.
     const path = MongoRunner.dataPath + '../magicRestore/configsvr/node0';
     let configMongo = new Mongo(topology.configsvr.nodes[0]);
-    performMagicRestore(configMongo, path, "configsvr", {"replSet": "config-rs", "configsvr": ''});
+
+    // Config shards must perform both dedicated config server and shard server steps in restore, so
+    // we must make the distinction between a config shard and dedicated config server in the
+    // nodeType. We can determine the node role by checking the 'config.shards' collection and the
+    // node's shard identity document.
+    const isConfigShard = (conn) => {
+        const configShardDoc = conn.getDB("config").shards.findOne({_id: "config"});
+        if (configShardDoc == null) {
+            return false;
+        }
+        const shardIdentityDoc = conn.getDB("admin").system.version.findOne({_id: "shardIdentity"});
+        if (shardIdentityDoc == null) {
+            return false;
+        }
+        return shardIdentityDoc.shardName == "config";
+    };
+    const cfgNodeType = isConfigShard(configMongo) ? "configShard" : "configServer";
+    performMagicRestore(configMongo, path, cfgNodeType, "configsvr", {"replSet": "config-rs"});
 
     // Need to iterate over the shards and do one restore per shard.
     for (const [shardName, shard] of Object.entries(topology.shards)) {
         const dbPathPrefix = MongoRunner.dataPath + '../magicRestore/' + shardName + '/node0';
         let nodeMongo = new Mongo(shard.nodes[0]);
-        performMagicRestore(
-            nodeMongo, dbPathPrefix, shardName, {"replSet": shardName, "shardsvr": ''});
+        performMagicRestore(nodeMongo, dbPathPrefix, "shard", shardName, {"replSet": shardName});
     }
 } else {
     // Is replica set so just need to do one restore.
     const conn = db.getMongo();
     const backupDbPath = MongoRunner.dataPath + '../magicRestore/node0';
-    performMagicRestore(conn, backupDbPath, "rs", {"replSet": "rs"});
+    performMagicRestore(conn, backupDbPath, "replicaSet", "rs", {"replSet": "rs"});
 }

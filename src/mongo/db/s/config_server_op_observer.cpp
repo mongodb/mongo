@@ -147,12 +147,6 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
         }
     }
 
-    // When doing a magic restore, we want to be able to write config.shards without triggering the
-    // below.
-    if (storageGlobalParams.magicRestore) {
-        return;
-    }
-
     // (Ignore FCV check): Auto-bootstrapping happens irrespective of the FCV when
     // gFeatureFlagAllMongodsAreSharded is enabled.
     if (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafe() &&
