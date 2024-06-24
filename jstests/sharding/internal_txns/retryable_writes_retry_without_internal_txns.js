@@ -104,18 +104,19 @@ let currentParentTxnNumber = NumberLong(35);
         let retryRes;
         assert.soon(() => {
             try {
-                retryRes = testDB.runCommand({
+                retryRes = assert.commandWorked(testDB.runCommand({
                     update: kCollName,
                     updates: [{q: {x: 1}, u: {$inc: {y: 1}}}, {q: {x: 2}, u: {$inc: {y: 1}}}],
                     lsid: parentLsid,
                     txnNumber: parentTxnNumber,
                     stmtIds: [stmtId1, stmtId2]
-                });
+                }));
                 return true;
             } catch (e) {
+                assert(ErrorCodes.isRetriableError(e.code) || isNetworkError(e));
                 assert(TransactionsUtil.isTransientTransactionError(e));
-                return false;
             }
+            return false;
         });
         assert.eq(retryRes.n, 2);
         assert.eq(testColl.find({x: 1, y: 1}).itcount(), 1);
@@ -171,7 +172,7 @@ let currentParentTxnNumber = NumberLong(35);
         let retryRes;
         assert.soon(() => {
             try {
-                retryRes = testDB.runCommand({
+                retryRes = assert.commandWorked(testDB.runCommand({
                     update: kCollName,
                     updates: [{q: {x: 1}, u: {$inc: {y: 1}}}],
                     lsid: childLsid2,
@@ -179,12 +180,13 @@ let currentParentTxnNumber = NumberLong(35);
                     startTransaction: true,
                     autocommit: false,
                     stmtId: stmtId,
-                });
+                }));
                 return true;
             } catch (e) {
+                assert(ErrorCodes.isRetriableError(e.code) || isNetworkError(e));
                 assert(TransactionsUtil.isTransientTransactionError(e));
-                return false;
             }
+            return false;
         });
 
         assert.commandWorked(
@@ -237,7 +239,7 @@ let currentParentTxnNumber = NumberLong(35);
         let retryRes1;
         assert.soon(() => {
             try {
-                retryRes1 = testDB.runCommand({
+                retryRes1 = assert.commandWorked(testDB.runCommand({
                     update: kCollName,
                     updates: [{q: {x: 1}, u: {$inc: {y: 1}}}],
                     lsid: childLsid1,
@@ -245,12 +247,13 @@ let currentParentTxnNumber = NumberLong(35);
                     startTransaction: true,
                     autocommit: false,
                     stmtId: stmtId1,
-                });
+                }));
                 return true;
             } catch (e) {
+                assert(ErrorCodes.isRetriableError(e.code) || isNetworkError(e));
                 assert(TransactionsUtil.isTransientTransactionError(e));
-                return false;
             }
+            return false;
         });
 
         assert.commandWorked(
