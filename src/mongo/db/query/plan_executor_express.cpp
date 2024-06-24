@@ -187,7 +187,7 @@ public:
     }
 
     void restoreState(const RestoreContext& context) override {
-        _plan.restoreResources(_opCtx, context.collection());
+        _plan.restoreResources(_opCtx, context.collection(), _nss);
     }
 
     void detachFromOperationContext() override {

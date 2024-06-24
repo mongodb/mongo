@@ -239,15 +239,48 @@ inline void prepareForCollectionInvalidation(const boost::optional<CollectionAcq
     // leave the CollectionAcquisition as is.
 }
 
-inline void restoreInvalidatedCollection(CollectionPtr const*& referenceToCollectionPtr,
-                                         const CollectionPtr* restoredCollectionPtr) {
+inline void checkRestoredCollection(OperationContext* opCtx,
+                                    const CollectionPtr& collection,
+                                    const UUID& expectedUUID,
+                                    const NamespaceString& expectedNss) {
+
+    if (!collection) {
+        auto catalog = CollectionCatalog::get(opCtx);
+        auto newNss = catalog->lookupNSSByUUID(opCtx, expectedUUID);
+        if (newNss && newNss != expectedNss) {
+            PlanYieldPolicy::throwCollectionRenamedError(expectedNss, *newNss, expectedUUID);
+        } else {
+            PlanYieldPolicy::throwCollectionDroppedError(expectedUUID);
+        }
+    } else {
+        if (const auto& newNss = collection->ns(); newNss != expectedNss) {
+            // TODO SERVER-31695: Allow queries to survive collection rename, rather than throwing
+            // here when a rename has happened during yield.
+            PlanYieldPolicy::throwCollectionRenamedError(expectedNss, newNss, expectedUUID);
+        } else if (collection->uuid() != expectedUUID) {
+            PlanYieldPolicy::throwCollectionDroppedError(expectedUUID);
+        }
+    }
+}
+
+inline void restoreInvalidatedCollection(OperationContext* opCtx,
+                                         CollectionPtr const*& referenceToCollectionPtr,
+                                         const CollectionPtr* restoredCollectionPtr,
+                                         const UUID& expectedUUID,
+                                         const NamespaceString& expectedNss) {
+
+    checkRestoredCollection(opCtx, *restoredCollectionPtr, expectedUUID, expectedNss);
     referenceToCollectionPtr = restoredCollectionPtr;
 }
 
-inline void restoreInvalidatedCollection(const boost::optional<CollectionAcquisition>&,
-                                         const CollectionPtr* restoredCollectionPtr) {
-    // No further action is needed to restore a CollectionAcquisition after its associated
-    // collection is restored.
+inline void restoreInvalidatedCollection(OperationContext* opCtx,
+                                         const boost::optional<CollectionAcquisition>& collAcq,
+                                         const CollectionPtr*,
+                                         const UUID& expectedUUID,
+                                         const NamespaceString& expectedNss) {
+
+    const auto& collPtr = collAcq->getCollectionPtr();
+    checkRestoredCollection(opCtx, collPtr, expectedUUID, expectedNss);
 }
 
 template <class Callable>
@@ -380,6 +413,8 @@ public:
         _indexCatalogEntry =
             IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, accessCollection(collection));
         _collection = std::move(collection);
+        _collectionUUID = accessCollection(unwrapCollection(_collection)).uuid();
+        _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
 
         _stats = stats;
         _stats->setStageName("EXPRESS_IXSCAN"_sd);
@@ -441,11 +476,16 @@ public:
         _indexCatalogEntry = nullptr;
     }
 
-    void restoreResources(OperationContext* opCtx, const CollectionPtr* collection) {
+    void restoreResources(OperationContext* opCtx,
+                          const CollectionPtr* collection,
+                          const NamespaceString& nss) {
         // Note that this can be called with collection pointing to
         // nullptr in cases where executor has a CollectionAcquisition instead
         // of a CollectionPtr, so handle it carefully.
-        restoreInvalidatedCollection(_collection, collection);
+        restoreInvalidatedCollection(opCtx, _collection, collection, *_collectionUUID, nss);
+        uassert(ErrorCodes::QueryPlanKilled,
+                "the catalog was closed and reopened",
+                CollectionCatalog::get(opCtx)->getEpoch() == _catalogEpoch);
         const auto& coll = unwrapCollection(_collection);
         _indexCatalogEntry =
             IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, accessCollection(coll));
@@ -457,7 +497,8 @@ public:
         const auto& collection = unwrapCollection(_collection);
         releaseResources();
         temporarilyYieldCollection(opCtx, collection, std::move(whileYieldedCallback));
-        restoreResources(opCtx, &accessCollectionPtr(collection));
+        restoreResources(
+            opCtx, &accessCollectionPtr(collection), accessCollection(collection).ns());
     }
 
 private:
@@ -473,11 +514,11 @@ private:
     BSONObj _queryFilter;  // Unowned BSON.
 
     typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
+    boost::optional<UUID> _collectionUUID;
+    uint64_t _catalogEpoch{0};
     const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
-
-    bool _exhausted{false};
-
     IteratorStats* _stats{nullptr};
+    bool _exhausted{false};
 };
 
 /**
@@ -502,6 +543,9 @@ public:
 
     void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
         _collection = std::move(collection);
+        _collectionUUID = accessCollection(unwrapCollection(_collection)).uuid();
+        _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
+
         _stats = stats;
         _stats->setStageName("EXPRESS_CLUSTERED_IXSCAN"_sd);
     }
@@ -545,8 +589,13 @@ public:
         prepareForCollectionInvalidation(_collection);
     }
 
-    void restoreResources(OperationContext* opCtx, const CollectionPtr* collection) {
-        restoreInvalidatedCollection(_collection, collection);
+    void restoreResources(OperationContext* opCtx,
+                          const CollectionPtr* collection,
+                          const NamespaceString& nss) {
+        restoreInvalidatedCollection(opCtx, _collection, collection, *_collectionUUID, nss);
+        uassert(ErrorCodes::QueryPlanKilled,
+                "the catalog was closed and reopened",
+                CollectionCatalog::get(opCtx)->getEpoch() == _catalogEpoch);
     }
 
     template <class Callable>
@@ -555,13 +604,16 @@ public:
         const auto& collection = unwrapCollection(_collection);
         releaseResources();
         temporarilyYieldCollection(opCtx, collection, std::move(whileYieldedCallback));
-        restoreResources(opCtx, &accessCollectionPtr(collection));
+        restoreResources(
+            opCtx, &accessCollectionPtr(collection), accessCollection(collection).ns());
     }
 
 private:
     BSONObj _queryFilter;  // Unowned BSON.
 
     typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
+    boost::optional<UUID> _collectionUUID;
+    uint64_t _catalogEpoch{0};
 
     bool _exhausted{false};
 
@@ -599,6 +651,8 @@ public:
         _indexCatalogEntry = LookupViaUserIndex::getIndexCatalogEntryForUserIndex(
             opCtx, accessCollection(collection), _indexIdent, _indexName);
         _collection = std::move(collection);
+        _collectionUUID = accessCollection(unwrapCollection(_collection)).uuid();
+        _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
 
         _stats = stats;
         _stats->setStageName("EXPRESS_IXSCAN"_sd);
@@ -696,11 +750,16 @@ public:
         _indexCatalogEntry = nullptr;
     }
 
-    void restoreResources(OperationContext* opCtx, const CollectionPtr* collection) {
+    void restoreResources(OperationContext* opCtx,
+                          const CollectionPtr* collection,
+                          const NamespaceString& nss) {
         // Note that this can be called with collection pointing to
         // nullptr in cases where executor has a CollectionAcquisition instead
         // of a CollectionPtr, so handle it carefully.
-        restoreInvalidatedCollection(_collection, collection);
+        restoreInvalidatedCollection(opCtx, _collection, collection, *_collectionUUID, nss);
+        uassert(ErrorCodes::QueryPlanKilled,
+                "the catalog was closed and reopened",
+                CollectionCatalog::get(opCtx)->getEpoch() == _catalogEpoch);
         const auto& coll = unwrapCollection(_collection);
         _indexCatalogEntry = LookupViaUserIndex::getIndexCatalogEntryForUserIndex(
             opCtx, accessCollection(coll), _indexIdent, _indexName);
@@ -712,7 +771,8 @@ public:
         const auto& collection = unwrapCollection(_collection);
         releaseResources();
         temporarilyYieldCollection(opCtx, collection, std::move(whileYieldedCallback));
-        restoreResources(opCtx, &accessCollectionPtr(collection));
+        restoreResources(
+            opCtx, &accessCollectionPtr(collection), accessCollection(collection).ns());
     }
 
 private:
@@ -734,6 +794,8 @@ private:
     const std::string _indexName;
 
     typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
+    boost::optional<UUID> _collectionUUID;
+    uint64_t _catalogEpoch{0};
     const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
 
     const CollatorInterface* _collator;  // Owned by the query's ExpressionContext.
@@ -1305,8 +1367,10 @@ public:
         releaseShardFilterResources(_shardFilter);
     }
 
-    void restoreResources(OperationContext* opCtx, const CollectionPtr* collection) {
-        _iterator.restoreResources(opCtx, collection);
+    void restoreResources(OperationContext* opCtx,
+                          const CollectionPtr* collection,
+                          const NamespaceString& nss) {
+        _iterator.restoreResources(opCtx, collection, nss);
         restoreShardFilterResources(_shardFilter);
     }
 
