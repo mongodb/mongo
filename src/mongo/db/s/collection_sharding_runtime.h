@@ -80,6 +80,7 @@ class CollectionShardingRuntime final : public CollectionShardingState,
 
 public:
     CollectionShardingRuntime(ServiceContext* service, NamespaceString nss);
+    ~CollectionShardingRuntime() override;
 
     /**
      * Obtains the sharding runtime for the specified collection, along with a resource lock in

@@ -57,6 +57,10 @@ protected:
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
 
+    /**
+     * Sets the catalog cache loader for mocking. This must be called before the setUp function is
+     * invoked.
+     */
     void setCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> loader);
 
     /**
