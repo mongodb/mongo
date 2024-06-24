@@ -108,6 +108,7 @@ class _AddRemoveShardThread(threading.Thread):
     _RESHARD_COLLECTION_ABORTED = 341
     _RESHARD_COLLECTION_IN_PROGRESS = 338
     _LOCK_BUSY = 46
+    _FAILED_TO_SATISFY_READ_PREFERENCE = 133
 
     _UNMOVABLE_NAMESPACE_REGEXES = [
         r"\.system\.",
@@ -622,6 +623,14 @@ class _AddRemoveShardThread(threading.Thread):
                     prev_round_interrupted = False
                     continue
 
+                # Some suites kill the primary causing the request to fail with
+                # FailedToSatisfyReadPreference
+                if err.code in [self._FAILED_TO_SATISFY_READ_PREFERENCE]:
+                    self.logger.info("Primary not found when " + msg + ", will retry. err: " +
+                                     str(err))
+                    time.sleep(1)
+                    continue
+
                 # If there was a failover when finishing the transition to a dedicated CSRS/shard removal or if
                 # the transitionToDedicated/removeShard request was interrupted when finishing the transition,
                 # it's possible that this thread didn't learn that the removal finished. When the
@@ -691,6 +700,14 @@ class _AddRemoveShardThread(threading.Thread):
                         err_name in str(err) for err_name in retryable_network_err_names):
                     self.logger.info("Network error adding shard when " + msg +
                                      ", will retry. err: " + str(err))
+                    time.sleep(1)
+                    continue
+
+                # Some suites kill the primary causing the request to fail with
+                # FailedToSatisfyReadPreference
+                if err.code in [self._FAILED_TO_SATISFY_READ_PREFERENCE]:
+                    self.logger.info("Primary not found when " + msg + ", will retry. err: " +
+                                     str(err))
                     time.sleep(1)
                     continue
 
