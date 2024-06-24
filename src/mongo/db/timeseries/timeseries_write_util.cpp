@@ -128,21 +128,6 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
             },
             [&source](const BSONObj&) { return source == OperationSource::kTimeseriesUpdate; });
 
-        auto data = docToWrite.getObjectField(kBucketDataFieldName);
-
-        // Iterate through each key-value pair in the data. This is a mapping from String keys
-        // representing data field names to a tuple of an iterator on a BSONColumn, the column
-        // itself, and a size_t type counter. The iterator allows us to iterate across the
-        // BSONColumn as we inspect each element and compare it to the expected value in the actual
-        // measurement we inserted. The column is stored to prevent the iterator on it from going
-        // out of scope. The StringData representation of the binary allows us to log the binary in
-        // the case that we encounter an error. The size_t counter represents how many times the
-        // iterator has been advanced - this allows us to detect when we didn't have a value set for
-        // a field in a particular measurement, so that we can check the corresponding BSONColumn
-        // for a skip value.
-        StringDataMap<std::tuple<BSONColumn::Iterator, BSONColumn, StringData, size_t>>
-            fieldsToDataAndNextCountMap;
-
         using AddAttrsFn = std::function<void(logv2::DynamicAttributes&)>;
         auto failed = [&sortedMeasurements, &batch, &docToWrite](StringData reason,
                                                                  AddAttrsFn addAttrsWithoutData,
@@ -179,6 +164,33 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
                                                      batch->bucketHandle.bucketId.oid),
                 "Failed data verification inserting into compressed column");
         };
+
+        auto actualMeta = docToWrite.getField(kBucketMetaFieldName);
+        auto expectedMeta = batch->bucketKey.metadata.element();
+        if (!actualMeta.binaryEqualValues(expectedMeta)) {
+            failed(
+                "mismatched metaField value",
+                [](logv2::DynamicAttributes&) {},
+                [&actualMeta, &expectedMeta](logv2::DynamicAttributes& attrs) {
+                    attrs.add("expectedMetaFieldValue", expectedMeta);
+                    attrs.add("actualMetaFieldValue", actualMeta);
+                });
+        }
+
+        auto data = docToWrite.getObjectField(kBucketDataFieldName);
+
+        // Iterate through each key-value pair in the data. This is a mapping from String keys
+        // representing data field names to a tuple of an iterator on a BSONColumn, the column
+        // itself, and a size_t type counter. The iterator allows us to iterate across the
+        // BSONColumn as we inspect each element and compare it to the expected value in the actual
+        // measurement we inserted. The column is stored to prevent the iterator on it from going
+        // out of scope. The StringData representation of the binary allows us to log the binary in
+        // the case that we encounter an error. The size_t counter represents how many times the
+        // iterator has been advanced - this allows us to detect when we didn't have a value set for
+        // a field in a particular measurement, so that we can check the corresponding BSONColumn
+        // for a skip value.
+        StringDataMap<std::tuple<BSONColumn::Iterator, BSONColumn, StringData, size_t>>
+            fieldsToDataAndNextCountMap;
 
         // First, populate our map.
         for (auto&& [key, columnValue] : data) {
