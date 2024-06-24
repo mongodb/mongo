@@ -294,9 +294,12 @@ void DocumentSourceOut::initialize() {
         // If the output collection exists, we should create the temp collection on the shard that
         // owns the output collection.
         auto targetShard = getMergeShardId();
+
+        // Set the enum state to 'kTmpCollExists' first, because 'createTempCollection' can throw
+        // after constructing the collection.
+        _tmpCleanUpState = OutCleanUpProgress::kTmpCollExists;
         pExpCtx->mongoProcessInterface->createTempCollection(
             pExpCtx->opCtx, _tempNs, collectionOptions.done(), targetShard);
-        _tmpCleanUpState = OutCleanUpProgress::kTmpCollExists;
     }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(

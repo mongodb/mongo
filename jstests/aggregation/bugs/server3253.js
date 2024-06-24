@@ -8,10 +8,11 @@
 // server-3253 Unsharded support for $out
 import {anyEq, assertErrorCode, collectionExists} from "jstests/aggregation/extras/utils.js";
 
-var input = db.server3253_in;
-var inputDoesntExist = db.server3253_doesnt_exist;
-var output = db.server3253_out;
-var cappedOutput = db.server3253_out_capped;
+const testDb = db.getSiblingDB("server3253");
+var input = testDb.server3253_in;
+var inputDoesntExist = testDb.server3253_doesnt_exist;
+var output = testDb.server3253_out;
+var cappedOutput = testDb.server3253_out_capped;
 
 input.drop();
 inputDoesntExist.drop();  // never created
@@ -45,8 +46,8 @@ function test(input, pipeline, expected) {
 }
 
 function listCollections(name) {
-    var collectionInfosCursor = db.runCommand("listCollections", {filter: {name: name}});
-    return new DBCommandCursor(db, collectionInfosCursor).toArray();
+    var collectionInfosCursor = testDb.runCommand("listCollections", {filter: {name: name}});
+    return new DBCommandCursor(testDb, collectionInfosCursor).toArray();
 }
 
 input.insert({_id: 1});
@@ -91,7 +92,7 @@ test(input, [{$project: {c: {$concat: ["hello there ", "_id"]}}}], [
 ]);
 
 cappedOutput.drop();
-db.createCollection(cappedOutput.getName(), {capped: true, size: 2});
+testDb.createCollection(cappedOutput.getName(), {capped: true, size: 2});
 assertErrorCode(input, {$out: cappedOutput.getName()}, 17152);
 
 // ensure everything works even if input doesn't exist.
