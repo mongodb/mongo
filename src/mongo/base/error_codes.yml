@@ -917,3 +917,11 @@ error_codes:
       name: IDLUnknownFieldPossibleMongocryptd,
       categories: [IDLParseError],
     }
+  # The following is for rewriting errors returned by a remote server while running a retriable
+  # command so that the error is not passed through to other servers in a cluster. See SERVER-91331
+  # for an example of using this error code.
+  - {
+      code: 91331,
+      name: RetriableRemoteCommandFailure,
+      categories: [Interruption, RetriableError],
+    }
