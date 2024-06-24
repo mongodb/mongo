@@ -7,42 +7,50 @@ selector:
   - jstests/fle2/**/*.js
   - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
-  # These tests are run in sharded_jscore_txns.
-  - jstests/core/txns/**/*.js
-  # TODO SERVER-87108 re-enable all map reduce tests
-  - jstests/core/query/mr/*.js
-  # The following tests fail because a certain command or functionality is not supported on
-  # mongos. This command or functionality is placed in a comment next to the failing test.
-  - jstests/core/**/apitest_db.js  # serverStatus output doesn't have storageEngine.
-  - jstests/core/**/check_shard_index.js  # checkShardingIndex.
-  - jstests/core/**/collection_truncate.js  # emptycapped.
-  - jstests/core/**/compact_keeps_indexes.js  # compact.
-  - jstests/core/**/currentop.js  # uses fsync.
-  - jstests/core/**/dbhash.js  # dbhash.
-  - jstests/core/**/fsync.js  # uses fsync.
-  - jstests/core/**/geo_s2cursorlimitskip.js  # profiling.
-  - jstests/core/**/geo_update_btree2.js  # notablescan.
-  - jstests/core/**/index9.js  # "local" database.
-  - jstests/core/**/queryoptimizera.js  # "local" database.
-  - jstests/core/**/stages*.js  # stageDebug.
-  - jstests/core/**/startup_log.js  # "local" database.
-  - jstests/core/**/top.js  # top.
-  # The following tests fail because mongos behaves differently from mongod when testing certain
-  # functionality. The differences are in a comment next to the failing test.
-  - jstests/core/**/geo_2d_explain.js  # executionSuccess in different spot in explain().
-  - jstests/core/**/geo_s2explain.js  # inputStage in different spot in explain().
-  - jstests/core/**/geo_s2sparse.js  # keysPerIndex in different spot in validate().
-  - jstests/core/**/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
-  # The following tests fail because of divergent dropCollection behavior between standalones and
-  # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
-  # we expect a second drop to return status OK.
-  - jstests/core/**/explain_upsert.js
-  # override library is not able to intercept createIndex commands executed inside benchRun
-  - jstests/core/**/bench_test1.js
-  # TODO SERVER-91073: Validate command does not check if a received shard version is stale before proceeding.
-  - jstests/core/index/index_partial_write_ops.js
-  # moveCollection will drop indexes which will reset index statistics this test asserts on.
-  - jstests/core/index/index_stats.js
+    # These tests are run in sharded_jscore_txns.
+    - jstests/core/txns/**/*.js
+    # TODO SERVER-87108 re-enable all map reduce tests
+    - jstests/core/query/mr/*.js
+    # The following tests fail because a certain command or functionality is not supported on
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/collection_truncate.js # emptycapped.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/index9.js # "local" database.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/stages*.js # stageDebug.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+    # The following tests fail because of divergent dropCollection behavior between standalones and
+    # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
+    # we expect a second drop to return status OK.
+    - jstests/core/**/explain_upsert.js
+    # override library is not able to intercept createIndex commands executed inside benchRun
+    - jstests/core/**/bench_test1.js
+    # TODO SERVER-91073: Validate command does not check if a received shard version is stale before proceeding.
+    - jstests/core/index/index_partial_write_ops.js
+    # moveCollection will drop indexes which will reset index statistics this test asserts on.
+    - jstests/core/index/index_stats.js
+    # moveCollection and the many deleteMany commands in this test block each other and can easily cause the test to time out.
+    # This is caused by the pauseMigrationsDuringMultiUpdates cluster parameter and the random migrations failpoint both being enabled for this suite.
+    # TODO SERVER-91655: re-enable this test in this suite or potentially in a noPassthrough suite.
+    - jstests/core/timeseries/timeseries_predicates.js
+    # moveCollection and the many multi updates in this test block each other and can easily cause the test to time out.
+    # This is caused by the pauseMigrationsDuringMultiUpdates cluster parameter and the random migrations failpoint both being enabled for this suite.
+    # TODO SERVER-91722: re-enable this test in this suite or potentially in a noPassthrough suite.
+    - jstests/core/index/geo/geo_update_btree.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
