@@ -34,6 +34,7 @@
 
 #pragma once
 
+#include "modules/enterprise/src/audit/audit_format.h"
 #include <boost/optional/optional.hpp>
 #include <functional>
 #include <set>
@@ -401,7 +402,9 @@ public:
                               const std::vector<Status>& errors,
                               const std::string& suffix) const = 0;
 
-    virtual void logConfigEvent(Client* client, const AuditConfigDocument& config) const = 0;
+    virtual void logConfigEvent(Client* client,
+                                const AuditConfigDocument& config,
+                                AuditConfigFormat defaultConfigFormat) const = 0;
 
 
     /**
@@ -648,7 +651,9 @@ public:
                       const std::vector<Status>& errors,
                       const std::string& suffix) const override{};
 
-    void logConfigEvent(Client* client, const AuditConfigDocument& config) const override{};
+    void logConfigEvent(Client* client,
+                        const AuditConfigDocument& config,
+                        AuditConfigFormat defaultConfigFormat) const override{};
 };
 
 }  // namespace audit
