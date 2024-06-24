@@ -69,11 +69,13 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -191,14 +193,31 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                             << "MoveCollection can only be called on an unsharded collection.",
                         !cmOld.isSharded() && cmOld.hasRoutingTable());
             } else if (provenance && provenance.get() == ProvenanceEnum::kUnshardCollection) {
-                // If the collection is already unsharded, check if the toShard matches.
+                // If the collection is already unsharded, this request should be a no-op. Check
+                // that the user didn't specify a "to" shard other than the shard the collection
+                // lives on - if it is different, return an error.
                 if (!cmOld.isSharded() && cmOld.hasRoutingTable()) {
-                    std::set<ShardId> currentShards;
-                    cmOld.getAllShardIds(&currentShards);
-                    const auto toShard = _doc.getShardDistribution().get().front().getShard();
-                    uassert(ErrorCodes::NamespaceNotSharded,
-                            "unshardCollection can only be called on a sharded collection.",
-                            currentShards.find(toShard) != currentShards.end());
+                    if (_doc.getShardDistribution()) {
+                        std::set<ShardId> currentShards;
+                        cmOld.getAllShardIds(&currentShards);
+                        const auto toShard = _doc.getShardDistribution().get().front().getShard();
+                        uassert(ErrorCodes::NamespaceNotSharded,
+                                "Collection is already unsharded. Call moveCollection to move this "
+                                "collection to a different shard.",
+                                currentShards.find(toShard) != currentShards.end());
+                    }
+
+                    return;
+                }
+
+                // Pick the "to" shard if the client did not specify one.
+                if (!_doc.getShardDistribution()) {
+                    auto toShard = shardutil::selectLeastLoadedNonDrainingShard(opCtx);
+                    mongo::ShardKeyRange destinationRange(toShard);
+                    destinationRange.setMin(cluster::unsplittable::kUnsplittableCollectionMinKey);
+                    destinationRange.setMax(cluster::unsplittable::kUnsplittableCollectionMaxKey);
+                    std::vector<mongo::ShardKeyRange> distribution = {destinationRange};
+                    configsvrReshardCollection.setShardDistribution(distribution);
                 }
             } else {
                 uassert(ErrorCodes::NamespaceNotSharded,

@@ -35,7 +35,6 @@
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
-#include "mongo/s/shard_util.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -67,18 +66,15 @@ public:
             reshardCollectionRequest.setKey(cluster::unsplittable::kUnsplittableCollectionShardKey);
             reshardCollectionRequest.setProvenance(ProvenanceEnum::kUnshardCollection);
 
-            ShardId toShard;
+            boost::optional<std::vector<mongo::ShardKeyRange>> distribution = boost::none;
             if (request().getToShard().has_value()) {
-                toShard = request().getToShard().get();
-            } else {
-                toShard = shardutil::selectLeastLoadedNonDrainingShard(opCtx);
+                auto toShard = request().getToShard().get();
+                mongo::ShardKeyRange destinationRange(toShard);
+                destinationRange.setMin(cluster::unsplittable::kUnsplittableCollectionMinKey);
+                destinationRange.setMax(cluster::unsplittable::kUnsplittableCollectionMaxKey);
+                distribution.emplace(std::vector<mongo::ShardKeyRange>{destinationRange});
             }
 
-
-            mongo::ShardKeyRange destinationRange(toShard);
-            destinationRange.setMin(cluster::unsplittable::kUnsplittableCollectionMinKey);
-            destinationRange.setMax(cluster::unsplittable::kUnsplittableCollectionMaxKey);
-            std::vector<mongo::ShardKeyRange> distribution = {destinationRange};
             reshardCollectionRequest.setShardDistribution(distribution);
             reshardCollectionRequest.setForceRedistribution(true);
             reshardCollectionRequest.setNumInitialChunks(1);
@@ -89,7 +85,8 @@ public:
             LOGV2(8018400,
                   "Running a reshard collection command for the unshard collection request.",
                   "dbName"_attr = request().getDbName(),
-                  "toShard"_attr = toShard);
+                  "toShard"_attr = request().getToShard().has_value() ? request().getToShard().get()
+                                                                      : ShardId());
 
             const auto dbInfo =
                 uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
