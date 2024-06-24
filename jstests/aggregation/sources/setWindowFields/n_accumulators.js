@@ -82,22 +82,27 @@ for (const acc of Object.keys(nAccumulators)) {
         testError({window: {documents: [-1, 1]}}, ErrorCodes.FailedToParse);
         testError({[acc]: {n: 2}, window: {documents: [-1, 1]}}, 5787907);
         testError({[acc]: {input: "$foo"}, window: {documents: [-1, 1]}}, 5787906);
-        testError({[acc]: {input: "$foo", n: 2.1}, window: {documents: [-1, 1]}}, 5787903);
+        testError({[acc]: {input: "$foo", n: 2.1}, window: {documents: [-1, 1]}},
+                  [5787903, 8070607, 8178107]);
 
         // Invalid window specification.
         testError({[acc]: {input: "$foo", n: 2.0}, window: [-1, 1]}, ErrorCodes.FailedToParse);
 
         // Non constant argument for 'n'.
-        testError({[acc]: {input: "$foo", n: "$a"}, window: {documents: [-1, 1]}}, 5787902);
+        testError({[acc]: {input: "$foo", n: "$a"}, window: {documents: [-1, 1]}},
+                  [5787902, 8070609, 8070610, 8178113]);
 
         // Can't reference partition key.
-        testError({[acc]: {input: "$foo", n: "$ticker"}, window: {documents: [-1, 1]}}, 5787902);
+        testError({[acc]: {input: "$foo", n: "$ticker"}, window: {documents: [-1, 1]}},
+                  [5787902, 8070609, 8070610, 8178113]);
 
         // n = 0
-        testError({[acc]: {input: "$foo", n: 0}, window: {documents: [-1, 1]}}, 5787908);
+        testError({[acc]: {input: "$foo", n: 0}, window: {documents: [-1, 1]}},
+                  [5787908, 8070608, 8178108]);
 
         // n < 0
-        testError({[acc]: {input: "$foo", n: -100}, window: {documents: [-1, 1]}}, 5787908);
+        testError({[acc]: {input: "$foo", n: -100}, window: {documents: [-1, 1]}},
+                  [5787908, 8070608, 8178108]);
     } else if (acc == "$topN" || acc == "$bottomN") {
         // TODO SERVER-59327 combine error codes if we decide to use the same parser function.
         // Invalid/missing accumulator specification.
@@ -108,7 +113,7 @@ for (const acc of Object.keys(nAccumulators)) {
         testError({[acc]: {n: 2, sortBy}, window: {documents: [-1, 1]}}, 5788004);
         testError({[acc]: {output, sortBy}, window: {documents: [-1, 1]}}, 5788003);
         testError({[acc]: {output, sortBy, n: 2.1}, window: {documents: [-1, 1]}},
-                  [5787903, 8178107]);
+                  [5787903, 8070607, 8155711, 8178107]);
 
         // Missing sortBy.
         testError({[acc]: {output, n: 2}, window: {documents: [-1, 1]}}, 5788005);
@@ -117,16 +122,20 @@ for (const acc of Object.keys(nAccumulators)) {
         testError({[acc]: {output, sortBy, n: 2.0}, window: [-1, 1]}, ErrorCodes.FailedToParse);
 
         // Non constant argument for 'n'.
-        testError({[acc]: {output, sortBy, n: "$a"}, window: {documents: [-1, 1]}}, 5787902);
+        testError({[acc]: {output, sortBy, n: "$a"}, window: {documents: [-1, 1]}},
+                  [5787902, 8155720]);
 
         // Can't reference partition key.
-        testError({[acc]: {output, sortBy, n: "$ticker"}, window: {documents: [-1, 1]}}, 5787902);
+        testError({[acc]: {output, sortBy, n: "$ticker"}, window: {documents: [-1, 1]}},
+                  [5787902, 8155720]);
 
         // n = 0
-        testError({[acc]: {output, sortBy, n: 0}, window: {documents: [-1, 1]}}, 5787908);
+        testError({[acc]: {output, sortBy, n: 0}, window: {documents: [-1, 1]}},
+                  [5787908, 8155708]);
 
         // n < 0
-        testError({[acc]: {output, sortBy, n: -100}, window: {documents: [-1, 1]}}, 5787908);
+        testError({[acc]: {output, sortBy, n: -100}, window: {documents: [-1, 1]}},
+                  [5787908, 8155708]);
     } else {
         // $top/$bottom parsing tests.
         const sortBy = {"foo": 1};
