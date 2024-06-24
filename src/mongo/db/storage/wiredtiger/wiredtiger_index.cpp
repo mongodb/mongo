@@ -1904,7 +1904,9 @@ void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
 
     // WT_NOTFOUND is possible if index key is in old (v4.0) format. Retry removal of key using old
     // format.
-    _unindexTimestampUnsafe(opCtx, c, keyString, dupsAllowed);
+    if (hasOldFormatVersion()) {
+        _unindexTimestampUnsafe(opCtx, c, keyString, dupsAllowed);
+    }
 }
 
 void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
