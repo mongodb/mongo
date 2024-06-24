@@ -127,6 +127,7 @@ env.Library(
 env.CppUnitTest(
     target='db_ftdc_test',
     source=[
+        'collector_test.cpp',
         'compressor_test.cpp',
         'controller_test.cpp',
         'file_manager_test.cpp',

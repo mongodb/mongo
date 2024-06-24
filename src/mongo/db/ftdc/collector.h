@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -104,6 +105,35 @@ private:
     std::vector<std::unique_ptr<FTDCCollectorInterface>> _none;
     std::vector<std::unique_ptr<FTDCCollectorInterface>> _shard;
     std::vector<std::unique_ptr<FTDCCollectorInterface>> _router;
+};
+
+/**
+ * Collector filter, used to disable specific collectors at runtime,
+ * e.g. when a daemon takes an Arbiter role.
+ *
+ * The filter function is run every time stats are collected, and
+ * collection is skipped if the filter returns false.
+ */
+class FilteredFTDCCollector : public FTDCCollectorInterface {
+public:
+    FilteredFTDCCollector(std::function<bool()> pred, std::unique_ptr<FTDCCollectorInterface> coll)
+        : _pred(std::move(pred)), _coll(std::move(coll)) {}
+
+    std::string name() const override {
+        return _coll->name();
+    }
+
+    bool hasData() const override {
+        return _pred() && _coll->hasData();
+    }
+
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
+        _coll->collect(opCtx, builder);
+    }
+
+private:
+    std::function<bool()> _pred;
+    std::unique_ptr<FTDCCollectorInterface> _coll;
 };
 
 /**
