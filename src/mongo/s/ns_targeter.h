@@ -72,6 +72,8 @@ public:
 
     virtual bool isTrackedTimeSeriesBucketsNamespace() const = 0;
 
+    virtual bool isUpdateOneWithIdWithoutShardKeyEnabled() const = 0;
+
     /**
      * Returns a ShardEndpoint for a single document write or throws ShardKeyNotFound if 'doc' is
      * malformed with respect to the shard key pattern of the collection.
