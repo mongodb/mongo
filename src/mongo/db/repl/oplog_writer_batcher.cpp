@@ -42,8 +42,9 @@ namespace {
 
 // The default batch limits used for steady state replication.
 const OplogWriterBatcher::BatchLimits defaultBatchLimits{
-    BSONObjMaxInternalSize,                          // 16MB + margin
-    BSONObjMaxInternalSize + BSONObjMaxInternalSize  // 32MB + margin
+    BSONObjMaxInternalSize,      // 16MB + margin
+    BSONObjMaxInternalSize * 2,  // 32MB + margin
+    5 * 1000                     // default number of replBatchLimitOperations
 };
 
 }  // namespace
@@ -88,10 +89,12 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx,
             totalBytes += batchSize;
             totalOps += batch.count();
             batches.push_back(std::move(batch));
-            // Once the total bytes is between 16MB and 32MB, we return it as a writer batch. This
-            // may not be optimistic on size but we can avoid waiting the next batch coming before
-            // deciding whether we can return.
-            if (totalBytes > batchLimits.minBytes) {
+            // Once the total bytes is between 16MB and 32MB, or the total ops reach the
+            // limit, we return it as a writer batch. This may not be optimistic on size
+            // but we can avoid waiting the next batch coming before deciding whether we
+            // can return. This also means the maxCount is just a soft limit because the
+            // total ops can exceed it.
+            if (totalBytes > batchLimits.minBytes || totalOps >= batchLimits.maxCount) {
                 break;
             }
         }

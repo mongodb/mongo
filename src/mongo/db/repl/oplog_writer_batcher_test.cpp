@@ -69,7 +69,7 @@ public:
         _notEmptyCv.notify_one();
     }
 
-    void waitForSpace(OperationContext*, std::size_t size) override {
+    void waitForSpace(OperationContext*, std::size_t size, std::size_t count) override {
         MONGO_UNIMPLEMENTED;
     }
 
@@ -79,6 +79,10 @@ public:
     }
 
     std::size_t getMaxSize() const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    std::size_t getMaxCount() const override {
         MONGO_UNIMPLEMENTED;
     }
 
@@ -202,6 +206,7 @@ void OplogWriterBatcherTest::setUp() {
 
     _limits.minBytes = 16 * 1024 * 1024;             // 16MB
     _limits.maxBytes = _limits.minBytes + 4 * 1024;  // 16MB + 4K
+    _limits.maxCount = 100;
 }
 
 void OplogWriterBatcherTest::tearDown() {
@@ -239,7 +244,7 @@ TEST_F(OplogWriterBatcherTest, MergeBatches) {
     ASSERT_EQ(3, batch.size());
 }
 
-TEST_F(OplogWriterBatcherTest, WriterBatchSizeInBytes) {
+TEST_F(OplogWriterBatcherTest, WriterBatchByteSizeLimit) {
     OplogWriterBufferMock writerBuffer;
     OplogWriterBatcher writerBatcher(&writerBuffer);
 
@@ -258,6 +263,27 @@ TEST_F(OplogWriterBatcherTest, WriterBatchSizeInBytes) {
               writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).byteSize());
     ASSERT_EQ(_limits.minBytes + 1,
               writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).byteSize());
+    ASSERT_TRUE(writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).empty());
+}
+
+TEST_F(OplogWriterBatcherTest, WriterBatchCountLimit) {
+    OplogWriterBufferMock writerBuffer;
+    OplogWriterBatcher writerBatcher(&writerBuffer);
+
+    _limits.maxCount = 3;
+
+    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(123))}, 1);
+    OplogWriterBatch batch2({makeNoopOplogEntry(Seconds(123))}, 1);
+    OplogWriterBatch batch3({makeNoopOplogEntry(Seconds(123))}, 1);
+    OplogWriterBatch batch4({makeNoopOplogEntry(Seconds(123))}, 1);
+    writerBuffer.push_forTest(batch1);
+    writerBuffer.push_forTest(batch2);
+    writerBuffer.push_forTest(batch3);
+    writerBuffer.push_forTest(batch4);
+
+    // Once we can form a batch with count >= 3, we should return immediately.
+    ASSERT_EQ(3, writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).count());
+    ASSERT_EQ(1, writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).count());
     ASSERT_TRUE(writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).empty());
 }
 

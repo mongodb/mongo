@@ -1306,18 +1306,20 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
         // the bytes of the documents read off the network.
         std::vector<BSONObj> retryableWritesEntries;
         retryableWritesEntries.reserve(cursor->objsLeftInBatch());
-        auto toApplyDocumentBytes = 0;
+        std::size_t toApplyDocumentBytes = 0;
+        std::size_t toApplyDocumentCount = 0;
 
         while (cursor->moreInCurrentBatch()) {
             // Gather entries from current batch.
             BSONObj doc = cursor->next();
             toApplyDocumentBytes += doc.objsize();
+            toApplyDocumentCount++;
             retryableWritesEntries.push_back(doc);
         }
 
         if (retryableWritesEntries.size() != 0) {
             // Wait for enough space.
-            donorOplogBuffer->waitForSpace(opCtx.get(), toApplyDocumentBytes);
+            donorOplogBuffer->waitForSpace(opCtx.get(), toApplyDocumentBytes, toApplyDocumentCount);
             // Buffer retryable writes entries.
             donorOplogBuffer->preload(
                 opCtx.get(), retryableWritesEntries.begin(), retryableWritesEntries.end());

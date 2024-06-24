@@ -228,8 +228,19 @@ void OplogWriterImpl::_run() {
         // Update various things that care about our last written optime.
         finalizeOplogBatch(opCtx, lastOpTimeAndWallTime, flushJournal);
 
-        // Push the entries to the applier's buffer, may be blocked if buffer is full.
-        _applyBuffer->push(opCtx, ops.begin(), ops.end());
+        // Push the entries to the applier's buffer, may be blocked if no enough space.
+        // The number of entries in the batch could be larger than the buffer's limit,
+        // so we need to break the batch into smaller ones.
+        auto capacity = _applyBuffer->getMaxCount() / 2;
+        auto remain = ops.size();
+        auto begin = ops.begin();
+
+        while (remain > capacity) {
+            _applyBuffer->push(opCtx, begin, begin + capacity);
+            remain -= capacity;
+            begin += capacity;
+        }
+        _applyBuffer->push(opCtx, begin, ops.end());
     }
 }
 

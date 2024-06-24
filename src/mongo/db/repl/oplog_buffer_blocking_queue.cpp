@@ -55,18 +55,22 @@ std::size_t getTotalDocumentSize(OplogBuffer::Batch::const_iterator begin,
 
 }  // namespace
 
-OplogBufferBlockingQueue::OplogBufferBlockingQueue(std::size_t maxSize)
-    : OplogBufferBlockingQueue(maxSize, nullptr, Options()) {}
+OplogBufferBlockingQueue::OplogBufferBlockingQueue(std::size_t maxSize, std::size_t maxCount)
+    : OplogBufferBlockingQueue(maxSize, maxCount, nullptr, Options()) {}
 OplogBufferBlockingQueue::OplogBufferBlockingQueue(std::size_t maxSize,
+                                                   std::size_t maxCount,
                                                    Counters* counters,
                                                    Options options)
-    : _maxSize(maxSize), _counters(counters), _options(std::move(options)) {}
+    : _maxSize(maxSize), _maxCount(maxCount), _counters(counters), _options(std::move(options)) {
+    invariant(maxSize > 0 && maxCount > 0);
+}
 
 void OplogBufferBlockingQueue::startup(OperationContext*) {
     invariant(!_isShutdown);
     // Update server status metric to reflect the current oplog buffer's max size.
     if (_counters) {
         _counters->setMaxSize(getMaxSize());
+        _counters->setMaxCount(getMaxCount());
     }
 }
 
@@ -108,7 +112,7 @@ void OplogBufferBlockingQueue::push(OperationContext*,
 
         // Block until enough space is available.
         invariant(!_drainMode);
-        _waitForSpace_inlock(lk, size);
+        _waitForSpace_inlock(lk, size, count);
 
         // Do not push anything if already shutdown.
         if (_isShutdown) {
@@ -129,9 +133,11 @@ void OplogBufferBlockingQueue::push(OperationContext*,
     }
 }
 
-void OplogBufferBlockingQueue::waitForSpace(OperationContext*, std::size_t size) {
+void OplogBufferBlockingQueue::waitForSpace(OperationContext*,
+                                            std::size_t size,
+                                            std::size_t count) {
     stdx::unique_lock<Latch> lk(_mutex);
-    _waitForSpace_inlock(lk, size);
+    _waitForSpace_inlock(lk, size, count);
 }
 
 bool OplogBufferBlockingQueue::isEmpty() const {
@@ -141,6 +147,10 @@ bool OplogBufferBlockingQueue::isEmpty() const {
 
 std::size_t OplogBufferBlockingQueue::getMaxSize() const {
     return _maxSize;
+}
+
+std::size_t OplogBufferBlockingQueue::getMaxCount() const {
+    return _maxCount;
 }
 
 std::size_t OplogBufferBlockingQueue::getSize() const {
@@ -178,7 +188,8 @@ bool OplogBufferBlockingQueue::tryPop(OperationContext*, Value* value) {
         invariant(_curSize >= 0);
 
         // Only notify producer if there is a waiting producer and enough space available.
-        if (_waitSize > 0 && _curSize + _waitSize <= _maxSize) {
+        if ((_waitSize || _waitCount) && (_curSize + _waitSize <= _maxSize) &&
+            (_queue.size() + _waitCount <= _maxCount)) {
             _notFullCV.notify_one();
         }
     }
@@ -243,15 +254,18 @@ void OplogBufferBlockingQueue::exitDrainMode() {
 }
 
 void OplogBufferBlockingQueue::_waitForSpace_inlock(stdx::unique_lock<Latch>& lk,
-                                                    std::size_t size) {
-    invariant(size > 0);
-    invariant(!_waitSize);
+                                                    std::size_t size,
+                                                    std::size_t count) {
+    invariant(size > 0 && count > 0);
+    invariant(!_waitSize && !_waitCount);
 
-    while (_curSize + size > _maxSize && !_isShutdown) {
+    while ((_curSize + size > _maxSize || _queue.size() + count > _maxCount) && !_isShutdown) {
         // We only support one concurrent producer.
         _waitSize = size;
+        _waitCount = count;
         _notFullCV.wait(lk);
         _waitSize = 0;
+        _waitCount = 0;
     }
 }
 

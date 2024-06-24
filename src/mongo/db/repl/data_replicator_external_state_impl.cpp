@@ -60,6 +60,9 @@ namespace {
 // The maximum size of the oplog buffer is set to 256MB.
 constexpr std::size_t kOplogBufferSize = 256 * 1024 * 1024;
 
+// The maximum count of the oplog buffer is set to unlimited.
+constexpr std::size_t kOplogBufferCount = std::numeric_limits<std::size_t>::max();
+
 const char kCollectionOplogBufferName[] = "collection";
 const char kBlockingQueueOplogBufferName[] = "inMemoryBlockingQueue";
 
@@ -147,7 +150,7 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOpl
         return std::make_unique<OplogBufferProxy>(
             std::make_unique<OplogBufferCollection>(StorageInterface::get(opCtx), options));
     } else {
-        return std::make_unique<OplogBufferBlockingQueue>(kOplogBufferSize);
+        return std::make_unique<OplogBufferBlockingQueue>(kOplogBufferSize, kOplogBufferCount);
     }
 }
 

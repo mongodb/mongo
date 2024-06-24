@@ -249,7 +249,9 @@ void OplogBufferCollection::_push(WithLock,
     _cvNoLongerEmpty.notify_all();
 }
 
-void OplogBufferCollection::waitForSpace(OperationContext* opCtx, std::size_t size) {}
+void OplogBufferCollection::waitForSpace(OperationContext* opCtx,
+                                         std::size_t size,
+                                         std::size_t count) {}
 
 bool OplogBufferCollection::isEmpty() const {
     stdx::lock_guard<Latch> lk(_mutex);
@@ -257,6 +259,10 @@ bool OplogBufferCollection::isEmpty() const {
 }
 
 std::size_t OplogBufferCollection::getMaxSize() const {
+    return 0;
+}
+
+std::size_t OplogBufferCollection::getMaxCount() const {
     return 0;
 }
 

@@ -646,9 +646,11 @@ Status BackgroundSync::_enqueueDocuments(OplogFetcher::Documents::const_iterator
     // Wait for enough space.
     // This should be called outside of the mutex to avoid deadlocks.
     if (_oplogWriter) {
-        _oplogWriter->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
+        _oplogWriter->waitForSpace(
+            opCtx.get(), info.toApplyDocumentBytes, info.toApplyDocumentCount);
     } else {
-        _oplogApplier->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
+        _oplogApplier->waitForSpace(
+            opCtx.get(), info.toApplyDocumentBytes, info.toApplyDocumentCount);
     }
 
     {

@@ -59,6 +59,7 @@ namespace repl {
 namespace {
 
 constexpr std::size_t kTestOplogBufferSize = 64 * 1024 * 1024;
+constexpr std::size_t kTestOplogBufferCount = std::numeric_limits<std::size_t>::max();
 
 /**
  * Minimal implementation of OplogApplier for testing.
@@ -105,7 +106,8 @@ protected:
 };
 
 void OplogApplierTest::setUp() {
-    _buffer = std::make_unique<OplogBufferBlockingQueue>(kTestOplogBufferSize);
+    _buffer =
+        std::make_unique<OplogBufferBlockingQueue>(kTestOplogBufferSize, kTestOplogBufferCount);
     _applier = std::make_unique<OplogApplierMock>(_buffer.get());
     _opCtxHolder = makeOperationContext();
 
