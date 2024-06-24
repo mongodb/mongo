@@ -742,6 +742,13 @@ tasks:
         vars:
           test_control: "locust_bulk_insert"
 
+  - name: top_ten_queries
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "top_ten_queries"
+
   - name: tsbs_load
     priority: 5
     commands:

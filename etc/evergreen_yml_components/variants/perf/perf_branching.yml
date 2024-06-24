@@ -396,7 +396,10 @@ buildvariants:
     tasks:
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
+      - name: linkbench2.2024-05
+        cron: *high-value-workload-cron
       - name: smoke_test
+      - name: top_ten_queries
       - name: tsbs_load.2024-05
         cron: *high-value-workload-cron
       - name: tsbs_query
@@ -433,8 +436,6 @@ buildvariants:
         activate: false
       - name: ycsb_30GB.100update.rate_limited.2024-05
         activate: false
-      - name: linkbench2.2024-05
-        cron: *high-value-workload-cron
 
   # On PERF-730 we changed the initial sync tests to use two nodes instead of three. To avoid
   # losing history, the name remains unchanged, but the display_name reflects the change to 2-Node.
