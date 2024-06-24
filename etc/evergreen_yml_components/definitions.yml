@@ -2635,6 +2635,33 @@ functions:
         args:
           - "./src/evergreen/sasl_windows_cyrussasl_teardown.sh"
 
+  "process code coverage data": &process_code_coverage_data
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "./src/evergreen/functions/code_coverage_data_process.sh"
+      env:
+        GCOV_TOOL: ${gcov_tool}
+
+  "archive coveralls json": &archive_coveralls_json
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: "src/coveralls.json"
+      remote_file: ${project}/${build_variant}/${revision}/gcov/coveralls-${task_id}-${execution}.json
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/json
+      display_name: coveralls.json - Execution ${execution}
+      optional: true
+
+  "save code coverage data":
+    - *f_expansions_write
+    - *process_code_coverage_data
+    - *archive_coveralls_json
+
   "do scons setup":
     - command: manifest.load
     - *f_expansions_write

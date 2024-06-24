@@ -85,6 +85,7 @@ post:
   - func: "upload jstestfuzz minimized output"
   - func: "upload clang tidy results"
   - func: "kill processes"
+  - func: "save code coverage data"
   - func: "save local client logs"
   - func: "save jepsen artifacts"
   - func: "save mongo coredumps"
