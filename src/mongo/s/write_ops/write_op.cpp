@@ -218,8 +218,7 @@ void WriteOp::targetWrites(OperationContext* opCtx,
         if (endpoints.size() > 1u && !inTransaction) {
             // Do not ignore shard version if this is WriteType::WithoutShardKeyWithId
             // TODO: PM-3673 for non-retryable writes.
-            if (!feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+            if (!targeter.isUpdateOneWithIdWithoutShardKeyEnabled() ||
                 (isNonTargetedWriteWithoutShardKeyWithExactId &&
                  !*isNonTargetedWriteWithoutShardKeyWithExactId) ||
                 (!isNonTargetedWriteWithoutShardKeyWithExactId)) {
