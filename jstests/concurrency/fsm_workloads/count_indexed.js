@@ -7,6 +7,11 @@
  * and a random 'countPerNum' in range [50, 100]
  * and then inserts 'modulus * countPerNum' documents. [250, 1000]
  * Each thread inserts docs into a unique collection.
+ *
+ * TODO SERVER-91708: An index build queued to start but not added to the list of active index
+ * builds yet will allow a moveCollection to proceed and the index build will fail to build
+ * on account of the collection being dropped on the donor.
+ * @tags: [assumes_balancer_off]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/count.js";
