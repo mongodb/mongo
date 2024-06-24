@@ -33,18 +33,18 @@ variables:
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     repo_edition: enterprise
-    large_distro_name: rhel8.8-medium
-    core_analyzer_distro_name: rhel8.8-xlarge
+    large_distro_name: rhel80-medium
+    core_analyzer_distro_name: rhel80-xlarge
     num_scons_link_jobs_available: 0.99
     compile_variant: *linux_x86_dynamic_compile_variant_name
 
 buildvariants:
-  - name: enterprise-rhel-88-64-bit-inmem
-    display_name: Enterprise RHEL 8.8 (inMemory)
+  - name: enterprise-rhel-80-64-bit-inmem
+    display_name: Enterprise RHEL 8.0 (inMemory)
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-small
+      - rhel80-small
     expansions:
       additional_package_targets: >-
         archive-mongocryptd
@@ -54,23 +54,23 @@ buildvariants:
         --excludeWithAnyTags=requires_persistence,requires_journaling
       compile_flags: >-
         --ssl
-        MONGO_DISTMOD=rhel88
+        MONGO_DISTMOD=rhel80
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --use-diagnostic-latches=on
       multiversion_platform: rhel80
       multiversion_edition: enterprise
       scons_cache_scope: shared
-      large_distro_name: rhel8.8-large
-      core_analyzer_distro_name: rhel8.8-xlarge
-      compile_variant: enterprise-rhel-88-64-bit-inmem
+      large_distro_name: rhel80-large
+      core_analyzer_distro_name: rhel80-xlarge
+      compile_variant: enterprise-rhel-80-64-bit-inmem
     tasks:
       - name: compile_test_serial_no_unittests_TG
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: compile_integration_and_test_no_audit_parallel_stream_TG
         distros:
-          - rhel8.8-large
+          - rhel80-large
       - name: .aggfuzzer .common !.feature_flag_guarded
       - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded
       - name: audit
@@ -81,7 +81,7 @@ buildvariants:
       - name: .misc_js
       - name: .concurrency !.no_txns !.kill_terminate !.incompatible_inmemory !.feature_flag_guarded
         distros:
-          - rhel8.8-medium # Some workloads require a lot of memory, use a bigger machine for this suite.
+          - rhel80-medium # Some workloads require a lot of memory, use a bigger machine for this suite.
       - name: initial_sync_fuzzer_gen
       - name: .jscore .common !.decimal
       - name: jsCore_txns_large_txns_format
@@ -96,7 +96,7 @@ buildvariants:
       - name: replica_sets_multi_stmt_txn_jscore_passthrough_gen
       - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
       - name: .resharding_fuzzer
       - name: .retry
       - name: rollback_fuzzer_gen
@@ -105,7 +105,7 @@ buildvariants:
       - name: session_jscore_passthrough
       - name: sharded_multi_stmt_txn_jscore_passthrough_gen
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
       - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
       - name: .sharding .common !.multiversion !.csrs !.encrypt !.feature_flag_guarded
       - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -114,12 +114,12 @@ buildvariants:
       - name: generate_buildid_to_debug_symbols_mapping
 
   - <<: *linux_x86_dynamic_compile_variant_dependency
-    name: &enterprise-rhel-88-64-bit-large-txns-format enterprise-rhel-88-64-bit-large-txns-format
-    display_name: "Enterprise RHEL 8.8 (large transactions format)"
+    name: &enterprise-rhel-80-64-bit-large-txns-format enterprise-rhel-80-64-bit-large-txns-format
+    display_name: "Enterprise RHEL 8.0 (large transactions format)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
     run_on:
-      - rhel8.8-small
+      - rhel80-small
     expansions:
       <<: *linux_x86_generic_expansions
       test_flags: >-
@@ -159,7 +159,7 @@ buildvariants:
       - name: .replica_sets !.multi_oplog !.large
       - name: .replica_sets !.multi_oplog .large
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
       - name: .replica_sets .encrypt
       - name: .resharding_fuzzer
       - name: .rollbackfuzzer
@@ -171,4 +171,4 @@ buildvariants:
       - name: sharding_csrs_continuous_config_stepdown_gen
       - name: sharded_multi_stmt_txn_jscore_passthrough_gen
         distros:
-          - rhel8.8-medium
+          - rhel80-medium

@@ -192,16 +192,16 @@ def main():
     else:
         if platform.machine() == "x86_64":
             variant = BuildVariant(
-                name="enterprise-rhel-88-64-bit-build-metrics",
+                name="enterprise-rhel-80-64-bit-build-metrics",
                 activate=True,
             )
             for link_model, tasks in tasks["linux_x86_64_tasks"].items():
                 variant.add_task_group(
-                    create_task_group(f"linux_X86_64_{link_model}", tasks), ["rhel8.8-xlarge"]
+                    create_task_group(f"linux_X86_64_{link_model}", tasks), ["rhel80-xlarge"]
                 )
         else:
             variant = BuildVariant(
-                name="enterprise-rhel-88-aarch64-build-metrics",
+                name="enterprise-rhel-80-aarch64-build-metrics",
                 activate=True,
             )
             for link_model, tasks in tasks["linux_arm64_tasks"].items():

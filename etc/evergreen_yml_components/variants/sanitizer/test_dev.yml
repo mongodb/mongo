@@ -12,7 +12,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_params # Essential set of compile parameters used for Linux dev variants.
     run_on:
-      - rhel8.8-xlarge
+      - rhel80-xlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     tasks:
       - name: compile_test_parallel_core_stream_TG
@@ -109,8 +109,8 @@ variables:
     hang_analyzer_dump_core: false
     max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
-    large_distro_name: rhel8.8-large
-    xlarge_distro_name: rhel8.8-xxlarge
+    large_distro_name: rhel80-build
+    xlarge_distro_name: rhel80-xxlarge
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
@@ -135,7 +135,7 @@ buildvariants:
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
 
   - <<: *generic_linux_compile_params
     name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
@@ -170,11 +170,11 @@ buildvariants:
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
 
   - &linux-64-debug-required-template
     <<: *linux_x86_dynamic_debug_compile_variant_dependency
@@ -183,7 +183,7 @@ buildvariants:
     tags: ["required"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-medium
+      - rhel80-medium
     expansions:
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       test_flags: >-
@@ -192,8 +192,8 @@ buildvariants:
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       target_resmoke_time: 15
       max_sub_suites: 5
-      large_distro_name: rhel8.8-medium
-      core_analyzer_distro_name: rhel8.8-xlarge
+      large_distro_name: rhel80-medium
+      core_analyzer_distro_name: rhel80-xlarge
       compile_variant: *linux_x86_dynamic_debug_compile_variant_name
       build_mongot: true
       download_mongot_release: true
@@ -203,20 +203,20 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
 
-  - &rhel88-debug-aubsan-lite-all-feature-flags-required-template
+  - &rhel80-debug-aubsan-lite-all-feature-flags-required-template
     <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel88-debug-aubsan-lite-all-feature-flags-required rhel88-debug-aubsan-lite-all-feature-flags-required
-    display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.8 DEBUG (all feature flags)"
+    name: &rhel80-debug-aubsan-lite-all-feature-flags-required rhel80-debug-aubsan-lite-all-feature-flags-required
+    display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
     tags: ["required"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-large
+      - rhel80-build
     expansions:
       <<: *aubsan-lite-required-expansions
       # To force disable feature flags even on the all feature flags variant, please use this file:
@@ -231,12 +231,12 @@ buildvariants:
       - name: jsCore_wildcard_indexes
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel88-debug-aubsan rhel88-debug-aubsan
-    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.8 DEBUG"
+    name: &rhel80-debug-aubsan rhel80-debug-aubsan
+    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-large
+      - rhel80-build
     expansions:
       <<: *aubsan-lite-required-expansions
       test_flags: --excludeWithAnyTags=requires_increased_memlock_limits,incompatible_aubsan
@@ -244,28 +244,28 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - rhel8.8-large
+          - rhel80-large
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - rhel8.8-large
+          - rhel80-large
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - rhel8.8-large
+          - rhel80-large
       - name: .non_deterministic !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - rhel8.8-large
+          - rhel80-large
       - name: .search_e2e_tests
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel88-debug-aubsan-experimental rhel88-debug-aubsan-experimental
-    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.8 DEBUG Experimental"
+    name: &rhel80-debug-aubsan-experimental rhel80-debug-aubsan-experimental
+    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG Experimental"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-large
+      - rhel80-build
     expansions:
       <<: *aubsan-lite-required-expansions
       test_flags: >-
@@ -277,12 +277,12 @@ buildvariants:
       - name: .random_multiversion_ds
       - name: .watchdog
 
-  - name: rhel88-asan
-    display_name: ~ ASAN RHEL 8.8
+  - name: rhel80-asan
+    display_name: ~ ASAN RHEL 8.0
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-large
+      - rhel80-build
     stepback: true
     expansions:
       lang_environment: LANG=C
@@ -306,7 +306,7 @@ buildvariants:
         --excludeWithAnyTags=requires_fast_memory,corrupts_data
         --enableEnterpriseTests=off
       separate_debug: off
-      compile_variant: rhel88-asan
+      compile_variant: rhel80-asan
     tasks:
       - name: compile_test_serial_TG
       - name: compile_test_parallel_unittest_stream_TG
@@ -314,13 +314,13 @@ buildvariants:
       - name: .jstestfuzz !.initsync !.feature_flag_guarded !.incompatible_system_allocator
       - name: generate_buildid_to_debug_symbols_mapping
 
-  - &rhel88-debug-aubsan-lite_fuzzer-template
-    name: &rhel88-debug-aubsan-lite_fuzzer rhel88-debug-aubsan-lite_fuzzer
-    display_name: "{A,UB}SAN Enterprise RHEL 8.8 FUZZER"
+  - &rhel80-debug-aubsan-lite_fuzzer-template
+    name: &rhel80-debug-aubsan-lite_fuzzer rhel80-debug-aubsan-lite_fuzzer
+    display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-large
+      - rhel80-build
     stepback: false
     expansions:
       additional_package_targets: >-
@@ -349,7 +349,7 @@ buildvariants:
       hang_analyzer_dump_core: false
       scons_cache_scope: shared
       separate_debug: off
-      compile_variant: *rhel88-debug-aubsan-lite_fuzzer
+      compile_variant: *rhel80-debug-aubsan-lite_fuzzer
     display_tasks:
       - name: libfuzzertests!
         execution_tasks:
@@ -358,21 +358,21 @@ buildvariants:
     tasks:
       - name: compile_archive_and_run_libfuzzertests_TG
 
-  - &enterprise-rhel88-debug-tsan-template
-    name: &enterprise-rhel88-debug-tsan-compile enterprise-rhel88-debug-tsan-compile
-    display_name: "* TSAN Enterprise RHEL 8.8 DEBUG Compile"
+  - &enterprise-rhel80-debug-tsan-template
+    name: &enterprise-rhel80-debug-tsan-compile enterprise-rhel80-debug-tsan-compile
+    display_name: "* TSAN Enterprise RHEL 8.0 DEBUG Compile"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-large
+      - rhel80-large
     stepback: false
-    expansions: &enterprise-rhel88-debug-tsan-expansions-template
+    expansions: &enterprise-rhel80-debug-tsan-expansions-template
       additional_package_targets: >-
         archive-mongocryptd
         archive-mongocryptd-debug
       lang_environment: LANG=C
       toolchain_version: stable
-      compile_variant: *enterprise-rhel88-debug-tsan-compile
+      compile_variant: *enterprise-rhel80-debug-tsan-compile
       # If you add anything to san_options, make sure the appropriate
       # changes are also made to SConstruct.
       #
@@ -401,9 +401,9 @@ buildvariants:
       resmoke_jobs_factor: 0.3
       scons_cache_scope: shared
       separate_debug: off
-      large_distro_name: &enterprise-rhel88-debug-tsan-large-distro-name rhel8.8-xlarge
-      xlarge_distro_name: rhel8.8-xxlarge
-      core_analyzer_distro_name: rhel8.8-xxlarge
+      large_distro_name: &enterprise-rhel80-debug-tsan-large-distro-name rhel80-xlarge
+      xlarge_distro_name: rhel80-xxlarge
+      core_analyzer_distro_name: rhel80-xxlarge
       multiversion_platform: rhel80
       multiversion_edition: enterprise
       test_flags: >-
@@ -420,22 +420,22 @@ buildvariants:
       - name: .release_critical .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
       - name: .release_critical .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: .default .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
       - name: .default .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
 
-  - <<: *enterprise-rhel88-debug-tsan-template
-    name: &enterprise-rhel88-debug-tsan enterprise-rhel88-debug-tsan
-    display_name: "* TSAN Enterprise RHEL 8.8 DEBUG"
+  - <<: *enterprise-rhel80-debug-tsan-template
+    name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
+    display_name: "* TSAN Enterprise RHEL 8.0 DEBUG"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     depends_on:
       - name: archive_dist_test_debug
-        variant: *enterprise-rhel88-debug-tsan-compile
+        variant: *enterprise-rhel80-debug-tsan-compile
       - name: archive_jstestshell
-        variant: *enterprise-rhel88-debug-tsan-compile
+        variant: *enterprise-rhel80-debug-tsan-compile
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
@@ -445,39 +445,39 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - *enterprise-rhel88-debug-tsan-large-distro-name
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .development_critical .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - *enterprise-rhel88-debug-tsan-large-distro-name
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .release_critical !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - *enterprise-rhel88-debug-tsan-large-distro-name
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .release_critical .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - *enterprise-rhel88-debug-tsan-large-distro-name
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .default !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - *enterprise-rhel88-debug-tsan-large-distro-name
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .default .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - *enterprise-rhel88-debug-tsan-large-distro-name
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .non_deterministic !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - *enterprise-rhel88-debug-tsan-large-distro-name
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .non_deterministic .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - *enterprise-rhel88-debug-tsan-large-distro-name
+          - *enterprise-rhel80-debug-tsan-large-distro-name
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel88-debug-aubsan-classic-engine rhel88-debug-aubsan-classic-engine
-    display_name: "* {A,UB}SAN Enterprise RHEL 8.8 DEBUG (Classic Engine)"
+    name: &rhel80-debug-aubsan-classic-engine rhel80-debug-aubsan-classic-engine
+    display_name: "* {A,UB}SAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-large
+      - rhel80-build
     expansions:
       <<: *aubsan-lite-required-expansions
       test_flags: >-

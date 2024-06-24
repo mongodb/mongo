@@ -12,7 +12,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_params # Essential set of compile parameters used for Linux dev variants.
     run_on:
-      - rhel8.8-xlarge
+      - rhel80-xlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     tasks:
       - name: compile_test_parallel_core_stream_TG
@@ -66,7 +66,7 @@ buildvariants:
     tags: []
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-medium
+      - rhel80-medium
     modules:
       - wtdevelop
     depends_on:
@@ -80,7 +80,7 @@ buildvariants:
     expansions:
       use_wt_develop: true
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
-      large_distro_name: rhel8.8-medium
+      large_distro_name: rhel80-medium
       max_sub_suites: "5"
       target_resmoke_time: "15"
       compile_flags: >-

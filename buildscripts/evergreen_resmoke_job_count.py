@@ -30,18 +30,18 @@ SYS_PLATFORM = sys.platform
 
 # Apply factor for a task based on the build variant it is running on.
 VARIANT_TASK_FACTOR_OVERRIDES = {
-    "enterprise-rhel-88-64-bit": [{"task": r"logical_session_cache_replication.*", "factor": 0.75}],
-    "enterprise-rhel-88-64-bit-inmem": [
+    "enterprise-rhel-80-64-bit": [{"task": r"logical_session_cache_replication.*", "factor": 0.75}],
+    "enterprise-rhel-80-64-bit-inmem": [
         {"task": "secondary_reads_passthrough", "factor": 0.3},
         {"task": "multi_stmt_txn_jscore_passthrough_with_migration", "factor": 0.3},
     ],
-    "enterprise-rhel88-debug-tsan": [
+    "enterprise-rhel80-debug-tsan": [
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125}
     ],
-    "rhel88-debug-aubsan-classic-engine": [
+    "rhel80-debug-aubsan-classic-engine": [
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
     ],
-    "rhel88-debug-aubsan-all-feature-flags": [
+    "rhel80-debug-aubsan-all-feature-flags": [
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
     ],
     # TODO(SERVER-91466): figure out why noPassthrough tests are taking up more memory after switching
@@ -54,7 +54,7 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
 
 TASKS_FACTORS = [{"task": r"replica_sets.*", "factor": 0.5}, {"task": r"sharding.*", "factor": 0.5}]
 
-DISTRO_MULTIPLIERS = {"rhel8.8-large": 1.618}
+DISTRO_MULTIPLIERS = {"rhel80-large": 1.618}
 
 # Apply factor for a task based on the machine type it is running on.
 MACHINE_TASK_FACTOR_OVERRIDES = {

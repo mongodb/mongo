@@ -11,7 +11,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux-x86-dynamic-compile-params # Essential set of compile parameters used for Linux dev variants.
     run_on:
-      - rhel8.8-xlarge
+      - rhel80-xlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     stepback: false
 
@@ -25,7 +25,7 @@ variables:
     has_packages: false
     compile_flags: >-
       --ssl
-      MONGO_DISTMOD=rhel88
+      MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
@@ -59,8 +59,8 @@ variables:
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     repo_edition: enterprise
-    large_distro_name: rhel8.8-medium
-    core_analyzer_distro_name: rhel8.8-xlarge
+    large_distro_name: rhel80-medium
+    core_analyzer_distro_name: rhel80-xlarge
     num_scons_link_jobs_available: 0.99
     compile_variant: *linux_x86_dynamic_compile_variant_name
 
@@ -69,7 +69,7 @@ variables:
   # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &enterprise-rhel-88-64-bit-dynamic-expansions
+  - &enterprise-rhel-80-64-bit-dynamic-expansions
     <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -80,7 +80,7 @@ variables:
     max_sub_suites: 5
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
-    large_distro_name: rhel8.8-medium
+    large_distro_name: rhel80-medium
 
 buildvariants:
   - <<: *linux-x86-dynamic-compile-params
@@ -99,22 +99,22 @@ buildvariants:
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
 
-  - &enterprise-rhel-88-64-bit-dynamic-template
+  - &enterprise-rhel-80-64-bit-dynamic-template
     <<: *linux_x86_dynamic_compile_variant_dependency
-    name: &enterprise-rhel-88-64-bit-dynamic enterprise-rhel-88-64-bit-dynamic
-    display_name: "* Shared Library Enterprise RHEL 8.8"
+    name: &enterprise-rhel-80-64-bit-dynamic enterprise-rhel-80-64-bit-dynamic
+    display_name: "* Shared Library Enterprise RHEL 8.0"
     tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-small
+      - rhel80-small
     expansions:
-      <<: *enterprise-rhel-88-64-bit-dynamic-expansions
+      <<: *enterprise-rhel-80-64-bit-dynamic-expansions
     depends_on:
       - name: archive_dist_test_debug
         variant: *linux_x86_dynamic_compile_variant_name
@@ -127,29 +127,29 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
 
   # TODO (SERVER-75884): Remove this variant once we switch to config shard as the default.
   # This build variant is used to test suites that use sharded cluster fixture with config shard mode.
-  - &enterprise-rhel-88-64-bit-dynamic-config-shard
+  - &enterprise-rhel-80-64-bit-dynamic-config-shard
     <<: *linux_x86_dynamic_compile_variant_dependency
-    name: enterprise-rhel-88-64-bit-dynamic-config-shard
-    display_name: "* Shared Library Enterprise RHEL 8.8 (Config Shard)"
+    name: enterprise-rhel-80-64-bit-dynamic-config-shard
+    display_name: "* Shared Library Enterprise RHEL 8.0 (Config Shard)"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-small
+      - rhel80-small
     stepback: false
-    expansions: &enterprise-rhel-88-64-bit-dynamic-config-shard-expansions
-      <<: *enterprise-rhel-88-64-bit-dynamic-expansions
+    expansions: &enterprise-rhel-80-64-bit-dynamic-config-shard-expansions
+      <<: *enterprise-rhel-80-64-bit-dynamic-expansions
       test_flags: >-
         --configShard=any
         --excludeWithAnyTags=config_shard_incompatible
@@ -187,20 +187,20 @@ buildvariants:
       - name: .concurrency .sharded .large
       - name: .unsplittable_collections
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
       - name: .multi_shard
 
-  - &enterprise-rhel-88-64-bit-dynamic-classic-engine
+  - &enterprise-rhel-80-64-bit-dynamic-classic-engine
     <<: *linux_x86_dynamic_compile_variant_dependency
-    name: enterprise-rhel-88-64-bit-dynamic-classic-engine
-    display_name: "Shared Library Enterprise RHEL 8.8 (Classic Engine)"
+    name: enterprise-rhel-80-64-bit-dynamic-classic-engine
+    display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-small
+      - rhel80-small
     stepback: false
     expansions:
-      <<: *enterprise-rhel-88-64-bit-dynamic-expansions
+      <<: *enterprise-rhel-80-64-bit-dynamic-expansions
       jstestfuzz_num_generated_files: 40
       jstestfuzz_concurrent_num_files: 10
       target_resmoke_time: 10
@@ -208,7 +208,7 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
         --excludeWithAnyTags=featureFlagSbeFull
-      large_distro_name: rhel8.8-medium
+      large_distro_name: rhel80-medium
     depends_on:
       - name: archive_dist_test_debug
         variant: *linux_x86_dynamic_compile_variant_name
@@ -227,7 +227,7 @@ buildvariants:
       - name: .concurrency !.large !.no_txns !.compute_mode !.feature_flag_guarded
       - name: .concurrency .large !.no_txns !.compute_mode !.feature_flag_guarded
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
       - name: .encrypt
       - name: .jscore .common !jsCore !.sbe_only
       - name: .jstestfuzz !.feature_flag_guarded !.flow_control
@@ -240,17 +240,17 @@ buildvariants:
       - name: .read_write_concern !.large
       - name: .read_write_concern .large
         distros:
-          - rhel8.8-medium
+          - rhel80-medium
       - name: .replica_sets !.encrypt !.auth
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: .rollbackfuzzer
       - name: .sharding .common !.feature_flag_guarded
       - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
       - name: .sharding .txns
       - name: .serverless
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: .updatefuzzer
       - name: aggregation_repeat_queries_multiplan_single_solutions
       - name: audit
@@ -270,7 +270,7 @@ buildvariants:
       - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
       - name: jsCore
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
       - name: jsCore_txns_large_txns_format
       - name: json_schema
@@ -281,22 +281,22 @@ buildvariants:
       - name: replica_sets_reconfig_jscore_passthrough_gen
       - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough_gen
         distros:
-          - rhel8.8-xlarge
+          - rhel80-xlarge
       - name: retryable_writes_jscore_passthrough_gen
       - name: retryable_writes_jscore_stepdown_passthrough_gen
       - name: sasl
@@ -318,21 +318,21 @@ buildvariants:
       - name: implicit_query_settings_fallback
 
   # This variant run search integration tests against latest/HEAD 10gen/mongot.
-  - name: &enterprise-rhel-88-64-mongot-integration enterprise-rhel-88-64-mongot-integration
-    display_name: "Enterprise RHEL 8.8 Mongot Integration"
+  - name: &enterprise-rhel-80-64-mongot-integration enterprise-rhel-80-64-mongot-integration
+    display_name: "Enterprise RHEL 8.0 Mongot Integration"
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-medium
+      - rhel80-medium
     tags: []
     expansions:
       scons_cache_scope: shared
       scons_cache_mode: all
-      compile_variant: *enterprise-rhel-88-64-mongot-integration
+      compile_variant: *enterprise-rhel-80-64-mongot-integration
       has_packages: false
       build_mongot: true
       compile_flags: >-
         --ssl
-        MONGO_DISTMOD=rhel88
+        MONGO_DISTMOD=rhel80
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
@@ -340,7 +340,7 @@ buildvariants:
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
-          - rhel8.8-large
+          - rhel80-large
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
 

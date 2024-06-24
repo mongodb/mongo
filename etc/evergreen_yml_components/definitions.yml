@@ -39,13 +39,13 @@ variables:
       - enterprise-debian12-64
       - enterprise-rhel-81-ppc64le
       - ubi8
-      - rhel88
-      - rhel-88-arm64
+      - rhel80
+      - rhel-82-arm64
       - rhel90
       - rhel90-arm64
-      - enterprise-rhel-88-64-bit
-      - enterprise-rhel-88-64-bit-suggested # For testing selinux.
-      - enterprise-rhel-88-arm64
+      - enterprise-rhel-80-64-bit
+      - enterprise-rhel-80-64-bit-suggested # For testing selinux.
+      - enterprise-rhel-82-arm64
       - enterprise-rhel-83-s390x
       - enterprise-rhel-90-64-bit
       - enterprise-rhel-90-arm64

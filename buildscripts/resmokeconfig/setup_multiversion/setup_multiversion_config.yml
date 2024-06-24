@@ -115,19 +115,9 @@ evergreen_buildvariants:
     platform: rhel80
     architecture: x86_64
 
-  - name: rhel88
-    edition: targeted
-    platform: rhel88
-    architecture: x86_64
-
   - name: enterprise-rhel-80-64-bit
     edition: enterprise
     platform: rhel80
-    architecture: x86_64
-
-  - name: enterprise-rhel-88-64-bit
-    edition: enterprise
-    platform: rhel88
     architecture: x86_64
 
   - name: rhel-82-arm64
@@ -138,16 +128,6 @@ evergreen_buildvariants:
   - name: enterprise-rhel-82-arm64
     edition: enterprise
     platform: rhel82
-    architecture: arm64
-
-  - name: rhel-88-arm64
-    edition: targeted
-    platform: rhel88
-    architecture: arm64
-
-  - name: enterprise-rhel-88-arm64
-    edition: enterprise
-    platform: rhel88
     architecture: arm64
 
   - name: enterprise-rhel-71-ppc64le

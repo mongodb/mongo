@@ -71,7 +71,7 @@ class ToolchainDistroName(Tuple[str, ...], enum.Enum):
     MACOS1100 = ("macos-1100",)
     RHEL6 = ("rhel6", "rhel62", "rhel67")
     RHEL7 = ("rhel7", "rhel70", "rhel71", "rhel72", "rhel76", "ubi7")
-    RHEL8 = ("rhel8", "rhel80", "rhel81", "rhel82", "rhel83", "rhel84", "rhel88", "ubi8")
+    RHEL8 = ("rhel8", "rhel80", "rhel81", "rhel82", "rhel83", "rhel84", "ubi8")
     SUSE12 = ("suse12", "suse12-sp5")
     SUSE15 = ("suse15", "suse15-sp0", "suse15-sp2")
     UBUNTU1404 = ("ubuntu1404",)

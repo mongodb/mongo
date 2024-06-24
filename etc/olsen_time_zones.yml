@@ -34,6 +34,6 @@ buildvariants:
   - name: linux-64
     display_name: Linux
     run_on:
-      - rhel8.8-small
+      - rhel80-small
     tasks:
       - name: compile
