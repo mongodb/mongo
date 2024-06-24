@@ -164,5 +164,19 @@ TEST_F(MongodOptionsTest, MagicRestoreUseProvidedPort) {
     ASSERT_EQ(serverGlobalParams.port, 123);
 }
 
+TEST_F(MongodOptionsTest, MagicRestoreShardParams) {
+    env.setMagicRestore().setReplicaSet("rsName").setClusterRole("shardsvr");
+    auto status = storeMongodOptions(env);
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "Cannot start magic restore with --shardsvr or --configsvr");
+
+    env.setMagicRestore().setReplicaSet("rsName").setClusterRole("configsvr");
+    status = storeMongodOptions(env);
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "Cannot start magic restore with --shardsvr or --configsvr");
+}
+
 }  // namespace
 }  // namespace mongo
