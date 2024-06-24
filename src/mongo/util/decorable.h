@@ -66,6 +66,7 @@
 #include <fmt/format.h>
 #include <iostream>
 #include <memory>
+#include <numeric>
 #include <sstream>
 #include <type_traits>
 #include <typeindex>
@@ -159,7 +160,6 @@ public:
     size_t declare(const LifecycleOperations* ops) {
         static constexpr auto al = alignof(T);
         static constexpr auto sz = sizeof(T);
-        static_assert(al <= alignof(std::max_align_t), "over-aligned decoration");
         ptrdiff_t offset = (_bufferSize + al - 1) / al * al;  // pad to alignment
         _entries.push_back({&typeid(T), offset, ops, sz, al});
         _bufferSize = offset + sz;
@@ -168,6 +168,13 @@ public:
 
     size_t bufferSize() const {
         return _bufferSize;
+    }
+
+    size_t bufferAlignment() const {
+        return std::accumulate(_entries.begin(),
+                               _entries.end(),
+                               size_t{1},
+                               [](auto&& acc, auto&& e) { return std::max(acc, e.align); });
     }
 
     auto begin() const {
@@ -342,6 +349,17 @@ public:
     }
 
 private:
+    struct AlignedDeleter {
+        void operator()(unsigned char* ptr) const {
+            ::operator delete(ptr, size, alignment);
+        }
+
+        std::size_t size;
+        std::align_val_t alignment;
+    };
+
+    using OwningPointer = std::unique_ptr<unsigned char, AlignedDeleter>;
+
     static Registry& _reg() {
         return getRegistry<DecoratedType>();
     }
@@ -377,11 +395,16 @@ private:
         *reinterpret_cast<const void**>(_data) = DecoratedType::upcastBackLink(decorated);
     }
 
-    std::unique_ptr<unsigned char[]> _makeData() {
-        return std::make_unique<unsigned char[]>(_reg().bufferSize());
+    OwningPointer _makeData() {
+        auto alignment = _reg().bufferAlignment();
+        auto sz = _reg().bufferSize();
+        auto rawBuffer =
+            static_cast<unsigned char*>(::operator new(sz, std::align_val_t(alignment)));
+        std::memset(rawBuffer, 0, sz);
+        return OwningPointer{rawBuffer, AlignedDeleter{sz, std::align_val_t{alignment}}};
     }
 
-    std::unique_ptr<unsigned char[]> _dataOwnership{_makeData()};
+    OwningPointer _dataOwnership{_makeData()};
     unsigned char* _data{_dataOwnership.get()};
 };
 

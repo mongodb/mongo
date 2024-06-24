@@ -158,6 +158,31 @@ TEST_F(DecorableTest, Alignment) {
     ASSERT_EQ(reinterpret_cast<uintptr_t>(&x[get<3>(d)]) % alignof(int), 0);
 }
 
+// Verify that decorations with alignment requirements > alignof(std::max_align_t) have their
+// alignment requirement respected.
+TEST_F(DecorableTest, ExtendedAlignment) {
+    struct X : Decorable<X> {};
+    constexpr std::size_t overAlignedRequirement = alignof(std::max_align_t) * 1024;
+    struct alignas(overAlignedRequirement) BigBoy {
+        int data;
+    };
+    struct BigBoys {
+        BigBoy boys[2];
+    };
+    static_assert(alignof(BigBoys) == alignof(BigBoy));
+    static_assert(alignof(BigBoys[2]) == alignof(BigBoy));
+
+    X::declareDecoration<char>();
+    auto bigBoy = X::declareDecoration<BigBoy>();
+    X::declareDecoration<char>();
+    auto bigBoys = X::declareDecoration<BigBoys>();
+
+    X x;
+    ASSERT_EQ(reinterpret_cast<uintptr_t>(&x[bigBoy]) % overAlignedRequirement, 0);
+    ASSERT_EQ(reinterpret_cast<uintptr_t>(&x[bigBoys].boys[0]) % overAlignedRequirement, 0);
+    ASSERT_EQ(reinterpret_cast<uintptr_t>(&x[bigBoys].boys[1]) % overAlignedRequirement, 0);
+}
+
 TEST_F(DecorableTest, MaplikeAccess) {
     struct X : Decorable<X> {};
     static auto d = X::declareDecoration<int>();
