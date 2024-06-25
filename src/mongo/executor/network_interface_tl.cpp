@@ -309,9 +309,10 @@ void NetworkInterfaceTL::_run() {
 }
 
 void NetworkInterfaceTL::shutdown() {
+    bool shouldWaitForDrain = false;
 
     {
-        stdx::unique_lock lk(_stateMutex);
+        stdx::lock_guard lk(_stateMutex);
         switch (_state) {
             case kDefault:
                 _state = kStopped;
@@ -321,7 +322,7 @@ void NetworkInterfaceTL::shutdown() {
                 return;
             case kStarted:
                 _state = kStopping;
-                _stoppedCV.wait(lk, [&] { return _pendingCmdCount.load() == 0; });
+                shouldWaitForDrain = _pendingCmdCount.load() > 0;
                 break;
             case kStopping:
             case kStopped:
@@ -363,6 +364,14 @@ void NetworkInterfaceTL::shutdown() {
         // above, this will return immediately; otherwise, it will block on the thread that claimed
         // responsibility for fulfilling the promise.
         cmdState->promiseFulfilled.get();
+    }
+
+    // Now that the commands have been canceled, make sure their
+    // executors are flushed before stopping the reactor.
+    if (shouldWaitForDrain) {
+        stdx::unique_lock lk(_stateMutex);
+        invariant(_state == kStopping);
+        _stoppedCV.wait(lk, [&] { return _pendingCmdCount.load() == 0; });
     }
 
     // Stop the reactor/thread first so that nothing runs on a partially dtor'd pool.
