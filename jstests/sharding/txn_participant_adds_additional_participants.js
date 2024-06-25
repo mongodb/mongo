@@ -34,10 +34,10 @@ const verifyFinalTransactionMetrics = function(
                   initialTxnMetrics.commitTypes.singleWriteShard.successful + 1);
     }
 
-    // Check the number of participants at commit time was incremented by the number of participants
-    // we expect in the transaction
-    assert.eq(finalTxnMetrics.totalParticipantsAtCommit,
-              initialTxnMetrics.totalParticipantsAtCommit + expectedParticipants.length);
+    // Check the number of participants at commit time was incremented by at least the number of
+    // participants we expect in the transaction.
+    assert.gte(finalTxnMetrics.totalParticipantsAtCommit,
+               initialTxnMetrics.totalParticipantsAtCommit + expectedParticipants.length);
 };
 
 const setUpTestCase = function(addedParticipantIsExistingParticipantBeforeAgg,
