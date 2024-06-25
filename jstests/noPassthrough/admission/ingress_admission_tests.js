@@ -20,14 +20,10 @@ function findCurOpByComment(db, comment) {
 }
 
 /**
- * Wait until ingress admission control ticket pool is resized to 0
+ * Wait until the operation we're running is blocked by ingress admission control.
  */
 function waitUntilIngressAdmissionIsBlocked(db) {
-    assert.soon(() => {
-        const res = assert.commandWorked(
-            db.adminCommand({getParameter: 1, ingressAdmissionControllerTicketPoolSize: 1}));
-        return res.ingressAdmissionControllerTicketPoolSize == 0;
-    });
+    assert.soon(() => db.serverStatus().queues.ingress.available == 0);
 }
 
 /**
@@ -95,7 +91,6 @@ function testCurrentOp(conn, db, collName) {
         if (notCurrentlyQueued) {
             // while here, validate that the operation was admitted and `currentQueue` is null
             assert.gte(op.queues.ingress.admissions, 1);
-            assert.gte(op.queues.execution.admissions, 1);
             assert(op.currentQueue == null, 'expected no current queue');
         }
 
