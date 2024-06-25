@@ -3,14 +3,11 @@
  * when performing comparisons on a foreign collection with a different default collation. Exercises
  * the fix for SERVER-43350.
  *
- * Collation can be set at three different levels for $lookup stage
+ * Collation can be set at two different levels for $lookup stage
  *  1. on the local collection (collation on the foreign collection is always ignored)
- *  2. on the $lookup stage via '_internalCollation' property
- *  3. on the aggregation command via 'collation' property in options
+ *  2. on the aggregation command via 'collation' property in options
  *
- * The three settings have the following precedence:
- *  1. '_internalCollation' overrides all others
- *  2. 'collation' option overrides local collection's collation
+ * The 'collation' command option overrides local collection's collation.
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
@@ -123,29 +120,6 @@ let explain;
     }
 })();
 
-// Collation set on $lookup stage with '_internalCollation' should override collation of the local
-// collection and on the command.
-(function testStageCollationPrecedence() {
-    for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
-        let lookupStage = lookupInto(collAa);
-        lookupStage.$lookup._internalCollation = caseInsensitive;
-        results = collAa.aggregate([lookupStage], {collation: caseSensitive}).toArray();
-        assertArrayEq({
-            actual: results,
-            expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on stage, running: " + tojson(lookupInto)
-        });
-
-        lookupStage.$lookup._internalCollation = caseSensitive;
-        results = collAA.aggregate([lookupStage], {collation: caseInsensitive}).toArray();
-        assertArrayEq({
-            actual: results,
-            expected: resultCaseSensitive,
-            extraErrorMsg: " Case-sensitive collation on stage, running: " + tojson(lookupInto)
-        });
-    }
-})();
-
 // In presense of indexes lookup might choose a different strategy for the join, that relies on the
 // index (INLJ). It should respect the effective collation of $lookup.
 (function testCollationWithIndexes() {
@@ -207,21 +181,6 @@ let explain;
             explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
                                                  {collation: {locale: "fr"}, allowDiskUse: false});
             assertNestedLoopJoinStrategy(explain);
-        }
-
-        // Stage-level collation overrides collection-level and command-level collations.
-        let lookupStage = lookupInto(collAa_indexed);
-        lookupStage.$lookup._internalCollation = caseInsensitive;
-        results = collAa.aggregate([lookupStage], {collation: caseSensitive}).toArray();
-        assertArrayEq({
-            actual: results,
-            expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on stage, foreign is indexed, running: " +
-                tojson(lookupInto)
-        });
-        if (areCollectionsCollocated) {
-            explain = collAa.explain().aggregate([lookupStage], {collation: caseSensitive});
-            assertIndexJoinStrategy(explain);
         }
     }
 })();
