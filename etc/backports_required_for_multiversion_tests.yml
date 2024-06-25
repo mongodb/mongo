@@ -699,6 +699,10 @@ last-continuous:
     ticket: SERVER-91616
   - test_file: jstests/core/query/regex/regex3.js
     ticket: SERVER-91616
+  - test_file: jstests/sharding/migration_coordinator_abort_failover.js
+    ticket: SERVER-91331
+  - test_file: jstests/sharding/migration_coordinator_commit_failover.js
+    ticket: SERVER-91331
   suites: null
 last-lts:
   all:
@@ -1454,4 +1458,8 @@ last-lts:
     ticket: SERVER-91616
   - test_file: jstests/core/query/regex/regex3.js
     ticket: SERVER-91616
+  - test_file: jstests/sharding/migration_coordinator_abort_failover.js
+    ticket: SERVER-91331
+  - test_file: jstests/sharding/migration_coordinator_commit_failover.js
+    ticket: SERVER-91331
   suites: null
