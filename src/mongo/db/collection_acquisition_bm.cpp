@@ -150,9 +150,9 @@ private:
             using ServiceContextMongoDTest::tearDown;  // Widen visibility from protected to public
         };
 
-        unittest::JoinThread _thread;
         PromiseAndFuture<void> _running;
         PromiseAndFuture<void> _stopRequest;
+        unittest::JoinThread _thread;
         Test* _test;
     };
 
