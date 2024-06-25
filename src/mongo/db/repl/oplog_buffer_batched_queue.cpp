@@ -36,7 +36,9 @@ OplogBufferBatchedQueue::OplogBufferBatchedQueue(std::size_t maxSize)
     : OplogBufferBatchedQueue(maxSize, nullptr) {}
 
 OplogBufferBatchedQueue::OplogBufferBatchedQueue(std::size_t maxSize, Counters* counters)
-    : _maxSize(maxSize), _counters(counters) {}
+    : _maxSize(maxSize), _counters(counters) {
+    invariant(maxSize > 0);
+}
 
 void OplogBufferBatchedQueue::startup(OperationContext*) {
     invariant(!_isShutdown);
@@ -97,8 +99,11 @@ void OplogBufferBatchedQueue::push(OperationContext*,
     }
 }
 
-void OplogBufferBatchedQueue::waitForSpace(OperationContext* opCtx, std::size_t size) {
+void OplogBufferBatchedQueue::waitForSpace(OperationContext* opCtx,
+                                           std::size_t size,
+                                           std::size_t count) {
     stdx::unique_lock<Latch> lk(_mutex);
+    // This buffer has no limit for count.
     _waitForSpace_inlock(lk, size);
 }
 
@@ -110,6 +115,10 @@ bool OplogBufferBatchedQueue::isEmpty() const {
 
 std::size_t OplogBufferBatchedQueue::getMaxSize() const {
     return _maxSize;
+}
+
+std::size_t OplogBufferBatchedQueue::getMaxCount() const {
+    return 0;
 }
 
 std::size_t OplogBufferBatchedQueue::getSize() const {

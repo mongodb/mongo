@@ -71,8 +71,8 @@ bool OplogWriter::inShutdown() const {
     return _inShutdown;
 }
 
-void OplogWriter::waitForSpace(OperationContext* opCtx, std::size_t size) {
-    _writeBuffer->waitForSpace(opCtx, size);
+void OplogWriter::waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count) {
+    _writeBuffer->waitForSpace(opCtx, size, count);
 }
 
 void OplogWriter::enqueue(OperationContext* opCtx,

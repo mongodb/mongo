@@ -75,7 +75,7 @@ public:
             values.push_back(*i);
         }
     }
-    void waitForSpace(OperationContext*, std::size_t) override {
+    void waitForSpace(OperationContext*, std::size_t, std::size_t count) override {
         waitForSpaceCalled = true;
     }
     bool isEmpty() const override {
@@ -83,6 +83,9 @@ public:
     }
     std::size_t getMaxSize() const override {
         return maxSize;
+    }
+    std::size_t getMaxCount() const override {
+        return maxCount;
     }
     std::size_t getSize() const override {
         std::size_t totalSize = 0;
@@ -141,6 +144,7 @@ public:
     mutable bool lastObjectPushedCalled = false;
     std::deque<Value> values;
     std::size_t maxSize = 0U;
+    std::size_t maxCount = 0U;
 };
 
 class OplogBufferProxyTest : public unittest::Test {
@@ -198,13 +202,15 @@ TEST_F(OplogBufferProxyTest, ShutdownResetsCachedValues) {
 }
 
 TEST_F(OplogBufferProxyTest, WaitForSpace) {
-    _proxy->waitForSpace(_opCtx, 100U);
+    _proxy->waitForSpace(_opCtx, 100U, 1U);
     ASSERT_TRUE(_mock->waitForSpaceCalled);
 }
 
-TEST_F(OplogBufferProxyTest, MaxSize) {
+TEST_F(OplogBufferProxyTest, MaxSizeCount) {
     _mock->maxSize = 8888U;
+    _mock->maxCount = 6666U;
     ASSERT_EQUALS(_mock->maxSize, _proxy->getMaxSize());
+    ASSERT_EQUALS(_mock->maxCount, _proxy->getMaxCount());
 }
 
 TEST_F(OplogBufferProxyTest, EmptySizeAndCount) {

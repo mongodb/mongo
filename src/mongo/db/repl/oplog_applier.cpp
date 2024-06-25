@@ -101,8 +101,8 @@ bool OplogApplier::inShutdown() const {
     return _inShutdown;
 }
 
-void OplogApplier::waitForSpace(OperationContext* opCtx, std::size_t size) {
-    _oplogBuffer->waitForSpace(opCtx, size);
+void OplogApplier::waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count) {
+    _oplogBuffer->waitForSpace(opCtx, size, count);
 }
 
 /**

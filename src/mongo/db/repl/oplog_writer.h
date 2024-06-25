@@ -95,7 +95,7 @@ public:
     /**
      * Blocks until enough space is available.
      */
-    void waitForSpace(OperationContext* opCtx, std::size_t size);
+    void waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count);
 
     /**
      * Pushes operations read into oplog buffer.

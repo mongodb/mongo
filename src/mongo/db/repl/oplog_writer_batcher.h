@@ -44,6 +44,7 @@ public:
     public:
         size_t minBytes;
         size_t maxBytes;
+        size_t maxCount;
     };
 
     OplogWriterBatcher(OplogBuffer* oplogBuffer);

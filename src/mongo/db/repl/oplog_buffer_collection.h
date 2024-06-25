@@ -127,9 +127,10 @@ public:
      */
     void preload(OperationContext* opCtx, Batch::const_iterator begin, Batch::const_iterator end);
 
-    void waitForSpace(OperationContext* opCtx, std::size_t size) override;
+    void waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count) override;
     bool isEmpty() const override;
     std::size_t getMaxSize() const override;
+    std::size_t getMaxCount() const override;
     std::size_t getSize() const override;
     std::size_t getCount() const override;
     void clear(OperationContext* opCtx) override;

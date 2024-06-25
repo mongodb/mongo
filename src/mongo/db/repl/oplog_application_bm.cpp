@@ -121,6 +121,7 @@ namespace mongo {
 namespace {
 
 constexpr std::size_t kOplogBufferSize = 256 * 1024 * 1024;
+constexpr std::size_t kOplogBufferCount = std::numeric_limits<std::size_t>::max();
 
 class TestServiceContext {
 public:
@@ -214,7 +215,8 @@ public:
             std::make_unique<MongoDSessionCatalog>(
                 std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
-        _oplogBuffer = std::make_unique<repl::OplogBufferBlockingQueue>(kOplogBufferSize);
+        _oplogBuffer =
+            std::make_unique<repl::OplogBufferBlockingQueue>(kOplogBufferSize, kOplogBufferCount);
         _oplogApplierThreadPool = repl::makeReplWorkerPool();
 
         // Act as a secondary to get optimizations due to parallizing 'prepare' oplog entries. But

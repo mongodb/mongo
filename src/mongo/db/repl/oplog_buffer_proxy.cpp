@@ -79,8 +79,8 @@ void OplogBufferProxy::push(OperationContext* opCtx,
     _target->push(opCtx, begin, end, bytes);
 }
 
-void OplogBufferProxy::waitForSpace(OperationContext* opCtx, std::size_t size) {
-    _target->waitForSpace(opCtx, size);
+void OplogBufferProxy::waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count) {
+    _target->waitForSpace(opCtx, size, count);
 }
 
 bool OplogBufferProxy::isEmpty() const {
@@ -89,6 +89,10 @@ bool OplogBufferProxy::isEmpty() const {
 
 std::size_t OplogBufferProxy::getMaxSize() const {
     return _target->getMaxSize();
+}
+
+std::size_t OplogBufferProxy::getMaxCount() const {
+    return _target->getMaxCount();
 }
 
 std::size_t OplogBufferProxy::getSize() const {
