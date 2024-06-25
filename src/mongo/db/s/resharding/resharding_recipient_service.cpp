@@ -500,16 +500,16 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                     if (!_isAlsoDonor) {
                         auto opCtx = factory.makeOperationContext(&cc());
 
-                        _externalState->clearFilteringMetadata(opCtx.get(),
-                                                               _metadata.getSourceNss(),
-                                                               _metadata.getTempReshardingNss());
+                        _externalState->clearFilteringMetadataOnTempReshardingCollection(
+                            opCtx.get(), _metadata.getTempReshardingNss());
 
                         ShardingRecoveryService::get(opCtx.get())
                             ->releaseRecoverableCriticalSection(
                                 opCtx.get(),
                                 _metadata.getSourceNss(),
                                 _critSecReason,
-                                ShardingCatalogClient::kLocalWriteConcern);
+                                ShardingCatalogClient::kLocalWriteConcern,
+                                ShardingRecoveryService::FilteringMetadataClearer());
                     }
                 })
                 .then([this, executor, &factory] {

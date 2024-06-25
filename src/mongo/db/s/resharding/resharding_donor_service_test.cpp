@@ -113,6 +113,11 @@ public:
 
     void refreshCollectionPlacementInfo(OperationContext* opCtx,
                                         const NamespaceString& sourceNss) override {}
+
+    std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
+    getOnReleaseCriticalSectionCustomAction() override {
+        return std::make_unique<ShardingRecoveryService::NoCustomAction>();
+    }
 };
 
 class ReshardingDonorServiceForTest : public ReshardingDonorService {

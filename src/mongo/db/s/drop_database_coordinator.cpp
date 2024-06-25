@@ -477,7 +477,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 dbNss,
                 _critSecReason,
                 WriteConcerns::kMajorityWriteConcernNoTimeout,
-                /* throwIfReasonDiffers */ false);
+                ShardingRecoveryService::FilteringMetadataClearer(
+                    true /*includeStepsForNamespaceDropped*/),
+                false /* throwIfReasonDiffers */);
         })
         .then([this, token, dbNss, executor = executor, anchor = shared_from_this()] {
             auto opCtxHolder = cc().makeOperationContext();

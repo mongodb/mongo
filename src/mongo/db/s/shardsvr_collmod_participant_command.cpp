@@ -89,11 +89,19 @@ void releaseCriticalSectionInEmptySession(OperationContext* opCtx,
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
         newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         service->releaseRecoverableCriticalSection(
-            newOpCtx.get(), bucketNs, reason, ShardingCatalogClient::kLocalWriteConcern);
+            newOpCtx.get(),
+            bucketNs,
+            reason,
+            ShardingCatalogClient::kLocalWriteConcern,
+            ShardingRecoveryService::FilteringMetadataClearer());
     } else {
         // No need to create a new operation context if no session is checked-out
         service->releaseRecoverableCriticalSection(
-            opCtx, bucketNs, reason, ShardingCatalogClient::kLocalWriteConcern);
+            opCtx,
+            bucketNs,
+            reason,
+            ShardingCatalogClient::kLocalWriteConcern,
+            ShardingRecoveryService::FilteringMetadataClearer());
     }
 }
 
@@ -141,15 +149,6 @@ public:
                         "collMod unblocking should always be on a time-series collection",
                         timeseries::getTimeseriesOptions(opCtx, ns(), true));
                 auto bucketNs = ns().makeTimeseriesBucketsNamespace();
-                {
-                    // Clear the filtering metadata before releasing the critical section to prevent
-                    // scenarios where a stepDown/stepUp will leave the node with wrong metadata.
-                    // Cleanup on secondary nodes is performed by the release of the section.
-                    AutoGetCollection autoColl(opCtx, bucketNs, MODE_IX);
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                         bucketNs)
-                        ->clearFilteringMetadata(opCtx);
-                }
 
                 auto service = ShardingRecoveryService::get(opCtx);
                 const auto reason = BSON("command"

@@ -317,8 +317,11 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnDatabase
     /////////////////////////////////
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+        ->releaseRecoverableCriticalSection(operationContext(),
+                                            dbName,
+                                            dbOpReason,
+                                            ShardingCatalogClient::kLocalWriteConcern,
+                                            ShardingRecoveryService::NoCustomAction());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -369,12 +372,18 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
     /////////////////////////////////
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+        ->releaseRecoverableCriticalSection(operationContext(),
+                                            dbName,
+                                            dbOpReason,
+                                            ShardingCatalogClient::kLocalWriteConcern,
+                                            ShardingRecoveryService::NoCustomAction());
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+        ->releaseRecoverableCriticalSection(operationContext(),
+                                            dbName,
+                                            dbOpReason,
+                                            ShardingCatalogClient::kLocalWriteConcern,
+                                            ShardingRecoveryService::NoCustomAction());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -451,7 +460,8 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
         ->releaseRecoverableCriticalSection(operationContext(),
                                             dbName,
                                             differentOpReason,
-                                            ShardingCatalogClient::kLocalWriteConcern);
+                                            ShardingCatalogClient::kLocalWriteConcern,
+                                            ShardingRecoveryService::NoCustomAction());
 }
 
 TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollection) {
@@ -488,8 +498,11 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollecti
     /////////////////////////////////
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+        ->releaseRecoverableCriticalSection(operationContext(),
+                                            collNss,
+                                            collOpReason,
+                                            ShardingCatalogClient::kLocalWriteConcern,
+                                            ShardingRecoveryService::NoCustomAction());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
@@ -540,12 +553,18 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
     /////////////////////////////////
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+        ->releaseRecoverableCriticalSection(operationContext(),
+                                            collNss,
+                                            collOpReason,
+                                            ShardingCatalogClient::kLocalWriteConcern,
+                                            ShardingRecoveryService::NoCustomAction());
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+        ->releaseRecoverableCriticalSection(operationContext(),
+                                            collNss,
+                                            collOpReason,
+                                            ShardingCatalogClient::kLocalWriteConcern,
+                                            ShardingRecoveryService::NoCustomAction());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
@@ -622,7 +641,8 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
         ->releaseRecoverableCriticalSection(operationContext(),
                                             collNss,
                                             differentOpReason,
-                                            ShardingCatalogClient::kLocalWriteConcern);
+                                            ShardingCatalogClient::kLocalWriteConcern,
+                                            ShardingRecoveryService::NoCustomAction());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

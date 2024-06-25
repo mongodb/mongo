@@ -44,6 +44,48 @@ namespace mongo {
 class ShardingRecoveryService : public ReplicaSetAwareServiceShardSvr<ShardingRecoveryService> {
 
 public:
+    /*
+     * Base interface for defining a preliminary action (in form of functor) to be executed by the
+     * ShardingRecoveryService prior to the release of a Critical Section.
+     */
+    class BeforeReleasingCustomAction {
+
+    public:
+        virtual ~BeforeReleasingCustomAction() {}
+        /*
+         * The function encapsulating the custom action. Subclasses must ensure that its
+         * implementation:
+         * - is idemptotent
+         * - is compatible with an execution context where the collection/database lock
+         * for the namespace being released is already acquired in exclusive mode.
+         */
+        virtual void operator()(OperationContext*, const NamespaceString&) const = 0;
+    };
+
+    /*
+     * Implementation for an empty custom action.
+     */
+    class NoCustomAction : public BeforeReleasingCustomAction {
+    public:
+        void operator()(OperationContext*, const NamespaceString&) const final{};
+    };
+
+
+    /*
+     * Custom action for filtering metadata clearing.
+     */
+    class FilteringMetadataClearer : public BeforeReleasingCustomAction {
+    public:
+        FilteringMetadataClearer(bool includeStepsForNamespaceDropped = false);
+
+        void operator()(OperationContext* opCtx,
+                        const NamespaceString& nssBeingReleased) const final;
+
+    private:
+        const bool _includeStepsForNamespaceDropped;
+    };
+
+
     ShardingRecoveryService() = default;
 
     static ShardingRecoveryService* get(ServiceContext* serviceContext);
@@ -86,19 +128,21 @@ public:
      * Releases the recoverable critical section for the given namespace and reason.
      *
      * It removes a doc from `config.collectionCriticalSections` with `writeConcern` write concern.
-     * As part of the removal, the filtering information is cleared on secondary nodes. It is
-     * responsibility of the caller to properly set the filtering information on the primary node.
      *
-     * Do nothing if the critical section is not taken for that namespace and reason.
+     * Does nothing if the critical section is not actually taken for that namespace and reason.
      *
-     * Throw an invariant in case the collection critical section is already taken by another
-     * operation with a different reason unless the flag 'throwIfReasonDiffers' is set to false.
+     * The execution of a custom action immediately prior to the release may be specified by the
+     * caller through the related parameter (see comments on BeforeReleasingCustomAction and its
+     * subclasses for more details).
      *
+     * Invariants in case the collection critical section is already taken by another operation with
+     * a different reason unless the flag 'throwIfReasonDiffers' is set to false.
      */
     void releaseRecoverableCriticalSection(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const BSONObj& reason,
                                            const WriteConcernOptions& writeConcern,
+                                           const BeforeReleasingCustomAction& beforeReleasingAction,
                                            bool throwIfReasonDiffers = true);
 
     /**

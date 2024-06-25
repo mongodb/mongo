@@ -2014,7 +2014,11 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
     const auto critSecReason = criticalSectionReason(*_sessionId);
 
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-        opCtx, _nss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+        opCtx,
+        _nss,
+        critSecReason,
+        ShardingCatalogClient::kMajorityWriteConcern,
+        ShardingRecoveryService::NoCustomAction());
 
     const auto timeInCriticalSectionMs = timeInCriticalSection.millis();
     ShardingStatistics::get(opCtx).totalRecipientCriticalSectionTimeMillis.addAndFetch(

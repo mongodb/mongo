@@ -1023,6 +1023,7 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
         mainNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
         ShardingCatalogClient::kMajorityWriteConcern,
+        ShardingRecoveryService::FilteringMetadataClearer(),
         throwIfReasonDiffers);
 
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
@@ -1030,6 +1031,7 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
         mainNss,
         critSecReason,
         ShardingCatalogClient::kMajorityWriteConcern,
+        ShardingRecoveryService::FilteringMetadataClearer(),
         throwIfReasonDiffers);
 }
 
@@ -1745,26 +1747,11 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                                                         CommitPhase::kSuccessful);
 
                     LOGV2_DEBUG(5277907, 2, "Collection successfully committed", logAttrs(nss()));
-
-                    forceShardFilteringMetadataRefresh(opCtx, nss());
                 } catch (const DBException& ex) {
-                    LOGV2(
-                        5277908,
-                        "Failed to obtain collection's placement version, so it will be recovered",
-                        logAttrs(nss()),
-                        "error"_attr = redact(ex));
-
-                    // If the refresh fails, then set the placement version to UNKNOWN and let a
-                    // future operation to refresh the metadata.
-
-                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    {
-                        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
-                        AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                             nss())
-                            ->clearFilteringMetadata(opCtx);
-                    }
+                    LOGV2(5277908,
+                          "Collection commit sequence was interrupted",
+                          logAttrs(nss()),
+                          "error"_attr = redact(ex));
 
                     generateCommitEventForChangeStreams(opCtx,
                                                         nss(),
@@ -1790,6 +1777,8 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                         continue;
                     }
 
+                    // TODO for PR - I am still keeping this for execution in mixed binaries
+                    // clusters.
                     auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardid));
                     shard->runFireAndForgetCommand(
                         opCtx,
@@ -2603,12 +2592,6 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
                                         _request,
                                         *_doc.getTranslatedRequestParams(),
                                         CommitPhase::kSuccessful);
-
-    // Clear the filtering metadata on the coordinator. The participants' metadata will be
-    // cleared in the next phase when the critical sections are released.
-    AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
-    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss())
-        ->clearFilteringMetadata(opCtx);
 }
 
 void CreateCollectionCoordinator::_exitCriticalSection(

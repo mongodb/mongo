@@ -48,6 +48,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -331,6 +332,9 @@ public:
     virtual void updateCoordinatorDocument(OperationContext* opCtx,
                                            const BSONObj& query,
                                            const BSONObj& update) = 0;
+
+    virtual std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
+    getOnReleaseCriticalSectionCustomAction() = 0;
 
     virtual void refreshCollectionPlacementInfo(OperationContext* opCtx,
                                                 const NamespaceString& sourceNss) = 0;

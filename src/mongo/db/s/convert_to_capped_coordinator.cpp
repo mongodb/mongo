@@ -35,6 +35,7 @@
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -412,24 +413,12 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                {
-                    const auto preImageColl = acquireCollection(
-                        opCtx,
-                        CollectionAcquisitionRequest(nss(),
-                                                     AcquisitionPrerequisites::kPretendUnsharded,
-                                                     repl::ReadConcernArgs::get(opCtx),
-                                                     AcquisitionPrerequisites::kRead),
-                        MODE_IS);
-
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                         nss())
-                        ->clearFilteringMetadata(opCtx);
-                }
                 ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
                     opCtx,
                     nss(),
                     _critSecReason,
                     ShardingCatalogClient::kMajorityWriteConcern,
+                    ShardingRecoveryService::FilteringMetadataClearer(),
                     true /* throwIfReasonDiffers */);
             }))
         .onError([this, executor = executor, anchor = shared_from_this()](const Status& status) {
@@ -515,6 +504,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
                     nss(),
                     _critSecReason,
                     ShardingCatalogClient::kMajorityWriteConcern,
+                    ShardingRecoveryService::NoCustomAction(),
                     false /* throwIfReasonDiffers */);
             }
         });
