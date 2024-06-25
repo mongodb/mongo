@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
+#include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo::mongot_cursor {
@@ -82,21 +83,14 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
 /**
  * Run the given search query against mongot and build one cursor object for each
  * cursor returned from mongot.
- * TODO SERVER-90943 This function should accept a InternalSearchMongotRemoteSpec rather than
- * require the fields passed individually.
  * TODO SERVER-86733 Bounds should not be optional once batchSize tuning is enabled for SBE.
  */
 std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSearchStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const BSONObj& query,
+    const InternalSearchMongotRemoteSpec& spec,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
-    boost::optional<long long> docsRequested = boost::none,
-    boost::optional<DocsNeededBounds> minDocsNeededBounds = boost::none,
-    boost::optional<DocsNeededBounds> maxDocsNeededBounds = boost::none,
     boost::optional<int64_t> userBatchSize = boost::none,
     std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
-    const boost::optional<int>& protocolVersion = boost::none,
-    bool requiresSearchSequenceToken = false,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
 
 /**

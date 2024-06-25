@@ -28,7 +28,9 @@
  */
 #include "mongo/db/query/search/mongot_cursor.h"
 
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/query/search/internal_search_cluster_parameters_gen.h"
+#include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/db/query/search/mongot_cursor_getmore_strategy.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
@@ -190,21 +192,21 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
 
 std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSearchStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const BSONObj& query,
+    const InternalSearchMongotRemoteSpec& spec,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
-    boost::optional<long long> docsRequested,
-    boost::optional<DocsNeededBounds> minDocsNeededBounds,
-    boost::optional<DocsNeededBounds> maxDocsNeededBounds,
     boost::optional<int64_t> userBatchSize,
     std::function<boost::optional<long long>()> calcDocsNeededFn,
-    const boost::optional<int>& protocolVersion,
-    bool requiresSearchSequenceToken,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
     // UUID is required for mongot queries. If not present, no results for the query as the
     // collection has not been created yet.
     if (!expCtx->uuid) {
         return {};
     }
+
+    const auto& query = spec.getMongotQuery();
+
+    boost::optional<DocsNeededBounds> minDocsNeededBounds = spec.getMinDocsNeededBounds();
+    boost::optional<DocsNeededBounds> maxDocsNeededBounds = spec.getMaxDocsNeededBounds();
 
     boost::optional<long long> batchSize = boost::none;
     // We should only use batchSize if the batchSize feature flag (featureFlagSearchBatchSizeTuning)
@@ -217,6 +219,11 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
         batchSize = computeInitialBatchSize(
             expCtx, *minDocsNeededBounds, *maxDocsNeededBounds, userBatchSize, isStoredSource);
     }
+
+    boost::optional<long long> docsRequested = spec.getMongotDocsRequested().has_value()
+        ? boost::make_optional<long long>(*spec.getMongotDocsRequested())
+        : boost::none;
+
     // We disable setting docsRequested if we're already setting batchSize or if
     // the docsRequested feature flag (featureFlagSearchBatchSizeLimit) is disabled.
     // TODO SERVER-74941 Remove docsRequested alongside featureFlagSearchBatchSizeLimit.
@@ -239,16 +246,24 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
         minDocsNeededBounds.value_or(docs_needed_bounds::Unknown()),
         maxDocsNeededBounds.value_or(docs_needed_bounds::Unknown()),
         expCtx->ns.tenantId());
+
+    // If it turns out that this stage is not running on a sharded collection, we don't want
+    // to send the protocol version to mongot. If the protocol version is sent, mongot will
+    // generate unmerged metadata documents that we won't be set up to merge.
+    const auto& protocolVersion =
+        expCtx->needsMerge ? spec.getMetadataMergeProtocolVersion() : boost::none;
+
     return establishCursors(expCtx,
-                            getRemoteCommandRequestForSearchQuery(expCtx->opCtx,
-                                                                  expCtx->ns,
-                                                                  expCtx->uuid,
-                                                                  expCtx->explain,
-                                                                  query,
-                                                                  protocolVersion,
-                                                                  docsRequested,
-                                                                  batchSize,
-                                                                  requiresSearchSequenceToken),
+                            getRemoteCommandRequestForSearchQuery(
+                                expCtx->opCtx,
+                                expCtx->ns,
+                                expCtx->uuid,
+                                expCtx->explain,
+                                query,
+                                protocolVersion,
+                                docsRequested,
+                                batchSize,
+                                spec.getRequiresSearchSequenceToken().value_or(false)),
                             taskExecutor,
                             std::move(getMoreStrategy),
                             std::move(yieldPolicy));
