@@ -125,7 +125,8 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              std::size_t uniqueLeaves,
                              std::size_t uniqueTokens,
                              const AnchorPaddingRootToken& anchorPaddingRootToken,
-                             ECStats* escStats);
+                             ECStats* escStats,
+                             std::size_t maxDocsPerInsert = write_ops::kMaxWriteBatchSize);
 
 /**
  * Performs cleanup of the ESC entries for the encrypted field/value pair
