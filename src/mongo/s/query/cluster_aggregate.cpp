@@ -66,7 +66,10 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_common.h"
@@ -509,6 +512,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
     }
 
+    // pipelineBuilder will be invoked within AggregationTargeter::make() if and only if it chooses
+    // any policy other than "specific shard only".
     boost::intrusive_ptr<ExpressionContext> expCtx;
     const auto pipelineBuilder = [&]() {
         auto pipeline =
@@ -552,6 +557,17 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             // Validate the pipeline post-optimization.
             const bool alreadyOptimized = true;
             pipeline->validateCommon(alreadyOptimized);
+        }
+
+        // TODO SERVER-89546: Ideally extractDocsNeededBounds should be called internally within
+        // DocumentSourceSearch.
+        if (search_helpers::isSearchPipeline(pipeline.get())) {
+            // We won't reach this if the whole pipeline passes through with the "specific shard"
+            // policy. That's okay since the shard will have access to the entire pipeline to
+            // extract accurate bounds.
+            auto [minBounds, maxBounds] = extractDocsNeededBounds(*pipeline.get());
+            auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(pipeline->peekFront());
+            searchStage->setDocsNeededBounds(minBounds, maxBounds);
         }
         return pipeline;
     };

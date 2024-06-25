@@ -173,8 +173,11 @@ public:
     }
 
     void setDocsNeededBounds(DocsNeededBounds minBounds, DocsNeededBounds maxBounds) {
-        _spec.setMinDocsNeededBounds(minBounds);
-        _spec.setMaxDocsNeededBounds(maxBounds);
+        if (std::holds_alternative<docs_needed_bounds::Unknown>(_spec.getMinDocsNeededBounds()) &&
+            std::holds_alternative<docs_needed_bounds::Unknown>(_spec.getMaxDocsNeededBounds())) {
+            _spec.setMinDocsNeededBounds(minBounds);
+            _spec.setMaxDocsNeededBounds(maxBounds);
+        }
     }
 
     void setSearchIdLookupMetrics(

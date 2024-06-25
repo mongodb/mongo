@@ -145,6 +145,11 @@ public:
         return std::move(_metadataCursor);
     }
 
+    void setDocsNeededBounds(DocsNeededBounds minBounds, DocsNeededBounds maxBounds) {
+        _spec.setMinDocsNeededBounds(minBounds);
+        _spec.setMaxDocsNeededBounds(maxBounds);
+    }
+
 private:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
