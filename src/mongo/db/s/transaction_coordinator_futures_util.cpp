@@ -78,8 +78,18 @@ using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 }  // namespace
 
 AsyncWorkScheduler::AsyncWorkScheduler(ServiceContext* serviceContext)
+    : AsyncWorkScheduler(serviceContext, nullptr, WithLock::withoutLock() /* No parent */) {}
+
+AsyncWorkScheduler::AsyncWorkScheduler(ServiceContext* serviceContext,
+                                       AsyncWorkScheduler* parent,
+                                       WithLock withParentLock)
     : _serviceContext(serviceContext),
-      _executor(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor()) {}
+      _executor(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor()),
+      _parent(parent) {
+    if (_parent) {
+        _itToRemove = _parent->_childSchedulers.emplace(_parent->_childSchedulers.begin(), this);
+    }
+}
 
 AsyncWorkScheduler::~AsyncWorkScheduler() {
     {
@@ -93,7 +103,6 @@ AsyncWorkScheduler::~AsyncWorkScheduler() {
     stdx::lock_guard<Latch> lg(_parent->_mutex);
     _parent->_childSchedulers.erase(_itToRemove);
     _parent->_notifyAllTasksComplete(lg);
-    _parent = nullptr;
 }
 
 Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemoteCommand(
@@ -228,14 +237,13 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
 }
 
 std::unique_ptr<AsyncWorkScheduler> AsyncWorkScheduler::makeChildScheduler() {
-    auto child = std::make_unique<AsyncWorkScheduler>(_serviceContext);
 
     stdx::lock_guard<Latch> lg(_mutex);
+    // This is to enable access to the private AsyncWorkScheduler ctor.
+    std::unique_ptr<AsyncWorkScheduler> child(new AsyncWorkScheduler(_serviceContext, this, lg));
+
     if (!_shutdownStatus.isOK())
         child->shutdown(_shutdownStatus);
-
-    child->_parent = this;
-    child->_itToRemove = _childSchedulers.emplace(_childSchedulers.begin(), child.get());
 
     return child;
 }
