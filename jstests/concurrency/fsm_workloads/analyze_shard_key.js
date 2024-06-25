@@ -484,14 +484,29 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         }
 
         // Validate the frequency metrics. Likewise, due to the concurrent writes by other threads,
-        // it is not feasible to assert on the exact "mostCommonValues".
-        assert.eq(metrics.mostCommonValues.length, this.analyzeShardKeyNumMostCommonValues);
+        // it is not feasible to assert on the exact "mostCommonValues". Also, if the shard key is
+        // unique and the suite performs unclean shutdown, then the length of "mostCommonValues" may
+        // be less than analyzeShardKeyNumMostCommonValues since unclean shutdown can cause
+        // $collStats to return wrong number of documents and the calculation of the cardinality and
+        // frequency metrics for a unique shard key depends on the metrics returned by $collStats.
+        const shouldCheckMostCommonValues = !(this.shardKeyOptions.isUnique && TestData.killShards);
+        if (shouldCheckMostCommonValues) {
+            assert.eq(metrics.mostCommonValues.length, this.analyzeShardKeyNumMostCommonValues);
+        }
 
-        // Validate the monotonicity metrics. This check is skipped if the balancer is enabled
-        // since chunk migration deletes documents from the donor shard and re-inserts them on the
-        // recipient shard so there is no guarantee that the insertion order from the client is
-        // preserved.
-        if (!isSampling && !TestData.runningWithBalancer) {
+        // Validate the monotonicity metrics. This check is skipped if:
+        // - The analyzeShardKey command is run with a custom 'sampleRate' or 'sampleSize' since
+        //   the number of sampled documents may be so low that the resulting correlation
+        //   coefficient is very different from the actual correlation coefficient.
+        // - The balancer is enabled since chunk migration deletes documents from the donor shard
+        //   and re-inserts them on the recipient shard so there is no guarantee that the original
+        //   insertion order is preserved.
+        // - There is a lot of shard key updates since they overwrite the recordId order in the
+        //   the shard key index.
+        const shouldCheckMonotonicity = !isSampling && !TestData.runningWithBalancer &&
+            (this.writeDistribution.percentageOfShardKeyUpdates <=
+             this.percentageOfShardKeyUpdatesThresholdForMonotonicityCheck);
+        if (shouldCheckMonotonicity) {
             assert.eq(metrics.monotonicity.type,
                       this.shardKeyOptions.isMonotonic && !this.shardKeyOptions.isHashed
                           ? "monotonic"
@@ -516,6 +531,11 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
 
     // The number of sampled queries returned by the latest analyzeShardKey command.
     $config.data.previousNumSampledQueries = 0;
+
+    // The maximum percentage of shard key updates to still do the monotonicity check. Shard key
+    // updates overwrite recordId order in the shard key index so if the accuracy of the
+    // monotonicity check decreases as the number of shard key updates increases.
+    $config.data.percentageOfShardKeyUpdatesThresholdForMonotonicityCheck = 20;
 
     $config.data.isAcceptableSampleSize = function isAcceptableSampleSize(
         part, whole, expectedPercentage) {
