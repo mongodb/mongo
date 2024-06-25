@@ -267,7 +267,7 @@ buildvariants:
     cron: "0 */4 * * *" # Run these tasks every 4 hours
     patchable: false
     run_on:
-      - amazon2023.0-small
+      - amazon2023.3-small
     expansions: &amazon-linux-2023-x86-mongot-integration-expansions
       build_mongot: true
       compile_flags: >-
@@ -289,7 +289,7 @@ buildvariants:
     tasks: &amazon-linux-2023-x86-mongot-distro-tasks
       - name: compile_and_archive_dist_test_TG
         distros:
-          - amazon2023.0-large
+          - amazon2023.3-large
       # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
       - name: set_downstream_expansions_for_mongot
       # TODO SERVER-89721 remove search suites that use mongot mock.
@@ -310,7 +310,7 @@ buildvariants:
     tags: []
     patch_only: true
     run_on:
-      - amazon2023.0-small
+      - amazon2023.3-small
     expansions:
       <<: *amazon-linux-2023-x86-mongot-integration-expansions
       compile_variant: amazon-linux-2023-x86-mongot-integration-patchable
@@ -325,7 +325,7 @@ buildvariants:
     cron: "0 */4 * * *" # Run these tasks every 4 hours
     patchable: false
     run_on:
-      - amazon2023.0-arm64-small
+      - amazon2023.3-arm64-small
     expansions: &amazon2023-arm64-mongot-integration-expansions
       build_mongot: true
       compile_flags: >-
@@ -351,7 +351,7 @@ buildvariants:
     tasks: &amazon2023-arm64-mongot-distro-tasks
       - name: compile_and_archive_dist_test_TG
         distros:
-          - amazon2023.0-arm64-large
+          - amazon2023.3-arm64-large
       # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
       - name: set_downstream_expansions_for_mongot
       # TODO SERVER-89721 remove search suites that use mongot mock.
@@ -372,7 +372,7 @@ buildvariants:
     tags: []
     patch_only: true
     run_on:
-      - amazon2023.0-arm64-small
+      - amazon2023.3-arm64-small
     expansions:
       <<: *amazon2023-arm64-mongot-integration-expansions
       compile_variant: amazon2023-arm64-mongot-integration-patchable
@@ -495,9 +495,9 @@ buildvariants:
 
   # Variant to support Code Coverage on arm64
   - name: &AL2023-arm64-coverage AL2023-arm64-coverage
-    display_name: "~ AL2023 Arm64 Code Coverage"
+    display_name: "~ AL2023.3 Arm64 Code Coverage"
     run_on:
-      - amazon2023.0-arm64-large
+      - amazon2023.3-arm64-large
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
     stepback: false
     expansions:
@@ -512,7 +512,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
-      large_distro_name: amazon2023.0-arm64-large
+      large_distro_name: amazon2023.3-arm64-large
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       # The gcov instrumentation saves the path the .gcno files were created in as the default path
       # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
@@ -529,7 +529,7 @@ buildvariants:
     tasks: &AL2023-arm64-coverage-tasks
       - name: compile_and_package_serial_no_unittests_TG
         distros:
-          - amazon2023.0-arm64-large
+          - amazon2023.3-arm64-large
       - name: compile_test_parallel_unittest_stream_TG
         distros:
-          - amazon2023.0-arm64-large
+          - amazon2023.3-arm64-large

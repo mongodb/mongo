@@ -304,7 +304,7 @@ class Distro(object):
         elif self.dname == "amazon2":
             return "2017.12"
         elif self.dname == "amazon2023":
-            return "2023.0"
+            return "2023.3"
         elif self.dname == "ubuntu":
             if build_os == "ubuntu1204":
                 return "precise"

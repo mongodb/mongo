@@ -119,11 +119,11 @@ buildvariants:
   # Note that this task is currently optional;
   # This will eventually become suggested, then required.
   - name: &amazon-linux-2023-arm64-bazel-compile amazon-linux-2023-arm64-bazel-compile
-    display_name: "Amazon Linux 2023 Enterprise arm64 Bazel Compile"
+    display_name: "Amazon Linux 2023.3 Enterprise arm64 Bazel Compile"
     tags: ["bazel_check"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - amazon2023.0-arm64-small
+      - amazon2023.3-arm64-small
     stepback: false
     expansions:
       compile_variant: *amazon-linux-2023-arm64-bazel-compile
@@ -224,11 +224,11 @@ buildvariants:
       - name: .updatefuzzer
 
   - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
-    display_name: "! AL2023 arm64 Enterprise (SEP Benchmark)"
+    display_name: "! AL2023.3 arm64 Enterprise (SEP Benchmark)"
     tags: ["required"]
     cron: "0 */4 * * *"
     run_on:
-      - amazon2023.0-arm64-large
+      - amazon2023.3-arm64-large
     expansions:
       compile_flags: >-
         --ssl
