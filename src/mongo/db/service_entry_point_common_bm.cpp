@@ -273,6 +273,5 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {}
 MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {}
 
-
 }  // namespace
 }  // namespace mongo
