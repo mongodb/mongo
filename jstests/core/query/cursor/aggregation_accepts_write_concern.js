@@ -23,9 +23,28 @@ assert.commandWorked(testDB.runCommand({
 }));
 
 // An aggregation pipeline that writes accepts writeConcern.
-assert.commandWorked(testDB.runCommand({
-    aggregate: collName,
-    pipeline: [{$match: {_id: 1}}, {$out: collName + "_out"}],
-    cursor: {},
-    writeConcern: {w: "majority"}
-}));
+let attempt = 0;
+let res;
+assert.soon(
+    () => {
+        attempt++;
+        res = testDB.runCommand({
+            aggregate: collName,
+            pipeline: [{$match: {_id: 1}}, {$out: collName + "_out"}],
+            cursor: {},
+            writeConcern: {w: "majority"}
+        });
+        if (res.ok) {
+            return true;
+        } else if (TestData.runningWithBalancer && res.code == ErrorCodes.QueryPlanKilled) {
+            // sometimes the balancer will race with this agg and kill the query,
+            // so just retry.
+            print("Retrying aggregate() after being killed attempt " + attempt +
+                  " res: " + tojson(res));
+            return false;
+        } else {
+            doassert("command failed: " + tojson(res));
+        }
+    },
+    () => "Timed out while retrying aggregate(), response: " + tojson(res),
+);

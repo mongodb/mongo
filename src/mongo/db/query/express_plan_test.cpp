@@ -350,5 +350,61 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
     ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
 }
+
+TEST_F(ExpressPlanTest, TestIdLookupNullCollectionOnRestoreThrows) {
+    auto collection = createAndPopulateTestCollection();
+    const CollectionPtr& collectionPtr = *collection;
+    IteratorStats iteratorStats;
+
+    IdLookupViaIndex<const CollectionPtr*> iterator(fromjson("{_id: 2}"));
+    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("ExpressPlanTest.TestCollection");
+    const CollectionPtr nullCollection;
+
+    iterator.releaseResources();
+    ASSERT_THROWS(iterator.restoreResources(operationContext(), &nullCollection, nss),
+                  ExceptionFor<ErrorCodes::QueryPlanKilled>);
+}
+
+TEST_F(ExpressPlanTest, TestLookupViaUserIndexNullCollectionOnRestoreThrows) {
+    StringData indexName = "a_1"_sd;
+    auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
+    auto collection = createAndPopulateTestCollectionWithIndex(indexSpec);
+    const CollectionPtr& collectionPtr = *collection;
+    IteratorStats iteratorStats;
+
+    auto indexDescriptor =
+        collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
+    auto filter = fromjson("{a: 2}");
+    CollatorInterface* collator = nullptr;
+    LookupViaUserIndex<const CollectionPtr*> iterator(filter.firstElement(),
+                                                      indexDescriptor->getEntry()->getIdent(),
+                                                      indexName.toString(),
+                                                      collator);
+    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+    auto nss = NamespaceString::createNamespaceString_forTest("ExpressPlanTest.TestCollection");
+    const CollectionPtr nullCollection;
+
+    iterator.releaseResources();
+    ASSERT_THROWS(iterator.restoreResources(operationContext(), &nullCollection, nss),
+                  ExceptionFor<ErrorCodes::QueryPlanKilled>);
+}
+
+TEST_F(ExpressPlanTest, TestLookupClusteredIdIndexNullCollectionOnRestoreThrows) {
+    auto collection = createAndPopulateTestClusteredCollection();
+    const CollectionPtr& collectionPtr = *collection;
+
+    IteratorStats iteratorStats;
+    IdLookupOnClusteredCollection<const CollectionPtr*> iterator(fromjson("{_id: 4}"));
+    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+    auto nss = NamespaceString::createNamespaceString_forTest("ExpressPlanTest.TestCollection");
+    const CollectionPtr nullCollection;
+
+    iterator.releaseResources();
+    ASSERT_THROWS(iterator.restoreResources(operationContext(), &nullCollection, nss),
+                  ExceptionFor<ErrorCodes::QueryPlanKilled>);
+}
+
 }  // namespace
 }  // namespace mongo::express
