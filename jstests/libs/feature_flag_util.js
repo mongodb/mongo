@@ -29,14 +29,30 @@ export var FeatureFlagUtil = (function() {
         // In order to get an accurate answer for whether a feature flag is enabled, we need to ask
         // a mongod. If db represents a connection to mongos, or some other configuration, we need
         // to obtain the correct connection to a mongod.
-        let conn;
+        let conn = null;
         const setConn = (db) => {
-            if (FixtureHelpers.isMongos(db)) {
-                // For sharded cluster get a connection to the first replicaset
-                conn = new Mongo(FixtureHelpers.getAllReplicas(db)[0].getURL());
-            } else {
+            if (!FixtureHelpers.isMongos(db)) {
                 conn = db;
+                return;
             }
+
+            // For sharded cluster get a connection to the first replicaset through a Mongo
+            // object; its construction may fail when the contacted primary is shutting down, so
+            // that related errors are tolerated in case this method is being called within the
+            // context of a kill/terminate primary suite.
+            const timeoutMsecs = 5 * 60 * 1000;
+            const firstReplicaSet = FixtureHelpers.getAllReplicas(db)[0];
+            assert.soon(function() {
+                try {
+                    conn = new Mongo(firstReplicaSet.getURL());
+                    return true;
+                } catch (e) {
+                    if (ErrorCodes.isRetriableError(e.code)) {
+                        return false;
+                    }
+                    throw e;
+                }
+            }, `Unable to establish a connection with ${firstReplicaSet.name}`, timeoutMsecs);
         };
         try {
             setConn(db);
