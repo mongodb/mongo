@@ -5095,8 +5095,8 @@ public:
         const auto expect = edges->get().size();
         // The actual size of edges should be equal to edges->size(). This is a sanity check.
         ASSERT_EQ(expect, edges->size());
-        const auto calculated =
-            getEdgesLength(fieldType, makeRangeQueryTypeConfig(lb, ub, precision, sparsity));
+        const auto calculated = getEdgesLength(
+            fieldType, "rangeField"_sd, makeRangeQueryTypeConfig(lb, ub, precision, sparsity));
         if (expect != calculated) {
             // Context for the exception we're about to throw.
             LOGV2(8574790,
@@ -5165,9 +5165,10 @@ public:
                             // by the test.
                             try {
                                 auto qtc = makeRangeQueryTypeConfig(lb, ub, precision, sparsity);
-                                validateRangeIndex(BSONType::NumberDouble, qtc);
+                                validateRangeIndex(BSONType::NumberDouble, "rangeField"_sd, qtc);
                             } catch (DBException& e) {
-                                if (e.code() == 6966805 || e.code() == 6966806) {
+                                if (e.code() == 6966805 || e.code() == 6966806 ||
+                                    e.code() == 9157100) {
                                     thrownCode = e.code();
                                 } else {
                                     throw;
@@ -5231,8 +5232,25 @@ TEST_F(EdgeTestFixture, getEdgesLengthDecimal128) {
                 }
                 for (std::uint32_t precision = 1; precision <= kMaxPrecisionDecimal128;
                      ++precision) {
-                    assertEdgesLengthMatch(
-                        lb, ub, precision, sparsity, getEdgesDecimal128, BSONType::NumberDecimal);
+                    // getEdgesLength may throw if the min,max,precision combination can't be
+                    // used for the precision-mode encoding.
+                    if (canUsePrecisionMode(lb, ub, precision, nullptr)) {
+                        assertEdgesLengthMatch(lb,
+                                               ub,
+                                               precision,
+                                               sparsity,
+                                               getEdgesDecimal128,
+                                               BSONType::NumberDecimal);
+                    } else {
+                        ASSERT_THROWS_CODE(assertEdgesLengthMatch(lb,
+                                                                  ub,
+                                                                  precision,
+                                                                  sparsity,
+                                                                  getEdgesDecimal128,
+                                                                  BSONType::NumberDecimal),
+                                           DBException,
+                                           9157101);
+                    }
                 }
             }
         }

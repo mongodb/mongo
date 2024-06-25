@@ -61,7 +61,7 @@ void validateEncryptedFieldConfig(const EncryptedFieldConfig* config);
 bool validateDoublePrecisionRange(double d, uint32_t precision);
 bool validateDecimal128PrecisionRange(Decimal128& dec, uint32_t precision);
 
-void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query);
+void validateRangeIndex(BSONType fieldType, StringData fieldPath, QueryTypeConfig& query);
 uint32_t getNumberOfBitsInDomain(BSONType fieldType,
                                  const boost::optional<Value>& min,
                                  const boost::optional<Value>& max,
@@ -71,5 +71,5 @@ uint32_t getNumberOfBitsInDomain(BSONType fieldType,
                                  const boost::optional<BSONElement>& max,
                                  const boost::optional<uint32_t>& precision);
 
-void setRangeDefaults(BSONType fieldType, QueryTypeConfig* query);
+void setRangeDefaults(BSONType fieldType, StringData fieldPath, QueryTypeConfig* query);
 }  // namespace mongo

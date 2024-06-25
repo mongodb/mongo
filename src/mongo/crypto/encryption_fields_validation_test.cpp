@@ -113,7 +113,7 @@ Status validateRangeIndexTest(int trimFactor,
     indexConfig.setTrimFactor(trimFactor);
     indexConfig.setSparsity(1);
     try {
-        validateRangeIndex(fieldType, indexConfig);
+        validateRangeIndex(fieldType, "rangeField"_sd, indexConfig);
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();

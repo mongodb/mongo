@@ -4422,9 +4422,9 @@ std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
     return getEdgesT(aost.value, aost.min, aost.max, sparsity, trimFactor);
 }
 
-std::uint64_t getEdgesLength(BSONType fieldType, QueryTypeConfig config) {
+std::uint64_t getEdgesLength(BSONType fieldType, StringData fieldPath, QueryTypeConfig config) {
     // validates fieldType & config and sets defaults
-    setRangeDefaults(fieldType, &config);
+    setRangeDefaults(fieldType, fieldPath, &config);
 
     const auto sparsity = *config.getSparsity();
     const auto trimFactor = config.getTrimFactor().get_value_or(0);

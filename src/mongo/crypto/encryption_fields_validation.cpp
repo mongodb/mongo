@@ -245,10 +245,9 @@ uint32_t getNumberOfBitsInDomain(BSONType fieldType,
     }
 }
 
-void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query) {
+void validateRangeIndex(BSONType fieldType, StringData fieldPath, QueryTypeConfig& query) {
     uassert(6775201,
-            str::stream() << "Type '" << typeName(fieldType)
-                          << "' is not a supported range indexed type",
+            "Type '{}' is not a supported range indexed type"_format(typeName(fieldType)),
             isFLE2RangeIndexedSupportedType(fieldType));
 
     auto& indexMin = query.getMin();
@@ -288,26 +287,39 @@ void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query) {
         if (query.getPrecision().has_value()) {
             uint32_t precision = query.getPrecision().value();
             if (fieldType == NumberDouble) {
+                auto min = query.getMin()->coerceToDouble();
                 uassert(6966805,
-                        "The number of decimal digits for minimum value must be less than or equal "
-                        "to precision",
-                        validateDoublePrecisionRange(query.getMin()->coerceToDouble(), precision));
+                        "The number of decimal digits for minimum value of field '{}' "
+                        "must be less than or equal to precision"_format(fieldPath),
+                        validateDoublePrecisionRange(min, precision));
+                auto max = query.getMax()->coerceToDouble();
                 uassert(6966806,
-                        "The number of decimal digits for maximum value must be less than or equal "
-                        "to precision",
-                        validateDoublePrecisionRange(query.getMax()->coerceToDouble(), precision));
-
+                        "The number of decimal digits for maximum value of field '{}' "
+                        "must be less than or equal to precision"_format(fieldPath),
+                        validateDoublePrecisionRange(max, precision));
+                uassert(
+                    9157100,
+                    "The domain of double values specified by the min, max, and precision "
+                    "for field '{}' cannot be represented in fewer than 64 bits"_format(fieldPath),
+                    query.getQueryType() == QueryTypeEnum::RangePreviewDeprecated ||
+                        canUsePrecisionMode(min, max, precision));
             } else {
                 auto minDecimal = query.getMin()->coerceToDecimal();
                 uassert(6966807,
-                        "The number of decimal digits for minimum value must be less than or "
-                        "equal to precision",
+                        "The number of decimal digits for minimum value of field '{}' "
+                        "must be less than or equal to precision"_format(fieldPath),
                         validateDecimal128PrecisionRange(minDecimal, precision));
                 auto maxDecimal = query.getMax()->coerceToDecimal();
                 uassert(6966808,
-                        "The number of decimal digits for maximum value must be less than or "
-                        "equal to precision",
+                        "The number of decimal digits for maximum value of field '{}' "
+                        "must be less than or equal to precision"_format(fieldPath),
                         validateDecimal128PrecisionRange(maxDecimal, precision));
+                uassert(
+                    9157101,
+                    "The domain of decimal values specified by the min, max, and precision "
+                    "for field '{}' cannot be represented in fewer than 128 bits"_format(fieldPath),
+                    query.getQueryType() == QueryTypeEnum::RangePreviewDeprecated ||
+                        canUsePrecisionMode(minDecimal, maxDecimal, precision));
             }
         }
     }
@@ -349,7 +361,7 @@ void validateEncryptedField(const EncryptedField* field) {
                   field->getQueries().value());
 
         uassert(6412601,
-                "Bson type needs to be specified for an indexed field",
+                "BSON type needs to be specified for an indexed field",
                 field->getBsonType().has_value());
         auto fieldType = typeFromName(field->getBsonType().value());
 
@@ -376,7 +388,7 @@ void validateEncryptedField(const EncryptedField* field) {
                 // rangePreview is renamed to range in Range V2, but we still need to accept it as
                 // valid so that we can start up with existing rangePreview collections.
             case QueryTypeEnum::Range: {
-                validateRangeIndex(fieldType, encryptedIndex);
+                validateRangeIndex(fieldType, field->getPath(), encryptedIndex);
                 break;
             }
         }
@@ -453,11 +465,11 @@ bool validateDecimal128PrecisionRange(Decimal128& dec, uint32_t precision) {
     return maybe_integer == trunc_integer;
 }
 
-void setRangeDefaults(BSONType fieldType, QueryTypeConfig* queryp) {
+void setRangeDefaults(BSONType fieldType, StringData fieldPath, QueryTypeConfig* queryp) {
     auto& query = *queryp;
 
     // Make sure the QueryTypeConfig is valid before setting defaults
-    validateRangeIndex(fieldType, query);
+    validateRangeIndex(fieldType, fieldPath, query);
 
     auto [defMin, defMax] = getRangeMinMaxDefaults(fieldType);
     auto defSparsity = getRangeSparsityDefault();
