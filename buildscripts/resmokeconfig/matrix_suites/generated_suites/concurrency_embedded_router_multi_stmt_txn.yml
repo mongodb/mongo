@@ -77,7 +77,6 @@ selector:
   - jstests/concurrency/fsm_workloads/drop_index_during_lookup.js
   - jstests/concurrency/fsm_workloads/update_rename.js
   - jstests/concurrency/fsm_workloads/update_rename_noindex.js
-  - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - does_not_support_causal_consistency

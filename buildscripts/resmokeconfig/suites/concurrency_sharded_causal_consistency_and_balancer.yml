@@ -45,9 +45,6 @@ selector:
     # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
     - jstests/concurrency/fsm_workloads/update_where.js
 
-    # Time-series collections are not supported on mongos.
-    - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
-
   exclude_with_any_tags:
     - does_not_support_causal_consistency
     # This suite uses secondary read preference, which isn't currently compatible with transactions.

@@ -39,9 +39,6 @@ selector:
     # The WTWriteConflictException failpoint is not supported on mongos.
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
-    # Time-series collections are not supported on mongos.
-    - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
-
   exclude_with_any_tags:
     - does_not_support_causal_consistency
     - assumes_against_mongod_not_mongos

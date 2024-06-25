@@ -64,7 +64,6 @@ selector:
   - jstests/concurrency/fsm_workloads/reindex.js
   - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
   - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-  - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - assumes_against_mongod_not_mongos
