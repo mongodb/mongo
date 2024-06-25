@@ -56,8 +56,13 @@ const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), 
 
 const mongotQuery = {};
 const protocolVersion = NumberInt(1);
-const expectedMongotCommand =
-    mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0, protocolVersion);
+const expectedMongotCommand = mongotCommandForQuery({
+    query: mongotQuery,
+    collName: collName,
+    db: dbName,
+    collectionUUID: collUUID0,
+    protocolVersion: protocolVersion
+});
 
 const cursorId = NumberLong(123);
 const secondCursorId = NumberLong(cursorId + 1001);

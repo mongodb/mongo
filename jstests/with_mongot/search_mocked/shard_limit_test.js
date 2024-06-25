@@ -101,8 +101,13 @@ function testBasicCase(shard0Conn, shard1Conn, cursorId) {
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history, cursorId);
 
-    mockPlanShardedSearchResponse(
-        testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(testColl.getName(),
+                                  mongotQuery,
+                                  dbName,
+                                  undefined /*sortSpec*/,
+                                  stWithMock,
+                                  false /*maybeUnused*/,
+                                  {verbosity: explainVerbosity});
     const explainResult = testColl.explain(explainVerbosity).aggregate(pipeline);
     assertLimitAbsorbed(explainResult, mongotQuery);
 }

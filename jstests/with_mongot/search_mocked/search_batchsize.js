@@ -6,7 +6,9 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
+    getDefaultProtocolVersionForPlanShardedSearch,
     mockPlanShardedSearchResponse,
+    mongotCommandForQuery,
     MongotMock
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
@@ -16,6 +18,7 @@ import {
 const dbName = "test";
 const collName = "search_batchsize";
 const chunkBoundary = 8;
+const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 
 const docs = [
     {"_id": 1, "title": "cakes"},
@@ -50,16 +53,6 @@ const searchQuery = {
     query: "cakes",
     path: "title"
 };
-
-function searchCmd(uuid, extractedLimit) {
-    return {
-        search: collName,
-        collectionUUID: uuid,
-        query: searchQuery,
-        $db: dbName,
-        cursorOptions: {docsRequested: extractedLimit},
-    };
-}
 
 // All the documents that would be returned by the search query above.
 let relevantDocs = [];
@@ -101,7 +94,13 @@ function buildHistoryStandalone(coll, collUUID, extractedLimit, mongotConn) {
         const cursorId = NumberLong(123);
         const history = [
             {
-                expectedCommand: searchCmd(collUUID, extractedLimit),
+                expectedCommand: mongotCommandForQuery({
+                    query: searchQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID,
+                    cursorOptions: {docsRequested: NumberInt(extractedLimit)}
+                }),
                 response: {
                     cursor: {
                         id: NumberLong(0),
@@ -126,7 +125,14 @@ function buildHistoryShardedEnv(coll, collUUID, extractedLimit, stWithMock) {
         // Set history for shard 0.
         const history0 = [
             {
-                expectedCommand: searchCmd(collUUID, extractedLimit),
+                expectedCommand: mongotCommandForQuery({
+                    query: searchQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID,
+                    protocolVersion: protocolVersion,
+                    cursorOptions: {docsRequested: NumberInt(extractedLimit)}
+                }),
                 response: {
                     cursors: [
                         {
@@ -158,7 +164,14 @@ function buildHistoryShardedEnv(coll, collUUID, extractedLimit, stWithMock) {
         // Set history for shard 1.
         const history1 = [
             {
-                expectedCommand: searchCmd(collUUID, extractedLimit),
+                expectedCommand: mongotCommandForQuery({
+                    query: searchQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID,
+                    protocolVersion: protocolVersion,
+                    cursorOptions: {docsRequested: NumberInt(extractedLimit)}
+                }),
                 response: {
                     cursors: [
                         {
@@ -249,6 +262,7 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
                     collectionUUID: collUUID,
                     query: searchQuery,
                     $db: dbName,
+                    intermediate: protocolVersion
                 },
                 response: {
                     cursors: [
@@ -285,6 +299,7 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
                     collectionUUID: collUUID,
                     query: searchQuery,
                     $db: dbName,
+                    intermediate: protocolVersion
                 },
                 response: {
                     cursors: [
@@ -346,7 +361,14 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
         const metaID = NumberLong(12);
         const historyResults = [
             {
-                expectedCommand: searchCmd(collUUID, limit),
+                expectedCommand: mongotCommandForQuery({
+                    query: searchQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID,
+                    protocolVersion: protocolVersion,
+                    cursorOptions: {docsRequested: NumberInt(limit)}
+                }),
                 response: {
                     ok: 1,
                     cursors: [
@@ -382,7 +404,14 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
         const metaID = NumberLong(22);
         const historyResults = [
             {
-                expectedCommand: searchCmd(collUUID, limit),
+                expectedCommand: mongotCommandForQuery({
+                    query: searchQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID,
+                    protocolVersion: protocolVersion,
+                    cursorOptions: {docsRequested: NumberInt(limit)}
+                }),
                 response: {
                     ok: 1,
                     cursors: [
@@ -514,6 +543,7 @@ function buildHistorySearchWithinLookupShardedEnv(db, stWithMock, searchLookupQu
                     query: searchLookupQuery,
                     $db: dbName,
                     cursorOptions: {docsRequested: numBerries},
+                    intermediate: protocolVersion
                 },
                 response: {
                     cursors: [
@@ -669,7 +699,13 @@ function getMoreCaseBuildHistoryStandalone(coll, collUUID, mongotConn, limitVal,
 
     const history = [
         {
-            expectedCommand: searchCmd(collUUID, limitVal),
+            expectedCommand: mongotCommandForQuery({
+                query: searchQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID,
+                cursorOptions: {docsRequested: NumberInt(limitVal)}
+            }),
             response: {
                 cursor: {
                     id: cursorId,
@@ -753,7 +789,14 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
     // Set history for shard 0.
     const history0 = [
         {
-            expectedCommand: searchCmd(collUUID, limitVal),
+            expectedCommand: mongotCommandForQuery({
+                query: searchQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID,
+                protocolVersion: protocolVersion,
+                cursorOptions: {docsRequested: limitVal}
+            }),
             response: {
                 cursors: [
                     {
@@ -831,7 +874,14 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
     // Set history for shard 1.
     const history1 = [
         {
-            expectedCommand: searchCmd(collUUID, limitVal),
+            expectedCommand: mongotCommandForQuery({
+                query: searchQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID,
+                protocolVersion: protocolVersion,
+                cursorOptions: {docsRequested: NumberInt(limitVal)}
+            }),
             response: {
                 cursors: [
                     {

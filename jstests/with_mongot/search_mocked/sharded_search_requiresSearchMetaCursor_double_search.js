@@ -61,8 +61,6 @@ st.shardColl(shardedColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), shardedCollName);
 const mongotQuery = {};
 const protocolVersion = NumberInt(1);
-const expectedMongotCommand =
-    mongotCommandForQuery(mongotQuery, shardedCollName, dbName, collUUID0, protocolVersion);
 
 let cursorId = NumberLong(123);
 let metaCursorId = NumberLong(cursorId + 1001);
@@ -73,7 +71,19 @@ let shard0DB = shard0Conn.getDB(dbName);
 let shard1Conn = st.rs1.getPrimary();
 let shard1DB = shard1Conn.getDB(dbName);
 
-function mockShards() {
+function mockShards(extractedLimit = null) {
+    let cursorOptions = null;
+    if (extractedLimit != null) {
+        cursorOptions = {docsRequested: NumberInt(extractedLimit)};
+    }
+    let expectedMongotCommand = mongotCommandForQuery({
+        query: mongotQuery,
+        collName: shardedCollName,
+        db: dbName,
+        collectionUUID: collUUID0,
+        protocolVersion: protocolVersion,
+        cursorOptions: cursorOptions
+    });
     // Mock shard0 responses.
     const mongot0ResponseBatch = [
         {_id: 3, $searchScore: 100},
@@ -158,7 +168,8 @@ function runRequiresSearchMetaCursorTest({
     subPipelinePlanShardedSearchDispatchedToShards,
     expectedDocs,
     outerPipelineShouldRequireSearchMetaCursor,
-    innerPipelineShouldRequireSearchMetaCursor
+    innerPipelineShouldRequireSearchMetaCursor,
+    topLevelExtractedLimit = null,
 }) {
     // Each pipeline will run planShardedSearch from mongos for the top-level $search. The
     // subPipelinePlanShardedSearchDispatchedToShards arguments indicates if the sub-pipeline will
@@ -170,7 +181,7 @@ function runRequiresSearchMetaCursorTest({
     } else {
         mockPlanShardedSearchFromMongos();
     }
-    mockShards();
+    mockShards(topLevelExtractedLimit);
     mockShards();
 
     // We disable the order check since the order of execution is non-deterministic.
@@ -306,7 +317,8 @@ runRequiresSearchMetaCursorTest({
     outerPipelineShouldRequireSearchMetaCursor: true,
     // TODO SERVER-87079 Fix queries where $search is in a subpipeline to not create unnecessary
     // meta cursor.
-    innerPipelineShouldRequireSearchMetaCursor: true
+    innerPipelineShouldRequireSearchMetaCursor: true,
+    topLevelExtractedLimit: 2,
 });
 
 stWithMock.stop();

@@ -45,8 +45,12 @@ function prepSearchResponses(mongotConn, howMany, coll, collUUID, stWithMock = u
     for (let i = 0; i < howMany; i++) {
         let history = [];
         let singleResponse = {
-            expectedCommand: mongotCommandForQuery(
-                searchQuery, coll.getName(), coll.getDB().getName(), collUUID),
+            expectedCommand: mongotCommandForQuery({
+                query: searchQuery,
+                collName: coll.getName(),
+                db: coll.getDB().getName(),
+                collectionUUID: collUUID
+            }),
             response: {
                 cursor: {
                     id: NumberLong(0),

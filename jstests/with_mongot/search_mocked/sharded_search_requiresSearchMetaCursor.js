@@ -58,8 +58,6 @@ st.shardColl(shardedColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), shardedCollName);
 const mongotQuery = {};
 const protocolVersion = NumberInt(1);
-const expectedMongotCommand =
-    mongotCommandForQuery(mongotQuery, shardedCollName, dbName, collUUID0, protocolVersion);
 
 const cursorId = NumberLong(123);
 const metaCursorId = NumberLong(cursorId + 1001);
@@ -70,7 +68,20 @@ const shard0DB = shard0Conn.getDB(dbName);
 const shard1Conn = st.rs1.getPrimary();
 const shard1DB = shard1Conn.getDB(dbName);
 
-function mockShards() {
+function mockShards(extractedLimit = null) {
+    let cursorOptions = null;
+    if (extractedLimit != null) {
+        cursorOptions = {docsRequested: NumberInt(extractedLimit)};
+    }
+
+    let expectedMongotCommand = mongotCommandForQuery({
+        query: mongotQuery,
+        collName: shardedCollName,
+        db: dbName,
+        collectionUUID: collUUID0,
+        protocolVersion: protocolVersion,
+        cursorOptions: cursorOptions
+    });
     // Mock shard0 responses.
     const mongot0ResponseBatch = [
         {_id: 3, $searchScore: 100},
@@ -120,8 +131,14 @@ function resetShardProfilers() {
 
 // Sets up the mock responses, runs the given pipeline, then confirms via system.profile that the
 // requiresSearchMetaCursor field is set properly when commands are dispatched to shards.
-function runRequiresSearchMetaCursorTest(
-    {pipeline, coll, expectedDocs, shouldRequireSearchMetaCursor, hasSearchMetaStage = false}) {
+function runRequiresSearchMetaCursorTest({
+    pipeline,
+    coll,
+    expectedDocs,
+    shouldRequireSearchMetaCursor,
+    hasSearchMetaStage = false,
+    extractedLimit = null
+}) {
     // Mock planShardedSearch responses.
     if (coll.getName() === shardedCollName) {
         mockPlanShardedSearchResponse(
@@ -137,7 +154,7 @@ function runRequiresSearchMetaCursorTest(
                                             shard0Conn);
     }
 
-    mockShards();
+    mockShards(extractedLimit);
     resetShardProfilers();
 
     const comment = "search_query";
@@ -183,7 +200,8 @@ runRequiresSearchMetaCursorTest({
     pipeline: [{$search: mongotQuery}, {$limit: 1}, {$project: {meta: "$$SEARCH_META"}}],
     coll: shardedColl,
     expectedDocs: [{_id: 11, meta: {val: 1}}],
-    shouldRequireSearchMetaCursor: true
+    shouldRequireSearchMetaCursor: true,
+    extractedLimit: 1
 });
 
 runRequiresSearchMetaCursorTest({
@@ -221,7 +239,8 @@ runRequiresSearchMetaCursorTest({
     pipeline: [{$search: mongotQuery}, {$limit: 1}, {$addFields: {meta: "$$SEARCH_META.val"}}],
     coll: shardedColl,
     expectedDocs: [{_id: 11, x: "brown", y: "ipsum", meta: 1}],
-    shouldRequireSearchMetaCursor: true
+    shouldRequireSearchMetaCursor: true,
+    extractedLimit: 1
 });
 
 runRequiresSearchMetaCursorTest({
@@ -324,6 +343,7 @@ runRequiresSearchMetaCursorTest({
     coll: unshardedColl,
     expectedDocs: [{b: 5}, {x: "brown", meta: {val: 1}}],
     shouldRequireSearchMetaCursor: true,
+    extractedLimit: 1,
 });
 
 // When $search is in a subpipeline it will always create a meta cursor, even when unnecessary.
@@ -343,6 +363,7 @@ runRequiresSearchMetaCursorTest({
     coll: unshardedColl,
     expectedDocs: [{b: 5}, {x: "brown"}, {x: "brown"}, {x: "brown"}],
     shouldRequireSearchMetaCursor: true,
+    extractedLimit: 3,
 });
 
 runRequiresSearchMetaCursorTest({
@@ -360,6 +381,7 @@ runRequiresSearchMetaCursorTest({
     coll: unshardedColl,
     expectedDocs:  [{b: 5, out: [{x: "brown"}]}],
     shouldRequireSearchMetaCursor: true,
+    extractedLimit: 1,
 });
 
 stWithMock.stop();

@@ -3,6 +3,7 @@
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
+    getDefaultProtocolVersionForPlanShardedSearch,
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
@@ -25,6 +26,7 @@ const dbName = jsTestName();
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
+const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 // Ensure db's primary shard is shard1 so we only set the correct mongot to have history.
 assert.commandWorked(
     mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
@@ -102,16 +104,19 @@ const mongotQuery = {
 // Define mocks' responses
 //------------------------
 
-function searchQueryExpectedByMock(searchColl) {
-    return mongotCommandForQuery(mongotQuery,
-                                 searchColl.getName(),
-                                 testDB.getName(),
-                                 getUUIDFromListCollections(testDB, searchColl.getName()));
+function searchQueryExpectedByMock(searchColl, protocolVersion = null) {
+    return mongotCommandForQuery({
+        query: mongotQuery,
+        collName: searchColl.getName(),
+        db: testDB.getName(),
+        collectionUUID: getUUIDFromListCollections(testDB, searchColl.getName()),
+        protocolVersion: protocolVersion
+    });
 }
 
 const shard1HistorySharded = [
     {
-        expectedCommand: searchQueryExpectedByMock(shardedSearchColl),
+        expectedCommand: searchQueryExpectedByMock(shardedSearchColl, protocolVersion),
         response: mongotMultiCursorResponseForBatch(
             [{_id: 0, $searchScore: 0.99}, {_id: 1, $searchScore: 0.20}],
             NumberLong(0),
@@ -125,7 +130,7 @@ const shard1HistorySharded = [
 
 const shard0HistorySharded = [
     {
-        expectedCommand: searchQueryExpectedByMock(shardedSearchColl),
+        expectedCommand: searchQueryExpectedByMock(shardedSearchColl, protocolVersion),
         response: mongotMultiCursorResponseForBatch(
             [
                 {_id: 4, $searchScore: 0.33},
@@ -220,7 +225,7 @@ function setupMockRequest(searchColl, mongot, requestType) {
             },
             response: {
                 ok: 1,
-                protocolVersion: NumberInt(42),
+                protocolVersion: protocolVersion,
                 metaPipeline:  // Sum counts in the shard metadata.
                     [{$group: {_id: null, count: {$sum: "$count"}}}, {$project: {_id: 0, count: 1}}]
             },

@@ -3,7 +3,10 @@
  * '$$SEARCH_META' succeeds on sharded collections.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
+    getDefaultProtocolVersionForPlanShardedSearch,
+    mongotCommandForQuery
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
     ShardingTestWithMongotMock
 } from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
@@ -23,6 +26,7 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
+const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const testColl = testDB.getCollection(collName);
@@ -61,7 +65,7 @@ function mockPlanShardedSearchResponseLocal(conn, cursorId = 1, maybeUnused = fa
         },
         response: {
             ok: 1,
-            protocolVersion: NumberInt(42),
+            protocolVersion: protocolVersion,
             // This does not represent an actual merging pipeline. The merging pipeline is
             // arbitrary, it just must only generate one document.
             metaPipeline: [
@@ -97,8 +101,13 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
     // Main pipeline response.
     const shard0MainHistory = [
         {
-            expectedCommand:
-                mongotCommandForQuery(mongotQuery, testColl.getName(), testDB.getName(), collUUID0),
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: testColl.getName(),
+                db: testDB.getName(),
+                collectionUUID: collUUID1,
+                protocolVersion: protocolVersion
+            }),
             response: {
                 ok: 1,
                 cursors: [
@@ -130,8 +139,13 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
 
     const shard0UnionHistory = [
         {
-            expectedCommand:
-                mongotCommandForQuery(mongotQuery, testColl.getName(), testDB.getName(), collUUID0),
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: testColl.getName(),
+                db: testDB.getName(),
+                collectionUUID: collUUID1,
+                protocolVersion: protocolVersion
+            }),
             response: {
                 ok: 1,
                 cursors: [
@@ -176,8 +190,13 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
     // Main pipeline response.
     const shard1MainHistory = [
         {
-            expectedCommand:
-                mongotCommandForQuery(mongotQuery, testColl.getName(), testDB.getName(), collUUID1),
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: testColl.getName(),
+                db: testDB.getName(),
+                collectionUUID: collUUID1,
+                protocolVersion: protocolVersion
+            }),
             response: {
                 ok: 1,
                 cursors: [
@@ -210,8 +229,13 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
     ];
 
     const shard1UnionHistory = [{
-        expectedCommand:
-            mongotCommandForQuery(mongotQuery, testColl.getName(), testDB.getName(), collUUID1),
+        expectedCommand: mongotCommandForQuery({
+            query: mongotQuery,
+            collName: testColl.getName(),
+            db: testDB.getName(),
+            collectionUUID: collUUID1,
+            protocolVersion: protocolVersion
+        }),
         response: {
             ok: 1,
             cursors: [

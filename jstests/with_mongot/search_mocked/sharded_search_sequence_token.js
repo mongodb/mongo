@@ -58,8 +58,14 @@ const protocolVersion = NumberInt(1);
 const cursorOptions = {
     requiresSearchSequenceToken: true
 };
-const expectedMongotCommand =
-    mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0, protocolVersion, cursorOptions);
+const expectedMongotCommand = mongotCommandForQuery({
+    query: mongotQuery,
+    collName: collName,
+    db: dbName,
+    collectionUUID: collUUID0,
+    protocolVersion: protocolVersion,
+    cursorOptions: cursorOptions
+});
 
 const cursorId = NumberLong(123);
 const secondCursorId = NumberLong(cursorId + 1001);

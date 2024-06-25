@@ -40,7 +40,8 @@ coll.insert({_id: 0});
     const expectedDocs = [{_id: 0}];
 
     const history = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID),
+        expectedCommand: mongotCommandForQuery(
+            {query: mongotQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
         response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
     }];
     mongotMock.setMockResponses(history, cursorId);
@@ -57,7 +58,8 @@ coll.insert({_id: 0});
     const expectedDocs = [{_id: 0, score: 1.234}];
 
     const history = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID),
+        expectedCommand: mongotCommandForQuery(
+            {query: mongotQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
         response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
     }];
     mongotMock.setMockResponses(history, cursorId);
@@ -76,7 +78,8 @@ coll.insert({_id: 0});
     const expectedDocs = [{_id: 0, scoreInfo: searchScoreDetails}];
 
     const history = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID),
+        expectedCommand: mongotCommandForQuery(
+            {query: mongotQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
         response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
     }];
     mongotMock.setMockResponses(history, cursorId);
@@ -93,7 +96,8 @@ coll.insert({_id: 0});
     const responseOk = 1;
 
     const history = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID),
+        expectedCommand: mongotCommandForQuery(
+            {query: mongotQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
         response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
     }];
     mongotMock.setMockResponses(history, cursorId);
@@ -127,7 +131,8 @@ coll.insert({_id: 20});
 
     const history = [
         {
-            expectedCommand: mongotCommandForQuery(mongotQuery, collName, dbName, collUUID),
+            expectedCommand: mongotCommandForQuery(
+                {query: mongotQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
             response: mongotResponseForBatch(batchOne, cursorId, collNS, 1),
         },
         {

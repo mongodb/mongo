@@ -53,7 +53,8 @@ var cursorCounter = 123;
  */
 function setupSearchQuery(term, times, batch, searchMetaValue) {
     const searchQuery = {query: term, path: "title"};
-    const searchCmd = mongotCommandForQuery(searchQuery, coll.getName(), dbName, collUUID);
+    const searchCmd = mongotCommandForQuery(
+        {query: searchQuery, collName: coll.getName(), db: dbName, collectionUUID: collUUID});
 
     if (Array.isArray(searchMetaValue)) {
         assert.eq(times, searchMetaValue.length);

@@ -95,7 +95,8 @@ const searchQuery = {
     path: "title"
 };
 runTest([{$search: searchQuery}],
-        mongotCommandForQuery(searchQuery, collName, dbName, collectionUUID));
+        mongotCommandForQuery(
+            {query: searchQuery, collName: collName, db: dbName, collectionUUID: collectionUUID}));
 
 mongotMock.stop();
 MongoRunner.stopMongod(conn);

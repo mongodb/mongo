@@ -51,10 +51,10 @@ const BSONObj placeholderCmd = BSON("placeholder"
 const BSONObj placeholderResponse = BSON("placeholder"
                                          << "response");
 
-void assertUserCommandMatchesExpectedCommand(BSONObj userCmd, BSONObj expectedCmd) {
+void assertGivenCommandMatchesExpectedCommand(BSONObj givenCmd, BSONObj expectedCmd) {
     uassert(31086,
-            str::stream() << "Expected command matching " << expectedCmd << " but got " << userCmd,
-            mongotmock::checkUserCommandMatchesExpectedCommand(userCmd, expectedCmd));
+            str::stream() << "Expected command matching " << expectedCmd << " but got " << givenCmd,
+            mongotmock::checkGivenCommandMatchesExpectedCommand(givenCmd, expectedCmd));
 }
 
 /**
@@ -136,7 +136,7 @@ private:
         // We should not have allowed an empty 'history'.
         invariant(state->hasNextCursorResponse());
         auto cmdResponsePair = state->peekNextCommandResponsePair();
-        assertUserCommandMatchesExpectedCommand(cmdObj, cmdResponsePair.expectedCommand);
+        assertGivenCommandMatchesExpectedCommand(cmdObj, cmdResponsePair.expectedCommand);
 
 
         // If this command returns multiple cursors, we need to claim a state for each one.
@@ -161,7 +161,7 @@ private:
                 secondState);
             // Pop the response from the second state if it is a placeholder.
             auto secondResponsePair = secondState->peekNextCommandResponsePair();
-            if (mongotmock::checkUserCommandMatchesExpectedCommand(
+            if (mongotmock::checkGivenCommandMatchesExpectedCommand(
                     secondResponsePair.expectedCommand, placeholderCmd)) {
                 secondState->popNextCommandResponsePair();
             }
@@ -232,7 +232,7 @@ public:
         auto cmdResponsePair = cursorState->peekNextCommandResponsePair();
         // Note that killCursors always does order checking to prevent killing cursors if the mock
         // is expecting more commands for that cursor.
-        assertUserCommandMatchesExpectedCommand(cmdObj, cmdResponsePair.expectedCommand);
+        assertGivenCommandMatchesExpectedCommand(cmdObj, cmdResponsePair.expectedCommand);
         result->appendElements(cmdResponsePair.response);
 
         cursorState->popNextCommandResponsePair();
@@ -285,7 +285,7 @@ public:
         }
 
         auto cmdResponsePair = cursorState->peekNextCommandResponsePair();
-        assertUserCommandMatchesExpectedCommand(cmdObj, cmdResponsePair.expectedCommand);
+        assertGivenCommandMatchesExpectedCommand(cmdObj, cmdResponsePair.expectedCommand);
         result->appendElements(cmdResponsePair.response);
 
         cursorState->popNextCommandResponsePair();

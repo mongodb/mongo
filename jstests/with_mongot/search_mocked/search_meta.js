@@ -5,7 +5,7 @@ import {getPlanStages} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {mongotCommandForQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 // Set up mongotmock and point the mongod to it.
 const mongotmock = new MongotMock();
@@ -18,6 +18,7 @@ const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 
 const coll = testDB.searchCollector;
+const collName = coll.getName();
 coll.drop();
 assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
 assert.commandWorked(coll.insert({"_id": 2, "title": "cookies and cakes"}));
@@ -29,12 +30,6 @@ const searchQuery = {
     path: "title"
 };
 
-const searchCmd = {
-    search: coll.getName(),
-    collectionUUID: collUUID,
-    query: searchQuery,
-    $db: dbName
-};
 const explainContents = {
     content: "test"
 };
@@ -43,7 +38,8 @@ const cursorId = NumberLong(17);
 // Verify that $searchMeta evaluates into SEARCH_META variable returned by mongot.
 {
     const history = [{
-        expectedCommand: searchCmd,
+        expectedCommand: mongotCommandForQuery(
+            {query: searchQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
         response: {
             ok: 1,
             cursor: {
@@ -67,7 +63,16 @@ const cursorId = NumberLong(17);
 }
 
 {
-    const history = [{expectedCommand: searchCmd, response: {explain: explainContents, ok: 1}}];
+    const history = [{
+        expectedCommand: mongotCommandForQuery({
+            query: searchQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID,
+            explainVerbosity: {verbosity: "queryPlanner"}
+        }),
+        response: {explain: explainContents, ok: 1}
+    }];
 
     assert.commandWorked(
         mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
@@ -94,7 +99,8 @@ const cursorId = NumberLong(17);
 // command.
 {
     const history = [{
-        expectedCommand: searchCmd,
+        expectedCommand: mongotCommandForQuery(
+            {query: searchQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
         response: {
             ok: 1,
             cursor: {

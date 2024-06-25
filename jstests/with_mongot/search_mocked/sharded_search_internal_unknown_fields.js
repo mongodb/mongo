@@ -67,11 +67,14 @@ const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), 
 const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), collName);
 
 function mockShardZero() {
-    const exampleCursor = searchShardedExampleCursors1(
-        dbName,
-        collNS,
-        collName,
-        mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0, protocolVersion));
+    const exampleCursor =
+        searchShardedExampleCursors1(dbName, collNS, collName, mongotCommandForQuery({
+                                         query: mongotQuery,
+                                         collName: collName,
+                                         db: dbName,
+                                         collectionUUID: collUUID0,
+                                         protocolVersion: protocolVersion
+                                     }));
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
 
     s0Mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
@@ -79,11 +82,14 @@ function mockShardZero() {
 }
 
 function mockShardOne() {
-    const exampleCursor = searchShardedExampleCursors2(
-        dbName,
-        collNS,
-        collName,
-        mongotCommandForQuery(mongotQuery, collName, dbName, collUUID1, protocolVersion));
+    const exampleCursor =
+        searchShardedExampleCursors2(dbName, collNS, collName, mongotCommandForQuery({
+                                         query: mongotQuery,
+                                         collName: collName,
+                                         db: dbName,
+                                         collectionUUID: collUUID1,
+                                         protocolVersion: protocolVersion
+                                     }));
     const s1Mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
 
     s1Mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);

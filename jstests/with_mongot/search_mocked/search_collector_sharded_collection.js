@@ -65,8 +65,13 @@ const searchQuery = {
     path: "title"
 };
 
-const expectedCommand = mongotCommandForQuery(
-    searchQuery, testColl.getName(), testDB.getName(), collUUID, NumberInt(42));
+const expectedCommand = mongotCommandForQuery({
+    query: searchQuery,
+    collName: testColl.getName(),
+    db: testDB.getName(),
+    collectionUUID: collUUID,
+    protocolVersion: NumberInt(42)
+});
 
 // History for shard 1.
 {
