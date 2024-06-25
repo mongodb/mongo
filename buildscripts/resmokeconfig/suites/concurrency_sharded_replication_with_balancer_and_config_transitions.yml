@@ -31,6 +31,9 @@ selector:
     - jstests/concurrency/fsm_workloads/compact.js
     - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
+    # test creates too many collections for ContinuousAddRemoveShard
+    - jstests/concurrency/fsm_workloads/create_collection.js
+
     # can cause OOM kills on test hosts
     - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
