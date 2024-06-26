@@ -124,7 +124,7 @@ buildvariants:
   tags: ["bazel_check"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2023.0-arm64-small
+  - amazon2023.3-arm64-small
   stepback: false
   expansions:
     compile_variant: *amazon-linux-2023-arm64-bazel-compile
@@ -219,7 +219,7 @@ buildvariants:
   tags: ["required"]
   cron: "0 */4 * * *"
   run_on:
-  - amazon2023.0-arm64-large
+  - amazon2023.3-arm64-large
   expansions:
     compile_flags: >-
       --ssl

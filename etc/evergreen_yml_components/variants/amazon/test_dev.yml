@@ -245,7 +245,7 @@ buildvariants:
   cron: "0 */4 * * *" # Run these tasks every 4 hours
   patchable: false
   run_on:
-  - amazon2023.0-small
+  - amazon2023.3-small
   expansions:
     compile_flags: >-
       --ssl
@@ -266,7 +266,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2023.0-large
+    - amazon2023.3-large
   - name: search
   - name: search_auth
   - name: search_pinned_connections_auth
@@ -283,7 +283,7 @@ buildvariants:
   cron: "0 */4 * * *" # Run these tasks every 4 hours
   patchable: false
   run_on:
-  - amazon2023.0-arm64-small
+  - amazon2023.3-arm64-small
   expansions:
     compile_flags: >-
       --ssl
@@ -308,7 +308,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2023.0-arm64-large
+    - amazon2023.3-arm64-large
   - name: search
   - name: search_auth
   - name: search_pinned_connections_auth

@@ -229,7 +229,7 @@ buildvariants:
   tags: ["bazel_check"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2023.0-small
+  - amazon2023.3-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -250,12 +250,12 @@ buildvariants:
     packager_distro: amazon2023
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2023.0-large
+    large_distro_name: amazon2023.3-large
     compile_variant: amazon2023
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2023.0-large
+    - amazon2023.3-large
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -267,7 +267,7 @@ buildvariants:
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2023.0-small
+  - amazon2023.3-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
@@ -296,7 +296,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2023.0-large
+    - amazon2023.3-large
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -310,7 +310,7 @@ buildvariants:
   #   tags: []
   #   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   #   run_on:
-  #     - amazon2023.0-small
+  #     - amazon2023.3-small
   #   expansions:
   #     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
   #     compile_flags: >-
@@ -335,30 +335,30 @@ buildvariants:
   #     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
   #     external_auth_jobs_max: 1
   #     compile_variant: enterprise-amazon2023-lto
-  #     large_distro_name: amazon2023.0-large
+  #     large_distro_name: amazon2023.3-large
   #   tasks:
   #     - name: compile_test_and_package_serial_lto_no_unittests_TG
   #       distros:
-  #         - amazon2023.0-large
+  #         - amazon2023.3-large
   #     # TODO: SERVER-79886 Fix broken test_packages task
   #     # - name: test_packages
   #     #   distros:
-  #     #   - amazon2023.0-large
+  #     #   - amazon2023.3-large
   #     - name: .development_critical !.requires_large_host
   #     - name: .development_critical .requires_large_host
   #       distros:
-  #         - amazon2023.0-large
+  #         - amazon2023.3-large
   #     - name: .release_critical !.requires_large_host !publish_packages !push !crypt_push
   #     - name: .release_critical .requires_large_host !publish_packages !push !crypt_push
   #       distros:
-  #         - amazon2023.0-large
+  #         - amazon2023.3-large
 
 - name: amazon2023-arm64
   display_name: "Amazon Linux 2023 arm64"
   tags: ["bazel_check"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2023.0-arm64-small
+  - amazon2023.3-arm64-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -380,12 +380,12 @@ buildvariants:
     packager_distro: amazon2023
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2023.0-arm64-large
+    large_distro_name: amazon2023.3-arm64-large
     compile_variant: amazon2023-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2023.0-arm64-large
+    - amazon2023.3-arm64-large
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
@@ -398,7 +398,7 @@ buildvariants:
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2023.0-arm64-small
+  - amazon2023.3-arm64-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
@@ -427,7 +427,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2023.0-arm64-large
+    - amazon2023.3-arm64-large
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
@@ -442,7 +442,7 @@ buildvariants:
   #   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   #   activate: false
   #   run_on:
-  #     - amazon2023.0-arm64-small
+  #     - amazon2023.3-arm64-small
   #   expansions:
   #     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
   #     compile_flags: >-
@@ -467,11 +467,11 @@ buildvariants:
   #     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
   #     external_auth_jobs_max: 1
   #     compile_variant: enterprise-amazon2023-arm64-lto
-  #     large_distro_name: amazon2023.0-arm64-large
+  #     large_distro_name: amazon2023.3-arm64-large
   #   tasks:
   #     - name: compile_test_and_package_serial_lto_no_unittests_TG
   #       distros:
-  #         - amazon2023.0-arm64-large
+  #         - amazon2023.3-arm64-large
   #     # TODO: SERVER-79886 Fix broken test_packages task
   #     # - name: test_packages
   #     #   distros:
@@ -479,11 +479,11 @@ buildvariants:
   #     - name: .development_critical !.requires_large_host
   #     - name: .development_critical .requires_large_host
   #       distros:
-  #         - amazon2023.0-arm64-large
+  #         - amazon2023.3-arm64-large
   #     - name: .release_critical !.requires_large_host !publish_packages !push !crypt_push
   #     - name: .release_critical .requires_large_host !publish_packages !push !crypt_push
   #       distros:
-  #         - amazon2023.0-arm64-large
+  #         - amazon2023.3-arm64-large
 
 - name: enterprise-amazon2-streams
   display_name: "Amazon Linux 2 enterprise build with streams"
