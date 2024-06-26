@@ -70,9 +70,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // TODO (SERVER-88275) a moveCollection can cause the original collection to be dropped and
         // re-created with a different uuid, causing the aggregation to fail with QueryPlannedKilled
         // when the mongos is fetching data from the shard using getMore(). Remove
-        // theinterruptedQueryErrors from allowedErrorCodes once this bug is being addressed
+        // the interruptedQueryErrors from allowedErrorCodes once this bug is being addressed
         if (TestData.runningWithBalancer) {
             allowedErrorCodes = allowedErrorCodes.concat(interruptedQueryErrors);
+            // On slow builds with the balancer enabled, it is possible for the router to exhaust
+            // all refresh attempts without converging, causing the StaleConfig error to be returned
+            // to the client.
+            allowedErrorCodes.push(ErrorCodes.StaleConfig);
         }
 
         assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
