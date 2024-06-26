@@ -443,12 +443,13 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              std::size_t uniqueLeaves,
                              std::size_t uniqueTokens,
                              const AnchorPaddingRootToken& anchorPaddingRootToken,
-                             ECStats* escStats) {
+                             ECStats* escStats,
+                             std::size_t maxDocsPerInsert) {
     CompactStatsCounter<ECStats> stats(escStats);
     // Compact 4.e, Calculate pathLength := #Edges_SPH(lb, lb, uh, prc, theta)
     const auto pathLength = getEdgesLength(fieldType, fieldPath, queryTypeConfig);
     // Compact 4.f, Calculate numPads := ceil( gamma * (pathLength * uniqueLeaves - len(C_f)) )
-    const auto numPads =
+    const size_t numPads =
         std::ceil(anchorPaddingFactor * ((pathLength * uniqueLeaves) - uniqueTokens));
     if (numPads <= 0) {
         // Nothing to do.
@@ -480,16 +481,30 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
     // Compact 4.i, for all i in numPads: esc.insert(anchorPaddingDocument)
     // {_id   : F(AnchorPaddingKeyToken, null || a + i),
     //  value : Enc(AnchorPaddingValueToken, 0 || 0 )}
-    std::vector<BSONObj> batchWrite;
-    for (std::size_t i = 1; i <= numPads; ++i) {
-        batchWrite.push_back(ESCCollectionAnchorPadding::generatePaddingDocument(
-            anchorPaddingKeyToken, anchorPaddingValueToken, apos + i));
-    }
+    LOGV2_DEBUG(9165601,
+                2,
+                "Inserting padding documents for range field",
+                "edgesLength"_attr = pathLength,
+                "uniqueLeaves"_attr = uniqueLeaves,
+                "uniqueTokens"_attr = uniqueTokens);
 
+    std::vector<BSONObj> batchWrite;
     StmtId stmtId = kUninitializedStmtId;
-    checkWriteErrors(
-        uassertStatusOK(queryImpl->insertDocuments(escNss, std::move(batchWrite), &stmtId, true)));
-    stats.addInserts(numPads);
+    maxDocsPerInsert = (maxDocsPerInsert > 0) ? std::min(numPads, maxDocsPerInsert) : numPads;
+
+    for (std::size_t i = 1; i <= numPads;) {
+        batchWrite.reserve(maxDocsPerInsert);
+
+        for (; i <= numPads && batchWrite.size() < maxDocsPerInsert; i++) {
+            batchWrite.push_back(ESCCollectionAnchorPadding::generatePaddingDocument(
+                anchorPaddingKeyToken, anchorPaddingValueToken, apos + i));
+        }
+        const auto docsCount = batchWrite.size();
+        checkWriteErrors(uassertStatusOK(
+            queryImpl->insertDocuments(escNss, std::move(batchWrite), &stmtId, true)));
+        stats.addInserts(docsCount);
+        batchWrite.clear();
+    }
 }
 
 namespace {
