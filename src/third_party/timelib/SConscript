@@ -16,8 +16,10 @@ try:
             '-DHAVE_WINSOCK2_H',
         ])
 
-        # C4996: '...': was declared deprecated
-        env.Append(CCFLAGS=['/wd4996'])
+        env.Append(CCFLAGS=[
+            '/wd4067',  # C4067: '...': expected a newline
+            '/wd4996',  # C4996: '...': was declared deprecated
+        ])
     elif env.TargetOSIs('solaris'):
         env.AppendUnique(CCFLAGS=[
             '-DHAVE_DIRENT_H',
@@ -44,17 +46,17 @@ except ValueError:
 env.Library(
     target='timelib',
     source=[
-        'astro.c',
-        'dow.c',
-        'interval.c',
-        'parse_date.c',
-        'parse_iso_intervals.c',
-        'parse_tz.c',
-        'parse_posix.c',
-        'parse_zoneinfo.c',
-        'timelib.c',
-        'tm2unixtime.c',
-        'unixtime2tm.c',
+        'dist/astro.c',
+        'dist/dow.c',
+        'dist/interval.c',
+        'dist/parse_date.c',
+        'dist/parse_iso_intervals.c',
+        'dist/parse_tz.c',
+        'dist/parse_posix.c',
+        'dist/parse_zoneinfo.c',
+        'dist/timelib.c',
+        'dist/tm2unixtime.c',
+        'dist/unixtime2tm.c',
     ],
     LIBDEPS_TAGS=[
         'init-no-global-side-effects',

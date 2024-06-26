@@ -52,7 +52,7 @@ a notice will be included in
 | [schemastore.org]          | Apache-2.0        | 6847cfc3a1        |                      |                                 |
 | [scons]                    | MIT               | 3.1.2             |                      |                                 |
 | [Snappy]                   | BSD-3-Clause      | 1.1.7             |          ✗           |                ✗                |
-| [timelib]                  | MIT               | 2022.04           |                      |                ✗                |
+| [timelib]                  | MIT               | 2022.10           |                      |                ✗                |
 | [TomCrypt]                 | Public Domain     | 1.18.2            |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015  | 8.0.0             |          ✗           |                ✗                |
 | [libunwind]                | MIT               | 1.6.2 + changes   |                      |                ✗                |
@@ -61,6 +61,7 @@ a notice will be included in
 | [yaml-cpp]                 | MIT               | 0.6.3             |                      |                ✗                |
 | [Zlib]                     | Zlib              | 1.3               |          ✗           |                ✗                |
 | [Zstandard]                | BSD-3-Clause      | 1.5.5             |          ✗           |                ✗                |
+
 
 [abseil-cpp]: https://github.com/abseil/abseil-cpp
 [ASIO]: https://github.com/chriskohlhoff/asio
