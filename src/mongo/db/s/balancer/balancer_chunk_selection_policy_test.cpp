@@ -37,8 +37,6 @@
 #include <ostream>
 #include <set>
 #include <string>
-#include <system_error>
-#include <type_traits>
 #include <utility>
 
 #include "mongo/base/error_codes.h"
@@ -67,7 +65,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
@@ -114,37 +111,6 @@ protected:
             chunksPerShard[shardId].push_back(ChunkRange(min, max));
         }
         return chunksPerShard;
-    }
-
-    /**
-     * Sets up mock network to expect a listDatabases command and returns a BSON response with
-     * a dummy sizeOnDisk.
-     */
-    void expectListDatabasesCommand() {
-        BSONObjBuilder resultBuilder;
-        CommandHelpers::appendCommandStatusNoThrow(resultBuilder, Status::OK());
-
-        onCommand([&resultBuilder](const RemoteCommandRequest& request) {
-            ASSERT(request.cmdObj["listDatabases"]);
-            std::vector<BSONObj> dbInfos;
-            BSONObjBuilder b;
-            b.append("name", kDbName.toString_forTest());
-            b.append("sizeOnDisk", kSizeOnDisk);
-            b.append("empty", kSizeOnDisk > 0);
-            resultBuilder.append("databases", dbInfos);
-            resultBuilder.append("totalSize", kSizeOnDisk);
-            return resultBuilder.obj();
-        });
-    }
-
-    /**
-     * Sets up mock network for all the shards to expect the commands executed for computing cluster
-     * stats, which include listDatabase and serverStatus.
-     */
-    void expectGetStatsCommands(int numShards) {
-        for (int i = 0; i < numShards; i++) {
-            expectListDatabasesCommand();
-        }
     }
 
     /**
@@ -380,7 +346,6 @@ TEST_F(BalancerChunkSelectionTest, ZoneRangeMaxNotAlignedWithChunkMax) {
             });
 
             const int numShards = 2;
-            expectGetStatsCommands(numShards);
             for (int i = 0; i < numShards; i++) {
                 expectGetStatsForBalancingCommand();
             }
@@ -428,8 +393,6 @@ TEST_F(BalancerChunkSelectionTest, AllImbalancedCollectionsShouldEventuallyBeSel
                 collectionsSelected.insert(chunkToMove.nss);
             }
         });
-
-        expectGetStatsCommands(2 /*numShards*/);
 
         // Collection size distribution for each collection:
         //      Shard0 -> 512 MB
@@ -482,8 +445,6 @@ TEST_F(BalancerChunkSelectionTest, CollectionsSelectedShouldBeCached) {
             }
         });
 
-        expectGetStatsCommands(2 /*numShards*/);
-
         // Collection size distribution for each collection:
         //      Shard0 -> 512 MB
         //      Shard1 ->   0 MB
@@ -532,8 +493,6 @@ TEST_F(BalancerChunkSelectionTest, CachedCollectionsShouldBeSelected) {
                 collectionsSelected.insert(chunkToMove.nss);
             }
         });
-
-        expectGetStatsCommands(2 /*numShards*/);
 
         // Collection size distribution for each collection:
         //      Shard0 -> 512 MB
@@ -585,8 +544,6 @@ TEST_F(BalancerChunkSelectionTest, MaxTimeToScheduleBalancingOperationsExceeded)
         ASSERT_EQUALS(1U, chunksToMove.size());
     });
 
-    expectGetStatsCommands(4);
-
     // We need to get at least 1 migration per batch since the timeout only exceeds when balancer
     // has found at least one candidate migration On the other side, we must get less than 2
     // migrations per batch since the maximum number of migrations per balancing round is 2 (with 4
@@ -620,8 +577,6 @@ TEST_F(BalancerChunkSelectionTest, MoreThanOneBatchIsProcessedIfNeeded) {
 
         ASSERT_EQUALS(2U, chunksToMove.size());
     });
-
-    expectGetStatsCommands(4);
 
     // We are scheduling one migration on the first batch to make sure that the second batch is
     // processed
@@ -657,8 +612,6 @@ TEST_F(BalancerChunkSelectionTest, StopChunksSelectionIfThereAreNoMoreShardsAvai
 
         ASSERT_EQUALS(1U, chunksToMove.size());
     });
-
-    expectGetStatsCommands(2 /*numShards*/);
 
     // Only 1 batch must be processed, so we expect only 1 call to `getStatsForBalancing` since
     // the cluster has 2 shards
@@ -697,7 +650,6 @@ TEST_F(BalancerChunkSelectionTest, DontSelectChunksFromCollectionsWithDefragment
         ASSERT_EQ(uuid2, chunksToMove[0].uuid);
     });
 
-    expectGetStatsCommands(2 /*numShards*/);
     expectGetStatsForBalancingCommandsWithOneMigration(
         2 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
     future.default_timed_get();
@@ -731,7 +683,6 @@ TEST_F(BalancerChunkSelectionTest, DontSelectChunksFromCollectionsWithBalancingD
         ASSERT_EQ(uuid2, chunksToMove[0].uuid);
     });
 
-    expectGetStatsCommands(2 /*numShards*/);
     expectGetStatsForBalancingCommandsWithOneMigration(
         2 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
     future.default_timed_get();
@@ -761,8 +712,6 @@ TEST_F(BalancerChunkSelectionTest, DontGetMigrationCandidatesIfAllCollectionsAre
 
         ASSERT(chunksToMove.empty());
     });
-
-    expectGetStatsCommands(2 /*numShards*/);
 
     // Expecting 2 calls to getStatsForBalancing commands since there are 7 collections (2 batches)
     // All collection distributions are balanced:
@@ -830,7 +779,6 @@ TEST_F(BalancerChunkSelectionTest, SelectChunksToSplit) {
                 ASSERT_EQ(expectedSplitPointsPerChunk.size(), swSplitInfo.getValue().size())
                     << "Got unexpected split points";
             });
-            expectGetStatsCommands(2 /*numShards*/);
             future.default_timed_get();
             removeAllZones(nss);
         };

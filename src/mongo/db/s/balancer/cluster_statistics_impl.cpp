@@ -74,16 +74,6 @@ using ShardStatistics = ClusterStatistics::ShardStatistics;
 ClusterStatisticsImpl::~ClusterStatisticsImpl() = default;
 
 StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationContext* opCtx) {
-    return _getStats(opCtx, boost::none);
-}
-
-StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getCollStats(
-    OperationContext* opCtx, NamespaceString const& ns) {
-    return _getStats(opCtx, ns);
-}
-
-StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
-    OperationContext* opCtx, boost::optional<NamespaceString> ns) {
     // Get a list of all the shards that are participating in this balance round along with any
     // maximum allowed quotas and current utilization. We get the latter by issuing
     // db.serverStatus() (mem.mapped) to all shards.
@@ -104,35 +94,14 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
     std::vector<ShardStatistics> stats;
 
     for (const auto& shard : shards) {
-        const auto shardSizeStatus = [&]() -> StatusWith<long long> {
-            if (ns) {
-                return shardutil::retrieveCollectionShardSize(opCtx, shard.getName(), *ns);
-            }
-
-            return shardutil::retrieveTotalShardSize(opCtx, shard.getName());
-        }();
-
-        if (!shardSizeStatus.isOK()) {
-            const auto& status = shardSizeStatus.getStatus();
-
-            return status.withContext(str::stream()
-                                      << "Unable to obtain shard utilization information for "
-                                      << shard.getName());
-        }
-
         std::set<std::string> shardZones;
         for (const auto& shardZone : shard.getTags()) {
             shardZones.insert(shardZone);
         }
 
-        stats.emplace_back(shard.getName(),
-                           shardSizeStatus.getValue(),
-                           shard.getDraining(),
-                           std::move(shardZones),
-                           ShardStatistics::use_bytes_t{});
+        stats.emplace_back(shard.getName(), shard.getDraining(), std::move(shardZones));
     }
 
     return stats;
 }
-
 }  // namespace mongo
