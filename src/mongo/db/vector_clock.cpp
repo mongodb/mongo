@@ -352,14 +352,14 @@ bool VectorClock::gossipOut(OperationContext* opCtx,
         return false;
     }
 
-    const auto claimsInternal = [&]() -> bool {
+    const auto isInternal = [&]() -> bool {
         if (forceInternal) {
             return true;
         }
 
         if (opCtx) {
             if (auto client = opCtx->getClient(); client && client->session()) {
-                return opCtx->getClient()->isPossiblyUnauthenticatedInternalClient();
+                return opCtx->getClient()->isInternalClient();
             }
         }
 
@@ -367,13 +367,13 @@ bool VectorClock::gossipOut(OperationContext* opCtx,
     }();
 
     ComponentSet toGossip =
-        claimsInternal ? _getGossipInternalComponents() : _getGossipExternalComponents();
+        isInternal ? _getGossipInternalComponents() : _getGossipExternalComponents();
 
     auto now = getTime();
     bool clusterTimeWasOutput = false;
     for (auto component : toGossip) {
         clusterTimeWasOutput |=
-            _gossipOutComponent(opCtx, outMessage, now._time, component, claimsInternal);
+            _gossipOutComponent(opCtx, outMessage, now._time, component, isInternal);
     }
     return clusterTimeWasOutput;
 }

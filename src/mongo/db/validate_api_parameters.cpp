@@ -122,23 +122,7 @@ APIParametersFromClient parseAndValidateAPIParameters(const CommandInvocation& i
 
 void enforceRequireAPIVersion(OperationContext* opCtx, Command* command) {
     auto client = opCtx->getClient();
-    const bool isInternalThreadOrClient = [&] {
-        // No Transport Session indicates this command is internally sourced.
-        if (!client->session()) {
-            return true;
-        }
-
-        // Pre-auth commands are allowed to trust the {hello: 1, internalClient: ...}
-        // claim without auth validation.
-        if (command && !command->requiresAuth() &&
-            client->isPossiblyUnauthenticatedInternalClient()) {
-            return true;
-        }
-
-        // Otherwise, only authenticated client authorized to claim internality are
-        // treated as internal.
-        return client->isInternalClient();
-    }();
+    auto isInternalThreadOrClient = !client->session() || client->isInternalClient();
 
     if (gRequireApiVersion.load() && !client->isInDirectClient() && !isInternalThreadOrClient) {
         uassert(

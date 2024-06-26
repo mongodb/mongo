@@ -71,13 +71,6 @@ bool checkIfRouterClient(const std::shared_ptr<transport::Session>& session) {
     return session && session->isFromRouterPort();
 }
 
-// In a normal server process, this will be overridden by AuthorizationSessionImpl
-// to examine the active user's privilege set.
-// For UnitTests, this simply fails closed unless explicitly overridden.
-std::function<bool(Client*)> checkAuthForInternalClient = [](Client*) {
-    return false;
-};
-
 }  // namespace
 
 void Client::initThread(StringData desc,
@@ -268,14 +261,6 @@ void Client::_setOperationContext(OperationContext* opCtx) {
     if (_session) {
         _session->setInOperation(opCtx != nullptr);
     }
-}
-
-bool Client::isInternalClient() {
-    return _isInternalClient && checkAuthForInternalClient(this);
-}
-
-void Client::setCheckAuthForInternalClient(std::function<bool(Client*)> fn) {
-    checkAuthForInternalClient = std::move(fn);
 }
 
 }  // namespace mongo
