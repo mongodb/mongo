@@ -105,7 +105,7 @@ void assertAllowedInternalIfRequired(const OperationContext* opCtx,
     const auto isInternal = isInternalClient(opCtx->getClient());
 
     uassert(5491300,
-            str::stream() << operatorName << "' is not allowed in user requests",
+            str::stream() << operatorName << " is not allowed in user requests",
             !(allowedWithClientType == AllowedWithClientType::kInternal && !isInternal));
 }
 }  // namespace mongo
