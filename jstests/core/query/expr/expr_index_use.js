@@ -6,8 +6,12 @@
 //   assumes_balancer_off,
 // ]
 
-import {getAggPlanStage, getPlanStage, hasRejectedPlans} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {
+    getAggPlanStage,
+    getEngine,
+    getPlanStage,
+    hasRejectedPlans
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.expr_index_use;
 coll.drop();
@@ -52,8 +56,6 @@ assert.commandWorked(coll.insert({w: {z: 2}}));
 assert.commandWorked(coll.createIndex({w: 1}));
 assert.commandWorked(coll.createIndex({"w.z": 1}));
 
-const isSBEEnabled = checkSbeFullyEnabled(db);
-
 /**
  * Executes the expression 'expr' as both a find and an aggregate. Then confirms
  * 'metricsToCheck', which is an object containing:
@@ -92,7 +94,8 @@ function confirmExpectedExprExecution(expr, metricsToCheck, collation) {
     ];
     assert.eq(metricsToCheck.nReturned, coll.aggregate(pipelineWithProject, aggOptions).itcount());
     let explain = coll.explain("executionStats").aggregate(pipelineWithProject, aggOptions);
-    assert(getAggPlanStage(explain, "COLLSCAN", isSBEEnabled /* useQueryPlannerSection */),
+    assert(getAggPlanStage(
+               explain, "COLLSCAN", getEngine(explain) === "sbe" /* useQueryPlannerSection */),
            explain);
 
     // Verifies that there are no rejected plans, and that the winning plan uses the expected
