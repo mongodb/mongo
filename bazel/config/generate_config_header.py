@@ -5,6 +5,42 @@
 import argparse
 import platform
 import subprocess
+import json
+
+_CONFIG_HEADER_SUBST = (
+    (
+        "@mongo_config_altivec_vec_vbpermq_output_index@",
+        "MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX",
+    ),
+    ("@mongo_config_debug_build@", "MONGO_CONFIG_DEBUG_BUILD"),
+    ("@mongo_config_use_tracing_profiler@", "MONGO_CONFIG_USE_TRACING_PROFILER"),
+    ("@mongo_config_have_execinfo_backtrace@", "MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE"),
+    ("@mongo_config_have_explicit_bzero@", "MONGO_CONFIG_HAVE_EXPLICIT_BZERO"),
+    ("@mongo_config_have_fips_mode_set@", "MONGO_CONFIG_HAVE_FIPS_MODE_SET"),
+    ("@mongo_config_have_header_unistd_h@", "MONGO_CONFIG_HAVE_HEADER_UNISTD_H"),
+    ("@mongo_config_have_memset_s@", "MONGO_CONFIG_HAVE_MEMSET_S"),
+    ("@mongo_config_have_posix_monotonic_clock@", "MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK"),
+    ("@mongo_config_have_pthread_setname_np@", "MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP"),
+    ("@mongo_config_have_ssl_ec_key_new@", "MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW"),
+    ("@mongo_config_have_ssl_set_ecdh_auto@", "MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO"),
+    ("@mongo_config_have_strnlen@", "MONGO_CONFIG_HAVE_STRNLEN"),
+    ("@mongo_config_max_extended_alignment@", "MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT"),
+    ("@mongo_config_ocsp_stapling_enabled@", "MONGO_CONFIG_OCSP_STAPLING_ENABLED"),
+    ("@mongo_config_optimized_build@", "MONGO_CONFIG_OPTIMIZED_BUILD"),
+    ("@mongo_config_ssl_has_asn1_any_definitions@", "MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS"),
+    ("@mongo_config_ssl_provider@", "MONGO_CONFIG_SSL_PROVIDER"),
+    ("@mongo_config_ssl@", "MONGO_CONFIG_SSL"),
+    ("@mongo_config_usdt_enabled@", "MONGO_CONFIG_USDT_ENABLED"),
+    ("@mongo_config_usdt_provider@", "MONGO_CONFIG_USDT_PROVIDER"),
+    ("@mongo_config_use_libunwind@", "MONGO_CONFIG_USE_LIBUNWIND"),
+    ("@mongo_config_use_raw_latches@", "MONGO_CONFIG_USE_RAW_LATCHES"),
+    ("@mongo_config_wiredtiger_enabled@", "MONGO_CONFIG_WIREDTIGER_ENABLED"),
+    ("@mongo_config_grpc@", "MONGO_CONFIG_GRPC"),
+    ("@mongo_config_glibc_rseq@", "MONGO_CONFIG_GLIBC_RSEQ"),
+    ("@mongo_config_tcmalloc_google@", "MONGO_CONFIG_TCMALLOC_GOOGLE"),
+    ("@mongo_config_tcmalloc_gperf@", "MONGO_CONFIG_TCMALLOC_GPERF"),
+    ("@mongo_config_streams@", "MONGO_CONFIG_STREAMS"),
+)
 
 
 class CompilerSettings:
@@ -18,13 +54,29 @@ class HeaderDefinition:
         self.value = value
 
 
-def write_config_header(output_path: str, definitions: list[HeaderDefinition]) -> None:
-    with open(output_path, "w") as file:
-        for definition in definitions:
+def write_config_header(
+    template_path: str, output_path: str, definitions: list[HeaderDefinition]
+) -> None:
+    with open(template_path, "r") as file:
+        content = file.read()
+
+    key_to_definition = {definition.key: definition for definition in definitions}
+
+    for subst_key, definition_key in _CONFIG_HEADER_SUBST:
+        definition = key_to_definition.get(definition_key)
+        if definition is not None:
             if definition.value is None:
-                file.write(f"#define {definition.key}\n")
+                definition_str = f"#define {definition.key}"
             else:
-                file.write(f"#define {definition.key} {definition.value}\n")
+                definition_str = f"#define {definition.key} {definition.value}"
+        else:
+            definition_str = f"// #undef {definition_key}"
+
+        content = content.replace(subst_key, definition_str)
+
+    with open(output_path, "w") as file:
+        file.write(content)
+        print(f"Mongo config header file written to {output_path}")
 
 
 def compile_check(source_text: str) -> bool:
@@ -70,7 +122,7 @@ def glibc_rseq_present_flag() -> list[HeaderDefinition]:
         printf("%d", __rseq_size);
         return EXIT_SUCCESS;
     }"""):
-        return [HeaderDefinition("MONGO_CONFIG_GLIBC_RSEQ")]
+        return [HeaderDefinition("MONGO_CONFIG_GLIBC_RSEQ", 1)]
     else:
         return []
 
@@ -86,7 +138,7 @@ def memset_s_present_flag() -> list[HeaderDefinition]:
             return memset_s(data, 0, 0, 0);
         }
         """):
-        return [HeaderDefinition("MONGO_CONFIG_HAVE_MEMSET_S")]
+        return [HeaderDefinition("MONGO_CONFIG_HAVE_MEMSET_S", 1)]
     else:
         return []
 
@@ -95,7 +147,7 @@ def strnlen_present_flag() -> list[HeaderDefinition]:
     print("[MONGO_CONFIG_HAVE_STRNLEN] Checking for strnlen...")
 
     if func_check("strnlen", "<string.h>"):
-        return [HeaderDefinition("MONGO_CONFIG_HAVE_STRNLEN")]
+        return [HeaderDefinition("MONGO_CONFIG_HAVE_STRNLEN", 1)]
     else:
         return []
 
@@ -105,7 +157,7 @@ def explicit_bzero_present_flag() -> list[HeaderDefinition]:
 
     # Glibc 2.25+, OpenBSD 5.5+ and FreeBSD 11.0+ offer explicit_bzero, a secure way to zero memory
     if func_check("explicit_bzero", "<string.h>"):
-        return [HeaderDefinition("MONGO_CONFIG_HAVE_EXPLICIT_BZERO")]
+        return [HeaderDefinition("MONGO_CONFIG_HAVE_EXPLICIT_BZERO", 1)]
     else:
         return []
 
@@ -124,7 +176,7 @@ def pthread_setname_np_present_flag() -> list[HeaderDefinition]:
             return 0;
         }
         """):
-        return [HeaderDefinition("MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP")]
+        return [HeaderDefinition("MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP", 1)]
     else:
         return []
 
@@ -149,7 +201,7 @@ def asn1_present_flag() -> list[HeaderDefinition]:
         #include <openssl/asn1.h>
         int main(void) { return 0; }
         """):
-        return [HeaderDefinition("MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS")]
+        return [HeaderDefinition("MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS", 1)]
     else:
         return []
 
@@ -168,7 +220,7 @@ def ssl_set_ecdh_auto_present_flag() -> list[HeaderDefinition]:
             return 0;
         }
         """):
-        return [HeaderDefinition("MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO")]
+        return [HeaderDefinition("MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO", 1)]
     else:
         return []
 
@@ -187,7 +239,7 @@ def ssl_ec_key_new_present_flag() -> list[HeaderDefinition]:
             return 0;
         }
         """):
-        return [HeaderDefinition("MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW")]
+        return [HeaderDefinition("MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW", 1)]
     else:
         return []
 
@@ -206,7 +258,7 @@ def posix_monotonic_clock_present_flag() -> list[HeaderDefinition]:
         #endif
         int main(void) { return 0; }
         """):
-        return [HeaderDefinition("MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK")]
+        return [HeaderDefinition("MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK", 1)]
     else:
         return []
 
@@ -217,7 +269,7 @@ def execinfo_backtrace_present_flag() -> list[HeaderDefinition]:
         #include <execinfo.h>
         int main(void) { return backtrace != nullptr && backtrace_symbols != nullptr && backtrace_symbols_fd != nullptr; }
         """):
-        return [HeaderDefinition("MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE")]
+        return [HeaderDefinition("MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE", 1)]
     else:
         return []
 
@@ -343,7 +395,7 @@ def altivec_vbpermq_output_flag() -> list[HeaderDefinition]:
     return []
 
 
-def generate_config_header(output_path: str) -> None:
+def generate_config_header(output_path: str, template_path: str, extra_definitions: str) -> None:
     definitions: list[HeaderDefinition] = []
 
     definitions += glibc_rseq_present_flag()
@@ -361,7 +413,10 @@ def generate_config_header(output_path: str) -> None:
     definitions += altivec_vbpermq_output_flag()
     # New checks can be added here
 
-    write_config_header(output_path, definitions)
+    for key, value in json.loads(extra_definitions).items():
+        definitions.append(HeaderDefinition(key, value))
+
+    write_config_header(template_path, output_path, definitions)
 
 
 if __name__ == "__main__":
@@ -371,10 +426,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output-path", help="Path to the output config header file", required=True
     )
+    parser.add_argument(
+        "--template-path", help="Path to the config header's template file", required=True
+    )
+    parser.add_argument("--extra-definitions", help="Extra header definitions")
 
     args = parser.parse_args()
 
     CompilerSettings.compiler_path = args.compiler_path
     CompilerSettings.compiler_args = args.compiler_args
 
-    generate_config_header(args.output_path)
+    generate_config_header(args.output_path, args.template_path, args.extra_definitions)

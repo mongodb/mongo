@@ -28,15 +28,19 @@ def mongo_config_header_impl(ctx):
     ctx.actions.run(
         executable = python.interpreter.path,
         outputs = [output],
-        inputs = depset(transitive = [cc_toolchain.all_files, python.files, ctx.attr.generator_script.files]),
+        inputs = depset(transitive = [cc_toolchain.all_files, python.files, ctx.attr.generator_script.files, ctx.attr.template.files]),
         arguments = [
             generator_script,  # bazel/config/generate_config_header.py
             "--compiler-path",
             compiler_bin,
             "--compiler-args",
             " ".join(compiler_flags),
+            "--template-path",
+            ctx.attr.template.files.to_list()[0].path,
             "--output-path",
             output.path,
+            "--extra-definitions",
+            json.encode(ctx.attr.extra_definitions),
         ],
     )
 
@@ -45,9 +49,17 @@ def mongo_config_header_impl(ctx):
 mongo_config_header = rule(
     mongo_config_header_impl,
     attrs = {
+        "template": attr.label(
+            doc = "The template file used to generate the header.",
+            allow_single_file = True,
+        ),
         "output": attr.label(
             doc = "The output of this rule.",
             allow_single_file = True,
+        ),
+        "extra_definitions": attr.string_dict(
+            doc = "Extra definitions to set.",
+            default = {},
         ),
         "generator_script": attr.label(
             doc = "The python generator script to use.",
