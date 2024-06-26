@@ -627,6 +627,12 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 assertTimeseriesBucketsCollectionNotFound(nss);
             }
 
+            if (source == OperationSource::kFromMigrate) {
+                uasserted(
+                    ErrorCodes::CannotCreateCollection,
+                    "The implicit creation of a collection due to a migration is not allowed.");
+            }
+
             collection.reset();  // unlock.
             makeCollection(opCtx, nss);
         }
@@ -1371,6 +1377,12 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                 if (!updateRequest->isUpsert()) {
                     // Inexistent collection.
                     return acquisition;
+                }
+
+                if (source == OperationSource::kFromMigrate) {
+                    uasserted(
+                        ErrorCodes::CannotCreateCollection,
+                        "The implicit creation of a collection due to a migration is not allowed.");
                 }
             }
             makeCollection(opCtx, ns);
