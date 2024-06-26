@@ -183,6 +183,13 @@ public:
                     continue;
                 }
 
+                // Don't propagate CommandOnShardedViewNotSupportedOnMongod errors for clarity. This
+                // command doesn't support any kind of view, whether or not it's sharded.
+                if (status == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
+                    uasserted(ErrorCodes::CommandNotSupportedOnView,
+                              "Operation not supported for a view");
+                }
+
                 uassertStatusOK(status);
                 auto parsedResponse =
                     AnalyzeShardKeyResponse::parse(IDLParserContext("clusterAnalyzeShardKey"),
