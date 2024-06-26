@@ -47,8 +47,8 @@ variables:
   - ubi8
   - rhel80
   - rhel-82-arm64
-  - rhel90
-  - rhel90-arm64
+  - rhel93
+  - rhel93-arm64
   - enterprise-rhel-80-64-bit
   - enterprise-rhel-80-64-bit-suggested  # For testing selinux.
   - enterprise-rhel-82-arm64
