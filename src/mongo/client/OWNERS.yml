@@ -3,3 +3,18 @@ filters:
   - "*":
     approvers:
       - 10gen/server-service-architecture
+  - "authenticate*":
+    approvers:
+      - 10gen/server-security
+  - "cyrus_sasl_client_session.*":
+    approvers:
+      - 10gen/server-security
+  - "internal_auth*":
+    approvers:
+      - 10gen/server-security
+  - "sasl*":
+    approvers:
+      - 10gen/server-security
+  - "scram_client_cache*":
+    approvers:
+      - 10gen/server-security
