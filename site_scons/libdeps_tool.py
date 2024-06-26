@@ -65,6 +65,7 @@ import json
 import fileinput
 import subprocess
 import time
+import traceback
 
 try:
     import networkx
@@ -1288,7 +1289,7 @@ def process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_sig):
                     sig = get_digest(str(lib))
                     BAZEL_SIG_CACHE[str(lib)] = sig
                     signature += sig
-            return signature
+            return signature, bazel_libs
 
         # add any per library link flags (whole archive flags)
         bazel_libs_to_append = handle_bazel_lib_link_flags(env, libdeps_ext, bazel_libs)
@@ -1297,7 +1298,7 @@ def process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_sig):
     # record time for metrics
     env.AddLibdepsTime(time.time() - start_time)
 
-    return bazel_libs_to_append
+    return bazel_libs_to_append, bazel_libs
 
 
 EMITTING_SHARED = None
@@ -1369,11 +1370,14 @@ def expand_libdeps_for_link(source, target, env, for_signature):
 
     if "conftest" not in str(target[0]):
         # process all the thin targets we gathers to search for hidden deps to link
-        bazel_libdeps = process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_signature)
+        bazel_libdeps_args, bazel_libdeps = process_bazel_libdeps(
+            env, bazel_libdeps_to_add, libdeps_ext, for_signature
+        )
+        setattr(target[0].attributes, "bazel_libdeps", bazel_libdeps)
     else:
-        bazel_libdeps = []
+        bazel_libdeps_args = []
 
-    return libdeps_with_flags + bazel_libdeps
+    return libdeps_with_flags + bazel_libdeps_args
 
 
 def generate_libdeps_graph(env):

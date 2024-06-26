@@ -1431,11 +1431,12 @@ def get_command(env, node, action):
             err_msg += " On Windows, please ensure that you have run the necessary Visual Studio environment setup scripts (e.g. vcvarsall.bat ...,  or launching a Visual Studio Command Prompt) before invoking SCons."
         raise Exception(err_msg)
 
+    bazel_deps = getattr(node.attributes, "bazel_libdeps", [])
     ninja_build = {
         "order_only": get_order_only(node),
         "outputs": get_outputs(node),
         "inputs": get_inputs(node),
-        "implicit": implicit,
+        "implicit": implicit + bazel_deps,
         "rule": rule,
         "variables": variables,
     }
