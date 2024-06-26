@@ -324,7 +324,9 @@ void validateRangeIndex(BSONType fieldType, StringData fieldPath, QueryTypeConfi
         }
     }
 
-    if (query.getTrimFactor().has_value()) {
+    if (gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        query.getTrimFactor().has_value()) {
         uint32_t tf = query.getTrimFactor().value();
 
         auto [defMin, defMax] = getRangeMinMaxDefaults(fieldType);
