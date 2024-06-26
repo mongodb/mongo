@@ -1004,14 +1004,6 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         env.AddMethod(wait_for_bazel, "WaitForBazel")
 
-        # need to force generated headers as targets as something may include the header, but its never listed explcitly,
-        # so this forces scons to always copy headers to its build tree for use includes
-        SCons.Script.BUILD_TARGETS += [
-            thintarget
-            for thintarget in Globals.scons2bazel_targets.keys()
-            if thintarget.strip().endswith(".h")
-        ]
-
     env.AddMethod(add_libdeps_time, "AddLibdepsTime")
     env.AddMethod(generate_bazel_info_for_ninja, "GenerateBazelInfoForNinja")
     env.AddMethod(bazel_deps_check_query_cache, "CheckBazelDepsCache")

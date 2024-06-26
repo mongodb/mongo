@@ -6671,13 +6671,6 @@ Export(
 )
 
 
-def injectMongoIncludePaths(thisEnv):
-    thisEnv.AppendUnique(CPPPATH=["$BUILD_DIR"])
-
-
-env.AddMethod(injectMongoIncludePaths, "InjectMongoIncludePaths")
-
-
 def injectModule(env, module, **kwargs):
     injector = env["MODULE_INJECTORS"].get(module)
     if injector:
@@ -6893,15 +6886,23 @@ else:
     env.AddMethod(noop, "WaitForBazel")
     env.AddMethod(noop, "BazelAutoInstall")
 
+
+def injectMongoIncludePaths(thisEnv):
+    thisEnv.AppendUnique(CPPPATH=["$BUILD_DIR"])
+    if thisEnv.get("BAZEL_OUT_DIR"):
+        thisEnv.AppendUnique(CPPPATH=["#$BAZEL_OUT_DIR/src"])
+
+
+env.AddMethod(injectMongoIncludePaths, "InjectMongoIncludePaths")
+
+gen_header_paths = [
+    (pathlib.Path(env.Dir("$BUILD_DIR").path) / "mongo").as_posix(),
+    (pathlib.Path(env.Dir("$BAZEL_OUT_DIR").path) / "src" / "mongo").as_posix(),
+]
+
 replacements = {
-    "@MONGO_BUILD_DIR@": (
-        ";".join(
-            [
-                (pathlib.Path(env.Dir("$BUILD_DIR").path) / "mongo").as_posix(),
-                (pathlib.Path(env.Dir("$BAZEL_OUT_DIR").path) / "src" / "mongo").as_posix(),
-            ]
-        )
-    ),
+    "@MONGO_BUILD_DIR@": ("|".join([path + "/.*" for path in gen_header_paths])),
+    "@MONGO_BRACKET_BUILD_DIR@": (";".join(gen_header_paths)),
 }
 
 clang_tidy_config = env.Substfile(
