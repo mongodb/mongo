@@ -36,6 +36,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/db/ttl_collection_cache.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
@@ -62,7 +63,15 @@ void TTLCollectionCache::registerTTLInfo(UUID uuid, const Info& info) {
 void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
     stdx::lock_guard<Latch> lock(_ttlInfosLock);
     auto infoIt = _ttlInfos.find(uuid);
-    fassert(5400705, infoIt != _ttlInfos.end());
+    if (infoIt == _ttlInfos.end()) {
+        LOGV2_DEBUG(9150100,
+                    3,
+                    "Tried to deregister index from TTLCollectionCache with untracked UUID",
+                    "uuid"_attr = uuid,
+                    "indexName"_attr = info.getIndexName());
+        return;
+    }
+
     auto& [_, infoVec] = *infoIt;
 
     auto iter = infoVec.begin();
@@ -83,8 +92,16 @@ void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
         });
     }
 
-    fassert(40220, iter != infoVec.end());
-    infoVec.erase(iter);
+    if (iter == infoVec.end()) {
+        LOGV2_DEBUG(9150101,
+                    3,
+                    "Tried to deregister untracked index from TTLCollectionCache",
+                    "uuid"_attr = uuid,
+                    "indexName"_attr = info.getIndexName());
+    } else {
+        infoVec.erase(iter);
+    }
+
     if (infoVec.empty()) {
         _ttlInfos.erase(infoIt);
     }
