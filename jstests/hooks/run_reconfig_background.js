@@ -13,7 +13,7 @@ import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 function isIgnorableError(codeName) {
     if (codeName === "NotWritablePrimary" || codeName === "InterruptedDueToReplStateChange" ||
         codeName === "PrimarySteppedDown" || codeName === "NodeNotFound" ||
-        codeName === "ShutdownInProgress") {
+        codeName === "ShutdownInProgress" || codeName == "InterruptedAtShutdown") {
         return true;
     }
     return false;
