@@ -2140,24 +2140,24 @@ if not env["HOST_ARCH"]:
 
 env["TARGET_OS_FAMILY"] = "posix" if env.TargetOSIs("posix") else env.GetTargetOSName()
 
-# Currently we only use tcmalloc on windows and linux x86_64. Other
-# linux targets (power, s390x, arm) do not currently support tcmalloc.
-#
+if env.TargetOSIs("linux") or "tcmalloc-google" == get_option("allocator"):
+    # tcmalloc from google has some requirements on the kernel version for rseq support
+    # here we check if it should be available
+    try:
+        kernel_version = platform.release().split(".")
+        kernel_major = int(kernel_version[0])
+        kernel_minor = int(kernel_version[1])
+    except (ValueError, IndexError):
+        print(
+            f"Failed to extract kernel major and minor versions, tcmalloc-google will not be available for use: {kernel_version}"
+        )
+        kernel_major = 0
+        kernel_minor = 0
+
 # Normalize the allocator option and store it in the Environment. It
 # would be nicer to use SetOption here, but you can't reset user
 # options for some strange reason in SCons. Instead, we store this
 # option as a new variable in the environment.
-try:
-    kernel_version = platform.release().split(".")
-    kernel_major = int(kernel_version[0])
-    kernel_minor = int(kernel_version[1])
-except (ValueError, IndexError):
-    print(
-        f"Failed to extract kernel major and minor versions, tcmalloc-google will not be available for use: {kernel_version}"
-    )
-    kernel_major = 0
-    kernel_minor = 0
-
 if get_option("allocator") == "auto":
     if env.TargetOSIs("linux") and env["TARGET_ARCH"] in ("x86_64", "aarch64"):
         env["MONGO_ALLOCATOR"] = "tcmalloc-google"
