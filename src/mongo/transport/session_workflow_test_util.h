@@ -33,7 +33,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/transport/mock_session.h"
-#include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -107,10 +106,8 @@ public:
     std::function<Future<void>(Message, const BatonHandle&)> asyncSinkMessageCb;
 };
 
-class MockServiceEntryPoint : public ServiceEntryPointImpl {
+class MockServiceEntryPoint : public ServiceEntryPoint {
 public:
-    using ServiceEntryPointImpl::ServiceEntryPointImpl;
-
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept override {
         return handleRequestCb(opCtx, request);

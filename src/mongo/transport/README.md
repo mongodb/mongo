@@ -73,7 +73,6 @@ to the client.
 [ServiceExecutor]: service_executor.h
 [SessionWorkflow]: session_workflow.h
 [ServiceEntryPoint]: service_entry_point.h
-[ServiceEntryPointImpl]: service_entry_point_impl.h
 [ReplyBuilderInterface]: ../rpc/reply_builder_interface.h
 [DocSequenceBuilder]: ../rpc/op_msg.h
 [egress_networking]: ../../../docs/egress_networking.md

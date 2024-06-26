@@ -69,7 +69,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/load_balancer_support.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/service_entry_point_mongos.h"
+#include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -201,14 +201,14 @@ Future<DbResponse> HandleRequest::run() {
     }
 }
 
-Future<DbResponse> ServiceEntryPointMongos::handleRequestImpl(OperationContext* opCtx,
-                                                              const Message& message) noexcept {
+Future<DbResponse> ServiceEntryPointRouterRole::handleRequestImpl(OperationContext* opCtx,
+                                                                  const Message& message) noexcept {
     auto hr = HandleRequest(opCtx, message);
     return hr.run();
 }
 
-Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
-                                                          const Message& message) noexcept {
+Future<DbResponse> ServiceEntryPointRouterRole::handleRequest(OperationContext* opCtx,
+                                                              const Message& message) noexcept {
     return handleRequestImpl(opCtx, message);
 }
 

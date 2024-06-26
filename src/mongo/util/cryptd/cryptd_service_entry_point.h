@@ -30,15 +30,13 @@
 #pragma once
 
 #include "mongo/transport/client_transport_observer.h"
-#include "mongo/transport/service_entry_point_impl.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session_manager_common.h"
 
 namespace mongo {
 
-class ServiceEntryPointCryptD final : public ServiceEntryPointImpl {
+class ServiceEntryPointCryptD final : public ServiceEntryPoint {
 public:
-    using ServiceEntryPointImpl::ServiceEntryPointImpl;
-
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept final;
 };

@@ -29,20 +29,18 @@
 
 #pragma once
 
-#include "mongo/transport/service_entry_point_impl.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/rpc/message.h"
+#include "mongo/transport/service_entry_point.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
 /**
- * The entry point from the TransportLayer into Mongos.
+ * Shard-role specific service entry point.
  */
-class ServiceEntryPointMongos final : public ServiceEntryPointImpl {
+class ServiceEntryPointShardRole final : public ServiceEntryPoint {
 public:
-    using ServiceEntryPointImpl::ServiceEntryPointImpl;
-
-    static Future<DbResponse> handleRequestImpl(OperationContext* opCtx,
-                                                const Message& request) noexcept;
-
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept final;
 };

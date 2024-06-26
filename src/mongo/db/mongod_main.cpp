@@ -198,7 +198,8 @@
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_entry_point_mongod.h"
+#include "mongo/db/service_entry_point_rs_endpoint.h"
+#include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/kill_sessions_remote.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -261,7 +262,7 @@
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/resource_yielders.h"
 #include "mongo/s/routing_information_cache.h"
-#include "mongo/s/service_entry_point_mongos.h"
+#include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
@@ -525,8 +526,20 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     initializeCommandHooks(serviceContext);
 
-    serviceContext->getService(ClusterRole::ShardServer)
-        ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    {
+        // (Ignore FCV check): The ReplicaSetEndpoint service entry point needs to be set even
+        // before the FCV is fully upgraded.
+        const bool useRSEndpoint =
+            feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabledAndIgnoreFCVUnsafe();
+        auto shardRoleSEP = std::make_unique<ServiceEntryPointShardRole>();
+        auto shardService = serviceContext->getService(ClusterRole::ShardServer);
+        if (useRSEndpoint) {
+            shardService->setServiceEntryPoint(
+                std::make_unique<ServiceEntryPointRSEndpoint>(std::move(shardRoleSEP)));
+        } else {
+            shardService->setServiceEntryPoint(std::move(shardRoleSEP));
+        }
+    }
 
     {
         // Set up the periodic runner for background job execution. This is required to be running
@@ -933,7 +946,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
             // Router role should use SEPMongos
             serviceContext->getService(ClusterRole::RouterServer)
-                ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
+                ->setServiceEntryPoint(std::make_unique<ServiceEntryPointRouterRole>());
         }
 
         if (replSettings.isReplSet() &&

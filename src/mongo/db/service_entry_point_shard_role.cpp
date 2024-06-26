@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/service_entry_point_common.h"
+#include "mongo/db/service_entry_point_shard_role.h"
 
 #include <algorithm>
 #include <boost/optional.hpp>
@@ -118,6 +118,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_entry_point_shard_role_helpers.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
@@ -229,10 +230,8 @@ struct HandleRequest {
     // Maintains the context (e.g., opCtx and replyBuilder) required for command execution.
     class ExecutionContext final : public RequestExecutionContext {
     public:
-        ExecutionContext(OperationContext* opCtx,
-                         Message msg,
-                         const ServiceEntryPointCommon::Hooks& hooks)
-            : RequestExecutionContext(opCtx, std::move(msg)), behaviors(hooks) {}
+        ExecutionContext(OperationContext* opCtx, Message msg)
+            : RequestExecutionContext(opCtx, std::move(msg)) {}
         ~ExecutionContext() = default;
 
         Client& client() const {
@@ -275,15 +274,12 @@ struct HandleRequest {
                 (client().session() && client().isInternalClient());
         }
 
-        const ServiceEntryPointCommon::Hooks& behaviors;
         boost::optional<long long> slowMsOverride;
         bool forceLog = false;
     };
 
-    HandleRequest(OperationContext* opCtx,
-                  const Message& msg,
-                  const ServiceEntryPointCommon::Hooks& behaviors)
-        : executionContext(ExecutionContext(opCtx, const_cast<Message&>(msg), behaviors)) {}
+    HandleRequest(OperationContext* opCtx, const Message& msg)
+        : executionContext(ExecutionContext(opCtx, const_cast<Message&>(msg))) {}
 
     void startOperation();
     DbResponse runOperation();
@@ -640,7 +636,7 @@ private:
     // Clear any lock state which may have changed after the locker update.
     void _resetLockerStateAfterShardingUpdate(OperationContext* opCtx) {
         dassert(!opCtx->isContinuingMultiDocumentTransaction());
-        _execContext.behaviors.resetLockerState(opCtx);
+        service_entry_point_shard_role_helpers::resetLockerState(opCtx);
         if (opCtx->isStartingMultiDocumentTransaction())
             _setLockStateForTransaction(opCtx);
     }
@@ -1039,7 +1035,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         }
 
         if (opCtx->isStartingMultiDocumentTransaction()) {
-            execContext.behaviors.waitForReadConcern(
+            service_entry_point_shard_role_helpers::waitForReadConcern(
                 opCtx, _ecd->getInvocation(), execContext.getRequest());
         }
 
@@ -1227,7 +1223,6 @@ void RunCommandImpl::_epilogue() {
     auto opCtx = execContext.getOpCtx();
     auto command = execContext.getCommand();
     auto replyBuilder = execContext.getReplyBuilder();
-    auto& behaviors = execContext.behaviors;
     _ecd->onCommandFinished();
 
     // This fail point blocks all commands which are running on the specified namespace, or which
@@ -1259,18 +1254,18 @@ void RunCommandImpl::_epilogue() {
                 requestMatchesComment;
         });
 
-    behaviors.waitForLinearizableReadConcern(opCtx);
+    service_entry_point_shard_role_helpers::waitForLinearizableReadConcern(opCtx);
     const DatabaseName& dbName = _ecd->getInvocation()->db();
     tenant_migration_access_blocker::checkIfLinearizableReadWasAllowedOrThrow(opCtx, dbName);
 
     // Wait for data to satisfy the read concern level, if necessary.
-    behaviors.waitForSpeculativeMajorityReadConcern(opCtx);
+    service_entry_point_shard_role_helpers::waitForSpeculativeMajorityReadConcern(opCtx);
 
     {
         auto body = replyBuilder->getBodyBuilder();
         auto status = CommandHelpers::extractOrAppendOkAndGetStatus(body);
         _ok = status.isOK();
-        behaviors.attachCurOpErrInfo(opCtx, status);
+        service_entry_point_shard_role_helpers::attachCurOpErrInfo(opCtx, status);
 
         boost::optional<ErrorCodes::Error> code =
             _ok ? boost::none : boost::optional<ErrorCodes::Error>(status.code());
@@ -1291,15 +1286,14 @@ void RunCommandImpl::_epilogue() {
     }
 
     auto commandBodyBob = replyBuilder->getBodyBuilder();
-    behaviors.appendReplyMetadata(
+    service_entry_point_shard_role_helpers::appendReplyMetadata(
         opCtx, _ecd->getInvocation()->getGenericArguments(), &commandBodyBob);
     appendClusterAndOperationTime(
         opCtx, &commandBodyBob, &commandBodyBob, _ecd->getStartOperationTime());
 }
 
 void RunCommandImpl::_runImpl() {
-    auto& execContext = _ecd->getExecutionContext();
-    execContext.behaviors.uassertCommandDoesNotSpecifyWriteConcern(
+    service_entry_point_shard_role_helpers::uassertCommandDoesNotSpecifyWriteConcern(
         _ecd->getInvocation()->getGenericArguments());
     _runCommand();
 }
@@ -1338,7 +1332,8 @@ void RunCommandAndWaitForWriteConcern::_waitForWriteConcern(BSONObjBuilder& bb) 
     }
 
     CurOp::get(opCtx)->debug().writeConcern.emplace(opCtx->getWriteConcern());
-    _execContext.behaviors.waitForWriteConcern(opCtx, invocation, _ecd->getLastOpBeforeRun(), bb);
+    service_entry_point_shard_role_helpers::waitForWriteConcern(
+        opCtx, invocation, _ecd->getLastOpBeforeRun(), bb);
 }
 
 void RunCommandAndWaitForWriteConcern::_runImpl() {
@@ -1370,7 +1365,8 @@ void RunCommandAndWaitForWriteConcern::_setup() {
     if (command->getLogicalOp() == LogicalOp::opGetMore) {
         // WriteConcern will be set up during command processing, it must not be specified on
         // the command body.
-        _execContext.behaviors.uassertCommandDoesNotSpecifyWriteConcern(genericArgs);
+        service_entry_point_shard_role_helpers::uassertCommandDoesNotSpecifyWriteConcern(
+            genericArgs);
     } else {
         // WriteConcern should always be explicitly specified by operations received on shard
         // and config servers, even if it is empty (ie. writeConcern: {}).  In this context
@@ -1912,10 +1908,11 @@ void ExecCommandDatabase::_commandExec() {
     // after invoking the TransactionParticipant, which will determine whether a transaction
     // is being started or continued.
     if (!opCtx->inMultiDocumentTransaction()) {
-        _execContext.behaviors.waitForReadConcern(
+        service_entry_point_shard_role_helpers::waitForReadConcern(
             opCtx, getInvocation(), _execContext.getRequest());
     }
-    _execContext.behaviors.setPrepareConflictBehaviorForReadConcern(opCtx, getInvocation());
+    service_entry_point_shard_role_helpers::setPrepareConflictBehaviorForReadConcern(
+        opCtx, getInvocation());
 
     _extraFieldsBuilder.resetToEmpty();
     _execContext.getReplyBuilder()->reset();
@@ -1989,7 +1986,8 @@ StatusWith<bool> ExecCommandDatabase::_refreshIfNeeded(const Status& execError) 
             return false;
         }
 
-        const auto refreshStatus = _execContext.behaviors.refreshDatabase(opCtx, *staleInfo);
+        const auto refreshStatus =
+            service_entry_point_shard_role_helpers::refreshDatabase(opCtx, *staleInfo);
         if (refreshStatus.isOK()) {
             _refreshedDatabase = true;
             return true;
@@ -2021,10 +2019,12 @@ StatusWith<bool> ExecCommandDatabase::_refreshIfNeeded(const Status& execError) 
         }
 
         if (inCriticalSection) {
-            _execContext.behaviors.handleReshardingCriticalSectionMetrics(opCtx, *staleInfo);
+            service_entry_point_shard_role_helpers::handleReshardingCriticalSectionMetrics(
+                opCtx, *staleInfo);
         }
 
-        const auto refreshStatus = _execContext.behaviors.refreshCollection(opCtx, *staleInfo);
+        const auto refreshStatus =
+            service_entry_point_shard_role_helpers::refreshCollection(opCtx, *staleInfo);
 
         // Fail the direct shard operation so that a RetryableWriteError label can be returned and
         // the write can be retried by the driver.
@@ -2049,7 +2049,8 @@ StatusWith<bool> ExecCommandDatabase::_refreshIfNeeded(const Status& execError) 
         tassert(8462305, "ShardCannotRefreshDueToLocksHeld must have extraInfo", refreshInfo);
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
-        const auto refreshStatus = _execContext.behaviors.refreshCatalogCache(opCtx, *refreshInfo);
+        const auto refreshStatus =
+            service_entry_point_shard_role_helpers::refreshCatalogCache(opCtx, *refreshInfo);
         if (refreshStatus.isOK()) {
             _refreshedCatalogCache = true;
             return true;
@@ -2134,7 +2135,6 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     auto opCtx = _execContext.getOpCtx();
     auto command = _execContext.getCommand();
     auto replyBuilder = _execContext.getReplyBuilder();
-    const auto& behaviors = _execContext.behaviors;
     onCommandFinished();
 
     // Append the error labels for transient transaction errors.
@@ -2154,7 +2154,8 @@ void ExecCommandDatabase::_handleFailure(Status status) {
                                         getLastOpAfterRun());
 
     BSONObjBuilder metadataBob;
-    behaviors.appendReplyMetadata(opCtx, _invocation->getGenericArguments(), &metadataBob);
+    service_entry_point_shard_role_helpers::appendReplyMetadata(
+        opCtx, _invocation->getGenericArguments(), &metadataBob);
 
     // The read concern may not have yet been placed on the operation context, so attempt to parse
     // it here, so if it is valid it can be used to compute the proper operationTime.
@@ -2177,8 +2178,9 @@ void ExecCommandDatabase::_handleFailure(Status status) {
                 "Assertion while executing command",
                 "command"_attr = _execContext.getRequest().getCommandName(),
                 "db"_attr = _execContext.getRequest().readDatabaseForLogging(),
-                "commandArgs"_attr = redact(ServiceEntryPointCommon::getRedactedCopyForLogging(
-                    command, _execContext.getRequest().body)),
+                "commandArgs"_attr =
+                    redact(service_entry_point_shard_role_helpers::getRedactedCopyForLogging(
+                        command, _execContext.getRequest().body)),
                 "error"_attr = redact(status.toString()));
 
     generateErrorResponse(
@@ -2229,15 +2231,16 @@ void executeCommand(HandleRequest::ExecutionContext& execContext) {
     }
 
     Command* c = execContext.getCommand();
-    LOGV2_DEBUG(21965,
-                2,
-                "About to run the command",
-                "db"_attr = request.readDatabaseForLogging(),
-                "client"_attr = (opCtx->getClient() && opCtx->getClient()->hasRemote()
-                                     ? opCtx->getClient()->getRemote().toString()
-                                     : ""),
-                "commandArgs"_attr =
-                    redact(ServiceEntryPointCommon::getRedactedCopyForLogging(c, request.body)));
+    LOGV2_DEBUG(
+        21965,
+        2,
+        "About to run the command",
+        "db"_attr = request.readDatabaseForLogging(),
+        "client"_attr = (opCtx->getClient() && opCtx->getClient()->hasRemote()
+                             ? opCtx->getClient()->getRemote().toString()
+                             : ""),
+        "commandArgs"_attr = redact(
+            service_entry_point_shard_role_helpers::getRedactedCopyForLogging(c, request.body)));
 
     opCtx->setExhaust(OpMsg::isFlagSet(execContext.getMessage(), OpMsg::kExhaustSupported));
 
@@ -2423,7 +2426,7 @@ void HandleRequest::completeOperation(DbResponse& response) {
             LOGV2_DEBUG(21970, 1, "Note: not profiling because of recursive read lock");
         } else if (executionContext.client().isInDirectClient()) {
             LOGV2_DEBUG(21971, 1, "Note: not profiling because we are in DBDirectClient");
-        } else if (executionContext.behaviors.lockedForWriting()) {
+        } else if (service_entry_point_shard_role_helpers::lockedForWriting()) {
             LOGV2_DEBUG(21972, 1, "Note: not profiling because doing fsync+lock");
         } else if (opCtx->readOnly()) {
             LOGV2_DEBUG(21973, 1, "Note: not profiling because server is read-only");
@@ -2447,15 +2450,6 @@ void HandleRequest::completeOperation(DbResponse& response) {
 
 }  // namespace
 
-BSONObj ServiceEntryPointCommon::getRedactedCopyForLogging(const Command* command,
-                                                           const BSONObj& cmdObj) {
-    mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
-    command->snipForLogging(&cmdToLog);
-    BSONObjBuilder bob;
-    cmdToLog.writeTo(&bob);
-    return bob.obj();
-}
-
 void logHandleRequestFailure(const Status& status) {
     LOGV2_INFO(4879802, "Failed to handle request", "error"_attr = redact(status));
 }
@@ -2477,10 +2471,9 @@ void onHandleRequestException(const HandleRequest::ExecutionContext& context,
     logHandleRequestFailure(status);
 }
 
-Future<DbResponse> ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
-                                                          const Message& m,
-                                                          const Hooks& behaviors) noexcept try {
-    HandleRequest hr(opCtx, m, behaviors);
+Future<DbResponse> ServiceEntryPointShardRole::handleRequest(OperationContext* opCtx,
+                                                             const Message& m) noexcept try {
+    HandleRequest hr(opCtx, m);
     hr.startOperation();
 
     try {
@@ -2496,7 +2489,5 @@ Future<DbResponse> ServiceEntryPointCommon::handleRequest(OperationContext* opCt
     logHandleRequestFailure(status);
     return status;
 }
-
-ServiceEntryPointCommon::Hooks::~Hooks() = default;
 
 }  // namespace mongo

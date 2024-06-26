@@ -40,7 +40,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cluster_command_translations.h"
-#include "mongo/s/service_entry_point_mongos.h"
+#include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 
@@ -66,7 +66,7 @@ BSONObj ClusterSEPTransactionClientBehaviors::maybeModifyCommand(BSONObj cmdObj)
 Future<DbResponse> ClusterSEPTransactionClientBehaviors::handleRequest(
     OperationContext* opCtx, const Message& request) const {
     if (!_isRouterEnabled) {
-        return ServiceEntryPointMongos::handleRequestImpl(opCtx, request);
+        return ServiceEntryPointRouterRole::handleRequestImpl(opCtx, request);
     }
     return _service->getServiceEntryPoint()->handleRequest(opCtx, request);
 }

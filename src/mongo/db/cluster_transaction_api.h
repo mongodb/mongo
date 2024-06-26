@@ -35,7 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/rpc/message.h"
-#include "mongo/s/service_entry_point_mongos.h"
+#include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/util/future.h"
 
 namespace mongo::txn_api::details {

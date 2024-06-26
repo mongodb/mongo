@@ -33,7 +33,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
-#include "mongo/s/service_entry_point_mongos.h"
+#include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -68,7 +68,7 @@ MultiUpdateCoordinatorExternalStateImpl::MultiUpdateCoordinatorExternalStateImpl
 Future<DbResponse> MultiUpdateCoordinatorExternalStateImpl::sendClusterUpdateCommandToShards(
     OperationContext* opCtx, const Message& message) const {
     opCtx->setCommandForwardedFromRouter();
-    return ServiceEntryPointMongos::handleRequestImpl(opCtx, message);
+    return ServiceEntryPointRouterRole::handleRequestImpl(opCtx, message);
 }
 
 void MultiUpdateCoordinatorExternalStateImpl::startBlockingMigrations(OperationContext* opCtx,

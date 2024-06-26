@@ -30,7 +30,9 @@
 #pragma once
 
 #include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -56,13 +58,21 @@ public:
      * severity every X seconds (defined in SEP::impl) to prevent logs from overwhelming the rest
      * of the system.
      */
-    virtual logv2::LogSeverity slowSessionWorkflowLogSeverity() = 0;
+    logv2::LogSeverity slowSessionWorkflowLogSeverity() {
+        return _slowSessionWorkflowLogSuppressor();
+    }
 
     /**
      * Processes a request and fills out a DbResponse.
      */
     virtual Future<DbResponse> handleRequest(OperationContext* opCtx,
                                              const Message& request) noexcept = 0;
-};
 
+private:
+    static constexpr Seconds kSlowSessionWorkflowLogSuppresionPeriod{5};
+    logv2::SeveritySuppressor _slowSessionWorkflowLogSuppressor{
+        kSlowSessionWorkflowLogSuppresionPeriod,
+        logv2::LogSeverity::Info(),
+        logv2::LogSeverity::Debug(2)};
+};
 }  // namespace mongo

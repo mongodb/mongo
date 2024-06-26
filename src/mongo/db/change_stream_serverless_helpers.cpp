@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/change_stream_serverless_helpers.h"
 
 #include <memory>

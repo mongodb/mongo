@@ -427,7 +427,7 @@ env.Library(
     target="startup_initialization",
     source=[
         "client_transport_observer_mongos.cpp",
-        "service_entry_point_mongos.cpp",
+        "service_entry_point_router_role.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/catalog/collection_catalog",

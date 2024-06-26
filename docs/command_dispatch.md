@@ -15,16 +15,10 @@ single client connection during its lifetime. Central to the entry point is the
 requests and returns a response message indicating the result of the
 corresponding request message. This function is currently implemented by several
 subclasses of the parent `ServiceEntryPoint` in order to account for the
-differences in processing requests between _mongod_ and _mongos_ -- these
-distinctions are reflected in the `ServiceEntryPointMongos` and
-`ServiceEntryPointMongod` subclasses (see [here][service_entry_point_mongos_h]
-and [here][service_entry_point_mongod_h]). One such distinction is the _mongod_
-entry point's use of the `ServiceEntryPointCommon::Hooks` interface, which
-provides greater flexibility in modifying the entry point's behavior. This
-includes waiting on a read of a particular [read concern][read_concern] level to
-be completed, as well as determining whether a read concern can indeed by
-satisfied given the current state of the server. Similar functionality exists
-for [write concerns][write_concern] as well.
+differences in processing requests between the shard and router roles -- these
+distinctions are reflected in the `ServiceEntryPointRouterRole` and
+`ServiceEntryPointShardRole` subclasses (see [here][service_entry_point_router_role_h]
+and [here][service_entry_point_shard_role.h]).
 
 ## Strategy
 
@@ -73,8 +67,8 @@ For details on transport internals, including ingress networking, see [this docu
 [service_entry_point_h]: ../src/mongo/transport/service_entry_point.h
 [session_h]: ../src/mongo/transport/session.h
 [session_workflow_h]: ../src/mongo/transport/session_workflow.h
-[service_entry_point_mongos_h]: ../src/mongo/s/service_entry_point_mongos.h
-[service_entry_point_mongod_h]: ../src/mongo/db/service_entry_point_mongod.h
+[service_entry_point_router_role_h]: ../src/mongo/s/service_entry_point_router_role.h
+[service_entry_point_shard_role_h]: ../src/mongo/db/service_entry_point_shard_role.h
 [read_concern]: https://docs.mongodb.com/manual/reference/read-concern/
 [write_concern]: https://docs.mongodb.com/manual/reference/write-concern/
 [strategy_h]: ../src/mongo/s/commands/strategy.h

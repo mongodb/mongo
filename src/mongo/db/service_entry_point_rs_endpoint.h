@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,34 +29,33 @@
 
 #pragma once
 
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/service_entry_point_shard_role.h"
+#include "mongo/rpc/message.h"
 #include "mongo/transport/service_entry_point.h"
-
-#include "mongo/logv2/log_severity.h"
-#include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
 /**
- * A basic entry point from the TransportLayer into a server.
+ * Replica-Set Endpoint specific service entry point.
  *
- * The server logic is implemented inside of handleRequest() by a subclass.
+ * The Replica-Set Endpoint service is a "proxy service" that ordinarily will dispatch
+ * requests to the router-role ServiceEntryPoint, but will dispatch particular requests
+ * to the shard-role ServiceEntryPoint.
  */
-class ServiceEntryPointImpl : public ServiceEntryPoint {
+class ServiceEntryPointRSEndpoint final : public ServiceEntryPoint {
 public:
-    using ServiceEntryPoint::ServiceEntryPoint;
+    ServiceEntryPointRSEndpoint(std::unique_ptr<ServiceEntryPointShardRole> shardSep)
+        : _shardSep{std::move(shardSep)} {}
 
-    static constexpr Seconds kSlowSessionWorkflowLogSuppresionPeriod{5};
-
-    logv2::LogSeverity slowSessionWorkflowLogSeverity() final {
-        return _slowSessionWorkflowLogSuppressor();
-    }
+    Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                     const Message& request) noexcept final;
 
 private:
-    logv2::SeveritySuppressor _slowSessionWorkflowLogSuppressor{
-        kSlowSessionWorkflowLogSuppresionPeriod,
-        logv2::LogSeverity::Info(),
-        logv2::LogSeverity::Debug(2)};
-};
+    Future<DbResponse> _replicaSetEndpointHandleRequest(OperationContext* opCtx,
+                                                        const Message& request) noexcept;
 
+    std::unique_ptr<ServiceEntryPointShardRole> _shardSep;
+};
 }  // namespace mongo

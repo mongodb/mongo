@@ -1249,47 +1249,13 @@ env.Library(
 env.Library(
     target="service_context_d",
     source=[
-        "service_entry_point_mongod.cpp",
+        "service_entry_point_rs_endpoint.cpp",
+        "service_entry_point_shard_role.cpp",
         "transaction_resources_init_mongod.cpp",
     ],
     LIBDEPS=[
         "service_context",
         "storage/storage_engine_common",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/s/startup_initialization",
-        "auth/auth",
-        "command_can_run_here",
-        "commands/fsync_locked",
-        "not_primary_error_tracker",
-        "read_concern_d_impl",
-        "rw_concern_d",
-        "s/sharding_runtime_d",
-        "server_base",
-        "service_entry_point_common",
-        "storage/storage_engine_lock_file",
-        "storage/storage_engine_metadata",
-        "storage/storage_options",
-    ],
-)
-
-env.Library(
-    target="service_context_non_d",
-    source=[
-        "transaction_resources_init_non_mongod.cpp",
-    ],
-    LIBDEPS=[
-        "service_context",
-    ],
-    LIBDEPS_PRIVATE=[
-        "shard_role_api",
-    ],
-)
-
-env.Library(
-    target="service_entry_point_common",
-    source=[
-        "service_entry_point_common.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
@@ -1305,6 +1271,7 @@ env.Library(
         "auth/security_token_auth",
         "auth/user_acquisition_stats",
         "command_can_run_here",
+        "commands/fsync_locked",
         "commands/server_status_core",
         "commands/txn_cmd_request",
         "curop_metrics",
@@ -1312,10 +1279,13 @@ env.Library(
         "introspect",
         "multitenancy",
         "not_primary_error_tracker",
+        "read_concern_d_impl",
         "repl/repl_server_parameters",
         "repl/replica_set_messages",
         "repl/tenant_migration_access_blocker",
         "rw_concern_d",
+        "s/sharding_runtime_d",
+        "server_base",
         "server_feature_flags",
         "session/session_catalog_mongod",
         "shared_request_handling",
@@ -1327,9 +1297,23 @@ env.Library(
         "stats/top",
         "storage/storage_engine_lock_file",
         "storage/storage_engine_metadata",
+        "storage/storage_options",
         "transaction/transaction",
         "validate_api_parameters",
         "write_block_bypass",
+    ],
+)
+
+env.Library(
+    target="service_context_non_d",
+    source=[
+        "transaction_resources_init_non_mongod.cpp",
+    ],
+    LIBDEPS=[
+        "service_context",
+    ],
+    LIBDEPS_PRIVATE=[
+        "shard_role_api",
     ],
 )
 

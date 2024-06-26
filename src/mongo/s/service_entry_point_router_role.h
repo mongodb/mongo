@@ -29,28 +29,20 @@
 
 #pragma once
 
-#include "mongo/db/dbmessage.h"
-#include "mongo/rpc/message.h"
-#include "mongo/transport/service_entry_point_impl.h"
-#include "mongo/util/future.h"
+#include "mongo/transport/service_entry_point.h"
 
 namespace mongo {
 
 /**
- * Mongod specific service entry point.
+ * The entry point from the TransportLayer into Mongos.
  */
-class ServiceEntryPointMongod final : public ServiceEntryPointImpl {
+class ServiceEntryPointRouterRole final : public ServiceEntryPoint {
 public:
-    ServiceEntryPointMongod();
-    ~ServiceEntryPointMongod() override;
+    static Future<DbResponse> handleRequestImpl(OperationContext* opCtx,
+                                                const Message& request) noexcept;
+
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept final;
-
-private:
-    Future<DbResponse> _replicaSetEndpointHandleRequest(OperationContext* opCtx,
-                                                        const Message& m) noexcept;
-    class Hooks;
-    std::unique_ptr<Hooks> _hooks;
 };
 
 }  // namespace mongo

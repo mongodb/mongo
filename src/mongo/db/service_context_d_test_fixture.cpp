@@ -48,7 +48,7 @@
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_entry_point_mongod.h"
+#include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -134,7 +134,8 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
         serviceContext->setTickSource(std::move(options._mockTickSource));
     }
 
-    serviceContext->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    serviceContext->getService()->setServiceEntryPoint(
+        std::make_unique<ServiceEntryPointShardRole>());
 
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
     serviceContext->setOpObserver(std::move(observerRegistry));
