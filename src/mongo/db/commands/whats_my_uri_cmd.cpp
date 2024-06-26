@@ -48,10 +48,6 @@ class CmdWhatsMyUri : public BasicCommand {
 public:
     CmdWhatsMyUri() : BasicCommand("whatsmyuri") {}
 
-    bool requiresAuth() const override {
-        return false;
-    }
-
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
@@ -64,10 +60,11 @@ public:
         return "{whatsmyuri:1}";
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj& cmdObj) const override {
-        return Status::OK();  // No auth required
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        // No explicit privileges required.  Any authenticated user may call.
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,
