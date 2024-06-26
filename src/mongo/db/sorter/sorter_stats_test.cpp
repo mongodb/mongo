@@ -67,16 +67,21 @@ TEST(SorterStatsTest, SingleSorterMemUsage) {
     ASSERT_EQ(sorterStats.memUsage(), 1);
     ASSERT_EQ(sorterTracker.memUsage.load(), 1);
 
+    // Decrement 'memUsage' more than the total
+    sorterStats.decrementMemUsage(10);
+    ASSERT_EQ(sorterStats.memUsage(), 0);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 0);
+
     sorterStats.resetMemUsage();
     ASSERT_EQ(sorterStats.memUsage(), 0);
     ASSERT_EQ(sorterTracker.memUsage.load(), 0);
 
-    // Simulate increasing memUsage
+    // Simulate increasing 'memUsage'
     sorterStats.setMemUsage(3);
     ASSERT_EQ(sorterStats.memUsage(), 3);
     ASSERT_EQ(sorterTracker.memUsage.load(), 3);
 
-    // Simulate decreasing memUsage
+    // Simulate decreasing 'memUsage'
     sorterStats.setMemUsage(1);
     ASSERT_EQ(sorterStats.memUsage(), 1);
     ASSERT_EQ(sorterTracker.memUsage.load(), 1);
