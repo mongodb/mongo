@@ -384,6 +384,9 @@ buildvariants:
       # thread leaks, which we have because we don't do a clean shutdown
       # of the ServiceContext.
       #
+      # Run TSAN with diagnostic latches off, as our diagnostics reduce
+      # TSAN's visibility - see SERVER-88159.
+      #
       san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=5:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
       build_mongot: true
       compile_flags: >-
@@ -396,7 +399,7 @@ buildvariants:
         --use-libunwind=off
         --link-model=dynamic
         -j$(grep -c ^processor /proc/cpuinfo)
-        --use-diagnostic-latches=on
+        --use-diagnostic-latches=off
       # Avoid starting too many mongod's under TSAN build.
       resmoke_jobs_factor: 0.3
       scons_cache_scope: shared
@@ -408,7 +411,7 @@ buildvariants:
       multiversion_edition: enterprise
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-        --excludeWithAnyTags=tsan_incompatible
+        --excludeWithAnyTags=tsan_incompatible,requires_latch_analyzer
     tasks:
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
