@@ -893,9 +893,8 @@ copy_cell_restart:
         WT_RET(__wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &page_del->timestamp));
         WT_RET(__wt_vunpack_uint(
           &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &page_del->durable_timestamp));
-        page_del->prepare_state = 0;                /* No prepare can have been in progress. */
-        page_del->previous_ref_state = WT_REF_DISK; /* The leaf page is on disk. */
-        page_del->committed = true;                 /* There is no running transaction. */
+        page_del->prepare_state = 0; /* No prepare can have been in progress. */
+        page_del->committed = true;  /* There is no running transaction. */
         page_del->selected_for_write = true;
     }
 

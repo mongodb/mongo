@@ -179,7 +179,7 @@ class test_hs21(wttest.WiredTigerTestCase):
             stat_cursor.reset()
             curr_files_open = stat_cursor[stat.conn.file_open][2]
             curr_dhandles_removed = stat_cursor[stat.conn.dh_sweep_remove][2]
-            curr_dhandle_sweep_closes = stat_cursor[stat.conn.dh_sweep_close][2]
+            curr_dhandle_sweep_closes = stat_cursor[stat.conn.dh_sweep_dead_close][2]
 
             self.printVerbose(3, "==== loop " + str(sleep))
             self.printVerbose(3, "Number of files open: " + str(curr_files_open))
@@ -192,7 +192,7 @@ class test_hs21(wttest.WiredTigerTestCase):
                 break
 
         stat_cursor.reset()
-        final_dhandle_sweep_closes = stat_cursor[stat.conn.dh_sweep_close][2]
+        final_dhandle_sweep_closes = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         stat_cursor.close()
         # We want to assert our active history files have all been closed.
         self.assertGreaterEqual(final_dhandle_sweep_closes, self.numfiles)

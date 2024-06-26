@@ -135,7 +135,7 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     if (previous_state != WT_REF_DISK)
         return (0);
 
-    if (!WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
+    if (!WT_REF_CAS_STATE(session, ref, WT_REF_DISK, WT_REF_LOCKED))
         return (0);
 
     /*
@@ -194,9 +194,7 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      */
     WT_ERR(__wt_page_parent_modify_set(session, ref, false));
 
-    /* Allocate and initialize the page-deleted structure. */
     WT_ERR(__wt_calloc_one(session, &ref->page_del));
-    ref->page_del->previous_ref_state = previous_state;
 
     /* History store truncation is non-transactional. */
     if (!WT_IS_HS(session->dhandle))
@@ -213,7 +211,7 @@ err:
     __wt_free(session, ref->page_del);
 
     /* Return the page to its previous state. */
-    WT_REF_SET_STATE(ref, previous_state);
+    WT_REF_SET_STATE(ref, WT_REF_DISK);
     return (ret);
 }
 
@@ -267,7 +265,11 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
      * the update list to be null to be conservative.
      */
     if (current_state == WT_REF_DELETED) {
-        current_state = ref->page_del->previous_ref_state;
+        /*
+         * When fast truncate succeeds it moves a WT_REF from WT_REF_DISK to WT_REF_DELETED. Thus
+         * the reverse operation is to return the state to WT_REF_DISK.
+         */
+        current_state = WT_REF_DISK;
         /*
          * Don't set the WT_PAGE_DELETED transaction ID to aborted; instead, just discard the
          * structure. This avoids having to check for an aborted delete in other situations.
@@ -539,7 +541,7 @@ __instantiate_col_var(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_DELETED *pa
                 WT_ASSERT(session, cbt.slot == WT_COL_SLOT(page, cip));
 
                 /* Attach the tombstone, using the update-restore path. */
-                WT_ERR(__wt_col_modify(&cbt, recno + j, NULL, upd, WT_UPDATE_INVALID, true, true));
+                WT_ERR(__wt_col_modify(&cbt, recno + j, NULL, &upd, WT_UPDATE_INVALID, true, true));
                 /* Null the pointer so we don't free it twice. */
                 upd = NULL;
             }

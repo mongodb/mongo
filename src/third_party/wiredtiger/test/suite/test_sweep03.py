@@ -97,7 +97,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         self.wait_for_sweep(0)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close1 = stat_cursor[stat.conn.dh_sweep_close][2]
+        close1 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         stat_cursor.close()
 
         # We expect nothing to have been closed.
@@ -118,7 +118,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # We just filled the table, now check what the stats are
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache1 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        close1 = stat_cursor[stat.conn.dh_sweep_close][2]
+        close1 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         sweep_baseline = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
@@ -130,7 +130,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # Grab the stats post table drop to see things have decremented
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache2 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        close2 = stat_cursor[stat.conn.dh_sweep_close][2]
+        close2 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         stat_cursor.close()
 
         # Ensure that the handle has been closed after the drop.
@@ -152,7 +152,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # We just filled the table, now check what the stats are
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache1 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        close1 = stat_cursor[stat.conn.dh_sweep_close][2]
+        close1 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         sweep_baseline = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
@@ -163,7 +163,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # Grab the stats post table drop to see things have decremented
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache2 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        close2 = stat_cursor[stat.conn.dh_sweep_close][2]
+        close2 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         stat_cursor.close()
 
         # The sweep server should not be involved in regular drop cleanup

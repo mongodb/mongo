@@ -207,13 +207,7 @@ functions:
         ${PREPARE_PATH}
         virtualenv -p python3 venv
         source venv/bin/activate
-        python3 -m pip install 'poetry==1.5.1'
-        export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
-        # FIXME-WT-12911 - There's a dependency ordering issue in the mongo poetry.lock file. Running poetry install twice resolves it.
-        set +o errexit
-        python3 -m poetry install --no-root --sync
-        set -o errexit
-        python3 -m poetry install --no-root --sync
+        buildscripts/poetry_sync.sh
 
         ./buildscripts/scons.py --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --link-model=dynamic --ninja generate-ninja ICECC=icecc CCACHE=ccache
         ninja -j$(nproc --all) install-mongod
@@ -268,7 +262,7 @@ functions:
           DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_ZSTD=1/}
         fi
 
-        if [[ "${build_variant|}" =~ "macos-1300" ]]; then
+        if [[ "${build_variant|}" =~ "macos-13" ]]; then
           # For mac builds, we want explicitly tell cmake which python to use, as
           # well as the matching library directory and header files. The find_libpython
           # module gives us the library.
@@ -294,7 +288,7 @@ functions:
              fi
           fi
 
-          if [ "${build_variant|}" = "macos-1300-arm64" ]; then
+          if [ "${build_variant|}" = "macos-13-arm64" ]; then
             DEFINED_EVERGREEN_CONFIG_FLAGS="$DEFINED_EVERGREEN_CONFIG_FLAGS -DPython3_EXECUTABLE=$SYSPY -DPython3_LIBRARY=$SYSPYLIB -DPython3_INCLUDE_DIR=$SYSPYINCDEF"
           else
             DEFINED_EVERGREEN_CONFIG_FLAGS="$DEFINED_EVERGREEN_CONFIG_FLAGS -DPYTHON_EXECUTABLE:FILEPATH=$SYSPY -DPYTHON_LIBRARY=$SYSPYLIB -DPYTHON_INCLUDE_DIR=$SYSPYINCDEF"
@@ -341,6 +335,16 @@ functions:
           $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
           echo "Completed CMake"
         fi
+  "python config check":
+    command: shell.exec
+    type: setup
+    params:
+      working_dir: "wiredtiger/cmake_build"
+      shell: bash
+      script: |
+        set -o errexit
+        # Confirm that the Python binary matches the version of that configured by CMake.
+        ${python_binary|python3} ../test/evergreen/python_version_check.py -v -c ./CMakeCache.txt -s ${python_config_search_string}
   "make wiredtiger": &make_wiredtiger
     command: shell.exec
     params:
@@ -1471,7 +1475,8 @@ variables:
     tasks:
       - name: compile
       - name: make-check-test
-      - name: unit-test
+        # Use a special version of unit-test for macOS that checks for Python version consistency.
+      - name: unit-test-macos
       - name: fops
       - name: memory-model-test-mac
         batchtime: 40320 # 28 days
@@ -2180,6 +2185,15 @@ tasks:
     - name: compile
     commands:
       - func: "fetch artifacts"
+      - func: "unit test"
+
+  - name: unit-test-macos
+    tags: ["python"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "python config check"
       - func: "unit test"
 
   - name: unit-test-zstd
@@ -5725,13 +5739,13 @@ buildvariants:
     - name: catch2-unittest-test
 
 - <<: *mac_test_template
-  name: macos-1300-arm64
-  display_name: "macOS 13.00 (ARM64)"
+  name: macos-13-arm64
+  display_name: "macOS 13 (ARM64)"
   run_on:
-    - macos-1300-arm64
+    - macos-13-arm64
   batchtime: 120 # 2 hours
   expansions:
-    python_binary: '/opt/homebrew/Frameworks/Python.framework/Versions/3.11/bin/python3.11'
+    python_binary: '/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11'
     python_config_search_string: '_Python3_EXECUTABLE'
     <<: *mac_test_template_expansions
 
@@ -5815,39 +5829,40 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
     - name: ".lint"
+    - name: ".workgen-test"
+      batchtime: 1440 # 24 hours
+    - name: checkpoint-filetypes-test
+    - name: chunkcache-test
     - name: compile
-    - name: make-check-test
-    - name: unit-test
+    - name: configure-combinations
     - name: fops
     - name: format-failure-configs-test
       distros: ubuntu2004-arm64-large
+    - name: format-smoke-test
+    - name: format-stress-pull-request-test
     - name: linux-directio
       distros: ubuntu2004-arm64-large
-    - name: checkpoint-filetypes-test
-    - name: unit-test-zstd
-    - name: unit-test-extra-long
-      distros: ubuntu2004-arm64-large
-    - name: spinlock-gcc-test
-    - name: spinlock-pthread-adaptive-test
-      distros: ubuntu2004-arm64-large
-    - name: wtperf-test
     - name: long-test
       distros: ubuntu2004-arm64-large
-    - name: configure-combinations
-    - name: format-smoke-test
-    - name: s3-tiered-storage-extensions-test
-    - name: chunkcache-test
+    - name: make-check-test
     - name: memory-model-test
       batchtime: 40320 # 28 days
-    - name: ".workgen-test"
-      batchtime: 1440 # 24 hours
-    - name: model-unit-test
     - name: model-test-failure-workloads
       batchtime: 1440 # 24 hours
     - name: model-test-long
       batchtime: 1440 # once a day
     - name: model-test-long-with-coverage
       batchtime: 1440 # once a day
+    - name: model-unit-test
+    - name: s3-tiered-storage-extensions-test
+    - name: spinlock-gcc-test
+    - name: spinlock-pthread-adaptive-test
+      distros: ubuntu2004-arm64-large
+    - name: unit-test
+    - name: unit-test-extra-long
+      distros: ubuntu2004-arm64-large
+    - name: unit-test-zstd
+    - name: wtperf-test
 
 - name: amazon2-arm64
   display_name: "Amazon Linux 2 ARM64"
@@ -5860,27 +5875,28 @@ buildvariants:
     cmake_generator: "Unix Makefiles"
   # Using large distro for a few tests here as more memory is required.
   tasks:
+    - name: checkpoint-filetypes-test
     - name: compile
-    - name: make-check-test
-      distros: amazon2-arm64-large
-    - name: unit-test
     - name: fops
     - name: format-failure-configs-test
       distros: amazon2-arm64-large
+    - name: format-smoke-test
+    - name: format-stress-pull-request-test
     - name: linux-directio
       distros: amazon2-arm64-large
-    - name: checkpoint-filetypes-test
-    - name: unit-test-zstd
-    - name: unit-test-extra-long
+    - name: long-test
       distros: amazon2-arm64-large
+    - name: make-check-test
+      distros: amazon2-arm64-large
+    - name: s3-tiered-storage-extensions-test
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
       distros: amazon2-arm64-large
-    - name: wtperf-test
-    - name: long-test
+    - name: unit-test
+    - name: unit-test-extra-long
       distros: amazon2-arm64-large
-    - name: format-smoke-test
-    - name: s3-tiered-storage-extensions-test
+    - name: unit-test-zstd
+    - name: wtperf-test
 
 # Antithesis build and push
 - name: ubuntu2004-antithesis

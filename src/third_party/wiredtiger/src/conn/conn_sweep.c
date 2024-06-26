@@ -146,6 +146,12 @@ __sweep_expire(WT_SESSION_IMPL *session, uint64_t now)
               session, WT_WITH_DHANDLE(session, dhandle, ret = __sweep_expire_one(session)));
         else
             WT_WITH_DHANDLE(session, dhandle, ret = __sweep_expire_one(session));
+
+        if (ret == 0)
+            WT_STAT_CONN_INCR(session, dh_sweep_expired_close);
+        else
+            WT_STAT_CONN_INCR(session, dh_sweep_ref);
+
         WT_RET_BUSY_OK(ret);
     }
 
@@ -180,7 +186,7 @@ __sweep_discard_trees(WT_SESSION_IMPL *session, u_int *dead_handlesp)
 
         /* We closed the btree handle. */
         if (ret == 0) {
-            WT_STAT_CONN_INCR(session, dh_sweep_close);
+            WT_STAT_CONN_INCR(session, dh_sweep_dead_close);
             ++*dead_handlesp;
         } else
             WT_STAT_CONN_INCR(session, dh_sweep_ref);

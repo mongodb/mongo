@@ -377,12 +377,16 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
 
     /*
      * Start the backup and fill in the cursor's list. Acquire the schema lock, we need a consistent
-     * view when creating a copy.
+     * view when creating a copy. We only need the locks when opening the top-level backup cursor.
+     * We do not need them when opening a duplicate backup cursor.
      */
     WT_STAT_CONN_SET(session, backup_start, 1);
-    WT_WITH_CHECKPOINT_LOCK(
-      session, WT_WITH_SCHEMA_LOCK(session, ret = __backup_start(session, cb, othercb, cfg)));
-    WT_ERR(ret);
+    if (othercb == NULL) {
+        WT_WITH_CHECKPOINT_LOCK(
+          session, WT_WITH_SCHEMA_LOCK(session, ret = __backup_start(session, cb, othercb, cfg)));
+        WT_ERR(ret);
+    } else
+        WT_ERR(__backup_start(session, cb, othercb, cfg));
     WT_ERR(cb->incr_file == NULL ?
         __wt_cursor_init(cursor, uri, NULL, cfg, cursorp) :
         __wti_curbackup_open_incr(session, uri, other, cursor, cfg, cursorp));
@@ -548,8 +552,10 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
     incremental_config = log_config = false;
     is_dup = othercb != NULL;
 
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+    if (!is_dup) {
+        WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+        WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+    }
 
     /*
      * Per-file offset incremental hot backup configurations take a starting checkpoint and optional
@@ -756,8 +762,10 @@ __backup_start(
     dest = NULL;
     is_dup = othercb != NULL;
 
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+    if (!is_dup) {
+        WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+        WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+    }
 
     cb->next = 0;
     cb->list = NULL;

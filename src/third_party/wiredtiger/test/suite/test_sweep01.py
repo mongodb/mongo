@@ -78,7 +78,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                 time.sleep(1)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close1 = stat_cursor[stat.conn.dh_sweep_close][2]
+        close1 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         remove1 = stat_cursor[stat.conn.dh_sweep_remove][2]
         sweep1 = stat_cursor[stat.conn.dh_sweeps][2]
         sclose1 = stat_cursor[stat.conn.dh_session_handles][2]
@@ -133,7 +133,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr("Sweep loop took " + str(sleep))
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close2 = stat_cursor[stat.conn.dh_sweep_close][2]
+        close2 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         remove2 = stat_cursor[stat.conn.dh_sweep_remove][2]
         sweep2 = stat_cursor[stat.conn.dh_sweeps][2]
         sclose2 = stat_cursor[stat.conn.dh_session_handles][2]

@@ -1047,12 +1047,6 @@ struct __wt_page_deleted {
     wt_shared volatile uint8_t prepare_state;
 
     /*
-     * The previous state of the WT_REF; if the fast-truncate transaction is rolled back without the
-     * page first being instantiated, this is the state to which the WT_REF returns.
-     */
-    WT_REF_STATE previous_ref_state;
-
-    /*
      * If the fast-truncate transaction has committed. If we're forced to instantiate the page, and
      * the committed flag isn't set, we have to create an update structure list for the transaction
      * to resolve in a subsequent commit. (This is tricky: if the transaction is rolled back, the
