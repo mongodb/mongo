@@ -138,6 +138,13 @@ MONGO_INITIALIZER(ServerlessPrivilegePermittedMap)(InitializerContext*) try {
     uassertStatusOK(ex.toStatus().withContext("Failed parsing extraData for MatchType enum"));
 }
 
+MONGO_INITIALIZER(CheckAuthForInternalClient)(InitializerContext*) {
+    Client::setCheckAuthForInternalClient([](Client* client) {
+        return AuthorizationSession::get(client)->isAuthorizedForClusterAction(ActionType::internal,
+                                                                               boost::none);
+    });
+}
+
 void validateSecurityTokenUserPrivileges(const User::ResourcePrivilegeMap& privs) {
     for (const auto& priv : privs) {
         auto matchType = priv.first.matchType();
@@ -838,6 +845,7 @@ const ActionSet kClusterActionsQuickList({
     ActionType::advanceClusterTime,
     ActionType::bypassDefaultMaxTimeMS,
     ActionType::bypassWriteBlockingMode,
+    ActionType::internal,
     ActionType::useTenant,
 });
 }  // namespace

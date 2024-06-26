@@ -262,7 +262,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
             authorizeExternalUser();
         } else {
-            if (!opCtx->getClient()->isInternalClient()) {
+            if (!opCtx->getClient()->isPossiblyUnauthenticatedInternalClient()) {
                 LOGV2_WARNING(
                     20430,
                     "Client isn't a mongod or mongos, but is connecting with a certificate "

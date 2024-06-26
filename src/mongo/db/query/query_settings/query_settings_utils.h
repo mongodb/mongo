@@ -81,7 +81,7 @@ namespace utils {
  * Determines if 'querySettings' field is allowed to be present as part of the command request for
  * the given 'client'.
  */
-bool allowQuerySettingsFromClient(const Client* client);
+bool allowQuerySettingsFromClient(Client* client);
 
 /**
  * Returns true if a given QuerySettings instance contains only default values.

@@ -69,7 +69,7 @@ enum class AllowedWithClientType {
 };
 
 // Helper function to get whether a client is internal.
-bool isInternalClient(const Client* client);
+bool isInternalClient(Client* client);
 
 // Use to assert that a feature is allowed only if it is used internally.
 void assertAllowedInternalIfRequired(const OperationContext* opCtx,
