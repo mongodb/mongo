@@ -339,9 +339,28 @@ public:
         _supportsHello = newVal;
     }
 
-    bool isInternalClient() const {
+    /**
+     * Returns TRUE if the client has claimed to be an "internal client" via {hello: 1} command.
+     * This API is not suitable as an authorization check and must be used with caution.
+     */
+    bool isPossiblyUnauthenticatedInternalClient() const {
         return _isInternalClient;
     }
+
+    /**
+     * Returns TRUE if the client has claimed to be an "internal client" AND has authenticated
+     * as a user posessing ActionType::internal on the non-tenanted Cluster resource.
+     *
+     * Callers MUST NOT rely on this for authorization checks.
+     * Callers MUST use AuthorizationSession::isAuthorizedForClusterAction(ActionType::internal).
+     */
+    bool isInternalClient();
+
+    /**
+     * Assign a callback from the authorization subsystem to validate that the current
+     * client has authorizations necessary to act as an internal client.
+     */
+    static void setCheckAuthForInternalClient(std::function<bool(Client*)>);
 
     void setIsInternalClient(bool isInternalClient) {
         _isInternalClient = isInternalClient;
@@ -441,7 +460,7 @@ private:
 
     UUID _uuid;
 
-    // Indicates that this client is internal to the cluster.
+    // Indicates that this client claims to be internal to the cluster.
     bool _isInternalClient{false};
 
     ErrorCodes::Error _disconnectErrorCode = ErrorCodes::ClientDisconnect;

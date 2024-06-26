@@ -487,13 +487,13 @@ public:
                     // from its client. Once kInternalClient has been set, we assume that any future
                     // "isMaster" commands are forwarded in this manner, and we do not update the
                     // session tags.
-                    if (!opCtx->getClient()->isInternalClient()) {
+                    if (!opCtx->getClient()->isPossiblyUnauthenticatedInternalClient()) {
                         return (originalTags | connectionTagsToSet) & ~connectionTagsToUnset;
                     } else {
                         return originalTags;
                     }
                 });
-            if (!opCtx->getClient()->isInternalClient()) {
+            if (!opCtx->getClient()->isPossiblyUnauthenticatedInternalClient()) {
                 opCtx->getClient()->setIsInternalClient(isInternalClient);
             }
         }

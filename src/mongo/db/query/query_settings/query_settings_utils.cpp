@@ -503,7 +503,7 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
 
 namespace utils {
 
-bool allowQuerySettingsFromClient(const Client* client) {
+bool allowQuerySettingsFromClient(Client* client) {
     // Query settings are allowed to be part of the request only in cases when request:
     // - comes from mongos (internal client), which has already performed the query settings lookup
     // or
