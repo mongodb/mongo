@@ -173,6 +173,13 @@ function testCommitDecisionWriteConcern(writeConcern) {
         `Verify that commitTransaction returns once the decision is written with client's writeConcern ${
             tojson(writeConcern)}`);
     awaitResult();
+    if (writeConcern.w == "majority") {
+        // When using majority write concern, secondaries acknowledge/make durable writes
+        // independently from applying them, so before checking for the commit decision we need to
+        // ensure lastApplied is caught up on the relevant node(s).
+        const nodesToAwait = st.rs0.getSecondaries().slice(-1 * st.rs0.nodes.length / 2);
+        st.rs0.awaitReplication(null, null, nodesToAwait);
+    }
     assertDecisionCommittedOnNodes(st.rs0, st.rs0.nodes.length - nodesToStopReplication.length);
 
     jsTest.log(
