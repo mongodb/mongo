@@ -404,6 +404,8 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     savedInstances.clear();
     newThenOldScopedExecutor.reset();
 
+    _onServiceInitialization();
+
     PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic.pauseWhileSet();
 
     // Now wait for the first write of the new term to be majority committed, so that we know
@@ -640,6 +642,10 @@ std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::g
     }
 
     return instances;
+}
+
+std::shared_ptr<executor::ScopedTaskExecutor> PrimaryOnlyService::getInstanceExecutor() const {
+    return _scopedExecutor;
 }
 
 void PrimaryOnlyService::releaseInstance(const InstanceID& id, Status status) {
