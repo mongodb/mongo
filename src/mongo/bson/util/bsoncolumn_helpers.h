@@ -790,7 +790,7 @@ public:
             [](size_t count, int64_t last, uint8_t scaleIndex, uint64_t lastNonRLEBlock) {});
     }
 
-    template <class Buffer, typename Finish>
+    template <typename Encoding, class Buffer, typename Finish>
     requires Appendable<Buffer>
     static const char* decompressAllLiteral(const char* ptr,
                                             const char* end,
@@ -815,11 +815,11 @@ public:
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
-            elemCount += simple8b::visitAll<int64_t>(
+            elemCount += simple8b::visitAll<Encoding>(
                 ptr + 1,
                 size,
                 lastNonRLEBlock,
-                [&buffer](int64_t v) {
+                [&buffer](const Encoding v) {
                     uassert(
                         8609800, "Post literal delta blocks should only contain skip or 0", v == 0);
                     buffer.appendLast();
@@ -834,14 +834,14 @@ public:
         return ptr;
     }
 
-    template <class Buffer>
+    template <typename Encoding, class Buffer>
     requires Appendable<Buffer>
     static const char* decompressAllLiteral(const char* ptr, const char* end, Buffer& buffer) {
-        return decompressAllLiteral(ptr,
-                                    end,
-                                    buffer,
-                                    simple8b::kSingleZero /* lastNonRLEBlock */,
-                                    [](size_t count, uint64_t lastNonRLEBlock) {});
+        return decompressAllLiteral<Encoding>(ptr,
+                                              end,
+                                              buffer,
+                                              simple8b::kSingleZero /* lastNonRLEBlock */,
+                                              [](size_t count, uint64_t lastNonRLEBlock) {});
     }
 
     template <typename Encoding>

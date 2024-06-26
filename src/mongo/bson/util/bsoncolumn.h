@@ -654,7 +654,7 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> alloc
             if (isSimple8bControlByte(*ptr)) {
                 const char* newPtr = nullptr;
                 for (auto&& collector : ownedCollectors) {
-                    newPtr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(
+                    newPtr = BSONColumnBlockDecompressHelpers::decompressAllLiteral<int64_t>(
                         ptr, end, collector, lastNonRLEBlock, [&collector](size_t count, uint64_t) {
                             for (size_t i = 0; i < count; ++i) {
                                 collector.appendPositionInfo(1);
@@ -671,7 +671,7 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> alloc
             if (isSimple8bControlByte(*ptr)) {
                 const char* newPtr = nullptr;
                 for (auto&& collector : ownedCollectors) {
-                    newPtr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(
+                    newPtr = BSONColumnBlockDecompressHelpers::decompressAllLiteral<int64_t>(
                         ptr, end, collector, lastNonRLEBlock, [&collector](size_t count, uint64_t) {
                             for (size_t i = 0; i < count; ++i) {
                                 collector.appendPositionInfo(1);

@@ -181,7 +181,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                                     buffer.append(BSONBinData(data, size, ref.binDataType()));
                                 });
                     } else {
-                        ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(
+                        ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral<int128_t>(
                             ptr, end, buffer);
                     }
                     break;
@@ -214,7 +214,8 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                 case MaxKey:
                     // Non-delta types, deltas should only contain skip or 0
                     buffer.template append<BSONElement>(literal);
-                    ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(ptr, end, buffer);
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral<int64_t>(
+                        ptr, end, buffer);
                     break;
                 default:
                     uasserted(8295704, "Type not implemented");
@@ -225,7 +226,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
             using PathBufferPair = std::pair<RootPath, Buffer&>;
             std::array<PathBufferPair, 1> path{{{RootPath{}, buffer}}};
             ptr = decompressor.decompress(std::span<PathBufferPair, 1>{path});
-            ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(ptr, end, buffer);
+            ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral<int64_t>(ptr, end, buffer);
         } else {
             uasserted(8295706, "Unexpected control");
         }

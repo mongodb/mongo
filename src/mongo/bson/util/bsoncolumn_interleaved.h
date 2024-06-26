@@ -961,7 +961,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                 }
             } else {
                 for (auto&& buffer : state._buffers) {
-                    ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral<int128_t>(
                         control, end, *buffer, state._lastNonRLEBlock, finishLiteral);
                 }
             }
@@ -995,7 +995,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
         case MinKey:
         case MaxKey:
             for (auto&& buffer : state._buffers) {
-                ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(
+                ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral<int64_t>(
                     control, end, *buffer, state._lastNonRLEBlock, finishLiteral);
             }
             break;
