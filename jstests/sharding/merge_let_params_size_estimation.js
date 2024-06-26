@@ -106,6 +106,10 @@ function runTest({testFixture, conn, shardLocal, shardOutput}) {
     assert.commandWorked(coll.insertMany(kMoreDocs));
     assert.commandWorked(outColl.insertMany(kMoreDocs));
 
+    if (isReplSet) {
+        testFixture.awaitReplication();
+    }
+
     // The aggregate should not fail.
     assert.commandWorked(aggColl.runCommand("aggregate", aggCommand));
 
