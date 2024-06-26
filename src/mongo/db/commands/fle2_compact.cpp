@@ -436,6 +436,7 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
 
 void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              const NamespaceString& escNss,
+                             StringData fieldPath,
                              BSONType fieldType,
                              const QueryTypeConfig& queryTypeConfig,
                              double anchorPaddingFactor,
@@ -445,7 +446,7 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              ECStats* escStats) {
     CompactStatsCounter<ECStats> stats(escStats);
     // Compact 4.e, Calculate pathLength := #Edges_SPH(lb, lb, uh, prc, theta)
-    const auto pathLength = getEdgesLength(fieldType, queryTypeConfig);
+    const auto pathLength = getEdgesLength(fieldType, fieldPath, queryTypeConfig);
     // Compact 4.f, Calculate numPads := ceil( gamma * (pathLength * uniqueLeaves - len(C_f)) )
     const auto numPads =
         std::ceil(anchorPaddingFactor * ((pathLength * uniqueLeaves) - uniqueTokens));
@@ -765,10 +766,11 @@ void processFLECompactV2(OperationContext* opCtx,
                 ->getValue(namespaces.escNss.tenantId())
                 .getCompactAnchorPaddingFactor()
                 .get_value_or(kDefaultAnchorPaddingFactor));
-        for (const auto& [_, rangeField] : rangeFields) {
+        for (const auto& [fieldPath, rangeField] : rangeFields) {
             // The function that handles the transaction may outlive this function so we need to use
             // shared_ptrs
-            auto argsBlock = std::make_tuple(namespaces.escNss, anchorPaddingFactor, rangeField);
+            auto argsBlock = std::make_tuple(
+                namespaces.escNss, anchorPaddingFactor, rangeField, fieldPath.toString());
             auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
             auto service = opCtx->getService();
 
@@ -781,9 +783,11 @@ void processFLECompactV2(OperationContext* opCtx,
                             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                             FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
-                            auto [escNss, anchorPaddingFactor, rangeField] = *sharedBlock.get();
+                            auto [escNss, anchorPaddingFactor, rangeField, fieldPath] =
+                                *sharedBlock.get();
                             compactOneRangeFieldPad(&queryImpl,
                                                     escNss,
+                                                    fieldPath,
                                                     rangeField.fieldType,
                                                     rangeField.queryTypeConfig,
                                                     anchorPaddingFactor,

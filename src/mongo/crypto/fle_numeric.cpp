@@ -230,26 +230,8 @@ OSTType_Double getTypeInfoDouble(double value,
                 "Must specify both a lower bound, upper bound and precision",
                 min.has_value() == max.has_value() && max.has_value() == precision.has_value());
 
-        double range = max.get() - min.get();
-
-        // We can overflow if max = max double and min = min double so make sure we have finite
-        // number after we do subtraction
-        if (std::isfinite(range)) {
-
-            // This creates a range which is wider then we permit by our min/max bounds check with
-            // the +1 but it is as the algorithm is written in the paper.
-            double rangeAndPrecision = (range + 1) * exp10Double(precision.get());
-
-            if (std::isfinite(rangeAndPrecision)) {
-
-                double bits_range_double = log2(rangeAndPrecision);
-                bits_range = ceil(bits_range_double);
-
-                if (bits_range < 64) {
-                    use_precision_mode = true;
-                }
-            }
-        }
+        use_precision_mode =
+            canUsePrecisionMode(min.get(), max.get(), precision.get(), &bits_range);
     }
 
     if (use_precision_mode) {
@@ -366,7 +348,7 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
     // because the encoding for precision truncated decimal128 is incompatible with normal
     // decimal128 values.
     bool use_precision_mode = false;
-    int bits_range = 0;
+    uint32_t bits_range = 0;
     if (precision.has_value()) {
         uassert(6966804,
                 "Must specify both a lower bound, upper bound and precision",
@@ -374,24 +356,8 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
 
         uassert(6966802, "Precision must be between 0 and 6142 inclusive", precision.get() <= 6142);
 
-
-        Decimal128 bounds = max.get().subtract(min.get()).add(Decimal128(1));
-
-        if (bounds.isFinite()) {
-            Decimal128 bits_range_dec = bounds.scale(precision.get()).logarithm(Decimal128(2));
-
-            if (bits_range_dec.isFinite() && bits_range_dec < Decimal128(128)) {
-                // kRoundTowardPositive is the same as C99 ceil()
-
-                bits_range = bits_range_dec.toIntExact(Decimal128::kRoundTowardPositive);
-
-                // bits_range is always >= 0 but coverity cannot be sure since it does not
-                // understand Decimal128 math so we add a check for positive integers.
-                if (bits_range >= 0 && bits_range < 128) {
-                    use_precision_mode = true;
-                }
-            }
-        }
+        use_precision_mode =
+            canUsePrecisionMode(min.get(), max.get(), precision.get(), &bits_range);
     }
 
     if (use_precision_mode) {
@@ -516,6 +482,61 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
     }
 
     return {mapping, 0, std::numeric_limits<boost::multiprecision::uint128_t>::max()};
+}
+
+bool canUsePrecisionMode(Decimal128 min, Decimal128 max, uint32_t precision, uint32_t* maxBitsOut) {
+    invariant(min < max);
+
+    uint32_t bits_range;
+
+    Decimal128 bounds = max.subtract(min).add(Decimal128(1));
+    if (bounds.isFinite()) {
+        Decimal128 bits_range_dec = bounds.scale(precision).logarithm(Decimal128(2));
+
+        if (bits_range_dec.isFinite() && bits_range_dec < Decimal128(128)) {
+            // kRoundTowardPositive is the same as C99 ceil()
+
+            bits_range = bits_range_dec.toIntExact(Decimal128::kRoundTowardPositive);
+
+            // bits_range is always >= 0 but coverity cannot be sure since it does not
+            // understand Decimal128 math so we add a check for positive integers.
+            if (bits_range >= 0 && bits_range < 128) {
+                if (maxBitsOut) {
+                    *maxBitsOut = bits_range;
+                }
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool canUsePrecisionMode(double min, double max, uint32_t precision, uint32_t* maxBitsOut) {
+    invariant(min < max);
+
+    uint32_t bits_range;
+
+    double range = max - min;
+    if (std::isfinite(range)) {
+
+        // This creates a range which is wider then we permit by our min/max bounds check with
+        // the +1 but it is as the algorithm is written in the paper.
+        double rangeAndPrecision = (range + 1) * exp10Double(precision);
+
+        if (std::isfinite(rangeAndPrecision)) {
+
+            double bits_range_double = log2(rangeAndPrecision);
+            bits_range = ceil(bits_range_double);
+
+            if (bits_range < 64) {
+                if (maxBitsOut) {
+                    *maxBitsOut = bits_range;
+                }
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 }  // namespace mongo

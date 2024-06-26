@@ -613,6 +613,7 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
     if (isRange) {
         compactOneRangeFieldPad(_queryImpl.get(),
                                 _namespaces.escNss,
+                                "rangeField"_sd,
                                 BSONType::NumberLong,
                                 queryTypeConfig,
                                 0.42,
@@ -643,6 +644,7 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
     if (isRange) {
         compactOneRangeFieldPad(_queryImpl.get(),
                                 _namespaces.escNss,
+                                "rangeField"_sd,
                                 BSONType::NumberLong,
                                 queryTypeConfig,
                                 0.42,
@@ -1053,6 +1055,7 @@ TEST_F(FleCompactTest, InjectSomeAnchorPadding) {
     // numPads := 0.42 * (8 * 1 - 5) => 0.42 * 3 => 1.26 => 2 pads {1, 2}
     compactOneRangeFieldPad(_queryImpl.get(),
                             _namespaces.escNss,
+                            "a.b.c"_sd,
                             BSONType::NumberInt,
                             queryTypeConfig,
                             0.42,
@@ -1074,6 +1077,7 @@ TEST_F(FleCompactTest, InjectManyAnchorPadding) {
     // numPads := 1.0 * (8 * 5 - 25) => 40 - 25 => 15.0 => 15 pads {1..15}
     compactOneRangeFieldPad(_queryImpl.get(),
                             _namespaces.escNss,
+                            "a.b.c"_sd,
                             BSONType::NumberLong,
                             queryTypeConfig,
                             1,
