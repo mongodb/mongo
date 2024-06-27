@@ -128,6 +128,38 @@ export let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
 };
 
 /**
+ * Assert that starting MongoDB with --replSet will fail when going through initial sync with
+ * existing data on the node.
+ */
+export let assertErrorOnStartupWhenInitialSyncingWithData = function(replSet, originalNode) {
+    jsTestLog("The node with data should fail to complete initial sync");
+
+    clearRawMongoProgramOutput();
+    let node = null;
+    // Sometimes replsettest.Start cannot connect to the node before it crashes and it will throw a
+    // StopError. Wrap this call in a try block to avoid throwing on that error. This is fine
+    // because we still make sure the correct fatal log message gets written.
+    try {
+        node = replSet.start(originalNode, {
+            dbpath: originalNode.dbpath,
+            port: originalNode.port,
+            restart: true,
+            waitForConnect: true,
+            setParameter: {"failpoint.skipClearInitialSyncState": "{'mode':'alwaysOn'}"}
+        });
+    } catch (e) {
+        jsTestLog("Ignoring exception from replsettest.start: " + tojson(e));
+    } finally {
+        assert.soon(function() {
+            return rawMongoProgramOutput().search(/Fatal assertion.*9184100/) >= 0;
+        });
+        if (node) {
+            MongoRunner.stopMongod(node, null, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+        }
+    }
+};
+
+/**
  * Assert that starting MongoDB as a standalone on an existing data path succeeds. Uses a provided
  * testFunc to run any caller-provided checks on the started node.
  */
