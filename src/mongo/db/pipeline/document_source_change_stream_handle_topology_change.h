@@ -66,7 +66,8 @@ namespace mongo {
  */
 class DocumentSourceChangeStreamHandleTopologyChange final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamHandleTopologyChange"_sd;
+    static constexpr StringData kStageName =
+        change_stream_constants::stage_names::kHandleTopologyChange;
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChange> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);

@@ -57,6 +57,7 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/document_source_facet.h"
@@ -3313,15 +3314,14 @@ public:
     };
 
     ChangeStreamPipelineOptimizationTest()
-        : ChangeStreamPipelineOptimizationTest(NamespaceString::createNamespaceString_forTest(
-              boost::none, "unittests", "pipeline_test")) {}
+        : ChangeStreamPipelineOptimizationTest({.inMongos = false}) {}
 
-    ChangeStreamPipelineOptimizationTest(const NamespaceString& nss) {
+    ChangeStreamPipelineOptimizationTest(ExpressionContextOptionsStruct options) {
         _opCtx = _testServiceContext.makeOperationContext();
-        _expCtx = make_intrusive<ExpressionContextForTest>(_opCtx.get(), nss);
-    }
-
-    void setExpCtx(ExpressionContextOptionsStruct options) {
+        _expCtx = make_intrusive<ExpressionContextForTest>(
+            _opCtx.get(),
+            NamespaceString::createNamespaceString_forTest(
+                boost::none, "unittests", "pipeline_test"));
         _expCtx->opCtx = _opCtx.get();
         _expCtx->uuid = UUID::gen();
         _expCtx->inMongos = options.inMongos;
@@ -3346,6 +3346,15 @@ public:
         return pipeline;
     }
 
+    static std::string generateEventResumeToken() {
+        ResumeTokenData resumeTokenDataIn{Timestamp{1001, 3},
+                                          ResumeTokenData::kDefaultTokenVersion,
+                                          0,
+                                          UUID::gen(),
+                                          Value(Document{{"operationType", "drop"_sd}})};
+        return ResumeToken(resumeTokenDataIn).toBSON().toString();
+    }
+
 private:
     QueryTestServiceContext _testServiceContext;
     ServiceContext::UniqueOperationContext _opCtx;
@@ -3353,7 +3362,6 @@ private:
 };
 
 TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookUpSize) {
-    setExpCtx({.inMongos = false});
     auto pipeline = makePipeline(
         {changestreamStage("{fullDocument: 'updateLookup', showExpandedEvents: true}")});
     ASSERT_EQ(pipeline->getSources().size(), getChangeStreamStageSize());
@@ -3363,8 +3371,6 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookUpSize) {
 }
 
 TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
-    setExpCtx({.inMongos = false});
-
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
     auto pipeline =
@@ -3377,8 +3383,6 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupSwapsWithIndepend
 }
 
 TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage) {
-    setExpCtx({.inMongos = false});
-
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added eve
     auto pipeline =
@@ -3391,8 +3395,6 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMa
 }
 
 TEST_F(ChangeStreamPipelineOptimizationTest, FullDocumentBeforeChangeLookupSize) {
-    setExpCtx({.inMongos = false});
-
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
     auto pipeline = makePipeline(
@@ -3405,8 +3407,6 @@ TEST_F(ChangeStreamPipelineOptimizationTest, FullDocumentBeforeChangeLookupSize)
 
 TEST_F(ChangeStreamPipelineOptimizationTest,
        FullDocumentBeforeChangeLookupSwapsWithIndependentMatch) {
-    setExpCtx({.inMongos = false});
-
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
     auto pipeline = makePipeline(
@@ -3420,8 +3420,6 @@ TEST_F(ChangeStreamPipelineOptimizationTest,
 
 TEST_F(ChangeStreamPipelineOptimizationTest,
        FullDocumentBeforeChangeDoesNotSwapWithMatchOnPreImage) {
-    setExpCtx({.inMongos = false});
-
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
     auto pipeline = makePipeline(
@@ -3433,10 +3431,33 @@ TEST_F(ChangeStreamPipelineOptimizationTest,
     assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1 /* pos */);
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamHandleTopologyChangeSwapsWithRedact) {
-    setExpCtx(
-        {.inMongos = true});  // To enforce the $_internalChangeStreamHandleTopologyChange stage.
+TEST_F(ChangeStreamPipelineOptimizationTest,
+       ChangeStreamEnsureResumeTokenSwapsWithJsonSchemaMatch) {
+    auto pipeline = makePipeline(
+        {changestreamStage("{resumeAfter: " + generateEventResumeToken() + "}"),
+         matchStage(
+             "{$jsonSchema: {properties: {documentKey: {properties: {_id: {enum: [1, 2]}}}}}}")});
 
+    // Assert $match is the last stage before optimization.
+    assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1);
+
+    pipeline->optimizePipeline();
+
+    // Assert that $match swaps with $_internalChangeStreamHandleTopologyChange after optimization.
+    assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -2);
+    assertStageAtPos<DocumentSourceChangeStreamEnsureResumeTokenPresent>(pipeline->getSources(),
+                                                                         -1);
+}
+
+// To enforce the $_internalChangeStreamHandleTopologyChange stage.
+class ChangeStreamPipelineOptimizationTestWithMongoS : public ChangeStreamPipelineOptimizationTest {
+public:
+    ChangeStreamPipelineOptimizationTestWithMongoS()
+        : ChangeStreamPipelineOptimizationTest({.inMongos = true}) {}
+};
+
+TEST_F(ChangeStreamPipelineOptimizationTestWithMongoS,
+       ChangeStreamHandleTopologyChangeSwapsWithRedact) {
     auto pipeline =
         makePipeline({changestreamStage("{showExpandedEvents: true}"), redactStage("'$$PRUNE'")});
     pipeline->optimizePipeline();
@@ -3445,6 +3466,23 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamHandleTopologyChangeSwa
     assertStageAtPos<DocumentSourceRedact>(pipeline->getSources(), -2 /* pos */);
     assertStageAtPos<DocumentSourceChangeStreamHandleTopologyChange>(pipeline->getSources(),
                                                                      -1 /* pos */);
+}
+
+TEST_F(ChangeStreamPipelineOptimizationTestWithMongoS,
+       ChangeStreamHandleTopologyChangeSwapsWithJsonSchemaMatch) {
+    auto pipeline = makePipeline(
+        {changestreamStage("{}"),
+         matchStage(
+             "{$jsonSchema: {properties: {documentKey: {properties: {_id: {enum: [1, 2]}}}}}}")});
+
+    // Assert $match is the last stage before optimization.
+    assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1);
+
+    pipeline->optimizePipeline();
+
+    // Assert that $match swaps with $_internalChangeStreamHandleTopologyChange after optimization.
+    assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -2);
+    assertStageAtPos<DocumentSourceChangeStreamHandleTopologyChange>(pipeline->getSources(), -1);
 }
 
 TEST(PipelineOptimizationTest, SortLimProjLimBecomesTopKSortProj) {

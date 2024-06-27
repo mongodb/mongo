@@ -153,6 +153,8 @@ last-continuous:
       ticket: SERVER-91114
     - test_file: jstests/aggregation/sources/redact/root_redact.js
       ticket: SERVER-91339
+    - test_file: jstests/change_streams/split_large_event.js
+      ticket: SERVER-91406
     - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
       ticket: SERVER-90995
     - test_file: jstests/core/timeseries/timeseries_cursor_batches.js
@@ -326,6 +328,8 @@ last-lts:
       ticket: SERVER-91075
     - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/range/two_sided_find.js
       ticket: SERVER-91075
+    - test_file: jstests/change_streams/split_large_event.js
+      ticket: SERVER-91406
     - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
       ticket: SERVER-90995
     - test_file: jstests/core/timeseries/timeseries_cursor_batches.js

@@ -51,7 +51,8 @@ namespace mongo {
 class DocumentSourceChangeStreamEnsureResumeTokenPresent final
     : public DocumentSourceChangeStreamCheckResumability {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamEnsureResumeTokenPresent"_sd;
+    static constexpr StringData kStageName =
+        change_stream_constants::stage_names::kEnsureResumeTokenPresent;
 
     const char* getSourceName() const final;
 

@@ -34,8 +34,17 @@
 
 namespace mongo {
 namespace change_stream_constants {
+namespace stage_names {
+static constexpr StringData kEnsureResumeTokenPresent =
+    "$_internalChangeStreamEnsureResumeTokenPresent"_sd;
+static constexpr StringData kHandleTopologyChange = "$_internalChangeStreamHandleTopologyChange"_sd;
+}  // namespace stage_names
 
-const BSONObj kSortSpec = BSON("_id._data" << 1);
+static const BSONObj kSortSpec = BSON("_id._data" << 1);
+
+// Internal change stream stages that can appear in a router (mongoS) pipeline.
+static const StringDataSet kChangeStreamRouterPipelineStages = {
+    stage_names::kEnsureResumeTokenPresent, stage_names::kHandleTopologyChange};
 
 }  // namespace change_stream_constants
 }  // namespace mongo
