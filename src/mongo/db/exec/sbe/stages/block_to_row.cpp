@@ -231,7 +231,13 @@ void BlockToRowStage::close() {
 }
 
 void BlockToRowStage::doSaveState(bool relinquishCursor) {
-    if (slotsAccessible() && !_deblockedOwned) {
+    // Copy the values no matter whether the slotsAccessible() returns true or not. We do this
+    // because, even if the slot is not accessible, it is not clear whether we'll need the remaining
+    // values in our input block or not. We make local copies of all unprocessed values, plus the
+    // current one to be conservative. Note that copying the current value is not strictly necessary
+    // when slotsAccessible() is false, but we do it anyway since it's a negligible fixed cost per
+    // save/restore.
+    if (!_deblockedOwned) {
         for (auto& run : _deblockedValueRuns) {
             // Copy the values which have not yet been returned, starting at _curIdx.
             for (size_t i = _curIdx; i < run.size(); ++i) {

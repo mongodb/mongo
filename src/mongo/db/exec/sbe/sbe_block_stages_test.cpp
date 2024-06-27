@@ -795,16 +795,34 @@ void BlockStagesTest::testBlockToBitmap(
     auto ctx = makeCompileCtx();
     prepareTree(ctx.get(), blockToRow.get());
 
-    // Run the plan and ensure that only values with a corresponding '1' in the bitset are returned.
     auto accessor = blockToRow->getAccessor(*ctx, outputSlots[0]);
-    size_t i = 0;
-    for (auto st = blockToRow->getNext(); st == PlanState::ADVANCED;
-         st = blockToRow->getNext(), ++i) {
-        auto tagVal = accessor->getViewOfValue();
-        auto expectedTagVal = expected.getAt(i);
+    auto blockToRowPtr = blockToRow.get();
 
-        ASSERT_THAT(tagVal, ValueEq(expectedTagVal)) << "for {}th 'tag'"_format(i);
-    }
+    // Run the plan and ensure that only values with a corresponding '1' in the bitset are returned.
+    auto iterateBlockAndAssert = [&](bool yield) {
+        size_t i = 0;
+        for (auto st = blockToRowPtr->getNext(); st == PlanState::ADVANCED;
+             st = blockToRowPtr->getNext(), ++i) {
+            auto tagVal = accessor->getViewOfValue();
+            auto expectedTagVal = expected.getAt(i);
+
+            ASSERT_THAT(tagVal, ValueEq(expectedTagVal)) << "for {}th 'tag'"_format(i);
+
+            // Test out saveState() and restoreState() for 50% of the documents (the first document,
+            // the third document, the fifth document, and so on).
+            if (yield && (i % 2 == 0)) {
+                const bool relinquishCursor = true;
+                const bool disableSlotAccess = true;
+                blockToRowPtr->saveState(relinquishCursor, disableSlotAccess);
+                blockToRowPtr->restoreState(relinquishCursor);
+            }
+        }
+    };
+
+    // Run the test twice, once without yielding and once with yielding.
+    iterateBlockAndAssert(false);
+    blockToRow->open(true /* reOpen */);
+    iterateBlockAndAssert(true);
 }
 
 std::unique_ptr<value::ValueBlock> makeBlock(std::vector<int> ints) {
@@ -869,5 +887,32 @@ TEST_F(BlockStagesTest, BlockToRowNoValuesFiltered) {
     testBlockToBitmap(blocks,
                       {std::vector<bool>{true, true, true, true, true, true}},
                       makeIntArray({1, 2, 3, 4, 5, 6}));
+}
+
+// This test is the same as above, except the values in the block are objects rather than ints. This
+// gives us coverage for the resource management behavior of heap-allocated values in block-to-row.
+TEST_F(BlockStagesTest, BlockToRowNoValuesFilteredObjects) {
+    std::vector<std::unique_ptr<value::ValueBlock>> blocks;
+    auto out = std::make_unique<value::HeterogeneousBlock>();
+    for (auto i = 0; i < 6; ++i) {
+        auto [tagArg2, valArg2] = value::makeNewObject();
+        auto obj = value::getObjectView(valArg2);
+        obj->push_back("a", value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
+        out->push_back(value::TypeTags::Object, valArg2);
+    }
+
+    blocks.push_back(std::unique_ptr<value::ValueBlock>(out.release()));
+
+    auto [tagExpected, valExpected] = value::makeNewArray();
+    auto expected = value::getArrayView(valExpected);
+    for (auto i = 0; i < 6; ++i) {
+        auto [tagArg2, valArg2] = value::makeNewObject();
+        auto obj = value::getObjectView(valArg2);
+        obj->push_back("a", value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
+        expected->push_back(value::TypeTags::Object, valArg2);
+    }
+    value::ValueGuard expectedGuard(tagExpected, valExpected);
+
+    testBlockToBitmap(blocks, {std::vector<bool>{true, true, true, true, true, true}}, *expected);
 }
 }  // namespace mongo::sbe

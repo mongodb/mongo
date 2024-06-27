@@ -435,6 +435,152 @@ std::unique_ptr<sbe::EExpression> makeIfNullExpr(sbe::EExpression::Vector values
     return expr;
 }
 
+namespace {
+/**
+ * VirtualScanStage stores the array 'arrValue' and getNext() returns each value from the array.
+ *
+ * This stage mimics the resource management behavior like an actual scan stage. getNext() and
+ * doSaveState() release the memory of the returned values. This is useful to expose the potential
+ * memory misuse bugs such as heap-use-after-free and memory leaks.
+ */
+class VirtualScanStage final : public sbe::PlanStage {
+public:
+    explicit VirtualScanStage(PlanNodeId planNodeId,
+                              sbe::value::SlotId out,
+                              sbe::value::TypeTags arrTag,
+                              sbe::value::Value arrValue,
+                              PlanYieldPolicy* yieldPolicy = nullptr,
+                              bool participateInTrialRunTracking = true)
+        : sbe::PlanStage("virtualscan"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
+          _outField(out),
+          _arrTag(arrTag),
+          _arrValue(arrValue) {
+        invariant(sbe::value::isArray(arrTag));
+    }
+
+    ~VirtualScanStage() final {
+        sbe::value::releaseValue(_arrTag, _arrValue);
+        for (; _releaseIndex < _values.size(); ++_releaseIndex) {
+            auto [tagElem, valueElem] = _values.at(_releaseIndex);
+            sbe::value::releaseValue(tagElem, valueElem);
+        }
+    }
+
+    std::unique_ptr<sbe::PlanStage> clone() const final {
+        auto [tag, val] = sbe::value::copyValue(_arrTag, _arrValue);
+        return std::make_unique<VirtualScanStage>(_commonStats.nodeId,
+                                                  _outField,
+                                                  tag,
+                                                  val,
+                                                  _yieldPolicy,
+                                                  participateInTrialRunTracking());
+    }
+
+    void prepare(sbe::CompileCtx& ctx) final {
+        _outFieldOutputAccessor = std::make_unique<sbe::value::ViewOfValueAccessor>();
+    }
+
+    sbe::value::SlotAccessor* getAccessor(sbe::CompileCtx& ctx, sbe::value::SlotId slot) final {
+        if (_outField == slot) {
+            return _outFieldOutputAccessor.get();
+        }
+        return ctx.getAccessor(slot);
+    }
+
+    void open(bool reOpen) final {
+        auto optTimer(getOptTimer(_opCtx));
+
+        for (; _releaseIndex < _values.size(); ++_releaseIndex) {
+            auto [tagElem, valueElem] = _values.at(_releaseIndex);
+            sbe::value::releaseValue(tagElem, valueElem);
+        }
+        _values.clear();
+
+        sbe::value::ArrayEnumerator enumerator(_arrTag, _arrValue);
+        while (!enumerator.atEnd()) {
+            auto [tagElem, valueElem] = enumerator.getViewOfValue();
+            _values.push_back(sbe::value::copyValue(tagElem, valueElem));
+            enumerator.advance();
+        }
+        _releaseIndex = 0;
+        _index = 0;
+
+        _commonStats.opens++;
+    }
+
+    sbe::PlanState getNext() final {
+        auto optTimer(getOptTimer(_opCtx));
+
+        checkForInterruptAndYield(_opCtx);
+
+        if (_index >= _values.size()) {
+            return trackPlanState(sbe::PlanState::IS_EOF);
+        }
+
+        auto [tagElem, valueElem] = _values.at(_index);
+        _outFieldOutputAccessor->reset(tagElem, valueElem);
+        _index++;
+
+        // Depends on whether the last call was to getNext() or open()/doSaveState().
+        invariant(_releaseIndex == _index - 1 || _releaseIndex == _index - 2);
+
+        // We don't want to release at _index-1, since this is the data we're in the process of
+        // returning, but data at any prior index is allowed to be freed.
+        if (_releaseIndex == _index - 2) {
+            auto [returnedTagElem, returnedValueElem] = _values.at(_releaseIndex);
+            sbe::value::releaseValue(returnedTagElem, returnedValueElem);
+            _releaseIndex++;
+        }
+
+        return trackPlanState(sbe::PlanState::ADVANCED);
+    }
+
+    void close() final {
+        auto optTimer(getOptTimer(_opCtx));
+
+        trackClose();
+    }
+
+    std::unique_ptr<sbe::PlanStageStats> getStats(bool includeDebugInfo) const final {
+        auto ret = std::make_unique<sbe::PlanStageStats>(_commonStats);
+        return ret;
+    }
+    const SpecificStats* getSpecificStats() const final {
+        return nullptr;
+    }
+    size_t estimateCompileTimeSize() const final {
+        return sizeof(*this);
+    }
+
+protected:
+    void doSaveState(bool relinquishCursor) final {
+        if (relinquishCursor) {
+            for (; _releaseIndex < _index; ++_releaseIndex) {
+                auto [tagElem, valueElem] = _values.at(_releaseIndex);
+                sbe::value::releaseValue(tagElem, valueElem);
+            }
+        }
+    }
+
+private:
+    const sbe::value::SlotId _outField;
+
+    sbe::value::TypeTags _arrTag;
+    sbe::value::Value _arrValue;
+
+    std::unique_ptr<sbe::value::ViewOfValueAccessor> _outFieldOutputAccessor;
+
+    // Keeps track of an index for the array values, and an index for the next value to release.
+    size_t _index{0};
+    size_t _releaseIndex{0};
+
+    // Stores the values in std::vector instead of value::Array allows to release memory from values
+    // individually. This also avoid releasing memory twice due to value::Array::~Array().
+    std::vector<std::pair<sbe::value::TypeTags, sbe::value::Value>> _values;
+};
+
+}  // namespace
+
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualScan(
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::TypeTags arrTag,
@@ -444,27 +590,11 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualSc
     // The value passed in must be an array.
     invariant(sbe::value::isArray(arrTag));
 
-    // Make an EConstant expression for the array.
-    auto arrayExpression = makeConstant(arrTag, arrVal);
+    auto outputSlot = slotIdGenerator->generate();
+    auto virtualScan = sbe::makeS<VirtualScanStage>(planNodeId, outputSlot, arrTag, arrVal);
 
-    // Build the unwind/project/limit/coscan subtree.
-    auto projectSlot = slotIdGenerator->generate();
-    auto unwindSlot = slotIdGenerator->generate();
-    auto unwind = sbe::makeS<sbe::UnwindStage>(
-        sbe::makeProjectStage(makeLimitCoScanTree(planNodeId, 1),
-                              planNodeId,
-                              projectSlot,
-                              std::move(arrayExpression)),
-        projectSlot,
-        unwindSlot,
-        slotIdGenerator->generate(),  // We don't need an index slot but must to provide it.
-        false,                        // Don't preserve null and empty arrays.
-        planNodeId,
-        yieldPolicy);
-
-    // Return the UnwindStage and its output slot. The UnwindStage can be used as an input
-    // to other PlanStages.
-    return {unwindSlot, std::move(unwind)};
+    // Return the VirtualScanStage and its output slot.
+    return {outputSlot, std::move(virtualScan)};
 }
 
 std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtualScanMulti(
