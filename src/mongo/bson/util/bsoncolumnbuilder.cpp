@@ -267,6 +267,9 @@ bool _mergeObj(allocator_aware::BSONObjBuilder<Allocator>* builder,
                     return false;
 
                 // Recurse deeper
+                if (builder->hasField(name)) {
+                    return false;
+                }
                 auto subBuilder = [&] {
                     if (refIt->type() == Object) {
                         return allocator_aware::BSONObjBuilder<Allocator>{
@@ -284,6 +287,9 @@ bool _mergeObj(allocator_aware::BSONObjBuilder<Allocator>* builder,
             } else {
                 // If name match and neither is Object we can append from reference and increment
                 // both objects.
+                if (builder->hasField(name)) {
+                    return false;
+                }
                 builder->append(*refIt);
             }
 
