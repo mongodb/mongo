@@ -144,6 +144,8 @@ SampledCommandRequest makeSampledUpdateCommandRequest(
 
     write_ops::UpdateCommandRequest sampledCmd(originalCmd.getNamespace(), {std::move(op)});
     sampledCmd.setLet(originalCmd.getLet());
+    sampledCmd.getWriteCommandRequestBase().setBypassEmptyTsReplacement(
+        originalCmd.getBypassEmptyTsReplacement());
 
     return {sampleId,
             sampledCmd.getNamespace(),
@@ -176,6 +178,8 @@ SampledCommandRequest makeSampledDeleteCommandRequest(
 
     write_ops::DeleteCommandRequest sampledCmd(originalCmd.getNamespace(), {std::move(op)});
     sampledCmd.setLet(originalCmd.getLet());
+    sampledCmd.getWriteCommandRequestBase().setBypassEmptyTsReplacement(
+        originalCmd.getBypassEmptyTsReplacement());
 
     return {sampleId,
             sampledCmd.getNamespace(),
@@ -212,6 +216,7 @@ SampledCommandRequest makeSampledFindAndModifyCommandRequest(
     sampledCmd.setSort(originalCmd.getSort());
     sampledCmd.setArrayFilters(originalCmd.getArrayFilters());
     sampledCmd.setLet(originalCmd.getLet());
+    sampledCmd.setBypassEmptyTsReplacement(originalCmd.getBypassEmptyTsReplacement());
 
     return {sampleId,
             sampledCmd.getNamespace(),

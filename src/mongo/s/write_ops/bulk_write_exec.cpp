@@ -234,6 +234,7 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
     // internally between the mongos and the mongods.
     request.setOrdered(_clientRequest.getOrdered());
     request.setBypassDocumentValidation(_clientRequest.getBypassDocumentValidation());
+    request.setBypassEmptyTsReplacement(_clientRequest.getBypassEmptyTsReplacement());
 
     // TODO (SERVER-72989): Attach stmtIds etc. when building support for retryable
     // writes on mongos

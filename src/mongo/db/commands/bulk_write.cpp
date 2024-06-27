@@ -331,10 +331,13 @@ bool handleInsertOp(OperationContext* opCtx,
 
     auto stmtId = getStatementId(opCtx, req, currentOpIdx);
     bool containsDotsAndDollarsField = false;
-    const bool preserveEmptyTimestamps = false;
+
+    // If 'req.getBypassEmptyTsReplacement()' is true, set "bypassEmptyTsReplacement=true" for
+    // fixDocumentForInsert().
+    const bool bypassEmptyTsReplacement = static_cast<bool>(req.getBypassEmptyTsReplacement());
 
     auto fixedDoc = fixDocumentForInsert(
-        opCtx, op->getDocument(), preserveEmptyTimestamps, &containsDotsAndDollarsField);
+        opCtx, op->getDocument(), bypassEmptyTsReplacement, &containsDotsAndDollarsField);
 
     // TODO SERVER-72988: handle retryable writes.
     if (!fixedDoc.isOK()) {
@@ -408,6 +411,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         updateRequest.setSort(op->getSort().value_or(BSONObj()));
         updateRequest.setHint(op->getHint());
         updateRequest.setCollation(op->getCollation().value_or(BSONObj()));
+        updateRequest.setBypassEmptyTsReplacement(req.getBypassEmptyTsReplacement());
         updateRequest.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
         updateRequest.setUpsert(op->getUpsert());
         if (op->getReturn()) {

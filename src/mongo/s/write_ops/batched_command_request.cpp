@@ -169,6 +169,10 @@ const boost::optional<BSONObj>& BatchedCommandRequest::getLet() const {
     return _visit(Visitor{});
 };
 
+const OptionalBool& BatchedCommandRequest::getBypassEmptyTsReplacement() const {
+    return _visit([](auto&& op) -> decltype(auto) { return op.getBypassEmptyTsReplacement(); });
+};
+
 const write_ops::WriteCommandRequestBase& BatchedCommandRequest::getWriteCommandRequestBase()
     const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getWriteCommandRequestBase(); });

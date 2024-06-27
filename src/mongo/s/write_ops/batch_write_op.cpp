@@ -642,6 +642,9 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
             wcb.setStmtIds(std::move(stmtIdsForOp));
         }
 
+        wcb.setBypassEmptyTsReplacement(
+            _clientRequest.getWriteCommandRequestBase().getBypassEmptyTsReplacement());
+
         return wcb;
     }());
 
