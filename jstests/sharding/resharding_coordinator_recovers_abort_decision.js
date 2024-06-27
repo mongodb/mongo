@@ -90,7 +90,11 @@ reshardingTest.withReshardingInBackground(
 
             assert.commandWorked(mongos.getDB("admin").killOp(ops[0].opid));
 
-            reshardingTest.stepUpNewPrimaryOnShard(reshardingTest.configShardName);
+            // Step down the config shard's primary.
+            let replSet = reshardingTest.getReplSetForShard(reshardingTest.configShardName);
+            let primary = replSet.getPrimary();
+            assert.commandWorked(
+                primary.getDB("admin").runCommand({replSetStepDown: 60, force: true}));
 
             // After a stepdown, the _configsvrReshardCollection command will be retried by the
             // primary shard. We use the reshardCollectionJoinedExistingOperation failpoint to
