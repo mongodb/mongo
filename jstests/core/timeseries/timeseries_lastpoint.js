@@ -35,6 +35,8 @@
  *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
  *   # collection to insert more documents then expected by the test.
  *   assumes_balancer_off,
+ *   # Some optimization is done in 7.2, some tests may fail prior to 7.2.
+ *   requires_fcv_72,
  * ]
  *
  */
