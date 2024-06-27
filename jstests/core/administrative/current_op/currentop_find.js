@@ -4,53 +4,68 @@
  *   assumes_read_preference_unchanged,
  *   assumes_read_concern_unchanged,
  *   not_allowed_with_signed_security_token,
- *   assumes_unsharded_collection
+ *   assumes_unsharded_collection,
+ *   requires_getmore,
  * ]
  */
-(function() {
+
 "use strict";
 
-const testDB = db.getSiblingDB(jsTestName());
-testDB.createCollection("coll");
-testDB.createCollection("coll2");
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
-const coll = testDB.coll;
-const coll2 = testDB.coll2;
+const testDB = db.getSiblingDB("currentop_find");
 
-for (let i = 0; i < 100; ++i) {
-    coll.insert({"x": i, "y": i + 1});
-}
+function assertPlanSummary(collection, expected) {
+    const ns = `${testDB.getName()}.${collection.getName()}`;
 
-for (let i = 0; i < 1000; ++i) {
-    coll2.insert({"x": i, "y": i + 1});
-}
-coll2.insert({"x": 1001, "y": -1});
-coll2.insert({"x": -1, "y": 1001});
+    const match = {type: "idleCursor", ns};
 
-for (let i = 1000; i < 2000; ++i) {
-    coll2.insert({"x": i, "y": [i - 1, i, i + 1]});
-}
-coll2.insert({x: 1001, y: [1, 2, 3]});
-coll2.insert({x: 1001, y: [1, 2, 3]});
-// Tests that a collection scan query reports a COLLSCAN plan summary.
-{
-    let curs = coll.find().batchSize(2);
-    curs.next();
-    let currOpResult = db.adminCommand({
+    const currOpResult = assert.commandWorked(db.adminCommand({
         aggregate: 1,
         cursor: {},
-        pipeline: [{$currentOp: {idleCursors: true}}, {$match: {type: "idleCursor"}}]
-    });
+        pipeline: [{$currentOp: {idleCursors: true}}, {$match: match}]
+    }));
 
-    let planSummary = "";
-    var batch = currOpResult.cursor.firstBatch;
-    for (var i = 0; i < batch.length; i++) {
-        if (batch[i].ns == "currentop_find.coll") {
-            planSummary = batch[i].planSummary;
-            break;
-        }
+    const batch = currOpResult.cursor.firstBatch;
+    assert.eq(1, batch.length, `Expected only one operation in batch: \n${tojson(batch)}`);
+    assert.eq(batch[0].planSummary,
+              expected,
+              `Response included incorrect planSummary:\n${tojson(batch)}`);
+}
+
+const coll = assertDropAndRecreateCollection(testDB, "coll");
+{
+    const docs = [];
+    for (let i = 0; i < 100; ++i) {
+        docs.push({"x": i, "y": i + 1});
     }
-    assert.eq(planSummary, "COLLSCAN", "Response included incorrect or empty planSummary");
+    assert.commandWorked(coll.insertMany(docs));
+}
+
+const coll2 = assertDropAndRecreateCollection(testDB, "coll2");
+{
+    const docs = [];
+    for (let i = 0; i < 1000; ++i) {
+        docs.push({"x": i, "y": i + 1});
+    }
+    docs.push({"x": 1001, "y": -1});
+    docs.push({"x": -1, "y": 1001});
+
+    for (let i = 1000; i < 2000; ++i) {
+        docs.push({"x": i, "y": [i - 1, i, i + 1]});
+    }
+    docs.push({x: 1001, y: [1, 2, 3]});
+    docs.push({x: 1001, y: [1, 2, 3]});
+    assert.commandWorked(coll2.insertMany(docs));
+}
+
+// Tests that a collection scan query reports a COLLSCAN plan summary.
+{
+    const curs = coll.find().batchSize(2);
+    curs.next();
+
+    assertPlanSummary(coll, "COLLSCAN");
+
     curs.close();
 }
 
@@ -59,77 +74,38 @@ if (!TestData.isHintsToQuerySettingsSuite) {
     // This guard excludes this test case from being run on the cursor_hints_to_query_settings
     // suite. The suite replaces cursor hints with query settings. Query settings do not force
     // indexes, and therefore empty filter will result in collection scans.
-    coll.createIndex({x: 1});
-    let curs = coll.find().hint({x: 1}).batchSize(2);
+    assert.commandWorked(coll.createIndex({x: 1}));
+    const curs = coll.find().hint({x: 1}).batchSize(2);
     curs.next();
 
-    let currOpResult = db.adminCommand({
-        aggregate: 1,
-        cursor: {},
-        pipeline: [{$currentOp: {idleCursors: true}}, {$match: {type: "idleCursor"}}]
-    });
+    assertPlanSummary(coll, "IXSCAN { x: 1 }");
 
-    let planSummary = "";
-    var batch = currOpResult.cursor.firstBatch;
-    for (var i = 0; i < batch.length; i++) {
-        if (batch[i].ns == "currentop_find.coll") {
-            planSummary = batch[i].planSummary;
-            break;
-        }
-    }
-    assert.eq(planSummary, "IXSCAN { x: 1 }", "Response included incorrect or empty planSummary ");
     curs.close();
+    assert.commandWorked(coll.dropIndexes());
 }
 
-// // Tests that an index intersection plan shows both indexes in the plan summary. Also tests
-// // compound indexes, dotted paths, and an index w/ descending order.
+// Tests that an index intersection plan shows both indexes in the plan summary. Also tests
+// compound indexes, dotted paths, and an index w/ descending order.
 {
-    coll2.createIndexes([{x: 1}, {y: 1, 'a.b.c': -1}]);
-    let curs = coll2.find({$or: [{x: 1001}, {y: 1001}]}).batchSize(2);
+    assert.commandWorked(coll2.createIndexes([{x: 1}, {y: 1, 'a.b.c': -1}]));
+    const curs = coll2.find({$or: [{x: 1001}, {y: 1001}]}).batchSize(2);
     curs.next();
 
-    let currOpResult = db.adminCommand({
-        aggregate: 1,
-        cursor: {},
-        pipeline: [{$currentOp: {idleCursors: true}}, {$match: {type: "idleCursor"}}]
-    });
-    let planSummary = "";
-    var batch = currOpResult.cursor.firstBatch;
-    for (var i = 0; i < batch.length; i++) {
-        if (batch[i].ns == "currentop_find.coll2") {
-            planSummary = batch[i].planSummary;
-            break;
-        }
-    }
-    assert.eq(planSummary,
-              "IXSCAN { x: 1 }, IXSCAN { y: 1, a.b.c: -1 }",
-              "Response included incorrect or empty planSummary");
+    assertPlanSummary(coll2, "IXSCAN { x: 1 }, IXSCAN { y: 1, a.b.c: -1 }");
+
     curs.close();
-    coll2.dropIndex('x_1');
-    coll2.dropIndex({y: 1, 'a.b.c': -1});
+    assert.commandWorked(coll2.dropIndexes());
 }
 
 // Tests that an index scan query returns the correct planSummary when PathTraverse nodes are
 // involved (i.e. when one field in the collection has arrays).
 {
-    coll2.createIndex({y: 1});
-    let curs = coll2.find({y: [1, 2, 3]}).hint({y: 1}).batchSize(2);
+    assert.commandWorked(coll2.createIndex({y: 1}));
+    const curs = coll2.find({y: [1, 2, 3]}).hint({y: 1}).batchSize(2);
     curs.next();
-    let currOpResult = db.adminCommand({
-        aggregate: 1,
-        cursor: {},
-        pipeline: [{$currentOp: {idleCursors: true}}, {$match: {type: "idleCursor"}}]
-    });
-    let planSummary = "";
-    var batch = currOpResult.cursor.firstBatch;
 
-    for (var i = 0; i < batch.length; i++) {
-        if (batch[i].ns == "currentop_find.coll2") {
-            planSummary = batch[i].planSummary;
-            break;
-        }
-    }
-    assert.eq(planSummary, "IXSCAN { y: 1 }", "Response included incorrect or empty planSummary ");
+    assertPlanSummary(coll2, "IXSCAN { y: 1 }");
+
     curs.close();
+    assert.commandWorked(coll2.dropIndexes());
 }
-})();

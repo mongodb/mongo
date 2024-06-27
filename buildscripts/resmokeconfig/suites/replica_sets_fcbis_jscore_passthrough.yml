@@ -12,10 +12,10 @@ selector:
     - jstests/core/**/profile_list_indexes.js
     - jstests/core/**/recursion.js
     - jstests/core/**/system_profile.js
-    # operation_latency_histogram.js and geo_s2cursorlimitskip.js do not expect concurrent reads
-    # against their test collections.
+    # The tests below do not expect concurrent reads against their test collections.
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/**/geo_s2cursorlimitskip.js
+    - jstests/core/administrative/current_op/currentop_find.js
     # These tests run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
     - jstests/core/**/profile_agg.js
     - jstests/core/**/profile_count.js

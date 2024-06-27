@@ -49,6 +49,9 @@ selector:
     - jstests/core/columnstore/columnstore_index_correctness.js
 
     - jstests/core/query/query_settings/**/*.js
+
+    # TODO: SERVER-91874 The test below fails due to unclosed by the test suite cursors.
+    - jstests/core/administrative/current_op/currentop_find.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_profiling
