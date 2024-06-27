@@ -69,7 +69,7 @@ CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
       _ws(ws),
       _canonicalQuery(cq),
       _plannerParams(params),
-      _decisionWorks(decisionWorks) {
+      _decisionWorks{decisionWorks} {
     _children.emplace_back(std::move(root));
 }
 
@@ -90,7 +90,29 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // If we work this many times during the trial period, then we will replan the
     // query from scratch.
     size_t maxWorksBeforeReplan =
-        static_cast<size_t>(internalQueryCacheEvictionRatio * _decisionWorks);
+        static_cast<size_t>(internalQueryCacheEvictionRatio * getDecisionWorks());
+
+    // the replan works can not exceed the number of works that is set to be the fraction of the 
+    // collection size.
+    // in extreme cases, if there are no restrictions, Probably more than the total collection size,
+    // this replan may lose effectiveness. it may lead that the query use wrong index.
+    size_t numUpperLimitWorks = trial_period::getTrialPeriodMaxWorks(opCtx(), collection());
+    if (maxWorksBeforeReplan > numUpperLimitWorks) {
+        maxWorksBeforeReplan = numUpperLimitWorks;
+    }
+    
+    // sometimes the _decisionWorks is greater than numUpperLimitWorks, even greater than the collection size.
+    // for example: We deleted a lot of data in the process of querying the data
+    // 
+    // Force adjust the cache entry works, If not adjust, the replan will lose effectiveness
+    if (getDecisionWorks() > numUpperLimitWorks) {
+        LOGV2_DEBUG(20578,
+            1,
+            "Force adjust the cache entry works",
+            "oldWorks"_attr = getDecisionWorks(),
+            "newWorks"_attr = numUpperLimitWorks);
+        _decisionWorks.store(numUpperLimitWorks);
+    }
 
     // The trial period ends without replanning if the cached plan produces this many results.
     size_t numResults = trial_period::getTrialPeriodNumToReturn(*_canonicalQuery);
@@ -167,18 +189,27 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
                 1,
                 "Evicting cache entry and replanning query",
                 "maxWorksBeforeReplan"_attr = maxWorksBeforeReplan,
-                "decisionWorks"_attr = _decisionWorks,
+                "decisionWorks"_attr = getDecisionWorks(),
                 "query"_attr = redact(_canonicalQuery->toStringShort()),
                 "planSummary"_attr = explainer->getPlanSummary());
 
     const bool shouldCache = true;
-    return replan(
-        yieldPolicy,
-        shouldCache,
-        str::stream()
-            << "cached plan was less efficient than expected: expected trial execution to take "
-            << _decisionWorks << " works but it took at least " << maxWorksBeforeReplan
-            << " works");
+    if (getDecisionWorks() < maxWorksBeforeReplan) {
+        return replan(
+            yieldPolicy,
+            shouldCache,
+            str::stream()
+                << "cached plan was less efficient than expected: expected trial execution to take "
+                << getDecisionWorks() << " works but it took at least " << maxWorksBeforeReplan
+                << " works");
+    } else {
+        return replan(
+            yieldPolicy,
+            shouldCache,
+            str::stream()
+                << "cached plan may be less efficient than expected: expected decisionWorks is "
+                << getDecisionWorks() << ", it is same to the maxWorksBeforeReplan");
+    }
 }
 
 Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
