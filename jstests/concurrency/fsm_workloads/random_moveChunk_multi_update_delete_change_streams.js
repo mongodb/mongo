@@ -12,7 +12,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {
-    runWithManualRetriesIfInStepdownSuite,
+    runWithManualRetries,
     withSkipRetryOnNetworkError
 } from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
@@ -121,7 +121,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         if (TestData.runningWithShardStepdowns) {
             fsm.forceRunningOutsideTransaction(this);
-            runWithManualRetriesIfInStepdownSuite(() => {
+            runWithManualRetries(() => {
                 $super.states.init.apply(this, arguments);
             });
         } else {
