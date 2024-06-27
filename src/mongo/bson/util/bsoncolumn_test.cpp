@@ -8868,7 +8868,9 @@ TEST_F(BSONColumnTest, FuzzerDiscoveredEdgeCases) {
         "AQAAAAAjAAAAHAkALV3DRTINAACAd/ce/////xwJAC33Hv////+/AA=="_sd,
         // Unencodable literal for 128bit types, prevEncoded128 needs to be set to none by
         // compressor.
-        "DQAUAAAAAAgAAIDx///++AAAAAMAAAAIAACA8f///vj/AAAA"_sd};
+        "DQAUAAAAAAgAAIDx///++AAAAAMAAAAIAACA8f///vj/AAAA"_sd,
+        // Merge of interleaved objects that results in repeated fieldname
+        "fwB/APEPAAAA/wD/////KwAGAAALAJ0qnZ0AAICx87tAc/+/fgQABwAAAP8AAICx88BEjAi/AICxAAIAACQAFgAA"_sd};
 
     for (auto&& binaryBase64 : binariesBase64) {
         auto binary = base64::decode(binaryBase64);
@@ -8877,8 +8879,13 @@ TEST_F(BSONColumnTest, FuzzerDiscoveredEdgeCases) {
         // This is required to be able to verify these binary blobs.
         BSONColumnBuilder builder;
         BSONColumn column(binary.data(), binary.size());
-        for (auto&& elem : column) {
-            builder.append(elem);
+        try {
+            for (auto&& elem : column) {
+                builder.append(elem);
+            }
+        } catch (const DBException& ex) {
+            ASSERT_NOT_OK(ex.toStatus());
+            continue;
         }
         BSONBinData finalized = builder.finalize();
         ASSERT_EQ(binary.size(), finalized.length);
