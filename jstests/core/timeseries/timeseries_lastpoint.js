@@ -34,6 +34,8 @@
  *   tenant_migration_incompatible,
  *   # Buckets being closed during resharding can cause the bucket ranges in this test to vary.
  *   assumes_balancer_off,
+ *   # Some optimization is done in 7.2, some tests may fail prior to 7.2.
+ *   requires_fcv_72,
  * ]
  *
  */
