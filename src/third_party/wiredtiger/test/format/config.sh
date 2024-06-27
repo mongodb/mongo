@@ -329,6 +329,8 @@ CONFIG configuration_list[] = {
 
 {"stress.hs_sweep", "stress history store sweep", C_BOOL, 2, 0, 0}
 
+{"stress.prefetch_delay", "stress prefetch delay", C_BOOL, 2, 0, 0}
+
 {"stress.prepare_resolution_1", "stress prepare resolution (#1)", C_BOOL, 2, 0, 0}
 
 {"stress.sleep_before_read_overflow_onpage", "stress onpage overflow read race with checkpoint", C_BOOL, 2, 0, 0}

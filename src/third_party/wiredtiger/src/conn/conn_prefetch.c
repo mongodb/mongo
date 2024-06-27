@@ -41,6 +41,9 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         __wt_cond_wait(session, conn->prefetch_threads.wait_cond, 10 * WT_THOUSAND, NULL);
 
     while (!TAILQ_EMPTY(&conn->pfqh)) {
+        /* Encourage races. */
+        __wt_timing_stress(session, WT_TIMING_STRESS_PREFETCH_DELAY, NULL);
+
         __wt_spin_lock(session, &conn->prefetch_lock);
         pe = TAILQ_FIRST(&conn->pfqh);
 
@@ -95,9 +98,17 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
          */
         F_CLR_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH);
         (void)__wt_atomic_subv32(&((WT_BTREE *)pe->dhandle->handle)->prefetch_busy, 1);
-        WT_ERR(ret);
 
         __wt_free(session, pe);
+
+        /*
+         * Ignore specific errors that prevented prefetch from making progress, they are harmless.
+         */
+        if (ret == WT_NOTFOUND || ret == WT_RESTART) {
+            WT_STAT_CONN_INCR(session, prefetch_skipped_error_ok);
+            ret = 0;
+        }
+        WT_ERR(ret);
     }
 
 err:

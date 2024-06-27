@@ -108,7 +108,7 @@ __wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH_QUEUE_ENTRY *pe)
 
     if (pe->ref->home != pe->first_home)
         __wt_verbose(
-          session, WT_VERB_PREFETCH, "The home changed while queued for pre-fetch %s", "");
+          session, WT_VERB_PREFETCH, "%s", "The home changed while queued for pre-fetch");
 
     WT_PREFETCH_ASSERT(session, pe->dhandle != NULL, prefetch_skipped_no_valid_dhandle);
     WT_PREFETCH_ASSERT(
@@ -125,8 +125,7 @@ __wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH_QUEUE_ENTRY *pe)
     if (__wt_ref_addr_copy(session, pe->ref, &addr)) {
         WT_ERR(__wt_page_in(session, pe->ref, WT_READ_PREFETCH));
         WT_ERR(__wt_page_release(session, pe->ref, 0));
-    } else
-        ret = (WT_ERROR);
+    }
 
 err:
     WT_LEAVE_GENERATION(session, WT_GEN_SPLIT);
