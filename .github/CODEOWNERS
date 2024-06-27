@@ -4,5 +4,6 @@
 # Exclude some test files and READMEs from the backport approvals
 /jstests/**/*
 /etc/backports_required_for_multiversion_tests.yml
+/etc/*.suppressions
 /README.md
 **/README.md
