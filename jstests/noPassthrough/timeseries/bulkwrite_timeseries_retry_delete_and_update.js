@@ -11,7 +11,6 @@
  *   requires_fcv_80,
  *   featureFlagTimeseriesUpdatesSupport,
  *   # Needed to run createUnsplittableCollection
- *   # TODO (SERVER-87625) Remove feature flag dependency.
  *   featureFlagAuthoritativeShardCollection,
  * ]
  */
