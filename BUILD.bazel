@@ -87,6 +87,20 @@ mongo_config_header(
             "MONGO_CONFIG_HAVE_HEADER_UNISTD_H": "1",
         },
         "//conditions:default": {},
+    }) | select({
+        "//bazel/config:ssl_enabled_windows": {
+            "MONGO_CONFIG_SSL": "1",
+            "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_WINDOWS",
+        },
+        "//bazel/config:ssl_enabled_macos": {
+            "MONGO_CONFIG_SSL": "1",
+            "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_APPLE",
+        },
+        "//bazel/config:ssl_enabled_linux": {
+            "MONGO_CONFIG_SSL": "1",
+            "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_OPENSSL",
+        },
+        "//conditions:default": {},
     }),
     output = "mongo/config.h",
     template = "//src/mongo:config.h.in",

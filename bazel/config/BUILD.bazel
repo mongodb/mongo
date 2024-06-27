@@ -23,6 +23,7 @@ load(
     "separate_debug",
     "shared_archive",
     "spider_monkey_dbg",
+    "ssl",
     "streams_release_build",
     "tsan",
     "ubsan",
@@ -1508,15 +1509,13 @@ selects.config_setting_group(
     ],
 )
 
-# TODO: another conditional check for openssl is required to be ported from -
-#   https://github.com/10gen/mongo/blob/master/SConstruct#L6039
-# Depends on: https://jira.mongodb.org/browse/SERVER-80599
 selects.config_setting_group(
     name = "streams_release_build_required_setting",
     match_all = [
         ":release_enabled",
         ":streams_release_build_enabled",
         ":platform_for_streaming_build",
+        ":ssl_enabled_linux",
     ],
 )
 
@@ -1684,5 +1683,52 @@ selects.config_setting_group(
     match_all = [
         "@platforms//os:windows",
         ":warnings_as_errors_enabled",
+    ],
+)
+
+# -----------
+# ssl options
+# -----------
+
+ssl(
+    name = "ssl",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "ssl_enabled",
+    flag_values = {
+        "//bazel/config:ssl": "True",
+    },
+)
+
+config_setting(
+    name = "ssl_disabled",
+    flag_values = {
+        "//bazel/config:ssl": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "ssl_enabled_windows",
+    match_all = [
+        "@platforms//os:windows",
+        ":ssl_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "ssl_enabled_macos",
+    match_all = [
+        "@platforms//os:macos",
+        ":ssl_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "ssl_enabled_linux",
+    match_all = [
+        "@platforms//os:linux",
+        ":ssl_enabled",
     ],
 )

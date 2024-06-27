@@ -759,6 +759,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--//bazel/config:disable_warnings_as_errors={env.GetOption("disable-warnings-as-errors") == "source"}',
         f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}",
         f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}",
+        f'--//bazel/config:ssl={"True" if env.GetOption("ssl") == "on" else "False"}',
         "--compilation_mode=dbg",  # always build this compilation mode as we always build with -g
     ]
 

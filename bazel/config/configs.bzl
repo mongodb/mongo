@@ -488,3 +488,14 @@ disable_warnings_as_errors = rule(
     implementation = lambda ctx: disable_warnings_as_errors_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# ssl
+# =========
+
+ssl_provider = provider(doc = "Enable or Disable SSL", fields = ["enabled"])
+
+ssl = rule(
+    implementation = lambda ctx: ssl_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
