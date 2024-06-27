@@ -5,21 +5,6 @@
 # Any global task, function, or taskgroup definition can be added here. Note that if
 # the definition is added to another file, YAML anchors from this file can't be used.
 
-# Files that match an ignore-list pattern will not trigger a build, if they're the only modified
-# files in the patch.
-ignore:
-  - ".*"
-  - "!.clang-format"
-  - "!.eslintrc.yml"
-  - "*.md"
-  - "*.rst"
-  - "*.txt"
-  - "/distsrc/**"
-  - "/docs/**"
-  - "/etc/*.yml"
-  - "!/etc/evergreen.yml"
-  - "README"
-
 #######################################
 #             Variable                #
 #######################################
