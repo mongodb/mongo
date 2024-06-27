@@ -149,15 +149,6 @@ void renameOrDropTarget(OperationContext* opCtx,
     }
 }
 
-void clearFilteringMetadataOnNss(OperationContext* opCtx, const NamespaceString& nss) {
-    // Set the placement version to UNKNOWN to force a future operation to refresh the metadata
-    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
-        ->clearFilteringMetadata(opCtx);
-}
-
 }  // namespace
 
 RenameCollectionParticipantService* RenameCollectionParticipantService::getService(
@@ -362,27 +353,6 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 service->promoteRecoverableCriticalSectionToBlockAlsoReads(
                     opCtx, toNss, reason, ShardingCatalogClient::kLocalWriteConcern);
 
-                // Clear the filtering metadata before releasing the critical section (it will be
-                // recovered the next time is accessed) and to safely create new range deletion
-                // tasks (the submission will serialize on the renamed collection's metadata
-                // refresh).
-                {
-                    Lock::DBLock dbLock(opCtx, fromNss.dbName(), MODE_IX);
-                    Lock::CollectionLock collLock(opCtx, fromNss, MODE_IX);
-                    auto scopedCsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                            opCtx, fromNss);
-                    scopedCsr->clearFilteringMetadataForDroppedCollection(opCtx);
-                }
-
-                {
-                    Lock::DBLock dbLock(opCtx, toNss.dbName(), MODE_IX);
-                    Lock::CollectionLock collLock(opCtx, toNss, MODE_IX);
-                    auto scopedCsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                             toNss);
-                    scopedCsr->clearFilteringMetadata(opCtx);
-                }
 
                 rangedeletionutil::snapshotRangeDeletionsForRename(opCtx, fromNss, toNss);
             }))
@@ -459,9 +429,6 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 const auto& fromNss = _doc.getFromNss();
                 const auto& toNss = _doc.getTo();
 
-                clearFilteringMetadataOnNss(opCtx, fromNss);
-                clearFilteringMetadataOnNss(opCtx, toNss);
-
                 // Release source/target critical sections
                 // Note: Use 'throwIfReasonDiffers=false' on the destination collection because as
                 // soon as the critical section is released migrations can start. In case this phase
@@ -479,9 +446,20 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                                                 toNss, SerializationContext::stateDefault()));
                 auto service = ShardingRecoveryService::get(opCtx);
                 service->releaseRecoverableCriticalSection(
-                    opCtx, fromNss, reason, ShardingCatalogClient::kLocalWriteConcern);
+                    opCtx,
+                    fromNss,
+                    reason,
+                    ShardingCatalogClient::kLocalWriteConcern,
+                    ShardingRecoveryService::FilteringMetadataClearer(
+                        true /*includeStepsForNamespaceDropped*/),
+                    true /* throwIfReasonDiffers*/);
                 service->releaseRecoverableCriticalSection(
-                    opCtx, toNss, reason, WriteConcerns::kMajorityWriteConcernNoTimeout, false);
+                    opCtx,
+                    toNss,
+                    reason,
+                    WriteConcerns::kMajorityWriteConcernNoTimeout,
+                    ShardingRecoveryService::FilteringMetadataClearer(),
+                    false /* throwIfReasonDiffers*/);
 
                 LOGV2(5515107, "CRUD unblocked", "fromNs"_attr = fromNss, "toNs"_attr = toNss);
             }))

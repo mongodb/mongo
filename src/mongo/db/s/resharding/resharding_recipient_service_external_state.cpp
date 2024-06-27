@@ -237,11 +237,9 @@ void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(Operation
     }
 }
 
-void RecipientStateMachineExternalStateImpl::clearFilteringMetadata(
-    OperationContext* opCtx,
-    const NamespaceString& sourceNss,
-    const NamespaceString& tempReshardingNss) {
-    stdx::unordered_set<NamespaceString> namespacesToRefresh{sourceNss, tempReshardingNss};
+void RecipientStateMachineExternalStateImpl::clearFilteringMetadataOnTempReshardingCollection(
+    OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
+    stdx::unordered_set<NamespaceString> namespacesToRefresh{tempReshardingNss};
     resharding::clearFilteringMetadata(opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
 }
 

@@ -67,6 +67,9 @@ commands:
             clearFilteringMetadata:
                 type: bool
                 description: >-
+                    (NOTE: this field has been deprecated in 8.0:
+                     - starting from such a release, filtering metadata are always cleared when blockType == kUnblock;
+                     - requestors should still specify a value to maintain operability with remote nodes running a legacy binary)
                     If true the filtering metadata will be cleared, forcing a refresh the next time
                     the collection metadata is needed.
                 optional: true

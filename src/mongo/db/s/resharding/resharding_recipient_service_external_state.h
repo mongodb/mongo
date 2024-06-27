@@ -102,9 +102,8 @@ public:
                                            const BSONObj& query,
                                            const BSONObj& update) = 0;
 
-    virtual void clearFilteringMetadata(OperationContext* opCtx,
-                                        const NamespaceString& sourceNss,
-                                        const NamespaceString& tempReshardingNss) = 0;
+    virtual void clearFilteringMetadataOnTempReshardingCollection(
+        OperationContext* opCtx, const NamespaceString& tempReshardingNss) = 0;
 
     /**
      * Creates the temporary resharding collection locally.
@@ -155,9 +154,8 @@ public:
                                    const BSONObj& query,
                                    const BSONObj& update) override;
 
-    void clearFilteringMetadata(OperationContext* opCtx,
-                                const NamespaceString& sourceNss,
-                                const NamespaceString& tempReshardingNss) override;
+    void clearFilteringMetadataOnTempReshardingCollection(
+        OperationContext* opCtx, const NamespaceString& tempReshardingNss) override;
 
 private:
     template <typename Callable>

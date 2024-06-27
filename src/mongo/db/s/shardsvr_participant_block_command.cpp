@@ -101,12 +101,6 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             auto handleRecoverableCriticalSection = [this](auto opCtx) {
-                if (request().getClearFilteringMetadata().value_or(false)) {
-                    AutoGetCollection autoColl(opCtx, ns(), MODE_IX);
-                    auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                        opCtx, ns());
-                    csr->clearFilteringMetadata(opCtx);
-                }
                 const auto reason = request().getReason().get_value_or(
                     BSON("command"
                          << "ShardSvrParticipantBlockCommand"
@@ -124,6 +118,7 @@ public:
                             ns(),
                             reason,
                             ShardingCatalogClient::kLocalWriteConcern,
+                            ShardingRecoveryService::FilteringMetadataClearer(),
                             request().getThrowIfReasonDiffers()
                                 ? *request().getThrowIfReasonDiffers()
                                 : true);

@@ -946,7 +946,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 opCtx,
                                 toNss,
                                 criticalSectionReason,
-                                WriteConcerns::kLocalWriteConcern);
+                                WriteConcerns::kLocalWriteConcern,
+                                ShardingRecoveryService::NoCustomAction());
                         }
                     }
 
@@ -1002,6 +1003,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         toNss,
                         criticalSectionReason,
                         WriteConcerns::kLocalWriteConcern,
+                        ShardingRecoveryService::NoCustomAction(),
                         false /* throwIfReasonDiffers */);
                     _completeOnError = true;
                     throw;

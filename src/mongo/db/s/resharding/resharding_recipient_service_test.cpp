@@ -199,9 +199,8 @@ public:
                                    const BSONObj& query,
                                    const BSONObj& update) override {}
 
-    void clearFilteringMetadata(OperationContext* opCtx,
-                                const NamespaceString& sourceNss,
-                                const NamespaceString& tempReshardingNss) override {}
+    void clearFilteringMetadataOnTempReshardingCollection(
+        OperationContext* opCtx, const NamespaceString& tempReshardingNss) override {}
 
 private:
     const StringData _currentShardKey = "oldKey";

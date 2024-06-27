@@ -157,6 +157,39 @@ AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* o
 }
 }  // namespace
 
+ShardingRecoveryService::FilteringMetadataClearer::FilteringMetadataClearer(
+    bool includeStepsForNamespaceDropped)
+    : _includeStepsForNamespaceDropped(includeStepsForNamespaceDropped) {}
+
+void ShardingRecoveryService::FilteringMetadataClearer::operator()(
+    OperationContext* opCtx, const NamespaceString& nssBeingReleased) const {
+    if (nssBeingReleased.isNamespaceAlwaysUntracked()) {
+        return;
+    }
+
+    if (nssBeingReleased.isDbOnly()) {
+        AutoGetDb autoDb(opCtx, nssBeingReleased.dbName(), MODE_IX);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+            opCtx, nssBeingReleased.dbName());
+        scopedDss->clearDbInfo(opCtx);
+        return;
+    }
+
+    AutoGetCollection autoColl(
+        opCtx,
+        nssBeingReleased,
+        MODE_IX,
+        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+
+    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+        opCtx, nssBeingReleased);
+    if (_includeStepsForNamespaceDropped) {
+        scopedCsr->clearFilteringMetadataForDroppedCollection(opCtx);
+    } else {
+        scopedCsr->clearFilteringMetadata(opCtx);
+    }
+}
+
 ShardingRecoveryService* ShardingRecoveryService::get(ServiceContext* serviceContext) {
     return &serviceDecorator(serviceContext);
 }
@@ -419,6 +452,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     const NamespaceString& nss,
     const BSONObj& reason,
     const WriteConcernOptions& writeConcern,
+    const BeforeReleasingCustomAction& beforeReleasingAction,
     bool throwIfReasonDiffers) {
     LOGV2_DEBUG(5656606,
                 3,
@@ -492,8 +526,10 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
                             collCSDoc.getReason().toString()),
                 !isDifferentReason);
 
+        // The collection critical section is taken (in any phase), perform the custom action then
+        // try to release it.
 
-        // The collection critical section is taken (in any phase), try to release it.
+        beforeReleasingAction(opCtx, nss);
 
         // The following code will try to remove a doc from config.criticalCollectionSections:
         // - If everything goes well, the shard server op observer will release the in-memory CS

@@ -98,5 +98,4 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
 Status onDbVersionMismatchNoExcept(OperationContext* opCtx,
                                    const DatabaseName& dbName,
                                    boost::optional<DatabaseVersion> clientDbVersion) noexcept;
-
 }  // namespace mongo

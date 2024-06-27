@@ -117,6 +117,7 @@ public:
                                                         NamespaceString(dbName),
                                                         csReason,
                                                         ShardingCatalogClient::kLocalWriteConcern,
+                                                        ShardingRecoveryService::NoCustomAction(),
                                                         false /* throwIfReasonDiffers */);
             }
 

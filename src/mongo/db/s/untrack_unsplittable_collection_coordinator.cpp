@@ -148,16 +148,10 @@ void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(
     auto opCtxHolder = cc().makeOperationContext();
     auto* opCtx = opCtxHolder.get();
     getForwardableOpMetadata().setOn(opCtx);
-    {
-        AutoGetCollection autoColl(opCtx, nss(), MODE_IS);
-        auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            opCtx, autoColl.getNss());
-        auto cd = csr->getCollectionDescription(opCtx);
-        csr->clearFilteringMetadata(opCtx);
-    }
 
-    // Note also that this code is indirectly used to notify to secondary nodes to clear their
-    // filtering information.
+    // Force a refresh of the filtering metadata to clean up the data structure held by the
+    // CollectionShardingRuntime (Note also that this code is indirectly used to notify to secondary
+    // nodes to clear their filtering information).
     forceShardFilteringMetadataRefresh(opCtx, nss());
     CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss());
 
@@ -166,8 +160,11 @@ void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
     auto service = ShardingRecoveryService::get(opCtx);
-    service->releaseRecoverableCriticalSection(
-        opCtx, nss(), _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
+    service->releaseRecoverableCriticalSection(opCtx,
+                                               nss(),
+                                               _critSecReason,
+                                               ShardingCatalogClient::kLocalWriteConcern,
+                                               ShardingRecoveryService::FilteringMetadataClearer());
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "untrackCollection.end", nss());
 }

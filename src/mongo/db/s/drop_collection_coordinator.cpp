@@ -120,10 +120,6 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                         "expectedUUID"_attr = *expectedUUID);
             return;
         }
-
-        // Clear CollectionShardingRuntime entry.
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
-            ->clearFilteringMetadataForDroppedCollection(opCtx);
     }
 
     dropCollectionShardingIndexCatalog(opCtx, nss);
@@ -175,7 +171,8 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
     }
 
     // Force the refresh of the catalog cache to purge outdated information. Note also that this
-    // code is indirectly used to notify to secondary nodes to clear their filtering information.
+    // code is indirectly used to notify to secondary nodes to clear their filtering information
+    // once the data flushed to disk get replicated.
     forceShardFilteringMetadataRefresh(opCtx, nss);
     CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
 

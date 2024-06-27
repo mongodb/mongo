@@ -786,6 +786,7 @@ void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) cons
         NamespaceString(_dbName),
         _csReason,
         ShardingCatalogClient::kLocalWriteConcern,
+        ShardingRecoveryService::NoCustomAction(),
         false /*throwIfReasonDiffers*/);
 }
 
