@@ -262,19 +262,17 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
             existingIndexDesc->infoObj()[IndexDescriptor::kPathProjectionFieldName];
     }
 
-    // If the FCV has not been upgraded to 4.9+, add unique/sparse to the options map. They do not
-    // contribute to the index signature, but can determine whether or not the candidate index is
-    // identical to the existing index.
+    // If the FCV has not been upgraded to 4.9+, unique/sparse do not contribute to the index
+    // signature, but can determine whether or not the candidate index is identical to the existing
+    // index.
     if (!isFcvAtLeast49) {
-        thisOptionsMap[IndexDescriptor::kUniqueFieldName] =
-            infoObj()[IndexDescriptor::kUniqueFieldName];
-        existingIndexOptionsMap[IndexDescriptor::kUniqueFieldName] =
-            existingIndexDesc->infoObj()[IndexDescriptor::kUniqueFieldName];
+        if (unique() != existingIndexDesc->unique()) {
+            return Comparison::kEquivalent;
+        }
 
-        thisOptionsMap[IndexDescriptor::kSparseFieldName] =
-            infoObj()[IndexDescriptor::kSparseFieldName];
-        existingIndexOptionsMap[IndexDescriptor::kSparseFieldName] =
-            existingIndexDesc->infoObj()[IndexDescriptor::kSparseFieldName];
+        if (isSparse() != existingIndexDesc->isSparse()) {
+            return Comparison::kEquivalent;
+        }
     }
 
     // If the FCV has not been upgraded to 4.7+, add partialFilterExpression to the options map. It
