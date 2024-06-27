@@ -153,6 +153,7 @@ private:
     const uint64_t _start;
 };
 
+
 class ServiceEntryPointCommonBenchmarkFixture : public benchmark::Fixture {
 public:
     ServiceEntryPointCommonBenchmarkFixture() {
