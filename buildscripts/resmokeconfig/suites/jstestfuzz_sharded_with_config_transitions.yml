@@ -63,6 +63,7 @@ executor:
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
         internalQueryStatsRateLimit: -1
+        reshardingMinimumOperationDurationMillis: 0
         internalQueryStatsErrorsAreCommandFatal: true
         # Manually set the random migration fail point so we can set a threshold for skipping
         # moveCollection to prevent "starving" random chunk migrations.

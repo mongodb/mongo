@@ -146,6 +146,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         skipDroppingHashedShardKeyIndex: true
+        reshardingMinimumOperationDurationMillis: 0
         # Manually set the random migration fail point so we can set a threshold for skipping
         # moveCollection to prevent "starving" random chunk migrations.
         failpoint.balancerShouldReturnRandomMigrations:

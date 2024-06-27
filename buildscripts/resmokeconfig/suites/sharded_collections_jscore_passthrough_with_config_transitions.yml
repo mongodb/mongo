@@ -239,6 +239,7 @@ executor:
         orphanCleanupDelaySecs: 1
         skipDroppingHashedShardKeyIndex: true
         featureFlagReshardingForTimeseries: true
+        reshardingMinimumOperationDurationMillis: 0
     set_cluster_parameter:
       parameter: pauseMigrationsDuringMultiUpdates
       value:

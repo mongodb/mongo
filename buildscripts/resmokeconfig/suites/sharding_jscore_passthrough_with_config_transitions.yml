@@ -131,6 +131,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagReshardingForTimeseries: true
+        reshardingMinimumOperationDurationMillis: 0
         failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
           data:
             comment: *movePrimaryComment
