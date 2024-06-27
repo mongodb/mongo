@@ -41,16 +41,4 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::get(OperationContext* opCt
     return contextDecoration(opCtx);
 }
 
-void ExecutionAdmissionContext::copyTo(
-    OperationContext* opCtx, boost::optional<AdmissionContext::Priority> newPriority) const {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
-    if (newPriority) {
-        ExecutionAdmissionContext newContext(*this);
-        newContext._priority.store(*newPriority);
-        contextDecoration(opCtx) = newContext;
-        return;
-    }
-
-    contextDecoration(opCtx) = *this;
-}
 }  // namespace mongo

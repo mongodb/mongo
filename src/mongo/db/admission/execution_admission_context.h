@@ -45,13 +45,6 @@ public:
      * Retrieve the ExecutionAdmissionContext decoration the provided OperationContext
      */
     static ExecutionAdmissionContext& get(OperationContext* opCtx);
-
-    /**
-     * Copy this ExecutionAdmissionContext to another OperationContext. Optionally, provide a new
-     * priority to upgrade the copied context's priority.
-     */
-    void copyTo(OperationContext* opCtx,
-                boost::optional<AdmissionContext::Priority> newPriority = boost::none) const;
 };
 
 }  // namespace mongo
