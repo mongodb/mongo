@@ -163,6 +163,7 @@ public:
         ptrdiff_t offset = (_bufferSize + al - 1) / al * al;  // pad to alignment
         _entries.push_back({&typeid(T), offset, ops, sz, al});
         _bufferSize = offset + sz;
+        _bufferAlignment = std::max(_bufferAlignment, al);
         return _entries.size() - 1;
     }
 
@@ -171,10 +172,7 @@ public:
     }
 
     size_t bufferAlignment() const {
-        return std::accumulate(_entries.begin(),
-                               _entries.end(),
-                               size_t{1},
-                               [](auto&& acc, auto&& e) { return std::max(acc, e.align); });
+        return _bufferAlignment;
     }
 
     auto begin() const {
@@ -194,6 +192,7 @@ public:
 private:
     std::vector<Entry> _entries;
     size_t _bufferSize = sizeof(void*);  // The owner pointer is always present.
+    size_t _bufferAlignment = 1;
 };
 
 /** Defined for gdb pretty-printer visibility only. */
