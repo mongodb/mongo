@@ -51,6 +51,7 @@ function runTest(st, collName, errorCode, isSharded) {
     for (let commandTestCase of kCommandTestCases) {
         const commandName = commandTestCase.name;
         const commandBody = commandTestCase.command;
+        const failCommandOptions = {namespace: ns, errorCode, failCommands: [commandName]};
 
         if (isSharded && commandName === "distinct") {
             // Distinct isn't allowed on sharded collections in a multi-document transaction.
@@ -63,7 +64,7 @@ function runTest(st, collName, errorCode, isSharded) {
         assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 15}}));
 
         // Verify the command must fail on a snapshot error from a subsequent statement.
-        setFailCommandOnShards(st, {times: 1}, [commandName], errorCode, 1, ns);
+        setFailCommandOnShards(st, {times: 1}, failCommandOptions, 1);
         const res = assert.commandFailedWithCode(sessionDB.runCommand(commandBody), errorCode);
         assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
