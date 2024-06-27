@@ -20,6 +20,7 @@ ignore:
 - ".*"
 - "!.clang-format"
 - "!.eslintrc.yml"
+- "!.github"
 - "*.md"
 - "*.rst"
 - "*.txt"
