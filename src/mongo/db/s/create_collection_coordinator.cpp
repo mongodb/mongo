@@ -949,26 +949,6 @@ void checkCommandArguments(OperationContext* opCtx,
                               << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
                 originalNss.size() <= NamespaceString::MaxNsShardedCollectionLen);
     }
-
-    if (originalNss.dbName() == DatabaseName::kConfig) {
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
-        auto findReponse = uassertStatusOK(
-            configShard->exhaustiveFindOnConfig(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                repl::ReadConcernLevel::kMajorityReadConcern,
-                                                originalNss,
-                                                BSONObj(),
-                                                BSONObj(),
-                                                1));
-
-        auto numDocs = findReponse.docs.size();
-
-        // If this is a collection on the config db, it must be empty to be sharded.
-        uassert(ErrorCodes::IllegalOperation,
-                "collections in the config db must be empty to be sharded",
-                numDocs == 0);
-    }
 }
 
 /**
@@ -1663,9 +1643,17 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                 _doc.setTranslatedRequestParams(_translateRequestParameters(opCtx));
                 _updateStateDocument(opCtx, CreateCollectionCoordinatorDocumentLegacy(_doc));
 
+                if (nss().dbName() == DatabaseName::kConfig) {
+                    uassert(ErrorCodes::IllegalOperation,
+                            "collections in the config db must be empty to be sharded",
+                            checkIfCollectionIsEmpty(opCtx, nss(), ShardId::kConfigServerId));
+                    _collectionEmpty = true;
+                } else {
+                    _collectionEmpty = checkIfCollectionIsEmpty(
+                        opCtx, nss(), ShardingState::get(opCtx)->shardId());
+                }
+
                 ShardKeyPattern shardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
-                _collectionEmpty =
-                    checkIfCollectionIsEmpty(opCtx, nss(), ShardingState::get(opCtx)->shardId());
                 _splitPolicy = create_collection_util::createPolicy(
                     opCtx,
                     shardKeyPattern,
@@ -2226,8 +2214,22 @@ void CreateCollectionCoordinator::_enterWriteCriticalSectionOnDataShardAndCheckC
                                   {*_doc.getOriginalDataShard()},
                                   CriticalSectionBlockTypeEnum::kWrites);
 
-    _doc.setCollectionIsEmpty(
-        checkIfCollectionIsEmpty(opCtx, nss(), {*_doc.getOriginalDataShard()}));
+    const auto targetIsConfigDb = nss().dbName() == DatabaseName::kConfig;
+    const auto collectionIsEmpty = std::invoke([&, this]() {
+        if (targetIsConfigDb) {
+            return checkIfCollectionIsEmpty(opCtx, nss(), ShardId::kConfigServerId);
+        }
+        return checkIfCollectionIsEmpty(opCtx, nss(), {*_doc.getOriginalDataShard()});
+    });
+
+    if (targetIsConfigDb) {
+        // If this is a collection on the config db, it must be empty to be sharded.
+        uassert(ErrorCodes::IllegalOperation,
+                "collections in the config db must be empty to be sharded",
+                collectionIsEmpty);
+    }
+
+    _doc.setCollectionIsEmpty(collectionIsEmpty);
 }
 
 void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
