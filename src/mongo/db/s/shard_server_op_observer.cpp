@@ -159,7 +159,11 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
     // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
         shard_role_details::getLocker(opCtx));
-    AutoGetCollection autoColl(opCtx, deletedNss, MODE_IX);
+    AutoGetCollection autoColl(
+        opCtx,
+        deletedNss,
+        MODE_IX,
+        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
 
     tassert(7751400,
             str::stream() << "Untimestamped writes to "
@@ -356,7 +360,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
             shard_role_details::getLocker(opCtx));
-        AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
+        AutoGetCollection autoColl(
+            opCtx,
+            updatedNss,
+            MODE_IX,
+            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         if (refreshingFieldNewVal.isBoolean() && !refreshingFieldNewVal.boolean()) {
             tassert(7751401,
                     str::stream()
