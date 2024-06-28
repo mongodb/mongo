@@ -73,5 +73,17 @@ assert.eq(51, st.rs0.getPrimary().getCollection(ns).countDocuments({}));
 checkIsUnsplittableSet();
 testReadWriteSucceeds();
 
+jsTest.log(
+    'Check that calling unshardCollection is succeeds and is a no-op as long as toShard does not differ from the current shard it lives on');
+const collInfo = mongos.getDB(dbName).getCollectionInfos({name: coll.getName()})[0];
+const prevCollUUID = collInfo.info.uuid;
+assert.commandWorked(mongos.adminCommand({unshardCollection: ns}));
+assert.eq(mongos.getDB(dbName).getCollectionInfos({name: coll.getName()})[0].info.uuid,
+          prevCollUUID);
+
+jsTest.log('Check that calling unshardCollection with a toShard other than what it lives on fails');
+assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns, toShard: shard1}),
+                             ErrorCodes.NamespaceNotSharded);
+
 st.stop();
 })();
