@@ -43,6 +43,17 @@
 namespace mongo {
 namespace {
 
+TEST(WriteConcernOptionsTest, WriteConcernOptionsTimeout) {
+    WriteConcernOptions::Timeout five{Milliseconds{5}}, ten{Milliseconds{10}};
+
+    ASSERT_LT(WriteConcernOptions::kNoWaiting, five);
+    ASSERT_LT(WriteConcernOptions::kNoWaiting, ten);
+    ASSERT_LT(WriteConcernOptions::kNoWaiting, WriteConcernOptions::kNoTimeout);
+    ASSERT_GT(WriteConcernOptions::kNoTimeout, five);
+    ASSERT_GT(WriteConcernOptions::kNoTimeout, ten);
+    ASSERT_LT(five, ten);
+}
+
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseOnEmptyDocument) {
     auto status = WriteConcernOptions::parse({}).getStatus();
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
