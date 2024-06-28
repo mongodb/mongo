@@ -410,7 +410,7 @@ buildvariants:
       multiversion_platform: rhel80
       multiversion_edition: enterprise
       test_flags: >-
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
         --excludeWithAnyTags=tsan_incompatible,requires_latch_analyzer
     tasks:
       - name: search_end_to_end_sharded_cluster
