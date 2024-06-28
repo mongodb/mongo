@@ -1204,8 +1204,12 @@ def handle_bazel_lib_link_flags(env, libext, libs):
     elif env.TargetOSIs("darwin"):
         if libext != env.subst("$SHLIBSUFFIX"):
             return env.Flatten([[env["LINK_WHOLE_ARCHIVE_LIB_START"], lib] for lib in libs])
+        else:
+            return env.Flatten([[env["LINK_AS_NEEDED_LIB_START"], lib] for lib in libs])
+
     elif env.TargetOSIs("windows"):
         return [env["LINK_WHOLE_ARCHIVE_LIB_START"] + ":" + lib for lib in libs]
+    return []
 
 
 def add_bazel_libdep(env, libdep, bazel_libdeps):
@@ -1266,7 +1270,7 @@ def process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_sig):
 
     bazel_libs = []
     bazel_targets_checked = set()
-    signature = ""
+    signature = []
     start_time = time.time()
     try:
         # check the cache for any queries we need to run, and add the hidden deps to the list to link
@@ -1284,15 +1288,19 @@ def process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_sig):
         if for_sig:
             for lib in bazel_libs:
                 if str(lib) in BAZEL_SIG_CACHE:
-                    signature += BAZEL_SIG_CACHE[str(lib)]
+                    signature += [BAZEL_SIG_CACHE[str(lib)]]
                 else:
-                    sig = get_digest(str(lib))
+                    sig = [get_digest(str(lib))]
                     BAZEL_SIG_CACHE[str(lib)] = sig
                     signature += sig
             return signature, bazel_libs
 
         # add any per library link flags (whole archive flags)
-        bazel_libs_to_append = handle_bazel_lib_link_flags(env, libdeps_ext, bazel_libs)
+        if bazel_libs:
+            bazel_libs_to_append = handle_bazel_lib_link_flags(env, libdeps_ext, bazel_libs)
+        else:
+            bazel_libs_to_append = []
+
     except:
         traceback.print_exc()
     # record time for metrics
@@ -1374,6 +1382,7 @@ def expand_libdeps_for_link(source, target, env, for_signature):
             env, bazel_libdeps_to_add, libdeps_ext, for_signature
         )
         setattr(target[0].attributes, "bazel_libdeps", bazel_libdeps)
+
     else:
         bazel_libdeps_args = []
 
