@@ -15,7 +15,7 @@ let assertCmdResultEq = function(cmd, expected) {
     let res = viewsDB.runCommand(cmd);
     assert.commandWorked(res);
 
-    let cursor = new DBCommandCursor(db, res, 5);
+    let cursor = new DBCommandCursor(viewsDB, res, 5);
     let actual = cursor.toArray();
     assert(arrayEq(actual, expected),
            "actual: " + tojson(cursor.toArray()) + ", expected:" + tojson(expected));
