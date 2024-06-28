@@ -1116,6 +1116,20 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                         // other scenario this will happen is when an uncompressed bucket is
                         // encountered and must be compressed before reattempting a write to the
                         // compressed bucket.
+
+                        for (auto& closedBucket : std::get<bucket_catalog::InsertContext>(
+                                                      insertContextAndDate.getValue())
+                                                      .closedBuckets) {
+                            compressAndWriteBucketFunc(opCtx,
+                                                       closedBucket.bucketId.oid,
+                                                       bucketsColl->ns(),
+                                                       bucketsColl->uuid(),
+                                                       closedBucket.timeField);
+                        }
+
+                        // Will update state in the bucket catalog to clear out the closed buckets.
+                        std::get<bucket_catalog::InsertContext>(insertContextAndDate.getValue())
+                            .closedBuckets.clear();
                         continue;
                     } else if (result.getStatus().code() ==
                                ErrorCodes::TimeseriesBucketCompressionFailed) {
