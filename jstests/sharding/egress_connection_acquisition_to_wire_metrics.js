@@ -43,10 +43,10 @@ assert.gt(afterConnAcquiredToWireTime,
 // Test with mirrored reads to execute the 'fireAndForget' path and verify logs are still correctly
 // printed.
 const shardPrimary = st.rs0.getPrimary();
-assert.commandWorked(shardPrimary.adminCommand({clearLog: 'global'}));
 initialConnAcquiredToWireTime = getConnAcquiredToWireMicros(shardPrimary);
 jsTestLog(`Initial metric value for mongod totalTimeForEgressConnectionAcquiredToWireMicros: ${
     tojson(initialConnAcquiredToWireTime)}`);
+assert.commandWorked(shardPrimary.adminCommand({clearLog: 'global'}));
 assert.commandWorked(
     shardPrimary.adminCommand({setParameter: 1, mirrorReads: {samplingRate: 1.0}}));
 shardPrimary.getDB(jsTestName()).runCommand({find: "test", filter: {}});
