@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,47 +27,27 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cmath>
-#include <limits>
-#include <memory>
-
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/pipeline/percentile_algo_discrete.h"
+#include "mongo/db/pipeline/percentile_algo_accurate.h"
 
 namespace mongo {
 
-boost::optional<double> DiscretePercentile::computePercentile(double p) {
-    if (_accumulatedValues.empty() && _negInfCount == 0 && _posInfCount == 0) {
-        return boost::none;
+/**
+ *'ContinuousPercentile' algorithm for computing accurate continuous percentiles
+ */
+class ContinuousPercentile : public AccuratePercentile {
+public:
+    ContinuousPercentile() = default;  // no config required for this algorithm
+
+    static double computeTrueRank(int n, double p) {
+        return p * (n - 1);
     }
 
-    const int n = _accumulatedValues.size();
-    int rank = computeTrueRank(n + _posInfCount + _negInfCount, p);
-    if (_negInfCount > 0 && rank < _negInfCount) {
-        return -std::numeric_limits<double>::infinity();
-    } else if (_posInfCount > 0 && rank >= n + _negInfCount) {
-        return std::numeric_limits<double>::infinity();
-    }
-    rank -= _negInfCount;
+    double linearInterpolate(double rank, int rank_ceil, int rank_floor);
 
-    // The data might be sorted either by construction or because too many percentiles have been
-    // requested at once, in which case we can just return the corresponding element, otherwise,
-    // use std::nth_element algorithm which does partial sorting of the range and places n_th order
-    // statistic at its place in the vector. The algorithm runs in O(_accumulatedValues.size()).
-    if (_shouldSort) {
-        auto it = _accumulatedValues.begin() + rank;
-        std::nth_element(_accumulatedValues.begin(), it, _accumulatedValues.end());
-        return *it;
-    }
-    return _accumulatedValues[rank];
-}
-
-std::unique_ptr<PercentileAlgorithm> createDiscretePercentile() {
-    return std::make_unique<DiscretePercentile>();
-}
+    boost::optional<double> computePercentile(double p) final;
+    // std::vector<double> computePercentiles(const std::vector<double>& ps) final;
+};
 
 }  // namespace mongo

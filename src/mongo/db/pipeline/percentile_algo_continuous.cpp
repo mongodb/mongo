@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -36,38 +36,59 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/pipeline/percentile_algo_discrete.h"
+#include "mongo/db/pipeline/percentile_algo_continuous.h"
 
 namespace mongo {
 
-boost::optional<double> DiscretePercentile::computePercentile(double p) {
+double ContinuousPercentile::linearInterpolate(double rank, int rank_ceil, int rank_floor) {
+    return (rank_ceil - rank) * _accumulatedValues[rank_floor] +
+        (rank - rank_floor) * _accumulatedValues[rank_ceil];
+}
+
+boost::optional<double> ContinuousPercentile::computePercentile(double p) {
     if (_accumulatedValues.empty() && _negInfCount == 0 && _posInfCount == 0) {
         return boost::none;
     }
 
     const int n = _accumulatedValues.size();
-    int rank = computeTrueRank(n + _posInfCount + _negInfCount, p);
+    double rank = computeTrueRank(n + _posInfCount + _negInfCount, p);
     if (_negInfCount > 0 && rank < _negInfCount) {
         return -std::numeric_limits<double>::infinity();
-    } else if (_posInfCount > 0 && rank >= n + _negInfCount) {
+    } else if (_posInfCount > 0 && rank > n + _negInfCount - 1) {
         return std::numeric_limits<double>::infinity();
     }
     rank -= _negInfCount;
+
+    int rank_ceil = ceil(rank);
+    int rank_floor = floor(rank);
 
     // The data might be sorted either by construction or because too many percentiles have been
     // requested at once, in which case we can just return the corresponding element, otherwise,
     // use std::nth_element algorithm which does partial sorting of the range and places n_th order
     // statistic at its place in the vector. The algorithm runs in O(_accumulatedValues.size()).
     if (_shouldSort) {
-        auto it = _accumulatedValues.begin() + rank;
-        std::nth_element(_accumulatedValues.begin(), it, _accumulatedValues.end());
-        return *it;
+        if (rank_ceil == rank && rank == rank_floor) {
+            auto it = _accumulatedValues.begin() + rank;
+            std::nth_element(_accumulatedValues.begin(), it, _accumulatedValues.end());
+            return *it;
+        } else {
+            auto ceil_it = _accumulatedValues.begin() + rank_ceil;
+            auto floor_it = _accumulatedValues.begin() + rank_floor;
+            std::nth_element(_accumulatedValues.begin(), ceil_it, _accumulatedValues.end());
+            std::nth_element(_accumulatedValues.begin(), floor_it, _accumulatedValues.end());
+            return linearInterpolate(rank, rank_ceil, rank_floor);
+        }
     }
-    return _accumulatedValues[rank];
+
+    if (rank_ceil == rank && rank == rank_floor) {
+        return _accumulatedValues[(int)rank];
+    } else {
+        return linearInterpolate(rank, rank_ceil, rank_floor);
+    }
 }
 
-std::unique_ptr<PercentileAlgorithm> createDiscretePercentile() {
-    return std::make_unique<DiscretePercentile>();
+std::unique_ptr<PercentileAlgorithm> createContinuousPercentile() {
+    return std::make_unique<ContinuousPercentile>();
 }
 
 }  // namespace mongo

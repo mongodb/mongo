@@ -101,6 +101,8 @@ env.Library(
         "accumulator_std_dev.cpp",
         "accumulator_sum.cpp",
         "map_reduce_options_gen.cpp",
+        "percentile_algo_accurate.cpp",
+        "percentile_algo_continuous.cpp",
         "percentile_algo_discrete.cpp",
         "percentile_algo_tdigest.cpp",
         "percentile_algo_tdigest_distributed.cpp",
@@ -807,6 +809,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target="db_percentile_algo_test",
     source=[
+        "percentile_algo_continuous_test.cpp",
         "percentile_algo_discrete_test.cpp",
         "percentile_algo_tdigest_test.cpp",
         "percentile_algo_tdigest_distributed_test.cpp",

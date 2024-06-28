@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include <vector>
-
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/pipeline/percentile_algo.h"
+#include "mongo/db/pipeline/percentile_algo_accurate.h"
 
 namespace mongo {
 
@@ -41,30 +39,30 @@ namespace mongo {
  * data sent to it and sorts it all when a percentile is requested. Requesting more percentiles
  * after the first one without incorporating more data is fast as it doesn't need to sort again.
  */
-class DiscretePercentile : public PercentileAlgorithm {
+class DiscretePercentile : public AccuratePercentile {
 public:
     DiscretePercentile() = default;  // no config required for this algorithm
 
-    void incorporate(double input) final;
-    void incorporate(const std::vector<double>& inputs) final;
-
-    boost::optional<double> computePercentile(double p) final;
-    std::vector<double> computePercentiles(const std::vector<double>& ps) final;
-
-    long memUsageBytes() const final {
-        return _accumulatedValues.capacity() * sizeof(double);
+    // We define "percentile" as:
+    //   Percentile P(p) where 'p' is from [0.0, 1.0] on dataset 'D' with 'n', possibly duplicated,
+    //   samples is value 'P' such that at least ceil(p*n) samples from 'D' are _less or equal_ to
+    //   'P' and no more than ceil(p*n) samples that are strictly _less_ than 'P'. Thus, p = 0 maps
+    //   to the min of 'D' and p = 1 maps to the max of 'D'.
+    //
+    // Notice, that this definition is ambiguous. For example, on D = {1.0, 2.0, ..., 10.0} P(0.1)
+    // could be any value in [1.0, 2.0] range. For discrete percentiles the value 'P' _must_ be one
+    // of the samples from 'D' but it's still ambiguous as either 1.0 or 2.0 can be used.
+    //
+    // This definiton leads to the following computation of 0-based rank for percentile 'p' while
+    // resolving the ambiguity towards the lower rank.
+    static int computeTrueRank(int n, double p) {
+        if (p >= 1.0) {
+            return n - 1;
+        }
+        return std::max(0, static_cast<int>(std::ceil(n * p)) - 1);
     }
 
-protected:
-    std::vector<double> _accumulatedValues;
-
-    // While infinities do compare and sort correctly, no arithmetics can be done on them so, to
-    // allow for implementing quick select in the future and to align with our implementation of
-    // t-digest, we are tracking them separately.
-    int _negInfCount = 0;
-    int _posInfCount = 0;
-
-    bool _shouldSort = true;
+    boost::optional<double> computePercentile(double p) final;
 };
 
 }  // namespace mongo

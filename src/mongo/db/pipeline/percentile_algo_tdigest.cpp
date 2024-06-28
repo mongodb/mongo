@@ -147,7 +147,7 @@ boost::optional<double> TDigest::computePercentile(double p) {
         return min();
     }
 
-    int rank = PercentileAlgorithm::computeTrueRank(_n + _posInfCount + _negInfCount, p);
+    int rank = computeTrueRank(_n + _posInfCount + _negInfCount, p);
     if (_negInfCount > 0 && rank < _negInfCount) {
         return -std::numeric_limits<double>::infinity();
     } else if (_posInfCount > 0 && rank >= _n + _negInfCount) {

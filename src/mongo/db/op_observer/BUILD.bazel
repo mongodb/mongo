@@ -80,6 +80,8 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:javascript_execution.h",
         "//src/mongo/db/pipeline:monotonic_expression.h",
         "//src/mongo/db/pipeline:percentile_algo.h",
+        "//src/mongo/db/pipeline:percentile_algo_accurate.h",
+        "//src/mongo/db/pipeline:percentile_algo_continuous.h",
         "//src/mongo/db/pipeline:percentile_algo_discrete.h",
         "//src/mongo/db/pipeline:resume_token.h",
         "//src/mongo/db/query:bson_typemask.h",

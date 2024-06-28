@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 
 namespace mongo {
@@ -75,7 +74,7 @@ protected:
     Value computePercentile(double p) const {
         // Calculate the rank.
         const double n = _values.size();
-        const double rank = PercentileAlgorithm::computeTrueRank(n, p);
+        const double rank = DiscretePercentile::computeTrueRank(n, p);
 
         // boost::container::flat_multiset stores the values in ascending order, so we don't need to
         // sort them before finding the value at index 'rank'.

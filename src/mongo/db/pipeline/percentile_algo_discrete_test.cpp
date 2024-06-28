@@ -210,7 +210,7 @@ TEST(DiscretePercentileTest, Incorporate_WithInfinities) {
     const double pFirstNonInf = 301.0 / 1500;
     ASSERT_NE(-inf, *dp.computePercentile(pFirstNonInf)) << "p:" << pFirstNonInf;
 
-    ASSERT_EQ(sorted[PercentileAlgorithm::computeTrueRank(n, 0.5)], *dp.computePercentile(0.5));
+    ASSERT_EQ(sorted[DiscretePercentile::computeTrueRank(n, 0.5)], *dp.computePercentile(0.5));
 
     // 200 out of 1500 values are positive infinities
     const double pInfStart = 1 - 199.0 / 1500;
@@ -233,9 +233,9 @@ TEST(DiscretePercentileTest, Incorporate_Nan_ShouldSkip) {
     dp.incorporate(std::numeric_limits<double>::quiet_NaN());
     dp.incorporate(inputs);
 
-    ASSERT_EQ(sorted[PercentileAlgorithm::computeTrueRank(n, 0.1)], *dp.computePercentile(0.1));
-    ASSERT_EQ(sorted[PercentileAlgorithm::computeTrueRank(n, 0.5)], *dp.computePercentile(0.5));
-    ASSERT_EQ(sorted[PercentileAlgorithm::computeTrueRank(n, 0.9)], *dp.computePercentile(0.9));
+    ASSERT_EQ(sorted[DiscretePercentile::computeTrueRank(n, 0.1)], *dp.computePercentile(0.1));
+    ASSERT_EQ(sorted[DiscretePercentile::computeTrueRank(n, 0.5)], *dp.computePercentile(0.5));
+    ASSERT_EQ(sorted[DiscretePercentile::computeTrueRank(n, 0.9)], *dp.computePercentile(0.9));
 }
 
 /**
@@ -253,9 +253,9 @@ TEST(DiscretePercentileTest, SmallDataset) {
 
     std::sort(inputs.begin(), inputs.end());
     ASSERT_EQ(inputs.front(), *dp.computePercentile(0));
-    ASSERT_EQ(inputs[PercentileAlgorithm::computeTrueRank(n, 0.1)], *dp.computePercentile(0.1));
-    ASSERT_EQ(inputs[PercentileAlgorithm::computeTrueRank(n, 0.5)], *dp.computePercentile(0.5));
-    ASSERT_EQ(inputs[PercentileAlgorithm::computeTrueRank(n, 0.9)], *dp.computePercentile(0.9));
+    ASSERT_EQ(inputs[DiscretePercentile::computeTrueRank(n, 0.1)], *dp.computePercentile(0.1));
+    ASSERT_EQ(inputs[DiscretePercentile::computeTrueRank(n, 0.5)], *dp.computePercentile(0.5));
+    ASSERT_EQ(inputs[DiscretePercentile::computeTrueRank(n, 0.9)], *dp.computePercentile(0.9));
     ASSERT_EQ(inputs.back(), *dp.computePercentile(1));
 }
 
@@ -272,9 +272,9 @@ TEST(DiscretePercentileTest, LargerDataset) {
 
     std::sort(inputs.begin(), inputs.end());
     ASSERT_EQ(inputs.front(), *dp.computePercentile(0));
-    ASSERT_EQ(inputs[PercentileAlgorithm::computeTrueRank(n, 0.005)], *dp.computePercentile(0.005));
-    ASSERT_EQ(inputs[PercentileAlgorithm::computeTrueRank(n, 0.5)], *dp.computePercentile(0.5));
-    ASSERT_EQ(inputs[PercentileAlgorithm::computeTrueRank(n, 0.995)], *dp.computePercentile(0.995));
+    ASSERT_EQ(inputs[DiscretePercentile::computeTrueRank(n, 0.005)], *dp.computePercentile(0.005));
+    ASSERT_EQ(inputs[DiscretePercentile::computeTrueRank(n, 0.5)], *dp.computePercentile(0.5));
+    ASSERT_EQ(inputs[DiscretePercentile::computeTrueRank(n, 0.995)], *dp.computePercentile(0.995));
     ASSERT_EQ(inputs.back(), *dp.computePercentile(1));
 }
 
@@ -286,9 +286,9 @@ TEST(DiscretePercentileTest, Presorted) {
     DiscretePercentile dp;
     dp.incorporate(inputs);
 
-    ASSERT_EQ(inputs[PercentileAlgorithm::computeTrueRank(n, 0.1)], *dp.computePercentile(0.1));
-    ASSERT_EQ(inputs[PercentileAlgorithm::computeTrueRank(n, 0.5)], *dp.computePercentile(0.5));
-    ASSERT_EQ(inputs[PercentileAlgorithm::computeTrueRank(n, 0.99)], *dp.computePercentile(0.99));
+    ASSERT_EQ(inputs[DiscretePercentile::computeTrueRank(n, 0.1)], *dp.computePercentile(0.1));
+    ASSERT_EQ(inputs[DiscretePercentile::computeTrueRank(n, 0.5)], *dp.computePercentile(0.5));
+    ASSERT_EQ(inputs[DiscretePercentile::computeTrueRank(n, 0.99)], *dp.computePercentile(0.99));
 }
 
 }  // namespace

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,47 +27,40 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cmath>
-#include <limits>
-#include <memory>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/pipeline/percentile_algo_discrete.h"
+#include "mongo/db/pipeline/percentile_algo.h"
 
 namespace mongo {
 
-boost::optional<double> DiscretePercentile::computePercentile(double p) {
-    if (_accumulatedValues.empty() && _negInfCount == 0 && _posInfCount == 0) {
-        return boost::none;
+/**
+ * 'AccuratePercentile' class for common functionality between discrete and continuous percentiles
+ */
+class AccuratePercentile : public PercentileAlgorithm {
+public:
+    AccuratePercentile() = default;  // no config required for this algorithm
+
+    void incorporate(double input) final;
+    void incorporate(const std::vector<double>& inputs) final;
+
+    long memUsageBytes() const final {
+        return _accumulatedValues.capacity() * sizeof(double);
     }
 
-    const int n = _accumulatedValues.size();
-    int rank = computeTrueRank(n + _posInfCount + _negInfCount, p);
-    if (_negInfCount > 0 && rank < _negInfCount) {
-        return -std::numeric_limits<double>::infinity();
-    } else if (_posInfCount > 0 && rank >= n + _negInfCount) {
-        return std::numeric_limits<double>::infinity();
-    }
-    rank -= _negInfCount;
+    std::vector<double> computePercentiles(const std::vector<double>& ps) final;
 
-    // The data might be sorted either by construction or because too many percentiles have been
-    // requested at once, in which case we can just return the corresponding element, otherwise,
-    // use std::nth_element algorithm which does partial sorting of the range and places n_th order
-    // statistic at its place in the vector. The algorithm runs in O(_accumulatedValues.size()).
-    if (_shouldSort) {
-        auto it = _accumulatedValues.begin() + rank;
-        std::nth_element(_accumulatedValues.begin(), it, _accumulatedValues.end());
-        return *it;
-    }
-    return _accumulatedValues[rank];
-}
+protected:
+    std::vector<double> _accumulatedValues;
 
-std::unique_ptr<PercentileAlgorithm> createDiscretePercentile() {
-    return std::make_unique<DiscretePercentile>();
-}
+    // While infinities do compare and sort correctly, no arithmetics can be done on them so, to
+    // allow for implementing quick select in the future and to align with our implementation of
+    // t-digest, we are tracking them separately.
+    int _negInfCount = 0;
+    int _posInfCount = 0;
+
+    bool _shouldSort = true;
+};
 
 }  // namespace mongo

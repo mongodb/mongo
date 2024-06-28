@@ -132,7 +132,7 @@ void assertExpectedAccuracy(const vector<double>& sorted,
                             double accuracyError,
                             const char* msg) {
     for (double p : percentiles) {
-        const int trueRank = PercentileAlgorithm::computeTrueRank(sorted.size(), p);
+        const int trueRank = TDigest::computeTrueRank(sorted.size(), p);
         // If there are duplicates in the data, the true rank is a range of values so we need to
         // find its lower and upper bounds.
         int lowerTrueRank = trueRank;
@@ -1166,8 +1166,8 @@ vector<int> computeError(vector<double> sorted,
     errors.reserve(percentiles.size());
     for (double p : percentiles) {
         const double pctl = digest.computePercentile(p).value();
-        errors.push_back(std::abs(computeRank(sorted, pctl) -
-                                  PercentileAlgorithm::computeTrueRank(sorted.size(), p)));
+        errors.push_back(
+            std::abs(computeRank(sorted, pctl) - TDigest::computeTrueRank(sorted.size(), p)));
     }
     return errors;
 }
