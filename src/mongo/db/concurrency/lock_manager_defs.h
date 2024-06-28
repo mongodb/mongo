@@ -529,8 +529,8 @@ struct LockRequest {
  * Note that using a struct to fetch internal LockManager information is preferable than a BSONObj
  * to minimize the time the LockManager mutexes are hold.
  */
-struct LogDegugInfo {
-    LogDegugInfo(LockMode mode, const std::string& debugInfo) : mode(mode), debugInfo(debugInfo) {}
+struct LogDebugInfo {
+    LogDebugInfo(LockMode mode, const std::string& debugInfo) : mode(mode), debugInfo(debugInfo) {}
 
     LockMode mode;
     std::string debugInfo;

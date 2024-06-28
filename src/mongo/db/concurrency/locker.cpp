@@ -745,7 +745,7 @@ void Locker::setGlobalLockTakenInMode(LockMode mode) {
     }
 }
 
-std::vector<LogDegugInfo> Locker::getLockInfoFromResourceHolders(ResourceId resId) const {
+std::vector<LogDebugInfo> Locker::getLockInfoFromResourceHolders(ResourceId resId) const {
     return _lockManager->getLockInfoFromResourceHolders(resId);
 }
 

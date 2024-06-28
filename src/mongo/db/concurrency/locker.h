@@ -525,7 +525,7 @@ public:
     /**
      * Returns a vector with the lock information from the given resource lock holders.
      */
-    std::vector<LogDegugInfo> getLockInfoFromResourceHolders(ResourceId resId) const;
+    std::vector<LogDebugInfo> getLockInfoFromResourceHolders(ResourceId resId) const;
 
     void dump() const;
 

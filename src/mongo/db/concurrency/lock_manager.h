@@ -146,7 +146,7 @@ public:
     /**
      * Returns a vector of those locks granted for the given resource.
      */
-    std::vector<LogDegugInfo> getLockInfoFromResourceHolders(ResourceId resId);
+    std::vector<LogDebugInfo> getLockInfoFromResourceHolders(ResourceId resId);
 
 private:
     // The lockheads need access to the partitions
