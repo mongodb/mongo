@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include <absl/hash/hash.h>
+
+#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/interval.h"
 
 #include <boost/move/utility_core.hpp>
@@ -353,6 +356,28 @@ TEST(Copying, ReverseClone) {
     ASSERT(c.reverseClone() == c);
 }
 
+TEST(Hashing, VerifyHashCorrectness) {
+    // Abseil is currently missing the 'gmock.h' dependency. If we add it (in SPM-2926), we could
+    // use 'absl::VerifyTypeImplementsAbslHashCorrectly' here for more complete validation.
+    auto checkHashes = [](const Interval& a, const Interval& b, const bool equal) {
+        const auto hash1 = absl::Hash<Interval>()(a);
+        const auto hash2 = absl::Hash<Interval>()(b);
+        ASSERT((hash1 == hash2) == equal);
+    };
+
+    Interval same1 = IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys);
+    Interval same2 = IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys);
+    Interval different = IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 3 << "" << 4), BoundInclusion::kIncludeBothStartAndEndKeys);
+
+    checkHashes(same1, same1, true /*equal*/);
+    checkHashes(same1, same2, true /*equal*/);
+
+    checkHashes(same1, different, false /*equal*/);
+    checkHashes(same2, different, false /*equal*/);
+}
 
 }  // unnamed namespace
 }  // namespace mongo

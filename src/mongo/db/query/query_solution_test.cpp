@@ -1720,6 +1720,70 @@ TEST(QuerySolutionTest, AssertSameHashes) {
     ASSERT(makeQs()->hash() == makeQs()->hash());
 }
 
+TEST(QuerySolutionTest, VerifyHashCorrectness) {
+    auto makeScan = [](const int direction, const BSONObj interval) {
+        auto scanNode =
+            std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("t" << direction)));
+        OrderedIntervalList oil{"t"};
+        oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+            std::move(interval), BoundInclusion::kIncludeBothStartAndEndKeys));
+        scanNode->bounds.fields.push_back(oil);
+        scanNode->computeProperties();
+        return scanNode;
+    };
+
+    auto makeScans = [&] {
+        std::vector<std::unique_ptr<QuerySolutionNode>> ixScans;
+        ixScans.push_back(makeScan(1, BSON("" << 1 << "" << 2)));
+        ixScans.push_back(makeScan(-1, BSON("" << 2 << "" << 1)));
+        return ixScans;
+    };
+
+    auto makeOr = [&] {
+        auto orNode = std::make_unique<OrNode>();
+        orNode->addChildren(makeScans());
+        orNode->computeProperties();
+        return orNode;
+    };
+
+    auto makeFetch = [&] {
+        auto fetchNode = std::make_unique<FetchNode>(makeOr());
+        auto filter = std::make_unique<LTMatchExpression>("a"_sd, Value(false));
+        filter->setInputParamId(1);
+        fetchNode->filter = std::move(filter);
+        fetchNode->computeProperties();
+        return fetchNode;
+    };
+
+    auto verifyHashCorrectness = [&](HashValuesOrParams hashValuesOrParams) {
+        auto scans = makeScans();
+        auto orNode = makeOr();
+        auto fetch = makeFetch();
+
+        std::vector<QuerySolutionHashParams> cases = {
+            QuerySolutionHashParams{*scans.at(0).get(), hashValuesOrParams},
+            QuerySolutionHashParams{*scans.at(1).get(), hashValuesOrParams},
+            QuerySolutionHashParams{*orNode.get(), hashValuesOrParams},
+            QuerySolutionHashParams{*fetch.get(), hashValuesOrParams},
+        };
+
+        // Abseil is currently missing the 'gmock.h' dependency. If we add it (in SPM-2926), we
+        // could use 'absl::VerifyTypeImplementsAbslHashCorrectly' here for more complete
+        // validation.
+        for (size_t i = 0; i < cases.size(); i++) {
+            for (size_t j = 0; j < cases.size(); j++) {
+                const bool sameObject = i == j;
+                const auto hash1 = absl::Hash<QuerySolutionHashParams>()(cases[i]);
+                const auto hash2 = absl::Hash<QuerySolutionHashParams>()(cases[j]);
+                ASSERT((hash1 == hash2) == sameObject);
+            }
+        }
+    };
+
+    verifyHashCorrectness(HashValuesOrParams::kHashValues);
+    verifyHashCorrectness(HashValuesOrParams::kHashParamIds);
+}
+
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
     auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");

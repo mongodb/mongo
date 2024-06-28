@@ -252,7 +252,7 @@ template <typename H>
 H AbslHashValue(H state, const Interval& c) {
     // Ignore field names since we only care about the value of the intervals.
     BSONElementComparator bec(BSONElementComparator::FieldNamesMode::kIgnore, nullptr);
-    size_t hash;
+    size_t hash = 0;
     bec.hash_combine(hash, c.start);
     bec.hash_combine(hash, c.end);
     return H::combine(std::move(state), c.startInclusive, c.endInclusive, hash);
