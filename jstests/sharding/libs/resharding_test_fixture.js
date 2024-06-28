@@ -1216,15 +1216,11 @@ export var ReshardingTest = class {
     }
 
     killAndRestartPrimaryOnShard(shardName) {
-        jsTestLog(`ReshardingTestFixture killing and restarting primary on shard ${shardName}`);
-
+        jsTest.log(`ReshardingTestFixture killing and restarting primary on shard ${shardName}`);
         const replSet = this.getReplSetForShard(shardName);
-        const originalPrimaryConn = replSet.getPrimary();
 
-        const SIGKILL = 9;
-        const opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
-        replSet.restart(originalPrimaryConn, opts, SIGKILL);
-        replSet.awaitNodesAgreeOnPrimary();
+        this._st.killAndRestartPrimaryOnShard(shardName, replSet);
+
         const newPrimaryConn = replSet.getPrimary();
         this._st.getAllNodes().forEach((conn) => {
             awaitRSClientHosts(conn, {host: newPrimaryConn.host}, {ok: true, ismaster: true});
@@ -1232,15 +1228,12 @@ export var ReshardingTest = class {
     }
 
     shutdownAndRestartPrimaryOnShard(shardName) {
-        jsTestLog(
+        jsTest.log(
             `ReshardingTestFixture shutting down and restarting primary on shard ${shardName}`);
-
         const replSet = this.getReplSetForShard(shardName);
-        const originalPrimaryConn = replSet.getPrimary();
 
-        const SIGTERM = 15;
-        replSet.restart(originalPrimaryConn, {}, SIGTERM);
-        replSet.awaitNodesAgreeOnPrimary();
+        this._st.shutdownAndRestartPrimaryOnShard(shardName, replSet);
+
         const newPrimaryConn = replSet.getPrimary();
         this._st.getAllNodes().forEach((conn) => {
             awaitRSClientHosts(conn, {host: newPrimaryConn.host}, {ok: true, ismaster: true});
