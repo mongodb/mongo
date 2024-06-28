@@ -213,7 +213,7 @@ __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type, ui
      * If passed fast-delete information, append the fast-delete information after the aggregated
      * timestamp information.
      */
-    if (page_del != NULL) {
+    if (page_del != NULL && __wt_process.fast_truncate_2022) {
         WT_ASSERT(session, cell_type == WT_CELL_ADDR_DEL);
 
         WT_IGNORE_RET(__wt_vpack_uint(&p, 0, page_del->txnid));

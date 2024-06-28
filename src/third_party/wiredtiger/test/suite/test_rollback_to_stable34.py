@@ -35,6 +35,7 @@ import wttest
 
 # test_rollback_to_stable34.py
 # Test interaction between fast-delete and RTS.
+@wttest.skip_for_hook("nonstandalone", "timestamped truncate not supported for nonstandalone")
 @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_rollback_to_stable34(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
