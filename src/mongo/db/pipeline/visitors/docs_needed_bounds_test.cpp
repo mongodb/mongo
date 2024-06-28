@@ -40,20 +40,20 @@ TEST(DocsNeededBoundsTest, DocsNeededBoundsParsesCorrectly) {
     auto bsonElemFieldName = "docsNeeded"_sd;
 
     auto bsonObj = BSON(bsonElemFieldName << "NeedAll");
-    auto bounds = docs_needed_bounds::parseDocsNeededBoundsFromBSON(bsonObj[bsonElemFieldName]);
+    auto bounds = docs_needed_bounds::parseDocsNeededConstraintFromBSON(bsonObj[bsonElemFieldName]);
     ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::NeedAll>(bounds));
 
     bsonObj = BSON(bsonElemFieldName << "Unknown");
-    bounds = docs_needed_bounds::parseDocsNeededBoundsFromBSON(bsonObj[bsonElemFieldName]);
+    bounds = docs_needed_bounds::parseDocsNeededConstraintFromBSON(bsonObj[bsonElemFieldName]);
     ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds));
 
     bsonObj = BSON(bsonElemFieldName << 1);
-    bounds = docs_needed_bounds::parseDocsNeededBoundsFromBSON(bsonObj[bsonElemFieldName]);
+    bounds = docs_needed_bounds::parseDocsNeededConstraintFromBSON(bsonObj[bsonElemFieldName]);
     ASSERT_TRUE(std::holds_alternative<long long>(bounds));
     ASSERT_EQ(std::get<long long>(bounds), 1);
 
     bsonObj = BSON(bsonElemFieldName << 9952);
-    bounds = docs_needed_bounds::parseDocsNeededBoundsFromBSON(bsonObj[bsonElemFieldName]);
+    bounds = docs_needed_bounds::parseDocsNeededConstraintFromBSON(bsonObj[bsonElemFieldName]);
     ASSERT_TRUE(std::holds_alternative<long long>(bounds));
     ASSERT_EQ(std::get<long long>(bounds), 9952);
 }
@@ -62,30 +62,30 @@ TEST(DocsNeededBoundsTest, DocsNeededBoundsParseErrors) {
     auto bsonElemFieldName = "docsNeeded"_sd;
 
     auto bsonObj = BSON(bsonElemFieldName << "Invalid");
-    ASSERT_THROWS(docs_needed_bounds::parseDocsNeededBoundsFromBSON(bsonObj[bsonElemFieldName]),
+    ASSERT_THROWS(docs_needed_bounds::parseDocsNeededConstraintFromBSON(bsonObj[bsonElemFieldName]),
                   ExceptionFor<ErrorCodes::BadValue>);
 
     bsonObj = BSON(bsonElemFieldName << 1.1);
-    ASSERT_THROWS(docs_needed_bounds::parseDocsNeededBoundsFromBSON(bsonObj[bsonElemFieldName]),
+    ASSERT_THROWS(docs_needed_bounds::parseDocsNeededConstraintFromBSON(bsonObj[bsonElemFieldName]),
                   ExceptionFor<ErrorCodes::BadValue>);
 
     bsonObj = BSON(bsonElemFieldName << Decimal128::kPositiveNaN);
-    ASSERT_THROWS(docs_needed_bounds::parseDocsNeededBoundsFromBSON(bsonObj[bsonElemFieldName]),
+    ASSERT_THROWS(docs_needed_bounds::parseDocsNeededConstraintFromBSON(bsonObj[bsonElemFieldName]),
                   ExceptionFor<ErrorCodes::BadValue>);
 
     bsonObj = BSON(bsonElemFieldName << -1);
-    ASSERT_THROWS(docs_needed_bounds::parseDocsNeededBoundsFromBSON(bsonObj[bsonElemFieldName]),
+    ASSERT_THROWS(docs_needed_bounds::parseDocsNeededConstraintFromBSON(bsonObj[bsonElemFieldName]),
                   ExceptionFor<ErrorCodes::BadValue>);
 }
 
 TEST(DocsNeededBoundsTest, DocsNeededBoundsSerializesCorrectly) {
     BSONObjBuilder objBuilder;
 
-    docs_needed_bounds::serializeDocsNeededBounds(
+    docs_needed_bounds::serializeDocsNeededConstraint(
         docs_needed_bounds::Unknown(), "minBounds", &objBuilder);
-    docs_needed_bounds::serializeDocsNeededBounds(
+    docs_needed_bounds::serializeDocsNeededConstraint(
         docs_needed_bounds::NeedAll(), "maxBounds", &objBuilder);
-    docs_needed_bounds::serializeDocsNeededBounds(101, "otherTestBounds", &objBuilder);
+    docs_needed_bounds::serializeDocsNeededConstraint(101, "otherTestBounds", &objBuilder);
 
     ASSERT_BSONOBJ_EQ(objBuilder.done(),
                       BSON("minBounds"

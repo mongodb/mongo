@@ -565,9 +565,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             // We won't reach this if the whole pipeline passes through with the "specific shard"
             // policy. That's okay since the shard will have access to the entire pipeline to
             // extract accurate bounds.
-            auto [minBounds, maxBounds] = extractDocsNeededBounds(*pipeline.get());
+            auto bounds = extractDocsNeededBounds(*pipeline.get());
             auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(pipeline->peekFront());
-            searchStage->setDocsNeededBounds(minBounds, maxBounds);
+            searchStage->setDocsNeededBounds(bounds);
         }
         return pipeline;
     };

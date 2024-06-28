@@ -100,8 +100,8 @@ public:
         RemoteCommandRequest rcr,
         std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
         boost::optional<long long> startingBatchSize = boost::none,
-        DocsNeededBounds minDocsNeededBounds = docs_needed_bounds::Unknown(),
-        DocsNeededBounds maxDocsNeededBounds = docs_needed_bounds::Unknown()) {
+        DocsNeededBounds bounds = DocsNeededBounds(docs_needed_bounds::Unknown(),
+                                                   docs_needed_bounds::Unknown())) {
         std::unique_ptr<MongotTaskExecutorCursorGetMoreStrategy> mongotGetMoreStrategy;
 
         // If calcDocsNeededFn is provided, that enables use of the docsRequested option. Otherwise,
@@ -110,14 +110,10 @@ public:
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
                 calcDocsNeededFn,
                 /*startingBatchSize*/ boost::none,
-                minDocsNeededBounds,
-                maxDocsNeededBounds);
+                bounds);
         } else if (startingBatchSize.has_value()) {
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
-                /*calcDocsNeededFn*/ nullptr,
-                startingBatchSize,
-                minDocsNeededBounds,
-                maxDocsNeededBounds);
+                /*calcDocsNeededFn*/ nullptr, startingBatchSize, bounds);
         } else {
             // Use the default startingBatchSize.
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>();
@@ -157,8 +153,7 @@ public:
             auto tec = makeMongotCursor(rcr,
                                         calcDocsNeededFn,
                                         /*startingBatchSize*/ boost::none,
-                                        /*minDocsNeededBounds*/ 10,
-                                        /*maxDocsNeededBounds*/ 10);
+                                        DocsNeededBounds(10, 10));
 
             // Mock the response for the first batch.
             scheduleSuccessfulCursorResponse(
@@ -233,8 +228,7 @@ public:
             auto tec = makeMongotCursor(rcr,
                                         calcDocsNeededFn,
                                         /*startingBatchSize*/ boost::none,
-                                        /*minDocsNeededBounds*/ 50,
-                                        /*maxDocsNeededBounds*/ 100);
+                                        DocsNeededBounds(50, 100));
             // Mock the response for the first batch.
             scheduleSuccessfulCursorResponse(
                 "firstBatch", 1, 2, cursorId, /*expectedPrefetch*/ false);
@@ -583,11 +577,11 @@ public:
                                       << "foo"),
                                  opCtx.get());
         // Use NeedAll bounds to trigger pre-fetching for all batches.
-        auto tec = makeMongotCursor(rcr,
-                                    /*calcDocsNeededFn*/ nullptr,
-                                    /*startingBatchSize*/ 5,
-                                    /*minDocsNeededBounds*/ docs_needed_bounds::NeedAll(),
-                                    /*maxDocsNeededBounds*/ docs_needed_bounds::NeedAll());
+        auto tec = makeMongotCursor(
+            rcr,
+            /*calcDocsNeededFn*/ nullptr,
+            /*startingBatchSize*/ 5,
+            DocsNeededBounds(docs_needed_bounds::NeedAll(), docs_needed_bounds::NeedAll()));
         // Assert the initial request is received.
         ASSERT_TRUE(tryWaitUntilReadyRequests());
         scheduleSuccessfulCursorResponse("firstBatch", 1, 5, cursorId, /*expectedPrefetch*/ true);

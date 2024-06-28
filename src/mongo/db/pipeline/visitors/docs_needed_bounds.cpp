@@ -30,12 +30,12 @@
 
 namespace mongo {
 namespace docs_needed_bounds {
-Bounds parseDocsNeededBoundsFromBSON(const BSONElement& elem) {
+DocsNeededConstraint parseDocsNeededConstraintFromBSON(const BSONElement& elem) {
     if (elem.isNumber() &&
         (elem.type() == BSONType::NumberInt || elem.type() == BSONType::NumberLong)) {
-        uassert(ErrorCodes::BadValue, "DocsNeededBounds cannot be NaN.", !elem.isNaN());
+        uassert(ErrorCodes::BadValue, "DocsNeededConstraint cannot be NaN.", !elem.isNaN());
         auto val = elem.safeNumberLong();
-        uassert(ErrorCodes::BadValue, "DocsNeededBounds number value must be >= 0.", val >= 0);
+        uassert(ErrorCodes::BadValue, "DocsNeededConstraint number value must be >= 0.", val >= 0);
         return val;
     } else if (elem.type() == BSONType::String) {
         if (elem.str() == kNeedAllName) {
@@ -45,20 +45,21 @@ Bounds parseDocsNeededBoundsFromBSON(const BSONElement& elem) {
         }
     }
     uasserted(ErrorCodes::BadValue,
-              str::stream() << "DocsNeededBounds has to be either of the strings \"" << kNeedAllName
-                            << "\" or \"" << kUnknownName << "\", or a non-decimal number; "
+              str::stream() << "DocsNeededConstraint has to be either of the strings \""
+                            << kNeedAllName << "\" or \"" << kUnknownName
+                            << "\", or a non-decimal number; "
                             << "found: " << typeName(elem.type()));
 }
 
-void serializeDocsNeededBounds(const Bounds& bounds,
-                               StringData fieldName,
-                               BSONObjBuilder* builder) {
+void serializeDocsNeededConstraint(const DocsNeededConstraint& constraint,
+                                   StringData fieldName,
+                                   BSONObjBuilder* builder) {
     visit(OverloadedVisitor{
               [&](long long val) { builder->append(fieldName, val); },
               [&](NeedAll) { builder->append(fieldName, kNeedAllName); },
               [&](Unknown) { builder->append(fieldName, kUnknownName); },
           },
-          bounds);
+          constraint);
 }
 }  // namespace docs_needed_bounds
 }  // namespace mongo

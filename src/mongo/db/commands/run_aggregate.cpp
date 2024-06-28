@@ -835,13 +835,12 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
             resetContextFn();
             pipelines.push_back(std::move(pipeline));
 
-            auto [minBounds, maxBounds] = extractDocsNeededBounds(*pipelines.back().get());
+            // TODO SERVER-89546 extractDocsNeededBounds should be called internally within
+            // DocumentSourceSearch optimization; that also means we'd be skipping that step when
+            // optimization is off.
+            auto bounds = extractDocsNeededBounds(*pipelines.back().get());
             auto metadataPipe = search_helpers::prepareSearchForTopLevelPipelineLegacyExecutor(
-                expCtx,
-                pipelines.back().get(),
-                minBounds,
-                maxBounds,
-                request.getCursor().getBatchSize());
+                expCtx, pipelines.back().get(), bounds, request.getCursor().getBatchSize());
             if (metadataPipe) {
                 pipelines.push_back(std::move(metadataPipe));
             }

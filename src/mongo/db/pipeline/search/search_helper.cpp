@@ -319,8 +319,7 @@ void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline
 std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegacyExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     Pipeline* origPipeline,
-    DocsNeededBounds minBounds,
-    DocsNeededBounds maxBounds,
+    DocsNeededBounds bounds,
     boost::optional<int64_t> userBatchSize) {
     // First, desuguar $search, and inject shard filterer.
     prepareSearchPipelineLegacyExecutor(origPipeline, true);
@@ -335,7 +334,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
     auto origSearchStage =
         dynamic_cast<DocumentSourceInternalSearchMongotRemote*>(origPipeline->peekFront());
     tassert(6253727, "Expected search stage", origSearchStage);
-    origSearchStage->setDocsNeededBounds(minBounds, maxBounds);
+    origSearchStage->setDocsNeededBounds(bounds);
 
     // We expect to receive unmerged metadata documents from mongot if we are not in mongos and have
     // a metadata merge protocol version. However, we can ignore the meta cursor if the pipeline

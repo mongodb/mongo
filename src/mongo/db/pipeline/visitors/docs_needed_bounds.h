@@ -36,8 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/overloaded_visitor.h"
 
-namespace mongo {
-namespace docs_needed_bounds {
+namespace mongo::docs_needed_bounds {
 static constexpr auto kNeedAllName = "NeedAll"_sd;
 static constexpr auto kUnknownName = "Unknown"_sd;
 
@@ -49,11 +48,10 @@ struct Unknown {
     // Nothing
 };
 
-using Bounds = std::variant<long long, NeedAll, Unknown>;
+using DocsNeededConstraint = std::variant<long long, NeedAll, Unknown>;
 
-Bounds parseDocsNeededBoundsFromBSON(const BSONElement& elem);
-void serializeDocsNeededBounds(const Bounds& bounds, StringData fieldName, BSONObjBuilder* builder);
-}  // namespace docs_needed_bounds
-
-using DocsNeededBounds = docs_needed_bounds::Bounds;
-}  // namespace mongo
+DocsNeededConstraint parseDocsNeededConstraintFromBSON(const BSONElement& elem);
+void serializeDocsNeededConstraint(const DocsNeededConstraint& bounds,
+                                   StringData fieldName,
+                                   BSONObjBuilder* builder);
+}  // namespace mongo::docs_needed_bounds

@@ -29,9 +29,12 @@
 
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
+#include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 
 namespace mongo {
+using DocsNeededConstraint = docs_needed_bounds::DocsNeededConstraint;
+
 /**
  * The visitor context used to compute the number of documents needed for a pipeline, assuming
  * the pipeline will be traversed in reverse order. Tracks the minimum and maximum constraints
@@ -48,14 +51,14 @@ struct DocsNeededBoundsContext : public DocumentSourceVisitorContextBase {
     void applyBlockingStage();
     void applyUnknownStage();
 
-    DocsNeededBounds minBounds = docs_needed_bounds::Unknown();
-    DocsNeededBounds maxBounds = docs_needed_bounds::Unknown();
+    DocsNeededConstraint minBounds = docs_needed_bounds::Unknown();
+    DocsNeededConstraint maxBounds = docs_needed_bounds::Unknown();
 };
 
 /**
  * Walks the pipeline to infer lower and upper bound constraints on how many documents
- * will need to be scanned / retrieved to satisfy the query. Returns a pair of DocsNeededBounds,
- * (first the minimum lower bound constraint, then the maximum upper bound constraint), of type
+ * will need to be scanned / retrieved to satisfy the query. Returns the DocsNeededBounds,
+ * (with the minimum lower bound constraint and the maximum upper bound constraint), each of type
  * long long, NeedAll, or Unknown.
  *
  * We walk the pipeline back-to-front to observe how each stage in the pipeline will affect the
@@ -84,5 +87,5 @@ struct DocsNeededBoundsContext : public DocumentSourceVisitorContextBase {
  * define more stage-specific visitors in this file or other
  * document_source_visitor_docs_needed_bounds.cpp files in other modules.
  */
-std::pair<DocsNeededBounds, DocsNeededBounds> extractDocsNeededBounds(const Pipeline& pipeline);
+DocsNeededBounds extractDocsNeededBounds(const Pipeline& pipeline);
 }  // namespace mongo

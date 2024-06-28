@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
+#include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/executor/task_executor_cursor_options.h"
@@ -51,8 +51,8 @@ public:
     MongotTaskExecutorCursorGetMoreStrategy(
         std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
         boost::optional<long long> startingBatchSize = mongot_cursor::kDefaultMongotBatchSize,
-        DocsNeededBounds minDocsNeededBounds = docs_needed_bounds::Unknown(),
-        DocsNeededBounds maxDocsNeededBounds = docs_needed_bounds::Unknown(),
+        DocsNeededBounds docsNeededBounds = DocsNeededBounds(docs_needed_bounds::Unknown(),
+                                                             docs_needed_bounds::Unknown()),
         boost::optional<TenantId> tenantId = boost::none);
 
     MongotTaskExecutorCursorGetMoreStrategy(MongotTaskExecutorCursorGetMoreStrategy&& other) =
@@ -71,8 +71,8 @@ public:
 
     /**
      * For the mongot cursor, we want to prefetch the next batch if we know we'll need another batch
-     * (see _mustNeedAnotherBatch()), or if the maxDocsNeededBounds for this query is Unknown and
-     * we've already received 3 batches.
+     * (see _mustNeedAnotherBatch()), or if the maximum docsNeededBounds for this query is Unknown
+     * and we've already received 3 batches.
      */
     bool shouldPrefetch(long long totalNumReceived, long long numBatchesReceived) const final;
 
@@ -110,8 +110,7 @@ private:
 
     // The min and max DocsNeededBounds that had been extracted from the user pipeline, to bound the
     // batchSize requested from mongot.
-    DocsNeededBounds _minDocsNeededBounds;
-    DocsNeededBounds _maxDocsNeededBounds;
+    DocsNeededBounds _docsNeededBounds;
 
     // TODO SERVER-86738 Incorporate batchSizeHistory into explain executionStats with $search.
     // Tracks all batchSizes sent to mongot, to be included in the $search explain execution stats.

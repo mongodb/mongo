@@ -108,8 +108,7 @@ void doThrowIfNotRunningWithMongotHostConfigured() {
 }
 
 long long computeInitialBatchSize(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  const DocsNeededBounds minBounds,
-                                  const DocsNeededBounds maxBounds,
+                                  const DocsNeededBounds& bounds,
                                   const boost::optional<int64_t> userBatchSize,
                                   bool isStoredSource) {
     // TODO SERVER-63765 Allow cursor establishment for sharded clusters when userBatchSize is 0.
@@ -148,8 +147,8 @@ long long computeInitialBatchSize(const boost::intrusive_ptr<ExpressionContext>&
                          return applyOversubscription(kDefaultMongotBatchSize);
                      },
                  },
-                 minBounds,
-                 maxBounds);
+                 bounds.getMinBounds(),
+                 bounds.getMaxBounds());
 }
 }  // namespace
 
@@ -205,19 +204,16 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
 
     const auto& query = spec.getMongotQuery();
 
-    boost::optional<DocsNeededBounds> minDocsNeededBounds = spec.getMinDocsNeededBounds();
-    boost::optional<DocsNeededBounds> maxDocsNeededBounds = spec.getMaxDocsNeededBounds();
-
+    auto bounds = spec.getDocsNeededBounds();
     boost::optional<long long> batchSize = boost::none;
     // We should only use batchSize if the batchSize feature flag (featureFlagSearchBatchSizeTuning)
     // is enabled and we've already computed min/max bounds.
     if (feature_flags::gFeatureFlagSearchBatchSizeTuning.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        minDocsNeededBounds.has_value() && maxDocsNeededBounds.has_value()) {
+        bounds.has_value()) {
         const auto storedSourceElem = query[kReturnStoredSourceArg];
         bool isStoredSource = !storedSourceElem.eoo() && storedSourceElem.Bool();
-        batchSize = computeInitialBatchSize(
-            expCtx, *minDocsNeededBounds, *maxDocsNeededBounds, userBatchSize, isStoredSource);
+        batchSize = computeInitialBatchSize(expCtx, *bounds, userBatchSize, isStoredSource);
     }
 
     boost::optional<long long> docsRequested = spec.getMongotDocsRequested().has_value()
@@ -235,16 +231,17 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
         calcDocsNeededFn = nullptr;
     } else {
         // If we're enabling the docsRequested option, min/max bounds can be set to the
-        // docsRequested value (either the extracted limit value, or boost::none).
-        minDocsNeededBounds = docsRequested;
-        maxDocsNeededBounds = docsRequested;
+        // docsRequested value.
+        if (docsRequested.has_value()) {
+            bounds = DocsNeededBounds(*docsRequested, *docsRequested);
+        }
     }
 
     auto getMoreStrategy = std::make_unique<executor::MongotTaskExecutorCursorGetMoreStrategy>(
         calcDocsNeededFn,
         batchSize,
-        minDocsNeededBounds.value_or(docs_needed_bounds::Unknown()),
-        maxDocsNeededBounds.value_or(docs_needed_bounds::Unknown()),
+        bounds.value_or(
+            DocsNeededBounds(docs_needed_bounds::Unknown(), docs_needed_bounds::Unknown())),
         expCtx->ns.tenantId());
 
     // If it turns out that this stage is not running on a sharded collection, we don't want

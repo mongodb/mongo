@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_constraints.h"
-#include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
+#include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"
 #include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/executor/task_executor_cursor.h"
@@ -172,11 +172,11 @@ public:
         return !storedSourceElem.eoo() && storedSourceElem.Bool();
     }
 
-    void setDocsNeededBounds(DocsNeededBounds minBounds, DocsNeededBounds maxBounds) {
-        if (std::holds_alternative<docs_needed_bounds::Unknown>(_spec.getMinDocsNeededBounds()) &&
-            std::holds_alternative<docs_needed_bounds::Unknown>(_spec.getMaxDocsNeededBounds())) {
-            _spec.setMinDocsNeededBounds(minBounds);
-            _spec.setMaxDocsNeededBounds(maxBounds);
+    void setDocsNeededBounds(DocsNeededBounds bounds) {
+        // The bounds may have already been set when mongos walked the entire user pipeline. In that
+        // case, we shouldn't override the existing bounds.
+        if (!_spec.getDocsNeededBounds().has_value()) {
+            _spec.setDocsNeededBounds(bounds);
         }
     }
 

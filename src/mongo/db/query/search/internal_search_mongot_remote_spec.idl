@@ -75,11 +75,7 @@ structs:
           ignore the metadata cursor returned from mongot and not establish a search metadata pipeline.
         default: true
         type: bool
-      minDocsNeededBounds:
-        description: Minimum possible number of documents needed from mongot to satisfy the query.
-        default: mongo::docs_needed_bounds::Unknown()
-        type: DocsNeededBounds
-      maxDocsNeededBounds:
-        description: Maximum possible number of documents needed from mongot to satisfy the query.
-        default: mongo::docs_needed_bounds::Unknown()
+      docsNeededBounds:
+        description: Bounds to describe the minimum and maximum number of documents needed from mongot to satisfy the overall query.
+        optional: true
         type: DocsNeededBounds

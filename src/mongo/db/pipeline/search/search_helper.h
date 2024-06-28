@@ -39,7 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
+#include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/db/query/search/search_task_executors.h"
@@ -137,8 +137,7 @@ void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline
 std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegacyExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     Pipeline* origPipeline,
-    DocsNeededBounds minBounds,
-    DocsNeededBounds maxBounds,
+    DocsNeededBounds bounds,
     boost::optional<int64_t> userBatchSize);
 
 /**

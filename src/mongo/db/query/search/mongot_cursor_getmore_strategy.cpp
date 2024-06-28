@@ -43,13 +43,11 @@ namespace executor {
 MongotTaskExecutorCursorGetMoreStrategy::MongotTaskExecutorCursorGetMoreStrategy(
     std::function<boost::optional<long long>()> calcDocsNeededFn,
     boost::optional<long long> startingBatchSize,
-    DocsNeededBounds minDocsNeededBounds,
-    DocsNeededBounds maxDocsNeededBounds,
+    DocsNeededBounds docsNeededBounds,
     boost::optional<TenantId> tenantId)
     : _calcDocsNeededFn(calcDocsNeededFn),
       _currentBatchSize(startingBatchSize),
-      _minDocsNeededBounds(minDocsNeededBounds),
-      _maxDocsNeededBounds(maxDocsNeededBounds),
+      _docsNeededBounds(docsNeededBounds),
       _batchSizeHistory({}),
       _tenantId(tenantId) {
     if (startingBatchSize.has_value()) {
@@ -114,7 +112,7 @@ bool MongotTaskExecutorCursorGetMoreStrategy::_mustNeedAnotherBatch(
             [](docs_needed_bounds::NeedAll minBounds) { return true; },
             [](docs_needed_bounds::Unknown minBounds) { return false; },
         },
-        _minDocsNeededBounds);
+        _docsNeededBounds.getMinBounds());
 }
 
 bool MongotTaskExecutorCursorGetMoreStrategy::shouldPrefetch(long long totalNumReceived,
@@ -126,13 +124,13 @@ bool MongotTaskExecutorCursorGetMoreStrategy::shouldPrefetch(long long totalNumR
     // able to satisfy the limit, then we will fetch the next batch syncronously on the subsequent
     // 'getNext()' call.
     if (!_currentBatchSize.has_value()) {
-        return !std::holds_alternative<long long>(_maxDocsNeededBounds);
+        return !std::holds_alternative<long long>(_docsNeededBounds.getMaxBounds());
     }
 
     if (_mustNeedAnotherBatch(totalNumReceived)) {
         return true;
     }
-    return std::holds_alternative<docs_needed_bounds::Unknown>(_maxDocsNeededBounds) &&
+    return std::holds_alternative<docs_needed_bounds::Unknown>(_docsNeededBounds.getMaxBounds()) &&
         numBatchesReceived >= kAlwaysPrefetchAfterNBatches;
 }
 

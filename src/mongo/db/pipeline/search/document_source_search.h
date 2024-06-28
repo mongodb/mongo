@@ -145,9 +145,8 @@ public:
         return std::move(_metadataCursor);
     }
 
-    void setDocsNeededBounds(DocsNeededBounds minBounds, DocsNeededBounds maxBounds) {
-        _spec.setMinDocsNeededBounds(minBounds);
-        _spec.setMaxDocsNeededBounds(maxBounds);
+    void setDocsNeededBounds(DocsNeededBounds bounds) {
+        _spec.setDocsNeededBounds(bounds);
     }
 
 private:

@@ -57,9 +57,9 @@ void DocsNeededBoundsContext::applyPossibleDecreaseStage() {
     // For example, in the sequence of a $match before a $limit, without knowing the selectivity of
     // the $match, we must reset the maxBounds to Unknown.
     maxBounds = visit(OverloadedVisitor{
-                          [](long long) -> DocsNeededBounds { return Unknown(); },
-                          [](NeedAll all) -> DocsNeededBounds { return all; },
-                          [](Unknown unknown) -> DocsNeededBounds { return unknown; },
+                          [](long long) -> DocsNeededConstraint { return Unknown(); },
+                          [](NeedAll all) -> DocsNeededConstraint { return all; },
+                          [](Unknown unknown) -> DocsNeededConstraint { return unknown; },
                       },
                       maxBounds);
 }
@@ -72,9 +72,9 @@ void DocsNeededBoundsContext::applyPossibleIncreaseStage() {
     // For example, in the sequence of a $densify before a limit, we must reset the minBounds to
     // Unknown since we don't know the rate at which $densify will add documents to the stream.
     minBounds = visit(OverloadedVisitor{
-                          [](long long) -> DocsNeededBounds { return Unknown(); },
-                          [](NeedAll all) -> DocsNeededBounds { return all; },
-                          [](Unknown unknown) -> DocsNeededBounds { return unknown; },
+                          [](long long) -> DocsNeededConstraint { return Unknown(); },
+                          [](NeedAll all) -> DocsNeededConstraint { return all; },
+                          [](Unknown unknown) -> DocsNeededConstraint { return unknown; },
                       },
                       minBounds);
 }
@@ -82,9 +82,9 @@ void DocsNeededBoundsContext::applyPossibleIncreaseStage() {
 void DocsNeededBoundsContext::applySkip(long long newSkip) {
     // We apply $skip identically to maxBounds and minBounds, by adding the skip value if it's a
     // discretely $limit-ed bounds, or ignoring it otherwise.
-    auto applySkip = [newSkip](DocsNeededBounds currBounds) -> DocsNeededBounds {
+    auto applySkip = [newSkip](DocsNeededConstraint currBounds) -> DocsNeededConstraint {
         return visit(OverloadedVisitor{
-                         [newSkip](long long discreteBounds) -> DocsNeededBounds {
+                         [newSkip](long long discreteBounds) -> DocsNeededConstraint {
                              long long safeSum = 0;
                              if (overflow::add(discreteBounds, newSkip, &safeSum)) {
                                  // If we're skipping so many that it overflows 64
@@ -94,8 +94,8 @@ void DocsNeededBoundsContext::applySkip(long long newSkip) {
                              }
                              return safeSum;
                          },
-                         [](NeedAll all) -> DocsNeededBounds { return all; },
-                         [](Unknown unknown) -> DocsNeededBounds { return unknown; },
+                         [](NeedAll all) -> DocsNeededConstraint { return all; },
+                         [](Unknown unknown) -> DocsNeededConstraint { return unknown; },
                      },
                      currBounds);
     };
@@ -109,7 +109,7 @@ void DocsNeededBoundsContext::applyLimit(long long limit) {
     bool overridesMaxBounds = true;
     maxBounds =
         visit(OverloadedVisitor{
-                  [&overridesMaxBounds, limit](long long discreteBounds) -> DocsNeededBounds {
+                  [&overridesMaxBounds, limit](long long discreteBounds) -> DocsNeededConstraint {
                       if (limit <= discreteBounds) {
                           return limit;
                       } else {
@@ -117,8 +117,8 @@ void DocsNeededBoundsContext::applyLimit(long long limit) {
                           return discreteBounds;
                       }
                   },
-                  [limit](NeedAll) -> DocsNeededBounds { return limit; },
-                  [limit](Unknown) -> DocsNeededBounds { return limit; },
+                  [limit](NeedAll) -> DocsNeededConstraint { return limit; },
+                  [limit](Unknown) -> DocsNeededConstraint { return limit; },
               },
               maxBounds);
 
@@ -131,11 +131,11 @@ void DocsNeededBoundsContext::applyLimit(long long limit) {
     // 10 documents). We need to avoid miscomputing minBounds as 20 after $densify sets minBounds
     // to Unknown.
     minBounds = visit(OverloadedVisitor{
-                          [limit](long long discreteBounds) -> DocsNeededBounds {
+                          [limit](long long discreteBounds) -> DocsNeededConstraint {
                               return std::min(discreteBounds, limit);
                           },
-                          [limit](NeedAll) -> DocsNeededBounds { return limit; },
-                          [overridesMaxBounds, limit](Unknown unknown) -> DocsNeededBounds {
+                          [limit](NeedAll) -> DocsNeededConstraint { return limit; },
+                          [overridesMaxBounds, limit](Unknown unknown) -> DocsNeededConstraint {
                               // If minBounds is unknown, we don't want to set it if the limit
                               // didn't override the maxBounds. See comment above.
                               if (overridesMaxBounds) {
@@ -314,7 +314,7 @@ const ServiceContext::ConstructorActionRegisterer docsNeededBoundsRegisterer{
     }};
 
 
-std::pair<DocsNeededBounds, DocsNeededBounds> extractDocsNeededBounds(const Pipeline& pipeline) {
+DocsNeededBounds extractDocsNeededBounds(const Pipeline& pipeline) {
     DocsNeededBoundsContext ctx;
 
     ServiceContext* serviceCtx = pipeline.getContext()->opCtx->getServiceContext();
@@ -328,6 +328,6 @@ std::pair<DocsNeededBounds, DocsNeededBounds> extractDocsNeededBounds(const Pipe
             std::holds_alternative<NeedAll>(ctx.minBounds) ==
                 std::holds_alternative<NeedAll>(ctx.maxBounds));
 
-    return {ctx.minBounds, ctx.maxBounds};
+    return DocsNeededBounds(ctx.minBounds, ctx.maxBounds);
 }
 }  // namespace mongo
