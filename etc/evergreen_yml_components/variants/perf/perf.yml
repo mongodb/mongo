@@ -1725,8 +1725,10 @@ buildvariants:
     display_name: Renew SSL Cert
     cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *perf_modules
-    run_on: # Certbot with route53 plugin is installed on Ubuntu 20.04
-      - "ubuntu2004-small"
+    run_on:
+      # Certbot with route53 plugin is installed on Ubuntu 20.04
+      # This distro is limited to 1 host to avoid concurrent runs.
+      - "ubuntu2004-small-dsi-cert-renewal"
     tasks:
       - name: renew_ssl_cert
 
