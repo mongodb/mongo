@@ -10,7 +10,6 @@
  * stepdown/kill/terminate.
  * @tags: [
  *  requires_fcv_70,
- *  featureFlagUpdateOneWithoutShardKey,
  *  uses_transactions,
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,
@@ -304,9 +303,21 @@ var $config = extendWorkload($config, function($config, $super) {
             percentageOfScatterGatherReads
         };
 
-        [this.percentageOfWritesFilterByShardKeyEquality,
-         this.percentageOfWritesFilterByShardKeyRange,
-         this.percentageOfWritesNotFilterByShardKey] = this.generateRandomPercentages(3);
+        if (Object.keys(this.shardKeyOptions.shardKey).includes(this.currentShardKeyFieldName)) {
+            // For a sharded collection, it is illegal to perform a multi:false write that targets
+            // more than one shard. This collection is sharded on the shard key being analyzed, so
+            // we cannot test multi:false writes that do not filter by shard key equality since such
+            // writes may target more than one shard. For simplicity, just skip testing writes that
+            // do not filter by shard key equality.
+            this.percentageOfWritesFilterByShardKeyEquality = 100;
+            this.percentageOfWritesFilterByShardKeyRange = 0;
+            this.percentageOfWritesNotFilterByShardKey = 0;
+        } else {
+            [this.percentageOfWritesFilterByShardKeyEquality,
+             this.percentageOfWritesFilterByShardKeyRange,
+             this.percentageOfWritesNotFilterByShardKey] = this.generateRandomPercentages(3);
+        }
+
         const [percentageOfSingleShardWrites,
                percentageOfMultiShardWrites,
                percentageOfScatterGatherWrites] =
@@ -405,8 +416,8 @@ var $config = extendWorkload($config, function($config, $super) {
      * this. If the document lookup fails with an expected error, returns null. If it fails with
      * some other error, throws the error.
      */
-    $config.data.tryGenerateRandomWriteFilter = function tryGenerateRandomWriteFilter(db,
-                                                                                      collName) {
+    $config.data.tryGenerateRandomWriteFilter = function tryGenerateRandomWriteFilter(
+        db, collName, isMulti) {
         let doc;
         try {
             doc = this.getRandomDocument(db, collName);
@@ -433,6 +444,13 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         } else {
             filter[this.nonCandidateShardKeyFieldName] = doc[this.nonCandidateShardKeyFieldName];
+        }
+
+        // For a sharded collection, it is illegal to perform a multi:false write that targets more
+        // than one shard. To guarantee that this write targets only one shard, add shard key
+        // equality to its filter.
+        if (!isMulti && this.isShardedCluster) {
+            filter[this.currentShardKeyFieldName] = doc[this.currentShardKeyFieldName];
         }
 
         return filter;
@@ -890,6 +908,8 @@ var $config = extendWorkload($config, function($config, $super) {
     // The body of the workload.
 
     $config.setup = function setup(db, collName, cluster) {
+        this.isShardedCluster = cluster.isSharded();
+
         // Look up the number of most common values and the number of ranges that the
         // analyzeShardKey command should return.
         cluster.executeOnMongodNodes((db) => {
@@ -1111,18 +1131,19 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.update = function update(db, collName) {
-        const filter = this.tryGenerateRandomWriteFilter(db, collName);
+        const isMulti = Math.random() < this.probabilityOfMultiWrites;
+        const filter = this.tryGenerateRandomWriteFilter(db, collName, isMulti);
         if (!filter) {
             return;
         }
         const update = this.generateRandomModifierUpdate();
-        const isMulti = Math.random() < this.probabilityOfMultiWrites;
 
         const cmdObj = {
             update: collName,
             updates: [{q: filter, u: update, multi: isMulti}],
             comment: this.eligibleForSamplingComment
         };
+
         print("Starting update state " + tojsononeline(cmdObj));
         const res = db.runCommand(cmdObj);
         try {
@@ -1140,11 +1161,11 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.remove = function remove(db, collName) {
-        const filter = this.tryGenerateRandomWriteFilter(db, collName);
+        const isMulti = Math.random() < this.probabilityOfMultiWrites;
+        const filter = this.tryGenerateRandomWriteFilter(db, collName, isMulti);
         if (!filter) {
             return;
         }
-        const isMulti = Math.random() < this.probabilityOfMultiWrites;
 
         const cmdObj = {
             delete: collName,
@@ -1161,7 +1182,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.findAndModifyUpdate = function findAndModifyUpdate(db, collName) {
-        const filter = this.tryGenerateRandomWriteFilter(db, collName);
+        const filter = this.tryGenerateRandomWriteFilter(db, collName, false /* isMulti */);
         if (!filter) {
             return;
         }
@@ -1188,7 +1209,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.findAndModifyRemove = function findAndModifyRemove(db, collName) {
-        const filter = this.tryGenerateRandomWriteFilter(db, collName);
+        const filter = this.tryGenerateRandomWriteFilter(db, collName, false /* isMulti */);
         if (!filter) {
             return;
         }
