@@ -2511,12 +2511,12 @@ if not env.TargetOSIs("windows"):
     env["LINKCOM"] = env["LINKCOM"].replace("$LINKFLAGS", "$PROGLINKFLAGS")
     env["PROGLINKFLAGS"] = ["$LINKFLAGS"]
 
-    # CPPFLAGS is used for assembler commands, this condition below assumes assembler files
+    # ASPPFLAGS is used for assembler commands, this condition below assumes assembler files
     # will be only directly assembled in librarys and not programs
     if link_model.startswith("dynamic"):
-        env.Append(CPPFLAGS=["-fPIC"])
+        env.Append(ASPPFLAGS=["-fPIC"])
     else:
-        env.Append(CPPFLAGS=["-fPIE"])
+        env.Append(ASPPFLAGS=["-fPIE"])
 
 # When it is necessary to supply additional SHLINKFLAGS without modifying the toolset default,
 # following appends contents of SHLINKFLAGS_EXTRA variable to the linker command
