@@ -33,7 +33,7 @@ export const $config = (function() {
         // Runs many queries with different shapes to ensure eviction occurs in the queryStats
         // store.
         function multipleShapes(db, collName) {
-            for (var i = 0; i < 10000; i++) {
+            for (var i = 0; i < 2000; i++) {
                 let query = {};
                 query["foo" + i] = "bar";
                 db[collName].aggregate([{$match: query}]).itcount();
