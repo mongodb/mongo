@@ -576,6 +576,8 @@ mongo_cc_library(
         "//src/mongo/db/query:canonical_distinct.h",
         "//src/mongo/db/query:canonical_query.h",
         "//src/mongo/db/query:canonical_query_encoder.h",
+        "//src/mongo/db/query:count_command_gen",
+        "//src/mongo/db/query:count_request.h",
         "//src/mongo/db/query:cursor_response_gen",
         "//src/mongo/db/query:distinct_command_gen",
         "//src/mongo/db/query:explain_verbosity_gen",

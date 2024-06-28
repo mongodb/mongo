@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/projection.h"
@@ -122,5 +123,15 @@ StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
  */
 StatusWith<std::unique_ptr<ParsedFindCommand>> parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, ParsedFindCommandParams&& params);
+
+/**
+ * Converts the input 'countCommand' to a FindCommandRequest. Then, parses each big component of the
+ * FindCommandRequest. Throws exception if fails to parse.
+ */
+StatusWith<std::unique_ptr<ParsedFindCommand>> parseFromCount(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const CountCommandRequest& countCommand,
+    const ExtensionsCallback& extensionsCallback,
+    const NamespaceString& nss);
 }  // namespace parsed_find_command
 }  // namespace mongo

@@ -163,12 +163,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
  * Count doesn't care about actually examining its results; it just wants to walk through them.
  * As such, with certain covered queries, we can skip the overhead of fetching etc. when
  * executing a count.
+ *
+ * 'count' is required because the skip and limit values are not propagated from the count command
+ * to 'parsedFind' when calling parsed_find_command::parseFromCount.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const CollectionPtr* collection,
-    const CountCommandRequest& request,
-    const NamespaceString& nss);
+    std::unique_ptr<ParsedFindCommand> parsedFind,
+    const CountCommandRequest& count);
 
 /**
  * Get a PlanExecutor for a delete operation. 'parsedDelete' describes the query predicate

@@ -105,6 +105,15 @@
 namespace mongo {
 namespace {
 
+std::unique_ptr<ExtensionsCallback> getExtensionsCallback(const CollectionPtr& collection,
+                                                          OperationContext* opCtx,
+                                                          const NamespaceString& nss) {
+    if (collection) {
+        return std::make_unique<ExtensionsCallbackReal>(ExtensionsCallbackReal(opCtx, &nss));
+    }
+    return std::make_unique<ExtensionsCallbackNoop>(ExtensionsCallbackNoop());
+}
+
 // Failpoint which causes to hang "count" cmd after acquiring the DB lock.
 MONGO_FAIL_POINT_DEFINE(hangBeforeCollectionCount);
 
@@ -216,9 +225,10 @@ public:
             AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         const auto nss = ctx->getNss();
 
-        CountCommandRequest request(NamespaceStringOrUUID(NamespaceString{}));
+        std::unique_ptr<CountCommandRequest> request;
         try {
-            request = CountCommandRequest::parse(IDLParserContext("count"), opMsgRequest);
+            request = std::make_unique<CountCommandRequest>(
+                CountCommandRequest::parse(IDLParserContext("count"), opMsgRequest));
         } catch (...) {
             return exceptionToStatus();
         }
@@ -227,19 +237,19 @@ public:
         CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         if (shouldDoFLERewrite(request)) {
-            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                processFLECountD(opCtx, nss, &request);
+            if (!request->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                processFLECountD(opCtx, nss, request.get());
             }
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
         }
 
-        SerializationContext serializationCtx = request.getSerializationContext();
+        SerializationContext serializationCtx = request->getSerializationContext();
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();
 
-            auto viewAggregation = countCommandAsAggregationCommand(request, nss);
+            auto viewAggregation = countCommandAsAggregationCommand(*request, nss);
             if (!viewAggregation.isOK()) {
                 return viewAggregation.getStatus();
             }
@@ -275,9 +285,15 @@ public:
         }
 
         auto expCtx = makeExpressionContextForGetExecutor(
-            opCtx, request.getCollation().value_or(BSONObj()), nss, verbosity);
+            opCtx, request->getCollation().value_or(BSONObj()), nss, verbosity);
 
-        auto statusWithPlanExecutor = getExecutorCount(expCtx, &collection, request, nss);
+        const auto extensionsCallback = getExtensionsCallback(collection, opCtx, nss);
+        auto parsedFind = uassertStatusOK(
+            parsed_find_command::parseFromCount(expCtx, *request, *extensionsCallback, nss));
+
+        auto statusWithPlanExecutor =
+            getExecutorCount(expCtx, &collection, std::move(parsedFind), *request);
+
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -394,14 +410,15 @@ public:
                         CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
         }
 
-        auto statusWithPlanExecutor = getExecutorCount(
-            makeExpressionContextForGetExecutor(opCtx,
-                                                request.getCollation().value_or(BSONObj()),
-                                                nss,
-                                                boost::none /* verbosity */),
-            &collection,
-            request,
-            nss);
+        auto expCtx = makeExpressionContextForGetExecutor(
+            opCtx, request.getCollation().value_or(BSONObj()), nss, boost::none /* verbosity*/);
+
+        const auto extensionsCallback = getExtensionsCallback(collection, opCtx, nss);
+        auto parsedFind = uassertStatusOK(
+            parsed_find_command::parseFromCount(expCtx, request, *extensionsCallback, nss));
+
+        auto statusWithPlanExecutor =
+            getExecutorCount(expCtx, &collection, std::move(parsedFind), request);
         uassertStatusOK(statusWithPlanExecutor.getStatus());
 
         auto exec = std::move(statusWithPlanExecutor.getValue());

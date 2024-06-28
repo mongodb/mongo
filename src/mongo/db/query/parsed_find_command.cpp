@@ -74,16 +74,18 @@ bool hasNodeInSubtree(const MatchExpression* root,
     return false;
 }
 
-std::unique_ptr<CollatorInterface> resolveCollator(
-    OperationContext* opCtx, const std::unique_ptr<FindCommandRequest>& findCommand) {
-    if (!findCommand->getCollation().isEmpty()) {
-        return uassertStatusOKWithContext(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                              ->makeFromBSON(findCommand->getCollation()),
-                                          "unable to parse collation");
+/**
+ * Create a CollatorInterface for both count and find commands.
+ */
+std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
+                                                   const BSONObj& collation) {
+    if (collation.isEmpty()) {
+        return nullptr;
     }
-    return nullptr;
+    return uassertStatusOKWithContext(
+        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation),
+        "unable to parse collation");
 }
-
 /**
  * Helper for building 'out.' If there is a projection, parse it and add any metadata dependencies
  * it induces.
@@ -335,7 +337,7 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parse(
     // A collator can enter through both the FindCommandRequest and ExpressionContext arguments.
     // This invariant ensures that both collators are the same because downstream we
     // pull the collator from only one of the ExpressionContext carrier.
-    auto collator = resolveCollator(expCtx->opCtx, params.findCommand);
+    auto collator = resolveCollator(expCtx->opCtx, params.findCommand->getCollation());
     if (collator.get() && expCtx->getCollator()) {
         invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
     }
@@ -344,6 +346,35 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parse(
                                       params.extensionsCallback,
                                       params.allowedFeatures,
                                       params.projectionPolicies);
+}
+
+StatusWith<std::unique_ptr<ParsedFindCommand>> parseFromCount(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const CountCommandRequest& countCommand,
+    const ExtensionsCallback& extensionsCallback,
+    const NamespaceString& nss) {
+    auto collator = resolveCollator(expCtx->opCtx, countCommand.getCollation().get_value_or({}));
+    if (collator.get() && expCtx->getCollator()) {
+        invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
+    }
+
+    // Copy relevant count command fields to find command except skip and limit. The skip and limit
+    // fields are _not_ copied because the count stage in the PlanExecutor already applies the skip
+    // and limit, and thus copying the fields would involve erroneously skipping and limiting twice.
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setFilter(countCommand.getQuery());
+    findCommand->setCollation(countCommand.getCollation().value_or(BSONObj()));
+    findCommand->setHint(countCommand.getHint());
+
+    return parseWithValidatedCollator(
+        expCtx,
+        std::move(findCommand),
+        extensionsCallback,
+        // Currently, these are the only values used to parse a find command from a count command.
+        // The projection policy is copied from ParsedFindCommandsParams. Future work could extend
+        // this function by adding parameters for these values below.
+        MatchExpressionParser::kAllowAllSpecialFeatures,
+        ProjectionPolicies::findProjectionPolicies());
 }
 }  // namespace parsed_find_command
 }  // namespace mongo

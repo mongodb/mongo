@@ -148,9 +148,23 @@ public:
             const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             const auto collation = countRequest.getCollation().get_value_or(BSONObj());
+
+            auto expCtx =
+                makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                             nss,
+                                                             cri,
+                                                             collation,
+                                                             boost::none /*explainVerbosity*/,
+                                                             boost::none /*letParameters*/,
+                                                             boost::none /*runtimeConstants*/);
+
+            // TODO SERVER-90655: Register command for query stats on mongos.
+            auto parsedFind = uassertStatusOK(parsed_find_command::parseFromCount(
+                expCtx, countRequest, ExtensionsCallbackNoop(), nss));
+
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
-                opCtx,
-                nss.dbName(),
+                expCtx,
+                dbName,
                 nss,
                 cri,
                 applyReadWriteConcern(
@@ -161,8 +175,6 @@ public:
                 Shard::RetryPolicy::kIdempotent,
                 countRequest.getQuery(),
                 collation,
-                boost::none /*letParameters*/,
-                boost::none /*runtimeConstants*/,
                 true /*eligibleForSampling*/);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
