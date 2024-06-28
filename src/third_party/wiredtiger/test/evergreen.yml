@@ -1885,7 +1885,7 @@ tasks:
         vars:
           test_config: debug_mode=(cursor_copy=true)
 
-  - name: cppsuite-background-long
+  - name: cppsuite-background-compact-long
     tags: ["cppsuite-stress-test"]
     depends_on:
       - name: compile

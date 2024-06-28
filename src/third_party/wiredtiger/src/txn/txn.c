@@ -1212,25 +1212,18 @@ err:
 static void
 __txn_resolve_prepared_update_chain(WT_SESSION_IMPL *session, WT_UPDATE *upd, bool commit)
 {
-
-    /* If we've reached the end of the chain, we're done looking. */
-    if (upd == NULL)
-        return;
-
     /*
      * Aborted updates can exist in the update chain of our transaction. Generally this will occur
      * due to a reserved update. As such we should skip over these updates entirely.
      */
-    if (upd->txnid == WT_TXN_ABORTED) {
-        __txn_resolve_prepared_update_chain(session, upd->next, commit);
-        return;
-    }
+    while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
+        upd = upd->next;
 
     /*
-     * If the transaction id is then different and not aborted we know we've reached the end of our
-     * update chain and don't need to look deeper.
+     * The previous loop exits on null, check that here. Additionally if the transaction id is then
+     * different we know we've reached the end of our update chain and don't need to look deeper.
      */
-    if (upd->txnid != session->txn->id)
+    if (upd == NULL || upd->txnid != session->txn->id)
         return;
 
     /* Go down the chain. Do the resolves on the way back up. */

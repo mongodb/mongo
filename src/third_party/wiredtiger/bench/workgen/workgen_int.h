@@ -313,6 +313,16 @@ struct SleepOperationInternal : OperationInternal {
     virtual uint64_t sync_time_us() const;
 };
 
+struct VerifyOperationInternal : OperationInternal {
+    std::string verify_session_config;
+
+    VerifyOperationInternal() : OperationInternal(), verify_session_config() {}
+    VerifyOperationInternal(const VerifyOperationInternal &other) :
+        OperationInternal(other), verify_session_config(other.verify_session_config) {}
+    virtual void parse_config(const std::string &config);
+    virtual int run(ThreadRunner *runner, WT_SESSION *session);
+};
+
 struct TableInternal {
     tint_t _tint;
     uint32_t _context_count;
