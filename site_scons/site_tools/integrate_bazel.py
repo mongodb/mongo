@@ -62,6 +62,7 @@ _DISTRO_PATTERN_MAP = {
     "Ubuntu 18*": "ubuntu18",
     "Ubuntu 20*": "ubuntu20",
     "Ubuntu 22*": "ubuntu22",
+    "Ubuntu 24*": "ubuntu24",
     "Amazon Linux 2": "amazon_linux_2",
     "Amazon Linux 2023": "amazon_linux_2023",
     "Debian GNU/Linux 10": "debian10",
