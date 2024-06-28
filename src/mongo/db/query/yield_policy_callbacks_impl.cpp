@@ -36,6 +36,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
@@ -54,6 +55,16 @@ YieldPolicyCallbacksImpl::YieldPolicyCallbacksImpl(NamespaceString nssForFailpoi
 
 void YieldPolicyCallbacksImpl::duringYield(OperationContext* opCtx) const {
     CurOp::get(opCtx)->yielded();
+
+    // If we yielded because we encountered the need to refresh the sharding CatalogCache, refresh
+    // it here while the locks are yielded.
+    auto& catalogCacheRefreshRequired = planExecutorShardingCatalogCacheRefreshRequired(opCtx);
+    if (catalogCacheRefreshRequired) {
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        uassertStatusOK(
+            catalogCache->getCollectionRoutingInfo(opCtx, *catalogCacheRefreshRequired));
+        catalogCacheRefreshRequired.reset();
+    }
 
     const auto& nss = _nss;
     auto failPointHang = [opCtx, nss](FailPoint* fp) {

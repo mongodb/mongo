@@ -86,7 +86,8 @@ function runTest(reshardInPlace) {
         ErrorCodes.NoSuchTransaction,
         ErrorCodes.ShardCannotRefreshDueToLocksHeld,
         ErrorCodes.LockTimeout,
-        ErrorCodes.IncompleteTransactionHistory
+        ErrorCodes.IncompleteTransactionHistory,
+        ErrorCodes.WriteConflict,
     ]);
 
     function runCommandRetryOnTransientErrors(db, cmdObj) {

@@ -62,6 +62,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/yieldable.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
@@ -109,6 +110,16 @@ MONGO_WARN_UNUSED_RESULT_FUNCTION PlanStage::StageState handlePlanStageYield(
         // indefinitely, the only difference being the rate of retry. We prefer retrying faster, by
         // converting to WriteConflictException, to avoid stalling replication longer than
         // necessary.
+        yieldHandler();
+        return PlanStage::NEED_YIELD;
+    } catch (const ExceptionFor<ErrorCodes::ShardCannotRefreshDueToLocksHeld>& ex) {
+        // An operation may need to obtain the cached routing table (CatalogCache) for some
+        // namespace other than the main nss of the plan. When that cache is not immediately
+        // available, a refresh of the CatalogCache is needed. However, this refresh cannot be done
+        // while locks are being held. We handle this by requesting a yield and then refreshing the
+        // CatalogCache after having released the locks.
+        const auto& extraInfo = ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+        planExecutorShardingCatalogCacheRefreshRequired(expCtx->opCtx) = extraInfo->getNss();
         yieldHandler();
         return PlanStage::NEED_YIELD;
     }
