@@ -57,9 +57,6 @@ selector:
   # router tries to commit, it may not know the full participant list.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
-  # Time-series collections are not supported on mongos.
-  - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
-
   # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
   - jstests/concurrency/fsm_workloads/sharded_base_partitioned.js
   - jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js

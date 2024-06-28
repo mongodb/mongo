@@ -60,9 +60,6 @@ selector:
     # router tries to commit, it may not know the full participant list.
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
-    # Time-series collections are not supported on mongos.
-    - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
-
     # TODO SERVER-89841: Performs many sharding DDL operations and can time out taking the DDL lock
     # on slower variants.
     - jstests/concurrency/fsm_workloads/agg_lookup.js
