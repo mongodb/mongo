@@ -16,17 +16,28 @@ export function withSkipRetryOnNetworkError(fn) {
     return res;
 }
 
-export function runWithManualRetriesIfInStepdownSuite(fn) {
-    if (TestData.runningWithShardStepdowns) {
-        var result = undefined;
-        assert.soonNoExcept(() => {
-            result = withSkipRetryOnNetworkError(fn);
-            return true;
-        });
-        return result;
+export function inNonTransactionalStepdownSuite() {
+    return TestData.runningWithShardStepdowns && !TestData.runInsideTransaction;
+}
+
+// See the comment on withSkipRetryOnNetworkError for why manual retries are necessary in stepdown
+// suites. If we are also running inside a transaction, fsm.js will implicitly use
+// auto_retry_transaction.js, which has its own retry logic.
+export function runWithManualRetriesIfInNonTransactionalStepdownSuite(fn) {
+    if (inNonTransactionalStepdownSuite()) {
+        return runWithManualRetries(fn);
     } else {
         return fn();
     }
+}
+
+export function runWithManualRetries(fn) {
+    var result = undefined;
+    assert.soonNoExcept(() => {
+        result = withSkipRetryOnNetworkError(fn);
+        return true;
+    });
+    return result;
 }
 
 // The getMore command is not retryable, so it is not allowed to be run in suites with
