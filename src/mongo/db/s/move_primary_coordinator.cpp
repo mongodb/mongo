@@ -103,16 +103,14 @@ MONGO_FAIL_POINT_DEFINE(movePrimaryFailIfNeedToCloneMovableCollections);
 /**
  * Returns true if this unsharded collection can be moved by a moveCollection command.
  */
-bool isMovableUnshardedCollection(const NamespaceString& nss) {
+bool isMovableUnshardedCollection(const NamespaceString& nss, bool timeseriesReshardingSupported) {
     if (nss.isFLE2StateCollection()) {
         // TODO (SERVER-83713): Reconsider isFLE2StateCollection check.
         return false;
     }
 
     if (nss.isTimeseriesBucketsCollection()) {
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        return fcvSnapshot.isVersionInitialized() &&
-            resharding::gFeatureFlagReshardingForTimeseries.isEnabled(fcvSnapshot);
+        return timeseriesReshardingSupported;
     }
 
     if (nss.isLegalClientSystemNS()) {
@@ -505,10 +503,14 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getCollectionsToClone(
                         collectionsToIgnore.cend(),
                         std::back_inserter(collectionsToClone));
 
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    bool timeseriesReshardingSupported = fcvSnapshot.isVersionInitialized() &&
+        resharding::gFeatureFlagReshardingForTimeseries.isEnabled(fcvSnapshot);
+
     for (const auto& nss : collectionsToClone) {
         movePrimaryFailIfNeedToCloneMovableCollections.executeIf(
             [&](const BSONObj& data) {
-                if (isMovableUnshardedCollection(nss)) {
+                if (isMovableUnshardedCollection(nss, timeseriesReshardingSupported)) {
                     AutoGetCollection autoColl(opCtx, nss, MODE_IS);
                     uassert(9046501,
                             str::stream() << "Found a user collection to clone: "
