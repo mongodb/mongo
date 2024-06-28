@@ -687,6 +687,38 @@ void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const Record
     setKey(c, &key);
     int ret = wiredTigerPrepareConflictRetry(
         opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->search(c); });
+    if (ret == WT_NOTFOUND) {
+        HealthLogEntry entry;
+        entry.setNss(namespaceForUUID(opCtx, _uuid));
+        entry.setTimestamp(Date_t::now());
+        entry.setSeverity(SeverityEnum::Error);
+        entry.setScope(ScopeEnum::Collection);
+        entry.setOperation("WT_Cursor::remove");
+        entry.setMsg("Record to be deleted not found");
+
+        BSONObjBuilder bob;
+        bob.append("RecordId", id.toString());
+        bob.append("ident", getIdent());
+        bob.appendElements(getStackTrace().getBSONRepresentation());
+        entry.setData(bob.obj());
+
+        HealthLogInterface::get(opCtx)->log(entry);
+
+        if (TestingProctor::instance().isEnabled()) {
+            LOGV2_FATAL(9099700,
+                        "Record to be deleted not found",
+                        "nss"_attr = namespaceForUUID(opCtx, _uuid),
+                        "RecordId"_attr = id);
+        } else {
+            // Return early without crash if in production.
+            LOGV2_ERROR(9099701,
+                        "Record to be deleted not found",
+                        "nss"_attr = namespaceForUUID(opCtx, _uuid),
+                        "RecordId"_attr = id);
+            printStackTrace();
+            return;
+        }
+    }
     invariantWTOK(ret, c->session);
 
     WT_ITEM old_value;
