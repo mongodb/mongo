@@ -121,6 +121,14 @@ void runCreateCommandDirectClient(OperationContext* opCtx,
     // OperationShardingState.
     auto shardRole = setShardRoleToUnshardedIfNeeded(opCtx, ns);
 
+    // Preventively set the ShardVersion to UNSHARDED for the timeseries buckets namespace as well.
+    auto bucketsShardRole = [&]() -> boost::optional<ScopedSetShardRole> {
+        if (cmd.getTimeseries() && !ns.isTimeseriesBucketsCollection()) {
+            return setShardRoleToUnshardedIfNeeded(opCtx, ns.makeTimeseriesBucketsNamespace());
+        }
+        return boost::none;
+    }();
+
     BSONObj createRes;
     DBDirectClient localClient(opCtx);
     CreateCommand c = cmd;
