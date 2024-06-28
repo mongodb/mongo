@@ -577,6 +577,7 @@ jsTestOptions = function() {
             embeddedRouter: TestData.embeddedRouter || false,
 
             performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert: true,
+            fuzzMongodConfigs: TestData.fuzzMongodConfigs || false,
         });
     }
     return _jsTestOptions;
