@@ -987,11 +987,10 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             configureFailPoint(adminDb, "queryAnalysisSamplerFilterByComment", {}, "off");
         });
 
-        const res = assert.commandWorked(db.runCommand(
-            {find: this.metricsCollName, filter: {_id: new UUID(this.metricsDocIdString)}}));
-        assert.eq(res.cursor.id, 0, res);
-        assert.eq(res.cursor.firstBatch.length, 1, res);
-        const metrics = res.cursor.firstBatch[0].metrics;
+        const res =
+            db[this.metricsCollName].find({_id: new UUID(this.metricsDocIdString)}).toArray();
+        assert.eq(res.length, 1, res);
+        const metrics = res[0].metrics;
         print("Doing final validation of read and write distribution metrics " +
               tojson(this.truncateAnalyzeShardKeyResponseForLogging(metrics)));
         this.assertReadWriteDistributionMetrics(metrics, true /* isFinal */);
