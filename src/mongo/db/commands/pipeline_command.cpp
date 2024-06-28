@@ -246,7 +246,7 @@ public:
         }
 
         bool isSubjectToIngressAdmissionControl() const override {
-            return true;
+            return !_liteParsedPipeline.isExemptFromIngressAdmissionControl();
         }
 
         bool canIgnorePrepareConflicts() const override {

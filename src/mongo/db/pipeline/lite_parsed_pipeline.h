@@ -149,6 +149,16 @@ public:
     }
 
     /**
+     * Returns true if the pipeline contains at least one stage that requires the aggregation
+     * command to be exempt from ingress admission control.
+     */
+    bool isExemptFromIngressAdmissionControl() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+            return spec->isExemptFromIngressAdmissionControl();
+        });
+    }
+
+    /**
      * Returns true if any of the stages in this pipeline require knowledge of the collection
      * default collation to be successfully parsed, false otherwise. Note that this only applies
      * to top level stages and does not account for subpipelines.

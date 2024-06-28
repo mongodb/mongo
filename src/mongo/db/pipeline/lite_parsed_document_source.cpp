@@ -136,6 +136,12 @@ void LiteParsedDocumentSourceNestedPipelines::getForeignExecutionNamespaces(
     }
 }
 
+bool LiteParsedDocumentSourceNestedPipelines::isExemptFromIngressAdmissionControl() const {
+    return std::any_of(_pipelines.begin(), _pipelines.end(), [](auto&& pipeline) {
+        return pipeline.isExemptFromIngressAdmissionControl();
+    });
+}
+
 Status LiteParsedDocumentSourceNestedPipelines::checkShardedForeignCollAllowed(
     const NamespaceString& nss, bool inMultiDocumentTransaction) const {
     for (auto&& pipeline : _pipelines) {
