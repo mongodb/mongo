@@ -750,7 +750,11 @@ error_codes:
 
   - {code: 405, name: CannotCreateChunkDistribution}
 
-  - {code: 406, name: MigrationBlockingOperationCoordinatorCleaningUp}
+  - {
+      code: 406,
+      name: MigrationBlockingOperationCoordinatorCleaningUp,
+      categories: [RetriableError],
+    }
 
   - {
       code: 407,
