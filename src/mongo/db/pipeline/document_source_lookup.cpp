@@ -59,10 +59,12 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
+#include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
@@ -1219,6 +1221,9 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         }
 
         array.push_back(output.freezeToValue());
+    } else if (opts.serializeForCloning && _unwindSrc) {
+        output[getSourceName()]["$_internalUnwind"] = _unwindSrc->serialize(opts);
+        array.push_back(output.freezeToValue());
     } else {
         array.push_back(output.freezeToValue());
 
@@ -1377,6 +1382,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     std::string foreignField;
 
     BSONObj letVariables;
+    BSONObj unwindSpec;
     std::vector<BSONObj> pipeline;
     bool hasPipeline = false;
     bool hasLet = false;
@@ -1402,6 +1408,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
 
         if (argName == kFromField) {
             fromNs = parseLookupFromAndResolveNamespace(argument, pExpCtx->ns.dbName());
+            continue;
+        }
+
+        if (argName == "$_internalUnwind"_sd) {
+            tassert(8725002,
+                    "Invalid BSON type for $_internalUnwind.",
+                    argument.type() == BSONType::Object);
+            unwindSpec = argument.Obj();
             continue;
         }
 
@@ -1468,6 +1482,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
                                                std::move(localField),
                                                std::move(foreignField),
                                                pExpCtx);
+    }
+
+    if (!unwindSpec.isEmpty()) {
+        lookupStage->_unwindSrc = boost::dynamic_pointer_cast<DocumentSourceUnwind>(
+            DocumentSourceUnwind::createFromBson(unwindSpec.firstElement(), pExpCtx));
     }
     lookupStage->determineSbeCompatibility();
     return lookupStage;

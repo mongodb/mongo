@@ -1401,7 +1401,13 @@ TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAs) {
         "'right'}}"
         ",{$unwind: {path: '$same'}}"
         "]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right', $_internalUnwind: {$unwind: {path: '$same'}}}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldCoalesceWithUnwindOnAs) {
@@ -1416,7 +1422,16 @@ TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldCoalesceWithUnwindO
         "[{$lookup: {from : 'lookupColl', as : 'same', let: {}, pipeline: []}}"
         ",{$unwind: {path: '$same'}}"
         "]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', let: {}, pipeline: [], "
+        "$_internalUnwind: {$unwind: {path: '$same'}}}}"
+        "]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty) {
@@ -1433,7 +1448,16 @@ TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsWithPreserveEmp
         "'right'}}"
         ",{$unwind: {path: '$same', preserveNullAndEmptyArrays: true}}"
         "]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right', "
+        "$_internalUnwind: {$unwind: {path: '$same', preserveNullAndEmptyArrays: true}}}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex) {
@@ -1451,7 +1475,16 @@ TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsWithIncludeArra
         "'right'}}"
         ",{$unwind: {path: '$same', includeArrayIndex: 'index'}}"
         "]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right', "
+        "$_internalUnwind: {$unwind: {path: '$same', includeArrayIndex: 'index'}}}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldNotCoalesceWithUnwindNotOnAs) {
@@ -1493,7 +1526,10 @@ TEST(PipelineOptimizationTest, LookupShouldSwapWithMatch) {
         "[{$match: {independent: 0}}, "
         "{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: 'z'}}]";
 
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+    SerializationOptions options{.serializeForCloning = true};
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldSwapWithMatchOnExpr) {
@@ -1509,7 +1545,10 @@ TEST(PipelineOptimizationTest, LookupShouldSwapWithMatchOnExpr) {
         "[{$match: {$expr: {$eq: ['$independent', 1]}}}, "
         "{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: 'z'}}]";
 
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+    SerializationOptions options{.serializeForCloning = true};
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldSwapWithMatch) {
@@ -1538,7 +1577,10 @@ TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldSwapWithMatchOnExpr
         "[{$match: {$expr: {$eq: ['$independent', 1]}}}, "
         "{$lookup: {from: 'lookupColl', as: 'asField', let: {}, pipeline: []}}]";
 
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+    SerializationOptions options{.serializeForCloning = true};
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldSplitMatch) {
@@ -1568,7 +1610,10 @@ TEST(PipelineOptimizationTest, LookupShouldNotAbsorbMatchOnAs) {
         "'z'}}, "
         " {$match: {'asField.subfield': 0}}]";
 
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+    SerializationOptions options{.serializeForCloning = true};
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldNotAbsorbMatchWithExprOnAs) {
@@ -1583,7 +1628,10 @@ TEST(PipelineOptimizationTest, LookupShouldNotAbsorbMatchWithExprOnAs) {
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: 'z'}},"
         " {$match: {$expr: {$eq: ['$asField.subfield', 0]}}}]";
 
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+    SerializationOptions options{.serializeForCloning = true};
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindMatch) {
@@ -1600,7 +1648,16 @@ TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindMatch) {
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
         "'z',  let: {}, pipeline: [{$match: {subfield: {$eq: 1}}}]}},"
         "{$unwind: {path: '$asField'}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z',  let: {}, pipeline: [{$match: {subfield: {$eq: 1}}}], "
+        "$_internalUnwind: {$unwind: {path: '$asField'}}}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindAndTypeMatch) {
@@ -1617,7 +1674,16 @@ TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindAndTypeMatch) {
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
         "'z', let: {}, pipeline: [{$match: {subfield: {$type: [2]}}}]}},"
         "{$unwind: {path: '$asField'}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z', let: {}, pipeline: [{$match: {subfield: {$type: [2]}}}], "
+        "$_internalUnwind: {$unwind: {path: '$asField'}}}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldAbsorbUnwindMatch) {
@@ -1633,7 +1699,46 @@ TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldAbsorbUnwindMatch) 
         "[{$lookup: {from: 'lookupColl', as: 'asField', let: {}, "
         "pipeline: [{$match: {subfield: {$eq: 1}}}]}}, "
         "{$unwind: {path: '$asField'}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', let: {}, "
+        "pipeline: [{$match: {subfield: {$eq: 1}}}], "
+        "$_internalUnwind: {$unwind: {path: '$asField'}}}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldAbsorbUnwindAndTwoMatch) {
+    std::string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', pipeline: [{$match: {subfield1: {$eq: "
+        "1}}}]}}, "
+        "{$unwind: '$asField'}, "
+        "{$match: {'asField.subfield2': {$eq: 1}}}, "
+        "{$match: {'asField.subfield3': {$eq: 1}}}]";
+    std::string outputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', let: {}, "
+        "pipeline: [{$match: {subfield1: {$eq: 1}}}, {$match: {$and: [{subfield2: {$eq: 1}}, "
+        "{subfield3: {$eq: 1}}]}}], "
+        "unwinding: {preserveNullAndEmptyArrays: false} } } ]";
+    std::string serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', let: {}, "
+        "pipeline: [{$match: {subfield1: {$eq: 1}}}, {$match: {$and: [{subfield2: {$eq: 1}}, "
+        "{subfield3: {$eq: 1}}]}}]}}, "
+        "{$unwind: {path: '$asField'}}]";
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', let: {}, "
+        "pipeline: [{$match: {subfield1: {$eq: 1}}}, {$match: {$and: [{subfield2: {$eq: 1}}, "
+        "{subfield3: {$eq: 1}}]}}], "
+        "$_internalUnwind: {$unwind: {path: '$asField'}}}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindAndSplitAndAbsorbMatch) {
@@ -1660,7 +1765,17 @@ TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindAndSplitAndAbsorbMatch) {
         " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
         "'z', let: {}, pipeline: [{$match: {subfield: {$eq: 1}}}]}}, "
         " {$unwind: {path: '$asField'}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$match: {independentField: {$gt: 2}}}, "
+        " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z', let: {}, pipeline: [{$match: {subfield: {$eq: 1}}}], "
+        "$_internalUnwind: {$unwind: {path: '$asField'}}}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldNotSplitIndependentAndDependentOrClauses) {
@@ -1684,7 +1799,17 @@ TEST(PipelineOptimizationTest, LookupShouldNotSplitIndependentAndDependentOrClau
         " {$unwind: {path: '$asField'}}, "
         " {$match: {$or: [{'independent': {$gt: 4}}, "
         "                 {'asField.dependent': {$elemMatch: {a: {$eq: 1}}}}]}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z', $_internalUnwind: {$unwind: {path: '$asField'}}}},"
+        " {$match: {$or: [{'independent': {$gt: 4}}, "
+        "                 {'asField.dependent': {$elemMatch: {a: {$eq: 1}}}}]}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupWithMatchOnArrayIndexFieldShouldNotCoalesce) {
@@ -1712,7 +1837,17 @@ TEST(PipelineOptimizationTest, LookupWithMatchOnArrayIndexFieldShouldNotCoalesce
         "'z'}}, "
         " {$unwind: {path: '$asField', includeArrayIndex: 'index'}}, "
         " {$match: {$and: [{index: {$eq: 0}}, {'asField.value': {$gt: 0}}]}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$match: {independent: {$eq: 1}}}, "
+        " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z', $_internalUnwind: {$unwind: {path: '$asField', includeArrayIndex: 'index'}}}}, "
+        " {$match: {$and: [{index: {$eq: 0}}, {'asField.value': {$gt: 0}}]}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupWithUnwindPreservingNullAndEmptyArraysShouldNotCoalesce) {
@@ -1739,7 +1874,17 @@ TEST(PipelineOptimizationTest, LookupWithUnwindPreservingNullAndEmptyArraysShoul
         "'z'}}, "
         " {$unwind: {path: '$asField', preserveNullAndEmptyArrays: true}}, "
         " {$match: {'asField.value': {$gt: 0}}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$match: {independent: {$eq: 1}}}, "
+        " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z', $_internalUnwind: {$unwind: {path: '$asField', preserveNullAndEmptyArrays: true}}}}, "
+        " {$match: {'asField.value': {$gt: 0}}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupDoesNotAbsorbElemMatch) {
@@ -1763,7 +1908,16 @@ TEST(PipelineOptimizationTest, LookupDoesNotAbsorbElemMatch) {
         "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
         " {$unwind: {path: '$x'}}, "
         " {$match: {x: {$elemMatch: {a: 1}}}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+
+    auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
+
+    SerializationOptions options{.serializeForCloning = true};
+    serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z', "
+        " $_internalUnwind: {$unwind: {path: '$x'}}}}, "
+        " {$match: {x: {$elemMatch: {a: 1}}}}]";
+    assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupDoesSwapWithMatchOnLocalField) {
