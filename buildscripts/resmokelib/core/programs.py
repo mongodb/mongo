@@ -382,6 +382,9 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
         test_data["connectionString"] = connection_string
         connection_string = None
 
+    if config.FUZZ_MONGOD_CONFIGS is not None and config.FUZZ_MONGOD_CONFIGS is not False:
+        test_data["fuzzMongodConfigs"] = True
+
     for var_name in global_vars:
         _format_shell_vars(eval_sb, [var_name], global_vars[var_name])
 
