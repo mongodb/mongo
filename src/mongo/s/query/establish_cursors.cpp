@@ -143,6 +143,7 @@ public:
 
 private:
     void _handleFailure(const AsyncRequestsSender::Response& response, Status status) noexcept;
+    void _handleFailure(Status status) noexcept;
 
     /**
      * Favors the status with 'CollectionUUIDMismatch' error to be saved in '_maybeFailure' to be
@@ -215,44 +216,52 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
 }
 
 void CursorEstablisher::waitForResponse() noexcept {
-    auto response = _ars->next();
-    if (response.shardHostAndPort)
-        _remotesToClean.push_back(*response.shardHostAndPort);
-
+    // '_ars->next()' can throw while getting the response. We use a nested try-catch because if
+    // '_allowPartialResults' is true then we need information from 'response' to swallow retriable
+    // errors.
     try {
-        // Note the shardHostAndPort may not be populated if there was an error, so be sure
-        // to do this after parsing the cursor response to ensure the response was ok.
-        // Additionally, be careful not to push into 'remoteCursors' until we are sure we
-        // have a valid cursor, since the error handling path will attempt to clean up
-        // anything in 'remoteCursors'
-        auto responseData = uassertStatusOK(std::move(response.swResponse)).data;
-        auto cursors = CursorResponse::parseFromBSONMany(std::move(responseData));
+        auto response = _ars->next();
+        if (response.shardHostAndPort)
+            _remotesToClean.push_back(*response.shardHostAndPort);
 
-        bool hadValidCursor = false;
-        for (auto& cursor : cursors) {
-            if (!cursor.isOK()) {
-                _handleFailure(response, cursor.getStatus());
-                continue;
+        try {
+            // Note the shardHostAndPort may not be populated if there was an error, so be sure
+            // to do this after parsing the cursor response to ensure the response was ok.
+            // Additionally, be careful not to push into 'remoteCursors' until we are sure we
+            // have a valid cursor, since the error handling path will attempt to clean up
+            // anything in 'remoteCursors'
+            auto responseData = uassertStatusOK(std::move(response.swResponse)).data;
+            auto cursors = CursorResponse::parseFromBSONMany(std::move(responseData));
+
+            bool hadValidCursor = false;
+            for (auto& cursor : cursors) {
+                if (!cursor.isOK()) {
+                    _handleFailure(response, cursor.getStatus());
+                    continue;
+                }
+
+                hadValidCursor = true;
+
+                auto& cursorValue = cursor.getValue();
+                if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
+                    CurOp::get(_opCtx)->debug().additiveMetrics.aggregateCursorMetrics(
+                        *cursorMetrics);
+                }
+
+                _remoteCursors.emplace_back(RemoteCursor(response.shardId.toString(),
+                                                         *response.shardHostAndPort,
+                                                         std::move(cursorValue)));
             }
 
-            hadValidCursor = true;
-
-            auto& cursorValue = cursor.getValue();
-            if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
-                CurOp::get(_opCtx)->debug().additiveMetrics.aggregateCursorMetrics(*cursorMetrics);
+            if (response.shardHostAndPort && !hadValidCursor) {
+                // If we never got a valid cursor, we do not need to clean the host.
+                _remotesToClean.pop_back();
             }
-
-            _remoteCursors.emplace_back(RemoteCursor(
-                response.shardId.toString(), *response.shardHostAndPort, std::move(cursorValue)));
+        } catch (const DBException& ex) {
+            _handleFailure(response, ex.toStatus());
         }
-
-        if (response.shardHostAndPort && !hadValidCursor) {
-            // If we never got a valid cursor, we do not need to clean the host.
-            _remotesToClean.pop_back();
-        }
-
     } catch (const DBException& ex) {
-        _handleFailure(response, ex.toStatus());
+        _handleFailure(ex.toStatus());
     }
 }
 
@@ -366,6 +375,19 @@ void CursorEstablisher::_handleFailure(const AsyncRequestsSender::Response& resp
                                    boost::none,
                                    boost::none,
                                    true}});
+        return;
+    }
+
+    // Do not schedule any new requests.
+    _ars->stopRetrying();
+    _maybeFailure = std::move(status);
+}
+
+void CursorEstablisher::_handleFailure(Status status) noexcept {
+    LOGV2_DEBUG(
+        8846900, 3, "Experienced a failure while establishing cursors", "error"_attr = status);
+    if (_maybeFailure) {
+        _favorCollectionUUIDMismatchError(std::move(status));
         return;
     }
 
