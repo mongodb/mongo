@@ -63,11 +63,11 @@ class TransactionCoordinatorMetricsObserver;
  * State machine, which implements the two-phase commit protocol for a specific transaction,
  * identified by lsid + txnNumber + txnRetryCounter.
  *
- * The lifetime of a coordinator starts with a construction and ends with the `onCompletion()`
- * future getting signaled. It is illegal to destroy a coordinator without waiting for
- * `onCompletion()`.
+ * The lifetime of a coordinator starts with a construction, followed by calling `start()` to
+ * kick off asynchronous operations, and finally ends with the `onCompletion()` future getting
+ * signaled.
  */
-class TransactionCoordinator {
+class TransactionCoordinator : public std::enable_shared_from_this<TransactionCoordinator> {
     TransactionCoordinator(const TransactionCoordinator&) = delete;
     TransactionCoordinator& operator=(const TransactionCoordinator&) = delete;
 
@@ -103,6 +103,20 @@ public:
                            const CancellationToken& cancelToken);
 
     ~TransactionCoordinator();
+
+    /*
+     * After constructing a TransactionCoordinator, calling start() begins its asynchronous
+     * operations.
+     */
+    void start(OperationContext* operationContext);
+
+    /*
+     * After waiting on the onCompletion() future, users of TransactionCoordinator must call
+     * shutdown() to ensure its lifecycle ends cleanly. In particular, the 'scheduler' must be
+     * destroyed before its parent scheduler, and calling shutdown() allows the caller to do so
+     * at an appropriate time.
+     */
+    void shutdown();
 
     /**
      * The first time this is called, it asynchronously begins the two-phase commit process for the

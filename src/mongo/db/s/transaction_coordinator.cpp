@@ -173,6 +173,11 @@ TransactionCoordinator::TransactionCoordinator(
       _deadline(deadline),
       _cancelToken(cancelToken) {
     invariant(_txnNumberAndRetryCounter.getTxnRetryCounter());
+}
+
+void TransactionCoordinator::start(OperationContext* operationContext) {
+    invariant(_scheduler, "TransactionCoordinator shutdown before starting");
+    invariant(_sendPrepareScheduler, "TransactionCoordinator shutdown before starting");
 
     auto apiParams = APIParameters::get(operationContext);
     auto kickOffCommitPF = makePromiseFuture<void>();
@@ -182,8 +187,8 @@ TransactionCoordinator::TransactionCoordinator(
     // sequence has not yet started, it will be abandoned altogether.
     auto deadlineFuture =
         _scheduler
-            ->scheduleWorkAt(deadline,
-                             [this](OperationContext*) {
+            ->scheduleWorkAt(_deadline,
+                             [this, self = shared_from_this()](OperationContext*) {
                                  LOGV2_DEBUG(5047000,
                                              1,
                                              "TransactionCoordinator deadline reached",
@@ -198,7 +203,7 @@ TransactionCoordinator::TransactionCoordinator(
                                      {ErrorCodes::TransactionCoordinatorReachedAbortDecision,
                                       "Transaction exceeded deadline"});
                              })
-            .tapError([this](Status s) {
+            .tapError([this, self = shared_from_this()](Status s) {
                 if (_reserveKickOffCommitPromise()) {
                     _kickOffCommitPromise.setError(std::move(s));
                 }
@@ -214,11 +219,11 @@ TransactionCoordinator::TransactionCoordinator(
     // Two-phase commit phases chain. Once this chain executes, the 2PC sequence has completed
     // either with success or error and the scheduled deadline task above has been joined.
     std::move(kickOffCommitPF.future)
-        .then([this] {
+        .then([this, self = shared_from_this()] {
             return VectorClockMutable::get(_serviceContext)->waitForDurableTopologyTime();
         })
         .thenRunOn(_scheduler->getExecutor())
-        .then([this] {
+        .then([this, self = shared_from_this()] {
             // Persist the participants, unless they have been made durable already (which would
             // only be the case if this coordinator was created as part of step-up recovery).
             //  Input: _participants
@@ -242,7 +247,7 @@ TransactionCoordinator::TransactionCoordinator(
             return txn::persistParticipantsList(
                 *_sendPrepareScheduler, _lsid, _txnNumberAndRetryCounter, *_participants);
         })
-        .then([this](repl::OpTime opTime) {
+        .then([this, self = shared_from_this()](repl::OpTime opTime) {
             return waitForMajorityWithHangFailpoint(
                 _serviceContext,
                 hangBeforeWaitingForParticipantListWriteConcern,
@@ -253,7 +258,7 @@ TransactionCoordinator::TransactionCoordinator(
                 _cancelToken);
         })
         .thenRunOn(_scheduler->getExecutor())
-        .then([this, apiParams] {
+        .then([this, self = shared_from_this(), apiParams] {
             {
                 stdx::lock_guard<Latch> lg(_mutex);
                 _participantsDurable = true;
@@ -289,7 +294,7 @@ TransactionCoordinator::TransactionCoordinator(
                                     _txnNumberAndRetryCounter,
                                     apiParams,
                                     *_participants)
-                .then([this](PrepareVoteConsensus consensus) mutable {
+                .then([this, self = shared_from_this()](PrepareVoteConsensus consensus) mutable {
                     {
                         stdx::lock_guard<Latch> lg(_mutex);
                         _decision = consensus.decision();
@@ -314,19 +319,19 @@ TransactionCoordinator::TransactionCoordinator(
                 });
         })
         .onError<ErrorCodes::TransactionCoordinatorReachedAbortDecision>(
-            [this, lsid, txnNumberAndRetryCounter](const Status& status) {
+            [this, self = shared_from_this()](const Status& status) {
                 // Timeout happened, propagate the decision to abort the transaction to replicas
                 // and convert the internal error code to the public one.
                 LOGV2(5047001,
                       "Transaction coordinator made abort decision",
-                      "sessionId"_attr = lsid,
-                      "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
+                      "sessionId"_attr = _lsid,
+                      "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,
                       "status"_attr = redact(status));
                 stdx::lock_guard<Latch> lg(_mutex);
                 _decision = txn::PrepareVote::kAbort;
                 _decision->setAbortStatus(Status(ErrorCodes::NoSuchTransaction, status.reason()));
             })
-        .then([this] {
+        .then([this, self = shared_from_this()] {
             // Persist the commit decision, unless this has already been done (which would only be
             // the case if this coordinator was created as part of step-up recovery and the recovery
             // document contained a decision).
@@ -358,7 +363,7 @@ TransactionCoordinator::TransactionCoordinator(
                                         *_decision,
                                         _affectedNamespaces);
         })
-        .then([this](repl::OpTime opTime) {
+        .then([this, self = shared_from_this()](repl::OpTime opTime) {
             setDecisionPromise(*_decision, _decisionPromise);
             return waitForMajorityWithHangFailpoint(_serviceContext,
                                                     hangBeforeWaitingForDecisionWriteConcern,
@@ -368,7 +373,7 @@ TransactionCoordinator::TransactionCoordinator(
                                                     _txnNumberAndRetryCounter,
                                                     _cancelToken);
         })
-        .then([this, apiParams] {
+        .then([this, self = shared_from_this(), apiParams] {
             {
                 stdx::lock_guard<Latch> lg(_mutex);
                 _decisionDurable = true;
@@ -414,7 +419,7 @@ TransactionCoordinator::TransactionCoordinator(
                     MONGO_UNREACHABLE;
             };
         })
-        .then([this, apiParams] {
+        .then([this, self = shared_from_this(), apiParams] {
             setDecisionPromise(*_decision, _decisionAcknowledgedPromise);
 
             {
@@ -438,7 +443,7 @@ TransactionCoordinator::TransactionCoordinator(
             return txn::writeEndOfTransaction(
                 *_scheduler, _lsid, _txnNumberAndRetryCounter, _affectedNamespaces);
         })
-        .then([this] {
+        .then([this, self = shared_from_this()] {
             // Do a best-effort attempt (i.e., writeConcern w:1) to delete the coordinator's durable
             // state.
             {
@@ -456,24 +461,43 @@ TransactionCoordinator::TransactionCoordinator(
             }
             return txn::deleteCoordinatorDoc(*_scheduler, _lsid, _txnNumberAndRetryCounter);
         })
-        .getAsync([this, deadlineFuture = std::move(deadlineFuture)](Status s) mutable {
+        .getAsync([this, self = shared_from_this(), deadlineFuture = std::move(deadlineFuture)](
+                      Status s) mutable {
             // Interrupt this coordinator's scheduler hierarchy and join the deadline task's future
             // in order to guarantee that there are no more threads running within the coordinator.
             _scheduler->shutdown(
                 {ErrorCodes::TransactionCoordinatorDeadlineTaskCanceled, "Coordinator completed"});
 
-            return std::move(deadlineFuture).getAsync([this, s = std::move(s)](Status) {
-                // Notify all the listeners which are interested in the coordinator's lifecycle.
-                // After this call, the coordinator object could potentially get destroyed by its
-                // lifetime controller, so there shouldn't be any accesses to `this` after this
-                // call.
-                _done(s);
-            });
+            return std::move(deadlineFuture)
+                .getAsync([this, self = shared_from_this(), s = std::move(s)](Status) {
+                    // Notify all the listeners which are interested in the coordinator's lifecycle.
+                    _done(s);
+                });
         });
+}
+
+void TransactionCoordinator::shutdown() {
+    invariant(_completionPromise.getFuture().isReady());
+    // Callers can't directly control when a TransactionCoordinator is destroyed (since it keeps
+    // itself alive via shared_ptrs captured in continuation chains). _scheduler may be a
+    // child scheduler of a scheduler owned by the caller, and therefore the caller may
+    // require that _scheduler is destroyed before its own scheduler. Callers can (and must) call
+    // shutdown() after waiting on onCompletion() to ensure _scheduler is destroyed at an
+    // appropriate time.
+    invariant(_sendPrepareScheduler, "TransactionCoordinator shutdown multiple times");
+    invariant(_scheduler, "TransactionCoordinator shutdown multiple times");
+
+    _sendPrepareScheduler->join();
+    _sendPrepareScheduler.reset();
+
+    _scheduler->join();
+    _scheduler.reset();
 }
 
 TransactionCoordinator::~TransactionCoordinator() {
     invariant(_completionPromise.getFuture().isReady());
+    invariant(!_sendPrepareScheduler);
+    invariant(!_scheduler);
 }
 
 void TransactionCoordinator::runCommit(OperationContext* opCtx, std::vector<ShardId> participants) {

@@ -159,7 +159,8 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
     coordinator->onCompletion()
         .thenRunOn(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
         .ignoreValue()
-        .getAsync([this, lsid, txnNumberAndRetryCounter](Status) {
+        .getAsync([this, lsid, txnNumberAndRetryCounter, coordinator = coordinator](Status) {
+            coordinator->shutdown();
             _remove(lsid, txnNumberAndRetryCounter);
         });
 }
