@@ -991,7 +991,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericLn(value::TypeTa
             if (!operand.isGreater(Decimal128::kNormalizedZero) && !operand.isNaN()) {
                 return {false, value::TypeTags::Nothing, 0};
             }
-            auto operandLn = operand.logarithm();
+            auto operandLn = operand.naturalLogarithm();
 
             auto [tag, value] = value::makeCopyDecimal(operandLn);
             return {true, tag, value};

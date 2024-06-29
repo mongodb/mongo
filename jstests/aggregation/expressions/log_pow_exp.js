@@ -8,13 +8,29 @@ var coll = db.log_exponential_expressions;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: 8, b: 2}));
 
-var decimalE = NumberDecimal("2.718281828459045235360287471352662");
-var decimal1overE = NumberDecimal("0.3678794411714423215955237701614609");
+const doubleE = 2.7182818284590452;
+const decimalE = NumberDecimal("2.718281828459045235360287471352662");
+const decimal1overE = NumberDecimal("0.3678794411714423215955237701614609");
+
+// Given a double, is it an integer?
+function isInteger(n) {
+    return !n.toString().includes('.');
+}
+
+function isNumberDecimal(n) {
+    return n.toString().includes('NumberDecimal');
+}
 
 // Helper for testing that op returns expResult.
-function testOp(op, expResult) {
-    var pipeline = [{$project: {_id: 0, result: op}}];
-    assert.eq(coll.aggregate(pipeline).toArray(), [{result: expResult}]);
+function testOp(op, expResult, failMsg) {
+    const pipeline = [{$project: {_id: 0, result: op}}];
+    const result = coll.aggregate(pipeline).toArray();
+    assert.eq(result.length, 1);
+    if (expResult === null || isNaN(expResult) || isNumberDecimal(expResult)) {
+        assert.eq(result[0].result, expResult, failMsg);
+    } else {
+        assert.close(result[0].result, expResult, failMsg, 12 /*places*/);
+    }
 }
 
 // $log, $log10, $ln.
@@ -24,11 +40,180 @@ function testOp(op, expResult) {
 testOp({$log: [10, 10]}, 1);
 testOp({$log10: [10]}, 1);
 testOp({$ln: [Math.E]}, 1);
-//  - NumberDecimal
-testOp({$log: [NumberDecimal("10"), NumberDecimal("10")]}, NumberDecimal("1"));
-testOp({$log10: [NumberDecimal("10")]}, NumberDecimal("1"));
-// The below answer is actually correct: the input is an approximation of E
-testOp({$ln: [decimalE]}, NumberDecimal("0.9999999999999999999999999999999998"));
+
+// Different double and NumberDecimal inputs, verified manually.
+const logTestCases = [
+    // Base 8
+    {input: 1, base: 8, doubleResult: 0, decResult: NumberDecimal("0E+33")},
+    {
+        input: 2.5,
+        base: 8,
+        doubleResult: 0.4406426982957875,
+        decResult: NumberDecimal("0.4406426982957874492901064764964633")
+    },
+    {
+        input: 7,
+        base: 8,
+        doubleResult: 0.9357849740192015,
+        decResult: NumberDecimal("0.9357849740192013691473231057439436")
+    },
+    {input: 8, base: 8, doubleResult: 1, decResult: NumberDecimal("1")},
+    {
+        input: 64,
+        base: 8,
+        doubleResult: 2,
+        decResult: NumberDecimal("2.000000000000000000000000000000000")
+    },
+    {
+        input: 65,
+        base: 8,
+        doubleResult: 2.0074559376761516,
+        decResult: NumberDecimal("2.007455937676151502755710694582028")
+    },
+
+    // Base 9, a more unusual base.
+    {input: 1, base: 9, doubleResult: 0, decResult: NumberDecimal("0E+33")},
+    {
+        input: 2.5,
+        base: 9,
+        doubleResult: 0.41702188357323483,
+        decResult: NumberDecimal("0.4170218835732348650487566466679398")
+    },
+    {
+        input: 4,
+        base: 9,
+        doubleResult: 0.6309297535714574,
+        decResult: NumberDecimal("0.6309297535714574370995271143427609")
+    },
+    {input: 9, base: 9, doubleResult: 1, decResult: NumberDecimal("1")},
+    {
+        input: 10,
+        base: 9,
+        doubleResult: 1.0479516371446924,
+        decResult: NumberDecimal("1.047951637144692302148283761010701")
+    },
+    {input: 81, base: 9, doubleResult: 2, decResult: NumberDecimal("2")},
+    {
+        input: 82,
+        base: 9,
+        doubleResult: 2.0055843597957064,
+        decResult: NumberDecimal("2.005584359795706389324272570756155")
+    },
+
+    // Base 12.77, an even MORE unusual base.
+    {input: 1, base: 12.77, doubleResult: 0, decResult: NumberDecimal("0E+33")},
+    {
+        input: 2.5,
+        base: 12.77,
+        doubleResult: 0.3597390013391846,
+        decResult: NumberDecimal("0.3597390013391846393309152124110717")
+    },
+    {input: 12.77, base: 12.77, doubleResult: 1, decResult: NumberDecimal("1")},
+    {
+        input: 13,
+        base: 12.77,
+        doubleResult: 1.0070082433896357,
+        decResult: NumberDecimal("1.007008243389635671677137269228113")
+    },
+    {
+        input: 163.0729,
+        base: 12.77,
+        doubleResult: 2,
+        decResult: NumberDecimal("2.000000000000000000000000000000000")
+    },
+    {
+        input: 170,
+        base: 12.77,
+        doubleResult: 2.016332738676606,
+        decResult: NumberDecimal("2.016332738676605709114981994718173")
+    },
+];
+for (const test of logTestCases) {
+    // If we can cast our input, base (or both) to integer types, test them as well.
+    const inputs = [test.input, NumberDecimal(test.input.toString())];
+    if (isInteger(test.input)) {
+        inputs.push(NumberInt(test.input), NumberLong(test.input));
+    }
+    const bases = [test.base, NumberDecimal(test.base.toString())];
+    if (isInteger(test.base)) {
+        bases.push(NumberInt(test.base), NumberLong(test.base));
+    }
+    for (const input of inputs) {
+        for (const base of bases) {
+            const hasDecimalInput = isNumberDecimal(input) || isNumberDecimal(base);
+            testOp(
+                {$log: [input, base]}, hasDecimalInput ? test.decResult : test.doubleResult, test);
+        }
+    }
+}
+
+// Base 10, using $log10
+const log10TestCases = [
+    {input: 1, doubleResult: 0, decResult: NumberDecimal("0")},
+    {
+        input: 2.5,
+        doubleResult: 0.3979400086720376,
+        decResult: NumberDecimal("0.3979400086720376095725222105510140")
+    },
+    {input: 10, doubleResult: 1, decResult: NumberDecimal("1")},
+    {
+        input: 11,
+        doubleResult: 1.041392685158225,
+        decResult: NumberDecimal("1.041392685158225040750199971243024")
+    },
+    {input: 100, doubleResult: 2, decResult: NumberDecimal("2")},
+    {
+        input: 101,
+        doubleResult: 2.0043213737826426,
+        decResult: NumberDecimal("2.004321373782642574275188178222938")
+    },
+];
+for (const test of log10TestCases) {
+    // If the input is an integer anyway, test with our integer types as well.
+    if (isInteger(test.input)) {
+        testOp({$log10: NumberInt(test.input)}, test.doubleResult, test);
+        testOp({$log10: NumberLong(test.input)}, test.doubleResult, test);
+    }
+    testOp({$log10: test.input}, test.doubleResult, test);
+    testOp({$log10: NumberDecimal(test.input.toString())}, test.decResult, test);
+}
+
+// Base `e`, using $ln.
+const lnTestCases = [
+    {input: 1, doubleResult: 0, decResult: NumberDecimal("0")},
+    // `e` is about 2.7, so this should be close to 1.
+    {
+        input: 2.5,
+        doubleResult: 0.9162907318741551,
+        decResult: NumberDecimal("0.9162907318741550651835272117680110")
+    },
+    {
+        input: 7,
+        doubleResult: 1.9459101490553132,
+        decResult: NumberDecimal("1.945910149055313305105352743443180")
+    },
+    {
+        input: 10,
+        doubleResult: 2.302585092994046,
+        decResult: NumberDecimal("2.302585092994045684017991454684364")
+    },
+];
+for (const test of lnTestCases) {
+    if (isInteger(test.input)) {
+        testOp({$ln: NumberInt(test.input)}, test.doubleResult, test);
+        testOp({$ln: NumberLong(test.input)}, test.doubleResult, test);
+    }
+    testOp({$ln: test.input}, test.doubleResult, test);
+    testOp({$ln: NumberDecimal(test.input.toString())}, test.decResult, test);
+}
+
+// We represent `e` differently with double and NumberDecimal, so test that here.
+testOp({$ln: doubleE}, 1);
+testOp({$ln: 1 / doubleE}, -1);
+// The below answer is actually correct: the input is an approximation of E.
+testOp({$ln: decimalE}, NumberDecimal("0.9999999999999999999999999999999998"));
+testOp({$ln: decimal1overE}, NumberDecimal("-0.9999999999999999999999999999999998"));
+
 // All types converted to doubles.
 testOp({$log: [NumberLong("10"), NumberLong("10")]}, 1);
 testOp({$log10: [NumberLong("10")]}, 1);

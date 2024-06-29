@@ -3890,7 +3890,7 @@ Value ExpressionLn::evaluateNumericArg(const Value& numericArg) const {
     if (numericArg.getType() == NumberDecimal) {
         Decimal128 argDecimal = numericArg.getDecimal();
         if (argDecimal.isGreater(Decimal128::kNormalizedZero))
-            return Value(argDecimal.logarithm());
+            return Value(argDecimal.naturalLogarithm());
         // Fall through for error case.
     }
     double argDouble = numericArg.coerceToDouble();
