@@ -248,9 +248,9 @@ void DocumentSourceOut::initialize() {
     // collection to be the target collection once we are done. Note that this temporary
     // collection name is used by MongoMirror and thus should not be changed without
     // consultation.
-    _tempNs = makeBucketNsIfTimeseries(NamespaceStringUtil::deserialize(
+    _tempNs = NamespaceStringUtil::deserialize(
         getOutputNs().dbName(),
-        str::stream() << NamespaceString::kOutTmpCollectionPrefix << UUID::gen()));
+        str::stream() << NamespaceString::kOutTmpCollectionPrefix << UUID::gen());
 
     try {
         // Save the original collection options and index specs so we can check they didn't change
@@ -320,7 +320,7 @@ void DocumentSourceOut::initialize() {
         std::vector<BSONObj> tempNsIndexes = {std::begin(_originalIndexes),
                                               std::end(_originalIndexes)};
         pExpCtx->mongoProcessInterface->createIndexesOnEmptyCollection(
-            pExpCtx->opCtx, _tempNs, tempNsIndexes);
+            pExpCtx->opCtx, makeBucketNsIfTimeseries(_tempNs), tempNsIndexes);
     } catch (DBException& ex) {
         ex.addContext("Copying indexes for $out failed");
         throw;
@@ -330,7 +330,7 @@ void DocumentSourceOut::initialize() {
 void DocumentSourceOut::renameTemporaryCollection() {
     // If the collection is time-series, we must rename to the "real" buckets collection.
     const NamespaceString& outputNs = makeBucketNsIfTimeseries(getOutputNs());
-    const NamespaceString fromNs = _tempNs;
+    const NamespaceString fromNs = makeBucketNsIfTimeseries(_tempNs);
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &outWaitBeforeTempCollectionRename,
         pExpCtx->opCtx,
@@ -399,9 +399,7 @@ void DocumentSourceOut::finalize() {
 }
 
 BatchedCommandRequest DocumentSourceOut::makeBatchedWriteRequest() const {
-    const auto& nss =
-        _tempNs.isTimeseriesBucketsCollection() ? _tempNs.getTimeseriesViewNamespace() : _tempNs;
-    return makeInsertCommand(nss, pExpCtx->bypassDocumentValidation);
+    return makeInsertCommand(_tempNs, pExpCtx->bypassDocumentValidation);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
