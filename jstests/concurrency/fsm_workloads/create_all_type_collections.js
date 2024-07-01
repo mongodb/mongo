@@ -102,9 +102,8 @@ export const $config = (function() {
                 // in multi-document transactions.
                 return;
             }
-            if (TestData.runningWithShardStepdowns &&
-                !FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation")) {
-                // TODO SERVER-90742: Remove the early exit.
+            if (!FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation")) {
+                // TODO SERVER-90862 (or SERVER-90742): Remove the early exit.
                 return;
             }
             const coll = getRandomCollection(db);
