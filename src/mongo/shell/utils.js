@@ -267,39 +267,6 @@ friendlyEqual = function(a, b) {
     return false;
 };
 
-// Takes two arrays of documents, and returns whether they contain the same set of documents under
-// very lenient conditions. The documents do not need to be in the same order for this to return
-// true. Arrays are treated as sets (order is disregarded). Do not use this comparator unless all of
-// these behaviors are necessary.
-unorderedFriendlyEqual = function(result1, result2) {
-    // Sort the objects fields recursively.
-    const orderFn = function(doc) {
-        const keys = Object.keys(doc);
-        keys.sort();
-        let newDoc = {};
-        for (const key of keys) {
-            // Recurse through arrays and objects.
-            if (doc[key] instanceof Object) {
-                newDoc[key] = orderFn(doc[key]);
-            } else {
-                newDoc[key] = doc[key];
-            }
-        }
-        return newDoc;
-    };
-    result1 = result1.map(orderFn);
-    result2 = result2.map(orderFn);
-
-    const cmpFn = function(doc1, doc2) {
-        const doc1Json = tojson(doc1);
-        const doc2Json = tojson(doc2);
-        return doc1Json < doc2Json ? -1 : (doc1Json > doc2Json ? 1 : 0);
-    };
-    result1.sort(cmpFn);
-    result2.sort(cmpFn);
-    return friendlyEqual(result1, result2);
-};
-
 printStackTrace = function() {
     try {
         throw new Error("Printing Stack Trace");

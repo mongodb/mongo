@@ -152,13 +152,13 @@ export const propertyTests = [
         propertyFn: queryHasSameResultsAsControlCollScan,
         aggModel: aggPipelineModel,
         numQueriesNeeded: 10,
-        numRuns: 100
+        numRuns: 300
     },
     {
         propertyFn: repeatQueriesReturnSameResults,
         aggModel: aggPipelineModel,
         numQueriesNeeded: 1,
-        numRuns: 50
+        numRuns: 100
     },
     {
         propertyFn: repeatQueriesUseCache,
@@ -170,7 +170,7 @@ export const propertyTests = [
         propertyFn: cachedQueriesHaveSameResultsAsControlCollScan,
         aggModel: aggPipelineModel,
         numQueriesNeeded: 10,
-        numRuns: 50
+        numRuns: 100
     },
     {
         propertyFn: identicalQueryCreatesAtMostOneCacheEntry,

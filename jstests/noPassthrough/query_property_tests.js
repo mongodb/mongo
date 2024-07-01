@@ -71,7 +71,7 @@ function runProperty(propertyFn, isTs, indexes, pipelines) {
         experimentColl.createIndex(index.def, index.options);
     }
     const testHelpers = {
-        comp: unorderedFriendlyEqual,
+        comp: _resultSetsEqualUnordered,
         experimentDb,
         controlColl,
         getPlanCache,

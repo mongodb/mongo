@@ -147,6 +147,7 @@ globals:
   indentStr: true
   _forgetReplSet: true
   _fnvHashToHexString: true
+  _resultSetsEqualUnordered: true
   getStringWidth: true
 
   # likely could be replaced with `path`
@@ -205,7 +206,6 @@ globals:
   bsonUnorderedFieldsCompare: true
   bsonBinaryEqual: true
   friendlyEqual: true
-  unorderedFriendlyEqual: true
   timestampCmp: true
   decompressBSONColumn: true
 
