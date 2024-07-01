@@ -3809,6 +3809,17 @@ files = [
 types-urllib3 = "*"
 
 [[package]]
+name = "types-retry"
+version = "0.9.9.4"
+description = "Typing stubs for retry"
+optional = false
+python-versions = "*"
+files = [
+    {file = "types-retry-0.9.9.4.tar.gz", hash = "sha256:e4731dc684b56b875d9746459ad665d3bc281a56b530acdf1c97730167799941"},
+    {file = "types_retry-0.9.9.4-py3-none-any.whl", hash = "sha256:f29760a9fe8b1fefe253e5fe6be7e4c0eba243932c600e0eccffb42a21d17765"},
+]
+
+[[package]]
 name = "types-setuptools"
 version = "57.4.12"
 description = "Typing stubs for setuptools"
@@ -4252,4 +4263,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "2025793195e835da8876353e3164348bccebf76c662ed50d73f9f3ef2f0623b6"
+content-hash = "9821a33fa553b3f26d6fa74257262cb6fab738defe307e4cd555c97f929082a1"
