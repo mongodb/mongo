@@ -1,10 +1,10 @@
 /**
- * Utilities for testing config server config shard behaviors.
+ * Utilities for testing shard and config server transition behaviors
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-export const ConfigShardUtil = (function() {
-    function isTransitionEnabledIgnoringFCV(st) {
+export const ShardTransitionUtil = (function() {
+    function isConfigServerTransitionEnabledIgnoringFCV(st) {
         return FeatureFlagUtil.isEnabled(st.configRS.getPrimary(),
                                          "TransitionToCatalogShard",
                                          undefined /* user */,
@@ -45,14 +45,14 @@ export const ConfigShardUtil = (function() {
         });
     }
 
-    function retryOnConfigTransitionErrors(func) {
+    function retryOnShardTransitionErrors(func) {
         while (true) {
             try {
                 func();
                 return;
             } catch (e) {
                 if (e.code === ErrorCodes.ShardNotFound) {
-                    print("Ignoring error with transitioning config shard, retrying: " + tojson(e));
+                    print("Ignoring error with transitioning shard, retrying: " + tojson(e));
                     continue;
                 }
 
@@ -62,9 +62,9 @@ export const ConfigShardUtil = (function() {
     }
 
     return {
-        isTransitionEnabledIgnoringFCV,
+        isConfigServerTransitionEnabledIgnoringFCV,
         transitionToDedicatedConfigServer,
         waitForRangeDeletions,
-        retryOnConfigTransitionErrors,
+        retryOnShardTransitionErrors,
     };
 })();

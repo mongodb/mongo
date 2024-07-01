@@ -280,9 +280,22 @@ export const Cluster = function(clusterOptions, sessionOptions) {
         if (!fn || typeof (fn) !== 'function' || fn.length !== 1) {
             throw new Error('mongod function must be a function that takes a db as an argument');
         }
-        _conns.mongod.forEach(function(mongodConn) {
-            fn(mongodConn.getDB('admin'));
-        });
+
+        if (TestData.shardsAddedRemoved) {
+            _conns.mongod.forEach(function(mongodConn) {
+                try {
+                    fn(mongodConn.getDB('admin'));
+                } catch (e) {
+                    print(
+                        "Error executing function on mongod nodes, with addShard/removeShard running in background: " +
+                        tojson(e));
+                }
+            });
+        } else {
+            _conns.mongod.forEach(function(mongodConn) {
+                fn(mongodConn.getDB('admin'));
+            });
+        }
     };
 
     this.executeOnMongosNodes = function executeOnMongosNodes(fn) {
@@ -445,7 +458,7 @@ export const Cluster = function(clusterOptions, sessionOptions) {
         i = 0;
         var shard = st.shard(0);
         while (shard) {
-            if (TestData.transitioningConfigShard && shard.shardName === "config") {
+            if (TestData.shardsAddedRemoved && shard.shardName === "config") {
                 // Skip the config shard if it's transitioning in and out of being a shard to avoid
                 // tests that use manual shard operations failing with ShardNotFound.
             } else if (shard.name.includes('/')) {

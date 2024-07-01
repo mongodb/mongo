@@ -363,7 +363,8 @@ class _AddRemoveShardThread(threading.Thread):
 
         while True:
             if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
-                self.logger.error("Timed out waiting for removed shard to finish data clean up")
+                msg = "Timed out waiting for removed shard to finish data clean up"
+                self.logger.error(msg)
                 raise errors.ServerFailure(msg)
 
             direct_shard_conn = pymongo.MongoClient(shard_obj.get_driver_connection_url())
@@ -392,12 +393,15 @@ class _AddRemoveShardThread(threading.Thread):
                 time.sleep(1)
                 continue
 
-            if len(list(direct_shard_conn.config.rangeDeletions.find())) != 0:
+            # TODO SERVER-91474 Wait for ongoing transactions to finish on participants
+            if self._get_number_of_ongoing_transactions(direct_shard_conn) != 0:
                 self.logger.info(
-                    "Waiting for config.rangeDeletions to be empty before decomissioning."
+                    "Waiting for ongoing transactions to commit or abort before decomissioning."
                 )
                 time.sleep(1)
                 continue
+
+            # TODO SERVER-50144 Wait for config.rangeDeletions to be empty before decomissioning
 
             all_dbs = direct_shard_conn.admin.command({"listDatabases": 1})
             for db in all_dbs["databases"]:
@@ -413,6 +417,7 @@ class _AddRemoveShardThread(threading.Thread):
             break
 
         teardown_handler = fixture_interface.FixtureTeardownHandler(self.logger)
+        shard_obj.removeshard_teardown_marker = True
         teardown_handler.teardown(shard_obj, "shard")
         if not teardown_handler.was_successful():
             msg = "Error when decomissioning shard."
@@ -807,6 +812,24 @@ class _AddRemoveShardThread(threading.Thread):
 
     def _get_other_shard_id(self, shard_id):
         return self._get_other_shard_info(shard_id)["_id"]
+
+    def _get_number_of_ongoing_transactions(self, shard_conn):
+        res = list(
+            shard_conn.admin.aggregate(
+                [
+                    {
+                        "$currentOp": {
+                            "allUsers": True,
+                            "idleConnections": True,
+                            "idleSessions": True,
+                        }
+                    },
+                    {"$match": {"transaction": {"$exists": True}}},
+                    {"$count": "num_ongoing_txns"},
+                ]
+            )
+        )
+        return res[0]["num_ongoing_txns"] if res else 0
 
     def _run_post_remove_shard_checks(self, removed_shard_fixture, removed_shard_name):
         while True:

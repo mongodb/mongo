@@ -186,9 +186,9 @@ export const workerThread = (function() {
                 await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
             }
 
-            if (TestData.transitioningConfigShard) {
+            if (TestData.shardsAddedRemoved) {
                 await import(
-                    "jstests/libs/override_methods/implicitly_retry_on_config_transition_errors.js");
+                    "jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
             }
 
             for (const workload of workloads) {

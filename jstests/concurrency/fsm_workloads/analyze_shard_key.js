@@ -9,6 +9,7 @@
  *  uses_transactions,
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,
+ *  assumes_stable_shard_list,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

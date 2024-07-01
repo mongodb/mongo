@@ -4,7 +4,6 @@
  *   uses_change_streams,
  * ]
  */
-import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
 const dbName = jsTestName();
 const setupShardedCluster = (shards = 1) => {

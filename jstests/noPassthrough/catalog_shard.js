@@ -6,11 +6,11 @@
  *   requires_fcv_70,
  * ]
  */
-import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
@@ -269,7 +269,7 @@ const newShardName =
     assert.eq(1, removeRes.pendingRangeDeletions);
 
     suspendRangeDeletionFp.off();
-    ConfigShardUtil.waitForRangeDeletions(st.s);
+    ShardTransitionUtil.waitForRangeDeletions(st.s);
 
     // Start the final transition command. This will trigger locally dropping all tracked user
     // databases on the config server. Hang after removing one database and trigger a failover to
@@ -360,7 +360,7 @@ const newShardName =
     moveDatabaseAndUnshardedColls(st.s.getDB(dbName), newShardName);
     moveDatabaseAndUnshardedColls(st.s.getDB(unshardedDbName), newShardName);
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 0}, to: newShardName}));
-    ConfigShardUtil.waitForRangeDeletions(st.s);
+    ShardTransitionUtil.waitForRangeDeletions(st.s);
 
     // Insert documents directly onto the config server after it has fully drained and verify we
     // can't complete the transition.

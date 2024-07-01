@@ -3,7 +3,7 @@
 import copy
 
 from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.testing.fixtures import shardedcluster
+from buildscripts.resmokelib.testing.fixtures.fixturelib import with_naive_retry
 from buildscripts.resmokelib.testing.hooks import interface
 
 
@@ -61,7 +61,7 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
         """Execute drop databases hook."""
         same_db_name = None
         client = self._hook.fixture.mongo_client()
-        db_names = client.list_database_names()
+        db_names = with_naive_retry(lambda: client.list_database_names())
 
         exclude_dbs = copy.copy(self._hook.exclude_dbs)
         if self._hook.same_db_name:
@@ -73,7 +73,7 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
         for db_name in [db for db in db_names if db not in exclude_dbs]:
             self.logger.info("Dropping database %s", db_name)
             try:
-                client.drop_database(db_name)
+                with_naive_retry(lambda: client.drop_database(db_name))
             except:
                 self.logger.exception("Encountered an error while dropping database %s.", db_name)
                 raise
@@ -84,11 +84,11 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
                 same_db_name,
                 self._hook.same_collection_name,
             )
-            colls = client[same_db_name].list_collection_names()
+            colls = with_naive_retry(lambda: client[same_db_name].list_collection_names())
             for coll in [coll for coll in colls if coll != self._hook.same_collection_name]:
                 self.logger.info("Dropping db %s collection %s", same_db_name, coll)
                 try:
-                    client[same_db_name].drop_collection(coll)
+                    with_naive_retry(lambda: client[same_db_name].drop_collection(coll))
                 except:
                     self.logger.exception(
                         "Encountered an error while dropping db % collection %s.",

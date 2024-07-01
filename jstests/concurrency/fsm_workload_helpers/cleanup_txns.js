@@ -19,7 +19,10 @@ export function abortTransaction(sessionAwareDB, txnNumber) {
         ErrorCodes.Interrupted,
         ErrorCodes.LockTimeout,
         // TransactionRouter will error when trying to abort txns that have not been started
-        8027900
+        8027900,
+        // Ignore errors that can occur when shards are removed in the background
+        ErrorCodes.HostUnreachable,
+        ErrorCodes.ShardNotFound
     ];
     const abortCmd = {
         abortTransaction: 1,

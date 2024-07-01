@@ -21,7 +21,7 @@ executor:
         TestData:
           # Other fuzzers test commands against sharded clusters with logical session ids.
           disableImplicitSessions: true
-          transitioningConfigShard: true
+          shardsAddedRemoved: true
       crashOnInvalidBSONError: ""
       objcheck: ""
   hooks:
@@ -42,7 +42,7 @@ executor:
         global_vars:
           TestData:
             skipValidationOnInvalidViewDefinitions: true
-            transitioningConfigShard: true
+            shardsAddedRemoved: true
     - class: CheckRoutingTableConsistency
       shell_options:
         global_vars:

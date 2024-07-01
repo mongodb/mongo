@@ -117,10 +117,10 @@ executor:
       global_vars:
         TestData:
           runningWithBalancer: true
-          transitioningConfigShard: true
+          shardsAddedRemoved: true
       eval:
         await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
-        await import("jstests/libs/override_methods/implicitly_retry_on_config_transition_errors.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true
@@ -130,7 +130,7 @@ executor:
       shell_options:
         global_vars:
           TestData:
-            transitioningConfigShard: true
+            shardsAddedRemoved: true
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN

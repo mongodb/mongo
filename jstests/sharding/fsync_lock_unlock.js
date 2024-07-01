@@ -5,7 +5,7 @@
  *   uses_parallel_shell,
  * ]
  */
-import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
@@ -130,7 +130,7 @@ performFsyncLockUnlockWithReadWriteOperations();
 // config server.
 moveDatabaseAndUnshardedColls(st.s.getDB(dbName), st.shard1.shardName);
 
-ConfigShardUtil.transitionToDedicatedConfigServer(st);
+ShardTransitionUtil.transitionToDedicatedConfigServer(st);
 performFsyncLockUnlockWithReadWriteOperations();
 
 st.stop();

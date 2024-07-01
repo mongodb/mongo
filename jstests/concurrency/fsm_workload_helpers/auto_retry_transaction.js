@@ -57,9 +57,15 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
 
         // DDL operations on unsharded or unsplittable collections in a transaction can fail if a
         // movePrimary is in progress, which may happen in the config shard transition suite.
-        if (TestData.transitioningConfigShard &&
-            includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
+        if (TestData.shardsAddedRemoved && includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
             print("-=-=-=- Retrying transaction after move primary error: " + tojsononeline(e));
+            return true;
+        }
+
+        // TODO SERVER-85145: Stop ignoring ShardNotFound errors that might occur with concurrent
+        // shard removals.
+        if (TestData.shardsAddedRemoved && includesErrorCode(e, ErrorCodes.ShardNotFound)) {
+            print("-=-=-=- Retrying transaction after shard not found error: " + tojsononeline(e));
             return true;
         }
 
@@ -173,9 +179,13 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
                     // The transaction may have implicitly been aborted by the server or killed by
                     // the kill_session helper and will therefore return a
                     // NoSuchTransaction/Interrupted error code.
-                    assert.commandWorkedOrFailedWithCode(
-                        session.abortTransaction_forTesting(),
-                        [ErrorCodes.NoSuchTransaction, ErrorCodes.Interrupted]);
+                    assert.commandWorkedOrFailedWithCode(session.abortTransaction_forTesting(), [
+                        ErrorCodes.NoSuchTransaction,
+                        ErrorCodes.Interrupted,
+                        // Ignore errors that can occur when shards are removed in the background
+                        ErrorCodes.HostUnreachable,
+                        ErrorCodes.ShardNotFound
+                    ]);
                 }
 
                 if (shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession)) {

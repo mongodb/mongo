@@ -6,6 +6,7 @@
  *  requires_fcv_81,
  *  requires_sharding,
  *  uses_transactions,
+ *  assumes_stable_shard_list,
  * ]
  */
 

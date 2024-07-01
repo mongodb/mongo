@@ -90,6 +90,62 @@ selector:
     # caused by config transitions.
     - jstests/concurrency/fsm_workloads/kill_rooted_or.js
 
+    # TODO SERVER-50144 Removing a shard with in-progress migration coordinators can leave permanently
+    # pending config.rangeDeletions document on the recipient. Therefore, this suite removes shards without
+    # waiting for the range deleter to finish. As a result, we might decommision a shard before all
+    # open cursors can finish, such that tests using getMore must be skipped.
+    - jstests/concurrency/fsm_workloads/agg_base.js
+    - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
+    - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/create_index_background.js
+    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
+    - jstests/concurrency/fsm_workloads/create_index_background_unique.js
+    - jstests/concurrency/fsm_workloads/create_index_background_unique_capped.js
+    - jstests/concurrency/fsm_workloads/globally_managed_cursors.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_ordered_bulk.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_text.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_unordered_bulk.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_upsert.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_where.js
+    - jstests/concurrency/fsm_workloads/invalidated_cursors.js
+    - jstests/concurrency/fsm_workloads/kill_aggregation.js
+    - jstests/concurrency/fsm_workloads/kill_rooted_or.js
+    - jstests/concurrency/fsm_workloads/list_indexes.js
+    - jstests/concurrency/fsm_workloads/query_stats_concurrent.js
+    - jstests/concurrency/fsm_workloads/query_stats_enable_disable.js
+    - jstests/concurrency/fsm_workloads/reindex.js
+    - jstests/concurrency/fsm_workloads/reindex_background.js
+    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+    - jstests/concurrency/fsm_workloads/remove_multiple_documents.js
+    - jstests/concurrency/fsm_workloads/server_status_with_time_out_cursors.js
+    - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
+    - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
+    - jstests/concurrency/fsm_workloads/updateOne_with_sort_update_queue.js
+    - jstests/concurrency/fsm_workloads/updateOne_with_sort_update_queue_unindexed.js
+    - jstests/concurrency/fsm_workloads/update_where.js
+    - jstests/concurrency/fsm_workloads/yield.js
+    - jstests/concurrency/fsm_workloads/yield_fetch.js
+    - jstests/concurrency/fsm_workloads/yield_geo_near_dedup.js
+    - jstests/concurrency/fsm_workloads/yield_rooted_or.js
+    - jstests/concurrency/fsm_workloads/yield_sort.js
+    - jstests/concurrency/fsm_workloads/yield_sort_merge.js
+    - jstests/concurrency/fsm_workloads/yield_text.js
+    - jstests/concurrency/fsm_workloads/yield_with_drop.js
+
+    # Connects directly to shards that might have been decomissioned, which leads to network errors.
+    - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
+
+    # Tests that perform shard addition, shard removal, or movePrimary operations,
+    # might interfere with the state expected during execution of the ContinuousAddRemoveShard hook.
+    - jstests/concurrency/fsm_workloads/add_remove_shards_killop.js
+    - jstests/concurrency/fsm_workloads/move_primary_with_crud.js
+
+    # TODO SERVER-90609: movePrimary does not synchronize with index builds.
+    - jstests/concurrency/fsm_workloads/create_index_background_unique.js
+    - jstests/concurrency/fsm_workloads/create_index_background_unique_capped.js
+    - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
@@ -102,8 +158,11 @@ selector:
     - config_shard_incompatible
     - assumes_stable_shard_list
 
-    # This suites execute random moveCollections in the background that cause open cursors on the
-    # collection to be killed.
+    # Workloads that kill random sessions might interrupt operations
+    # performed by the ContinuousAddRemoveShard hook.
+    - kills_random_sessions
+
+    # TODO SERVER-50144 Not waiting for rangeDeleter. Skip tests using getMore.
     - requires_getmore
 
 executor:
@@ -116,11 +175,11 @@ executor:
   config:
     shell_options:
       eval: >-
-        await import("jstests/libs/override_methods/implicitly_retry_on_config_transition_errors.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
       global_vars:
         TestData:
           runningWithBalancer: true
-          transitioningConfigShard: true
+          shardsAddedRemoved: true
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousAddRemoveShard
@@ -134,7 +193,7 @@ executor:
       shell_options:
         global_vars:
           TestData:
-            transitioningConfigShard: true
+            shardsAddedRemoved: true
     - class: CheckOrphansDeleted
     - class: CheckRoutingTableConsistency
     - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
@@ -158,12 +217,6 @@ executor:
         defaultConfigCommandTimeoutMS: 90000
         skipDroppingHashedShardKeyIndex: true
         reshardingMinimumOperationDurationMillis: 0
-        # Manually set the random migration fail point so we can set a threshold for skipping
-        # moveCollection to prevent "starving" random chunk migrations.
-        failpoint.balancerShouldReturnRandomMigrations:
-          data:
-            skipMoveCollectionThreshold: 0.5
-          mode: alwaysOn
         balancerMigrationsThrottlingMs: 100
         featureFlagReshardingForTimeseries: true
     num_rs_nodes_per_shard: 3
@@ -171,3 +224,4 @@ executor:
     num_shards: 3
     num_mongos: 2
     enable_balancer: true
+    random_migrations: true

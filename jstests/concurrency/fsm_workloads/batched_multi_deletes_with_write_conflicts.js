@@ -50,7 +50,7 @@ export const $config = (function() {
                 const stages = getPlanStages(expl, "BATCHED_DELETE");
                 assert.gte(stages.length, 1, tojson(expl));
                 // Only expect a specific number of shards when shard membership is stable.
-                if (!TestData.transitioningConfigShard) {
+                if (!TestData.shardsAddedRemoved) {
                     assert.lte(stages.length, shardNames.length, tojson(expl));
                 }
             }

@@ -11,7 +11,7 @@
 
 import {ChangeStreamTest, ChangeStreamWatchMode} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
@@ -95,7 +95,7 @@ function runtTransitionTestCases(transitionType, watchMode, collSetupType) {
     // Perform the transition.
     if (transitionType === kTransitionType.toDedicatedConfigServer) {
         moveDatabaseAndUnshardedColls(db, otherShardName);
-        ConfigShardUtil.transitionToDedicatedConfigServer(st);
+        ShardTransitionUtil.transitionToDedicatedConfigServer(st);
     } else {
         assert.eq(kTransitionType.fromDedicatedConfigServer,
                   transitionType,
