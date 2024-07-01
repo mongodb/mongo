@@ -240,6 +240,8 @@ configure_debug_mode(char **p, size_t max)
 {
     CONFIG_APPEND(*p, ",debug_mode=[");
 
+    if (GV(DEBUG_BACKGROUND_COMPACT))
+        CONFIG_APPEND(*p, ",background_compact=true");
     if (GV(DEBUG_CHECKPOINT_RETENTION) != 0)
         CONFIG_APPEND(*p, ",checkpoint_retention=%" PRIu32, GV(DEBUG_CHECKPOINT_RETENTION));
     if (GV(DEBUG_CURSOR_REPOSITION))

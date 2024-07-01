@@ -65,4 +65,4 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
             c[k] = v
 
         # We were trying to generate a message matching this pattern.
-        self.captureout.checkAdditionalPattern(self, "old snapshot")
+        self.captureout.checkAdditionalPattern(self, "pinned in session")

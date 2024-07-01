@@ -22,16 +22,18 @@ There are two types of locks in WiredTiger:
  - Read Write (RW) Locks
 
 @subsection lock-usage Lock usage
-A correctly used lock takes the lock for each access to the shared memory it guards. WiredTiger
-sometimes deviates from this model and reads variables outside the context of the relevant lock.
-Such instances are only permitted if reading inconsistent data is sufficient for the use case.
+A correctly used lock must be held when accessing any of the shared memory locations that it
+protects, unless they are known to not be accessed by any other threads (e.g. you are initializing
+some structure that hasn't been shared yet). WiredTiger sometimes deviates from this model and reads
+variables outside the context of the relevant lock. Such instances are only permitted if reading
+inconsistent data is sufficient for the use case.
 
 More details on lock hierarchy and usage can be found in the @ref arch-locking-hierarchy.
 
 @section generations Generations
 
 Shared objects, including the page index, WT_REFs, etc. have their lifecycles managed using
-the WiredTiger generations system. In general when a reader thread accesses an object, that could be
+the WiredTiger generations system. In general, when a reader thread accesses an object that could be
 concurrently freed, it enters a "generation". After entering that generation it accesses the object.
 A generation is a monotonically increasing integer which denotes times at which a given object must
 exist.
@@ -73,7 +75,8 @@ between all reads prior to the barrier, and all reads or writes following the ba
 this barrier is used to provide ordering between a single prior read and all subsequent read and
 writes, in which case \c WT_ACQUIRE_READ_WITH_BARRIER can be used. While
 \c WT_ACQUIRE_READ_WITH_BARRIER can be thought of as ordering a single read with all subsequent
-instructions, mechanically it is still a \c WT_ACQUIRE_BARRIER and has the same semantics.
+instructions, mechanically it is still a \c WT_ACQUIRE_BARRIER and has the same semantics. It is
+better to use \c WT_ACQUIRE_READ to order a single prior read, described below.
 
 @subsection rel-bar Release barrier
 
@@ -83,7 +86,8 @@ writes. \c WT_RELEASE_WRITE_WITH_BARRIER has a similar intent to the
 \c WT_ACQUIRE_READ_WITH_BARRIER. It can be thought of as ordering a single write with respect to all
 prior reads and writes. However it is semantically the same as the \c WT_RELEASE_BARRIER. These
 barriers should be used as pairs. If one location requires an acquire barrier then there must be
-another location that requires a release barrier.
+another location that requires a release barrier.  It is better to use \c WT_RELEASE_WRITE to order
+a single write, described below.
 
 Previously WiredTiger defined a \c WT_PUBLISH macro which prevented StoreStore reordering, this
 macro has since been removed however the term publish still exists in the code base. The term
@@ -93,7 +97,7 @@ memory ordering semantics.
 @subsection full-bar Full barrier
 
 The full barrier prevents all 4 described types of reorderings and is accessible via the
-\c WT_FULL_BARRIER macro.
+\c WT_FULL_BARRIER macro. It is the only way to prevent StoreLoad reordering.
 
 @subsection com-bar Compiler barrier
 

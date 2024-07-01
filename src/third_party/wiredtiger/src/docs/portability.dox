@@ -33,22 +33,9 @@ location after the first 8 bits were written but before the subsequent 24 bits, 
 state. If two threads of control attempt to write to the same location simultaneously, the result
 must be one of the two values, not some combination of the both.
 
-@subsection aggregated-writes No Aggregated Writes of Adjacent Memory Locations
-To reduce memory requirements, WiredTiger may use a 32-bit type on 64-bit machines, which is OK
-if the compiler doesn't turn a 32-bit load/store into a 64-bit load/store, where the 64 bits
-consists of two adjacent 32-bit locations.
-
-Violating this can lead to races when two threads are cooperating. Suppose there is a thread X
-that finds the variable A of 32-bits set to 0 and writes in a new value. Concurrently another
-thread Y reads the adjacent variable B of 32-bits that are non-zero, does some operation, resets
-the memory location to 0. If thread X were to read the 64-bits consisting of the variable A and
-the adjacent variable B together, and write them both, the two threads could race.
-
-@subsection cache-lines Writes Across Cache Lines
-WiredTiger doesn't depend on writes across cache lines being atomic and it ensures that a single
-write that is smaller or equal to 4 bytes long is never split across the cache lines. This is
-achieved through address alignment: we know of no architectures with cache lines other than a
-multiple of 4 bytes in size, therefore, aligned 4-byte accesses will always be in a single cache
-line.
+As WiredTiger uses unmarked atomic reads it requires that the compiler does not insert additional
+writes to memory, even if that write matches the value recently loaded. These writes are often
+referred to as invented stores. WiredTiger does not rely on unaligned reads and writes being atomic,
+nor any writes greater than 8 bytes.
 
 */
