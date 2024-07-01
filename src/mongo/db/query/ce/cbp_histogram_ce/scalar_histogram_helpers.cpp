@@ -37,16 +37,16 @@ using stats::sameTypeBracket;
 using stats::ScalarHistogram;
 using stats::valueToDouble;
 
-EstimationResult estimateCardinalityEq(const ScalarHistogram& h,
-                                       sbe::value::TypeTags tag,
-                                       sbe::value::Value val,
-                                       EstimationType type) {
+EstimationResult estimateCardinality(const ScalarHistogram& h,
+                                     sbe::value::TypeTags tag,
+                                     sbe::value::Value val,
+                                     EstimationType type) {
     switch (type) {
         case EstimationType::kGreater:
-            return getTotals(h) - estimateCardinalityEq(h, tag, val, EstimationType::kLessOrEqual);
+            return getTotals(h) - estimateCardinality(h, tag, val, EstimationType::kLessOrEqual);
 
         case EstimationType::kGreaterOrEqual:
-            return getTotals(h) - estimateCardinalityEq(h, tag, val, EstimationType::kLess);
+            return getTotals(h) - estimateCardinality(h, tag, val, EstimationType::kLess);
 
         default:
             // Continue.
@@ -121,10 +121,10 @@ EstimationResult estimateCardinalityRange(const ScalarHistogram& histogram,
                                           sbe::value::TypeTags tagHigh,
                                           sbe::value::Value valHigh) {
     const auto highType = highInclusive ? EstimationType::kLessOrEqual : EstimationType::kLess;
-    const auto highEstimate = estimateCardinalityEq(histogram, tagHigh, valHigh, highType);
+    const auto highEstimate = estimateCardinality(histogram, tagHigh, valHigh, highType);
 
     const auto lowType = lowInclusive ? EstimationType::kLess : EstimationType::kLessOrEqual;
-    const auto lowEstimate = estimateCardinalityEq(histogram, tagLow, valLow, lowType);
+    const auto lowEstimate = estimateCardinality(histogram, tagLow, valLow, lowType);
 
     const auto est = highEstimate - lowEstimate;
 
@@ -228,12 +228,12 @@ EstimationResult estimateRangeQueryOnArray(const ScalarHistogram& histogramAmin,
     const EstimationType highType =
         highInclusive ? EstimationType::kLessOrEqual : EstimationType::kLess;
     const EstimationResult highEstimate =
-        estimateCardinalityEq(histogramAmin, tagHigh, valHigh, highType);
+        estimateCardinality(histogramAmin, tagHigh, valHigh, highType);
 
     const EstimationType lowType =
         lowInclusive ? EstimationType::kLess : EstimationType::kLessOrEqual;
     const EstimationResult lowEstimate =
-        estimateCardinalityEq(histogramAmax, tagLow, valLow, lowType);
+        estimateCardinality(histogramAmax, tagLow, valLow, lowType);
 
     return highEstimate - lowEstimate;
 }

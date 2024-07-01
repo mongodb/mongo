@@ -41,10 +41,10 @@ namespace mongo::optimizer::cbp::ce {
  * Computes an estimate for a value and estimation type. Uses linear interpolation to
  * calculate the frequency of a value in a bucket.
  */
-EstimationResult estimateCardinalityEq(const stats::ScalarHistogram& h,
-                                       sbe::value::TypeTags tag,
-                                       sbe::value::Value val,
-                                       EstimationType type);
+EstimationResult estimateCardinality(const stats::ScalarHistogram& h,
+                                     sbe::value::TypeTags tag,
+                                     sbe::value::Value val,
+                                     EstimationType type);
 
 /**
  * Computes an estimate for a range (low, high) and estimation type. Uses linear

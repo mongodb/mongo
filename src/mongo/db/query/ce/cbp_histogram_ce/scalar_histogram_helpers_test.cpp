@@ -1,0 +1,499 @@
+/**
+ *    Copyright (C) 2024-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include <memory>
+#include <tuple>
+#include <vector>
+
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/test_helpers.h"
+#include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/stats/maxdiff_test_utils.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+
+namespace mongo::optimizer::cbp::ce {
+
+namespace {
+namespace value = sbe::value;
+
+using stats::ScalarHistogram;
+
+auto NumberInt64 = sbe::value::TypeTags::NumberInt64;
+auto kEqual = EstimationType::kEqual;
+
+TEST(ScalarHistogramHelpersTest, ManualHistogram) {
+    std::vector<BucketData> data{{0, 1.0, 1.0, 1.0},
+                                 {10, 1.0, 10.0, 5.0},
+                                 {20, 3.0, 15.0, 3.0},
+                                 {30, 1.0, 10.0, 4.0},
+                                 {40, 2.0, 0.0, 0.0},
+                                 {50, 1.0, 10.0, 5.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(55.0, getTotals(hist).card);
+
+    ASSERT_EQ(1.0, estimateCardinalityScalarHistogramInteger(hist, 0, kEqual));
+}
+
+TEST(ScalarHistogramHelpersTest, OneBucketIntHistogram) {
+
+    std::vector<BucketData> data{{100, 3.0, 27.0, 9.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(30.0, getTotals(hist).card);
+
+    // Estimate with the bucket bound.
+    ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 100, kEqual).card);
+
+    // Estimate with a value inside the bucket.
+    ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 10, kEqual).card);
+
+    // Estimate for a value larger than the last bucket bound.
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kEqual).card);
+}
+
+TEST(ScalarHistogramHelpersTest, OneExclusiveBucketIntHistogram) {
+    // Data set of a single value.
+    // By exclusive bucket we mean a bucket with only boundary, that is the range frequency and
+    // NDV are zero.
+    std::vector<BucketData> data{{100, 2.0, 0.0, 0.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(2.0, getTotals(hist).card);
+
+    // Estimates with the bucket boundary.
+
+    ASSERT_EQ(2.0, estimateCardinality(hist, NumberInt64, 100, kEqual).card);
+
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 0, kEqual).card);
+
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kEqual).card);
+}
+
+TEST(ScalarHistogramHelpersTest, OneBucketTwoIntValuesHistogram) {
+    // Data set of two values, example {5, 100, 100}.
+    std::vector<BucketData> data{{100, 2.0, 1.0, 1.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(3.0, getTotals(hist).card);
+
+    // Estimates with the bucket boundary.
+    ASSERT_EQ(2.0, estimateCardinality(hist, NumberInt64, 100, kEqual).card);
+
+    ASSERT_EQ(1.0, estimateCardinality(hist, NumberInt64, 10, kEqual).card);
+
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kEqual).card);
+}
+
+TEST(ScalarHistogramHelpersTest, OneBucketTwoIntValuesHistogram2) {
+    std::vector<BucketData> data{{100, 2.0, 3.0, 1.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(5.0, getTotals(hist).card);
+
+    // Estimates with the bucket boundary.
+    ASSERT_EQ(2.0, estimateCardinality(hist, NumberInt64, 100, kEqual).card);
+
+    ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 10, kEqual).card);
+
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kEqual).card);
+}
+
+TEST(ScalarHistogramHelpersTest, TwoBucketsIntHistogram) {
+    std::vector<BucketData> data{{1, 1.0, 0.0, 0.0}, {100, 3.0, 26.0, 8.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(30.0, getTotals(hist).card);
+
+    // Estimates for a value smaller than the first bucket.
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, -42, kEqual).card);
+    // Estimates with bucket bounds.
+    ASSERT_EQ(1.0, estimateCardinality(hist, NumberInt64, 1, kEqual).card);
+
+    ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 100, kEqual).card);
+
+    // Estimates with a value inside the bucket. The estimates use interpolation.
+    ASSERT_APPROX_EQUAL(3.25, estimateCardinality(hist, NumberInt64, 10, kEqual).card, 0.01);
+    ASSERT_APPROX_EQUAL(3.25, estimateCardinality(hist, NumberInt64, 50, kEqual).card, 0.01);
+}
+
+TEST(ScalarHistogramHelpersTest, ThreeExclusiveBucketsIntHistogram) {
+    std::vector<BucketData> data{{1, 1.0, 0.0, 0.0}, {10, 8.0, 0.0, 0.0}, {100, 1.0, 0.0, 0.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(10.0, getTotals(hist).card);
+
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 5, kEqual).card);
+}
+
+TEST(ScalarHistogramHelpersTest, OneBucketStrHistogram) {
+    std::vector<BucketData> data{{"xyz", 3.0, 27.0, 9.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(30.0, getTotals(hist).card);
+
+    // Estimates with bucket bound.
+    auto [tag, value] = value::makeNewString("xyz"_sd);
+    value::ValueGuard vg(tag, value);
+    ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
+
+    // Estimates for a value inside the bucket. Since there is no low value bound in the histogram
+    // all values smaller than the upper bound will be estimated the same way using half of the
+    // bucket cardinality.
+    std::tie(tag, value) = value::makeNewString("a"_sd);
+    ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
+
+    std::tie(tag, value) = value::makeNewString(""_sd);
+    // In the special case of a single string bucket, we estimate empty string equality as for any
+    // other string value. In practice if there are at least 2 buckets for the string data and an
+    // empty string in the data set, it will be chosen as a bound for the first bucket and produce
+    // precise estimates.
+    ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
+
+    // Estimates for a value larger than the upper bound.
+    std::tie(tag, value) = value::makeNewString("z"_sd);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kEqual).card);
+}
+
+TEST(ScalarHistogramHelpersTest, TwoBucketsStrHistogram) {
+    // Data set of 100 strings in the range ["abc", "xyz"], with average frequency of 2.
+    std::vector<BucketData> data{{"abc", 2.0, 0.0, 0.0}, {"xyz", 3.0, 95.0, 48.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(100.0, getTotals(hist).card);
+
+    // Estimates for a value smaller than the first bucket bound.
+    auto [tag, value] = value::makeNewString("a"_sd);
+    value::ValueGuard vg(tag, value);
+
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kEqual).card);
+
+    // Estimates with bucket bounds.
+    std::tie(tag, value) = value::makeNewString("abc"_sd);
+    ASSERT_EQ(2.0, estimateCardinality(hist, tag, value, kEqual).card);
+
+    std::tie(tag, value) = value::makeNewString("xyz"_sd);
+    ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
+
+    // Estimates for a value inside the bucket.
+    std::tie(tag, value) = value::makeNewString("sun"_sd);
+    ASSERT_APPROX_EQUAL(1.98, estimateCardinality(hist, tag, value, kEqual).card, 0.01);
+
+    // Estimate for a value very close to the bucket bound.
+    std::tie(tag, value) = value::makeNewString("xyw"_sd);
+    ASSERT_APPROX_EQUAL(1.98, estimateCardinality(hist, tag, value, kEqual).card, 0.01);
+}
+
+TEST(ScalarHistogramHelpersTest, TwoBucketsDateHistogram) {
+    // June 6, 2017 -- June 7, 2017.
+    const int64_t startInstant = 1496777923000LL;
+    const int64_t endInstant = 1496864323000LL;
+    const auto startDate = Date_t::fromMillisSinceEpoch(startInstant);
+    const auto endDate = Date_t::fromMillisSinceEpoch(endInstant);
+
+    std::vector<BucketData> data{{Value(startDate), 3.0, 0.0, 0.0},
+                                 {Value(endDate), 1.0, 96.0, 48.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(100.0, getTotals(hist).card);
+
+    const auto valueBefore = value::bitcastFrom<int64_t>(startInstant - 1);
+    double expectedCard =
+        estimateCardinality(hist, value::TypeTags::Date, valueBefore, kEqual).card;
+    ASSERT_EQ(0.0, expectedCard);
+
+    const auto valueStart = value::bitcastFrom<int64_t>(startInstant);
+    expectedCard = estimateCardinality(hist, value::TypeTags::Date, valueStart, kEqual).card;
+    ASSERT_EQ(3.0, expectedCard);
+
+    const auto valueEnd = value::bitcastFrom<int64_t>(endInstant);
+    expectedCard = estimateCardinality(hist, value::TypeTags::Date, valueEnd, kEqual).card;
+    ASSERT_EQ(1.0, expectedCard);
+
+    const auto valueIn = value::bitcastFrom<int64_t>(startInstant + 43000000);
+    expectedCard = estimateCardinality(hist, value::TypeTags::Date, valueIn, kEqual).card;
+    ASSERT_EQ(2.0, expectedCard);
+
+    const auto valueAfter = value::bitcastFrom<int64_t>(endInstant + 100);
+    expectedCard = estimateCardinality(hist, value::TypeTags::Date, valueAfter, kEqual).card;
+    ASSERT_EQ(0.0, expectedCard);
+}
+
+TEST(ScalarHistogramHelpersTest, TwoBucketsTimestampHistogram) {
+    // June 6, 2017 -- June 7, 2017 in seconds.
+    const int64_t startInstant = 1496777923LL;
+    const int64_t endInstant = 1496864323LL;
+    const Timestamp startTs{Seconds(startInstant), 0};
+    const Timestamp endTs{Seconds(endInstant), 0};
+
+    std::vector<BucketData> data{{Value(startTs), 3.0, 0.0, 0.0}, {Value(endTs), 1.0, 96.0, 48.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(100.0, getTotals(hist).card);
+
+    const auto valueBefore = value::bitcastFrom<int64_t>(startTs.asULL() - 1);
+    CEType expectedCard = {
+        estimateCardinality(hist, value::TypeTags::Timestamp, valueBefore, kEqual).card};
+    ASSERT_EQ(0.0, expectedCard._value);
+
+    const auto valueStart = value::bitcastFrom<int64_t>(
+        startTs.asULL());  // NB: startTs.asInt64() produces different value.
+    expectedCard = {estimateCardinality(hist, value::TypeTags::Timestamp, valueStart, kEqual).card};
+    ASSERT_EQ(3.0, expectedCard._value);
+
+    const auto valueEnd = value::bitcastFrom<int64_t>(endTs.asULL());
+    expectedCard = {estimateCardinality(hist, value::TypeTags::Timestamp, valueEnd, kEqual).card};
+    ASSERT_EQ(1.0, expectedCard._value);
+
+    const auto valueIn = value::bitcastFrom<int64_t>((startTs.asULL() + endTs.asULL()) / 2);
+    expectedCard = {estimateCardinality(hist, value::TypeTags::Timestamp, valueIn, kEqual).card};
+    ASSERT_EQ(2.0, expectedCard._value);
+
+    const auto valueAfter = value::bitcastFrom<int64_t>(endTs.asULL() + 100);
+    expectedCard = {estimateCardinality(hist, value::TypeTags::Timestamp, valueAfter, kEqual).card};
+    ASSERT_EQ(0.0, expectedCard._value);
+}
+
+TEST(ScalarHistogramHelpersTest, TwoBucketsObjectIdHistogram) {
+    const auto startOid = OID("63340d8d27afef2de7357e8d");
+    const auto endOid = OID("63340dbed6cd8af737d4139a");
+    ASSERT_TRUE(startOid < endOid);
+
+    std::vector<BucketData> data{{Value(startOid), 2.0, 0.0, 0.0},
+                                 {Value(endOid), 1.0, 97.0, 77.0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    ASSERT_EQ(100.0, getTotals(hist).card);
+
+    auto [tag, value] = value::makeNewObjectId();
+    value::ValueGuard vg(tag, value);
+    const auto oidBefore = OID("63340d8d27afef2de7357e8c");
+    oidBefore.view().readInto(value::getObjectIdView(value));
+
+    double expectedCard = estimateCardinality(hist, tag, value, kEqual).card;
+    ASSERT_EQ(0.0, expectedCard);
+
+    // Bucket bounds.
+    startOid.view().readInto(value::getObjectIdView(value));
+    expectedCard = estimateCardinality(hist, tag, value, kEqual).card;
+    ASSERT_EQ(2.0, expectedCard);
+
+    endOid.view().readInto(value::getObjectIdView(value));
+    expectedCard = estimateCardinality(hist, tag, value, kEqual).card;
+    ASSERT_EQ(1.0, expectedCard);
+
+    // ObjectId value inside the bucket.
+    const auto oidInside = OID("63340db2cd4d46ff39178e9d");
+    oidInside.view().readInto(value::getObjectIdView(value));
+    expectedCard = estimateCardinality(hist, tag, value, kEqual).card;
+    ASSERT_APPROX_EQUAL(1.25, expectedCard, 0.01);
+
+    const auto oidAfter = OID("63340dbed6cd8af737d4139b");
+    oidAfter.view().readInto(value::getObjectIdView(value));
+    expectedCard = estimateCardinality(hist, tag, value, kEqual).card;
+    ASSERT_EQ(0.0, expectedCard);
+}
+
+TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromData) {
+    const int64_t startInstant = 1506777923000LL;
+    const int64_t endInstant = 1516864323000LL;
+    const Timestamp startTs{Seconds(1516864323LL), 0};
+    const Timestamp endTs{Seconds(1526864323LL), 0};
+    const auto startOid = OID("63340d8d27afef2de7357e8d");
+    const auto endOid = OID("63340dbed6cd8af737d4139a");
+
+    std::vector<stats::SBEValue> data;
+    data.emplace_back(value::TypeTags::Date, value::bitcastFrom<int64_t>(startInstant));
+    data.emplace_back(value::TypeTags::Date, value::bitcastFrom<int64_t>(endInstant));
+
+    data.emplace_back(value::TypeTags::Timestamp, value::bitcastFrom<int64_t>(startTs.asULL()));
+    data.emplace_back(value::TypeTags::Timestamp, value::bitcastFrom<int64_t>(endTs.asULL()));
+
+    auto [tag, val] = stats::makeInt64Value(100);
+    data.emplace_back(tag, val);
+    std::tie(tag, val) = stats::makeInt64Value(1000);
+    data.emplace_back(tag, val);
+
+    auto [strTag, strVal] = value::makeNewString("abc"_sd);
+    value::ValueGuard strVG(strTag, strVal);
+    auto [copyTag, copyVal] = value::copyValue(strTag, strVal);
+    data.emplace_back(copyTag, copyVal);
+    std::tie(strTag, strVal) = value::makeNewString("xyz"_sd);
+    std::tie(copyTag, copyVal) = value::copyValue(strTag, strVal);
+    data.emplace_back(copyTag, copyVal);
+
+    auto [objTag, objVal] = value::makeNewObjectId();
+    value::ValueGuard objVG(objTag, objVal);
+    startOid.view().readInto(value::getObjectIdView(objVal));
+    std::tie(tag, val) = copyValue(objTag, objVal);
+    data.emplace_back(tag, val);
+    endOid.view().readInto(value::getObjectIdView(objVal));
+    std::tie(tag, val) = copyValue(objTag, objVal);
+    data.emplace_back(tag, val);
+
+    sortValueVector(data);
+
+    // Force each type except numbers to use a single bucket. This way there is no bucket for the
+    // min value if present in the data and it needs to be estimated.
+
+    const ScalarHistogram& hist = makeHistogram(data, 6);
+
+    // Assert that our scalar histogram is what we expect.
+    auto expected = fromjson(
+        "{ \
+        buckets: [ \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 0.0, \
+                rangeDistincts: 0.0, \
+                cumulativeCount: 1.0, \
+                cumulativeDistincts: 1.0 \
+            }, \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 0.0, \
+                rangeDistincts: 0.0, \
+                cumulativeCount: 2.0, \
+                cumulativeDistincts: 2.0 \
+            }, \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 1.0, \
+                rangeDistincts: 1.0, \
+                cumulativeCount: 4.0, \
+                cumulativeDistincts: 4.0 \
+            }, \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 1.0, \
+                rangeDistincts: 1.0, \
+                cumulativeCount: 6.0, \
+                cumulativeDistincts: 6.0 \
+            }, \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 1.0, \
+                rangeDistincts: 1.0, \
+                cumulativeCount: 8.0, \
+                cumulativeDistincts: 8.0 \
+            }, \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 1.0, \
+                rangeDistincts: 1.0, \
+                cumulativeCount: 10.0, \
+                cumulativeDistincts: 10.0 \
+            } \
+        ], \
+        bounds: [ 100, 1000, 'xyz', ObjectId('63340dbed6cd8af737d4139a'), \
+                  new Date(1516864323000), Timestamp(1526864323, 0) ] \
+	}");
+    ASSERT_BSONOBJ_EQ(expected, hist.serialize());
+
+    // Minimum ObjectId.
+    auto&& [minOid, inclOid] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::ObjectId);
+    auto [minOidTag, minOidVal] = minOid->cast<mongo::optimizer::Constant>()->get();
+    CEType expectedCard = {estimateCardinality(hist, minOidTag, minOidVal, kEqual).card};
+    ASSERT_EQ(1.0, expectedCard._value);
+
+    // Minimum date.
+    const auto&& [minDate, inclDate] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Date);
+    const auto [minDateTag, minDateVal] = minDate->cast<mongo::optimizer::Constant>()->get();
+    expectedCard = {estimateCardinality(hist, minDateTag, minDateVal, kEqual).card};
+    ASSERT_EQ(1.0, expectedCard._value);
+
+    // Minimum timestamp.
+    auto&& [minTs, inclTs] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Timestamp);
+    auto [minTsTag, minTsVal] = minTs->cast<mongo::optimizer::Constant>()->get();
+    expectedCard = {estimateCardinality(hist, minTsTag, minTsVal, kEqual).card};
+    ASSERT_EQ(1.0, expectedCard._value);
+
+    // Add minimum values to the data set and create another histogram.
+    const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
+    value::ValueGuard vgLowStr(tagLowStr, valLowStr);
+    std::tie(copyTag, copyVal) = value::copyValue(tagLowStr, valLowStr);
+    data.emplace_back(copyTag, copyVal);
+    data.emplace_back(minDateTag, minDateVal);
+    data.emplace_back(minTsTag, minTsVal);
+
+    sortValueVector(data);
+    const ScalarHistogram& hist2 = makeHistogram(data, 6);
+
+    // Precise estimate for equality to empty string, it is a bucket boundary.
+    expectedCard = {estimateCardinality(hist2, tagLowStr, valLowStr, kEqual).card};
+    ASSERT_EQ(1.0, expectedCard._value);
+    // Equality to the minimum date/ts value is estimated by range_frequency/NDV.
+    expectedCard = {estimateCardinality(hist2, minDateTag, minDateVal, kEqual).card};
+    ASSERT_EQ(1.0, expectedCard._value);
+    expectedCard = {estimateCardinality(hist2, minTsTag, minTsVal, kEqual).card};
+    ASSERT_EQ(1.0, expectedCard._value);
+}
+
+TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromBuckets) {
+    const auto endOid = OID("63340dbed6cd8af737d4139a");
+    const auto endDate = Date_t::fromMillisSinceEpoch(1526864323000LL);
+    const Timestamp endTs{Seconds(1526864323LL), 0};
+
+    std::vector<BucketData> data{
+        {0, 1.0, 0.0, 0.0},
+        {100, 4.0, 95.0, 30.0},
+        {"xyz", 5.0, 95.0, 25.0},
+        {Value(endOid), 5.0, 95.0, 50.0},
+        {Value(endDate), 4.0, 96.0, 24.0},
+        {Value(endTs), 5.0, 95.0, 50.0},
+    };
+    const ScalarHistogram hist = createHistogram(data);
+    ASSERT_EQ(500.0, getTotals(hist).card);
+
+    // Minimum ObjectId.
+    auto&& [minOid, inclOid] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::ObjectId);
+    auto [minOidTag, minOidVal] = minOid->cast<mongo::optimizer::Constant>()->get();
+    CEType expectedCard{estimateCardinality(hist, minOidTag, minOidVal, kEqual).card};
+    ASSERT_CE_APPROX_EQUAL(1.9, expectedCard, 0.01);
+
+    // Minimum date.
+    const auto&& [minDate, inclDate] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Date);
+    const auto [minDateTag, minDateVal] = minDate->cast<mongo::optimizer::Constant>()->get();
+    expectedCard = {estimateCardinality(hist, minDateTag, minDateVal, kEqual).card};
+    ASSERT_EQ(4.0, expectedCard._value);
+
+    // Minimum timestamp.
+    auto&& [minTs, inclTs] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Timestamp);
+    auto [minTsTag, minTsVal] = minTs->cast<mongo::optimizer::Constant>()->get();
+    expectedCard = {estimateCardinality(hist, minTsTag, minTsVal, kEqual).card};
+    ASSERT_CE_APPROX_EQUAL(1.9, expectedCard, 0.01);
+}
+
+}  // namespace
+}  // namespace mongo::optimizer::cbp::ce

@@ -27,8 +27,13 @@ env.Library(
 env.CppUnitTest(
     target="cbp_histogram_estimation_test",
     source=[
-        "histogram_estimation_test.cpp",
         "test_helpers.cpp",
+        "scalar_histogram_helpers_test.cpp",
+        "array_histogram_helpers_test.cpp",
     ],
-    LIBDEPS=["$BUILD_DIR/mongo/db/query/ce/test_utils", "cbp_ce_histogram_estimation"],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/ce/test_utils",
+        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
+        "cbp_ce_histogram_estimation",
+    ],
 )

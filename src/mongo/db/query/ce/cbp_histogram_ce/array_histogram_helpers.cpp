@@ -39,11 +39,14 @@ EstimationResult estimateCardinalityEq(const stats::ArrayHistogram& ah,
                                        sbe::value::Value val,
                                        bool includeScalar) {
     EstimationResult estimation = {0.0 /*card*/, 0.0 /*ndv*/};
+    // Estimate cardinality for fields containing scalar values if includeScalar is true.
     if (includeScalar) {
-        estimation = estimateCardinalityEq(ah.getScalar(), tag, val, EstimationType::kEqual);
+        estimation = estimateCardinality(ah.getScalar(), tag, val, EstimationType::kEqual);
     }
+    // If histogram includes array data points, calculate cardinality for fields containing array
+    // values.
     if (ah.isArray()) {
-        estimation += estimateCardinalityEq(ah.getArrayUnique(), tag, val, EstimationType::kEqual);
+        estimation += estimateCardinality(ah.getArrayUnique(), tag, val, EstimationType::kEqual);
     }
     return estimation;
 }
