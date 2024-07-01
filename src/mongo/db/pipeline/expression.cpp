@@ -103,8 +103,12 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/text.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeSecondFeatureFlagBinDataConvertCheck);
+
 using Parser = Expression::Parser;
 
 using boost::intrusive_ptr;
@@ -7097,9 +7101,9 @@ Expression::Parser makeConversionAlias(const StringData shortcutName,
             expCtx,
             std::move(operands[0]),
             toType,
-            // The 'format' argument to $convert is not allowed in FCVs below 8.0. On a newer
+            // The 'format' argument to $convert is not allowed on FCVs below 8.0. On a newer
             // binary, $toString will still specify it.
-            ExpressionConvert::checkBinDataConvertAllowed() ? format : boost::none,
+            expCtx->isFeatureFlagBinDataConvertEnabled() ? format : boost::none,
             toSubtype);
     };
 }
@@ -7176,7 +7180,7 @@ boost::intrusive_ptr<Expression> ExpressionConvert::create(ExpressionContext* co
         format ? ExpressionConstant::create(expCtx, Value(toStringData(*format))) : nullptr,
         nullptr,
         nullptr,
-        checkBinDataConvertAllowed());
+        expCtx->isFeatureFlagBinDataConvertEnabled());
 }
 
 ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
@@ -7204,7 +7208,12 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
                           << typeName(expr.type()),
             expr.type() == BSONType::Object);
 
-    const bool allowBinDataConvert = checkBinDataConvertAllowed();
+    if (MONGO_unlikely(hangBeforeSecondFeatureFlagBinDataConvertCheck.shouldFail())) {
+        LOGV2(9160300, "Hanging due to hangBeforeSecondFeatureFlagBinDataConvertCheck fail point");
+        hangBeforeSecondFeatureFlagBinDataConvertCheck.pauseWhileSet();
+    }
+
+    const bool allowBinDataConvert = expCtx->isFeatureFlagBinDataConvertEnabled();
 
     boost::intrusive_ptr<Expression> input;
     boost::intrusive_ptr<Expression> to;
@@ -7415,11 +7424,6 @@ Value ExpressionConvert::performConversion(ConvertTargetTypeInfo targetTypeInfo,
 
     return table.findConversionFunc(inputType, targetTypeInfo.type, format, targetTypeInfo.subtype)(
         getExpressionContext(), inputValue);
-}
-
-bool ExpressionConvert::checkBinDataConvertAllowed() {
-    return feature_flags::gFeatureFlagBinDataConvert.isEnabledUseLatestFCVWhenUninitialized(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 namespace {

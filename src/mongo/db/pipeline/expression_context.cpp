@@ -462,4 +462,8 @@ void ExpressionContext::throwIfFeatureFlagIsNotEnabledOnFCV(
             flag->isEnabledOnVersion(versionToCheck));
 }
 
+bool ExpressionContext::isFeatureFlagBinDataConvertEnabled() {
+    return _featureFlagBinDataConvertValue.get();
+}
+
 }  // namespace mongo

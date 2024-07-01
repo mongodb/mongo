@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include <absl/container/node_hash_set.h>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/move/utility_core.hpp>
@@ -754,6 +755,12 @@ public:
         return _collator.getIgnore();
     }
 
+    /**
+     * Returns true if featureFlagBinDataConvert is enabled. See the comment below on
+     * '_featureFlagBinDataConvertValue' for more information about this pattern.
+     */
+    bool isFeatureFlagBinDataConvertEnabled();
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
@@ -846,6 +853,29 @@ private:
         _queryKnobConfiguration{[](const auto& querySettings) {
             return QueryKnobConfiguration(querySettings);
         }};
+
+    // We store the value of featureFlagBinDataConvert here. We can end up checking the value of the
+    // feature flag twice in certain scenarios; for example, if we have a $toString expression in a
+    // $project, we call makeConversionAlias() which checks the value of the feature flag to know
+    // whether we should add the 'format' argument to the ExpressionConvert. At some other point
+    // later we call the copy constructor ExpressionNodeAST, and since the copy constructor of
+    // ExpressionASTNode calls parseOperand(), we get into ExpressionConvert::parse(). This also
+    // checks the value of the feature flag to determine if we are allowed to parse the format
+    // argument. Since we want the value of the feature flag to be the same throughout an operation,
+    // we cache the value on the ExpressionContext. This is because if an FCV updgrade/downgrade
+    // happens in between the two checks of the feature flag's value, we can get different results
+    // and thus error due to partial execution of the feature. Caching the value here ensures that
+    // we will always see the same snapshot of the feature flag's value throughout the duration of
+    // one operation. Note that this is currently the only query feature flag that has this caching
+    // behavior. If it becomes a more common pattern that we need to check the value of a feature
+    // flag twice in an operation, we should strongly consider creating a class in which to cache
+    // the values of all the query feature flags in a more generalized manner, similar to
+    // QueryKnobConfiguration. Alternatively, we can store the FCV snapshot here and any query
+    // feature flag check would refer to the same FCV once it has been obtained.
+    Deferred<bool (*)()> _featureFlagBinDataConvertValue{[] {
+        return feature_flags::gFeatureFlagBinDataConvert.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    }};
 };
 
 }  // namespace mongo

@@ -3973,8 +3973,6 @@ public:
         return visitor->visit(this);
     }
 
-    static bool checkBinDataConvertAllowed();
-
 private:
     static BSONType computeTargetType(Value typeName);
     Value performConversion(ConvertTargetTypeInfo targetTypeInfo,
