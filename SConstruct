@@ -6731,8 +6731,8 @@ env.Alias("distsrc-zip", distSrcZip)
 env.Alias("distsrc", "distsrc-tgz")
 
 # Do this as close to last as possible before reading SConscripts, so
-# that any tools that may have injected other things via emitters are
-# included among the side effect adornments.
+# that any tools that may have injected other things via emitters are included
+# among the side effect adornments.
 env.Tool("task_limiter")
 if has_option("jlink"):
     link_jobs = env.SetupTaskLimiter(

@@ -18,13 +18,6 @@ build --nobuild_runfile_links
 # dynamically.
 build --experimental_cc_shared_library
 
-# The default memory is increased to support the size of mongo build, especially when
-# running large number of jobs for remote execution. By default if was 1/4 machine memory, 
-# so for workstations, thats 8GB. This would cause OOM sometimes. 20GB is enough to not
-# use all the system memory (assuming 32GB machines), and give bazel plenty of room
-# to grow.
-startup --host_jvm_args=-Xmx20g
-
 # This supports the "crosstool" feature (aka building from our toolchain).
 # Currently the only platform with a custom toolchain config is linux, use the default
 # toolchain_suite elsewhere.
@@ -69,7 +62,7 @@ build --experimental_remote_cache_compression=true
 build --grpc_keepalive_time=30s
 build --nolegacy_important_outputs
 build --bes_keywords=repo:mongo
-build --jobs=800
+build --jobs=200
 common --remote_upload_local_results=False
 
 # Settings specific for clang-tidy
