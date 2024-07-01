@@ -228,7 +228,13 @@ add_option(
 
 add_option(
     "lto",
-    help="enable link time optimizations (experimental, except with MSVC)",
+    help="enable full link time optimizations (experimental, except with MSVC)",
+    nargs=0,
+)
+
+add_option(
+    "thin-lto",
+    help="enable thin link time optimizations (experimental)",
     nargs=0,
 )
 
@@ -4765,6 +4771,10 @@ def doConfigure(myenv):
 
         # If possible with the current linker, mark relocations as read-only.
         myenv.AddToLINKFLAGSIfSupported("-Wl,-z,relro")
+
+        if has_option("thin-lto"):
+            if not myenv.AddToLINKFLAGSIfSupported("-flto=thin"):
+                myenv.ConfError("Failed to enable thin LTO")
 
         if linker_ld != "gold" and not env.TargetOSIs("darwin", "macOS"):
             myenv.AppendUnique(

@@ -736,6 +736,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f"--//bazel/config:compiler_type={env.ToolchainName()}",
         f'--//bazel/config:opt={env.GetOption("opt")}',
         f'--//bazel/config:dbg={env.GetOption("dbg") == "on"}',
+        f'--//bazel/config:thin_lto={env.GetOption("thin-lto") is not None}',
         f'--//bazel/config:separate_debug={True if env.GetOption("separate-debug") == "on" else False}',
         f'--//bazel/config:libunwind={env.GetOption("use-libunwind")}',
         f'--//bazel/config:use_gdbserver={False if env.GetOption("gdbserver") is None else True}',

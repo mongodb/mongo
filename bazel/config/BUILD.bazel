@@ -25,6 +25,7 @@ load(
     "spider_monkey_dbg",
     "ssl",
     "streams_release_build",
+    "thin_lto",
     "tsan",
     "ubsan",
     "use_diagnostic_latches",
@@ -1731,4 +1732,20 @@ selects.config_setting_group(
         "@platforms//os:linux",
         ":ssl_enabled",
     ],
+)
+
+# --------------------------------------
+# thin_lto
+# --------------------------------------
+
+thin_lto(
+    name = "thin_lto",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "thin_lto_enabled",
+    flag_values = {
+        "//bazel/config:thin_lto": "True",
+    },
 )
