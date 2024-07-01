@@ -376,5 +376,102 @@ TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest,
     SessionCatalog::get(operationContext()->getServiceContext())->reset_forTest();
 }
 
+TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest, FailUnyieldIfTxnStashDoesNotExist) {
+    auto lsid = makeLogicalSessionIdForTest();
+    operationContext()->setLogicalSessionId(lsid);
+    operationContext()->setTxnNumber(TxnNumber(0));
+    operationContext()->setInMultiDocumentTransaction();
+
+    repl::ReadConcernArgs readConcernArgs{LogicalTime(Timestamp(1, 0)),
+                                          repl::ReadConcernLevel::kMajorityReadConcern};
+    repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+
+    // Set up transaction state
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(operationContext());
+    auto contextSession = mongoDSessionCatalog->checkOutSession(operationContext());
+
+    auto txnParticipant = TransactionParticipant::get(operationContext());
+    txnParticipant.beginOrContinue(operationContext(),
+                                   TxnNumber(0),
+                                   false,
+                                   TransactionParticipant::TransactionActions::kStart);
+    txnParticipant.unstashTransactionResources(operationContext(), "insert");
+
+    // Schedule remote request
+    std::vector<AsyncRequestsSender::Request> requests;
+    requests.emplace_back(kTestRemoteShardId1,
+                          BSON("find"
+                               << "bar"));
+    std::set<ShardId> pendingShardIds{kTestRemoteShardId1};
+
+    auto msars = MultiStatementTransactionRequestsSender(
+        operationContext(),
+        executor(),
+        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+        requests,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        Shard::RetryPolicy::kNoRetry);
+
+    // Force the ARS to hang after it yields
+    setGlobalFailPoint("hangAfterYield",
+                       BSON("mode"
+                            << "alwaysOn"));
+
+    // Call MSARS::next(), which will hang after yielding because of the failpoint above. Once the
+    // failpoint is turned off and the MSARS tries to unyield, it should fail.
+    auto errorOnMsarsNextFuture = launchAsync([&]() {
+        auto response = msars.next();
+
+        // Get the response from the find request. Assert TransactionParticipantFailedUnyield is
+        // thrown even after a successful response, and contains an error with code 9183900.
+        auto status = response.swResponse.getStatus();
+        assertFailedToUnyieldError(status, ErrorCodes::duplicateCodeForTest(9183900));
+    });
+
+    // Mock a concurrent request in the same transaction. This request will block waiting to check
+    // out the session until the MSARS yields. We don't actually run an op here, but instead set up
+    // the TransactionParticipant state in such a way to mimic the request failing without aborting
+    // the transaction. This will mean the request unstashes the txnResources, but does not restash
+    // them nor mark the transaction as aborted.
+    auto mockConcurrentRequestFuture = launchAsync([&]() {
+        auto newClientOwned = getServiceContext()->getService()->makeClient("newClient");
+        AlternativeClientRegion acr(newClientOwned);
+        auto newOpCtx = cc().makeOperationContext();
+
+        newOpCtx->setLogicalSessionId(lsid);
+        newOpCtx->setTxnNumber(TxnNumber(0));
+        newOpCtx->setInMultiDocumentTransaction();
+
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx.get());
+        auto contextSession = mongoDSessionCatalog->checkOutSession(newOpCtx.get());
+
+        auto txnParticipant = TransactionParticipant::get(newOpCtx.get());
+        txnParticipant.beginOrContinue(newOpCtx.get(),
+                                       TxnNumber(0),
+                                       false,
+                                       TransactionParticipant::TransactionActions::kContinue);
+        txnParticipant.unstashTransactionResources(newOpCtx.get(), "insert");
+    });
+
+    // Wait until the concurrent request has unstashed the txnResources, then turn off the
+    // failpoint.
+    mockConcurrentRequestFuture.default_timed_get();
+    setGlobalFailPoint("hangAfterYield",
+                       BSON("mode"
+                            << "off"));
+
+    // Mock a successful find response from the remote shard, and then wait for the MSARS to fail
+    // when unyieding.
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return CursorResponse(
+                   NamespaceString::createNamespaceString_forTest("db.bar"), 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+    errorOnMsarsNextFuture.default_timed_get();
+
+    SessionCatalog::get(operationContext()->getServiceContext())->reset_forTest();
+}
+
 }  // namespace
 }  // namespace mongo

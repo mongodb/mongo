@@ -1616,7 +1616,10 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
 }
 
 void TransactionParticipant::Participant::unstashTransactionResources(
-    OperationContext* opCtx, const std::string& cmdName, bool forRecoveryPreparedTxnApplication) {
+    OperationContext* opCtx,
+    const std::string& cmdName,
+    bool forRecoveryPreparedTxnApplication,
+    bool forUnyield) {
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(opCtx->getTxnNumber());
 
@@ -1694,6 +1697,11 @@ void TransactionParticipant::Participant::unstashTransactionResources(
                                                    opCtx->getServiceContext()->getTickSource());
         return;
     }
+
+    uassert(9183900,
+            str::stream()
+                << "Expected to have a transaction resource stash when unyielding, but did not.",
+            !forUnyield);
 
     // If we have no transaction resources then we cannot be prepared. If we're not in progress,
     // we don't do anything else.

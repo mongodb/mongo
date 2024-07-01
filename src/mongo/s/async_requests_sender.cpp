@@ -70,6 +70,7 @@ namespace {
 const int kMaxNumFailedHostRetryAttempts = 3;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforePollResponse);
+MONGO_FAIL_POINT_DEFINE(hangAfterYield);
 
 }  // namespace
 
@@ -149,6 +150,10 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
     try {
         if (_resourceYielder) {
             _resourceYielder->yield(_opCtx);
+
+            if (MONGO_unlikely(hangAfterYield.shouldFail())) {
+                hangAfterYield.pauseWhileSet();
+            }
         }
 
         auto curOp = CurOp::get(_opCtx);
