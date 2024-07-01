@@ -196,4 +196,5 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB('admin'),
     });
 }
 
-st.stop();
+// TODO (SERVER-91380): remove skipIndexesConsistencyCheck flag.
+st.stop({skipIndexesConsistencyCheck: true});
