@@ -78,6 +78,11 @@ class test_scrub_eviction_prepare(wttest.WiredTigerTestCase):
         cursor2[1] = '10'
         session3.prepare_transaction('prepare_timestamp=10')
 
+        # Leaving a cursor open after updates can affect the release_evict cursor's
+        # behavior. It might not guarantee eviction because the open cursor pins the
+        # page in the cache. Therefore, always close the cursor explicitly before using.
+        cursor2.close()
+
         # Set the key to 2(to avoid prepare conflict if the key is set to 1) in the evict
         # cursor and evict the page which has both the keys 1 and 2.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")

@@ -25,7 +25,7 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-import os, wttest
+import os, time, wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -74,6 +74,16 @@ class test_truncate20(wttest.WiredTigerTestCase):
         evict_cursor.close()
         self.session.rollback_transaction()
 
+    def wait_for_cc_to_run(self):
+        c = self.session.open_cursor( 'statistics:')
+        cc_success = prev_cc_success = c[stat.conn.checkpoint_cleanup_success][2]
+        c.close()
+        while cc_success - prev_cc_success == 0:
+            time.sleep(0.1)
+            c = self.session.open_cursor( 'statistics:')
+            cc_success = c[stat.conn.checkpoint_cleanup_success][2]
+            c.close()
+
     @wttest.longtest('large number of rows to truncate and checkpoint')
     def test_truncate(self):
         uri = 'table:oplog'
@@ -117,7 +127,8 @@ class test_truncate20(wttest.WiredTigerTestCase):
             self.evict_cursor(uri, ds, start_num, nrows)
 
             # Take a checkpoint.
-            session2.checkpoint()
+            session2.checkpoint("debug=(checkpoint_cleanup=true)")
+            self.wait_for_cc_to_run()
 
             # Ensure the datasize is smaller than 600M
             self.assertGreater(600000000, os.path.getsize("oplog.wt"))
