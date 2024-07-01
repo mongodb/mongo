@@ -174,6 +174,17 @@ boost::filesystem::path getOngoingBackupPath() {
 
 }  // namespace
 
+std::string extractIdentFromPath(const boost::filesystem::path& dbpath,
+                                 const boost::filesystem::path& identAbsolutePath) {
+    // Remove the dbpath prefix to the identAbsolutePath.
+    boost::filesystem::path identWithExtension = boost::filesystem::relative(
+        identAbsolutePath, boost::filesystem::path(storageGlobalParams.dbpath));
+
+    // Remove the file extension and convert to generic form (i.e. replace "\" with "/"
+    // on windows, no-op on unix).
+    return boost::filesystem::change_extension(identWithExtension, "").generic_string();
+}
+
 bool WiredTigerFileVersion::shouldDowngrade(bool hasRecoveryTimestamp) {
     const auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
     if (replCoord && replCoord->getMemberState().arbiter()) {
@@ -1171,7 +1182,7 @@ public:
                 // to an entire file. Full backups cannot open an incremental cursor, even if they
                 // are the initial incremental backup.
                 const std::uint64_t length = options.incrementalBackup ? fileSize : 0;
-                auto nsAndUUID = _getNsAndUUID(filePath.stem().string());
+                auto nsAndUUID = _getNsAndUUID(filePath);
                 backupBlocks.push_back(BackupBlock(opCtx,
                                                    nsAndUUID.first,
                                                    nsAndUUID.second,
@@ -1191,7 +1202,9 @@ public:
 
 private:
     std::pair<boost::optional<NamespaceString>, boost::optional<UUID>> _getNsAndUUID(
-        const std::string& ident) const {
+        boost::filesystem::path identAbsolutePath) const {
+        std::string ident = extractIdentFromPath(
+            boost::filesystem::path(storageGlobalParams.dbpath), identAbsolutePath);
         auto it = _identsToNsAndUUID.find(ident);
         if (it == _identsToNsAndUUID.end()) {
             return std::make_pair(boost::none, boost::none);
@@ -1252,7 +1265,7 @@ private:
                         "offset"_attr = offset,
                         "size"_attr = size,
                         "type"_attr = type);
-            auto nsAndUUID = _getNsAndUUID(filePath.stem().string());
+            auto nsAndUUID = _getNsAndUUID(filePath);
             backupBlocks->push_back(BackupBlock(opCtx,
                                                 nsAndUUID.first,
                                                 nsAndUUID.second,
@@ -1265,7 +1278,7 @@ private:
         // If the file is unchanged, push a BackupBlock with offset=0 and length=0. This allows us
         // to distinguish between an unchanged file and a deleted file in an incremental backup.
         if (fileUnchangedFlag) {
-            auto nsAndUUID = _getNsAndUUID(filePath.stem().string());
+            auto nsAndUUID = _getNsAndUUID(filePath);
             backupBlocks->push_back(BackupBlock(opCtx,
                                                 nsAndUUID.first,
                                                 nsAndUUID.second,

@@ -607,6 +607,37 @@ TEST_F(WiredTigerKVEngineTest, TestOldestStableTimestampEndOfStartupRecoveryStab
         _helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(opCtxRaii.get()));
 }
 
+TEST_F(WiredTigerKVEngineTest, ExtractIdentFromPath) {
+    boost::filesystem::path dbpath = "/data/db";
+    boost::filesystem::path identAbsolutePathDefault =
+        "/data/db/collection-9-11733751379908443489.wt";
+    std::string identDefault = "collection-9-11733751379908443489";
+
+    ASSERT_EQ(extractIdentFromPath(dbpath, identAbsolutePathDefault), identDefault);
+
+    boost::filesystem::path identAbsolutePathDirectoryPerDb =
+        "/data/db/test/collection-9-11733751379908443489.wt";
+    std::string identDirectoryPerDb = "test/collection-9-11733751379908443489";
+
+    ASSERT_EQ(extractIdentFromPath(dbpath, identAbsolutePathDirectoryPerDb), identDirectoryPerDb);
+
+    boost::filesystem::path identAbsolutePathWiredTigerDirectoryForIndexes =
+        "/data/db/collection/9-11733751379908443489.wt";
+    std::string identWiredTigerDirectoryForIndexes = "collection/9-11733751379908443489";
+
+    ASSERT_EQ(extractIdentFromPath(dbpath, identAbsolutePathWiredTigerDirectoryForIndexes),
+              identWiredTigerDirectoryForIndexes);
+
+    boost::filesystem::path identAbsolutePathDirectoryPerDbAndWiredTigerDirectoryForIndexes =
+        "/data/db/test/collection/9-11733751379908443489.wt";
+    std::string identDirectoryPerDbWiredTigerDirectoryForIndexes =
+        "test/collection/9-11733751379908443489";
+
+    ASSERT_EQ(extractIdentFromPath(dbpath,
+                                   identAbsolutePathDirectoryPerDbAndWiredTigerDirectoryForIndexes),
+              identDirectoryPerDbWiredTigerDirectoryForIndexes);
+}
+
 TEST_F(WiredTigerKVEngineTest, WiredTigerDowngrade) {
     // Initializing this value to silence Coverity warning. Doesn't matter what value
     // _startupVersion is set to since shouldDowngrade() & getDowngradeString() only look at
