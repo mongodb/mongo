@@ -179,6 +179,10 @@ public:
         return _isUpdateOneWithIdWithoutShardKeyEnabled;
     }
 
+    bool isUpdateOneWithoutShardKeyEnabled() const override {
+        return _isUpdateOneWithoutShardKeyEnabled;
+    }
+
 private:
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges. Only handles queries of
@@ -195,6 +199,8 @@ private:
     bool _isTrackedTimeSeriesBucketsNamespace = false;
 
     bool _isUpdateOneWithIdWithoutShardKeyEnabled = false;
+
+    bool _isUpdateOneWithoutShardKeyEnabled = false;
 };
 
 void assertEndpointsEqual(const ShardEndpoint& endpointA, const ShardEndpoint& endpointB);
