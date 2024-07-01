@@ -48,6 +48,10 @@ build:windows --//bazel/config:compiler_type=msvc
 build:macos --cxxopt=-std=c++20
 build:windows --cxxopt=/std:c++20
 
+# EngFlow remote execution is not available on MacOS and Windows, default to local execution.
+common:macos --config=local
+common:windows --config=local
+
 # Set the windows version to win10 by default
 # TODO(SERVER-87654): We may want to add support for other Windows versions in the future.
 build:windows --cxxopt=-D_WIN32_WINNT=0x0A00
