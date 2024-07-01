@@ -12,7 +12,7 @@
  *   does_not_support_transactions,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
- *   # TODO (SERVER-88964, SERVER-89634): Enable this test
+ *   # TODO (SERVER-88964, SERVER-90971, SERVER-91702, SERVER-87931): Enable this test
  *   exclude_when_record_ids_replicated,
  *  ]
  */
