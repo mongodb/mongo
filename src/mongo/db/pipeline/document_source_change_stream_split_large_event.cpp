@@ -47,8 +47,6 @@
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_split_event_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
-#include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
-#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
@@ -209,24 +207,19 @@ size_t DocumentSourceChangeStreamSplitLargeEvent::_handleResumeAfterSplit(const 
     return fragmentNum;
 }
 
-namespace {
-// During pipeline optimization, the split stage must move ahead of these change stream stages.
-static const std::set<StringData> kStagesToMoveAheadOf = {
-    DocumentSourceChangeStreamEnsureResumeTokenPresent::kStageName,
-    DocumentSourceChangeStreamHandleTopologyChange::kStageName};
-}  // namespace
-
 Pipeline::SourceContainer::iterator DocumentSourceChangeStreamSplitLargeEvent::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     // Helper to determine whether the iterator has reached its final position in the pipeline.
     // Checks whether $changeStreamSplitLargeEvent should move ahead of the given stage.
     auto shouldMoveAheadOf = [](const auto& stagePtr) {
-        return kStagesToMoveAheadOf.count(stagePtr->getSourceName());
+        return change_stream_constants::kChangeStreamRouterPipelineStages.contains(
+            stagePtr->getSourceName());
     };
 
     // Find the point in the pipeline that the stage should move to.
-    for (auto it = itr; it != container->begin() && shouldMoveAheadOf(*std::prev(it)); --it) {
-        std::swap(*it, *std::prev(it));
+    for (auto it = itr; it != container->begin() && shouldMoveAheadOf(*std::prev(it));) {
+        // Swap 'it' with the previous stage.
+        container->splice(std::prev(it), *container, it);
     }
 
     // Return an iterator pointing to the next stage to be optimized.
@@ -237,6 +230,7 @@ void DocumentSourceChangeStreamSplitLargeEvent::validatePipelinePosition(
     bool alreadyOptimized,
     Pipeline::SourceContainer::const_iterator pos,
     const Pipeline::SourceContainer& container) const {
+
     // The $changeStreamSplitLargeEvent stage must be the final stage in the pipeline before
     // optimization.
     uassert(7182802,
@@ -249,7 +243,8 @@ void DocumentSourceChangeStreamSplitLargeEvent::validatePipelinePosition(
             str::stream() << getSourceName()
                           << " is at the wrong position in the pipeline after optimization",
             !alreadyOptimized || std::none_of(container.begin(), pos, [](const auto& stage) {
-                return kStagesToMoveAheadOf.count(stage->getSourceName());
+                return change_stream_constants::kChangeStreamRouterPipelineStages.contains(
+                    stage->getSourceName());
             }));
 };
 }  // namespace mongo

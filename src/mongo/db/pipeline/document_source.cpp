@@ -40,6 +40,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -178,52 +179,77 @@ bool groupMatchSwapVerified(const DocumentSourceMatch& nextMatch,
     return !expression::hasExistencePredicateOnPath(*(nextMatch.getMatchExpression()), "_id"_sd);
 }
 
+/**
+ * Returns 'true' if the given stage is an internal change stream stage that can appear in a router
+ * (mongoS) pipeline, or 'false' otherwise.
+ */
+bool isChangeStreamRouterPipelineStage(StringData stageName) {
+    return change_stream_constants::kChangeStreamRouterPipelineStages.contains(stageName);
+}
 }  // namespace
 
 bool DocumentSource::pushMatchBefore(Pipeline::SourceContainer::iterator itr,
                                      Pipeline::SourceContainer* container) {
-    auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
-    auto thisGroup = dynamic_cast<DocumentSourceGroup*>(this);
-    if (constraints().canSwapWithMatch && nextMatch && !nextMatch->isTextQuery() &&
-        (!thisGroup || groupMatchSwapVerified(*nextMatch, *thisGroup))) {
-        // If we reach this point we know:
-        // 1) The current stage is allowed to swap with a $match
-        // 2) The stage after us is a $match
-        // 3) The $match does not contain a text search predicate
-        // (We do not need to attempt this optimization if the $match contains a text search
-        // predicate because, in that scenario, $match is already required to be the first stage in
-        // the pipeline.)
-        auto splitMatch =
-            DocumentSourceMatch::splitMatchByModifiedFields(nextMatch, getModifiedPaths());
-        invariant(splitMatch.first || splitMatch.second);
+    if (!constraints().canSwapWithMatch) {
+        return false;
+    }
 
-        if (splitMatch.first) {
-            // If we reach this point: we know that at least part of the $match expression can be
-            // moved before this stage. So, we erase the original $match and move that independent
-            // part before this stage.
-            //
-            // If splitMatch.second is not null: the "independent part" of the $match expression was
-            // only one component of the original $match. So, we need to create a new $match stage
-            // for the remaining "dependent" component and insert it after ourselves--effectively
-            // keeping it in its original position in the pipeline.
-            LOGV2_DEBUG(
-                5943503,
+    auto nextStageAsMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
+    if (!nextStageAsMatch || nextStageAsMatch->isTextQuery()) {
+        // We do not need to attempt this optimization if the $match contains a text search
+        // predicate because, in that scenario, $match is already required to be the first stage in
+        // the pipeline.
+        return false;
+    }
+
+    // At this point:
+    // 1) The next stage after 'this' is $match.
+    // 2) The $match stage does not contain a text search predicate.
+
+    // TODO SERVER-55492: Remove the following workaround when there are rename checks for 'other'
+    // match expressions.
+    if (isChangeStreamRouterPipelineStage(this->getSourceName())) {
+        // Always move the $match stage ahead of internal change stream stages appearing in the
+        // router (mongoS) pipeline, because they do not access or modify any paths in the input
+        // document.
+        container->splice(itr, *container, std::next(itr));
+        return true;
+    }
+
+    auto thisStageAsGroup = dynamic_cast<DocumentSourceGroup*>(this);
+    if (thisStageAsGroup && !groupMatchSwapVerified(*nextStageAsMatch, *thisStageAsGroup)) {
+        return false;
+    }
+
+    auto [renameableMatchPart, nonRenameableMatchPart] =
+        DocumentSourceMatch::splitMatchByModifiedFields(nextStageAsMatch, getModifiedPaths());
+    invariant(renameableMatchPart || nonRenameableMatchPart);
+    if (!renameableMatchPart) {
+        return false;
+    }
+
+    LOGV2_DEBUG(5943503,
                 5,
                 "Swapping all or part of a $match stage in front of another stage: ",
-                "matchMovingBefore"_attr = redact(splitMatch.first->serializeToBSONForDebug()),
+                "matchMovingBefore"_attr = redact(renameableMatchPart->serializeToBSONForDebug()),
                 "thisStage"_attr = redact(serializeToBSONForDebug()),
                 "matchLeftAfter"_attr = redact(
-                    splitMatch.second ? splitMatch.second->serializeToBSONForDebug() : BSONObj()));
-            container->erase(std::next(itr));
-            container->insert(itr, std::move(splitMatch.first));
-            if (splitMatch.second) {
-                container->insert(std::next(itr), std::move(splitMatch.second));
-            }
+                    nonRenameableMatchPart ? nonRenameableMatchPart->serializeToBSONForDebug()
+                                           : BSONObj()));
 
-            return true;
-        }
+    // At this point we know that at least part of the $match expression can be moved ahead of
+    // 'this'. So, we erase the original $match and move that renameable part ahead of 'this' stage.
+    container->erase(std::next(itr));
+    container->insert(itr, std::move(renameableMatchPart));
+
+    // If 'nonRenameableMatchPart' is not null, the 'renameableMatchPart' of the $match expression
+    // was only one component of the original $match. So, we need to create a new $match stage for
+    // the remaining 'nonRenameableMatchPart' and insert it after 'this' - effectively keeping it in
+    // its original position in the pipeline.
+    if (nonRenameableMatchPart) {
+        container->insert(std::next(itr), std::move(nonRenameableMatchPart));
     }
-    return false;
+    return true;
 }
 
 bool DocumentSource::pushSampleBefore(Pipeline::SourceContainer::iterator itr,
