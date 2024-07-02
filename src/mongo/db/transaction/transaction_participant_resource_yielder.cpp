@@ -80,7 +80,11 @@ void TransactionParticipantResourceYielder::unyield(OperationContext* opCtx) {
                     opCtx, OperationContextSession::CheckInReason::kYield);
             });
 
-            txnParticipant.unstashTransactionResources(opCtx, _cmdName);
+            txnParticipant.unstashTransactionResources(
+                opCtx,
+                _cmdName,
+                false /* forRecoveryPreparedTxnApplication */,
+                true /* forUnyield */);
             releaseOnError.dismiss();
         }
     }

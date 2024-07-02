@@ -616,7 +616,8 @@ public:
          */
         void unstashTransactionResources(OperationContext* opCtx,
                                          const std::string& cmdName,
-                                         bool forRecoveryPreparedTxnApplication = false);
+                                         bool forRecoveryPreparedTxnApplication = false,
+                                         bool forUnyield = false);
 
         /**
          * Puts a transaction into a prepared state and returns the prepareTimestamp and the list of

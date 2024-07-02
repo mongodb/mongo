@@ -1046,11 +1046,6 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
             }
         }
 
-        if (opCtx->isStartingMultiDocumentTransaction()) {
-            execContext.behaviors.waitForReadConcern(
-                opCtx, _ecd->getInvocation(), execContext.getRequest());
-        }
-
         // Release the transaction lock resources and abort storage transaction for unprepared
         // transactions on failure to unstash the transaction resources to opCtx. We don't want
         // to have this error guard for beginOrContinue as it can abort the transaction for any
@@ -1063,6 +1058,11 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
                 txnParticipant.abortTransaction(opCtx);
             }
         });
+
+        if (opCtx->isStartingMultiDocumentTransaction()) {
+            execContext.behaviors.waitForReadConcern(
+                opCtx, _ecd->getInvocation(), execContext.getRequest());
+        }
 
         txnParticipant.unstashTransactionResources(opCtx, invocation->definition()->getName());
 
