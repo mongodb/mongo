@@ -525,7 +525,8 @@ buildvariants:
   - name: config_fuzzer_jsCore
   - name: .causally_consistent !.sharding
   - name: .change_streams
-  - name: .change_stream_fuzzer
+  # TODO SERVER-82766: change_stream fuzzers had been timing out on TSAN builds.
+  # - name: .change_stream_fuzzer
   - name: .misc_js
   - name: .concurrency !.large !.no_txns !.feature_flag_guarded
   - name: .concurrency .large !.no_txns !.feature_flag_guarded
