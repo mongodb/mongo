@@ -1,7 +1,7 @@
 /**
  * Test that queryStats works properly for a find command that uses agg expressions and produces the
  * proper query shape without issues during re-parsing.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_60]
  */
 load("jstests/libs/query_stats_utils.js");  // For getQueryStats and resetQueryStatsStore.
 

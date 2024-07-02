@@ -1,7 +1,7 @@
 /**
  * This test confirms that query stats store key fields for a find command are properly nested and
  * none are missing.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_60]
  */
 load("jstests/libs/query_stats_utils.js");  // For runCommandAndValidateQueryStats and
                                             // withQueryStatsEnabled and getLatestQueryStatsEntry

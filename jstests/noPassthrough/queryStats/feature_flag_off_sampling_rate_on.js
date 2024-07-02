@@ -10,20 +10,10 @@ load("jstests/libs/feature_flag_util.js");
 
 // Set sampling rate to -1.
 let options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
+    setParameter: {internalQueryStatsRateLimit: -1, featureFlagQueryStats: false},
 };
 const conn = MongoRunner.runMongod(options);
 const testdb = conn.getDB('test');
-
-// This test specifically tests error handling when the feature flag is not on.
-// TODO SERVER-65800 This test can be deleted when the feature is on by default.
-if (!conn || FeatureFlagUtil.isEnabled(testdb, "QueryStats")) {
-    jsTestLog(`Skipping test since feature flag is enabled. conn: ${conn}`);
-    if (conn) {
-        MongoRunner.stopMongod(conn);
-    }
-    return;
-}
 
 var coll = testdb[jsTestName()];
 coll.drop();

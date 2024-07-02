@@ -155,7 +155,8 @@ feature_flags:
     featureFlagQueryStats:
       description: "Feature flag for enabling full queryStats collection."
       cpp_varname: gFeatureFlagQueryStats
-      default: false
+      default: true
+      version: 6.0
 
     featureFlagShardedSearchCustomSort:
       description: "Feature flag to enable user specified sort for sharded $search queries."

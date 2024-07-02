@@ -1,6 +1,6 @@
 /**
  * Test the $queryStats hmac properties.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_60]
  */
 
 load("jstests/aggregation/extras/utils.js");  // For assertAdminDBErrCodeAndErrMsgContains.
@@ -105,7 +105,6 @@ function runTest(conn) {
 const conn = MongoRunner.runMongod({
     setParameter: {
         internalQueryStatsRateLimit: -1,
-        featureFlagQueryStats: true,
     }
 });
 runTest(conn);

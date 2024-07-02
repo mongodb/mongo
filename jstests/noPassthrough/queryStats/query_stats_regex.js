@@ -1,6 +1,6 @@
 /**
  * Test that queryStats works properly for a find command that uses regex.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 "use strict";

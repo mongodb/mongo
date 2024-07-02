@@ -1,6 +1,6 @@
 /**
  * Test that applicationName and namespace appear in queryStats for the find command.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_60]
  */
 load("jstests/libs/query_stats_utils.js");
 (function() {

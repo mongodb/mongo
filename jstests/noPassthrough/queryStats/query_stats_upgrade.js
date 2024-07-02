@@ -1,6 +1,6 @@
 /**
  * Test that query stats doesn't work on a lower FCV version but works after an FCV upgrade.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_60]
  */
 load('jstests/libs/analyze_plan.js');
 load("jstests/libs/feature_flag_util.js");

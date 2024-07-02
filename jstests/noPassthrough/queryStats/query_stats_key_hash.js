@@ -1,7 +1,7 @@
 /**
  * This test confirms that the hash generated alongside query stats entries is unique and stable
  * across restarts.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

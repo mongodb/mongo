@@ -60,7 +60,6 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
 
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
     auto& opDebug = CurOp::get(*opCtx)->debug();
     ASSERT_EQ(opDebug.queryStatsInfo.wasRateLimited, false);
 
@@ -96,7 +95,6 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
     // This test simulates an observed bug where an opCtx is used for two requests, and between the
     // first and the second the query stats store is emptied/disabled.
 
-    RAIIServerParameterControllerForTest queryStatsFeatureFlag{"featureFlagQueryStats", true};
     // Make query for query stats.
     const NamespaceString nss = NamespaceString("testDB.testColl");
     FindCommandRequest fcr((NamespaceStringOrUUID(nss)));
