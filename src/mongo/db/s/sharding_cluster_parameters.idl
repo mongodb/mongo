@@ -109,4 +109,4 @@ server_parameters:
       cpp_varname: configServerReadPreferenceForCatalogQueries
       redact: false
       condition:
-        min_fcv: 8.1
+        min_fcv: 8.0
