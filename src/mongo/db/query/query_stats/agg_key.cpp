@@ -63,6 +63,7 @@ AggCmdComponents::AggCmdComponents(const AggregateCommandRequest& request_,
     _hasField.batchSize = request_.getCursor().getBatchSize().has_value();
     _hasField.bypassDocumentValidation = request_.getBypassDocumentValidation().has_value();
     _hasField.explain = request_.getExplain().has_value();
+    _hasField.passthroughToShard = request_.getPassthroughToShard().has_value();
 }
 
 
@@ -77,7 +78,8 @@ void AggCmdComponents::HashValue(absl::HashState state) const {
                                      _hasField.batchSize,
                                      _hasField.bypassDocumentValidation,
                                      verbosity,
-                                     _hasField.explain);
+                                     _hasField.explain,
+                                     _hasField.passthroughToShard);
     // We don't need to add 'involvedNamespaces' here since they are already tracked/duplicated in
     // the Pipeline component of the query shape. We just expose them here for ease of
     // analysis/querying.
@@ -121,6 +123,23 @@ void AggCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions&
         // flag {explain: true} it is set to 'queryPlanner'.
         bob.append(AggregateCommandRequest::kExplainFieldName,
                    ExplainOptions::verbosityString(_verbosity.value()));
+    }
+
+    // The values here don't matter (assuming we're not using the 'kUnchanged' policy).
+    tassert(8949601,
+            "Serialization policy not supported - original values have been discarded",
+            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
+    if (_hasField.passthroughToShard) {
+        BSONObjBuilder passthroughToShardInfo =
+            bob.subobjStart(AggregateCommandRequest::kPassthroughToShardFieldName);
+        static const PassthroughToShardOptions representativePassthroughOptions = []() {
+            PassthroughToShardOptions passthroughOpts;
+            // The value doesn't matter since we will only use this for shapified output.
+            passthroughOpts.setShard("?");
+            return passthroughOpts;
+        }();
+        representativePassthroughOptions.serialize(&passthroughToShardInfo, opts);
+        passthroughToShardInfo.doneFast();
     }
 }
 

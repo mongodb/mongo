@@ -10,50 +10,22 @@ load("jstests/libs/query_stats_utils.js");         // For getLatestQueryStatsEnt
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 
-// Make sure to  only call this function while waiting for one new document or set batchSize of the
-// input cursor to 1, so each hasNext() call will correspond to an internal getMore.
-function getNumberOfGetMoresUntilNextDoc(cursor) {
-    let numGetMores = 0;
-    assert.soon(() => {
-        numGetMores++;
-        return cursor.hasNext();
-    });
-
-    // Get the document that is on the cursor to reset the cursor to a state where calling hasNext()
-    // corresponds to a getMore.
-    cursor.next();
-    return numGetMores;
-}
-
-function checkChangeStreamEntry({queryStatsEntry, db, collectionName, numExecs, numDocsReturned}) {
-    assert.eq(collectionName, queryStatsEntry.key.queryShape.cmdNs.coll);
-
-    // Confirm entry is a change stream request.
-    let stringifiedPipeline = JSON.stringify(queryStatsEntry.key.queryShape.pipeline, null, 0);
-    assert(stringifiedPipeline.includes("_internalChangeStream"));
-
-    // TODO SERVER-76263 Support reporting 'collectionType' on a sharded cluster.
-    if (!FixtureHelpers.isMongos(db)) {
-        assert.eq("changeStream", queryStatsEntry.key.collectionType);
-    }
-
-    // Checking that metrics match expected metrics.
-    assert.eq(queryStatsEntry.metrics.execCount, numExecs);
-    assert.eq(queryStatsEntry.metrics.docsReturned.sum, numDocsReturned);
-
-    // FirstResponseExecMicros and TotalExecMicros match since each getMore is recorded as a new
-    // first response.
-    assert.eq(queryStatsEntry.metrics.totalExecMicros.sum,
-              queryStatsEntry.metrics.firstResponseExecMicros.sum);
-    assert.eq(queryStatsEntry.metrics.totalExecMicros.max,
-              queryStatsEntry.metrics.firstResponseExecMicros.max);
-    assert.eq(queryStatsEntry.metrics.totalExecMicros.min,
-              queryStatsEntry.metrics.firstResponseExecMicros.min);
-}
-
 function testCollectionChangeStream(conn) {
     const db = conn.getDB("test");
     assertDropAndRecreateCollection(db, "coll");
+
+    // Check change stream explain is recorded.
+    assert.commandWorked(
+        db.coll.explain({"verbosity": "queryPlanner"}).aggregate([{"$changeStream": {}}]));
+    let queryStatsEntry = getLatestQueryStatsEntry(db);
+    checkChangeStreamEntry({
+        queryStatsEntry: queryStatsEntry,
+        db: db,
+        collectionName: "coll",
+        numExecs: 1,
+        numDocsReturned: 0
+    });
+    assert(queryStatsEntry.key.hasOwnProperty("explain"));
 
     // Check creation of change stream cursor is recorded.
     let cursor = db.coll.watch([], {batchSize: 1});
@@ -72,7 +44,7 @@ function testCollectionChangeStream(conn) {
     // Insert document into a collection and make sure retrieving the information updates the query
     // stats entry.
     assert.commandWorked(db.coll.insert({_id: 0, a: 1}));
-    numExecs += getNumberOfGetMoresUntilNextDoc(cursor);
+    numExecs += getNumberOfGetMoresUntilNextDocForChangeStream(cursor);
     numDocsReturned++;
 
     checkChangeStreamEntry({
@@ -86,7 +58,7 @@ function testCollectionChangeStream(conn) {
     // Close cursor and check that it updates query stats entry.
     cursor.close();
     numExecs++;
-    let queryStatsEntry = getLatestQueryStatsEntry(db);
+    queryStatsEntry = getLatestQueryStatsEntry(db);
     checkChangeStreamEntry({
         queryStatsEntry: queryStatsEntry,
         db: db,
@@ -119,7 +91,7 @@ function testDatabaseChangeStream(conn) {
     // Insert document into a collection and make sure retrieving the information updates the query
     // stats entry.
     assert.commandWorked(db.coll1.insert({_id: 1, a: 2}));
-    numExecs += getNumberOfGetMoresUntilNextDoc(wholeDBCursor);
+    numExecs += getNumberOfGetMoresUntilNextDocForChangeStream(wholeDBCursor);
     numDocsReturned++;
 
     checkChangeStreamEntry({
@@ -133,7 +105,7 @@ function testDatabaseChangeStream(conn) {
     // Insert document into a different collection and make sure retrieving the information updates
     // the query stats entry.
     assert.commandWorked(db.coll2.insert({_id: 1, a: 2}));
-    numExecs += getNumberOfGetMoresUntilNextDoc(wholeDBCursor);
+    numExecs += getNumberOfGetMoresUntilNextDocForChangeStream(wholeDBCursor);
     numDocsReturned++;
     checkChangeStreamEntry({
         queryStatsEntry: getLatestQueryStatsEntry(db),
@@ -181,7 +153,7 @@ function testWholeClusterChangeStream(conn) {
     // Insert document into a database and make sure retrieving the information updates the query
     // stats entry.
     assert.commandWorked(dbA.collA.insert({_id: 1, a: 2}));
-    numExecs += getNumberOfGetMoresUntilNextDoc(wholeClusterCursor);
+    numExecs += getNumberOfGetMoresUntilNextDocForChangeStream(wholeClusterCursor);
     numDocsReturned++;
 
     checkChangeStreamEntry({
@@ -195,7 +167,7 @@ function testWholeClusterChangeStream(conn) {
     // Insert document into different database and make sure retrieving the information updates the
     // query stats entry.
     assert.commandWorked(dbB.collB.insert({_id: 1, a: 2}));
-    numExecs += getNumberOfGetMoresUntilNextDoc(wholeClusterCursor);
+    numExecs += getNumberOfGetMoresUntilNextDocForChangeStream(wholeClusterCursor);
     numDocsReturned++;
 
     checkChangeStreamEntry({

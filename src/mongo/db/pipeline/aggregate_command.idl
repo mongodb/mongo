@@ -66,11 +66,13 @@ types:
 structs:
     PassthroughToShardOptions:
         description: "options for commands requesting a per shard cursor"
+        query_shape_component: true
         fields:
             shard:
                 description: "id of the shard to passthrough to"
                 type: string
                 unstable: true
+                query_shape: anonymize
 
 commands:
     aggregate:
