@@ -22,7 +22,7 @@ adminSA.runCommand({shardCollection: ns, key: {_id: 1}});
 try {
     s.stopBalancer();
 } catch (e) {
-    print("coundn't stop balancer via command");
+    print("couldn't stop balancer via command");
 }
 
 adminSA.settings.update({_id: 'balancer'}, {$set: {stopped: true}});

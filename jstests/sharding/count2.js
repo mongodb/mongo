@@ -34,7 +34,7 @@ s1.adminCommand({
 
 assert.eq(3, db1.count({name: {$gte: "aaa", $lt: "ddd"}}), "post count mongos1");
 
-// The second mongos still thinks its shard mapping is valid and accepts a cound
+// The second mongos still thinks its shard mapping is valid and accepts a count
 print("before sleep: " + Date());
 sleep(2000);
 print("after  sleep: " + Date());
