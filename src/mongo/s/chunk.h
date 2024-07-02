@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
@@ -92,7 +93,7 @@ public:
     }
 
     bool isJumbo() const {
-        return _jumbo;
+        return _jumbo.load();
     }
 
     /**
@@ -132,7 +133,7 @@ private:
 
     // Indicates whether this chunk should be treated as jumbo and not attempted to be moved or
     // split
-    mutable bool _jumbo;
+    AtomicWord<bool> _jumbo;
 
     // Used for tracking writes to this chunk, to estimate its size for the autosplitter. Since
     // ChunkInfo objects are always treated as const, and this contains metadata about the chunk
