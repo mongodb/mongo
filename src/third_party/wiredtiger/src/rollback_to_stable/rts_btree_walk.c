@@ -125,22 +125,26 @@ __rts_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
     WT_REF *ref;
     WT_TIMER timer;
     uint64_t msg_count;
+    uint32_t flags;
 
     __wt_timer_start(session, &timer);
+    flags = WT_READ_NO_EVICT | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED | WT_READ_SEE_DELETED;
     msg_count = 0;
 
     /* Walk the tree, marking commits aborted where appropriate. */
     ref = NULL;
-    while (
-      (ret = __wt_tree_walk_custom_skip(session, &ref, __rts_btree_walk_page_skip,
-         &rollback_timestamp,
-         WT_READ_NO_EVICT | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED | WT_READ_SEE_DELETED)) == 0 &&
+    while ((ret = __wt_tree_walk_custom_skip(
+              session, &ref, __rts_btree_walk_page_skip, &rollback_timestamp, flags)) == 0 &&
       ref != NULL) {
         __wti_rts_progress_msg(session, &timer, 0, 0, &msg_count, true);
 
         if (F_ISSET(ref, WT_REF_FLAG_LEAF))
-            WT_RET(__wti_rts_btree_abort_updates(session, ref, rollback_timestamp));
+            WT_ERR(__wti_rts_btree_abort_updates(session, ref, rollback_timestamp));
     }
+
+err:
+    /* On error, clear any left-over tree walk. */
+    WT_TRET(__wt_page_release(session, ref, flags));
     return (ret);
 }
 

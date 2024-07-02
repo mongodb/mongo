@@ -69,8 +69,8 @@ __row_insert_alloc(WT_SESSION_IMPL *session, const WT_ITEM *key, u_int skipdepth
  *     Row-store insert, update and delete.
  */
 int
-__wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, WT_UPDATE *upd_arg,
-  u_int modify_type, bool exclusive, bool restore)
+__wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
+  WT_UPDATE **updp_arg, u_int modify_type, bool exclusive, bool restore)
 {
     WT_DECL_RET;
     WT_INSERT *ins;
@@ -78,7 +78,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
     WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
     WT_SESSION_IMPL *session;
-    WT_UPDATE *last_upd, *old_upd, *upd, **upd_entry;
+    WT_UPDATE *last_upd, *old_upd, *upd, *upd_arg, **upd_entry;
     wt_timestamp_t prev_upd_ts;
     size_t ins_size, upd_size;
     uint32_t ins_slot;
@@ -89,6 +89,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
     page = cbt->ref->page;
     session = CUR2S(cbt);
     last_upd = NULL;
+    upd_arg = updp_arg == NULL ? NULL : *updp_arg;
     upd = upd_arg;
     prev_upd_ts = WT_TS_NONE;
     added_to_txn = inserted_to_update_chain = false;
@@ -327,6 +328,13 @@ err:
             if (last_upd != NULL)
                 last_upd->next = NULL;
         }
+
+        /*
+         * If upd was freed or if we know that its ownership was moved to a page, set the update
+         * argument to NULL to prevent future use by the caller.
+         */
+        if (upd == NULL && updp_arg != NULL)
+            *updp_arg = NULL;
     }
 
     return (ret);
