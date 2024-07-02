@@ -529,10 +529,7 @@ var ShardingTest = function ShardingTest(params) {
     ShardingTest.prototype.stop = function(opts = {}) {
         this.checkMetadataConsistency();
         this.checkUUIDsConsistentAcrossCluster();
-        // TODO (SERVER-91380): run this.checkIndexesConsistentAcrossCluster() unconditionally.
-        if (!opts.skipIndexesConsistencyCheck) {
-            this.checkIndexesConsistentAcrossCluster();
-        }
+        this.checkIndexesConsistentAcrossCluster();
         this.checkOrphansAreDeleted();
         this.checkRoutingTableConsistency();
         this.checkShardFilteringMetadata();
