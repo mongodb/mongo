@@ -204,6 +204,14 @@ public:
     }
 
     /**
+     * Returns true if this stage should make the aggregation command exempt from ingress admission
+     * control.
+     */
+    virtual bool isExemptFromIngressAdmissionControl() const {
+        return false;
+    }
+
+    /**
      * Returns true if this stage require knowledge of the collection default collation at parse
      * time, false otherwise. This is useful to know as it could save a network request to discern
      * the collation.
@@ -346,6 +354,8 @@ public:
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final;
 
     void getForeignExecutionNamespaces(stdx::unordered_set<NamespaceString>& nssSet) const override;
+
+    bool isExemptFromIngressAdmissionControl() const override;
 
     Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const override;

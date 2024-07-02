@@ -11,8 +11,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
  * Find one specific command in current ops, by its comment
  */
 function findCurOpByComment(db, comment) {
-    const res = assert.commandWorked(db.adminCommand({currentOp: 1}));
-    const ops = res["inprog"].filter((op) => op["command"]["comment"] == comment);
+    const ops = db.currentOp({"command.comment": comment}).inprog;
     if (ops.length == 0) {
         return null;
     }
@@ -82,7 +81,7 @@ function testCurrentOp(conn, db, collName) {
 
     // confirm that our operation is no longer waiting for ingress admission
     assert.soon(() => {
-        const op = findCurOpByComment(conn, kComment);
+        const op = findCurOpByComment(db, kComment);
         if (op == null) {
             return false;
         }
