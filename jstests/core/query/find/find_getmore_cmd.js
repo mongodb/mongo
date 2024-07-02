@@ -41,9 +41,11 @@ assert.commandFailed(cmdRes);
 // Find command with limit.
 cmdRes = db.runCommand({find: collName, limit: kLimit});
 assert.commandWorked(cmdRes);
-assert.eq(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
 assert.eq(cmdRes.cursor.firstBatch.length, kLimit);
+if (kLimit < findCommandBatchSize) {
+    assert.eq(cmdRes.cursor.id, NumberLong(0));
+}
 
 // Find command with positive batchSize followed by getMore command with positive batchSize.
 cmdRes = db.runCommand({find: collName, batchSize: 10});
