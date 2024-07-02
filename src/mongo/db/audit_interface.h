@@ -49,6 +49,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/audit_format.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
@@ -401,7 +402,9 @@ public:
                               const std::vector<Status>& errors,
                               const std::string& suffix) const = 0;
 
-    virtual void logConfigEvent(Client* client, const AuditConfigDocument& config) const = 0;
+    virtual void logConfigEvent(Client* client,
+                                const AuditConfigDocument& config,
+                                AuditConfigFormat formatIfPrevConfigNotSet) const = 0;
 
 
     /**
@@ -648,7 +651,9 @@ public:
                       const std::vector<Status>& errors,
                       const std::string& suffix) const override{};
 
-    void logConfigEvent(Client* client, const AuditConfigDocument& config) const override{};
+    void logConfigEvent(Client* client,
+                        const AuditConfigDocument& config,
+                        AuditConfigFormat formatIfPrevConfigNotSet) const override{};
 };
 
 }  // namespace audit
