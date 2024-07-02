@@ -960,14 +960,24 @@ Status ShardingCatalogManager::_updateClusterCardinalityParameter(const Lock::Ex
     configsvrSetClusterParameter.setDbName(DatabaseName::kAdmin);
 
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    const auto cmdResponse = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin,
-        configsvrSetClusterParameter.toBSON(),
-        Shard::RetryPolicy::kIdempotent);
 
-    return Shard::CommandResponse::getEffectiveStatus(cmdResponse);
+    while (true) {
+        try {
+            const auto cmdResponse =
+                shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+                    opCtx,
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                    DatabaseName::kAdmin,
+                    configsvrSetClusterParameter.toBSON(),
+                    Shard::RetryPolicy::kIdempotent);
+            return Shard::CommandResponse::getEffectiveStatus(cmdResponse);
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
+            // Retry on ErrorCodes::ConflictingOperationInProgress errors,
+            // which can be caused by another ConfigsvrCoordinator runnning concurrently.
+            opCtx->sleepFor(Milliseconds(500));
+            continue;
+        }
+    }
 }
 
 Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterAddShardIfNeeded(
