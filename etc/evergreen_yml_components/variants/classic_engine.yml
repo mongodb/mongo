@@ -60,6 +60,7 @@ buildvariants:
     max_sub_suites: 5
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --excludeWithAnyTags=requires_latch_analyzer
     large_distro_name: rhel80-medium
   depends_on:
   - name: archive_dist_test_debug
@@ -174,7 +175,7 @@ buildvariants:
     compile_variant: *rhel80-debug-asan-classic-engine
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-      --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits
+      --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
@@ -255,7 +256,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-      --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
+      --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
