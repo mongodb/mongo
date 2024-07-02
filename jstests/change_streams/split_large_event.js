@@ -283,3 +283,39 @@ for (const postImageMode of ["required", "updateLookup"]) {
         () => testColl.watch([], {resumeAfter: resumeTokens[resumeTokens.length - 2]}),
         ErrorCodes.ChangeStreamFatalError);
 }
+
+{
+    // Get a resume token from a real event as opposed to a post-batch resume token.
+    const csCursor1 = testColl.watch([]);
+    assert.commandWorked(testColl.insertOne({_id: "ccc"}));
+    assert.soon(() => csCursor1.hasNext());
+    const eventResumeToken = csCursor1.next()._id;
+    csCursor1.close();
+
+    // Test that $changeStreamSplitLargeEvent works correctly in the presence of a $match stage that
+    // cannot be pushed down (moved ahead of other stages).
+    const csCursor2 = testColl.watch(
+        [
+            {
+                // $jsonSchema expressions with nested properties belong to expression category
+                // 'other' and therefore will block its $match stage from moving ahead of other
+                // stages, unless those are the internal change stream stages allowed in the router
+                // (mongoS) pipeline.
+                // TODO SERVER-55492: Update the comment above when there are rename checks for
+                // 'other' match expressions.
+                $match:
+                    {$jsonSchema: {properties: {fullDocument: {properties: {a: {type: "number"}}}}}}
+            },
+            {$changeStreamSplitLargeEvent: {}}
+        ],
+        {resumeAfter: eventResumeToken});
+
+    // Assert the change stream pipeline works and can produce events.
+    assert.commandWorked(testColl.insertOne({_id: "ddd", a: 42}));
+    assert.soon(() => csCursor2.hasNext());
+    const event = csCursor2.next();
+    assert.eq("ddd", event.documentKey._id);
+    assert.eq(42, event.fullDocument.a);
+
+    csCursor2.close();
+}
