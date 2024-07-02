@@ -42,11 +42,7 @@ typedef struct _bson_writer_t bson_writer_t;
 
 
 BSON_EXPORT (bson_writer_t *)
-bson_writer_new (uint8_t **buf,
-                 size_t *buflen,
-                 size_t offset,
-                 bson_realloc_func realloc_func,
-                 void *realloc_func_ctx);
+bson_writer_new (uint8_t **buf, size_t *buflen, size_t offset, bson_realloc_func realloc_func, void *realloc_func_ctx);
 BSON_EXPORT (void)
 bson_writer_destroy (bson_writer_t *writer);
 BSON_EXPORT (size_t)

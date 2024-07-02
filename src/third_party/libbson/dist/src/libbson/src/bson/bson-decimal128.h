@@ -54,9 +54,7 @@ BSON_EXPORT (bool)
 bson_decimal128_from_string (const char *string, bson_decimal128_t *dec);
 
 BSON_EXPORT (bool)
-bson_decimal128_from_string_w_len (const char *string,
-                                   int len,
-                                   bson_decimal128_t *dec);
+bson_decimal128_from_string_w_len (const char *string, int len, bson_decimal128_t *dec);
 
 BSON_END_DECLS
 

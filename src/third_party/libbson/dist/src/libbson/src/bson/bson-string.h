@@ -48,8 +48,7 @@ bson_string_append_c (bson_string_t *string, char str);
 BSON_EXPORT (void)
 bson_string_append_unichar (bson_string_t *string, bson_unichar_t unichar);
 BSON_EXPORT (void)
-bson_string_append_printf (bson_string_t *string, const char *format, ...)
-   BSON_GNUC_PRINTF (2, 3);
+bson_string_append_printf (bson_string_t *string, const char *format, ...) BSON_GNUC_PRINTF (2, 3);
 BSON_EXPORT (void)
 bson_string_truncate (bson_string_t *string, uint32_t len);
 BSON_EXPORT (char *)
@@ -63,11 +62,9 @@ bson_strndup (const char *str, size_t n_bytes);
 BSON_EXPORT (void)
 bson_strncpy (char *dst, const char *src, size_t size);
 BSON_EXPORT (int)
-bson_vsnprintf (char *str, size_t size, const char *format, va_list ap)
-   BSON_GNUC_PRINTF (3, 0);
+bson_vsnprintf (char *str, size_t size, const char *format, va_list ap) BSON_GNUC_PRINTF (3, 0);
 BSON_EXPORT (int)
-bson_snprintf (char *str, size_t size, const char *format, ...)
-   BSON_GNUC_PRINTF (3, 4);
+bson_snprintf (char *str, size_t size, const char *format, ...) BSON_GNUC_PRINTF (3, 4);
 BSON_EXPORT (void)
 bson_strfreev (char **strv);
 BSON_EXPORT (size_t)

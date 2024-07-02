@@ -62,21 +62,15 @@ bson_json_opts_new (bson_json_mode_t mode, int32_t max_len);
 BSON_EXPORT (void)
 bson_json_opts_destroy (bson_json_opts_t *opts);
 BSON_EXPORT (void)
-bson_json_opts_set_outermost_array (bson_json_opts_t *opts,
-                                    bool is_outermost_array);
+bson_json_opts_set_outermost_array (bson_json_opts_t *opts, bool is_outermost_array);
 
-typedef ssize_t (*bson_json_reader_cb) (void *handle,
-                                        uint8_t *buf,
-                                        size_t count);
+typedef ssize_t (*bson_json_reader_cb) (void *handle, uint8_t *buf, size_t count);
 typedef void (*bson_json_destroy_cb) (void *handle);
 
 
 BSON_EXPORT (bson_json_reader_t *)
-bson_json_reader_new (void *data,
-                      bson_json_reader_cb cb,
-                      bson_json_destroy_cb dcb,
-                      bool allow_multiple,
-                      size_t buf_size);
+bson_json_reader_new (
+   void *data, bson_json_reader_cb cb, bson_json_destroy_cb dcb, bool allow_multiple, size_t buf_size);
 BSON_EXPORT (bson_json_reader_t *)
 bson_json_reader_new_from_fd (int fd, bool close_on_destroy);
 BSON_EXPORT (bson_json_reader_t *)
@@ -84,15 +78,11 @@ bson_json_reader_new_from_file (const char *filename, bson_error_t *error);
 BSON_EXPORT (void)
 bson_json_reader_destroy (bson_json_reader_t *reader);
 BSON_EXPORT (int)
-bson_json_reader_read (bson_json_reader_t *reader,
-                       bson_t *bson,
-                       bson_error_t *error);
+bson_json_reader_read (bson_json_reader_t *reader, bson_t *bson, bson_error_t *error);
 BSON_EXPORT (bson_json_reader_t *)
 bson_json_data_reader_new (bool allow_multiple, size_t size);
 BSON_EXPORT (void)
-bson_json_data_reader_ingest (bson_json_reader_t *reader,
-                              const uint8_t *data,
-                              size_t len);
+bson_json_data_reader_ingest (bson_json_reader_t *reader, const uint8_t *data, size_t len);
 
 
 BSON_END_DECLS
