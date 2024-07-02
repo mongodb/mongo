@@ -862,7 +862,9 @@ public:
             auto getNumTxnOps = [opCtx]() -> boost::optional<size_t> {
                 if (opCtx->inMultiDocumentTransaction()) {
                     auto participant = TransactionParticipant::get(opCtx);
-                    return participant.getTransactionOperationsForTest().size();
+                    if (participant) {
+                        return participant.getTransactionOperationsCount();
+                    }
                 }
                 return boost::optional<size_t>{};
             };

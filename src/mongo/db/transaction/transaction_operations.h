@@ -274,6 +274,11 @@ public:
      */
     std::vector<TransactionOperation> getOperationsForTest() const;
 
+    /**
+     * Returns number of operations.
+     */
+    size_t getOperationsCount() const;
+
 private:
     std::vector<TransactionOperation> _transactionOperations;
 

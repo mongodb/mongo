@@ -402,4 +402,8 @@ TransactionOperations::getOperationsForTest() const {
     return _transactionOperations;
 }
 
+size_t TransactionOperations::getOperationsCount() const {
+    return _transactionOperations.size();
+}
+
 }  // namespace mongo
