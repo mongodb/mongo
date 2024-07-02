@@ -298,11 +298,11 @@ OID AuthorizationManagerImpl::getCacheGeneration() {
 }
 
 void AuthorizationManagerImpl::setAuthEnabled(bool enabled) {
-    _authEnabled = enabled;
+    _authEnabled.storeRelaxed(enabled);
 }
 
 bool AuthorizationManagerImpl::isAuthEnabled() const {
-    return _authEnabled;
+    return _authEnabled.loadRelaxed();
 }
 
 bool AuthorizationManagerImpl::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
