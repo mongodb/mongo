@@ -164,6 +164,41 @@ executor::RemoteCommandRequest getRemoteCommandRequest(OperationContext* opCtx,
     rcr.sslMode = transport::ConnectSSLMode::kDisableSSL;
     return rcr;
 }
+// TODO SERVER-91594 makeTaskExecutorCursorForExplain() can be removed when mongot will always
+// return a cursor.
+std::unique_ptr<executor::TaskExecutorCursor> makeTaskExecutorCursorForExplain(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const executor::RemoteCommandRequest& command,
+    std::shared_ptr<executor::TaskExecutor> taskExecutor,
+    std::unique_ptr<executor::TaskExecutorCursorGetMoreStrategy> getMoreStrategy,
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
+    auto response =
+        runSearchCommandWithRetries(expCtx, command.cmdObj, makeRetryOnNetworkErrorPolicy());
+    auto responseData = response.data;
+    // We may query a version of mongot that only returns the explain object. Since creating a
+    // TaskExecutorCursor (TEC) with no cursor will error, we manually create a dummy cursor to
+    // create the TEC here.
+    if (responseData[CursorInitialReply::kCursorFieldName].type() != BSONType::Object) {
+        auto nss = expCtx->ns;
+        auto cursorBSON =
+            BSON(AnyCursor::kCursorIdFieldName
+                 << CursorId(0) << AnyCursor::kNsFieldName
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+                 << AnyCursor::kFirstBatchFieldName << BSONArray());
+        BSONObjBuilder cursorBuilder(std::move(responseData));
+        cursorBuilder << CursorInitialReply::kCursorFieldName << cursorBSON;
+        responseData = cursorBuilder.obj();
+    }
+    auto cursorResponse = CursorResponse::parseFromBSON(std::move(responseData));
+    executor::TaskExecutorCursorOptions options = {std::move(getMoreStrategy),
+                                                   std::move(yieldPolicy)};
+    return std::make_unique<executor::TaskExecutorCursor>(
+        taskExecutor,
+        nullptr,
+        uassertStatusOK(std::move(cursorResponse)),
+        command,
+        std::move(options));
+}
 
 std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -172,14 +207,25 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     std::unique_ptr<executor::TaskExecutorCursorGetMoreStrategy> getMoreStrategy,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
     std::vector<std::unique_ptr<executor::TaskExecutorCursor>> cursors;
-    auto initialCursor =
-        makeTaskExecutorCursor(expCtx->opCtx,
-                               taskExecutor,
-                               command,
-                               {std::move(getMoreStrategy), std::move(yieldPolicy)},
-                               makeRetryOnNetworkErrorPolicy());
 
-    auto additionalCursors = initialCursor->releaseAdditionalCursors();
+    std::unique_ptr<executor::TaskExecutorCursor> initialCursor;
+    std::vector<std::unique_ptr<executor::TaskExecutorCursor>> additionalCursors;
+
+    if (expCtx->explain) {
+        tassert(8431800,
+                "Sharded $search queries should not establishCursors() for explain.",
+                !expCtx->needsMerge);
+        initialCursor = makeTaskExecutorCursorForExplain(
+            expCtx, command, taskExecutor, std::move(getMoreStrategy), std::move(yieldPolicy));
+
+    } else {
+        initialCursor = makeTaskExecutorCursor(expCtx->opCtx,
+                                               taskExecutor,
+                                               command,
+                                               {std::move(getMoreStrategy), std::move(yieldPolicy)},
+                                               makeRetryOnNetworkErrorPolicy());
+        additionalCursors = initialCursor->releaseAdditionalCursors();
+    }
     cursors.push_back(std::move(initialCursor));
     // Preserve cursor order. Expect cursors to be labeled, so this may not be necessary.
     for (auto& thisCursor : additionalCursors) {

@@ -140,8 +140,7 @@ const expectedMongotCommand = mongotCommandForVectorSearchQuery(
             response: mongotResponseForBatch(constructMongotResponseBatchForIds(shard1Ids, 30, 70),
                                              cursorId,
                                              collNS,
-                                             responseOk,
-                                             true),
+                                             responseOk),
         },
         {
             expectedCommand: {getMore: cursorId, collection: collName},

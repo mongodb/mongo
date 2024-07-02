@@ -79,7 +79,7 @@ TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> e
 TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
                                        std::shared_ptr<executor::TaskExecutor> underlyingExec,
                                        CursorResponse&& response,
-                                       RemoteCommandRequest& rcr,
+                                       const RemoteCommandRequest& rcr,
                                        TaskExecutorCursorOptions&& options)
     : _executor(std::move(executor)),
       _underlyingExecutor(std::move(underlyingExec)),
@@ -115,6 +115,9 @@ TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other) noexcept
     }
     if (other._cursorType) {
         _cursorType = other._cursorType;
+    }
+    if (other._cursorExplain) {
+        _cursorExplain = other._cursorExplain->getOwned();
     }
     // Other is no longer responsible for this cursor id.
     other._cursorId = 0;
@@ -262,6 +265,7 @@ void TaskExecutorCursor::_processResponse(OperationContext* opCtx, CursorRespons
     }
 
     _cursorId = response.getCursorId();
+    _cursorExplain = response.getExplain();
     _batch = response.releaseBatch();
     _batchIter = _batch.begin();
     _totalNumDocsReceived += _batch.size();

@@ -381,6 +381,77 @@ TEST(CursorResponseTest, parseFromBSONToleratesUnknownFields) {
     ASSERT_EQ(response.getBatch().size(), 0U);
 }
 
+TEST(CursorResponseTest, parseFromBSONExplain) {
+    BSONObj explainObj = BSON("DocsReturned" << 7 << "executionTime"
+                                             << "100 ms");
+
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "db.coll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                 << "explain" << explainObj << "ok" << 1));
+
+    ASSERT_OK(result.getStatus());
+
+    CursorResponse response = std::move(result.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
+    ASSERT_EQ(response.getNSS(), defaultNss);
+    ASSERT_EQ(response.getBatch().size(), 2U);
+    ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
+    ASSERT_TRUE(response.getExplain());
+    ASSERT_BSONOBJ_EQ(response.getExplain().get(), explainObj);
+}
+
+TEST(CursorResponseTest, parseExplainsFromBSONMany) {
+    BSONObj cursor1 = BSON("id" << CursorId(123) << "ns" << defaultNssStr << "firstBatch"
+                                << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)));
+    BSONObj cursor2 = BSON("id" << CursorId(234) << "ns" << defaultNssStr << "firstBatch"
+                                << BSON_ARRAY(BSON("_id" << 3) << BSON("_id" << 4)));
+
+    BSONObj explainObj = BSON("DocsReturned" << 7 << "executionTime"
+                                             << "100 ms");
+    std::vector<StatusWith<CursorResponse>> results = CursorResponse::parseFromBSONMany(
+        BSON("cursors" << BSON_ARRAY(
+                 BSON("cursor" << cursor1 << "explain" << explainObj << "ok" << 1)
+                 << BSON("cursor" << cursor2 << "explain" << explainObj << "ok" << 1))));
+
+    for (auto& result : results) {
+        ASSERT_OK(result);
+    }
+
+    ASSERT_EQ(results.size(), 2);
+
+    CursorResponse response1 = std::move(results[0].getValue());
+    ASSERT_EQ(response1.getCursorId(), CursorId(123));
+    ASSERT_EQ(response1.getNSS(), defaultNss);
+    ASSERT_EQ(response1.getBatch().size(), 2U);
+    ASSERT_BSONOBJ_EQ(response1.getBatch()[0], BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(response1.getBatch()[1], BSON("_id" << 2));
+    ASSERT_TRUE(response1.getExplain());
+    ASSERT_BSONOBJ_EQ(response1.getExplain().get(), explainObj);
+
+    CursorResponse response2 = std::move(results[1].getValue());
+    ASSERT_EQ(response2.getCursorId(), CursorId(234));
+    ASSERT_EQ(response2.getNSS(), defaultNss);
+    ASSERT_EQ(response2.getBatch().size(), 2U);
+    ASSERT_BSONOBJ_EQ(response2.getBatch()[0], BSON("_id" << 3));
+    ASSERT_BSONOBJ_EQ(response2.getBatch()[1], BSON("_id" << 4));
+    ASSERT_TRUE(response2.getExplain());
+    ASSERT_BSONOBJ_EQ(response2.getExplain().get(), explainObj);
+}
+
+TEST(CursorResponseTest, parseFromBSONExplainWrongType) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "db.coll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                 << "explain"
+                 << "hi"
+                 << "ok" << 1));
+    ASSERT_NOT_OK(result.getStatus());
+}
+
 TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResultsReturned) {
     CursorResponseBuilder::Options options;
     options.isInitialResponse = true;
@@ -560,6 +631,7 @@ TEST(CursorResponseTest, toBSONPartialResultsReturned) {
     CursorResponse response(NamespaceString::createNamespaceString_forTest("testdb.testcoll"),
                             CursorId(123),
                             batch,
+                            boost::none,
                             boost::none,
                             boost::none,
                             boost::none,

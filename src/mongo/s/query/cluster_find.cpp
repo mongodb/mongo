@@ -1123,6 +1123,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                           boost::none,
                           boost::none,
                           boost::none,
+                          boost::none,
                           partialResultsReturned);
 }
 

@@ -236,10 +236,6 @@ private:
 
     InternalSearchMongotRemoteSpec _spec;
 
-    // If this is an explain of a $search at execution-level verbosity, then the explain
-    // results are held here. Otherwise, this is an empty object.
-    BSONObj _explainResponse;
-
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
 
     /**

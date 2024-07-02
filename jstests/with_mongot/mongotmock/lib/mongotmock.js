@@ -44,9 +44,18 @@ export function mongotCommandForQuery({
  * @param {Number} id - The mongot cursor ID.
  * @param {String} ns - The namespace of the collection our response is for.
  * @param {Boolean} ok - True when this response is not from an error.
+ * @param {Object} vars - Object containing var information
+ * @param {Object} explainContents - Object containing explain information.
  */
-export function mongotResponseForBatch(nextBatch, id, ns, ok) {
-    return {ok, cursor: {id, ns, nextBatch}};
+export function mongotResponseForBatch(nextBatch, id, ns, ok, explainContents = null, vars = null) {
+    let mongotResponse = {ok, cursor: {id, ns, nextBatch}};
+    if (explainContents != null) {
+        mongotResponse.explain = explainContents;
+    }
+    if (vars != null) {
+        mongotResponse.vars = vars;
+    }
+    return mongotResponse;
 }
 
 /**

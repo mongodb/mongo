@@ -1,8 +1,12 @@
 /**
  * Test of `$search` aggregation stage within $unionWith and $lookup stages.
  */
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {verifySearchStageExplainOutput} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 // Set up mongotmock and point the mongod to it.
 const mongotmock = new MongotMock();
@@ -51,10 +55,16 @@ var cursorCounter = 123;
  * array, length must be equal to times.
  * Returns the query to run.
  */
-function setupSearchQuery(term, times, batch, searchMetaValue) {
+function setupSearchQuery(
+    term, times, batch, searchMetaValue, explainVerbosity = null, explainObject = null) {
     const searchQuery = {query: term, path: "title"};
-    const searchCmd = mongotCommandForQuery(
-        {query: searchQuery, collName: coll.getName(), db: dbName, collectionUUID: collUUID});
+    const searchCmd = mongotCommandForQuery({
+        query: searchQuery,
+        collName: coll.getName(),
+        db: dbName,
+        collectionUUID: collUUID,
+        explainVerbosity
+    });
 
     if (Array.isArray(searchMetaValue)) {
         assert.eq(times, searchMetaValue.length);
@@ -66,17 +76,23 @@ function setupSearchQuery(term, times, batch, searchMetaValue) {
         if (Array.isArray(thisMeta)) {
             thisMeta = searchMetaValue[i];
         }
-        const history = [{
+
+        let response = {
+            cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: batch},
+            vars: {SEARCH_META: {value: thisMeta}},
+            ok: 1
+        };
+        if (explainVerbosity != null) {
+            response.explain = explainObject;
+        }
+
+        let history = {
             expectedCommand: searchCmd,
-            response: {
-                cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: batch},
-                vars: {SEARCH_META: {value: thisMeta}},
-                ok: 1
-            }
-        }];
+            response,
+        };
 
         assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: [history]}));
     }
     return searchQuery;
 }
@@ -825,6 +841,182 @@ assert.commandWorked(db.runCommand({
     ],
     cursor: {}
 }));
+
+if (checkSbeRestrictedOrFullyEnabled(db) &&
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchInSbe')) {
+    jsTestLog(
+        "Skipping explain tests with $lookup and $unionWith because it only applies to $search in classic engine.");
+    MongoRunner.stopMongod(conn);
+    mongotmock.stop();
+    quit();
+}
+
+// Test explain execution stats of $unionWith and $lookup with $search and $searchMeta.
+for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
+    const explainObj = {explain: "hello"};
+    {
+        const unionSearchQueryExplain = setupSearchQuery("cakes",
+                                                         1,
+                                                         [
+                                                             {_id: 1, $searchScore: 0.9},
+                                                             {_id: 2, $searchScore: 0.8},
+                                                             {_id: 5, $searchScore: 0.7},
+                                                             {_id: 6, $searchScore: 0.6},
+                                                             {_id: 8, $searchScore: 0.5}
+                                                         ],
+                                                         1,
+                                                         {verbosity: currentVerbosity},
+                                                         explainObj);
+
+        // $unionWith will run the search stage once to execute the query and again to obtain
+        // execution stats, so we need to mock another response.
+
+        setupSearchQuery("cakes",
+                         1,
+                         [
+                             {_id: 1, $searchScore: 0.9},
+                             {_id: 2, $searchScore: 0.8},
+                             {_id: 5, $searchScore: 0.7},
+                             {_id: 6, $searchScore: 0.6},
+                             {_id: 8, $searchScore: 0.5}
+                         ],
+                         1,
+                         {verbosity: currentVerbosity},
+                         explainObj);
+
+        const explainResult = collBase.explain(currentVerbosity).aggregate([
+            {$project: {"localField": 1, "_id": 0}},
+            {$unionWith: {coll: coll.getName(), pipeline: [{$search: unionSearchQueryExplain}]}}
+        ]);
+        const unionWithStage = getAggPlanStage(explainResult, "$unionWith");
+        assert.neq(unionWithStage, null, explainResult);
+        assert(unionWithStage.hasOwnProperty("nReturned"));
+        assert.eq(NumberLong(7), unionWithStage["nReturned"]);
+        const pipeline = unionWithStage["$unionWith"]["pipeline"];
+
+        const searchStage = pipeline[0];
+        assert.neq(searchStage, null, unionWithStage);
+        verifySearchStageExplainOutput({
+            stage: searchStage,
+            stageType: "$_internalSearchMongotRemote",
+            nReturned: NumberLong(5),
+            explain: explainObj,
+            verbosity: currentVerbosity,
+        });
+
+        const searchIdLookupStage = pipeline[1];
+        assert.neq(searchIdLookupStage, null, unionWithStage);
+        verifySearchStageExplainOutput({
+            stage: searchStage,
+            stageType: "$_internalSearchIdLookup",
+            nReturned: NumberLong(5),
+            verbosity: currentVerbosity,
+        });
+    }
+    {
+        const unionSubSearchMetaExplain = setupSearchQuery("cakes",
+                                                           1,
+                                                           [
+                                                               {_id: 1, $searchScore: 0.9},
+                                                               {_id: 2, $searchScore: 0.8},
+                                                           ],
+                                                           "metaVal",
+                                                           {verbosity: currentVerbosity},
+                                                           explainObj);
+        // $unionWith will run the search stage once to execute the query and again to obtain
+        // execution stats, so we need to mock another response.
+        setupSearchQuery("cakes",
+                         1,
+                         [
+                             {_id: 1, $searchScore: 0.9},
+                             {_id: 2, $searchScore: 0.8},
+                         ],
+                         "metaVal",
+                         {verbosity: currentVerbosity},
+                         explainObj);
+
+        const explainResult = coll.explain(currentVerbosity).aggregate([
+            {$match: {_id: 1}},
+            {
+                $unionWith:
+                    {coll: coll.getName(), pipeline: [{$searchMeta: unionSubSearchMetaExplain}]}
+            }
+        ]);
+
+        const unionWithStage = getAggPlanStage(explainResult, "$unionWith");
+        assert.neq(unionWithStage, null, explainResult);
+        assert(unionWithStage.hasOwnProperty("nReturned"));
+        assert.eq(NumberLong(2), unionWithStage["nReturned"]);
+
+        const pipeline = unionWithStage["$unionWith"]["pipeline"];
+        const searchMetaStage = pipeline[0];
+        assert.neq(searchMetaStage, null, unionWithStage);
+
+        verifySearchStageExplainOutput({
+            stage: searchMetaStage,
+            stageType: "$searchMeta",
+            explain: explainObj,
+            nReturned: NumberLong(1),
+            verbosity: currentVerbosity,
+        });
+    }
+
+    {
+        const lookupSearchQueryExplain = setupSearchQuery("cakes",
+                                                          1,
+                                                          [
+                                                              {_id: 1, $searchScore: 0.9},
+                                                              {_id: 2, $searchScore: 0.8},
+                                                              {_id: 5, $searchScore: 0.7},
+                                                              {_id: 6, $searchScore: 0.6},
+                                                              {_id: 8, $searchScore: 0.5}
+                                                          ],
+                                                          1,
+                                                          {verbosity: currentVerbosity},
+                                                          explainObj);
+
+        const explainResult =
+            collBase.explain(currentVerbosity)
+                .aggregate(makeLookupSearchPipeline(
+                    coll.getName(), lookupSearchQueryExplain, false /*localField*/));
+        // $lookup doesn't include the stats of the stages in its subpipeline, so the search
+        // explain results cannot be checked. We check that the lookup stage returned results.
+        const lookupStage = getAggPlanStage(explainResult, "$lookup");
+        assert.neq(lookupStage, null, explainResult);
+        assert(lookupStage.hasOwnProperty("nReturned"));
+        assert.eq(NumberLong(2), lookupStage["nReturned"]);
+        assert(explainResult.stages[0].$cursor.hasOwnProperty("executionStats"));
+    }
+
+    {
+        const lookupSearchMetaExplain = setupSearchQuery("cakes",
+                                                         1,
+                                                         [
+                                                             {_id: 1, $searchScore: 0.9},
+                                                             {_id: 2, $searchScore: 0.8},
+                                                         ],
+                                                         "metaVal",
+                                                         {verbosity: currentVerbosity},
+                                                         explainObj);
+
+        const explainResult = coll.explain(currentVerbosity).aggregate([{$match: {_id: 1}}, // Match one document.
+                                                                  {
+                                                                  $lookup: {
+                                                                  from: coll.getName(),
+                                                                  pipeline: [{$searchMeta: lookupSearchMetaExplain}],
+                                                                  as: "arr",
+                                                                  }
+                                                                  },
+                                                                  ]);
+        // $lookup doesn't include the stats of the stages in its subpipeline, so the search
+        // explain results cannot be checked. We check that the lookup stage returned results.
+        const lookupStage = getAggPlanStage(explainResult, "$lookup");
+        assert.neq(lookupStage, null, explainResult);
+        assert(lookupStage.hasOwnProperty("nReturned"));
+        assert.eq(NumberLong(1), lookupStage["nReturned"]);
+        assert(explainResult.stages[0].$cursor.hasOwnProperty("executionStats"));
+    }
+}
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();

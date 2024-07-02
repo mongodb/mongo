@@ -202,6 +202,11 @@ structs:
                 cpp_name: cursorType
                 optional: true
                 stability: unstable
+            explain:
+                description: "An optional field containing explain info."
+                type: object
+                optional: true
+                stability: unstable
 
     GetMoreResponseCursor:
         description: "A struct representing a subsequent response cursor."
@@ -227,6 +232,11 @@ structs:
                 description: "A response cursor object."
                 type: GetMoreResponseCursor
                 stability: stable
+            explain:
+                description: "An optional field containing updated explain info."
+                type: object
+                optional: true
+                stability: unstable
 
     # This type could be naturally expressed as a variant of InitialResponseCursor and
     # GetMoreResponseCursor, but the IDL parser can't handle multi-struct variants in general.
@@ -278,4 +288,9 @@ structs:
             cursor:
                 description: "A response cursor object."
                 type: AnyCursor
+                stability: unstable
+            explain:
+                description: "An optional field containing initial or updated explain info."
+                type: object
+                optional: true
                 stability: unstable

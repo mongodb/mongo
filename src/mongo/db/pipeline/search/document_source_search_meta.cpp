@@ -64,6 +64,14 @@ Value DocumentSourceSearchMeta::serialize(const SerializationOptions& opts) cons
 std::unique_ptr<executor::TaskExecutorCursor> DocumentSourceSearchMeta::establishCursor() {
     auto cursors = mongot_cursor::establishCursorsForSearchMetaStage(
         pExpCtx, getSearchQuery(), getTaskExecutor(), getIntermediateResultsProtocolVersion());
+
+    // TODO SERVER-91594: Since mongot will no longer only return explain, remove this block. Mongot
+    // can return only an explain object or an explain with a cursor. If mongot returned the explain
+    // object only, the cursor will not have attached vars. Since there's a possibility of not
+    // having vars for explain, we skip the check.
+    if (pExpCtx->explain && cursors.size() == 1) {
+        return std::move(*cursors.begin());
+    }
     if (cursors.size() == 1) {
         const auto& cursor = *cursors.begin();
         tassert(6448010,
@@ -94,6 +102,13 @@ DocumentSource::GetNextResult DocumentSourceSearchMeta::getNextAfterSetup() {
     if (!_returnedAlready) {
         tryToSetSearchMetaVar();
         auto& vars = pExpCtx->variables;
+
+        // TODO SERVER-91594: Remove this explain specific block.
+        // If mongot only returns an explain object, it will not have any attached vars and we
+        // should return EOF.
+        if (pExpCtx->explain && !vars.hasConstantValue(Variables::kSearchMetaId)) {
+            return GetNextResult::makeEOF();
+        }
         tassert(6448005,
                 "Expected SEARCH_META to be set for $searchMeta stage",
                 vars.hasConstantValue(Variables::kSearchMetaId) &&

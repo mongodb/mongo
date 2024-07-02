@@ -325,9 +325,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
     prepareSearchPipelineLegacyExecutor(origPipeline, true);
 
     if (expCtx->explain || !isSearchPipeline(origPipeline)) {
-        // $search doesn't return documents or metadata from explain regardless of the verbosity.
-        // $searchMeta or $vectorSearch pipelines won't need an additional pipeline since they
-        // only need one cursor.
+        // TODO SERVER-91828: Enable creation of cursors for sharded search.
+        // For sharded search, we don't return documents or metadata from explain regardless of
+        // the verbosity. Standalone search will establish its cursors later in
+        // internalSearchMongotRemote. $searchMeta or $vectorSearch pipelines won't need an
+        // additional pipeline since they only need one cursor.
         return nullptr;
     }
 

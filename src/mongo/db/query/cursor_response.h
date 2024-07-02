@@ -229,6 +229,7 @@ public:
                    boost::optional<BSONObj> postBatchResumeToken = boost::none,
                    boost::optional<BSONObj> writeConcernError = boost::none,
                    boost::optional<BSONObj> varsField = boost::none,
+                   boost::optional<BSONObj> explain = boost::none,
                    boost::optional<CursorTypeEnum> cursorType = boost::none,
                    boost::optional<CursorMetrics> metrics = boost::none,
                    bool partialResultsReturned = false,
@@ -274,6 +275,10 @@ public:
         return _varsField;
     }
 
+    boost::optional<BSONObj> getExplain() const {
+        return _explain;
+    }
+
     auto& getCursorMetrics() const {
         return _metrics;
     }
@@ -315,6 +320,7 @@ private:
     boost::optional<BSONObj> _postBatchResumeToken;
     boost::optional<BSONObj> _writeConcernError;
     boost::optional<BSONObj> _varsField;
+    boost::optional<BSONObj> _explain;
     boost::optional<CursorTypeEnum> _cursorType;
     boost::optional<CursorMetrics> _metrics;
     bool _partialResultsReturned = false;

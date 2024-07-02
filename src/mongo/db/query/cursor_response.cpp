@@ -68,6 +68,7 @@ const char kPartialResultsReturnedField[] = "partialResultsReturned";
 const char kInvalidatedField[] = "invalidated";
 const char kWasStatementExecuted[] = "$_wasStatementExecuted";
 const char kMetricsField[] = "metrics";
+const char kExplainField[] = "explain";
 
 }  // namespace
 
@@ -153,6 +154,7 @@ CursorResponse::CursorResponse(NamespaceString nss,
                                boost::optional<BSONObj> postBatchResumeToken,
                                boost::optional<BSONObj> writeConcernError,
                                boost::optional<BSONObj> varsField,
+                               boost::optional<BSONObj> explain,
                                boost::optional<CursorTypeEnum> cursorType,
                                boost::optional<CursorMetrics> metrics,
                                bool partialResultsReturned,
@@ -165,6 +167,7 @@ CursorResponse::CursorResponse(NamespaceString nss,
       _postBatchResumeToken(std::move(postBatchResumeToken)),
       _writeConcernError(std::move(writeConcernError)),
       _varsField(std::move(varsField)),
+      _explain(std::move(explain)),
       _cursorType(std::move(cursorType)),
       _metrics(std::move(metrics)),
       _partialResultsReturned(partialResultsReturned),
@@ -254,6 +257,7 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
              getOwnedBSONObj(cursor.getPostBatchResumeToken()),
              getOwnedBSONObj(response.getWriteConcernError()),
              getOwnedBSONObj(response.getVars()),
+             getOwnedBSONObj(response.getExplain()),
              cursor.getCursorType(),
              std::move(metrics),
              cursor.getPartialResultsReturned(),

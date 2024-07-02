@@ -2382,6 +2382,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                                boost::none /* postBatchResumeToken */,
                                boost::none /* writeConcernError */,
                                boost::none /* varsField */,
+                               boost::none /* explainField*/,
                                boost::none /* cursorType */,
                                std::move(metrics));
         scheduleNetworkResponses(std::move(responses));

@@ -109,7 +109,7 @@ public:
     TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
                        std::shared_ptr<executor::TaskExecutor> underlyingExec,
                        CursorResponse&& response,
-                       RemoteCommandRequest& rcr,
+                       const RemoteCommandRequest& rcr,
                        TaskExecutorCursorOptions&& options = {});
 
     /**
@@ -155,6 +155,10 @@ public:
 
     boost::optional<BSONObj> getCursorVars() const {
         return _cursorVars;
+    }
+
+    boost::optional<BSONObj> getCursorExplain() const {
+        return _cursorExplain;
     }
 
     boost::optional<CursorTypeEnum> getType() const {
@@ -254,6 +258,9 @@ private:
 
     // Variables sent alongside the results in the cursor.
     boost::optional<BSONObj> _cursorVars = boost::none;
+
+    // Explain object sent alongside the results in the cursor.
+    boost::optional<BSONObj> _cursorExplain = boost::none;
 
     // For commands that return multiple cursors, the type of the cursor.
     boost::optional<CursorTypeEnum> _cursorType;
