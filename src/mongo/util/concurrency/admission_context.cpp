@@ -111,6 +111,7 @@ WaitingForAdmissionGuard::WaitingForAdmissionGuard(AdmissionContext* admCtx, Tic
     : _admCtx(admCtx), _tickSource(tickSource) {
     invariant(_admCtx->_startQueueingTime.swap(_tickSource->getTicks()) ==
               AdmissionContext::kNotQueueing);
+    _admCtx->_startQueueingTime.notifyAll();
 }
 
 WaitingForAdmissionGuard::~WaitingForAdmissionGuard() {
@@ -119,6 +120,7 @@ WaitingForAdmissionGuard::~WaitingForAdmissionGuard() {
     _admCtx->_totalTimeQueuedMicros.fetchAndAdd(durationCount<Microseconds>(
         _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - startQueueingTime)));
     _admCtx->_startQueueingTime.store(AdmissionContext::kNotQueueing);
+    _admCtx->_startQueueingTime.notifyAll();
 }
 
 }  // namespace mongo

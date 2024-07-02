@@ -26,51 +26,28 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "mongo/util/concurrency/semaphore_ticketholder.h"
-
-#include "mongo/util/concurrency/ticketholder.h"
 #include <memory>
 
 #include "mongo/unittest/framework.h"
+#include "mongo/util/concurrency/semaphore_ticketholder.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/concurrency/ticketholder_test_fixture.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/future_util.h"
+#include "mongo/util/packaged_task.h"
 #include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#define ASSERT_SOON_EXP(exp)                         \
-    if (!(exp)) {                                    \
-        LOGV2_WARNING(8896601,                       \
-                      "Expression failed, retrying", \
-                      "exp"_attr = #exp,             \
-                      "file"_attr = __FILE__,        \
-                      "line"_attr = __LINE__);       \
-        return false;                                \
-    }
-
 namespace {
 using namespace mongo;
 
-// Windows test variants are sometimes slow so we have a relatively large timeout here for the
-// assertSoon.
-static inline const Seconds kWaitTimeout{20};
-static inline const Milliseconds kSleepTime{1};
+/** Timeout to use to ensure that waiters get queued and/or receive tickets in reasonable time.*/
+constexpr auto kDefaultTimeout = Milliseconds{100};
 
-/**
- * Asserts that eventually the predicate does not throw an exception.
- */
-void assertSoon(std::function<bool()> predicate, Milliseconds timeout = kWaitTimeout) {
-    Timer t;
-    while (!predicate()) {
-        if (t.elapsed() >= timeout) {
-            LOGV2_ERROR(8896602,
-                        "assertSoon failed, please check the logs for the reason all attempts have "
-                        "failed.");
-            ASSERT_TRUE(false);
-        }
-        sleepFor(kSleepTime);
-    }
+Date_t getNextDeadline() {
+    return Date_t::now() + kDefaultTimeout;
 }
 
 class SemaphoreTicketHolderTest : public TicketHolderTestFixture {
@@ -81,13 +58,49 @@ public:
         auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
         _tickSource = tickSource.get();
         getServiceContext()->setTickSource(std::move(tickSource));
+        ThreadPool::Options opts;
+        _pool = std::make_unique<ThreadPool>(opts);
+        _pool->startup();
+    }
+
+    void tearDown() override {
+        TicketHolderTestFixture::tearDown();
+        _pool->shutdown();
+        //_pool->join();
     }
 
     TickSourceMock<Microseconds>* getTickSource() {
         return _tickSource;
     }
 
+    /**
+     * Utility that schedules `cb` to run on an executor thread managed by the fixture.
+     * Returns a Future that is a handle to the return-value of the callback.
+     * The fixture's executor threads are joined at fixture tear-down.
+     */
+    template <typename Callable>
+    auto spawn(Callable&& cb) -> Future<typename std::invoke_result<Callable>::type> {
+        using ReturnType = typename std::invoke_result<Callable>::type;
+        auto task = PackagedTask([cb = std::move(cb)] { return cb(); });
+        auto taskFuture = task.getFuture();
+        _pool->schedule([runTask = std::move(task)](Status s) mutable {
+            invariant(s);
+            runTask();
+        });
+        return taskFuture;
+    }
+
+    /** Utility to make a immediate-resize-policy SemaphoreTicketHolder. */
+    std::unique_ptr<SemaphoreTicketHolder> makeImmediateResizeHolder(int initialNumTickets) {
+        return std::make_unique<SemaphoreTicketHolder>(
+            getServiceContext(),
+            initialNumTickets,
+            false /* trackPeakUsed */,
+            SemaphoreTicketHolder::ResizePolicy::kImmediate);
+    }
+
 private:
+    std::unique_ptr<ThreadPool> _pool;
     TickSourceMock<Microseconds>* _tickSource;
 };
 
@@ -139,19 +152,51 @@ TEST_F(SemaphoreTicketHolderTest, PriorityBookkeeping) {
         });
 }
 
-TEST_F(SemaphoreTicketHolderTest, ImmediateResize) {
-    auto holder =
-        std::make_unique<SemaphoreTicketHolder>(getServiceContext(),
-                                                1,
-                                                false /* trackPeakUsed */,
-                                                SemaphoreTicketHolder::ResizePolicy::kImmediate);
+TEST_F(SemaphoreTicketHolderTest, QueuedWaiterGetsTicketWhenMadeAvailable) {
+    constexpr int initialNumTickets = 3;
+    auto holder = makeImmediateResizeHolder(initialNumTickets);
 
-    Stats stats(holder.get());
+    // acquire all 3 tickets
     MockAdmissionContext admCtx{};
+    std::vector<Ticket> tickets;
+    for (int i = 0; i < initialNumTickets; ++i) {
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
+    }
 
-    // This mutex is to avoid data race conditions between checking for the ticket state and setting
-    // it in the worker threads.
-    Mutex ticketCheckMutex;
+    // try (and fail) to acquire a ticket - none are availabe.
+    ASSERT_FALSE(holder->tryAcquire(&admCtx));
+
+    // start a thread and make it wait on a ticket
+    MockAdmission releaseWaiterAdmission{getServiceContext(), AdmissionContext::Priority::kNormal};
+    Future<Ticket> ticketFuture = spawn([&]() {
+        return holder->waitForTicket(releaseWaiterAdmission.opCtx.get(),
+                                     &releaseWaiterAdmission.admCtx);
+    });
+
+    ASSERT_TRUE(releaseWaiterAdmission.waitUntilQueued(kDefaultTimeout));
+
+    // release the 3 tickets
+    tickets.erase(tickets.begin(), tickets.end());
+
+    // check that the waiter acquired a ticket
+    boost::optional<Ticket> ticket;
+    _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        ticket = std::move(ticketFuture).get(_opCtx.get());
+    });
+    ASSERT_EQ(holder->used(), 1);
+    ASSERT_EQ(holder->available(), 2);
+    ASSERT_EQ(holder->outof(), 3);
+}
+
+using SemaphoreTicketHolderImmediateResizeTest = SemaphoreTicketHolderTest;
+
+TEST_F(SemaphoreTicketHolderImmediateResizeTest, CanResizePool) {
+    constexpr int initialNumTickets = 1;
+    auto holder = makeImmediateResizeHolder(initialNumTickets);
+
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 1);
+    ASSERT_EQ(holder->outof(), 1);
 
     // expand the pool to 10 tickets
     ASSERT_TRUE(holder->resize(_opCtx.get(), 10));
@@ -159,124 +204,150 @@ TEST_F(SemaphoreTicketHolderTest, ImmediateResize) {
     ASSERT_EQ(holder->available(), 10);
     ASSERT_EQ(holder->outof(), 10);
 
+    // shrink the pool to 5 tickets
+    ASSERT_TRUE(holder->resize(_opCtx.get(), 5));
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 5);
+    ASSERT_EQ(holder->outof(), 5);
+}
+
+TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownTicketsStillAvailable) {
+    constexpr int initialNumTickets = 10;
+    auto holder = makeImmediateResizeHolder(initialNumTickets);
+
     // acquire 5 tickets
-    std::array<boost::optional<Ticket>, 5> tickets;
-    for (size_t i = 0; i < 5; ++i) {
-        tickets[i] = holder->waitForTicket(_opCtx.get(), &admCtx);
+    MockAdmissionContext admCtx{};
+    std::vector<Ticket> tickets;
+    for (int i = 0; i < 5; ++i) {
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
     }
+
+    // ensure 5 are now in-use and 5 are left available
     ASSERT_EQ(holder->used(), 5);
     ASSERT_EQ(holder->available(), 5);
     ASSERT_EQ(holder->outof(), 10);
 
+    // shrink the pool to 8 tickets
+    // available should still be positive, because we have more capacity (8) than tickets in use (5)
+    ASSERT_TRUE(holder->resize(_opCtx.get(), 8));
+    ASSERT_EQ(holder->used(), 5);
+    ASSERT_EQ(holder->available(), 3);
+    ASSERT_EQ(holder->outof(), 8);
+
+    // We can get a ticket as some are still available
+    ASSERT_TRUE(holder->tryAcquire(&admCtx));
+}
+
+TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownSoNoTicketsAvailalbe) {
+    constexpr int initialNumTickets = 10;
+    auto holder = makeImmediateResizeHolder(initialNumTickets);
+
+    // acquire 5 tickets
+    MockAdmissionContext admCtx{};
+    std::vector<Ticket> tickets;
+    for (int i = 0; i < 5; ++i) {
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
+    }
+
+    // ensure 5 are now in-use and 5 are left available
+    ASSERT_EQ(holder->used(), 5);
+    ASSERT_EQ(holder->available(), 5);
+    ASSERT_EQ(holder->outof(), 10);
+
+    // We can get a ticket when one is available
+    ASSERT_TRUE(holder->tryAcquire(&admCtx));
+
     // shrink the pool to 3 tickets
+    // available should now be negative because more are in use (5) than the total capacity (3)
     ASSERT_TRUE(holder->resize(_opCtx.get(), 3));
     ASSERT_EQ(holder->used(), 5);
     ASSERT_EQ(holder->available(), -2);
     ASSERT_EQ(holder->outof(), 3);
 
-    // try to acquire a ticket
+    // When < 0 tickets are availabe, we shouldn't be able to acquire one.
+    ASSERT_FALSE(holder->tryAcquire(&admCtx));
+}
+
+TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeUpMakesTicketsAvailableToWaiters) {
+    constexpr int initialNumTickets = 3;
+    auto holder = makeImmediateResizeHolder(initialNumTickets);
+
+    // acquire all 3 tickets
+    MockAdmissionContext admCtx{};
+    std::vector<Ticket> tickets;
+    for (int i = 0; i < initialNumTickets; ++i) {
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
+    }
+
+    // try (and fail) to acquire a ticket - none are availabe.
     ASSERT_FALSE(holder->tryAcquire(&admCtx));
 
     // start a thread and make it wait on a ticket
     MockAdmission releaseWaiterAdmission{getServiceContext(), AdmissionContext::Priority::kNormal};
-    stdx::thread releaseWaiter([&] {
-        auto ticket = holder->waitForTicket(releaseWaiterAdmission.opCtx.get(),
-                                            &releaseWaiterAdmission.admCtx);
-        stdx::lock_guard lk(ticketCheckMutex);
-        releaseWaiterAdmission.ticket = std::move(ticket);
+    Future<Ticket> ticketFuture = spawn([&]() {
+        return holder->waitForTicket(releaseWaiterAdmission.opCtx.get(),
+                                     &releaseWaiterAdmission.admCtx);
     });
-    while (holder->queued() < 1) {
-        // spin
-    }
 
-    // release 3 tickets
-    for (size_t i = 0; i < 3; i++) {
-        tickets[i].reset();
-    }
-
-    // check that the waiter acquired a ticket
-    assertSoon([&] {
-        stdx::lock_guard lk(ticketCheckMutex);
-        ASSERT_SOON_EXP(releaseWaiterAdmission.ticket);
-        return true;
-    });
-    releaseWaiter.join();
-    ASSERT_EQ(holder->used(), 3);
-    ASSERT_EQ(holder->available(), 0);
-    ASSERT_EQ(holder->outof(), 3);
-
-    // shrink the pool to 1 ticket
-    ASSERT_TRUE(holder->resize(_opCtx.get(), 1));
-    ASSERT_EQ(holder->used(), 3);
-    ASSERT_EQ(holder->available(), -2);
-    ASSERT_EQ(holder->outof(), 1);
-
-    // start 3 threads and make them wait on tickets
-    MockAdmission resizeWaiterAdmission1{getServiceContext(), AdmissionContext::Priority::kNormal};
-    stdx::thread resizeWaiter1([&] {
-        auto ticket = holder->waitForTicket(resizeWaiterAdmission1.opCtx.get(),
-                                            &resizeWaiterAdmission1.admCtx);
-        stdx::lock_guard lk(ticketCheckMutex);
-        resizeWaiterAdmission1.ticket = std::move(ticket);
-    });
-    MockAdmission resizeWaiterAdmission2{getServiceContext(), AdmissionContext::Priority::kNormal};
-    stdx::thread resizeWaiter2([&] {
-        auto ticket = holder->waitForTicket(resizeWaiterAdmission2.opCtx.get(),
-                                            &resizeWaiterAdmission2.admCtx);
-        stdx::lock_guard lk(ticketCheckMutex);
-        resizeWaiterAdmission2.ticket = std::move(ticket);
-    });
-    MockAdmission resizeWaiterAdmission3{getServiceContext(), AdmissionContext::Priority::kNormal};
-    stdx::thread resizeWaiter3([&] {
-        auto ticket = holder->waitForTicket(resizeWaiterAdmission3.opCtx.get(),
-                                            &resizeWaiterAdmission3.admCtx);
-        stdx::lock_guard lk(ticketCheckMutex);
-        resizeWaiterAdmission3.ticket = std::move(ticket);
-    });
-    while (holder->queued() < 3) {
-        // spin
-    }
+    ASSERT_TRUE(releaseWaiterAdmission.waitUntilQueued(kDefaultTimeout));
 
     // grow the pool to 5
     ASSERT_TRUE(holder->resize(_opCtx.get(), 5));
 
-    auto countAcquiredTickets = [&] {
-        stdx::lock_guard lk(ticketCheckMutex);
-        size_t numAcquired = 0;
-        if (resizeWaiterAdmission1.ticket)
-            numAcquired++;
-        if (resizeWaiterAdmission2.ticket)
-            numAcquired++;
-        if (resizeWaiterAdmission3.ticket)
-            numAcquired++;
-        return numAcquired;
-    };
-
-    // check that 2 of the 3 waiters acquired a ticket
-    assertSoon([&] {
-        auto numAcquired = countAcquiredTickets();
-        ASSERT_SOON_EXP(numAcquired == 2);
-        return true;
+    // check that the waiter acquired a ticket
+    boost::optional<Ticket> ticket;
+    _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        ticket = std::move(ticketFuture).get(_opCtx.get());
     });
-    ASSERT_EQ(holder->used(), 5);
-    ASSERT_EQ(holder->available(), 0);
+
+    ASSERT_EQ(holder->used(), 4);
+    ASSERT_EQ(holder->available(), 1);
     ASSERT_EQ(holder->outof(), 5);
-    ASSERT_EQ(holder->queued(), 1);
+}
 
-    // release a ticket
-    releaseWaiterAdmission.ticket.reset();
+TEST_F(SemaphoreTicketHolderImmediateResizeTest,
+       QueuedWaiterRemainsNegativeAfterReleaseToPoolWithNegativeAvailable) {
+    constexpr int initialNumTickets = 10;
+    auto holder = makeImmediateResizeHolder(initialNumTickets);
 
-    // check that all 3 waiters acquired a ticket
-    assertSoon([&] {
-        auto numAcquired = countAcquiredTickets();
-        ASSERT_SOON_EXP(numAcquired == 3);
-        return true;
+    // acquire 5 tickets
+    MockAdmissionContext admCtx{};
+    std::vector<Ticket> tickets;
+    for (int i = 0; i < 5; ++i) {
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
+    }
+
+    // ensure 5 are now in-use and 5 are left available
+    ASSERT_EQ(holder->used(), 5);
+    ASSERT_EQ(holder->available(), 5);
+    ASSERT_EQ(holder->outof(), 10);
+
+    // shrink the pool to 3 tickets
+    // available should now be negative because more are in use (5) than the total capacity (3)
+    ASSERT_TRUE(holder->resize(_opCtx.get(), 3));
+    ASSERT_EQ(holder->used(), 5);
+    ASSERT_EQ(holder->available(), -2);
+    ASSERT_EQ(holder->outof(), 3);
+
+    // start a thread and make it wait on a ticket
+    MockAdmission releaseWaiterAdmission{getServiceContext(), AdmissionContext::Priority::kNormal};
+    Future<Ticket> ticketFuture = spawn([&]() {
+        return holder->waitForTicket(releaseWaiterAdmission.opCtx.get(),
+                                     &releaseWaiterAdmission.admCtx);
     });
 
-    // clean up waiters
-    resizeWaiter1.join();
-    resizeWaiter2.join();
-    resizeWaiter3.join();
+    ASSERT_TRUE(releaseWaiterAdmission.waitUntilQueued(kDefaultTimeout));
+    // If we return a ticket, the waiter should stay asleep becuase the availabe count is still < 0
+    tickets.erase(tickets.end() - 1, tickets.end());
+    ASSERT_FALSE(ticketFuture.isReady());
+    // Same should be true when availabe count == 0 after the release .
+    tickets.erase(tickets.end() - 1, tickets.end());
+    ASSERT_FALSE(ticketFuture.isReady());
+    // But once it becomes positive, the waiter should wake up .
+    tickets.erase(tickets.end() - 1, tickets.end());
+    _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        std::move(ticketFuture).get(_opCtx.get());
+    });
 }
 
 TEST_F(SemaphoreTicketHolderTest, ReleaseToPoolWakesWaiters) {
@@ -284,12 +355,8 @@ TEST_F(SemaphoreTicketHolderTest, ReleaseToPoolWakesWaiters) {
     // adding a ticket would result in 0 available tickets (a case only reachable after resize).
     // This test is meant to prove that we always wake waiters when a ticket is returned, if there
     // are available tickets
-
-    auto holder =
-        std::make_unique<SemaphoreTicketHolder>(getServiceContext(),
-                                                2,
-                                                false /* trackPeakUsed */,
-                                                SemaphoreTicketHolder::ResizePolicy::kImmediate);
+    constexpr int initialNumTickets = 2;
+    auto holder = makeImmediateResizeHolder(initialNumTickets);
 
     // Here's the approach: We need to have a SemaphoreTicketHolder of size >1 in order to meet the
     // condition that we possibly have a non-zero number of tickets when returning a ticket to the
@@ -297,36 +364,58 @@ TEST_F(SemaphoreTicketHolderTest, ReleaseToPoolWakesWaiters) {
     // waiting thread waits for the initial waiters to queue before enqueueing itself. Back on the
     // main thread, wait for all three queued waiters before returning two tickets to the pool
     // immediately.
-
     MockAdmissionContext admCtx{};
     std::vector<Ticket> tickets;
-    for (size_t i = 0; i < 2; ++i) {
-        auto ticket = holder->waitForTicket(_opCtx.get(), &admCtx);
-        tickets.push_back(std::move(ticket));
+    for (int i = 0; i < initialNumTickets; ++i) {
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
     }
 
-    std::vector<stdx::thread> threads;
+    std::vector<Future<Ticket>> ticketFutures;
+    // Prepare 3 admisisons that will queue.
+    std::vector<std::unique_ptr<MockAdmission>> admissions;
     for (size_t i = 0; i < 3; ++i) {
-        threads.emplace_back([&] {
-            Timer t;
-            MockAdmission admission{getServiceContext(), AdmissionContext::Priority::kNormal};
-            auto ticket = holder->waitForTicket(admission.opCtx.get(), &admission.admCtx);
-            // TODO(SERVER-89297): SemaphoreTicketHolder currently does timed waits in the 500ms
-            // range, which prevents deadlock with the bug this test is meant to test. Remove this
-            // assertion when we switch to the NotifyableParkingLot. Choose a value of 400 because
-            // the timed waiters introduce jitter for each wait using a base value of 500ms.
-            ASSERT_LTE(t.millis(), 400);
-        });
+        auto admission = std::make_unique<MockAdmission>(getServiceContext(),
+                                                         AdmissionContext::Priority::kNormal);
+        admissions.push_back(std::move(admission));
     }
 
-    // await 3 queued waiters, and then return 2 tickets to the pool
-    assertSoon([&] { return holder->queued() == 3; });
+    //  Enqueue the 3 admissions.
+    for (size_t i = 0; i < 3; ++i) {
+        auto* admission = admissions[i].get();
+        AdmissionContext* admCtx = &admission->admCtx;
+        Future<Ticket> ticketFuture =
+            spawn([holder = holder.get(), opCtx = admission->opCtx.get(), admCtx = admCtx]() {
+                Timer t;
+                // TODO(SERVER-89297): SemaphoreTicketHolder currently does timed waits in the 500ms
+                // range, which prevents deadlock with the bug this test is meant to test. Remove
+                // this assertion when we switch to the NotifyableParkingLot. Choose a value of 400
+                // because the timed waiters introduce jitter for each wait using a base value of
+                // 500ms.
+                auto ticket = holder->waitForTicket(opCtx, admCtx);
+                ASSERT_LTE(t.millis(), 400);
+                return ticket;
+            });
+        ticketFutures.push_back(std::move(ticketFuture));
+    }
+
+    // Wait for 3 queued waiters, and then return 2 tickets to the pool
+    for (auto& admission : admissions) {
+        ASSERT_TRUE(admission->waitUntilQueued(kDefaultTimeout));
+    }
+
     tickets.erase(tickets.end() - 2, tickets.end());
 
-    // join all threads and drain the waiters one-by-one
-    for (auto& t : threads) {
-        t.join();
+    // Ensure that the released tickets wake waiters.
+    std::vector<Future<void>> eachDone;
+    for (auto&& ticket : ticketFutures) {
+        auto done = std::move(ticket).then([](Ticket ticket) {
+            // Let the ticket get destroyed, returning it to the pool
+            return;
+        });
+        eachDone.push_back(std::move(done));
     }
+    SemiFuture<void> allDone = whenAllSucceed(std::move(eachDone));
+    _opCtx->runWithDeadline(
+        getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] { allDone.get(_opCtx.get()); });
 }
-
 }  // namespace

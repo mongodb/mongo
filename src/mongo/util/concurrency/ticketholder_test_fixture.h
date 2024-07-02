@@ -134,6 +134,11 @@ struct TicketHolderTestFixture::MockAdmission {
         admissionPriority.emplace(opCtx.get(), admCtx, priority);
     }
 
+    // Block until this Admission attempt is queued waiting on a ticket.
+    bool waitUntilQueued(Nanoseconds timeout) {
+        return admCtx.waitUntilQueued(timeout);
+    }
+
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
     MockAdmissionContext admCtx;
