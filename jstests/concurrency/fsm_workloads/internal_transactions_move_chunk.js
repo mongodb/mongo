@@ -10,6 +10,7 @@
  *  antithesis_incompatible,
  *  # startCommit times out
  *  does_not_support_config_fuzzer,
+ *  assumes_stable_shard_list,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

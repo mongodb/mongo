@@ -7,7 +7,8 @@
  *  requires_fcv_60,
  *  requires_sharding,
  *  uses_transactions,
- *  antithesis_incompatible
+ *  antithesis_incompatible,
+ *  assumes_stable_shard_list,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

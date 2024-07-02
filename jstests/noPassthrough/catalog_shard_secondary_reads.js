@@ -6,7 +6,7 @@
  * ]
  */
 import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";
-import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
@@ -71,7 +71,7 @@ moveDatabaseAndUnshardedColls(st.s0.getDB('test'), st.shard1.shardName);
 moveDatabaseAndUnshardedColls(st.s0.getDB('sharded'), st.shard1.shardName);
 
 // A config shard can't be removed until all range deletions have finished.
-ConfigShardUtil.waitForRangeDeletions(st.s0);
+ShardTransitionUtil.waitForRangeDeletions(st.s0);
 
 removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
 assert.eq("completed", removeRes.state, tojson(removeRes));

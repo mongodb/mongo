@@ -37,7 +37,7 @@ export const $config = (function() {
             // The config transition suites involve moving unsharded collections in and out of
             // the config server. Having up to 100 unsharded collections to move may make this test
             // take too long to run and get killed by resmoke.
-            TestData.transitioningConfigShard ? 5 : 20,
+            TestData.shardsAddedRemoved ? 5 : 20,
         data: data,
         states: states,
         transitions: transitions,

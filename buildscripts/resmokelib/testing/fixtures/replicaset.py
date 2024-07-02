@@ -124,6 +124,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
         # This will be set in setup() after the MongoTFixture has been launched.
         self.mongot_port = None
+        # Track the fixture removal [teardown] performed during removeShard testing.
+        # This is needed, because we expect the fixture to be in the 'running' state
+        # when the evergeen job performs the final teardown. Therefore if the fixture was
+        # teared down earlier, it must be skipped during those final checks.
+        self.removeshard_teardown_marker = False
 
     def setup(self):
         """Set up the replica set."""
@@ -273,6 +278,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # Saving the mongot port to the ReplicaSetFixture allows the ShardedClusterFixture
             # to spin up a mongos with a connection to the last launched mongot.
             self.mongot_port = node.mongot_port
+
+        self.removeshard_teardown_marker = False
 
     def _create_initial_sync_config(self):
         """Helper function to create and return the config for an initial sync node."""

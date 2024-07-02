@@ -350,7 +350,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
     def is_running(self):
         """Return true if all nodes in the cluster are all still operating."""
         return (self.configsvr is not None and self.configsvr.is_running()
-                and all(shard.is_running() for shard in self.shards)
+                and all(shard.is_running()
+                        for shard in self.shards if not shard.removeshard_teardown_marker)
                 and all(mongos.is_running() for mongos in self.mongos))
 
     def get_internal_connection_string(self):

@@ -8,6 +8,7 @@
  *  requires_sharding,
  *  uses_transactions,
  *  antithesis_incompatible,
+ *  assumes_stable_shard_list,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

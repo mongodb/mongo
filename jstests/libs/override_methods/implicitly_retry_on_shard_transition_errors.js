@@ -1,6 +1,6 @@
 /**
- * Overrides runCommand so operations that encounter errors from a config shard transitioning in and
- * out of dedicated mode retry.
+ * Overrides runCommand to retry operations that encounter errors from removing a shard,
+ * or from a config shard transitioning in and out of dedicated mode.
  */
 import {getCommandName} from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
@@ -30,6 +30,12 @@ const kRetryableErrors = [
     // TODO SERVER-90609: Stop ignoring this error. Currently an index build may fail because a
     // concurrent movePrimary triggered by the transition hook drops the collection.
     {code: ErrorCodes.IndexBuildAborted},
+    // When shards are removed, it might take some time until all routing information is updated.
+    // TODO SERVER-85145: Stop ignoring transient errors that might occur with concurrent shard
+    // removals.
+    {code: ErrorCodes.HostUnreachable},
+    {code: ErrorCodes.ShutdownInProgress},
+    {code: ErrorCodes.ShardNotFound},
 ];
 
 // Commands known not to work with transitions so tests can fail immediately with a clear error.
@@ -86,7 +92,7 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
     let attempt = 0;
 
     if (kDisallowedCommands.includes(cmdName)) {
-        throw new Error("Cowardly refusing to run command with a transitioning config shard" +
+        throw new Error("Cowardly refusing to run command with a transitioning shard" +
                         tojson(cmdObj));
     }
 
@@ -98,8 +104,7 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
 
             if (shouldRetry(cmdObj, res)) {
                 print("Retrying on error from " + cmdName +
-                      " with transitioning config shard. Attempt: " + attempt +
-                      ", res: " + tojson(res));
+                      " with transitioning shard. Attempt: " + attempt + ", res: " + tojson(res));
                 return kRetry;
             }
 

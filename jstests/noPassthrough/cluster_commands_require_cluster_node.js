@@ -6,7 +6,6 @@
  *   requires_sharding,
  * ]
  */
-import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
 const kDBName = "foo";
 const kCollName = "bar";
