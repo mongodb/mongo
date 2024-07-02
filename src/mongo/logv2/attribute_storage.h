@@ -248,9 +248,11 @@ inline BSONArray mapValue(BSONArray const& value) {
 }
 inline CustomAttributeValue mapValue(BSONElement const& val) {
     CustomAttributeValue custom;
-    custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
-        builder.appendElements(val.wrap());
-    };
+    if (val) {
+        custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
+            builder.appendElements(val.wrap());
+        };
+    }
     custom.toString = [&val]() {
         return val.toString();
     };

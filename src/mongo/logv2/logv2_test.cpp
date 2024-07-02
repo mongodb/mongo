@@ -2347,6 +2347,13 @@ TEST_F(LogV2Test, UserAssert) {
                              });
 }
 
+
+TEST_F(LogV2Test, EmptyBSONElement) {
+    BSONObj doc = BSON("id" << 123);
+    ASSERT_DOES_NOT_THROW(
+        LOGV2(9189100, "Should not throw", "elem"_attr = doc["nonexistentField"]));
+}
+
 class UnstructuredLoggingTest : public LogV2JsonBsonTest {};
 
 TEST_F(UnstructuredLoggingTest, NoArgs) {
