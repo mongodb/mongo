@@ -228,6 +228,9 @@ struct SerializationOptions {
 
     // For aggregation indicate whether we should use the more verbose serialization format.
     boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;
+
+    // If set to true, serializes each stage and expression as needed for query analysis.
+    bool serializeForQueryAnalysis = false;
 };
 
 }  // namespace mongo
