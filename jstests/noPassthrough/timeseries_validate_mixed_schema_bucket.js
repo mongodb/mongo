@@ -87,7 +87,7 @@ assert.commandWorked(
 
 // Now that the allow mixed schema flag is false, an error should be returned after validating.
 res = assert.commandWorked(coll.validate());
-assert(res.valid);
+assert(!res.valid);
 assert.eq(res.warnings.length, 0);
 assert.gt(res.errors.length, 0, "Validation should return at least one error.");
 assert.containsPrefix(

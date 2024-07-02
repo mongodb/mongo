@@ -864,6 +864,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                         results->errors.push_back(
                             str::stream()
                             << "Detected a time-series bucket with malformed min/max values");
+                        results->valid = false;
                     } else if (containsMixedSchemaDataResponse.isOK() &&
                                containsMixedSchemaDataResponse.getValue()) {
                         bool mixedSchemaAllowed =
@@ -890,6 +891,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                 << "Detected a time-series bucket with mixed schema data when "
                                    "timeseriesBucketsMayHaveMixedSchemaData is false. You can run "
                                    "the collMod command to set this flag");
+                            results->valid = false;
                         }
                     }
                 }
