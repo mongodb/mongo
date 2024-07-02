@@ -501,6 +501,8 @@ last-continuous:
     ticket: SERVER-81454
   - test_file: jstests/sharding/move_chunk_deferred_lookup.js
     ticket: SERVER-89859
+  - test_file: jstests/sharding/secondaries_clear_filtering_metadata.js
+    ticket: SERVER-86669
   - test_file: jstests/aggregation/unwind_sort.js
     ticket: SERVER-90485
   - test_file: jstests/aggregation/group_by_objectid.js
@@ -1078,6 +1080,8 @@ last-lts:
     ticket: SERVER-81454
   - test_file: jstests/sharding/move_chunk_deferred_lookup.js
     ticket: SERVER-89859
+  - test_file: jstests/sharding/secondaries_clear_filtering_metadata.js
+    ticket: SERVER-86669
   - test_file: jstests/aggregation/unwind_sort.js
     ticket: SERVER-90485
   - test_file: jstests/aggregation/group_by_objectid.js
