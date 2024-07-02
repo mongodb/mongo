@@ -133,7 +133,7 @@ public:
             patterns.insert({std::move(pattern), APIParameters::get(opCtx)});
         }
 
-        uassertStatusOK(killSessionsCmdHelper(opCtx, result, patterns));
+        uassertStatusOK(killSessionsCmdHelper(opCtx, patterns));
         killSessionsReport(opCtx, cmdObj);
         return true;
     }

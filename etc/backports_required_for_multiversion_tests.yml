@@ -157,6 +157,8 @@ last-continuous:
       ticket: SERVER-91406
     - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
       ticket: SERVER-90995
+    - test_file: jstests/sharding/fail_kill_sessions.js
+      ticket: SERVER-89630
     - test_file: jstests/core/timeseries/timeseries_cursor_batches.js
       ticket: SERVER-91512
     - test_file: jstests/core/index/index_bounds_pipe.js
@@ -332,6 +334,8 @@ last-lts:
       ticket: SERVER-91406
     - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
       ticket: SERVER-90995
+    - test_file: jstests/sharding/fail_kill_sessions.js
+      ticket: SERVER-89630
     - test_file: jstests/core/timeseries/timeseries_cursor_batches.js
       ticket: SERVER-91512
     - test_file: jstests/sharding/migration_coordinator_abort_failover.js

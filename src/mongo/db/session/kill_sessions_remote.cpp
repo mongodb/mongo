@@ -108,7 +108,8 @@ SessionKiller::Result parallelExec(OperationContext* opCtx,
                                   Milliseconds(gKillSessionsPerHostTimeoutMS));
 
     for (const auto& result : results) {
-        if (!std::get<1>(result).isOK()) {
+        if (!std::get<1>(result).isOK() ||
+            !getStatusFromCommandResult(std::get<1>(result).data).isOK()) {
             failed.push_back(std::get<0>(result));
         }
     }
