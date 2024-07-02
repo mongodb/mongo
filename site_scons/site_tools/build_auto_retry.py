@@ -32,10 +32,6 @@ import re
 
 from typing import Callable, List, Dict
 
-# Note: The auto-retry settings are prefixed w/ "OOM", but since it's an unconditional retry,
-# it's not really OOM-specific. We're keeping the OOM prefix to make the code change simpler.
-# (This custom retry logic will go away once the build is fully Bazelified).
-
 
 def command_spawn_func(
     sh: str,
@@ -50,8 +46,8 @@ def command_spawn_func(
     success = False
 
     build_env = target[0].get_build_env()
-    max_retries = build_env.get("OOM_RETRY_ATTEMPTS", 10)
-    oom_max_retry_delay = build_env.get("OOM_RETRY_MAX_DELAY_SECONDS", 120)
+    max_retries = build_env.get("BUILD_RETRY_ATTEMPTS", 10)
+    build_max_retry_delay = build_env.get("BUILD_RETRY_MAX_DELAY_SECONDS", 120)
 
     while not success and retries <= max_retries:
         try:
@@ -82,7 +78,7 @@ def command_spawn_func(
             print(f"{os.path.basename(__file__)} captured error:")
             print(exc.stdout)
             retries += 1
-            retry_delay = int((time.time() - start_time) + oom_max_retry_delay * random.random())
+            retry_delay = int((time.time() - start_time) + build_max_retry_delay * random.random())
             print(
                 f"Failed while trying to build {target[0]}",
             )
@@ -91,7 +87,7 @@ def command_spawn_func(
                 time.sleep(retry_delay)
                 continue
 
-            # There was no OOM error or no more OOM retries left
+            # No more retries left
             return exc.returncode
         else:
             if proc.stdout:
@@ -102,7 +98,7 @@ def command_spawn_func(
 def generate(env):
     original_command_execute = SCons.Action.CommandAction.execute
 
-    def oom_retry_execute(command_action_instance, target, source, env, executor=None):
+    def build_retry_execute(command_action_instance, target, source, env, executor=None):
         if (
             "conftest" not in str(target[0])
             and target[0].has_builder()
@@ -130,7 +126,7 @@ def generate(env):
             )
         return result
 
-    SCons.Action.CommandAction.execute = oom_retry_execute
+    SCons.Action.CommandAction.execute = build_retry_execute
 
 
 def exists(env):

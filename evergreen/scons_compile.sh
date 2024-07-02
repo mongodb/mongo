@@ -52,7 +52,7 @@ else
   extra_args="$extra_args --release"
 fi
 
-extra_args="$extra_args SPLIT_DWARF=0 GDB_INDEX=0 ENABLE_OOM_RETRY=1 BAZEL_INTEGRATION_DEBUG=1"
+extra_args="$extra_args SPLIT_DWARF=0 GDB_INDEX=0 ENABLE_BUILD_RETRY=1 BAZEL_INTEGRATION_DEBUG=1"
 
 echo "Setting evergreen tmp dir to $TMPDIR"
 extra_args="$extra_args --evergreen-tmp-dir='${TMPDIR}'"

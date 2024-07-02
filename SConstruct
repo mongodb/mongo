@@ -1556,9 +1556,9 @@ env_vars.Add(
 )
 
 env_vars.Add(
-    "ENABLE_OOM_RETRY",
-    help='Set the boolean (auto, on/off true/false 1/0) to enable retrying a compile or link commands from "out of memory" failures.',
-    converter=functools.partial(bool_var_converter, var="ENABLE_OOM_RETRY"),
+    "ENABLE_BUILD_RETRY",
+    help="Set the boolean (auto, on/off true/false 1/0) to enable retrying a compile or link commands failures.",
+    converter=functools.partial(bool_var_converter, var="ENABLE_BUILD_RETRY"),
     default="False",
 )
 
@@ -2069,13 +2069,13 @@ releaseBuild = get_option("release") == "on"
 debugBuild = get_option("dbg") == "on"
 optBuild = mongo_generators.get_opt_options(env)
 
-if env.get("ENABLE_OOM_RETRY"):
+if env.get("ENABLE_BUILD_RETRY"):
     if get_option("ninja") != "disabled":
-        print("ENABLE_OOM_RETRY not compatible with ninja, disabling ENABLE_OOM_RETRY.")
+        print("ENABLE_BUILD_RETRY not compatible with ninja, disabling ENABLE_BUILD_RETRY.")
     else:
-        env["OOM_RETRY_ATTEMPTS"] = 10
-        env["OOM_RETRY_MAX_DELAY_SECONDS"] = 120
-        env.Tool("oom_auto_retry")
+        env["BUILD_RETRY_ATTEMPTS"] = 10
+        env["BUILD_RETRY_MAX_DELAY_SECONDS"] = 120
+        env.Tool("build_auto_retry")
 
 if env.ToolchainIs("clang"):
     # LLVM utilizes the stack extensively without optimization enabled, which
