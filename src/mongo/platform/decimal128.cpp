@@ -840,36 +840,33 @@ Decimal128 Decimal128::exponential(std::uint32_t* signalingFlags, RoundingMode r
     return Decimal128{libraryTypeToValue(current)};
 }
 
-Decimal128 Decimal128::logarithm(RoundingMode roundMode) const {
+Decimal128 Decimal128::naturalLogarithm(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return logarithm(&throwAwayFlag, roundMode);
+    return naturalLogarithm(&throwAwayFlag, roundMode);
 }
 
-Decimal128 Decimal128::logarithm(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
+Decimal128 Decimal128::naturalLogarithm(std::uint32_t* signalingFlags,
+                                        RoundingMode roundMode) const {
     BID_UINT128 current = decimal128ToLibraryType(_value);
     current = bid128_log(current, roundMode, signalingFlags);
     return Decimal128{libraryTypeToValue(current)};
 }
 
-Decimal128 Decimal128::logarithm(const Decimal128& other, RoundingMode roundMode) const {
+Decimal128 Decimal128::logarithm(const Decimal128& base, RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    if (other.isEqual(Decimal128(2))) {
+    if (base.isEqual(Decimal128(2))) {
         BID_UINT128 current = decimal128ToLibraryType(_value);
         current = bid128_log2(current, roundMode, &throwAwayFlag);
         return Decimal128{libraryTypeToValue(current)};
     }
-    if (other.isEqual(Decimal128(10))) {
+    if (base.isEqual(Decimal128(10))) {
         BID_UINT128 current = decimal128ToLibraryType(_value);
         current = bid128_log10(current, roundMode, &throwAwayFlag);
         return Decimal128{libraryTypeToValue(current)};
     }
-    return logarithm(other, &throwAwayFlag);
-}
-
-Decimal128 Decimal128::logarithm(const Decimal128& other,
-                                 std::uint32_t* signalingFlags,
-                                 RoundingMode roundMode) const {
-    return logarithm(signalingFlags, roundMode).divide(other);
+    // Logarithm with a generic base is equivalent to `ln(input) / ln(base)`.
+    return naturalLogarithm(&throwAwayFlag, roundMode)
+        .divide(base.naturalLogarithm(&throwAwayFlag, roundMode));
 }
 
 Decimal128 Decimal128::modulo(const Decimal128& other) const {
