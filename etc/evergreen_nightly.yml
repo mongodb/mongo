@@ -35,6 +35,9 @@ include:
   ### Uncomment when using this file for a LTS or Rapid release branch. ###
   # - filename: etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
 
+  ### Uncomment when using this file for a LTS or Rapid release branch. ###
+  # filename: etc/evergreen_yml_components/variants/mongot/test_dev.yml
+
   - filename: etc/evergreen_yml_components/variants/suse/test_release.yml
 
   - filename: etc/evergreen_yml_components/variants/ubuntu/test_release.yml

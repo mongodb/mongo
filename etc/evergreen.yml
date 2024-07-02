@@ -70,6 +70,8 @@ include:
 
   - filename: etc/evergreen_yml_components/variants/macos/test_dev_master_branch_only.yml
 
+  - filename: etc/evergreen_yml_components/variants/mongot/test_dev.yml
+
   - filename: etc/evergreen_yml_components/variants/rhel/test_dev.yml
   - filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
   - filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml

@@ -73,6 +73,9 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./etc/OWNERS.yml
 /etc/**/yamllint_config.yml @10gen/devprod-services-integrations
 
+# The following patterns are parsed from ./etc/evergreen_yml_components/variants/mongot/OWNERS.yml
+/etc/evergreen_yml_components/variants/mongot/**/* @TedTuckman @madelinezec
+
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/OWNERS.yml
 /jstests/concurrency/fsm_workloads/**/server_status.js @10gen/server-service-architecture
 /jstests/concurrency/fsm_workloads/**/server_status_with_time_out_cursors.js @10gen/server-service-architecture
