@@ -1964,6 +1964,8 @@ env.Library(
         "update/pattern_cmp",
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/util/elapsed_tracker",
+        "curop_failpoint_helpers",
         "mongohasher",
         "server_base",
         "service_context",
