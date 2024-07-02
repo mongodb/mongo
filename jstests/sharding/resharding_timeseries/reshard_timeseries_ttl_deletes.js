@@ -44,6 +44,10 @@ const timeseriesCollection = reshardingTest.createShardedCollection({
 function assertNumOfDocs(expected) {
     assert.soon(() => {
         const docs = st.s0.getCollection(ns).find({}).toArray();
+        if (expected !== docs.length) {
+            jsTestLog("Didn't find expected number of documents, trying again. Found: " +
+                      tojson(docs));
+        }
         return expected === docs.length;
     }, "Expected " + expected + " docs in the collection.");
 }
@@ -73,9 +77,9 @@ const donor1 = new Mongo(topology.shards[donorShardNames[1]].primary);
 const recipient0 = new Mongo(topology.shards[recipientShardNames[0]].primary);
 
 const hangTTLMonitorFP = configureFailPoint(donor0, 'hangTTLMonitorBetweenPasses');
+hangTTLMonitorFP.wait();
 insertDocsToBeDeleted();
 assertNumOfDocs(4);
-hangTTLMonitorFP.wait();
 
 reshardingTest.withReshardingInBackground(
     {
@@ -115,6 +119,7 @@ assert(applyOps.ns.includes("reshardingDb.system.buckets.resharding"));
 // Ensure TTL deletes works on the resharded collection.
 const pauseTTLMonitor =
     configureFailPoint(recipient0, 'hangTTLMonitorBetweenPasses', {}, "alwaysOn");
+pauseTTLMonitor.wait();
 insertDocsToBeDeleted();
 assertNumOfDocs(4);
 pauseTTLMonitor.off();
