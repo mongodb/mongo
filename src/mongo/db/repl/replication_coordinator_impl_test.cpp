@@ -1378,13 +1378,6 @@ TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedWhenAWriteConcernTimesOutBefo
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
     awaiter.reset();
 
-    // Test that the waiter is still in the waiter list as we only clean up abandoned waiters
-    // lazily.
-    ASSERT_EQ(replicationWaiterListMetric.get(), 1);
-
-    // Advance local node to time3 and this should trigger the lazy cleanup.
-    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time3, Date_t() + Seconds(110));
-
     // Test that the waiter list is now empty.
     ASSERT_EQ(replicationWaiterListMetric.get(), 0);
 }

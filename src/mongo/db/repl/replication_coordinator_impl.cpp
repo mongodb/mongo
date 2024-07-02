@@ -209,8 +209,7 @@ MONGO_FAIL_POINT_DEFINE(throwBeforeRecoveringTenantMigrationAccessBlockers);
 // Hang before allowing the transition from RECOVERING to SECONDARY.
 MONGO_FAIL_POINT_DEFINE(hangBeforeFinishRecovery);
 
-Atomic64Metric& replicationWaiterListMetric =
-    *MetricBuilder<Atomic64Metric>("repl.waiters.replication");
+Counter64& replicationWaiterListMetric = *MetricBuilder<Counter64>("repl.waiters.replication");
 Atomic64Metric& opTimeWaiterListMetric = *MetricBuilder<Atomic64Metric>("repl.waiters.opTime");
 
 namespace {
@@ -279,18 +278,19 @@ void ReplicationCoordinatorImpl::WaiterList::add(WithLock lk,
 }
 
 std::pair<SharedSemiFuture<void>, ReplicationCoordinatorImpl::SharedWaiterHandle>
-ReplicationCoordinatorImpl::WaiterList::add(WithLock lk,
-                                            const OpTime& opTime,
-                                            boost::optional<WriteConcernOptions> wc) {
+ReplicationCoordinatorImpl::WaiterList::add(WithLock lk, const OpTime& opTime) {
     auto pf = makePromiseFuture<void>();
-    auto waiter = std::make_shared<Waiter>(std::move(pf.promise), std::move(wc));
+    auto waiter = std::make_shared<Waiter>(std::move(pf.promise), boost::none);
     _waiters.emplace(opTime, waiter);
     _updateMetric(lk);
-    return std::make_pair(std::move(pf.future), waiter);
+    return std::make_pair(std::move(pf.future), std::move(waiter));
 }
 
-bool ReplicationCoordinatorImpl::WaiterList::remove(WithLock lk, SharedWaiterHandle waiter) {
-    for (auto iter = _waiters.begin(); iter != _waiters.end(); iter++) {
+bool ReplicationCoordinatorImpl::WaiterList::remove(WithLock lk,
+                                                    const OpTime& opTime,
+                                                    SharedWaiterHandle waiter) {
+    auto [begin, end] = _waiters.equal_range(opTime);
+    for (auto iter = begin; iter != end; iter++) {
         if (iter->second == waiter) {
             _waiters.erase(iter);
             _updateMetric(lk);
@@ -300,10 +300,10 @@ bool ReplicationCoordinatorImpl::WaiterList::remove(WithLock lk, SharedWaiterHan
     return false;
 }
 
-template <typename Func>
-void ReplicationCoordinatorImpl::WaiterList::setValueIf(WithLock lk,
-                                                        Func&& func,
-                                                        boost::optional<OpTime> opTime) {
+void ReplicationCoordinatorImpl::WaiterList::setValueIf(
+    WithLock lk,
+    std::function<bool(WithLock, const OpTime&, const SharedWaiterHandle&)> func,
+    boost::optional<OpTime> opTime) {
     for (auto it = _waiters.begin(); it != _waiters.end() && (!opTime || it->first <= *opTime);) {
         const auto& waiter = it->second;
         try {
@@ -341,6 +341,95 @@ void ReplicationCoordinatorImpl::WaiterList::setErrorAll(WithLock lk, Status sta
     }
     _waiters.clear();
     _updateMetric(lk);
+}
+
+ReplicationCoordinatorImpl::WriteConcernWaiterList::WriteConcernWaiterList(
+    Counter64& waiterCountMetric)
+    : _waiterCountMetric(waiterCountMetric) {}
+
+void ReplicationCoordinatorImpl::WriteConcernWaiterList::add(WithLock lk,
+                                                             const OpTime& opTime,
+                                                             SharedWaiterHandle waiter) {
+    invariant(waiter->writeConcern);
+    auto& waiterList = _waiters[*waiter->writeConcern];
+    waiterList.emplace(opTime, std::move(waiter));
+    _waiterCountMetric.incrementRelaxed();
+}
+
+std::pair<SharedSemiFuture<void>, ReplicationCoordinatorImpl::SharedWaiterHandle>
+ReplicationCoordinatorImpl::WriteConcernWaiterList::add(WithLock lk,
+                                                        const OpTime& opTime,
+                                                        WriteConcernOptions wc) {
+    auto pf = makePromiseFuture<void>();
+    auto waiter = std::make_shared<Waiter>(std::move(pf.promise), std::move(wc));
+    auto& waiterList = _waiters[*waiter->writeConcern];
+    waiterList.emplace(opTime, waiter);
+    _waiterCountMetric.incrementRelaxed();
+    return std::make_pair(std::move(pf.future), std::move(waiter));
+}
+
+bool ReplicationCoordinatorImpl::WriteConcernWaiterList::remove(WithLock lk,
+                                                                const OpTime& opTime,
+                                                                SharedWaiterHandle waiter) {
+    if (!waiter->writeConcern)
+        return false;
+    auto& waiterList = _waiters[*waiter->writeConcern];
+    auto [begin, end] = waiterList.equal_range(opTime);
+    for (auto iter = begin; iter != end; iter++) {
+        if (iter->second == waiter) {
+            waiterList.erase(iter);
+            _waiterCountMetric.decrementRelaxed();
+            return true;
+        }
+    }
+    return false;
+}
+
+void ReplicationCoordinatorImpl::WriteConcernWaiterList::setValueIf(
+    WithLock lk,
+    std::function<bool(WithLock, const OpTime&, const WriteConcernOptions&)> func,
+    boost::optional<OpTime> opTime) {
+    std::size_t erased = 0;
+    for (auto& waiterListEntry : _waiters) {
+        auto& waiterList = waiterListEntry.second;
+        auto it = waiterList.begin();
+        for (; it != waiterList.end() && (!opTime || it->first <= *opTime); ++it) {
+            const auto& waiter = it->second;
+            try {
+                if (!func(lk, it->first, waiterListEntry.first))
+                    break;
+                waiter->promise.emplaceValue();
+            } catch (const DBException& e) {
+                waiter->promise.setError(e.toStatus());
+            }
+            ++erased;
+        }
+        waiterList.erase(waiterList.begin(), it);
+    }
+    _waiterCountMetric.decrementRelaxed(erased);
+}
+
+void ReplicationCoordinatorImpl::WriteConcernWaiterList::setValueAll(WithLock lk) {
+    for (auto& waiterListEntry : _waiters) {
+        auto& waiterList = waiterListEntry.second;
+        for (auto& [opTime, waiter] : waiterList) {
+            waiter->promise.emplaceValue();
+        }
+    }
+    _waiters.clear();
+    _waiterCountMetric.setToZero();
+}
+
+void ReplicationCoordinatorImpl::WriteConcernWaiterList::setErrorAll(WithLock lk, Status status) {
+    invariant(!status.isOK());
+    for (auto& waiterListEntry : _waiters) {
+        auto& waiterList = waiterListEntry.second;
+        for (auto& [opTime, waiter] : waiterList) {
+            waiter->promise.setError(status);
+        }
+    }
+    _waiters.clear();
+    _waiterCountMetric.setToZero();
 }
 
 ReplicationCoordinatorImpl::SharedReplSetConfig::SharedReplSetConfig()
@@ -2404,6 +2493,12 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
     // pass.
     if (!status.isOK() && !future.isReady() && waiter) {
         invariant(!waiter->givenUp.swap(true));
+        // The WriteConcernWaiterList does not support delayed cleanup, so we remove this from
+        // that waiter list immediately.
+        stdx::lock_guard lock(_mutex);
+        // We cannot check the result of the remove because it is possible the waiter was fulfilled
+        // between the deadline expiring and taking the lock, or it is on a different waiter list.
+        _replicationWaiterList.remove(lock, opTime, waiter);
     }
 
     // If we get a timeout error and the opCtx deadline is >= the writeConcern wtimeout, then we
@@ -3254,12 +3349,15 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             auto status = futureGetNoThrowWithDeadline(
                 opCtx, future, std::min(stepDownUntil, waitUntil), ErrorCodes::ExceededTimeLimit);
 
-            // Mark the waiter given up if this waiter times out before the future is ready. This is
-            // so that unsatisfied but abandoned waiters can be cleaned up lazily in the next
-            // _wakeReadyWaiters pass.
+            // Remove the waiter from the list if it times out before the future is ready.
+            // The replicationWaiterList does not support delayed removal with waiter->givenUp.
             if (!status.isOK() && !future.isReady()) {
-                invariant(!waiter->givenUp.swap(true));
+                lk.lock();
+                invariant(waiter);
+                _replicationWaiterList.remove(lk, lastAppliedOpTime, waiter);
+                lk.unlock();
             }
+
             // We ignore the case where runWithDeadline returns timeoutError because in that case
             // coming back around the loop and calling tryToStartStepDown again will cause
             // tryToStartStepDown to return ExceededTimeLimit with the proper error message.
@@ -5215,7 +5313,7 @@ void ReplicationCoordinatorImpl::CatchupState::abort(WithLock lk,
         _repl->_replExecutor->cancel(_timeoutCbh);
     }
     if (reason != PrimaryCatchUpConclusionReason::kSucceeded && _waiter) {
-        _repl->_lastAppliedOpTimeWaiterList.remove(lk, _waiter);
+        _repl->_lastAppliedOpTimeWaiterList.remove(lk, _targetOpTime, _waiter);
         _waiter.reset();
     }
 
@@ -5254,6 +5352,17 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate(WithLock lk
     if (_waiter && _targetOpTime == *targetOpTime) {
         return;
     }
+
+    if (_waiter) {
+        _repl->_lastAppliedOpTimeWaiterList.remove(lk, _targetOpTime, _waiter);
+        _waiter.reset();
+    } else {
+        // Only increment the 'numCatchUps' election metric the first time we add a waiter, so that
+        // we only increment it once each time a primary has to catch up. If there is already an
+        // existing waiter, then the node is catching up and has already been counted.
+        ReplicationMetrics::get(getGlobalServiceContext()).incrementNumCatchUps();
+    }
+
     _targetOpTime = *targetOpTime;
 
     ReplicationMetrics::get(getGlobalServiceContext()).setTargetCatchupOpTime(_targetOpTime);
@@ -5266,16 +5375,6 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate(WithLock lk
               "Latest known optime",
               "memberId"_attr = pair.first,
               "latestKnownOpTime"_attr = (pair.second ? (*pair.second).toString() : "unknown"));
-    }
-
-    if (_waiter) {
-        _repl->_lastAppliedOpTimeWaiterList.remove(lk, _waiter);
-        _waiter.reset();
-    } else {
-        // Only increment the 'numCatchUps' election metric the first time we add a waiter, so that
-        // we only increment it once each time a primary has to catch up. If there is already an
-        // existing waiter, then the node is catching up and has already been counted.
-        ReplicationMetrics::get(getGlobalServiceContext()).incrementNumCatchUps();
     }
 
     auto targetOpTimeCB = [this, &lk](Status status) {
@@ -5493,11 +5592,10 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
 
     // Wake up writeConcern waiters that are no longer satisfiable due to the rsConfig change.
     _replicationWaiterList.setValueIf(
-        lk, [this](WithLock lk, const OpTime& opTime, const SharedWaiterHandle& waiter) {
-            invariant(waiter->writeConcern);
+        lk, [this](WithLock lk, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
             // This throws if a waiter's writeConcern is no longer satisfiable, in which case
             // setValueIf_inlock will fulfill the waiter's promise with the error status.
-            uassertStatusOK(_checkIfWriteConcernCanBeSatisfied(lk, waiter->writeConcern.value()));
+            uassertStatusOK(_checkIfWriteConcernCanBeSatisfied(lk, writeConcern));
             // Return false meaning that the waiter is still satisfiable and thus can remain in the
             // waiter list.
             return false;
@@ -5542,9 +5640,8 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
 void ReplicationCoordinatorImpl::_wakeReadyWaiters(WithLock lk, boost::optional<OpTime> opTime) {
     _replicationWaiterList.setValueIf(
         lk,
-        [this](WithLock lk, const OpTime& opTime, const SharedWaiterHandle& waiter) {
-            invariant(waiter->writeConcern);
-            return _doneWaitingForReplication(lk, opTime, waiter->writeConcern.value());
+        [this](WithLock lk, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+            return _doneWaitingForReplication(lk, opTime, writeConcern);
         },
         opTime);
 }

@@ -2346,3 +2346,15 @@ env.Benchmark(
         "storage_interface_impl",
     ],
 )
+
+env.Benchmark(
+    target="replication_waiter_list_bm",
+    source=[
+        "replication_waiter_list_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/unittest/unittest",
+        "repl_coordinator_impl",
+        "repl_coordinator_test_fixture",
+    ],
+)

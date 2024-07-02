@@ -129,6 +129,43 @@ class ReplSetMetadata;
 }  // namespace rpc
 
 namespace repl {
+// HashWriteConcernForReplication and EqualWriteConcernForReplication are used to make a hash
+// map of write concerns.  They should include all the fields, and only the fields which are
+// relevant to _doneWaitingForReplication -- syncMode, w, and checkCondition.
+// They are declared here, rather than inside ReplCoordinatorImpl, because it is not possible
+// to use the IsTrustedHasher template for an inner class.
+class HashWriteConcernForReplication {
+public:
+    std::size_t operator()(const WriteConcernOptions& a) const {
+        std::size_t seed = 0;
+        boost::hash_combine(seed, stdx::to_underlying(a.syncMode));
+        boost::hash_combine(seed, a.checkCondition);
+        std::visit(OverloadedVisitor{[&](const std::string& s) { boost::hash_combine(seed, s); },
+                                     [&](std::int64_t n) { boost::hash_combine(seed, n); },
+                                     [&](const WTags& tags) {
+                                         for (const auto& tag : tags) {
+                                             boost::hash_combine(seed, tag.first);
+                                             boost::hash_combine(seed, tag.second);
+                                         }
+                                     }},
+                   a.w);
+        return seed;
+    }
+};
+
+class EqualWriteConcernForReplication {
+public:
+    bool operator()(const WriteConcernOptions& a, const WriteConcernOptions& b) const {
+        return a.syncMode == b.syncMode && a.checkCondition == b.checkCondition && a.w == b.w;
+    }
+};
+}  // namespace repl
+
+template <>
+struct IsTrustedHasher<repl::HashWriteConcernForReplication, WriteConcernOptions> : std::true_type {
+};
+
+namespace repl {
 
 class HeartbeatResponseAction;
 class LastVote;
@@ -885,6 +922,7 @@ private:
 
     using SharedWaiterHandle = std::shared_ptr<Waiter>;
 
+    // This is a waiter list for things waiting on local opTimes only.
     class WaiterList {
     public:
         WaiterList() = delete;
@@ -893,16 +931,16 @@ private:
         // Adds waiter into the list.
         void add(WithLock lk, const OpTime& opTime, SharedWaiterHandle waiter);
         // Adds a waiter into the list and returns the future of the waiter's promise.
-        std::pair<SharedSemiFuture<void>, SharedWaiterHandle> add(
-            WithLock lk,
-            const OpTime& opTime,
-            boost::optional<WriteConcernOptions> w = boost::none);
+        std::pair<SharedSemiFuture<void>, SharedWaiterHandle> add(WithLock lk,
+                                                                  const OpTime& opTime);
         // Returns whether waiter is found and removed.
-        bool remove(WithLock lk, SharedWaiterHandle waiter);
+        bool remove(WithLock lk, const OpTime& opTime, SharedWaiterHandle waiter);
         // Signals all waiters whose opTime is <= the given opTime (if any) that satisfy the
         // condition in func.
-        template <typename Func>
-        void setValueIf(WithLock lk, Func&& func, boost::optional<OpTime> opTime = boost::none);
+        void setValueIf(
+            WithLock lk,
+            std::function<bool(WithLock, const OpTime&, const SharedWaiterHandle&)> func,
+            boost::optional<OpTime> opTime = boost::none);
         // Signals all waiters from the list and fulfills promises with OK status.
         void setValueAll(WithLock lk);
         // Signals all waiters from the list and fulfills promises with Error status.
@@ -916,6 +954,46 @@ private:
         // We keep a separate count outside _waiters.size() in order to avoid having to
         // take a lock to read the metric.
         Atomic64Metric& _waiterCountMetric;
+    };
+
+    // This is a waiter list for things waiting on opTimes along with a WriteConcern.  It breaks
+    // the waiters up by WriteConcern (using the hash and equal functors above) so that within a
+    // sub-list, the waiters are satisfied in order.
+    class WriteConcernWaiterList {
+    public:
+        WriteConcernWaiterList() = delete;
+        WriteConcernWaiterList(Counter64& waiterCountMetric);
+
+        // Adds waiter into the list.
+        void add(WithLock lk, const OpTime& opTime, SharedWaiterHandle waiter);
+        // Adds a waiter into the list and returns the future of the waiter's promise.
+        std::pair<SharedSemiFuture<void>, SharedWaiterHandle> add(WithLock lk,
+                                                                  const OpTime& opTime,
+                                                                  WriteConcernOptions w);
+        // Returns whether waiter is found and removed.
+        bool remove(WithLock lk, const OpTime& opTime, SharedWaiterHandle waiter);
+
+        // Signals all waiters whose opTime is <= the given opTime (if any) that satisfy the
+        // condition in func.  The func must have the property that, for any given
+        // WriteConcernOptions, there is some optime T such that func returns true for all
+        // optimes <= T, and false for all optimes > T.
+        void setValueIf(
+            WithLock lk,
+            std::function<bool(WithLock, const OpTime&, const WriteConcernOptions&)> func,
+            boost::optional<OpTime> opTime = boost::none);
+        // Signals all waiters from the list and fulfills promises with OK status.
+        void setValueAll(WithLock lk);
+        // Signals all waiters from the list and fulfills promises with Error status.
+        void setErrorAll(WithLock lk, Status status);
+
+    private:
+        // Waiters sorted by OpTime.
+        stdx::unordered_map<WriteConcernOptions,
+                            std::multimap<OpTime, SharedWaiterHandle, std::less<>>,
+                            HashWriteConcernForReplication,
+                            EqualWriteConcernForReplication>
+            _waiters;
+        Counter64& _waiterCountMetric;
     };
 
     enum class HeartbeatState { kScheduled = 0, kSent = 1 };
@@ -1869,7 +1947,7 @@ private:
     // Waiters in this list are checked and notified on remote nodes' opTime updates and self's
     // lastDurable opTime updates. We do not check this list on self's lastApplied opTime updates to
     // avoid checking all waiters in the list on every write.
-    WaiterList _replicationWaiterList;  // (M)
+    WriteConcernWaiterList _replicationWaiterList;  // (M)
 
     // list of information about clients waiting for a particular lastApplied opTime.
     // Waiters in this list are checked and notified on self's lastApplied opTime updates.
@@ -2042,7 +2120,7 @@ private:
     AtomicWord<bool> _isDataConsistent{false};
 };
 
-extern Atomic64Metric& replicationWaiterListMetric;
+extern Counter64& replicationWaiterListMetric;
 extern Atomic64Metric& opTimeWaiterListMetric;
 
 }  // namespace repl
