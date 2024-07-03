@@ -1059,6 +1059,7 @@ THIN_LTO_LINKFLAGS = select({
 
 MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc",
+    "-I$(GENDIR)/src",
     "-Isrc/third_party/boost",
     "-Isrc/third_party/immer/dist",
 ]
@@ -1231,7 +1232,7 @@ def mongo_cc_library(
         deps += TCMALLOC_DEPS
 
     if native.package_name().startswith("src/mongo"):
-        hdrs = hdrs + ["//:mongo_config_header"]
+        hdrs = hdrs + ["//src/mongo:mongo_config_header"]
 
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
@@ -1394,7 +1395,7 @@ def mongo_cc_binary(
         This can be configured via //config/bazel:linkstatic.""")
 
     if native.package_name().startswith("src/mongo"):
-        srcs = srcs + ["//:mongo_config_header"]
+        srcs = srcs + ["//src/mongo:mongo_config_header"]
 
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)

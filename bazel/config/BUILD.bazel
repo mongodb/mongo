@@ -47,13 +47,6 @@ exports_files([
     "generate_config_header.py",
 ])
 
-filegroup(
-    name = "generate_config_header",
-    srcs = [
-        "generate_config_header.py",
-    ],
-)
-
 # --------------------------------------
 # Compiler types
 # --------------------------------------

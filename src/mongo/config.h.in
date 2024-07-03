@@ -81,7 +81,7 @@
 @mongo_config_optimized_build@
 
 // Defined if OpenSSL has SEQUENCE_ANY
-@mongo_config_ssl_has_asn1_any_definitions@
+@mongo_config_have_asn1_any_definitions@
 
 // Defined if SSL support is enabled with chosen ssl provider
 @mongo_config_ssl_provider@

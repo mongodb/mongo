@@ -1,6 +1,7 @@
 # -*- mode: python; -*-
 
 import re
+import sys
 
 Import(
     [
@@ -54,40 +55,8 @@ env.SConscript(
     ],
 )
 
-config_header_substs = (
-    (
-        "@mongo_config_altivec_vec_vbpermq_output_index@",
-        "MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX",
-    ),
-    ("@mongo_config_debug_build@", "MONGO_CONFIG_DEBUG_BUILD"),
-    ("@mongo_config_use_tracing_profiler@", "MONGO_CONFIG_USE_TRACING_PROFILER"),
-    ("@mongo_config_have_execinfo_backtrace@", "MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE"),
-    ("@mongo_config_have_explicit_bzero@", "MONGO_CONFIG_HAVE_EXPLICIT_BZERO"),
-    ("@mongo_config_have_fips_mode_set@", "MONGO_CONFIG_HAVE_FIPS_MODE_SET"),
-    ("@mongo_config_have_header_unistd_h@", "MONGO_CONFIG_HAVE_HEADER_UNISTD_H"),
-    ("@mongo_config_have_memset_s@", "MONGO_CONFIG_HAVE_MEMSET_S"),
-    ("@mongo_config_have_posix_monotonic_clock@", "MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK"),
-    ("@mongo_config_have_pthread_setname_np@", "MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP"),
-    ("@mongo_config_have_ssl_ec_key_new@", "MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW"),
-    ("@mongo_config_have_ssl_set_ecdh_auto@", "MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO"),
-    ("@mongo_config_have_strnlen@", "MONGO_CONFIG_HAVE_STRNLEN"),
-    ("@mongo_config_max_extended_alignment@", "MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT"),
-    ("@mongo_config_ocsp_stapling_enabled@", "MONGO_CONFIG_OCSP_STAPLING_ENABLED"),
-    ("@mongo_config_optimized_build@", "MONGO_CONFIG_OPTIMIZED_BUILD"),
-    ("@mongo_config_ssl_has_asn1_any_definitions@", "MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS"),
-    ("@mongo_config_ssl_provider@", "MONGO_CONFIG_SSL_PROVIDER"),
-    ("@mongo_config_ssl@", "MONGO_CONFIG_SSL"),
-    ("@mongo_config_usdt_enabled@", "MONGO_CONFIG_USDT_ENABLED"),
-    ("@mongo_config_usdt_provider@", "MONGO_CONFIG_USDT_PROVIDER"),
-    ("@mongo_config_use_libunwind@", "MONGO_CONFIG_USE_LIBUNWIND"),
-    ("@mongo_config_use_raw_latches@", "MONGO_CONFIG_USE_RAW_LATCHES"),
-    ("@mongo_config_wiredtiger_enabled@", "MONGO_CONFIG_WIREDTIGER_ENABLED"),
-    ("@mongo_config_grpc@", "MONGO_CONFIG_GRPC"),
-    ("@mongo_config_glibc_rseq@", "MONGO_CONFIG_GLIBC_RSEQ"),
-    ("@mongo_config_tcmalloc_google@", "MONGO_CONFIG_TCMALLOC_GOOGLE"),
-    ("@mongo_config_tcmalloc_gperf@", "MONGO_CONFIG_TCMALLOC_GPERF"),
-    ("@mongo_config_streams@", "MONGO_CONFIG_STREAMS"),
-)
+sys.path.append("src/mongo")
+from src.mongo.mongo_config_header import get_config_header_substs
 
 
 def makeConfigHeaderDefine(self, key):
@@ -101,7 +70,7 @@ env.AddMethod(makeConfigHeaderDefine)
 
 generateConfigHeaderFile = env.Substfile(
     "config.h.in",
-    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs],
+    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in get_config_header_substs()],
 )
 env.Alias("generated-sources", generateConfigHeaderFile)
 

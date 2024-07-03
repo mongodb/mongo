@@ -1,5 +1,74 @@
+load("//bazel/config:generate_config_header.bzl", "generate_config_header")
+
 package(default_visibility = ["//visibility:public"])
 
-exports_files([
-    "config.h.in",
-])
+generate_config_header(
+    name = "mongo_config_header",
+    checks = "mongo_config_header.py",
+    extra_definitions = {} | select({
+        "//bazel/config:use_wiredtiger_enabled": {
+            "MONGO_CONFIG_WIREDTIGER_ENABLED": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:build_grpc_enabled": {
+            "MONGO_CONFIG_GRPC": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:tcmalloc_google_enabled": {
+            "MONGO_CONFIG_TCMALLOC_GOOGLE": "1",
+        },
+        "//bazel/config:tcmalloc_gperf_enabled": {
+            "MONGO_CONFIG_TCMALLOC_GPERF": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:libunwind_enabled": {
+            "MONGO_CONFIG_USE_LIBUNWIND": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:opt_any": {
+            "MONGO_CONFIG_OPTIMIZED_BUILD": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:dbg_enabled": {
+            "MONGO_CONFIG_DEBUG_BUILD": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:streams_release_build_required_setting": {
+            "MONGO_CONFIG_STREAMS": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:use_diagnostic_latches_enabled": {
+            "MONGO_CONFIG_USE_RAW_LATCHES": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:posix": {
+            "MONGO_CONFIG_HAVE_HEADER_UNISTD_H": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:ssl_enabled_windows": {
+            "MONGO_CONFIG_SSL": "1",
+            "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_WINDOWS",
+        },
+        "//bazel/config:ssl_enabled_macos": {
+            "MONGO_CONFIG_SSL": "1",
+            "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_APPLE",
+        },
+        "//bazel/config:ssl_enabled_linux": {
+            "MONGO_CONFIG_SSL": "1",
+            "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_OPENSSL",
+        },
+        "//conditions:default": {},
+    }),
+    logfile = "mongo_config.log",
+    output = "config.h",
+    template = "config.h.in",
+)
