@@ -1,5 +1,4 @@
 // Verify usage of $queryStats agg stage can be sent to audit log.
-// @tags: [requires_fcv_60]
 
 (function() {
 'use strict';
@@ -75,6 +74,7 @@ const runTest = function(audit, db, admin) {
 const auditFilterStr = "{'param.args.pipeline.0.$queryStats':{$exists:true}}";
 const parameters = {
     auditAuthorizationSuccess: true,
+    featureFlagQueryStats: true,
     internalQueryStatsRateLimit: -1
 };
 

@@ -1,7 +1,7 @@
 /**
  * This test confirms that query stats store key fields for an aggregate command are properly nested
  * and none are missing when running an explain query.
- * @tags: [requires_fcv_60]
+ * @tags: [featureFlagQueryStats]
  */
 load("jstests/libs/query_stats_utils.js");
 

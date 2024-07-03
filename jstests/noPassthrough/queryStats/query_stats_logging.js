@@ -1,6 +1,6 @@
 /**
  * Test logging of $queryStats.
- * @tags: [requires_fcv_60]
+ * @tags: [featureFlagQueryStats]
  */
 
 (function() {

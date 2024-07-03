@@ -1,6 +1,6 @@
 /**
  * Test that query stats key generation works for queries with non-object fields.
- * @tags: [requires_fcv_60]
+ * @tags: [featureFlagQueryStats]
  */
 load('jstests/libs/analyze_plan.js');
 

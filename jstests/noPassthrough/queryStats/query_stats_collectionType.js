@@ -2,7 +2,7 @@
  * Test that collectionType is returned properly in $queryStats. Checks for collection types
  * "collection", "view", "timeseries", "nonExistent", and "virtual". Type "changeStream" is covered
  * in query_stats_changeStreams.js.
- * @tags: [requires_fcv_60]
+ * @tags: [featureFlagQueryStats]
  */
 load("jstests/libs/query_stats_utils.js");
 (function() {
@@ -184,6 +184,7 @@ function runTest(conn) {
 const conn = MongoRunner.runMongod({
     setParameter: {
         internalQueryStatsRateLimit: -1,
+        featureFlagQueryStats: true,
     }
 });
 runTest(conn);
@@ -199,6 +200,7 @@ if (false) {
         mongosOptions: {
             setParameter: {
                 internalQueryStatsSamplingRate: -1,
+                featureFlagQueryStats: true,
             }
         },
     });

@@ -1,6 +1,6 @@
 /**
  * Test that mongos is collecting query stats metrics for find queries.
- * @tags: [requires_fcv_60]
+ * @tags: [featureFlagQueryStats]
  */
 
 load('jstests/libs/query_stats_utils.js');

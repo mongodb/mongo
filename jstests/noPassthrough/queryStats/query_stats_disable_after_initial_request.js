@@ -1,7 +1,7 @@
 /**
  * Tests that QueryStats metrics aren't collected if the feature is enabled initially but is
  * disabled before the lifetime of the request is complete.
- * @tags: [requires_fcv_60]
+ * @tags: [featureFlagQueryStats]
  */
 load("jstests/libs/query_stats_utils.js");  // For getQueryStatsFindCmd.
 (function() {

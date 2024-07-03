@@ -1,6 +1,6 @@
 /**
  * Test that $queryStats properly tokenizes aggregation commands, on mongod and mongos.
- * @tags: [requires_fcv_60]
+ * @tags: [featureFlagQueryStats]
  */
 load("jstests/libs/query_stats_utils.js");
 (function() {

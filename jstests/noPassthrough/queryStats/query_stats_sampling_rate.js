@@ -1,7 +1,7 @@
 /**
  * Test that calls to read from query stats store fail when sampling rate is not greater than 0 even
  * if feature flag is on.
- * @tags: [requires_fcv_60]
+ * @tags: [featureFlagQueryStats]
  */
 load('jstests/libs/analyze_plan.js');
 load("jstests/libs/query_stats_utils.js");
