@@ -361,7 +361,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
       _fromExpCtx(original._fromExpCtx->copyWith(_resolvedNs, original._fromExpCtx->uuid)),
       _resolvedPipeline(original._resolvedPipeline),
       _userPipeline(original._userPipeline),
-      _resolvedIntrospectionPipeline(original._resolvedIntrospectionPipeline->clone()),
+      _resolvedIntrospectionPipeline(original._resolvedIntrospectionPipeline->clone(_fromExpCtx)),
       _letVariables(original._letVariables) {
     if (!_localField && !_foreignField) {
         _cache.emplace(internalDocumentSourceCursorBatchSizeBytes.load());
