@@ -42,11 +42,15 @@ struct CollectionScanParams {
     };
 
     enum class ScanBoundInclusion {
-        kExcludeBothStartAndEndRecords,
-        kIncludeStartRecordOnly,
-        kIncludeEndRecordOnly,
-        kIncludeBothStartAndEndRecords,
+        kExcludeBothStartAndEndRecords = 0b00,
+        kIncludeStartRecordOnly = 0b01,
+        kIncludeEndRecordOnly = 0b10,
+        kIncludeBothStartAndEndRecords = 0b11,
     };
+
+    static ScanBoundInclusion makeInclusion(bool startInclusive, bool endInclusive) {
+        return ScanBoundInclusion(int(startInclusive) | (int(endInclusive) << 1));
+    }
 
     // If present, this parameter sets the start point of a forward scan or the end point of a
     // reverse scan. A forward scan will start scanning at the document with the lowest RecordId
