@@ -71,6 +71,10 @@ overrides:
   - task: buildscripts_test
     exec_timeout: 15
 
+  enterprise-windows-required:
+  - task: external_auth
+    exec_timeout: 120 # 2 hours
+
   windows-compile-required:
     - task: buildscripts_test
       exec_timeout: 15
