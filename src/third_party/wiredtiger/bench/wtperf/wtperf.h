@@ -94,6 +94,7 @@ typedef struct {
     int64_t modify_delta;   /* Value size change on modify */
     bool modify_distribute; /* Distribute the change of modifications across the whole new record */
     bool modify_force_update; /* Do force update instead of modify */
+    bool reopen_cursor;       /* Reopen cursor for each operation. */
     int64_t ops_per_txn;
     int64_t pause;           /* Time between scans */
     int64_t read_range;      /* Range of reads */

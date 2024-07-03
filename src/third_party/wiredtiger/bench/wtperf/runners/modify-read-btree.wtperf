@@ -1,0 +1,12 @@
+conn_config="cache_size=20G"
+table_config="type=file"
+key_sz=100
+value_sz=10240
+value_sz_max=1048576
+value_sz_min=10240
+icount=500000
+run_time=120
+sess_config="isolation=snapshot"
+threads=((count=1,reads=1,reopen_cursor=true),(count=1,modify=1,ops_per_txn=1,modify_delta=1024,reopen_cursor=true))
+populate_threads=1
+report_interval=5

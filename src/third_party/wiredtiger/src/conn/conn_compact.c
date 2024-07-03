@@ -525,12 +525,12 @@ __background_compact_server(void *arg)
     WT_DECL_RET;
     WT_SESSION *wt_session;
     WT_SESSION_IMPL *session;
-    bool full_iteration, running;
+    bool cache_pressure, full_iteration, running;
 
     session = arg;
     conn = S2C(session);
     wt_session = (WT_SESSION *)session;
-    full_iteration = running = false;
+    cache_pressure = full_iteration = running = false;
 
     WT_ERR(__wt_scr_alloc(session, 1024, &config));
     WT_ERR(__wt_scr_alloc(session, 1024, &next_uri));
@@ -549,8 +549,13 @@ __background_compact_server(void *arg)
             __wt_spin_unlock(session, &conn->background_compact.lock);
         }
 
-        /* When the entire metadata file has been parsed, take a break or wait until signalled. */
-        if (full_iteration || !running) {
+        /*
+         * Take a break or wait until signalled in any of the following conditions:
+         * - Background compaction is not enabled.
+         * - The entire metadata has been parsed.
+         * - There is cache pressure and we don't want compaction to potentially add more.
+         */
+        if (!running || full_iteration || cache_pressure) {
             /*
              * In order to always try to parse all the candidates present in the metadata file even
              * though the compaction server may be stopped at random times, only set the URI to the
@@ -562,6 +567,11 @@ __background_compact_server(void *arg)
                 WT_ERR(__wt_buf_set(session, uri, WT_BACKGROUND_COMPACT_URI_PREFIX,
                   strlen(WT_BACKGROUND_COMPACT_URI_PREFIX) + 1));
                 __background_compact_list_cleanup(session, BACKGROUND_COMPACT_CLEANUP_STALE_STAT);
+            }
+
+            if (cache_pressure) {
+                WT_STAT_CONN_INCR(session, background_compact_sleep_cache_pressure);
+                cache_pressure = false;
             }
 
             /* Check periodically in case the signal was missed. */
@@ -600,6 +610,18 @@ __background_compact_server(void *arg)
          * signalled and compaction is not supposed to be executed.
          */
         if (!running)
+            continue;
+
+        /*
+         * Throttle background compaction if any of the following conditions is met:
+         * - The dirty trigger threshold has been reached as compaction may generate more dirty
+         * content. Note that updates are not considered as compaction only marks pages dirty and
+         * does not generate additional updates.
+         * - The cache content is almost at the eviction_trigger threshold.
+         */
+        cache_pressure =
+          __wt_eviction_dirty_needed(session, NULL) || __wt_eviction_clean_needed(session, NULL);
+        if (cache_pressure)
             continue;
 
         /* Find the next URI to compact. */

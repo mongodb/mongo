@@ -448,6 +448,16 @@ check_compiling_configurations(TEST_OPTS *opts, CUSTOM_EVENT_HANDLER *handler)
     testutil_check(opts->session->begin_transaction(opts->session, compiled_ptr));
     testutil_check(opts->session->rollback_transaction(opts->session, NULL));
 
+    /* Test binding of several items of different integral lengths. */
+    testutil_check(opts->conn->compile_configuration(opts->conn, "WT_SESSION.begin_transaction",
+      "priority=%d,sync=%" PRIu64 ",no_timestamp=%" PRId32 ",operation_timeout_ms=%" PRIu16
+      ",roundup_timestamps=(prepared=%lu)",
+      &compiled_ptr));
+    testutil_check(opts->session->bind_configuration(
+      opts->session, compiled_ptr, 5, (uint64_t)1, (int32_t)1, (uint16_t)17, (long unsigned)1));
+    testutil_check(opts->session->begin_transaction(opts->session, compiled_ptr));
+    testutil_check(opts->session->rollback_transaction(opts->session, NULL));
+
     /* We should be able to compile an empty string. */
     handler->expect_errors = false;
     ret = opts->conn->compile_configuration(
@@ -504,7 +514,7 @@ main(int argc, char *argv[])
      */
     printf(
       "checked %d successful configuration compilation outputs\n", event_handler.state.completed);
-    testutil_assert(event_handler.state.completed == 45);
+    testutil_assert(event_handler.state.completed == 46);
 
     free_parse_state(&event_handler.state);
     testutil_cleanup(opts);

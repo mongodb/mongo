@@ -251,6 +251,12 @@ config_threads(WTPERF *wtperf, const char *config, size_t len)
                 workp->modify_force_update = v.val;
                 continue;
             }
+            if (STRING_MATCH("reopen_cursor", k.str, k.len)) {
+                if (v.type != WT_CONFIG_ITEM_BOOL)
+                    goto err;
+                workp->reopen_cursor = v.val;
+                continue;
+            }
             if (STRING_MATCH("ops_per_txn", k.str, k.len)) {
                 if ((workp->ops_per_txn = v.val) < 0)
                     goto err;

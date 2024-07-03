@@ -38,21 +38,42 @@ __wt_conf_bind(WT_SESSION_IMPL *session, const char *compiled_str, va_list ap)
 
         /* Fill in the bound value. */
         value = &bound->values[i].item;
-        value->type = bind_desc->type;
+        value->type = bind_desc->item_type;
 
         /*
          * We add a cast because we really want the default case, and some compilers would otherwise
          * not permit it.
          */
-        switch ((u_int)bind_desc->type) {
-        case WT_CONFIG_ITEM_NUM:
-        case WT_CONFIG_ITEM_BOOL:
-            /* The str/len fields will continue to be set to "%d" in our copy of the config string.
-             */
-            value->val = va_arg(ap, int64_t);
+        switch ((u_int)bind_desc->bind_type) {
+        /*
+         * For all integral types, The str/len fields will continue to be set to "%XXX" in our copy
+         * of the config string.
+         */
+        case WT_CONF_BIND_INT:
+            value->val = va_arg(ap, int);
             break;
-        case WT_CONFIG_ITEM_STRING:
-        case WT_CONFIG_ITEM_ID:
+
+        case WT_CONF_BIND_L_INT:
+            value->val = va_arg(ap, long int);
+            break;
+
+        case WT_CONF_BIND_LL_INT:
+            value->val = va_arg(ap, long long int);
+            break;
+
+        case WT_CONF_BIND_U_INT:
+            value->val = (int64_t)va_arg(ap, unsigned);
+            break;
+
+        case WT_CONF_BIND_UL_INT:
+            value->val = (int64_t)va_arg(ap, long unsigned);
+            break;
+
+        case WT_CONF_BIND_ULL_INT:
+            value->val = (int64_t)va_arg(ap, long long unsigned);
+            break;
+
+        case WT_CONF_BIND_STRING:
             str = va_arg(ap, const char *);
             len = strlen(str);
             value->str = str;
@@ -78,9 +99,9 @@ __wt_conf_bind(WT_SESSION_IMPL *session, const char *compiled_str, va_list ap)
             } else
                 WT_RET(__wt_conf_check_choice(session, bind_desc->choices, str, len, &value->str));
             break;
-        case WT_CONFIG_ITEM_STRUCT:
+
         default:
-            return (__wt_illegal_value(session, bind_desc->type));
+            return (__wt_illegal_value(session, bind_desc->bind_type));
         }
     }
 

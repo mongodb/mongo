@@ -432,6 +432,7 @@ struct __wt_connection_stats {
     int64_t background_compact_running;
     int64_t background_compact_exclude;
     int64_t background_compact_skipped;
+    int64_t background_compact_sleep_cache_pressure;
     int64_t background_compact_success;
     int64_t background_compact_timeout;
     int64_t background_compact_files_tracked;

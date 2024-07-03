@@ -156,10 +156,10 @@ update_value_delta(WTPERF_THREAD *thread, int64_t delta)
         delta = __wt_random(&thread->rnd) % (opts->value_sz_max - opts->value_sz);
 
     /* Ensure we aren't changing across boundaries */
-    if (delta > 0 && len + delta > opts->value_sz_max)
-        delta = opts->value_sz_max - len;
-    else if (delta < 0 && len + delta < opts->value_sz_min)
-        delta = opts->value_sz_min - len;
+    if (delta > 0 && len + delta + 1 > opts->value_sz_max)
+        delta = opts->value_sz_max - 1 - len;
+    else if (delta < 0 && len + delta + 1 < opts->value_sz_min)
+        delta = opts->value_sz_min - 1 - len;
 
     /* Bail if there isn't anything to do */
     if (delta == 0)
@@ -169,8 +169,9 @@ update_value_delta(WTPERF_THREAD *thread, int64_t delta)
         value[len + delta] = '\0';
     else {
         /* Extend the value by the configured amount. */
-        for (new_len = len; new_len < opts->value_sz_max && new_len - len < delta; new_len++)
+        for (new_len = len; new_len <= len + delta; ++new_len)
             value[new_len] = 'a';
+        value[new_len] = '\0';
     }
 }
 
@@ -374,27 +375,29 @@ worker(void *arg)
             goto err;
         }
     }
-    if (workload->table_index != INT32_MAX) {
-        if ((ret = session->open_cursor(
-               session, wtperf->uris[workload->table_index], NULL, NULL, &cursor)) != 0) {
-            lprintf(wtperf, ret, 0, "worker: WT_SESSION.open_cursor: %s",
-              wtperf->uris[workload->table_index]);
-            goto err;
-        }
-        if ((ret = session->open_cursor(session, wtperf->uris[workload->table_index], NULL,
-               "next_random=true", &thread->rand_cursor)) != 0) {
-            lprintf(wtperf, ret, 0, "worker: WT_SESSION.open_cursor: random %s",
-              wtperf->uris[workload->table_index]);
-            goto err;
-        }
-    } else {
-        total_table_count = opts->table_count + opts->scan_table_count;
-        cursors = dcalloc(total_table_count, sizeof(WT_CURSOR *));
-        for (i = 0; i < total_table_count; i++) {
-            if ((ret = session->open_cursor(session, wtperf->uris[i], NULL, NULL, &cursors[i])) !=
-              0) {
-                lprintf(wtperf, ret, 0, "worker: WT_SESSION.open_cursor: %s", wtperf->uris[i]);
+    if (!workload->reopen_cursor) {
+        if (workload->table_index != INT32_MAX) {
+            if ((ret = session->open_cursor(
+                   session, wtperf->uris[workload->table_index], NULL, NULL, &cursor)) != 0) {
+                lprintf(wtperf, ret, 0, "worker: WT_SESSION.open_cursor: %s",
+                  wtperf->uris[workload->table_index]);
                 goto err;
+            }
+            if ((ret = session->open_cursor(session, wtperf->uris[workload->table_index], NULL,
+                   "next_random=true", &thread->rand_cursor)) != 0) {
+                lprintf(wtperf, ret, 0, "worker: WT_SESSION.open_cursor: random %s",
+                  wtperf->uris[workload->table_index]);
+                goto err;
+            }
+        } else {
+            total_table_count = opts->table_count + opts->scan_table_count;
+            cursors = dcalloc(total_table_count, sizeof(WT_CURSOR *));
+            for (i = 0; i < total_table_count; i++) {
+                if ((ret = session->open_cursor(
+                       session, wtperf->uris[i], NULL, NULL, &cursors[i])) != 0) {
+                    lprintf(wtperf, ret, 0, "worker: WT_SESSION.open_cursor: %s", wtperf->uris[i]);
+                    goto err;
+                }
             }
         }
     }
@@ -481,11 +484,27 @@ worker(void *arg)
         if (opts->index_like_table)
             generate_index_key(thread, false, index_buf, next_val);
 
-        if (workload->table_index == INT32_MAX)
+        if (workload->table_index == INT32_MAX) {
             /*
              * Spread the data out around the multiple databases.
              */
-            cursor = cursors[map_key_to_table(wtperf->opts, next_val)];
+            i = map_key_to_table(wtperf->opts, next_val);
+            if (workload->reopen_cursor) {
+                if ((ret = session->open_cursor(session, wtperf->uris[i], NULL, NULL, &cursor)) !=
+                  0) {
+                    lprintf(wtperf, ret, 0, "worker: WT_SESSION.open_cursor: %s", wtperf->uris[i]);
+                    goto err;
+                }
+            } else
+                cursor = cursors[i];
+        } else if (workload->reopen_cursor) {
+            if ((ret = session->open_cursor(
+                   session, wtperf->uris[workload->table_index], NULL, NULL, &cursor)) != 0) {
+                lprintf(wtperf, ret, 0, "worker: WT_SESSION.open_cursor: %s",
+                  wtperf->uris[workload->table_index]);
+                goto err;
+            }
+        }
 
         /*
          * Skip the first time we do an operation, when trk->ops is 0, to avoid first time latency
@@ -757,6 +776,14 @@ op_err:
         if (opts->table_count > 1 && ret == 0 && *op != WORKER_INSERT && *op != WORKER_INSERT_RMW) {
             if ((ret = cursor->reset(cursor)) != 0) {
                 lprintf(wtperf, ret, 0, "Cursor reset failed");
+                goto err;
+            }
+        }
+
+        /* Close the cursor if we own the cursor. */
+        if (workload->reopen_cursor) {
+            if ((ret = cursor->close(cursor)) != 0) {
+                lprintf(wtperf, ret, 0, "Cursor close failed");
                 goto err;
             }
         }

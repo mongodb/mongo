@@ -4555,6 +4555,24 @@ tasks:
         vars:
           test-name: modify-force-update-large-record-btree.wtperf
 
+  - name: perf-test-modify-read-btree
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: modify-read-btree.wtperf
+          maxruns: 3
+          wtarg: -ops ['"load", "modify", "read"']
+      - func: "upload stats to atlas"
+        vars:
+          test-name: modify-read-btree.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: modify-read-btree.wtperf
+
     ###############################
     # Performance Tests for oplog #
     ###############################

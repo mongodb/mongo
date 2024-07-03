@@ -194,9 +194,9 @@ DEF_OPT_AS_STRING(threads, "",
   "'threads=((count=2,reads=1),(count=8,reads=1,inserts=2,updates=1))' which would create 2 "
   "threads doing only reads and 8 threads each doing 50% inserts and 25% reads and updates. "
   "Allowed configuration values are 'count', 'throttle', 'inserts', 'reads', 'read_range', "
-  "'modify', 'modify_delta', 'modify_distribute', 'modify_force_update', 'updates', "
-  "'update_delta', 'truncate', 'truncate_pct' and 'truncate_count'. There are also behavior "
-  "modifiers, supported modifiers are 'ops_per_txn'")
+  "'modify', 'modify_delta', 'modify_distribute', 'modify_force_update', 'reopen_cursor', "
+  "'updates', 'update_delta', 'truncate', 'truncate_pct' and 'truncate_count'. There are also "
+  "behavior modifiers, supported modifiers are 'ops_per_txn'")
 /*
  * Note for tiered storage usage, the test expects that the bucket will be specified in the runner's
  * 'conn_config' line. Any bucket or directory listed is assumed to already exist and the test
