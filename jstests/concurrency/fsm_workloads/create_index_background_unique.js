@@ -10,6 +10,7 @@
  * @tags: [
  *     creates_background_indexes,
  *     requires_persistence,
+ *     assumes_balancer_off,
  * ]
  */
 import {
