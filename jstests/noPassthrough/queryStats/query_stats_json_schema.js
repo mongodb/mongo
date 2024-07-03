@@ -1,5 +1,5 @@
 /**
- * Test that $queryStats properly tokenizes jsonSchema queries with a "properties" keyword, on
+ * Test that $queryStats properly tokenizes $jsonSchema queries with dollar-prefixed field names on
  * mongod and mongos.
  * @tags: [requires_fcv_81]
  */
@@ -44,8 +44,8 @@ function runTest(conn) {
 
     var statsSize = 0;
 
-    // jsonSchema with $stdDevPop field and $_internalSchemaType is correctly tokenized.
-    // Reproduces BF-31616.
+    // $jsonSchema properties list with $stdDevPop field and $_internalSchemaType is correctly
+    // tokenized. Reproduces BF-31616.
     {
         const kHashedDollarFieldName = "TQCdAEcs07vAzO0JeYUN70ULbcoe4rVOR6wzaUZXpjo=";
         const pipeline = [{$match: {$jsonSchema: {properties: {$stdDevPop: {type: 'array'}}}}}];
@@ -54,33 +54,17 @@ function runTest(conn) {
                 "$and": [{
                     "$and": [{
                         "$or": [
-                            {[kHashedDollarFieldName]: {"$not": {"$exists": "?bool"}}},
-                            {"$and": [{[kHashedDollarFieldName]: {"$_internalSchemaType": [4]}}]}
-                        ]
-                    }]
-                }]
-            }
-        }];
-        statsSize += 1;
-        const index = 0;
-
-        runAndVerifyQueryStatsTokenization(coll, admin, pipeline, expectedResult, statsSize, index);
-    }
-    // jsonSchema with $slice field and $_internalSchemaType is correctly tokenized.
-    // Reproduces BF-31947.
-    {
-        const kHashedDollarFieldName = "8+OxL+R4EJUT2/8luDRlK+3ZDQ3kPD6h7gscG44OQtw=";
-        const pipeline = [{$match: {$jsonSchema: {properties: {$slice: {type: 'number'}}}}}];
-        const expectedResult = [{
-            "$match": {
-                "$and": [{
-                    "$and": [{
-                        "$or": [
-                            {[kHashedDollarFieldName]: {"$not": {"$exists": "?bool"}}},
                             {
-                                "$and": [
-                                    {[kHashedDollarFieldName]: {"$_internalSchemaType": ["number"]}}
-                                ]
+                                "$nor": [{
+                                    "$_internalPath":
+                                        {[kHashedDollarFieldName]: {"$exists": "?bool"}}
+                                }]
+                            },
+                            {
+                                "$and": [{
+                                    "$_internalPath":
+                                        {[kHashedDollarFieldName]: {"$_internalSchemaType": [4]}}
+                                }]
                             }
                         ]
                     }]
@@ -92,8 +76,42 @@ function runTest(conn) {
 
         runAndVerifyQueryStatsTokenization(coll, admin, pipeline, expectedResult, statsSize, index);
     }
-    // jsonSchema with $bitsAnySet field, $_internalSchemaType, and $_internalSchemaMinLength is
-    // correctly tokenized. Reproduces BF-32040.
+    // $jsonSchema properties list with $slice field and $_internalSchemaType is correctly
+    // tokenized. Reproduces BF-31947.
+    {
+        const kHashedDollarFieldName = "8+OxL+R4EJUT2/8luDRlK+3ZDQ3kPD6h7gscG44OQtw=";
+        const pipeline = [{$match: {$jsonSchema: {properties: {$slice: {type: 'number'}}}}}];
+        const expectedResult = [{
+            "$match": {
+                "$and": [{
+                    "$and": [{
+                        "$or": [
+                            {
+                                "$nor": [{
+                                    "$_internalPath":
+                                        {[kHashedDollarFieldName]: {"$exists": "?bool"}}
+                                }]
+                            },
+                            {
+                                "$and": [{
+                                    "$_internalPath": {
+                                        [kHashedDollarFieldName]:
+                                            {"$_internalSchemaType": ["number"]}
+                                    }
+                                }]
+                            }
+                        ]
+                    }]
+                }]
+            }
+        }];
+        statsSize += 1;
+        const index = 0;
+
+        runAndVerifyQueryStatsTokenization(coll, admin, pipeline, expectedResult, statsSize, index);
+    }
+    // $jsonSchema properties list with $bitsAnySet field, $_internalSchemaType, and
+    // $_internalSchemaMinLength is correctly tokenized. Reproduces BF-32040.
     {
         const kHashedDollarFieldName = "48mlorj6MWkqJLHiyvv/5h1Doa+b8Pi7C3hH8O48Y5A=";
         const pipeline =
@@ -103,14 +121,25 @@ function runTest(conn) {
                 "$and": [{
                     "$and": [{
                         "$or": [
-                            {[kHashedDollarFieldName]: {"$not": {"$exists": "?bool"}}},
+                            {
+                                "$nor": [{
+                                    "$_internalPath":
+                                        {[kHashedDollarFieldName]: {"$exists": "?bool"}}
+                                }]
+                            },
                             {
                                 "$and": [
                                     {
-                                        [kHashedDollarFieldName]:
-                                            {"$_internalSchemaMinLength": "?number"}
+                                        "$_internalPath": {
+                                            [kHashedDollarFieldName]:
+                                                {"$_internalSchemaMinLength": "?number"}
+                                        },
                                     },
-                                    {[kHashedDollarFieldName]: {"$_internalSchemaType": [2]}}
+                                    {
+                                        "$_internalPath": {
+                                            [kHashedDollarFieldName]: {"$_internalSchemaType": [2]}
+                                        },
+                                    }
                                 ]
                             }
                         ]
@@ -123,8 +152,36 @@ function runTest(conn) {
 
         runAndVerifyQueryStatsTokenization(coll, admin, pipeline, expectedResult, statsSize, index);
     }
-    // jsonSchema with $or (special MQL keyword) field and $_internalSchemaType is correctly
-    // tokenized. Reproduces BF-32434.
+    // $jsonSchema properties list with empty $slice field is correctly tokenized.
+    // Reproduces BF-33441.
+    {
+        const kHashedDollarFieldName = "8+OxL+R4EJUT2/8luDRlK+3ZDQ3kPD6h7gscG44OQtw=";
+
+        const pipeline = [{$match: {$jsonSchema: {properties: {$slice: {}}}}}];
+        const expectedResult = [{
+            "$match": {
+                "$and": [{
+                    "$and": [{
+                        "$or": [
+                            {
+                                "$nor": [{
+                                    "$_internalPath":
+                                        {[kHashedDollarFieldName]: {"$exists": "?bool"}}
+                                }]
+                            },
+                            {}
+                        ]
+                    }]
+                }]
+            }
+        }];
+        statsSize += 1;
+        const index = 1;
+
+        runAndVerifyQueryStatsTokenization(coll, admin, pipeline, expectedResult, statsSize, index);
+    }
+    // $jsonSchema properties list with $or (special MQL keyword) field and $_internalSchemaType is
+    // correctly tokenized. Reproduces BF-32434.
     {
         const kHashedDollarFieldName = "gkp/+o9pv4jAJ5BBli/hmBNhOIyDgqBdEzcvDEsOl10=";
         const kHashedProjectFieldName = "+0wgDp/AI7f+XT+DJEqixDyZBq9zRe7RGN0wCS9bd94=";
@@ -141,50 +198,104 @@ function runTest(conn) {
                     "$and": [{
                         "$and": [{
                             "$or": [
-                                {[kHashedDollarFieldName]: {"$not": {"$exists": "?bool"}}},
                                 {
-                                    "$and":
-                                        [{[kHashedDollarFieldName]: {"$_internalSchemaType": [18]}}]
+                                    "$nor": [{
+                                        "$_internalPath":
+                                            {[kHashedDollarFieldName]: {"$exists": "?bool"}}
+                                    }]
+                                },
+                                {
+                                    "$and": [{
+                                        "$_internalPath": {
+                                            [kHashedDollarFieldName]: {"$_internalSchemaType": [18]}
+                                        }
+                                    }]
                                 }
                             ]
                         }]
                     }]
-                },
+                }
             },
             {"$project": {[kHashedProjectFieldName]: true}},
             {"$sort": {[kHashedSortFieldName]: 1}}
         ];
         statsSize += 1;
         // This one will sort last because of the 'project' and 'sort' parameters.
-        const index = 3;
+        const index = 4;
 
         runAndVerifyQueryStatsTokenization(coll, admin, pipeline, expectedResult, statsSize, index);
     }
-    /*
-     * Currently, jsonSchema with the "required" keyword and dollar fields is not properly tokenized
-     * because the translated MatchExpression doesn't contain a field starting with
-     * "$_internalSchema...".
-     * TODO SERVER-89844: Make $jsonSchema with dollar fields in all keyword fields reparseable.
+    // $jsonSchema with a "required" keyword and dollar fields is properly tokenized. Reproduces
+    // BF-33441.
     {
-        const kHashedArrayName = "mf6JpZnbHDm4Wa6EzBkQ4utXN7IsWMLJvIq0wP4qN1U=";
-        const internalSchemaCondSentinel = {
-            "$_internalSchemaCond":
-                [{"$alwaysTrue": "?number"}, {"$alwaysTrue": "?number"}, {"$alwaysTrue": "?number"}]
-        };
+        const kHashedDollarFieldName = "I8dnZuPUk2wDamTSSL481i1eTea4aLrPj0pLA8+T9uM=";
+        const kHashedFieldA = "GDiF6ZEXkeo4kbKyKEAAViZ+2RHIVxBQV9S6b6Lu7gU=";
+        const kHashedFieldB = "m1xtUkfSpZNxXjNZYKwo86vGD37Zxmd2gtt+TXDO558=";
 
         const pipeline = [{$match: {$jsonSchema: {required: ["a", "b", "$dollarPrefixes"]}}}];
         const expectedResult = [{
             "$match": {
-                "$or":
-                    [{[kHashedArrayName]: {"$eq": "?array<?object>"}}, internalSchemaCondSentinel]
-            },
+                "$and": [{
+                    "$and": [
+                        {"$_internalPath": {[kHashedDollarFieldName]: {"$exists": "?bool"}}},
+                        {[kHashedFieldA]: {"$exists": "?bool"}},
+                        {[kHashedFieldB]: {"$exists": "?bool"}}
+                    ]
+                }]
+            }
         }];
         statsSize += 1;
         const index = 0;
 
         runAndVerifyQueryStatsTokenization(coll, admin, pipeline, expectedResult, statsSize, index);
     }
-     */
+    // $jsonSchema with multiple dollar-prefixed field names in its properties and required lists is
+    // properly tokenized.
+    {
+        const kHashedSliceName = "8+OxL+R4EJUT2/8luDRlK+3ZDQ3kPD6h7gscG44OQtw=";
+        const kHashedOrName = "gkp/+o9pv4jAJ5BBli/hmBNhOIyDgqBdEzcvDEsOl10=";
+
+        const pipeline = [{
+            $match: {
+                $jsonSchema: {
+                    required: ["$slice", "$or"],
+                    properties: {$slice: {type: "number"}, $or: {type: "string"}}
+                }
+            }
+        }];
+        const expectedResult = [{
+            "$match": {
+                "$and": [
+                    {
+                        "$and": [
+                            {
+                                "$and": [{
+                                    "$_internalPath":
+                                        {[kHashedSliceName]: {"$_internalSchemaType": ["number"]}}
+                                }]
+                            },
+                            {
+                                "$and": [{
+                                    "$_internalPath":
+                                        {[kHashedOrName]: {"$_internalSchemaType": [2]}}
+                                }]
+                            }
+                        ]
+                    },
+                    {
+                        "$and": [
+                            {"$_internalPath": {[kHashedOrName]: {"$exists": "?bool"}}},
+                            {"$_internalPath": {[kHashedSliceName]: {"$exists": "?bool"}}}
+                        ]
+                    }
+                ]
+            }
+        }];
+        statsSize += 1;
+        const index = 1;
+
+        runAndVerifyQueryStatsTokenization(coll, admin, pipeline, expectedResult, statsSize, index);
+    }
 }
 
 const conn = MongoRunner.runMongod({
