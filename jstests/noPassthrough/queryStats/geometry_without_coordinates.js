@@ -1,6 +1,6 @@
 // This test was designed to reproduce SERVER-77430. There was a mistaken assertion in a parser that
 // we are interested in proving will not fail here.
-// @tags: [featureFlagQueryStats]
+// @tags: [requires_fcv_60]
 (function() {
 "use strict";
 

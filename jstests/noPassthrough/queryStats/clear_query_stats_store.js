@@ -1,6 +1,6 @@
 /**
  * Test that the queryStats store can be cleared when the cache size is reset to 0.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_60]
  */
 load("jstests/libs/query_stats_utils.js");  // For verifyMetrics and getQueryStats.
 

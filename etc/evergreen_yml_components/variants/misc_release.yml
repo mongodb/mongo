@@ -234,6 +234,10 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: .query_fuzzer
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
+  - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
   - name: .read_write_concern .large
     distros:
     - amazon2-arm64-latest-large
@@ -884,6 +888,10 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: .query_fuzzer
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
+  - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:

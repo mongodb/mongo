@@ -1,6 +1,6 @@
 /**
  * Test the queryStats related serverStatus metrics.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 "use strict";

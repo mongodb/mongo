@@ -1,5 +1,6 @@
 /**
  * Test that $queryStats properly tokenizes find commands, on mongod and mongos.
+ * @tags: [requires_fcv_60]
  */
 load("jstests/libs/query_stats_utils.js");
 (function() {
@@ -44,7 +45,6 @@ function runTest(conn) {
 let conn = MongoRunner.runMongod({
     setParameter: {
         internalQueryStatsRateLimit: -1,
-        featureFlagQueryStats: true,
     }
 });
 runTest(conn);
@@ -58,7 +58,6 @@ let st = new ShardingTest({
     mongosOptions: {
         setParameter: {
             internalQueryStatsRateLimit: -1,
-            featureFlagQueryStats: true,
         }
     },
 });

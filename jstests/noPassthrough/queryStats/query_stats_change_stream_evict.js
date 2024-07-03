@@ -4,7 +4,7 @@
 //   uses_change_streams,
 //   requires_replication,
 //   requires_sharding,
-//   featureFlagQueryStats
+//   requires_fcv_60
 // ]
 load("jstests/libs/query_stats_utils.js");         // For getLatestQueryStatsEntry, getQueryStats,
                                                    // resetQueryStatsStore.
