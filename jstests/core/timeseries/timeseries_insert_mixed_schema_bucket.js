@@ -9,6 +9,8 @@
  * ]
  */
 
+TestData.skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate = true;
+
 const testDB = db.getSiblingDB(jsTestName());
 const collName = "ts";
 
