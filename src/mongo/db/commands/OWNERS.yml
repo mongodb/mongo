@@ -9,6 +9,7 @@ filters:
   - "validate.cpp":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
   - "vote*index_build*":
     approvers:
       - 10gen/server-storage-execution

@@ -9,6 +9,7 @@ filters:
   - "repair*":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
   - "ttl*":
     approvers:
       - 10gen/server-storage-execution

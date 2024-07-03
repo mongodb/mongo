@@ -18,3 +18,4 @@ filters:
   - "validate_tests.cpp":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney

@@ -6,6 +6,7 @@ filters:
   - "collection_validation*":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
   - "collection_write_path*":
     approvers:
       - 10gen/server-storage-execution
@@ -21,6 +22,7 @@ filters:
   - "index_consistency*":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
   - "index_repair*":
     approvers:
       - 10gen/server-storage-execution
@@ -33,3 +35,4 @@ filters:
   - "validate*":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
