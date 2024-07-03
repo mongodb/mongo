@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/index_builds.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/rebuild_indexes.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -485,6 +486,28 @@ private:
                                        IndexBuildProtocol protocol);
 
 protected:
+    /**
+     * Acquire the collection MODE_X lock (and other locks up the hierarchy) as usual, with the
+     * exception of the RSTL. The RSTL will be acquired last, with a timeout. On timeout, all locks
+     * are released. If 'retry' is true, keeps until successful RSTL acquisition, and the returned
+     * StatusWith will always be OK and contain the locks. If false, it returns with the error after
+     * a single try. If 'collLockTimeout' is set to true, collection lock acquisition is done with
+     * a timeout. The function returns LockTimeout immediately upon collection lock acquisition
+     * timeout.
+     *
+     * This is intended to avoid a three-way deadlock between prepared transactions, stepdown, and
+     * index build threads when trying to acquire an exclusive collection lock.
+     *
+     * See SERVER-44722, SERVER-42621, and SERVER-71191.
+     */
+    StatusWith<
+        std::tuple<Lock::DBLock, Lock::CollectionLock, repl::ReplicationStateTransitionLockGuard>>
+    _acquireExclusiveLockWithRSTLRetry(OperationContext* opCtx,
+                                       ReplIndexBuildState* replState,
+                                       bool retry = true,
+                                       bool collLockTimeout = false);
+
+
     /**
      * Sets up the in-memory state of the index build. Validates index specs and filters out
      * existing indexes from the list of specs.
