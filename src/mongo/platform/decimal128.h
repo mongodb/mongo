@@ -471,13 +471,14 @@ public:
     Decimal128 exponential(RoundingMode roundMode = kRoundTiesToEven) const;
     Decimal128 exponential(std::uint32_t* signalingFlags,
                            RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 logarithm(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 logarithm(std::uint32_t* signalingFlags,
-                         RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 logarithm(const Decimal128& other, RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 logarithm(const Decimal128& other,
-                         std::uint32_t* signalingFlags,
-                         RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 naturalLogarithm(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 naturalLogarithm(std::uint32_t* signalingFlags,
+                                RoundingMode roundMode = kRoundTiesToEven) const;
+    // Calculate the logarithm with the given `base`, using this number as input. Uses fast paths
+    // for base 2 and 10.
+    // TODO SERVER-91935 convert `logarithm` and others to static methods for a more clear
+    // interface.
+    Decimal128 logarithm(const Decimal128& base, RoundingMode roundMode = kRoundTiesToEven) const;
     Decimal128 modulo(const Decimal128& other) const;
     Decimal128 modulo(const Decimal128& other, std::uint32_t* signalingFlags) const;
 
