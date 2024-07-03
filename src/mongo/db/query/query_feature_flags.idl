@@ -139,3 +139,10 @@ feature_flags:
       cpp_varname: gFeatureFlagSearchBatchSizeTuning
       default: false
       shouldBeFCVGated: true
+
+    featureFlagSearchHybridScoring:
+      description: "Feature flag to introduce MQL syntax to allow customizable scoring 
+                    of multiple ranked pipelines."
+      cpp_varname: gFeatureFlagSearchHybridScoring
+      default: false 
+      shouldBeFCVGated: true
