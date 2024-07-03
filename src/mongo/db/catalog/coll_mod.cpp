@@ -118,6 +118,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangAfterDatabaseLock);
 MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueFullIndexScan);
 MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueReleaseIXLock);
+MONGO_FAIL_POINT_DEFINE(allowSetTimeseriesBucketsMayHaveMixedSchemaDataFalse);
 
 void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
     try {
@@ -646,7 +647,8 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
                 CollMod::kTimeseriesBucketsMayHaveMixedSchemaDataFieldName);
         }
 
-        if (!*mixedSchema) {
+        if (!*mixedSchema &&
+            !MONGO_unlikely(allowSetTimeseriesBucketsMayHaveMixedSchemaDataFalse.shouldFail())) {
             return {ErrorCodes::InvalidOptions,
                     "Cannot set timeseriesBucketsMayHaveMixedSchemaData to false"};
         }
