@@ -85,7 +85,7 @@ function orderedBulkInsertDuringBlockingState(st, isBulkWriteOrdered) {
                        .tenantMigrationAccessBlocker[tenantID.str]
                        .donor;
         return mtab.numBlockedWrites > 0;
-    }, "no blocked writes found", 1 * 5000, 1 * 1000);
+    }, "no blocked writes found");
 
     blockingFp.off();
     abortFailPoint.off();
@@ -93,7 +93,7 @@ function orderedBulkInsertDuringBlockingState(st, isBulkWriteOrdered) {
     assert.soon(function() {
         let res = assert.commandWorked(adminDB.runCommand(cmdObj));
         return res['state'] == "aborted";
-    }, "migration not in aborted state", 1 * 10000, 1 * 1000);
+    }, "migration not in aborted state");
 
     bulkWriteThread.join();
 }
@@ -122,7 +122,7 @@ function orderedBulkInsertAfterTenantMigrationAborted(st, isBulkWriteOrdered) {
     assert.soon(function() {
         let res = assert.commandWorked(adminDB.runCommand(cmdObj));
         return res['state'] == "aborted";
-    }, "migration not in aborted state", 1 * 10000, 1 * 1000);
+    }, "migration not in aborted state");
 
     const kNumWriteOps = 6;
     const bulkRes =
