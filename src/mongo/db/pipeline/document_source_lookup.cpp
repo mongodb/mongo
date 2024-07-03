@@ -1389,7 +1389,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
                                                std::move(fromCollator),
                                                pExpCtx);
     }
+
     lookupStage->determineSbeCompatibility();
+
+    lookupStage->_originalBsonSize = elem.objsize();
+
     return lookupStage;
 }
 

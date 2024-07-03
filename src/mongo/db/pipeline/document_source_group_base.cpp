@@ -335,7 +335,8 @@ DocumentSourceGroupBase::DocumentSourceGroupBase(StringData stageName,
       _executionStarted(false),
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
       _spilled(false),
-      _sbeCompatible(false) {}
+      _sbeCompatible(false),
+      _originalBsonSize(0) {}
 
 void DocumentSourceGroupBase::addAccumulator(AccumulationStatement accumulationStatement) {
     _accumulatedFields.push_back(accumulationStatement);
@@ -438,7 +439,10 @@ void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
                 AccumulationStatement::parseAccumulationStatement(pExpCtx.get(), groupField, vps));
         }
     }
+
     _sbeCompatible = pExpCtx->sbeGroupCompatible && pExpCtx->sbeCompatible;
+
+    _originalBsonSize = elem.objsize();
 
     uassert(15955, "a group specification must include an _id", !_idExpressions.empty());
 }
