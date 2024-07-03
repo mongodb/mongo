@@ -913,11 +913,6 @@ bool isPathPrefixOf(StringData first, StringData second) {
     return second.startsWith(first) && second[first.size()] == '.';
 }
 
-bool bidirectionalPathPrefixOf(StringData first, StringData second) {
-    return first == second || expression::isPathPrefixOf(first, second) ||
-        expression::isPathPrefixOf(second, first);
-}
-
 boost::optional<StringMap<std::unique_ptr<MatchExpression>>> splitMatchExpressionForColumns(
     const MatchExpression* me) {
     boost::optional<StringMap<std::unique_ptr<MatchExpression>>> out;
