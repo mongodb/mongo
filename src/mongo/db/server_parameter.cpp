@@ -59,20 +59,6 @@ MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
 ServerParameter::ServerParameter(StringData name, ServerParameterType spt)
     : _name{name}, _type(spt) {}
 
-ServerParameter::ServerParameter(const ServerParameter& other) {
-    // Since there is a mutex stored as a member variable, we need to explicitly write a copy
-    // constructor because a mutex has it's default copy constructor deleted.
-    stdx::lock_guard lk(other._mutex);
-    this->_name = other._name;
-    this->_type = other._type;
-    this->_testOnly = other._testOnly;
-    this->_redact = other._redact;
-    this->_isOmittedInFTDC = other._isOmittedInFTDC;
-    this->_featureFlag = other._featureFlag;
-    this->_minFCV = other._minFCV;
-    this->_disableState = other._disableState;
-}
-
 Status ServerParameter::set(const BSONElement& newValueElement,
                             const boost::optional<TenantId>& tenantId) {
     auto validateStatus = validate(newValueElement, tenantId);
@@ -110,22 +96,16 @@ bool ServerParameter::isEnabled() const {
 
 bool ServerParameter::isEnabledOnVersion(
     const multiversion::FeatureCompatibilityVersion& targetFCV) const {
-    {
-        stdx::lock_guard lk(_mutex);
-        if (_disableState != DisableState::Enabled) {
-            return false;
-        }
+    if (_disableState != DisableState::Enabled) {
+        return false;
     }
     return _isEnabledOnVersion(targetFCV);
 }
 
 bool ServerParameter::canBeEnabledOnVersion(
     const multiversion::FeatureCompatibilityVersion& targetFCV) const {
-    {
-        stdx::lock_guard lk(_mutex);
-        if (_disableState == DisableState::PermanentlyDisabled) {
-            return false;
-        }
+    if (_disableState == DisableState::PermanentlyDisabled) {
+        return false;
     }
     return _isEnabledOnVersion(targetFCV);
 }
@@ -138,7 +118,6 @@ bool ServerParameter::_isEnabledOnVersion(
 
 bool ServerParameter::featureFlagIsDisabledOnVersion(
     const multiversion::FeatureCompatibilityVersion& targetFCV) const {
-    stdx::lock_guard lk(_mutex);
     return _featureFlag && !_featureFlag->isEnabledOnVersion(targetFCV);
 }
 
