@@ -6,7 +6,7 @@ from typing import Any, Dict, List, NamedTuple, Optional
 
 import structlog
 
-from evergreen import EvergreenApi, Patch
+from evergreen import EvergreenApi
 
 LOGGER = structlog.get_logger(__name__)
 
@@ -59,7 +59,7 @@ class TaskStatusCounts(NamedTuple):
             return 0.0
         return self.failed / self.completed
 
-    def __add__(self, other: Any) -> TaskStatusCounts:
+    def add(self, other: Any) -> TaskStatusCounts:
         """
         Create a new `TaskStatusCounts` object that has a sum of failed and
         completed counts of the current object and of the other object.
@@ -140,52 +140,6 @@ class EvergreenService:
                 all_build_ids.extend(build_ids)
 
         return self.get_build_statuses(all_build_ids)
-
-    def get_patch_statuses(
-        self, evg_project_names: List[str], window_start: datetime, window_end: datetime
-    ) -> List[TaskStatusCounts]:
-        """
-        Get task status counts of all patch builds for a given Evergreen projects.
-
-        :param evg_project_names: Evergreen project names.
-        :param window_start: Look for patches after this date.
-        :param window_end: Look for patches before this date.
-        :return: Task status counts of all patch builds.
-        """
-        all_build_ids = []
-
-        for evg_project_name in evg_project_names:
-            patches = self.evg_api.patches_by_project_time_window(
-                project_id=evg_project_name, after=window_start, before=window_end
-            )
-
-            with ThreadPoolExecutor() as executor:
-                futures = [
-                    executor.submit(
-                        self._get_build_ids_from_patch,
-                        project=evg_project_name,
-                        patch=patch,
-                    )
-                    for patch in patches
-                ]
-                for future in futures:
-                    all_build_ids.extend(future.result())
-
-        return self.get_build_statuses(all_build_ids)
-
-    @staticmethod
-    def _get_build_ids_from_patch(project: str, patch: Patch) -> List[str]:
-        LOGGER.info(
-            "Getting build ids from patch",
-            project=project,
-            patch_id=patch.patch_id,
-        )
-        if patch.version:
-            version = patch.get_version()
-            return [bvs.build_id for bvs in version.build_variants_status]
-
-        LOGGER.warning("Patch does not have a version", project=project, patch_id=patch.patch_id)
-        return []
 
     def get_build_statuses(self, build_ids: List[str]) -> List[TaskStatusCounts]:
         """

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, NamedTuple, Optional, Set
 
+from tabulate import tabulate
+
 from buildscripts.monitor_build_status.evergreen_service import EvgProjectsInfo
 from buildscripts.monitor_build_status.jira_service import BfIssue, BfTemperature, TestType
 
@@ -125,3 +127,50 @@ class BFsReport(NamedTuple):
             TestType.PERFORMANCE.value: self.performance._asdict(),
             TestType.UNKNOWN.value: self.unknown._asdict(),
         }
+
+    def as_str_table(self) -> str:
+        """Convert report into string table."""
+        headers = ["Assigned Team", "Hot BFs", "Cold BFs", "Perf BFs"]
+        table_data = []
+
+        for assigned_team in sorted(self.all_assigned_teams):
+            table_data.append(
+                [
+                    assigned_team,
+                    self.get_bf_count(
+                        test_types=[TestType.CORRECTNESS],
+                        bf_temperatures=[BfTemperature.HOT],
+                        assigned_team=assigned_team,
+                    ),
+                    self.get_bf_count(
+                        test_types=[TestType.CORRECTNESS],
+                        bf_temperatures=[BfTemperature.COLD, BfTemperature.NONE],
+                        assigned_team=assigned_team,
+                    ),
+                    self.get_bf_count(
+                        test_types=[TestType.PERFORMANCE],
+                        bf_temperatures=[BfTemperature.HOT, BfTemperature.COLD, BfTemperature.NONE],
+                        assigned_team=assigned_team,
+                    ),
+                ]
+            )
+
+        table_data.append(
+            [
+                "Overall",
+                self.get_bf_count(
+                    test_types=[TestType.CORRECTNESS],
+                    bf_temperatures=[BfTemperature.HOT],
+                ),
+                self.get_bf_count(
+                    test_types=[TestType.CORRECTNESS],
+                    bf_temperatures=[BfTemperature.COLD, BfTemperature.NONE],
+                ),
+                self.get_bf_count(
+                    test_types=[TestType.PERFORMANCE],
+                    bf_temperatures=[BfTemperature.HOT, BfTemperature.COLD, BfTemperature.NONE],
+                ),
+            ]
+        )
+
+        return tabulate(table_data, headers, tablefmt="outline")

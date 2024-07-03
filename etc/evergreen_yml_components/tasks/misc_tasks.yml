@@ -1124,7 +1124,7 @@ tasks:
             - "src/evergreen/run_python_script.sh"
             - "buildscripts/monitor_build_status/cli.py"
             - "--is-patch"
-            - ${is_patch|false}"
+            - "${is_patch}"
           env:
             JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
             JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}

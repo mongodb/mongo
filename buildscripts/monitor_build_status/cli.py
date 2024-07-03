@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Iterable, List
-
 import os
-import structlog
 import sys
+from datetime import datetime, timedelta, timezone
+from typing import Iterable, List, Tuple
+
+import structlog
 import typer
 from typing_extensions import Annotated
 
@@ -34,16 +34,16 @@ LOGGER = structlog.get_logger(__name__)
 JIRA_SERVER = "https://jira.mongodb.org"
 DEFAULT_REPO = "10gen/mongo"
 DEFAULT_BRANCH = "master"
-EVERGREEN_DAYS_LOOKBACK = 1
+SLACK_CHANNEL = "#10gen-mongo-code-lockdown"
+EVERGREEN_LOOKBACK_DAYS = 14
 
-GLOBAL_CORRECTNESS_HOT_BF_COUNT_LIMIT = 0
-GLOBAL_CORRECTNESS_COLD_BF_COUNT_LIMIT = 0
-GLOBAL_PERFORMANCE_BF_COUNT_LIMIT = 0
-PER_TEAM_CORRECTNESS_HOT_BF_COUNT_LIMIT = 0
-PER_TEAM_CORRECTNESS_COLD_BF_COUNT_LIMIT = 0
-PER_TEAM_PERFORMANCE_BF_COUNT_LIMIT = 0
-EVERGREEN_WATERFALL_FAILURE_RATE_LIMIT = 0.00
-EVERGREEN_PATCH_FAILURE_RATE_LIMIT = 0.00
+OVERALL_HOT_BF_COUNT_THRESHOLD = 30
+OVERALL_COLD_BF_COUNT_THRESHOLD = 100
+OVERALL_PERF_BF_COUNT_THRESHOLD = 30
+PER_TEAM_HOT_BF_COUNT_THRESHOLD = 7
+PER_TEAM_COLD_BF_COUNT_THRESHOLD = 20
+PER_TEAM_PERF_BF_COUNT_THRESHOLD = 10
+EVERGREEN_WATERFALL_FAILURE_RATE_THRESHOLD = 0.05
 
 
 def iterable_to_jql(entries: Iterable[str]) -> str:
@@ -68,7 +68,8 @@ class MonitorBuildStatusOrchestrator:
         self.evg_service = evg_service
 
     def evaluate_build_redness(self, repo: str, branch: str, notify: bool) -> None:
-        failures = []
+        status_message = f"\n`[STATUS]` '{repo}' repo '{branch}' branch"
+        threshold_percentages = []
 
         LOGGER.info("Getting Evergreen projects data")
         evg_projects_info = self.evg_service.get_evg_project_info(repo, branch)
@@ -76,43 +77,55 @@ class MonitorBuildStatusOrchestrator:
         LOGGER.info("Got Evergreen projects data")
 
         bfs_report = self._make_bfs_report(evg_projects_info)
-        failures.extend(self._check_bf_counts(bfs_report, branch))
+        bf_count_status_msg, bf_count_percentages = self._get_bf_counts_status(bfs_report)
+        status_message = f"{status_message}\n{bf_count_status_msg}\n"
+        threshold_percentages.extend(bf_count_percentages)
 
-        # We are looking for versions and patches starting window_end the beginning of yesterday
+        # We are looking for Evergreen versions that started before the beginning of yesterday
         # to give them time to complete
         window_end = datetime.utcnow().replace(
             hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
         ) - timedelta(days=1)
-        window_start = window_end - timedelta(days=EVERGREEN_DAYS_LOOKBACK)
+        window_start = window_end - timedelta(days=EVERGREEN_LOOKBACK_DAYS)
 
         waterfall_report = self._make_waterfall_report(
             evg_project_names=evg_project_names, window_start=window_start, window_end=window_end
         )
-        failures.extend(
-            self._check_waterfall_failure_rate(
+        waterfall_failure_rate_status_msg, waterfall_failure_rate_percentages = (
+            self._get_waterfall_failure_rate_status(
                 reports=waterfall_report, window_start=window_start, window_end=window_end
             )
         )
+        status_message = f"{status_message}\n{waterfall_failure_rate_status_msg}\n"
+        threshold_percentages.extend(waterfall_failure_rate_percentages)
 
-        patch_report = self._make_patch_report(
-            evg_project_names=evg_project_names, window_start=window_start, window_end=window_end
-        )
-        failures.extend(
-            self._check_patch_failure_rate(
-                reports=patch_report, window_start=window_start, window_end=window_end
+        if any(percentage > 100 for percentage in threshold_percentages):
+            status_message = (
+                f"{status_message}\n"
+                f"`[ACTION]` RED: At least one metric exceeds 100% of its threshold."
+                f" Lock the branch if it is not already.\n"
             )
-        )
+        elif all(percentage < 50 for percentage in threshold_percentages):
+            status_message = (
+                f"{status_message}\n"
+                f"`[ACTION]` GREEN: All metrics are within 50% of their thresholds."
+                f" The branch should be unlocked if it is not already.\n"
+            )
+        else:
+            status_message = (
+                f"{status_message}\n"
+                f"`[ACTION]` YELLOW: At least one metric exceeds 50% of its threshold,"
+                f" but none exceed 100%. No action is required.\n"
+            )
 
-        for failure in failures:
-            LOGGER.error(failure)
+        for line in status_message.split("\n"):
+            LOGGER.info(line)
 
         if notify:
-            LOGGER.info("Notifying channel with results")
-            # Send verbatim report for now. We'll want to tweak this to give
-            # us the most relevant information as that becmoes more clear.
+            LOGGER.info("Notifying slack channel with results", slack_channel=SLACK_CHANNEL)
             self.evg_service.evg_api.send_slack_message(
-                target="#10gen-mongo-code-lockdown",
-                msg="\n".join(failures),
+                target=SLACK_CHANNEL,
+                msg=status_message.strip(),
             )
 
     def _make_bfs_report(self, evg_projects_info: EvgProjectsInfo) -> BFsReport:
@@ -132,102 +145,77 @@ class MonitorBuildStatusOrchestrator:
         return bfs_report
 
     @staticmethod
-    def _check_bf_counts(bfs_report: BFsReport, branch: str) -> List[str]:
-        failures = []
-        bf_count_failure_msg = (
-            "BF count check failed: {scope}: {bf_type}"
-            " count ({bf_count}) exceeds threshold {bf_limit}"
-        )
+    def _get_bf_counts_status(bfs_report: BFsReport) -> Tuple[str, List[float]]:
+        percentages = []
+        status_message = "`[STATUS]` The current BF count"
+        status_message = f"{status_message}\n" f"```\n" f"{bfs_report.as_str_table()}\n" f"```"
 
-        global_correctness_hot_bf_count = bfs_report.get_bf_count(
+        def _make_status_msg(scope_: str, bf_type: str, bf_count: int, threshold: int) -> str:
+            percentage = bf_count / threshold * 100
+            percentages.append(percentage)
+            return (
+                f"{scope_} {bf_type} BFs: {bf_count} ({percentage:.2f}% of threshold {threshold})"
+            )
+
+        overall_hot_bf_count = bfs_report.get_bf_count(
             test_types=[TestType.CORRECTNESS],
             bf_temperatures=[BfTemperature.HOT],
         )
-        if global_correctness_hot_bf_count > GLOBAL_CORRECTNESS_HOT_BF_COUNT_LIMIT:
-            failures.append(
-                bf_count_failure_msg.format(
-                    scope=f"Branch({branch}): Global",
-                    bf_type="Correctness HOT BF",
-                    bf_count=global_correctness_hot_bf_count,
-                    bf_limit=GLOBAL_CORRECTNESS_HOT_BF_COUNT_LIMIT,
-                )
-            )
-
-        global_correctness_cold_bf_count = bfs_report.get_bf_count(
+        overall_cold_bf_count = bfs_report.get_bf_count(
             test_types=[TestType.CORRECTNESS],
             bf_temperatures=[BfTemperature.COLD, BfTemperature.NONE],
         )
-        if global_correctness_cold_bf_count > GLOBAL_CORRECTNESS_COLD_BF_COUNT_LIMIT:
-            failures.append(
-                bf_count_failure_msg.format(
-                    scope=f"Branch({branch}): Global",
-                    bf_type="Correctness COLD BF",
-                    bf_count=global_correctness_cold_bf_count,
-                    bf_limit=GLOBAL_CORRECTNESS_COLD_BF_COUNT_LIMIT,
-                )
-            )
-
-        global_performance_bf_count = bfs_report.get_bf_count(
+        overall_perf_bf_count = bfs_report.get_bf_count(
             test_types=[TestType.PERFORMANCE],
             bf_temperatures=[BfTemperature.HOT, BfTemperature.COLD, BfTemperature.NONE],
         )
-        if global_performance_bf_count > GLOBAL_PERFORMANCE_BF_COUNT_LIMIT:
-            failures.append(
-                bf_count_failure_msg.format(
-                    scope=f"Branch({branch}): Global",
-                    bf_type="Performance BF",
-                    bf_count=global_performance_bf_count,
-                    bf_limit=GLOBAL_PERFORMANCE_BF_COUNT_LIMIT,
-                )
-            )
+
+        scope = "Overall"
+        status_message = (
+            f"{status_message}"
+            f"\n{_make_status_msg(scope, 'Hot', overall_hot_bf_count, OVERALL_HOT_BF_COUNT_THRESHOLD)}"
+            f"\n{_make_status_msg(scope, 'Cold', overall_cold_bf_count, OVERALL_COLD_BF_COUNT_THRESHOLD)}"
+            f"\n{_make_status_msg(scope, 'Perf', overall_perf_bf_count, OVERALL_PERF_BF_COUNT_THRESHOLD)}"
+        )
+
+        max_per_team_hot_bf_count = 0
+        max_per_team_cold_bf_count = 0
+        max_per_team_perf_bf_count = 0
 
         for team in bfs_report.all_assigned_teams:
-            per_team_correctness_hot_bf_count = bfs_report.get_bf_count(
+            per_team_hot_bf_count = bfs_report.get_bf_count(
                 test_types=[TestType.CORRECTNESS],
                 bf_temperatures=[BfTemperature.HOT],
                 assigned_team=team,
             )
-            if per_team_correctness_hot_bf_count > PER_TEAM_CORRECTNESS_HOT_BF_COUNT_LIMIT:
-                failures.append(
-                    bf_count_failure_msg.format(
-                        scope=f"Branch({branch}): Team({team})",
-                        bf_type="Correctness HOT BF",
-                        bf_count=per_team_correctness_hot_bf_count,
-                        bf_limit=PER_TEAM_CORRECTNESS_HOT_BF_COUNT_LIMIT,
-                    )
-                )
+            if per_team_hot_bf_count > max_per_team_hot_bf_count:
+                max_per_team_hot_bf_count = per_team_hot_bf_count
 
-            per_team_correctness_cold_bf_count = bfs_report.get_bf_count(
+            per_team_cold_bf_count = bfs_report.get_bf_count(
                 test_types=[TestType.CORRECTNESS],
                 bf_temperatures=[BfTemperature.COLD, BfTemperature.NONE],
                 assigned_team=team,
             )
-            if per_team_correctness_cold_bf_count > PER_TEAM_CORRECTNESS_COLD_BF_COUNT_LIMIT:
-                failures.append(
-                    bf_count_failure_msg.format(
-                        scope=f"Branch({branch}): Team({team})",
-                        bf_type="Correctness COLD BF",
-                        bf_count=per_team_correctness_cold_bf_count,
-                        bf_limit=PER_TEAM_CORRECTNESS_COLD_BF_COUNT_LIMIT,
-                    )
-                )
+            if per_team_cold_bf_count > max_per_team_cold_bf_count:
+                max_per_team_cold_bf_count = per_team_cold_bf_count
 
-            per_team_performance_bf_count = bfs_report.get_bf_count(
+            per_team_perf_bf_count = bfs_report.get_bf_count(
                 test_types=[TestType.PERFORMANCE],
                 bf_temperatures=[BfTemperature.HOT, BfTemperature.COLD, BfTemperature.NONE],
                 assigned_team=team,
             )
-            if per_team_performance_bf_count > PER_TEAM_PERFORMANCE_BF_COUNT_LIMIT:
-                failures.append(
-                    bf_count_failure_msg.format(
-                        scope=f"Branch({branch}): Team({team})",
-                        bf_type="Performance BF",
-                        bf_count=per_team_performance_bf_count,
-                        bf_limit=PER_TEAM_PERFORMANCE_BF_COUNT_LIMIT,
-                    )
-                )
+            if per_team_perf_bf_count > max_per_team_perf_bf_count:
+                max_per_team_perf_bf_count = per_team_perf_bf_count
 
-        return failures
+        scope = "Max per Assigned Team"
+        status_message = (
+            f"{status_message}"
+            f"\n{_make_status_msg(scope, 'Hot', max_per_team_hot_bf_count, PER_TEAM_HOT_BF_COUNT_THRESHOLD)}"
+            f"\n{_make_status_msg(scope, 'Cold', max_per_team_cold_bf_count, PER_TEAM_COLD_BF_COUNT_THRESHOLD)}"
+            f"\n{_make_status_msg(scope, 'Perf', max_per_team_perf_bf_count, PER_TEAM_PERF_BF_COUNT_THRESHOLD)}"
+        )
+
+        return status_message, percentages
 
     def _make_waterfall_report(
         self, evg_project_names: List[str], window_start: datetime, window_end: datetime
@@ -244,21 +232,6 @@ class MonitorBuildStatusOrchestrator:
 
         return self._accumulate_project_statuses(evg_project_names, waterfall_status)
 
-    def _make_patch_report(
-        self, evg_project_names: List[str], window_start: datetime, window_end: datetime
-    ) -> List[TaskStatusCounts]:
-        LOGGER.info(
-            "Getting Evergreen patches data",
-            projects=evg_project_names,
-            window_start=window_start.isoformat(),
-            window_end=window_end.isoformat(),
-        )
-        waterfall_status = self.evg_service.get_patch_statuses(
-            evg_project_names=evg_project_names, window_start=window_start, window_end=window_end
-        )
-
-        return self._accumulate_project_statuses(evg_project_names, waterfall_status)
-
     @staticmethod
     def _accumulate_project_statuses(
         evg_project_names: List[str], build_statuses: List[TaskStatusCounts]
@@ -269,48 +242,32 @@ class MonitorBuildStatusOrchestrator:
             project_status = TaskStatusCounts(project=evg_project_name)
             for build_status in build_statuses:
                 if build_status.project == evg_project_name:
-                    project_status += build_status
+                    project_status = project_status.add(build_status)
             project_statuses.append(project_status)
 
         return project_statuses
 
     @staticmethod
-    def _check_waterfall_failure_rate(
+    def _get_waterfall_failure_rate_status(
         reports: List[TaskStatusCounts], window_start: datetime, window_end: datetime
-    ) -> List[str]:
-        failures = []
+    ) -> Tuple[str, List[float]]:
+        percentages = []
+        status_message = (
+            f"`[STATUS]` Evergreen waterfall failure rate between '{window_start.isoformat()}'"
+            f" and '{window_end.isoformat()}'"
+        )
 
         for project_status in reports:
             failure_rate = project_status.failure_rate()
-            if failure_rate > EVERGREEN_WATERFALL_FAILURE_RATE_LIMIT:
-                failures.append(
-                    f"Waterfall redness check failed:"
-                    f" Project({project_status.project}):"
-                    f" Failure rate ({failure_rate})"
-                    f" exceeds threshold {EVERGREEN_WATERFALL_FAILURE_RATE_LIMIT}"
-                    f" between {window_start.isoformat()} and {window_end.isoformat()}"
-                )
+            percentage = failure_rate / EVERGREEN_WATERFALL_FAILURE_RATE_THRESHOLD * 100
+            percentages.append(percentage)
+            status_message = (
+                f"{status_message}\n"
+                f"{project_status.project}: {failure_rate:.4f} ({percentage:.2f}% of threshold"
+                f" {EVERGREEN_WATERFALL_FAILURE_RATE_THRESHOLD})"
+            )
 
-        return failures
-
-    @staticmethod
-    def _check_patch_failure_rate(
-        reports: List[TaskStatusCounts], window_start: datetime, window_end: datetime
-    ) -> List[str]:
-        failures = []
-
-        for project_status in reports:
-            failure_rate = project_status.failure_rate()
-            if failure_rate > EVERGREEN_WATERFALL_FAILURE_RATE_LIMIT:
-                failures.append(
-                    f"Patch redness check failed:"
-                    f" Project({project_status.project}):"
-                    f" Failure rate ({failure_rate})"
-                    f" exceeds threshold {EVERGREEN_WATERFALL_FAILURE_RATE_LIMIT}"
-                    f" between {window_start.isoformat()} and {window_end.isoformat()}"
-                )
-
-        return failures
+        return status_message, percentages
 
 
 def main(
@@ -323,7 +280,8 @@ def main(
     is_patch: Annotated[
         str,
         typer.Option(
-            help="Is this script being called from a patch build. This should align with the `is_patch` environment variable set within Evergreen"
+            help="Is this script being called from a patch build."
+            " This should align with the `is_patch` environment variable set within Evergreen"
         ),
     ] = "true",  # default to the more "quiet" setting
 ) -> None:
@@ -355,9 +313,14 @@ def main(
         jira_service=jira_service, evg_service=evg_service
     )
 
-    # Notify when this is not being run in a patch.
-    # Explicitly match "false" instead of not "true" (the default), so that developer iterations at the command line won't so easily spam the channel.
+    # Notify when this is not being run in a patch
+    # In Evergreen waterfall `is_patch` is undefined and here we should get an empty string
+    if len(is_patch) == 0:
+        is_patch = "false"
+    # Explicitly match "false" instead of not "true" (the default),
+    # so that developer iterations at the command line won't so easily spam the channel
     notify = is_patch == "false"
+
     orchestrator.evaluate_build_redness(github_repo, branch, notify)
 
 
