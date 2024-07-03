@@ -201,30 +201,8 @@ public:
      */
     virtual void checkShardVersionOrThrow(OperationContext* opCtx) const = 0;
 
-    // BEGIN - ShardRole Support
-    //
-    // The methods below are intended only for the internal workings for the ShardRole API and
-    // should not be used anywhere else
-
-    /**
-     * Ensures that the version sent by the router matches the current version of the shard catalog
-     * and on mismatch only throws the retryable StaleConfig error, which allows the router to
-     * advance its cached state.
-     */
-    virtual void checkShardVersionOrThrowForAcquire(
-        OperationContext* opCtx, const ShardVersion& shardVersionSentByRouter) const = 0;
-
-    /**
-     * Ensures that the version at which an acquisition started before a yield is still the same
-     * after the restore. If the collection is still the same, will throw the retryable StaleConfig
-     * error. Otherwise, if the collection's timestamp has changed, will throw a non-retryable error
-     * indicating that the operation cannot proceed.
-     */
-    virtual void checkShardVersionOrThrowForRestoreFromYield(
-        OperationContext* opCtx, const ShardVersion& shardVersionAtYield) const = 0;
-
-    //
-    // END - ShardRole Support
+    virtual void checkShardVersionOrThrow(OperationContext* opCtx,
+                                          const ShardVersion& receivedShardVersion) const = 0;
 
     /**
      * Appends information about the shard version of the collection.
