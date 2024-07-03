@@ -863,6 +863,12 @@ add_option(
     help="Installs the appropriate mongot for your architecture",
 )
 
+add_option(
+    "patch-build-mongot-url",
+    default=None,
+    help="Installs mongot binary from upstream patch on mongot-master for your architecture",
+)
+
 try:
     with open("version.json", "r") as version_fp:
         version_data = json.load(version_fp)
@@ -6823,6 +6829,25 @@ if has_option("cache"):
         addNoCacheEmitter(env["BUILDERS"]["SharedArchive"])
         addNoCacheEmitter(env["BUILDERS"]["LoadableModule"])
 
+if env.GetOption("patch-build-mongot-url"):
+    binary_url = env.GetOption("patch-build-mongot-url")
+
+    env.Command(
+        target="mongot-localdev",
+        source=[],
+        action=[
+            f"curl {binary_url} | tar xvz",
+        ],
+    )
+
+    env.AutoInstall(
+        target="$PREFIX_BINDIR",
+        source=["mongot-localdev"],
+        AIB_COMPONENT="mongot",
+        AIB_ROLE="runtime",
+        AIB_COMPONENTS_EXTRA=["dist-test"],
+    )
+
 # mongot is a MongoDB-specific process written as a wrapper around Lucene. Using Lucene, mongot
 # indexes MongoDB databases to provide our customers with full text search capabilities.
 #
@@ -6830,7 +6855,7 @@ if has_option("cache"):
 # search suites. It downloads & bundles mongot with the other mongo binaries. These binaries become
 # available to the build variants in question when the binaries are extracted via archive_dist_test
 # during compilation.
-if env.GetOption("build-mongot"):
+elif env.GetOption("build-mongot"):
     # '--build-mongot` can be 'latest' or'release'
     #  - 'latest' describes the binaries created by the most recent commit merged to 10gen/mongot.
     #  - 'release' refers to the mongot binaries running in atlas prod.
