@@ -824,6 +824,10 @@ public:
             return p().transactionOperations.getOperationsForTest();
         }
 
+        size_t getTransactionOperationsCount() const {
+            return p().transactionOperations.getOperationsCount();
+        }
+
         size_t getNumberOfPrePostImagesToWriteForTest() const {
             return p().transactionOperations.getNumberOfPrePostImagesToWrite();
         }
