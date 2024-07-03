@@ -14,23 +14,6 @@ pre_error_fails_task: true
 stepback: true
 
 
-# Files that match an ignore-list pattern will not trigger a build, if they're the only modified
-# files in the patch.
-ignore:
-- ".*"
-- "!.clang-format"
-- "!.eslintrc.yml"
-- "!.github"
-- "*.md"
-- "*.rst"
-- "*.txt"
-- "/distsrc/**"
-- "/docs/**"
-- "/etc/*.yml"
-- "!/etc/evergreen.yml"
-- "README"
-
-
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
 parameters:
 - key: patch_compile_flags
