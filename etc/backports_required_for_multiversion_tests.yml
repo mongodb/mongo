@@ -517,7 +517,7 @@ last-continuous:
     ticket: SERVER-91178
   - test_file: jstests/sharding/direct_shard_connection_auth.js
     ticket: SERVER-89994
-  - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_negative.js
+  - test_file: jstests/core/timeseries/bucket_unpacking_with_sort.js
     ticket: SERVER-90833
   - test_file: jstests/core/write/bypass_empty_ts_replacement.js
     ticket: SERVER-88750
@@ -1096,7 +1096,7 @@ last-lts:
     ticket: SERVER-91178
   - test_file: jstests/sharding/direct_shard_connection_auth.js
     ticket: SERVER-89994
-  - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_negative.js
+  - test_file: jstests/core/timeseries/bucket_unpacking_with_sort.js
     ticket: SERVER-90833
   - test_file: jstests/core/write/bypass_empty_ts_replacement.js
     ticket: SERVER-88750
