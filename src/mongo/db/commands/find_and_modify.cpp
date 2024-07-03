@@ -171,6 +171,7 @@ void makeUpdateRequest(OperationContext* opCtx,
     requestOut->setExplain(explain);
 
     requestOut->setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+    requestOut->setBypassEmptyTsReplacement(request.getBypassEmptyTsReplacement());
 }
 
 void makeDeleteRequest(OperationContext* opCtx,

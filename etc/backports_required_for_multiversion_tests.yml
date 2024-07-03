@@ -359,6 +359,10 @@ last-continuous:
     ticket: SERVER-81454
   - test_file: jstests/core/timeseries/timeseries_computed_field.js
     ticket: SERVER-88072
+  - test_file: jstests/core/bypass_empty_ts_replacement.js
+    ticket: SERVER-88750
+  - test_file: jstests/core/bypass_empty_ts_replacement_timeseries.js
+    ticket: SERVER-88750
   - test_file: jstests/aggregation/unwind_sort.js
     ticket: SERVER-90485
   - test_file: jstests/aggregation/group_by_objectid.js
@@ -770,6 +774,10 @@ last-lts:
     ticket: SERVER-81454
   - test_file: jstests/core/timeseries/timeseries_computed_field.js
     ticket: SERVER-88072
+  - test_file: jstests/core/bypass_empty_ts_replacement.js
+    ticket: SERVER-88750
+  - test_file: jstests/core/bypass_empty_ts_replacement_timeseries.js
+    ticket: SERVER-88750
   - test_file: jstests/aggregation/unwind_sort.js
     ticket: SERVER-90485
   - test_file: jstests/aggregation/group_by_objectid.js

@@ -131,6 +131,12 @@ int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base) {
             encryptionInfo->toBSON().objsize() + kPerElementOverhead;
     }
 
+    if (auto bypassEmptyTsReplacement = base.getBypassEmptyTsReplacement();
+        bypassEmptyTsReplacement.has_value()) {
+        estSize += write_ops::WriteCommandRequestBase::kBypassEmptyTsReplacementFieldName.size() +
+            kBoolSize + kPerElementOverhead;
+    }
+
     return estSize;
 }
 
