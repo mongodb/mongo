@@ -43,6 +43,7 @@ function runTest(st, numShardsToError, errorCode, isSharded) {
         ]) {
             const commandName = commandTestCase.name;
             const commandBody = commandTestCase.command;
+            const failCommandOptions = {namespace: ns, errorCode, failCommands: [commandName]};
 
             jsTestLog(`Test ${commandName},` +
                       ` readConcern ${tojson(readConcern)},` +
@@ -62,7 +63,7 @@ function runTest(st, numShardsToError, errorCode, isSharded) {
 
             if (readConcern.hasOwnProperty("atClusterTime")) {
                 // Single error.
-                setFailCommandOnShards(st, {times: 1}, [commandName], errorCode, numShardsToError);
+                setFailCommandOnShards(st, {times: 1}, failCommandOptions, numShardsToError);
                 const res =
                     assert.commandFailedWithCode(db.runCommand(snapshotCommandBody), errorCode);
                 // No error labels for non-transaction error.
@@ -70,17 +71,17 @@ function runTest(st, numShardsToError, errorCode, isSharded) {
                 unsetFailCommandOnEachShard(st, numShardsToError);
             } else {
                 // Single error.
-                setFailCommandOnShards(st, {times: 1}, [commandName], errorCode, numShardsToError);
+                setFailCommandOnShards(st, {times: 1}, failCommandOptions, numShardsToError);
                 assert.commandWorked(db.runCommand(snapshotCommandBody));
                 unsetFailCommandOnEachShard(st, numShardsToError);
 
                 // Retry on multiple errors.
-                setFailCommandOnShards(st, {times: 3}, [commandName], errorCode, numShardsToError);
+                setFailCommandOnShards(st, {times: 3}, failCommandOptions, numShardsToError);
                 assert.commandWorked(db.runCommand(snapshotCommandBody));
                 unsetFailCommandOnEachShard(st, numShardsToError);
 
                 // Exhaust retry attempts.
-                setFailCommandOnShards(st, "alwaysOn", [commandName], errorCode, numShardsToError);
+                setFailCommandOnShards(st, "alwaysOn", failCommandOptions, numShardsToError);
                 const res =
                     assert.commandFailedWithCode(db.runCommand(snapshotCommandBody), errorCode);
                 // No error labels for non-transaction error.
