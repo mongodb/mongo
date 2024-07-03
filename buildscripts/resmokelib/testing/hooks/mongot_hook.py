@@ -49,9 +49,3 @@ class MongotHook(interface.Hook):
         self.logger.info("Begin deleting mongot data files after suite finished")
         self.clear_mongot_data_files()
         self.logger.info("Finished deleting mongot data files after suite finished")
-
-    def after_test(self, test, test_report):
-        """After test."""
-        self.logger.info("Begin deleting mongot data files after individual test finished")
-        self.clear_mongot_data_files()
-        self.logger.info("Finished deleting mongot data files after individual test finished")
