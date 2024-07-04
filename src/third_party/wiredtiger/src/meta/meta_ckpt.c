@@ -764,8 +764,6 @@ __assert_ckpt_matches(WT_SESSION_IMPL *session, WT_CKPT *ckpt_a, WT_CKPT *ckpt_b
       "Checkpoint data/size mismatch in __assert_ckpt_matches");
     WT_ASSERT_ALWAYS(session, ckpt_a->bpriv == NULL && ckpt_b->bpriv == NULL,
       "Checkpoint block manager mismatch in __assert_ckpt_matches");
-    WT_ASSERT_ALWAYS(session, ckpt_a->flags == ckpt_b->flags,
-      "Checkpoint flags mismatch in __assert_ckpt_matches");
 }
 
 /*

@@ -34,30 +34,13 @@ struct __wt_conf_bindings {
 };
 
 /*
- * WT_CONF_BIND_TYPE --
- *   These types are used for specifying configuration parameters to be bound.
- * We have a richer set of types for bindings than WT_CONFIG_ITEM_TYPE provides,
- * because using variable arguments for bindings demands it.
- */
-typedef enum {
-    WT_CONF_BIND_INT,
-    WT_CONF_BIND_L_INT,
-    WT_CONF_BIND_LL_INT,
-    WT_CONF_BIND_U_INT,
-    WT_CONF_BIND_UL_INT,
-    WT_CONF_BIND_ULL_INT,
-    WT_CONF_BIND_STRING
-} WT_CONF_BIND_TYPE;
-
-/*
  * WT_CONF_BIND_DESC --
  *	A descriptor about a value to be bound.
  */
 struct __wt_conf_bind_desc {
-    WT_CONFIG_ITEM_TYPE item_type; /* WT_CONFIG_ITEM.type */
-    WT_CONF_BIND_TYPE bind_type;   /* Type for bind argument */
-    const char **choices;          /* Choices for the value if applicable. */
-    u_int offset;                  /* offset into WT_SESSION::conf_bindings.values table */
+    WT_CONFIG_ITEM_TYPE type; /* WT_CONFIG_ITEM.type */
+    const char **choices;     /* Choices for the value if applicable. */
+    u_int offset;             /* offset into WT_SESSION::conf_bindings.values table */
 };
 
 /*

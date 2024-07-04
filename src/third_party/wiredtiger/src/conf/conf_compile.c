@@ -38,68 +38,28 @@ __conf_compile_value(WT_SESSION_IMPL *session, WT_CONF *top_conf, WT_CONFIG_ITEM
   WT_CONF_VALUE *conf_value, const WT_CONFIG_CHECK *check, WT_CONFIG_ITEM *value, bool bind_allowed,
   bool is_default)
 {
-    WT_CONF_BIND_TYPE bind_type;
     uint32_t bind_offset;
-    int left, longcount;
-    const char *str;
-    bool terminated;
 
-    if (value->len > 0 && *(str = value->str) == '%') {
+    if (value->len > 0 && value->str[0] == '%') {
         /* We must be doing an explicit compilation. */
         if (!bind_allowed)
             WT_RET_MSG(
               session, EINVAL, "Value '%.*s' is not valid here", (int)value->len, value->str);
 
-        terminated = false;
-        longcount = 0;
-        bind_type = WT_CONF_BIND_STRING;
-        for (left = (int)value->len - 1; left > 0 && !terminated; --left) {
-            switch (*++str) {
-            case 'l':
-                if (++longcount > 2)
-                    WT_RET_MSG(session, EINVAL,
-                      "Percent binding format has more then two long (l) specifiers");
-                break;
-            case 'd':
-                if (check_type != WT_CONFIG_ITEM_NUM && check_type != WT_CONFIG_ITEM_BOOL)
-                    WT_RET_MSG(session, EINVAL, "Value '%.*s' is not compatible with %s type",
-                      (int)value->len, value->str, check->type);
-                if (longcount == 0)
-                    bind_type = WT_CONF_BIND_INT;
-                else if (longcount == 1)
-                    bind_type = WT_CONF_BIND_L_INT;
-                else
-                    bind_type = WT_CONF_BIND_LL_INT;
-                terminated = true;
-                break;
-            case 'u':
-                if (check_type != WT_CONFIG_ITEM_NUM && check_type != WT_CONFIG_ITEM_BOOL)
-                    WT_RET_MSG(session, EINVAL, "Value '%.*s' is not compatible with %s type",
-                      (int)value->len, value->str, check->type);
-                if (longcount == 0)
-                    bind_type = WT_CONF_BIND_U_INT;
-                else if (longcount == 1)
-                    bind_type = WT_CONF_BIND_UL_INT;
-                else
-                    bind_type = WT_CONF_BIND_ULL_INT;
-                terminated = true;
-                break;
-            case 's':
-                if (check_type != WT_CONFIG_ITEM_STRING && check_type != WT_CONFIG_ITEM_STRUCT)
-                    WT_RET_MSG(session, EINVAL, "Value '%.*s' is not compatible with %s type",
-                      (int)value->len, value->str, check->type);
-                terminated = true;
-                break;
-            default:
-                WT_RET_MSG(session, EINVAL, "Value '%.*s' does not match %s for binding",
-                  (int)value->len, value->str, "%d or %s");
-                break;
-            }
-        }
-        if (!terminated)
+        if (value->len < 2)
             WT_RET_MSG(session, EINVAL, "Percent binding format is incomplete");
-        if (left > 0)
-            WT_RET_MSG(session, EINVAL, "Percent binding format has superfluous characters");
+
+        if (value->str[1] == 'd') {
+            if (check_type != WT_CONFIG_ITEM_NUM && check_type != WT_CONFIG_ITEM_BOOL)
+                WT_RET_MSG(session, EINVAL, "Value '%.*s' is not compatible with %s type",
+                  (int)value->len, value->str, check->type);
+        } else if (value->str[1] == 's') {
+            if (check_type != WT_CONFIG_ITEM_STRING && check_type != WT_CONFIG_ITEM_STRUCT)
+                WT_RET_MSG(session, EINVAL, "Value '%.*s' is not compatible with %s type",
+                  (int)value->len, value->str, check->type);
+        } else
+            WT_RET_MSG(session, EINVAL, "Value '%.*s' does not match %s for binding",
+              (int)value->len, value->str, "%d or %s");
 
         bind_offset = top_conf->binding_count++;
 
@@ -108,8 +68,7 @@ __conf_compile_value(WT_SESSION_IMPL *session, WT_CONF *top_conf, WT_CONFIG_ITEM
               (int)value->len, value->str);
 
         conf_value->type = CONF_VALUE_BIND_DESC;
-        conf_value->u.bind_desc.bind_type = bind_type;
-        conf_value->u.bind_desc.item_type = check_type;
+        conf_value->u.bind_desc.type = check_type;
         conf_value->u.bind_desc.choices = check->choices;
         conf_value->u.bind_desc.offset = bind_offset;
         WT_RET(__wt_realloc_def(session, &top_conf->binding_allocated, top_conf->binding_count,

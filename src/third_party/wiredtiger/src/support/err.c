@@ -594,9 +594,10 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
  *     Conditionally log the source of an error code and return the error.
  */
 int
-__wt_set_return_func(WT_SESSION_IMPL *session, const char *func, int line, int err)
+__wt_set_return_func(
+  WT_SESSION_IMPL *session, const char *func, int line, int err, const char *strerr)
 {
-    __wt_verbose(session, WT_VERB_ERROR_RETURNS, "%s: %d Error: %d", func, line, err);
+    __wt_verbose(session, WT_VERB_ERROR_RETURNS, "%s: %d Error: %d %s", func, line, err, strerr);
     return (err);
 }
 

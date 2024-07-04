@@ -42,7 +42,7 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
     while (!TAILQ_EMPTY(&conn->pfqh)) {
         /* Encourage races. */
-        __wt_timing_stress(session, WT_TIMING_STRESS_PREFETCH_DELAY, NULL);
+        __wt_timing_stress(session, WT_TIMING_STRESS_PREFETCH_1, NULL);
 
         __wt_spin_lock(session, &conn->prefetch_lock);
         pe = TAILQ_FIRST(&conn->pfqh);
@@ -69,6 +69,9 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
             __wt_free(session, pe);
             continue;
         }
+
+        /* Encourage races. */
+        __wt_timing_stress(session, WT_TIMING_STRESS_PREFETCH_2, NULL);
 
         /*
          * We increment this while in the prefetch lock as the thread reading from the queue expects
@@ -178,6 +181,9 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
     if (__wt_eviction_clean_pressure(session))
         return (EBUSY);
 
+    /* Ensure the ref is locked and cannot be freed concurrently. */
+    WT_ASSERT(session, WT_REF_GET_STATE(ref) == WT_REF_LOCKED);
+
     WT_RET(__wt_calloc_one(session, &pe));
     pe->ref = ref;
     pe->first_home = ref->home;
@@ -190,6 +196,8 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
         WT_ERR(EBUSY);
     }
 
+    /* We should never add a ref that is already in the prefetch queue. */
+    WT_ASSERT(session, !F_ISSET_ATOMIC_8(ref, WT_REF_FLAG_PREFETCH));
     /*
      * On top of indicating the leaf page is now in the prefetch queue, the prefetch flag also
      * guarantees the corresponding internal page cannot be evicted until prefetch has processed the

@@ -1897,6 +1897,13 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     page = ref->page;
     mod = page->modify;
 
+    /*
+     * We cannot evict the page in the prefetch queue. Eviction may split the page and free the ref.
+     * The prefetch thread would crash if it sees a freed ref.
+     */
+    if (F_ISSET_ATOMIC_8(ref, WT_REF_FLAG_PREFETCH))
+        return (false);
+
     /* Pages without modify structures can always be evicted, it's just discarding a disk image. */
     if (mod == NULL)
         return (true);

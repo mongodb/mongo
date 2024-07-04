@@ -39,7 +39,7 @@
     __wt_panic_func(                    \
       session, error, __PRETTY_FUNCTION__, __LINE__, WT_VERBOSE_CATEGORY_DEFAULT, __VA_ARGS__)
 #define __wt_set_return(session, error) \
-    __wt_set_return_func(session, __PRETTY_FUNCTION__, __LINE__, error)
+    __wt_set_return_func(session, __PRETTY_FUNCTION__, __LINE__, error, #error)
 
 /* Set "ret" and branch-to-err-label tests. */
 #define WT_ERR(a)             \
