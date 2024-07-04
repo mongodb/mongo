@@ -284,6 +284,7 @@ env.Library(
     target="docs_needed_bounds",
     source=[
         "visitors/docs_needed_bounds.cpp",
+        "visitors/docs_needed_bounds_util.cpp",
         "visitors/docs_needed_bounds.idl",
     ],
     LIBDEPS=["$BUILD_DIR/mongo/base", "$BUILD_DIR/mongo/idl/idl_parser"],

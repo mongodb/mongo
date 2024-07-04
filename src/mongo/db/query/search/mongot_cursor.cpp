@@ -241,7 +241,9 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     boost::optional<int64_t> userBatchSize,
     std::function<boost::optional<long long>()> calcDocsNeededFn,
-    std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy,
+    std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
+        searchIdLookupMetrics) {
     // UUID is required for mongot queries. If not present, no results for the query as the
     // collection has not been created yet.
     if (!expCtx->uuid) {
@@ -288,7 +290,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
         batchSize,
         bounds.value_or(
             DocsNeededBounds(docs_needed_bounds::Unknown(), docs_needed_bounds::Unknown())),
-        expCtx->ns.tenantId());
+        expCtx->ns.tenantId(),
+        searchIdLookupMetrics);
 
     // If it turns out that this stage is not running on a sharded collection, we don't want
     // to send the protocol version to mongot. If the protocol version is sent, mongot will

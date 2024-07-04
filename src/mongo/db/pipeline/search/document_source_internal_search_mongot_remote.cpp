@@ -299,7 +299,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextA
 std::unique_ptr<executor::TaskExecutorCursor>
 DocumentSourceInternalSearchMongotRemote::establishCursor() {
     auto cursors = mongot_cursor::establishCursorsForSearchStage(
-        pExpCtx, _spec, _taskExecutor, boost::none, nullptr);
+        pExpCtx, _spec, _taskExecutor, boost::none, nullptr, nullptr, getSearchIdLookupMetrics());
     // Should be called only in unsharded scenario, therefore only expect a results cursor and no
     // metadata cursor.
     tassert(5253301, "Expected exactly one cursor from mongot", cursors.size() == 1);

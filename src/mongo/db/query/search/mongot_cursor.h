@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
 #include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/executor/task_executor_cursor.h"
@@ -91,7 +92,9 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     boost::optional<int64_t> userBatchSize = boost::none,
     std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
-    std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr,
+    std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
+        searchIdLookupMetrics = nullptr);
 
 /**
  * Parallel to establishCursorsForSearchStage() but limited to the arguments expected for

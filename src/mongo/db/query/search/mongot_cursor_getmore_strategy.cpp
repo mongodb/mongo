@@ -30,6 +30,7 @@
 #include "mongo/db/query/search/mongot_cursor_getmore_strategy.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/pipeline/visitors/docs_needed_bounds_util.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/search/internal_search_cluster_parameters_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
@@ -44,12 +45,15 @@ MongotTaskExecutorCursorGetMoreStrategy::MongotTaskExecutorCursorGetMoreStrategy
     std::function<boost::optional<long long>()> calcDocsNeededFn,
     boost::optional<long long> startingBatchSize,
     DocsNeededBounds docsNeededBounds,
-    boost::optional<TenantId> tenantId)
+    boost::optional<TenantId> tenantId,
+    std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
+        searchIdLookupMetrics)
     : _calcDocsNeededFn(calcDocsNeededFn),
       _currentBatchSize(startingBatchSize),
       _docsNeededBounds(docsNeededBounds),
       _batchSizeHistory({}),
-      _tenantId(tenantId) {
+      _tenantId(tenantId),
+      _searchIdLookupMetrics(searchIdLookupMetrics) {
     if (startingBatchSize.has_value()) {
         _batchSizeHistory.emplace_back(*startingBatchSize);
     }
@@ -87,18 +91,45 @@ long long MongotTaskExecutorCursorGetMoreStrategy::_getNextBatchSize(
             "_getNextBatchSize() should only be called when using the batchSize field.",
             _currentBatchSize.has_value());
 
-    // Don't increase batchSize if the previous batch was returned without filling to the requested
-    // batchSize. That indicates the BSON limit was reached, which likely could happen again.
-    if (prevBatchNumReceived == *_currentBatchSize) {
-        auto batchSizeGrowthFactor =
-            ServerParameterSet::getClusterParameterSet()
-                ->get<ClusterParameterWithStorage<InternalSearchOptions>>("internalSearchOptions")
-                ->getValue(_tenantId)
-                .getBatchSizeGrowthFactor();
-        // In case the growth factor is small enough that the next batchSize rounds back to the
-        // previous batchSize, we use std::ceil to make sure it always grows by at least 1,
-        // unless the growth factor is exactly 1.
-        _currentBatchSize = std::ceil(*_currentBatchSize * batchSizeGrowthFactor);
+    auto internalSearchOptions =
+        ServerParameterSet::getClusterParameterSet()
+            ->get<ClusterParameterWithStorage<InternalSearchOptions>>("internalSearchOptions")
+            ->getValue(_tenantId);
+
+    // The maximum size we will allow the batch to grow to in a single growth step.
+    // In case the growth factor is small enough that the next batchSize rounds back to the
+    // previous batchSize, we use std::ceil to make sure it always grows by at least 1,
+    // unless the growth factor is exactly 1.
+    long long maxNextBatchSize =
+        std::ceil(*_currentBatchSize * internalSearchOptions.getBatchSizeGrowthFactor());
+
+    auto extractableLimit = docs_needed_bounds::calcExtractableLimit(_docsNeededBounds);
+    if ((_searchIdLookupMetrics && extractableLimit.has_value()) &&
+        (_searchIdLookupMetrics->getDocsReturnedByIdLookup() < extractableLimit.value())) {
+        // This case, where we need to request a GetMore from mongot for a non-stored source query
+        // with an extractable limit, is fairly unlikely. We knew the exact # of docs we wanted from
+        // mongot upfront, but our searchidLookupMetrics indicated not enough of them were found on
+        // mongod to satisfy the query. In this next batch, we use the number of docs we still need,
+        // and the success rate of docs previously found to infer a best guess of the least number
+        // of additional docs we need from mongot to complete the search query.
+        if (_searchIdLookupMetrics->getDocsReturnedByIdLookup() == 0) {
+            // Very unlikely case where no docs at all were found on mongod. We need to handle this
+            // so we don't divide by zero.
+            _currentBatchSize = maxNextBatchSize;
+        } else {
+            long long nDocsStillNeeded =
+                extractableLimit.value() - _searchIdLookupMetrics->getDocsReturnedByIdLookup();
+            long long possibleBatchSize =
+                (nDocsStillNeeded / _searchIdLookupMetrics->getIdLookupSuccessRate()) *
+                internalSearchOptions.getOversubscriptionFactor();
+            _currentBatchSize = std::min(possibleBatchSize, maxNextBatchSize);
+        }
+    }
+    // Don't increase batchSize if the previous batch was returned without filling to the
+    // requested batchSize. That indicates the BSON limit was reached, which likely could happen
+    // again.
+    else if (prevBatchNumReceived == *_currentBatchSize) {
+        _currentBatchSize = maxNextBatchSize;
     }
     _batchSizeHistory.emplace_back(*_currentBatchSize);
     return *_currentBatchSize;

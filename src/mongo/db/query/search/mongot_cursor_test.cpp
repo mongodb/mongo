@@ -101,7 +101,9 @@ public:
         std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
         boost::optional<long long> startingBatchSize = boost::none,
         DocsNeededBounds bounds = DocsNeededBounds(docs_needed_bounds::Unknown(),
-                                                   docs_needed_bounds::Unknown())) {
+                                                   docs_needed_bounds::Unknown()),
+        std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
+            searchIdLookupMetrics = nullptr) {
         std::unique_ptr<MongotTaskExecutorCursorGetMoreStrategy> mongotGetMoreStrategy;
 
         // If calcDocsNeededFn is provided, that enables use of the docsRequested option. Otherwise,
@@ -110,10 +112,16 @@ public:
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
                 calcDocsNeededFn,
                 /*startingBatchSize*/ boost::none,
-                bounds);
+                bounds,
+                /*tenantId*/ boost::none,
+                searchIdLookupMetrics);
         } else if (startingBatchSize.has_value()) {
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
-                /*calcDocsNeededFn*/ nullptr, startingBatchSize, bounds);
+                /*calcDocsNeededFn*/ nullptr,
+                startingBatchSize,
+                bounds,
+                /*tenantId*/ boost::none,
+                searchIdLookupMetrics);
         } else {
             // Use the default startingBatchSize.
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>();
@@ -666,6 +674,111 @@ public:
         });
     }
 
+    /*
+     * Test that in a non-stored source query that has an extractable limit that the batch size
+     * updates properly to mongot if not all the returned documents are found in id lookup.
+     */
+    void NonStoredSourceExtractableLimitNotAllDocsFoundInLookupTest() {
+        unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+            CursorId cursorId = 1;
+            RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                     DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                     BSON("search"
+                                          << "foo"),
+                                     opCtx.get());
+
+            // Mock lookup id metrics as batches are processed
+            std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
+                searchIdLookupMetrics =
+                    std::make_shared<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>();
+
+            // Construction of the TaskExecutorCursor enqueues a request in the
+            // NetworkInterfaceMock.
+            auto tec = makeMongotCursor(rcr,
+                                        /*calcDocsNeededFn*/ nullptr,
+                                        /*startingBatchSize*/ 107,
+                                        DocsNeededBounds(100, 100),
+                                        searchIdLookupMetrics);
+
+            // Mock the response for the first batch, which fulfills the requested batchSize of 101.
+            scheduleSuccessfulCursorResponse(
+                "firstBatch", 1, 107, cursorId, /*expectedPrefetch*/ false);
+
+            // Exhaust the first batch.
+            for (int docNum = 1; docNum <= 107; docNum++) {
+                ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
+            }
+
+            // Increment lookup id metrics. Simulate that not all docs are found and check
+            // that the batch size updates properly.
+            for (int i = 0; i < 107; ++i) {
+                searchIdLookupMetrics->incrementDocsSeenByIdLookup();
+            }
+            for (int i = 0; i < 82; ++i) {
+                searchIdLookupMetrics->incrementDocsReturnedByIdLookup();
+            }
+
+            // Compute the expected batch size and ensure that number appears in the cmd message.
+            long long expectedBatchSize =
+                1.064 * (double(100 - 82) / double(double(82) / double(107)));  // 24
+
+            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
+            ASSERT_FALSE(hasReadyRequests());
+
+            // Schedule another batch, where the batchSize is now 24.
+            auto responseSchedulerThread = monitor.spawn([&] {
+                auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
+                    "nextBatch", 102, 126, cursorId, /*expectedPrefetch*/ false);
+                const auto expectedGetMoreCmd =
+                    BSON("getMore" << 1LL << "collection"
+                                   << "test"
+                                   << "cursorOptions" << BSON("batchSize" << expectedBatchSize));
+                ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, receivedGetMoreCmd);
+            });
+
+            // Schedules the GetMore request and exhausts the cursor.
+            for (int docNum = 102; docNum <= 126; docNum++) {
+                ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
+            }
+            responseSchedulerThread.join();
+
+            // Assert no GetMore is requested.
+            ASSERT_FALSE(hasReadyRequests());
+
+            // Increment lookup id metrics. Simulate that not all docs are found again and check
+            // that the batch size updates properly.
+            for (int i = 0; i < 24; ++i) {
+                searchIdLookupMetrics->incrementDocsSeenByIdLookup();
+            }
+            for (int i = 0; i < 16; ++i) {
+                searchIdLookupMetrics->incrementDocsReturnedByIdLookup();
+            }
+
+            // Compute the expected batch size and ensure that number appears in the cmd message.
+            expectedBatchSize = 1.064 *
+                (double(100 - (82 + 16)) / double(double(82 + 16) / double(107 + 24)));  // 2
+
+            responseSchedulerThread = monitor.spawn([&] {
+                auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
+                    "nextBatch", 126, 128, /*cursorId*/ 0, /*expectedPrefetch*/ false);
+                const auto expectedGetMoreCmd =
+                    BSON("getMore" << 1LL << "collection"
+                                   << "test"
+                                   << "cursorOptions" << BSON("batchSize" << expectedBatchSize));
+                ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, receivedGetMoreCmd);
+            });
+
+            // Schedules the GetMore request and exhausts the cursor.
+            for (int docNum = 126; docNum <= 128; docNum++) {
+                ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
+            }
+            responseSchedulerThread.join();
+
+            // Assert no GetMore is requested.
+            ASSERT_FALSE(hasReadyRequests());
+        });
+    }
+
     ServiceContext::UniqueServiceContext serviceCtx = ServiceContext::make();
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
@@ -738,6 +851,16 @@ TEST_F(PinnedConnMongotCursorTestFixture, DefaultStartPrefetchAfterThreeBatchesT
 
 TEST_F(NonPinningMongotCursorTestFixture, DefaultStartPrefetchAfterThreeBatchesTest) {
     DefaultStartPrefetchAfterThreeBatchesTest();
+}
+
+TEST_F(PinnedConnMongotCursorTestFixture,
+       NonStoredSourceExtractableLimitNotAllDocsFoundInLookupTest) {
+    NonStoredSourceExtractableLimitNotAllDocsFoundInLookupTest();
+}
+
+TEST_F(NonPinningMongotCursorTestFixture,
+       NonStoredSourceExtractableLimitNotAllDocsFoundInLookupTest) {
+    NonStoredSourceExtractableLimitNotAllDocsFoundInLookupTest();
 }
 }  // namespace
 }  // namespace executor

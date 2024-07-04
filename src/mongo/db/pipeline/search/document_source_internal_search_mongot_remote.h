@@ -186,6 +186,12 @@ public:
         _searchIdLookupMetrics = std::move(searchIdLookupMetrics);
     }
 
+    std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
+    getSearchIdLookupMetrics() {
+        // Will be nullptr if query is stored source.
+        return _searchIdLookupMetrics;
+    }
+
 protected:
     /**
      * Helper serialize method that avoids making mongot call during explain from mongos.

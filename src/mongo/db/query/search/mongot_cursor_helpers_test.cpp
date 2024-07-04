@@ -276,6 +276,58 @@ TEST_F(MongotCursorHelpersTest, AlwaysPrefetchNeedAllBounds) {
     ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 3));
     ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 3));
 }
+
+/*
+ * This test checks that in a non-stored-source search query with an extractable limit
+ * that the batch size sent to mongot is adjusted properly when not all the documents sent back
+ * from mongot are found in mongod.
+ */
+TEST_F(MongotCursorHelpersTest, QueryHasExtractableLimitAndNotAllDocsFoundInLookup) {
+    long long extractableLimit = 100;
+    long long startingBatchSize = 101;
+    int defaultBatchSizeGrowthFactor = 2;
+    double defaultOversubscriptionFactor = 1.064;
+
+    std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
+        searchIdLookupMetrics =
+            std::make_shared<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>();
+
+    MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
+        MongotTaskExecutorCursorGetMoreStrategy(
+            /*calcDocsNeededFn*/ nullptr,
+            startingBatchSize,
+            DocsNeededBounds(extractableLimit, extractableLimit),
+            /*tenantId*/ boost::none,
+            searchIdLookupMetrics);
+
+    ASSERT_EQ(startingBatchSize, getMoreStrategy.getCurrentBatchSize());
+
+    // First, start with the unexpected case where for whatever reason no docs were found in id
+    // lookup, so that our batch size computation does not divide by zero.
+    for (int i = 0; i < getMoreStrategy.getCurrentBatchSize(); ++i) {
+        searchIdLookupMetrics->incrementDocsSeenByIdLookup();
+    }
+    getMoreStrategy.createGetMoreRequest(cursorId, nss, getMoreStrategy.getCurrentBatchSize());
+    ASSERT_EQ(defaultBatchSizeGrowthFactor * startingBatchSize,
+              getMoreStrategy.getCurrentBatchSize());
+
+    // Now, add in some realistic search id lookup metrics where some,
+    // but not all docs were found, and assert that the batch size updates as expected.
+    for (int i = 0; i < getMoreStrategy.getCurrentBatchSize(); ++i) {
+        searchIdLookupMetrics->incrementDocsSeenByIdLookup();
+    }
+    for (int i = 0; i < extractableLimit * 0.7; ++i) {
+        searchIdLookupMetrics->incrementDocsReturnedByIdLookup();
+    }
+
+    // Now we expect to fall into the special case where the batch size grows by a factor
+    // relative to the success rate of how many docs have been seen vs returned in id lookup.
+    getMoreStrategy.createGetMoreRequest(cursorId, nss, getMoreStrategy.getCurrentBatchSize());
+
+    long long expectedBatchSize = defaultOversubscriptionFactor *
+        ((100 - (100 * 0.7)) / ((100 * 0.7) / (101 + (2 * 101))));  // 138
+    ASSERT_EQ(expectedBatchSize, getMoreStrategy.getCurrentBatchSize());
+}
 }  // namespace
 }  // namespace executor
 }  // namespace mongo

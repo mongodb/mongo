@@ -366,7 +366,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
         origSearchStage->getMongotRemoteSpec(),
         origSearchStage->getTaskExecutor(),
         userBatchSize,
-        [origSearchStage] { return origSearchStage->calcDocsNeeded(); });
+        [origSearchStage] { return origSearchStage->calcDocsNeeded(); },
+        nullptr,
+        origSearchStage->getSearchIdLookupMetrics());
 
     // mongot can return zero cursors for an empty collection, one without metadata, or two for
     // results and metadata.
