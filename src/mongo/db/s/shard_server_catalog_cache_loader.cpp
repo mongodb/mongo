@@ -369,16 +369,24 @@ auto runAndThrowIfTermChanged(OperationContext* opCtx, F&& fn) {
     if constexpr (!std::is_same_v<void, std::invoke_result_t<F, decltype(termBeforeOperation)>>) {
         auto result = fn(termBeforeOperation);
         auto termAtEndOfOperation = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-        uassert(ErrorCodes::InterruptedDueToReplStateChange,
-                "Change of ReplicaSet term detected between start and end of operation",
-                termBeforeOperation == termAtEndOfOperation);
+        uassert(
+            ErrorCodes::InterruptedDueToReplStateChange,
+            fmt::format("Change of ReplicaSet term detected between start and end of operation. "
+                        "Term before operation is {}. Term at end of operation is {}",
+                        termBeforeOperation,
+                        termAtEndOfOperation),
+            termBeforeOperation == termAtEndOfOperation);
         return result;
     } else {
         fn(termBeforeOperation);
         auto termAtEndOfOperation = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-        uassert(ErrorCodes::InterruptedDueToReplStateChange,
-                "Change of ReplicaSet term detected between start and end of operation",
-                termBeforeOperation == termAtEndOfOperation);
+        uassert(
+            ErrorCodes::InterruptedDueToReplStateChange,
+            fmt::format("Change of ReplicaSet term detected between start and end of operation. "
+                        "Term before operation is {}. Term at end of operation is {}",
+                        termBeforeOperation,
+                        termAtEndOfOperation),
+            termBeforeOperation == termAtEndOfOperation);
     }
 }
 
