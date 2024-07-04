@@ -330,7 +330,7 @@ executor:
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections
     - class: CheckOrphansDeleted
-    - class: DropShardedCollections
+    - class: DropUserCollections
     - class: CleanEveryN
       n: 20
   fixture:
