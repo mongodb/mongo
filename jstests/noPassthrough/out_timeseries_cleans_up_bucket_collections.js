@@ -90,7 +90,7 @@ function runOutAndInterrupt(mergeShard) {
 
     // Assert that the temporary collections has been garbage collected.
     const tempCollections =
-        testDB.getCollectionNames().filter(coll => coll.startsWith('tmp.agg_out'));
+        testDB.getCollectionNames().filter(coll => coll.includes('tmp.agg_out'));
     const garbageCollectionEntries = st.s.getDB('config')['agg_temp_collections'].count();
     assert(tempCollections.length === 0 && garbageCollectionEntries === 0);
 }

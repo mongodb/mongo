@@ -38,7 +38,7 @@ function runOut(dbName, sourceCollName, targetCollName, expectCommandWorked, tim
 }
 
 function getTempCollections() {
-    return testDB.getCollectionNames().filter(coll => coll.startsWith('tmp.agg_out'));
+    return testDB.getCollectionNames().filter(coll => coll.includes('tmp.agg_out'));
 }
 
 function failFn_sigkill() {
