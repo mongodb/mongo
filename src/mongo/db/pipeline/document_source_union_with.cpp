@@ -84,6 +84,21 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
 
 }  // namespace
 
+DocumentSourceUnionWith::DocumentSourceUnionWith(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
+    : DocumentSource(kStageName, expCtx), _pipeline(std::move(pipeline)) {}
+
+DocumentSourceUnionWith::DocumentSourceUnionWith(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    NamespaceString unionNss,
+    std::vector<BSONObj> pipeline)
+    : DocumentSourceUnionWith(expCtx,
+                              buildPipelineFromViewDefinition(
+                                  expCtx, expCtx->getResolvedNamespace(unionNss), pipeline)) {
+    _userPipeline = std::move(pipeline);
+}
+
 DocumentSourceUnionWith::~DocumentSourceUnionWith() {
     if (_pipeline && _pipeline->getContext()->explain) {
         _pipeline->dispose(pExpCtx->opCtx);
@@ -183,9 +198,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         pipeline = unionWithSpec.getPipeline().value_or(std::vector<BSONObj>{});
     }
     return make_intrusive<DocumentSourceUnionWith>(
-        expCtx,
-        buildPipelineFromViewDefinition(
-            expCtx, expCtx->getResolvedNamespace(std::move(unionNss)), std::move(pipeline)));
+        expCtx, std::move(unionNss), std::move(pipeline));
 }
 
 DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
@@ -267,11 +280,7 @@ Pipeline::SourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
         _pipeline->addFinalSource(nextStage->clone());
         // Apply the same rewrite to the cached pipeline if available.
         if (pExpCtx->explain >= ExplainOptions::Verbosity::kExecStats) {
-            auto cloneForExplain = nextStage->clone();
-            if (!_cachedPipeline.empty()) {
-                cloneForExplain->setSource(_cachedPipeline.back().get());
-            }
-            _cachedPipeline.push_back(std::move(cloneForExplain));
+            _pushedDownStages.push_back(nextStage->serialize().getDocument().toBson());
         }
         auto newStageItr = container->insert(itr, std::move(nextStage));
         container->erase(std::next(itr));
@@ -304,6 +313,8 @@ void DocumentSourceUnionWith::doDispose() {
         if (!_pipeline->getContext()->explain) {
             _pipeline->dispose(pExpCtx->opCtx);
             _pipeline.reset();
+            _userPipeline.clear();
+            _pushedDownStages.clear();
         }
     }
 }
@@ -324,10 +335,18 @@ Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosi
             pipeCopy = Pipeline::create(_pipeline->getSources(), _pipeline->getContext()).release();
         } else if (*explain >= ExplainOptions::Verbosity::kExecStats &&
                    _executionState > ExecutionProgress::kIteratingSource) {
+            std::vector<BSONObj> recoveredPipeline;
             // We've either exhausted the sub-pipeline or at least started iterating it. Use the
-            // cached pipeline to get the explain output since the '_pipeline' may have been
-            // modified for any optimizations or pushdowns into the initial $cursor stage.
-            pipeCopy = Pipeline::create(_cachedPipeline, _pipeline->getContext()).release();
+            // cached user pipeline and pushed down stages to get the explain output since the
+            // '_pipeline' may have been modified for any optimizations or pushdowns into the
+            // initial $cursor stage.
+            recoveredPipeline.reserve(_userPipeline.size() + _pushedDownStages.size());
+            std::move(
+                _userPipeline.begin(), _userPipeline.end(), std::back_inserter(recoveredPipeline));
+            std::move(_pushedDownStages.begin(),
+                      _pushedDownStages.end(),
+                      std::back_inserter(recoveredPipeline));
+            pipeCopy = Pipeline::parse(recoveredPipeline, _pipeline->getContext()).release();
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
             // serialization in the explain output.

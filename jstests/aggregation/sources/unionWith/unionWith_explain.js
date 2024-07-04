@@ -70,7 +70,7 @@ function arrayEqWithIgnoredFields(union, regular) {
 
 function assertExplainEq(unionExplain, regularExplain) {
     const unionStage = getUnionWithStage(unionExplain);
-    assert(unionStage);
+    assert(unionStage, unionExplain);
     const unionSubExplain = unionStage.$unionWith.pipeline;
     if (FixtureHelpers.isMongos(testDB)) {
         const splitPipe = unionExplain.splitPipeline;
@@ -108,6 +108,19 @@ function testPipeline(pipeline) {
                                       {explain: true});
     let queryResult = collB.aggregate(pipeline, {explain: true});
     assertExplainEq(unionResult, queryResult);
+
+    // Alternative explain invocation. This is a regression test for SERVER-89344.
+    if (!FixtureHelpers.isMongos(db)) {
+        db.runCommand({
+            explain: {
+                "aggregate": collA.getName(),
+                "pipeline": [{$unionWith: {coll: collB.getName(), pipeline: pipeline}}],
+                "cursor": {}
+            }
+        });
+        db.runCommand(
+            {explain: {"aggregate": collB.getName(), "pipeline": pipeline, "cursor": {}}});
+    }
 }
 
 testPipeline([{$addFields: {bump: true}}]);
