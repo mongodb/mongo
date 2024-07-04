@@ -132,7 +132,7 @@ if [ "${build_mongot}" = "true" ]; then
   # Checking that this is not a downstream patch on mongod created by mongot's patch trigger.
   # In the case that it's not, download latest (eg HEAD of 10gen/mongot) or the
   # release (eg currently running in production on Atlas) mongot binary.
-  if [-z "${linux_x86_64_mongot_localdev_binary}" && -z "${linux_aarch64_mongot_localdev_binary}" && -z "${macos_x86_64_mongot_localdev_binary}" ]; then
+  if [[ ! -v linux_x86_64_mongot_localdev_binary && ! -v linux_aarch64_mongot_localdev_binary && ! -v macos_x86_64_mongot_localdev_binary ]]; then
     if [ "${download_mongot_release}" = "true" ]; then
       extra_args="$extra_args --build-mongot=release"
     else
