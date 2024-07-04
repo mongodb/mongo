@@ -743,10 +743,8 @@ buildvariants:
         activate: true
       - name: schedule_global_auto_tasks
 
-  ###
-  # New compiles
   - name: amazon2-x86-compile
-    display_name: "* Compile for Amazon Linux 2 x86 NEW"
+    display_name: "* Compile for Amazon Linux 2 x86"
     modules: *modules
     expansions:
       platform: linux
@@ -771,7 +769,7 @@ buildvariants:
             variant: amazon2-x86-compile
 
   - name: amazon2-arm64-compile
-    display_name: "* Compile for Amazon Linux 2 arm64 NEW"
+    display_name: "* Compile for Amazon Linux 2 arm64"
     modules: *modules
     expansions:
       platform: linux
@@ -796,7 +794,7 @@ buildvariants:
             variant: amazon2-arm64-compile
 
   - name: amazon2-arm64-mongocrypt-shlib-compile
-    display_name: "* Compile mongo_crypt_v1.so for Amazon Linux 2 arm64 NEW"
+    display_name: "* Compile mongo_crypt_v1.so for Amazon Linux 2 arm64"
     modules: *modules
     cron: "0 0 * * 4" # 00:00 on Thursday
     tags: ["bazel_check"]
@@ -829,7 +827,7 @@ buildvariants:
       - name: compile_mongocrypt_shlib
 
   - name: amazon2-x86-streams-compile
-    display_name: "* Compile Streams for Amazon Linux 2 x86 NEW"
+    display_name: "* Compile Streams for Amazon Linux 2 x86"
     modules: *modules
     expansions:
       platform: linux
@@ -855,7 +853,7 @@ buildvariants:
             variant: amazon2-x86-streams-compile
 
   - name: amazon2-arm64-openssl111-compile
-    display_name: "* Compile for Amazon Linux 2 arm64 OpenSSL 1.1.1 NEW"
+    display_name: "* Compile for Amazon Linux 2 arm64 OpenSSL 1.1.1"
     modules: *modules
     expansions:
       platform: linux
@@ -878,4 +876,34 @@ buildvariants:
         depends_on:
           - name: archive_dist_test
             variant: amazon2-arm64-openssl111-compile
-  ###
+
+  # This variant tests the reuse_compile_from feature
+  # by reusing compile artifacts from another compile
+  # in the same patch.
+  - name: test-reuse-compile-from
+    display_name: "~ Test reuse_compile_from"
+    modules: *modules
+    cron: "0 0 * * *" # Every day at 00:00
+    expansions:
+      platform: linux
+      project_dir: *project_dir
+      compile_variant: amazon2-arm64-compile
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      reuse_compile_from: ${version_id}
+      has_packages: false
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    run_on:
+      - amazon2-arm64-xlarge
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+        depends_on:
+          - name: archive_dist_test
+            variant: amazon2-arm64-compile
+          - name: archive_dist_test_debug
+            variant: amazon2-arm64-compile
