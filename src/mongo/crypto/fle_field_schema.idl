@@ -386,7 +386,6 @@ structs:
           trimFactor:
             description: "Determines how many levels of the hypergraph to trim"
             type: safeInt
-            optional: true
             validator: { gte: 0 }
           indexMin:
             description: "Minimum value for the encrypted index that this query is using."

@@ -161,15 +161,16 @@ void validateIDLFLE2RangeFindSpec(const FLE2RangeFindSpec* placeholder) {
                 min.type() == BSONType::NumberDecimal || min.type() == BSONType::NumberDouble);
     }
 
-    if (edgesInfo.getTrimFactor().has_value()) {
-        uint32_t tf = edgesInfo.getTrimFactor().value();
+    {
+        auto tf = edgesInfo.getTrimFactor();
         uassert(8574100,
                 "Trim factor must be less than the number of bits used to represent the domain.",
                 tf == 0 ||
-                    tf < getNumberOfBitsInDomain(
-                             min.type(), min, max, edgesInfo.getPrecision().map([](std::int32_t m) {
-                                 return static_cast<uint32_t>(m);
-                             })));
+                    static_cast<uint32_t>(tf) <
+                        getNumberOfBitsInDomain(
+                            min.type(), min, max, edgesInfo.getPrecision().map([](std::int32_t m) {
+                                return static_cast<uint32_t>(m);
+                            })));
     }
 
     auto lb = edgesInfo.getLowerBound().getElement();

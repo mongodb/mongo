@@ -1974,7 +1974,7 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
     auto includeLowerBound = edgesInfo.getLbIncluded();
     auto includeUpperBound = edgesInfo.getUbIncluded();
 
-    auto trimFactor = edgesInfo.getTrimFactor().value_or(0);
+    auto trimFactor = edgesInfo.getTrimFactor();
 
     // Open-ended ranges are represented with infinity as the other endpoint. Resolve infinite
     // bounds at this point to end at the min or max for this index.
