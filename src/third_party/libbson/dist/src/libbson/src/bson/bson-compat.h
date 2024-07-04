@@ -133,8 +133,7 @@ typedef SSIZE_T ssize_t;
 /* Derive the maximum representable value of signed integer type T using the
  * formula 2^(N - 1) - 1 where N is the number of bits in type T. This assumes
  * T is represented using two's complement. */
-#define BSON_NUMERIC_LIMITS_MAX_SIGNED(T) \
-   ((T) ((((size_t) 0x01u) << (sizeof (T) * (size_t) CHAR_BIT - 1u)) - 1u))
+#define BSON_NUMERIC_LIMITS_MAX_SIGNED(T) ((T) ((((size_t) 0x01u) << (sizeof (T) * (size_t) CHAR_BIT - 1u)) - 1u))
 
 /* Derive the minimum representable value of signed integer type T as one less
  * than the negation of its maximum representable value. This assumes T is
@@ -173,8 +172,7 @@ typedef signed char bool;
 #if defined(__GNUC__)
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 1)
 #define bson_sync_synchronize() __sync_synchronize ()
-#elif defined(__i386__) || defined(__i486__) || defined(__i586__) || \
-   defined(__i686__) || defined(__x86_64__)
+#elif defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__) || defined(__x86_64__)
 #define bson_sync_synchronize() asm volatile ("mfence" ::: "memory")
 #else
 #define bson_sync_synchronize() asm volatile ("sync" ::: "memory")

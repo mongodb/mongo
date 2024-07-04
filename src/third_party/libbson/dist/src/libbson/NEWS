@@ -1,3 +1,21 @@
+libbson 1.27.1
+==============
+
+Fixes:
+
+  * Fix string handling in `bson_string_new` and `bson_string_append`.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Roberto C. Sánchez
+
+
+
+libbson 1.27.0
+==============
+
+No changes since 1.26.2. Version incremented to match the libmongoc version.
+
 libbson 1.26.2
 ==============
 

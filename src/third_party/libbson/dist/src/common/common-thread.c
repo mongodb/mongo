@@ -20,9 +20,7 @@
 
 #if defined(BSON_OS_UNIX)
 int
-mcommon_thread_create (bson_thread_t *thread,
-                       BSON_THREAD_FUN_TYPE (func),
-                       void *arg)
+mcommon_thread_create (bson_thread_t *thread, BSON_THREAD_FUN_TYPE (func), void *arg)
 {
    BSON_ASSERT_PARAM (thread);
    BSON_ASSERT_PARAM (func);
@@ -39,16 +37,13 @@ mcommon_thread_join (bson_thread_t thread)
 bool
 mcommon_mutex_is_locked (bson_mutex_t *mutex)
 {
-   return mutex->valid_tid &&
-          pthread_equal (pthread_self (), mutex->lock_owner);
+   return mutex->valid_tid && pthread_equal (pthread_self (), mutex->lock_owner);
 }
 #endif
 
 #else
 int
-mcommon_thread_create (bson_thread_t *thread,
-                       BSON_THREAD_FUN_TYPE (func),
-                       void *arg)
+mcommon_thread_create (bson_thread_t *thread, BSON_THREAD_FUN_TYPE (func), void *arg)
 {
    BSON_ASSERT_PARAM (thread);
    BSON_ASSERT_PARAM (func);

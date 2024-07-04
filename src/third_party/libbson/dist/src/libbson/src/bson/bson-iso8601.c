@@ -24,11 +24,7 @@
 
 
 static bool
-get_tok (const char *terminals,
-         const char **ptr,
-         int32_t *remaining,
-         const char **out,
-         int32_t *out_len)
+get_tok (const char *terminals, const char **ptr, int32_t *remaining, const char **out, int32_t *out_len)
 {
    const char *terminal;
    bool found_terminal = false;
@@ -41,8 +37,7 @@ get_tok (const char *terminals,
    *out = *ptr;
    *out_len = -1;
 
-   for (; *remaining && !found_terminal;
-        (*ptr)++, (*remaining)--, (*out_len)++) {
+   for (; *remaining && !found_terminal; (*ptr)++, (*remaining)--, (*out_len)++) {
       for (terminal = terminals; *terminal; terminal++) {
          if (**ptr == *terminal) {
             found_terminal = true;
@@ -73,12 +68,7 @@ digits_only (const char *str, int32_t len)
 }
 
 static bool
-parse_num (const char *str,
-           int32_t len,
-           int32_t digits,
-           int32_t min,
-           int32_t max,
-           int32_t *out)
+parse_num (const char *str, int32_t len, int32_t digits, int32_t min, int32_t max, int32_t *out)
 {
    int i;
    int magnitude = 1;
@@ -102,10 +92,7 @@ parse_num (const char *str,
 }
 
 bool
-_bson_iso8601_date_parse (const char *str,
-                          int32_t len,
-                          int64_t *out,
-                          bson_error_t *error)
+_bson_iso8601_date_parse (const char *str, int32_t len, int64_t *out, bson_error_t *error)
 {
    const char *ptr;
    int32_t remaining = len;
@@ -139,12 +126,9 @@ _bson_iso8601_date_parse (const char *str,
 
    struct bson_tm posix_date = {0};
 
-#define DATE_PARSE_ERR(msg)                                \
-   bson_set_error (error,                                  \
-                   BSON_ERROR_JSON,                        \
-                   BSON_JSON_ERROR_READ_INVALID_PARAM,     \
-                   "Could not parse \"%s\" as date: " msg, \
-                   str);                                   \
+#define DATE_PARSE_ERR(msg)                                                                                     \
+   bson_set_error (                                                                                             \
+      error, BSON_ERROR_JSON, BSON_JSON_ERROR_READ_INVALID_PARAM, "Could not parse \"%s\" as date: " msg, str); \
    return false
 
 #define DEFAULT_DATE_PARSE_ERR                                                 \
@@ -156,8 +140,7 @@ _bson_iso8601_date_parse (const char *str,
    /* we have to match at least yyyy-mm-ddThh:mm */
    if (!(get_tok ("-", &ptr, &remaining, &year_ptr, &year_len) &&
          get_tok ("-", &ptr, &remaining, &month_ptr, &month_len) &&
-         get_tok ("T", &ptr, &remaining, &day_ptr, &day_len) &&
-         get_tok (":", &ptr, &remaining, &hour_ptr, &hour_len) &&
+         get_tok ("T", &ptr, &remaining, &day_ptr, &day_len) && get_tok (":", &ptr, &remaining, &hour_ptr, &hour_len) &&
          get_tok (":+-Z", &ptr, &remaining, &min_ptr, &min_len))) {
       DEFAULT_DATE_PARSE_ERR;
    }
@@ -245,8 +228,7 @@ _bson_iso8601_date_parse (const char *str,
 
          /* we inflect the meaning of a 'positive' timezone.  Those are hours
           * we have to subtract, and vice versa */
-         tz_adjustment =
-            (tz_ptr[0] == '-' ? 1 : -1) * ((tz_min * 60) + (tz_hour * 60 * 60));
+         tz_adjustment = (tz_ptr[0] == '-' ? 1 : -1) * ((tz_min * 60) + (tz_hour * 60 * 60));
 
          if (!(tz_adjustment > -86400 && tz_adjustment < 86400)) {
             DATE_PARSE_ERR ("timezone offset must be less than 24 hours");

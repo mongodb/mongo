@@ -88,9 +88,7 @@ typedef void (*bson_reader_destroy_func_t) (void *handle); /* IN */
 
 
 BSON_EXPORT (bson_reader_t *)
-bson_reader_new_from_handle (void *handle,
-                             bson_reader_read_func_t rf,
-                             bson_reader_destroy_func_t df);
+bson_reader_new_from_handle (void *handle, bson_reader_read_func_t rf, bson_reader_destroy_func_t df);
 BSON_EXPORT (bson_reader_t *)
 bson_reader_new_from_fd (int fd, bool close_on_destroy);
 BSON_EXPORT (bson_reader_t *)
@@ -102,8 +100,7 @@ bson_reader_destroy (bson_reader_t *reader);
 BSON_EXPORT (void)
 bson_reader_set_read_func (bson_reader_t *reader, bson_reader_read_func_t func);
 BSON_EXPORT (void)
-bson_reader_set_destroy_func (bson_reader_t *reader,
-                              bson_reader_destroy_func_t func);
+bson_reader_set_destroy_func (bson_reader_t *reader, bson_reader_destroy_func_t func);
 BSON_EXPORT (const bson_t *)
 bson_reader_read (bson_reader_t *reader, bool *reached_eof);
 BSON_EXPORT (off_t)

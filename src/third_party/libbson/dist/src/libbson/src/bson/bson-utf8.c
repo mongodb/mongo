@@ -210,15 +210,13 @@ bson_utf8_validate (const char *utf8, /* IN */
          return false;
 
       case 3:
-         if (((c >= 0x0800) && (c <= 0x0FFF)) ||
-             ((c >= 0x1000) && (c <= 0xFFFF))) {
+         if (((c >= 0x0800) && (c <= 0x0FFF)) || ((c >= 0x1000) && (c <= 0xFFFF))) {
             continue;
          }
          return false;
 
       case 4:
-         if (((c >= 0x10000) && (c <= 0x3FFFF)) ||
-             ((c >= 0x40000) && (c <= 0xFFFFF)) ||
+         if (((c >= 0x10000) && (c <= 0x3FFFF)) || ((c >= 0x40000) && (c <= 0xFFFFF)) ||
              ((c >= 0x100000) && (c <= 0x10FFFF))) {
             continue;
          }
@@ -441,18 +439,18 @@ bson_utf8_from_unichar (bson_unichar_t unichar,                      /* IN */
    } else if (unichar <= 0x7FF) {
       *len = 2;
       utf8[0] = 0xC0 | ((unichar >> 6) & 0x3F);
-      utf8[1] = 0x80 | ((unichar) &0x3F);
+      utf8[1] = 0x80 | ((unichar) & 0x3F);
    } else if (unichar <= 0xFFFF) {
       *len = 3;
       utf8[0] = 0xE0 | ((unichar >> 12) & 0xF);
       utf8[1] = 0x80 | ((unichar >> 6) & 0x3F);
-      utf8[2] = 0x80 | ((unichar) &0x3F);
+      utf8[2] = 0x80 | ((unichar) & 0x3F);
    } else if (unichar <= 0x1FFFFF) {
       *len = 4;
       utf8[0] = 0xF0 | ((unichar >> 18) & 0x7);
       utf8[1] = 0x80 | ((unichar >> 12) & 0x3F);
       utf8[2] = 0x80 | ((unichar >> 6) & 0x3F);
-      utf8[3] = 0x80 | ((unichar) &0x3F);
+      utf8[3] = 0x80 | ((unichar) & 0x3F);
    } else {
       *len = 0;
    }

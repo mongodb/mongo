@@ -63,10 +63,8 @@ BSON_EXPORT (void)
 bson_zero_free (void *mem, size_t size);
 
 
-#define BSON_ALIGNED_ALLOC(T) \
-   ((T *) (bson_aligned_alloc (BSON_ALIGNOF (T), sizeof (T))))
-#define BSON_ALIGNED_ALLOC0(T) \
-   ((T *) (bson_aligned_alloc0 (BSON_ALIGNOF (T), sizeof (T))))
+#define BSON_ALIGNED_ALLOC(T) ((T *) (bson_aligned_alloc (BSON_ALIGNOF (T), sizeof (T))))
+#define BSON_ALIGNED_ALLOC0(T) ((T *) (bson_aligned_alloc0 (BSON_ALIGNOF (T), sizeof (T))))
 
 
 BSON_END_DECLS
