@@ -142,7 +142,7 @@ class EnterpriseDistro(packager.Distro):
                 return ["ubuntu1804", "ubuntu2004", "ubuntu2204"]
         if arch == "aarch64":
             if self.dname == 'redhat':
-                return ["rhel82", "rhel90"]
+                return ["rhel82", "rhel90", "rhel93"]
             if self.dname == 'amazon2':
                 return ["amazon2"]
             if self.dname == 'amazon2023':
@@ -150,7 +150,7 @@ class EnterpriseDistro(packager.Distro):
             return []
 
         if re.search("(redhat|fedora|centos)", self.dname):
-            return ["rhel90", "rhel80", "rhel70", "rhel79", "rhel62", "rhel57"]
+            return ["rhel90", "rhel93", "rhel80", "rhel70", "rhel79", "rhel62", "rhel57"]
         return super(EnterpriseDistro, self).build_os(arch)
 
 

@@ -346,6 +346,7 @@ class Distro(object):
             return ["suse11", "suse12", "suse15"]
         elif re.search("(redhat|fedora|centos)", self.dname):
             return [
+                "rhel93",
                 "rhel90",
                 "rhel82",
                 "rhel80",

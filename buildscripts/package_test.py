@@ -112,6 +112,8 @@ OS_DOCKER_LOOKUP = {
                frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
     'rhel90': ('almalinux:9', "yum",
                frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
+    'rhel93': ('almalinux:9', "yum",
+               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
     'sunos5': None,
     'suse11': None,
     'suse12': None,
