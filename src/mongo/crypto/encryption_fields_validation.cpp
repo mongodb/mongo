@@ -167,11 +167,6 @@ uint32_t getNumberOfBitsInDomain(const boost::optional<Decimal128>& min,
     }
 }
 
-std::int64_t getRangeSparsityDefault() {
-    // TODO: SERVER-91077 change to a more suitable default value
-    return 1;
-}
-
 std::pair<mongo::Value, mongo::Value> getRangeMinMaxDefaults(BSONType fieldType) {
     switch (fieldType) {
         case NumberDouble:
@@ -470,10 +465,9 @@ void setRangeDefaults(BSONType fieldType, StringData fieldPath, QueryTypeConfig*
     validateRangeIndex(fieldType, fieldPath, query);
 
     auto [defMin, defMax] = getRangeMinMaxDefaults(fieldType);
-    auto defSparsity = getRangeSparsityDefault();
     query.setMin(query.getMin().value_or(defMin));
     query.setMax(query.getMax().value_or(defMax));
-    query.setSparsity(query.getSparsity().value_or(defSparsity));
+    query.setSparsity(query.getSparsity().value_or(kFLERangeSparsityDefault));
 }
 
 }  // namespace mongo

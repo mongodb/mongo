@@ -41,8 +41,8 @@ class EncryptedField;
 class EncryptedFieldConfig;
 class QueryTypeConfig;
 
-constexpr int kFLERangeSparsityDefault = 1;
-constexpr int kFLERangeTrimFactorDefault = 0;
+constexpr int kFLERangeSparsityDefault = 2;
+constexpr int kFLERangeTrimFactorDefault = 6;
 
 /*
  * Value: Value to attempt to coerce to field's type.

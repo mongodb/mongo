@@ -5071,6 +5071,7 @@ public:
         if (precision) {
             config.setPrecision(*precision);
         }
+        config.setTrimFactor(0);
         return config;
     }
 

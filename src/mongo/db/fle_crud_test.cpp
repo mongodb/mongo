@@ -455,7 +455,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
                         ,
             "path": "encrypted",
             "bsonType": "int",
-            "queries": {"queryType": "range", "min": 0, "max": 15, "sparsity": 1}
+            "queries": {"queryType": "range", "min": 0, "max": 15, "sparsity": 1, "trimFactor": 0}
 
         }
     ]
@@ -482,7 +482,7 @@ void parseEncryptedInvalidFieldConfig(StringData esc, StringData ecoc) {
                             ,
                 "path": "encrypted",
                 "bsonType": "int",
-                "queries": {"queryType": "range", "min": 0, "max": 15, "sparsity": 1}
+                "queries": {"queryType": "range", "min": 0, "max": 15, "sparsity": 1, "trimFactor": 0}
 
             }
         ]
@@ -553,6 +553,7 @@ BSONObj generateFLE2RangeInsertSpec(BSONElement value) {
     auto upperDoc = BSON("ub" << 15);
 
     spec.setMaxBound(boost::optional<IDLAnyType>(upperDoc.firstElement()));
+    spec.setTrimFactor(0);
     auto specDoc = BSON("s" << spec.toBSON());
 
     return specDoc;
@@ -563,17 +564,15 @@ std::vector<char> generateSinglePlaceholder(BSONElement value,
                                             Fle2AlgorithmInt alg = Fle2AlgorithmInt::kEquality,
                                             int64_t cm = 0) {
     FLE2EncryptionPlaceholder ep;
-
-    // Has to be generated outside of if statements to root the
-    // value until ep is finalized as an object.
-    BSONObj temp = generateFLE2RangeInsertSpec(value);
-
     ep.setAlgorithm(alg);
     ep.setUserKeyId(userKeyId);
     ep.setIndexKeyId(indexKeyId);
     ep.setType(mongo::Fle2PlaceholderType::kInsert);
 
+    // Keep definition outside of conditional to keep it alive until serialization.
+    BSONObj temp;
     if (alg == Fle2AlgorithmInt::kRange) {
+        temp = generateFLE2RangeInsertSpec(value);
         ep.setValue(temp.firstElement());
         ep.setSparsity(1);
     } else {
