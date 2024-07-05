@@ -315,28 +315,38 @@ void CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
 }
 
 void CollectionScan::assertTsHasNotFallenOff(const Record& record) {
-    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(record.data.toBson()));
+    const auto oplogEntry = record.data.toBson();
+    const repl::OplogEntryParserNonStrict oplogEntryParser{oplogEntry};
     invariant(_specificStats.docsTested == 0);
 
-    // If the first entry we see in the oplog is the replset initialization, then it doesn't matter
-    // if its timestamp is later than the timestamp that should not have fallen off the oplog; no
-    // events earlier can have fallen off this oplog.
-    // NOTE: A change collection can be created at any moment as such it might not have replset
-    // initialization message, as such this case is not fully applicable for the change collection.
-    const bool isNewRS =
-        oplogEntry.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg)) &&
-        oplogEntry.getOpType() == repl::OpTypeEnum::kNoop;
+    // Indicates that 'oplogEntry' means initialization of a replica set.
+    bool isNewRS{false};
 
-    // Verify that the timestamp of the first observed oplog entry is earlier than or equal to
-    // timestamp that should not have fallen off the oplog.
-    const bool tsHasNotFallenOff = oplogEntry.getTimestamp() <= *_params.assertTsHasNotFallenOff;
+    // Indicates that the timestamp of the observed oplog entry 'oplogEntry' is earlier than or
+    // equal to timestamp that should not have fallen off the oplog.
+    bool tsHasNotFallenOff{false};
+    try {
+        tsHasNotFallenOff =
+            oplogEntryParser.getOpTime().getTimestamp() <= *_params.assertTsHasNotFallenOff;
 
+        // If the first entry we see in the oplog is the replset initialization, then it doesn't
+        // matter if its timestamp is later than the timestamp that should not have fallen off the
+        // oplog; no events earlier can have fallen off this oplog.
+        // NOTE: A change collection can be created at any moment as such it might not have replset
+        // initialization message, as such this case is not fully applicable for the change
+        // collection.
+        isNewRS = oplogEntryParser.getOpType() == repl::OpTypeEnum::kNoop &&
+            oplogEntryParser.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg));
+    } catch (const AssertionException& exception) {
+        uasserted(8881102,
+                  str::stream() << "Failed to parse the oldest oplog entry" << causedBy(exception));
+    }
     uassert(ErrorCodes::OplogQueryMinTsMissing,
             str::stream()
                 << "Specified timestamp has already fallen off the oplog for the input timestamp: "
-                << *_params.assertTsHasNotFallenOff
-                << ", oplog entry: " << oplogEntry.getEntry().toString(),
+                << *_params.assertTsHasNotFallenOff << ", oplog entry: " << oplogEntry.toString(),
             isNewRS || tsHasNotFallenOff);
+
     // We don't need to check this assertion again after we've confirmed the first oplog event.
     _params.assertTsHasNotFallenOff = boost::none;
 }
