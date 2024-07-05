@@ -236,7 +236,7 @@ public:
  * Returns an empty document if the given bucket cannot be found or if this time-series collection
  * was not created with a metadata field name.
  */
-BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& bucket);
+BSONObj getMetadata(BucketCatalog& catalog, const BucketId& bucketId);
 
 /**
  * Returns the memory usage of the bucket catalog across all stripes from the approximated memory
@@ -357,7 +357,7 @@ void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Stat
  * This should be followed by a call to 'directWriteFinish' after the write has been committed,
  * rolled back, or otherwise finished.
  */
-void directWriteStart(BucketStateRegistry& registry, const UUID& collectionUUID, const OID& oid);
+void directWriteStart(BucketStateRegistry& registry, const BucketId& bucketId);
 
 /**
  * Notifies the catalog that a pending direct write to the bucket document with the specified ID has
@@ -365,7 +365,7 @@ void directWriteStart(BucketStateRegistry& registry, const UUID& collectionUUID,
  * in-memory representation of the on-disk bucket data from before the direct write should have been
  * cleared from the catalog, and it may be safely reopened from the on-disk state.
  */
-void directWriteFinish(BucketStateRegistry& registry, const UUID& collectionUUID, const OID& oid);
+void directWriteFinish(BucketStateRegistry& registry, const BucketId& bucketId);
 
 /**
  * Clears any bucket whose collection UUID has been cleared by removing the bucket from the catalog
@@ -382,10 +382,30 @@ void clear(BucketCatalog& catalog, const UUID& collectionUUID);
 /**
  * Freezes the given bucket in the registry so that this bucket will never be used in the future.
  */
-void freeze(BucketCatalog&, const UUID&, const OID&);
+void freeze(BucketCatalog&, const BucketId& bucketId);
+void freeze(BucketCatalog&,
+            const TimeseriesOptions& options,
+            const StringDataComparator* comparator,
+            const UUID& collectionUUID,
+            const BSONObj& bucket);
 
 /**
- * Resets the counter used for bucket OID generation. Should be called after a bucket _id collision.
+ * Extracts the BucketId from a bucket document.
+ */
+BucketId extractBucketId(BucketCatalog&,
+                         const TimeseriesOptions& options,
+                         const StringDataComparator* comparator,
+                         const UUID& collectionUUID,
+                         const BSONObj& bucket);
+
+BucketKey::Signature getKeySignature(const TimeseriesOptions& options,
+                                     const StringDataComparator* comparator,
+                                     const UUID& collectionUUID,
+                                     const BSONObj& metadata);
+
+/**
+ * Resets the counter used for bucket OID generation. Should be called after a bucket _id
+ * collision.
  */
 void resetBucketOIDCounter();
 

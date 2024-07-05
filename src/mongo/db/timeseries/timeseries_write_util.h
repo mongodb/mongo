@@ -189,7 +189,7 @@ enum class BucketReopeningPermittance {
 };
 
 using CompressAndWriteBucketFunc = std::function<void(
-    OperationContext*, const OID&, const NamespaceString&, const UUID&, StringData)>;
+    OperationContext*, const bucket_catalog::BucketId&, const NamespaceString&, StringData)>;
 
 /**
  * Attempts to insert a measurement doc into a bucket in the bucket catalog and retries
@@ -225,7 +225,7 @@ determineBatchesToCommit(T& batches, Fn&& extractElem) {
 
     // Sort by bucket so that preparing the commit for each batch cannot deadlock.
     std::sort(batchesToCommit.begin(), batchesToCommit.end(), [](auto left, auto right) {
-        return left.get()->bucketHandle.bucketId.oid < right.get()->bucketHandle.bucketId.oid;
+        return left.get()->bucketId.oid < right.get()->bucketId.oid;
     });
 
     return batchesToCommit;
@@ -286,7 +286,7 @@ void performAtomicWritesForUpdate(
     bucket_catalog::BucketCatalog& sideBucketCatalog,
     bool fromMigrate,
     StmtId stmtId,
-    std::set<OID>* bucketIds,
+    std::set<bucket_catalog::BucketId>* bucketIds,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc);
 
 /**

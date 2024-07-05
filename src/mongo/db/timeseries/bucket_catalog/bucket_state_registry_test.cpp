@@ -70,9 +70,9 @@ class BucketStateRegistryTest : public BucketCatalog, public CatalogTestFixture 
 public:
     BucketStateRegistryTest() {}
 
-    void clearById(const UUID& uuid, const OID& oid) {
-        directWriteStart(bucketStateRegistry, uuid, oid);
-        directWriteFinish(bucketStateRegistry, uuid, oid);
+    void clearById(const UUID& uuid, const OID& oid, std::uint8_t stripeNumber = 0) {
+        directWriteStart(bucketStateRegistry, BucketId{uuid, oid, stripeNumber});
+        directWriteFinish(bucketStateRegistry, BucketId{uuid, oid, stripeNumber});
     }
 
     bool hasBeenCleared(Bucket& bucket) {
@@ -101,7 +101,7 @@ public:
     bool cannotAccessBucket(Bucket& bucket) {
         if (hasBeenCleared(bucket)) {
             internal::removeBucket(*this,
-                                   *stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
+                                   *stripes[internal::getStripeNumber(*this, bucket.key)],
                                    withLock,
                                    bucket,
                                    internal::RemovalMode::kAbort);
@@ -112,22 +112,20 @@ public:
     }
 
     void checkAndRemoveClearedBucket(Bucket& bucket) {
-        auto a =
-            internal::findBucket(bucketStateRegistry,
-                                 *stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
-                                 withLock,
-                                 bucket.bucketId,
-                                 internal::IgnoreBucketState::kYes);
+        auto a = internal::findBucket(bucketStateRegistry,
+                                      *stripes[internal::getStripeNumber(*this, bucket.key)],
+                                      withLock,
+                                      bucket.bucketId,
+                                      internal::IgnoreBucketState::kYes);
         ASSERT(a == &bucket);
-        auto b =
-            internal::findBucket(bucketStateRegistry,
-                                 *stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
-                                 withLock,
-                                 bucket.bucketId,
-                                 internal::IgnoreBucketState::kNo);
+        auto b = internal::findBucket(bucketStateRegistry,
+                                      *stripes[internal::getStripeNumber(*this, bucket.key)],
+                                      withLock,
+                                      bucket.bucketId,
+                                      internal::IgnoreBucketState::kNo);
         ASSERT(b == nullptr);
         internal::removeBucket(*this,
-                               *stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
+                               *stripes[internal::getStripeNumber(*this, bucket.key)],
                                withLock,
                                bucket,
                                internal::RemovalMode::kAbort);
@@ -167,18 +165,12 @@ public:
     Date_t date = Date_t::now();
     TimeseriesOptions options;
     ExecutionStatsController stats = internal::getOrInitializeExecutionStats(*this, uuid1);
-    InsertContext info1{std::move(bucketKey1),
-                        internal::getStripeNumber(bucketKey1, numberOfStripes),
-                        options,
-                        stats};
-    InsertContext info2{std::move(bucketKey2),
-                        internal::getStripeNumber(bucketKey2, numberOfStripes),
-                        options,
-                        stats};
-    InsertContext info3{std::move(bucketKey3),
-                        internal::getStripeNumber(bucketKey3, numberOfStripes),
-                        options,
-                        stats};
+    InsertContext info1{
+        std::move(bucketKey1), internal::getStripeNumber(*this, bucketKey1), options, stats};
+    InsertContext info2{
+        std::move(bucketKey2), internal::getStripeNumber(*this, bucketKey2), options, stats};
+    InsertContext info3{
+        std::move(bucketKey3), internal::getStripeNumber(*this, bucketKey3), options, stats};
 };
 
 
@@ -747,7 +739,7 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
     TrackingContexts trackingContexts;
     auto batch =
         std::make_shared<WriteBatch>(trackingContexts,
-                                     BucketHandle{bucketId, info1.stripeNumber},
+                                     bucketId,
                                      info1.key,
                                      0,
                                      stats,
@@ -773,7 +765,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
     TrackingContexts trackingContexts;
     auto batch =
         std::make_shared<WriteBatch>(trackingContexts,
-                                     BucketHandle{bucketId, info1.stripeNumber},
+                                     bucketId,
                                      info1.key,
                                      0,
                                      stats,
@@ -801,17 +793,17 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
 }
 
 TEST_F(BucketStateRegistryTest, DirectWriteStartInitializesBucketState) {
-    auto bucketId = BucketId{uuid1, OID()};
-    directWriteStart(bucketStateRegistry, uuid1, bucketId.oid);
+    auto bucketId = BucketId{uuid1, OID(), 0};
+    directWriteStart(bucketStateRegistry, bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 }
 
 TEST_F(BucketStateRegistryTest, DirectWriteFinishRemovesBucketState) {
-    auto bucketId = BucketId{uuid1, OID()};
-    directWriteStart(bucketStateRegistry, uuid1, bucketId.oid);
+    auto bucketId = BucketId{uuid1, OID(), 0};
+    directWriteStart(bucketStateRegistry, bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
-    directWriteFinish(bucketStateRegistry, uuid1, bucketId.oid);
+    directWriteFinish(bucketStateRegistry, bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
@@ -829,19 +821,19 @@ TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
 
     // Start a direct write and ensure the counter is incremented correctly.
     while (dwCounter < 4) {
-        directWriteStart(bucketStateRegistry, uuid1, bucketId.oid);
+        directWriteStart(bucketStateRegistry, bucketId);
         dwCounter++;
         ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     while (dwCounter > 1) {
-        directWriteFinish(bucketStateRegistry, uuid1, bucketId.oid);
+        directWriteFinish(bucketStateRegistry, bucketId);
         dwCounter--;
         ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     // When the number of direct writes reaches 0, we should clear the bucket.
-    directWriteFinish(bucketStateRegistry, uuid1, bucketId.oid);
+    directWriteFinish(bucketStateRegistry, bucketId);
     ASSERT_FALSE(doesBucketHaveDirectWrite(bucketId));
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kCleared));
 }
@@ -849,42 +841,42 @@ TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
 TEST_F(BucketStateRegistryTest, ConflictingDirectWrites) {
     // While two direct writes (e.g. two racing updates) should correctly conflict at the storage
     // engine layer, we expect the directWriteStart/Finish pairs to work successfully.
-    BucketId bucketId{uuid1, OID()};
+    BucketId bucketId{uuid1, OID(), 0};
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_FALSE(state.has_value());
 
     // First direct write initializes state as untracked.
-    directWriteStart(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
+    directWriteStart(bucketStateRegistry, bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
-    directWriteStart(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
+    directWriteStart(bucketStateRegistry, bucketId);
 
     // First finish does not remove the state from the registry.
-    directWriteFinish(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
+    directWriteFinish(bucketStateRegistry, bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
     // Second one removes it.
-    directWriteFinish(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
+    directWriteFinish(bucketStateRegistry, bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
 TEST_F(BucketStateRegistryTest, LargeNumberOfDirectWritesInTransaction) {
     // If a single transaction contains many direct writes to the same bucket, we should handle
     // it gracefully.
-    BucketId bucketId{uuid1, OID()};
+    BucketId bucketId{uuid1, OID(), 0};
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_FALSE(state.has_value());
 
     int numDirectWrites = 100'000;
 
     for (int i = 0; i < numDirectWrites; ++i) {
-        directWriteStart(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
+        directWriteStart(bucketStateRegistry, bucketId);
         ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     for (int i = 0; i < numDirectWrites; ++i) {
         ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
-        directWriteFinish(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
+        directWriteFinish(bucketStateRegistry, bucketId);
     }
 
     ASSERT_FALSE(doesBucketHaveDirectWrite(bucketId));

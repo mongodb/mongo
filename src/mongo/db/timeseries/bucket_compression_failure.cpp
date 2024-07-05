@@ -37,30 +37,40 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(BucketCompressionFailure);
 
 static constexpr StringData kUUIDFieldName = "collectionUUID"_sd;
 static constexpr StringData kBucketIdFieldName = "bucketId"_sd;
+static constexpr StringData kKeySignatureFieldName = "keySignature"_sd;
 }  // namespace
 
-BucketCompressionFailure::BucketCompressionFailure(const UUID& collectionUUID, OID bucketId)
-    : _collectionUUID(std::move(collectionUUID)), _bucketId(std::move(bucketId)) {}
+BucketCompressionFailure::BucketCompressionFailure(const UUID& collectionUUID,
+                                                   const OID& bucketId,
+                                                   std::uint32_t keySignature)
+    : _collectionUUID(collectionUUID), _bucketId(bucketId), _keySignature(keySignature) {}
 
 std::shared_ptr<const ErrorExtraInfo> BucketCompressionFailure::parse(const BSONObj& obj) {
     auto uuidSW = UUID::parse(obj[kUUIDFieldName]);
     invariant(uuidSW.isOK());
     auto collectionUUID = uuidSW.getValue();
-    return std::make_shared<BucketCompressionFailure>(collectionUUID,
-                                                      obj[kBucketIdFieldName].OID());
+    return std::make_shared<BucketCompressionFailure>(
+        collectionUUID,
+        obj[kBucketIdFieldName].OID(),
+        static_cast<std::uint32_t>(obj[kKeySignatureFieldName].safeNumberLong()));
 }
 
 void BucketCompressionFailure::serialize(BSONObjBuilder* builder) const {
     _collectionUUID.appendToBuilder(builder, kUUIDFieldName);
     builder->append(kBucketIdFieldName, _bucketId);
+    builder->append(kKeySignatureFieldName, static_cast<long long>(_keySignature));
 }
 
 const UUID& BucketCompressionFailure::collectionUUID() const {
     return _collectionUUID;
 }
 
-OID BucketCompressionFailure::bucketId() const {
+const OID& BucketCompressionFailure::bucketId() const {
     return _bucketId;
+}
+
+std::uint32_t BucketCompressionFailure::keySignature() const {
+    return _keySignature;
 }
 
 }  // namespace mongo::timeseries

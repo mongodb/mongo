@@ -44,18 +44,22 @@ class BucketCompressionFailure final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::TimeseriesBucketCompressionFailed;
 
-    explicit BucketCompressionFailure(const UUID& collectionUUID, OID bucketId);
+    explicit BucketCompressionFailure(const UUID& collectionUUID,
+                                      const OID& bucketId,
+                                      std::uint32_t keySignature);
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
     void serialize(BSONObjBuilder*) const override;
 
     const UUID& collectionUUID() const;
-    OID bucketId() const;
+    const OID& bucketId() const;
+    std::uint32_t keySignature() const;
 
 private:
     UUID _collectionUUID;
     OID _bucketId;
+    std::uint32_t _keySignature;
 };
 
 }  // namespace mongo::timeseries
