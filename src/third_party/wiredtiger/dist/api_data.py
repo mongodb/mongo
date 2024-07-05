@@ -741,6 +741,16 @@ connection_runtime_config = [
             # !!! Must match WT_HS_FILE_MIN
             min='0')
         ]),
+    Config('heuristic_controls', '', r'''
+        control the behavior of various optimizations. This is primarily used as a mechanism for
+        rolling out changes to internal heuristics while providing a mechanism for quickly
+        reverting to prior behavior in the field''',
+        type='category', subconfig=[
+            Config('obsolete_tw_pages_dirty', '100', r'''
+                eviction to mark the number of obsolete time window pages that are marked as dirty
+                per btree in a single checkpoint''',
+                min=0, max=100000),
+        ]),
     Config('io_capacity', '', r'''
         control how many bytes per second are written and read. Exceeding the capacity results
         in throttling.''',

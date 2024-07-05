@@ -606,7 +606,7 @@ functions:
         ${PREPARE_TEST_ENV}
         . test/evergreen/find_cmake.sh
         cd cmake_build/${directory}
-        $CTEST ${extra_args} --output-on-failure 2>&1
+        $CTEST ${ctest_extra_args} --output-on-failure 2>&1
 
   "make check all":
     command: shell.exec
@@ -620,7 +620,7 @@ functions:
         . test/evergreen/find_cmake.sh
         cd cmake_build
         echo "Using number of parallel processes '-j ${num_jobs}' for 'make check all'"
-        $CTEST -L check -j ${num_jobs} --output-on-failure ${extra_args|} 2>&1
+        $CTEST -L check -j ${num_jobs} --output-on-failure ${ctest_extra_args|} 2>&1
 
   # The following cppsuite tasks define a greater overall task.
   "cppsuite test run": &cppsuite_test_run
@@ -853,7 +853,7 @@ functions:
         }
 
         for i in $(seq ${times|1}); do
-          ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=50} ${extra_args|} || fail
+          ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=50} ${test_format_extra_args|} || fail
         done
   "format test predictable":
     command: shell.exec
@@ -894,7 +894,7 @@ functions:
           rm -rf RUNDIR_1 RUNDIR_2 RUNDIR_3
 
           first_run_args="-c $config runs.timer=$runtime"
-          ./t -h RUNDIR_1 $first_run_args ${extra_args} || fail RUNDIR_1/CONFIG 2>&1
+          ./t -h RUNDIR_1 $first_run_args ${test_format_extra_args} || fail RUNDIR_1/CONFIG 2>&1
           stable_hex=$(../../../tools/wt_timestamps RUNDIR_1 | sed -e '/stable=/!d' -e 's/.*=//')
           ops=$(echo $((0x$stable_hex)))
 
@@ -940,8 +940,8 @@ functions:
         for i in $(seq ${times}); do
           echo Iteration $i/${times}
           rm -rf RUNDIR
-          ./t $format_args ${extra_args}
-          ./t -R $format_args ${extra_args}
+          ./t $format_args ${test_format_extra_args}
+          ./t -R $format_args ${test_format_extra_args}
         done
   "many dbs test":
     command: shell.exec
@@ -1692,7 +1692,7 @@ tasks:
       - func: "make check directory"
         vars:
           directory: examples/c
-          extra_args: -E "(ex_all|ex_backup_block)" -j ${num_jobs}
+          ctest_extra_args: -E "(ex_all|ex_backup_block)" -j ${num_jobs}
 
   - name: examples-c-production-disable-shared-test
     tags: ["pull_request"]
@@ -2086,7 +2086,7 @@ tasks:
       - func: "make check directory"
         vars:
           directory: test/csuite
-          extra_args: -LE "long_running" ${extra_args} -j ${num_jobs}
+          ctest_extra_args: -LE "long_running" ${ctest_extra_args} -j ${num_jobs}
 
   - name: csuite-timestamp-abort-test-s3
     commands:
@@ -2333,7 +2333,7 @@ tasks:
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
-          extra_args: -L long_running -j ${num_jobs}
+          ctest_extra_args: -L long_running -j ${num_jobs}
 
   # Break out Python unit tests into multiple buckets/tasks.  We have a fixed number of buckets,
   # and we use the -b option of the test/suite/run.py script to split up the tests.
@@ -2781,7 +2781,7 @@ tasks:
         vars:
           times: 10
           config: ../../../test/format/CONFIG.endian
-          extra_args: -h "WT_TEST.$i"
+          test_format_extra_args: -h "WT_TEST.$i"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build/test/format"
@@ -2833,7 +2833,7 @@ tasks:
         vars:
           times: 10
           config: ../../../test/format/CONFIG.endian
-          extra_args: -h "WT_TEST.$i"
+          test_format_extra_args: -h "WT_TEST.$i"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build/test/format"
@@ -3335,7 +3335,7 @@ tasks:
       - func: "format test"
         vars:
           times: 3
-          extra_args: runs.rows=1000000:2500000
+          test_format_extra_args: runs.rows=1000000:2500000
 
   - name: spinlock-pthread-adaptive-test
     commands:
@@ -3348,7 +3348,7 @@ tasks:
       - func: "format test"
         vars:
           times: 3
-          extra_args: runs.rows=1000000:2500000
+          test_format_extra_args: runs.rows=1000000:2500000
 
   - name: wtperf-test
     depends_on:
@@ -3458,16 +3458,16 @@ tasks:
       # format test
       - func: "format test"
         vars:
-          extra_args: file_type=fix runs.rows=1000000:2500000
+          test_format_extra_args: file_type=fix runs.rows=1000000:2500000
       - func: "format test"
         vars:
-          extra_args: file_type=row runs.rows=1000000:2500000
+          test_format_extra_args: file_type=row runs.rows=1000000:2500000
 
       # format test for stressing compaction code path
       - func: "format test"
         vars:
           times: 3
-          extra_args: file_type=row compaction=1 verify=1 runs.rows=1000000:2500000 runs.timer=3 ops.pct.delete=30
+          test_format_extra_args: file_type=row compaction=1 verify=1 runs.rows=1000000:2500000 runs.timer=3 ops.pct.delete=30
 
   - name: time-shift-sensitivity-test
     depends_on:
@@ -3523,7 +3523,7 @@ tasks:
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -S
       - func: "format test"
         vars:
-          extra_args: -C "verbose=(checkpoint_cleanup:1)"
+          test_format_extra_args: -C "verbose=(checkpoint_cleanup:1)"
 
   - name: format-asan-smoke-test
     commands:
@@ -3538,7 +3538,7 @@ tasks:
       - func: "format test"
         vars:
           additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
-          extra_args: -C "verbose=(checkpoint_cleanup:1)"
+          test_format_extra_args: -C "verbose=(checkpoint_cleanup:1)"
 
   - name: format-wtperf-test
     commands:
@@ -5533,7 +5533,7 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     # Exclude this test for ASan builds, as it results in a false positives owing
     # to deliberate killing of processes to invoke corruption.
-    extra_args: -E "wt12015_backup_corruption"
+    ctest_extra_args: -E "wt12015_backup_corruption"
   tasks:
     - name: ".pull_request !.pull_request_compilers !.model_checking !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
     - name: examples-c-test
@@ -5589,7 +5589,7 @@ buildvariants:
     # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes
     # some csuite tests to take an extended amount of time. These are excluded from the
     # make-check-test task and are covered by the csuite-long-running task.
-    extra_args: -LE "cppsuite|long_running"
+    ctest_extra_args: -LE "cppsuite|long_running"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
   tasks:
     - name: compile

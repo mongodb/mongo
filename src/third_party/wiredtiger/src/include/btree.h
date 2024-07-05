@@ -226,6 +226,12 @@ struct __wt_btree {
     uint64_t clean_ckpt_timer;
 
     /*
+     * Track the number of obsolete time window pages that are changed into dirty page
+     * reconciliation by the eviction.
+     */
+    uint32_t obsolete_tw_pages;
+
+    /*
      * We flush pages from the tree (in order to make checkpoint faster), without a high-level lock.
      * To avoid multiple threads flushing at the same time, lock the tree.
      */

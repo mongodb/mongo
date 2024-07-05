@@ -247,9 +247,6 @@ real_checkpointer(THREAD_DATA *td)
     verify_ts = WT_TS_NONE;
     flush_tier = false;
 
-    if (!g.opts.running)
-        return (log_print_err("Checkpoint thread started stopped\n", EINVAL, 1));
-
     while (g.ntables > g.ntables_created && g.opts.running)
         __wt_yield();
 
