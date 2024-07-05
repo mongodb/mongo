@@ -87,6 +87,7 @@ protected:
             std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
             Date_t::max(),
             cancelToken);
+        newCoordinator->start(operationContext());
 
         _coordinatorCatalog->insert(opCtx, lsid, txnNumberAndRetryCounter, newCoordinator);
     }
@@ -368,6 +369,8 @@ TEST_F(
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max(),
         cancelToken);
+    coordinator2->start(operationContext());
+
     ASSERT_THROWS_CODE(_coordinatorCatalog->insert(
                            operationContext(), lsid, txnNumberAndRetryCounter2, coordinator2),
                        AssertionException,
@@ -381,6 +384,7 @@ TEST_F(
     ASSERT_THROWS_CODE(coordinator2->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::TransactionCoordinatorCanceled);
+    coordinator2->shutdown();
 }
 
 TEST_F(TransactionCoordinatorCatalogTest,
@@ -405,6 +409,8 @@ TEST_F(TransactionCoordinatorCatalogTest,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max(),
         cancelToken);
+    coordinator2->start(operationContext());
+
     ASSERT_THROWS_CODE(_coordinatorCatalog->insert(
                            operationContext(), lsid, txnNumberAndRetryCounter2, coordinator2),
                        AssertionException,
@@ -417,6 +423,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
     ASSERT_THROWS_CODE(coordinator2->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::TransactionCoordinatorCanceled);
+    coordinator2->shutdown();
 }
 
 TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoCatalog) {
@@ -435,6 +442,7 @@ TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoC
                                                                 aws.makeChildScheduler(),
                                                                 network()->now() + Seconds{5},
                                                                 cancelToken);
+    coordinator->start(operationContext());
 
     aws.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Test step down"});
     catalog.onStepDown();
@@ -444,6 +452,7 @@ TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoC
     catalog.insert(operationContext(), lsid, txnNumberAndRetryCounter, coordinator);
     catalog.join();
 
+    // No need to call coordinator->shutdown() as the catalog will ensure it runs.
     coordinator->onCompletion().wait();
 }
 

@@ -111,6 +111,8 @@ void TransactionCoordinatorService::createCoordinator(
                                                                 scheduler.makeChildScheduler(),
                                                                 commitDeadline,
                                                                 _cancelSource.token());
+    coordinator->start(opCtx);
+
     try {
         catalog.insert(opCtx, lsid, txnNumberAndRetryCounter, coordinator);
     } catch (const DBException&) {
@@ -121,6 +123,7 @@ void TransactionCoordinatorService::createCoordinator(
         // cause the newly created coordinator to be destroyed. We ignore the return Status since we
         // want to just rethrow whatever exception was thrown when inserting into the catalog.
         [[maybe_unused]] auto status = coordinator->onCompletion().waitNoThrow();
+        coordinator->shutdown();
         throw;
     }
 }
@@ -297,6 +300,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                             scheduler.makeChildScheduler(),
                             clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()),
                             cancelSource.token());
+                        coordinator->start(opCtx);
 
                         catalog.insert(opCtx,
                                        lsid,
