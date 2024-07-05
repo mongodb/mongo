@@ -241,7 +241,14 @@ export function testMonotonicity(conn, dbName, collName, currentShardKey, testCa
         jsTest.log(`Testing metrics for ${
             tojson({dbName, collName, currentShardKey, numDocs, testCase})}`);
 
-        assert.commandWorked(coll.createIndex(testCase.indexKey));
+        // Waiting for the index to be created on all nodes is necessary since mongos runs
+        // the analyzeShardKey command with readPreference "secondaryPreferred".
+        assert.commandWorked(db.runCommand({
+            createIndexes: collName,
+            indexes: [{key: testCase.indexKey, name: JSON.stringify(testCase.indexKey)}],
+            writeConcern: {w: numNodesPerRS}
+        }));
+
         // To reduce the insertion order noise caused by parallel oplog application on
         // secondaries, insert the documents in multiple batches.
         const docs = makeDocuments(numDocs, fieldOpts);
