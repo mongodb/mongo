@@ -5,6 +5,8 @@
  *  multiversion_incompatible,
  * ]
  */
+(function() {
+"use strict";
 
 const dbName = "test";
 const collName = "empty_ts_repl";
@@ -154,3 +156,4 @@ let secondaryResult = secondaryColl.findOne({_id: emptyTs});
 assert.eq(tojson(result), tojson(secondaryResult), "_id=" + tojson(emptyTs));
 
 rst.stopSet();
+}());

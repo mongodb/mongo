@@ -5,6 +5,8 @@
  *   requires_fcv_60,
  * ]
  */
+(function() {
+"use strict";
 
 const coll = db.jstests_core_empty_ts;
 const emptyTs = Timestamp(0, 0);
@@ -129,3 +131,4 @@ assert.commandWorked(coll.update({_id: emptyTs}, {_id: emptyTs, a: emptyTs}));
 result = coll.findOne({_id: emptyTs});
 assert.eq(tojson(result._id), tojson(emptyTs), "_id=" + tojson(emptyTs));
 assert.neq(tojson(result.a), tojson(emptyTs), "_id=" + tojson(emptyTs));
+}());

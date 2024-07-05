@@ -5,6 +5,8 @@
  *   requires_fcv_60,
  * ]
  */
+(function() {
+"use strict";
 
 const coll = db.jstests_bypass_empty_ts_replacement;
 const collName = coll.getName();
@@ -197,3 +199,4 @@ runTests(bypassEmptyTsReplacement);
 
 bypassEmptyTsReplacement = false;
 runTests(bypassEmptyTsReplacement);
+}());
