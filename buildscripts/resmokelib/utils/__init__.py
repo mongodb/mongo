@@ -87,7 +87,7 @@ def get_task_name_without_suffix(task_name, variant_name):
     """Return evergreen task name without suffix added to the generated task.
 
     Remove evergreen variant name, numerical suffix and underscores between them from evergreen task name.
-    Example: "noPassthrough_0_enterprise-rhel-80-64-bit-dynamic-required" -> "noPassthrough"
+    Example: "noPassthrough_0_enterprise-rhel-88-64-bit-dynamic-required" -> "noPassthrough"
     """
     task_name = task_name if task_name else ""
     return re.sub(rf"(_[0-9]+)?(_{variant_name})?$", "", task_name)

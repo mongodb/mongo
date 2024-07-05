@@ -14,10 +14,10 @@ build_variant_large_distro_exceptions:
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
   - enterprise-macos-arm64
-  - enterprise-rhel-80-64-bit
-  - enterprise-rhel-80-64-bit-coverage
+  - enterprise-rhel-88-64-bit
+  - enterprise-rhel-88-64-bit-coverage
   - enterprise-rhel-81-ppc64le
-  - enterprise-rhel-82-arm64
+  - enterprise-rhel-88-arm64
   - enterprise-rhel-83-s390x
   - enterprise-rhel-90-64-bit
   - enterprise-rhel-90-arm64
@@ -27,23 +27,23 @@ build_variant_large_distro_exceptions:
   - enterprise-ubuntu1804-s390x
   - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu2204-arm64
-  - hot_backups-rhel-80-64-bit
+  - hot_backups-rhel-88-64-bit
   - linux-debug-aubsan-compile-required
   - linux-x86-dynamic-compile
   - linux-x86-dynamic-debug-compile-required
   - macos
   - macos-arm64
   - macos-debug-suggested
-  - rhel80
-  - rhel80-debug-asan
-  - rhel80-debug-asan-all-feature-flags
-  - rhel80-debug-asan-classic-engine
-  - rhel80-debug-aubsan-lite
-  - rhel80-debug-suggested
-  - rhel80-debug-ubsan
-  - rhel80-debug-ubsan-all-feature-flags
-  - rhel80-debug-ubsan-classic-engine
-  - rhel-82-arm64
+  - rhel88
+  - rhel88-debug-asan
+  - rhel88-debug-asan-all-feature-flags
+  - rhel88-debug-asan-classic-engine
+  - rhel88-debug-aubsan-lite
+  - rhel88-debug-suggested
+  - rhel88-debug-ubsan
+  - rhel88-debug-ubsan-all-feature-flags
+  - rhel88-debug-ubsan-classic-engine
+  - rhel-88-arm64
   - rhel93
   - rhel93-arm64
   - suse15

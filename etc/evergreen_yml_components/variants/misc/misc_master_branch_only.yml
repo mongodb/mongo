@@ -10,7 +10,7 @@ buildvariants:
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel80-small
+      - rhel8.8-small
     expansions:
       multiversion_platform: rhel80
       multiversion_edition: enterprise
@@ -24,4 +24,4 @@ buildvariants:
       - name: daily_task_scanner
       - name: monitor_build_status
         distros:
-          - rhel80-large
+          - rhel8.8-large
