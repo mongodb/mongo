@@ -11,6 +11,9 @@
  *  catches_command_failures,
  *  uses_curop_agg_stage,
  *  antithesis_incompatible,
+ *  # TODO SERVER-91851: Continously transitioning to and from dedicated config server could end up
+ *  # migrating data to a shard that is quickly added and removed. Remove tag once this if fixed.
+ *  config_shard_incompatible,
  * ]
  */
 
