@@ -34,11 +34,6 @@ TOOLCHAIN_MAP = {
         "sha": "382aeec8de641d466e2ca2562539b497534c620e0e403304d6794434e73bbdce",
         "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/debian12/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_debian12_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
     },
-    "rhel7_x86_64": {
-        "platform_name": "rhel70",
-        "sha": "ad7632e3fe32b336ebd0529ba3f865d4432028c6e3633325c910f1f98c8be542",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel70/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_rhel70_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
-    },
     "rhel8_aarch64": {
         "platform_name": "rhel82-arm64",
         "sha": "5e7d9d0b9f978332c409359453acacec4ce1106030674e549203a0c61a049bc4",
