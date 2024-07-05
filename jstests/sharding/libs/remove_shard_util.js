@@ -20,6 +20,7 @@ export function removeShard(shardingTestOrConn, shardName, timeout) {
             res = s.adminCommand({removeShard: shardName});
         }
         if (!res.ok && res.code === ErrorCodes.ShardNotFound) {
+            // TODO SERVER-32553: Clarify whether we should handle this scenario in tests or mongos
             // If the config server primary steps down right after removing the config.shards doc
             // for the shard but before responding with "state": "completed", the mongos would retry
             // the _configsvrRemoveShard command against the new config server primary, which would
