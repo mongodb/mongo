@@ -109,18 +109,6 @@ public:
     bool unlock(LockRequest* request);
 
     /**
-     * Downgrades the mode in which an already granted request is held, without changing the
-     * reference count of the lock request. This call never blocks, will always succeed and may
-     * potentially allow other blocked lock requests to proceed.
-     *
-     * @param request Request, already in granted mode through a previous call to lock.
-     * @param newMode Mode, which is less-restrictive than the mode in which the request is
-     *                  already held. I.e., the conflict set of newMode must be a sub-set of
-     *                  the conflict set of the request's current mode.
-     */
-    void downgrade(LockRequest* request, LockMode newMode);
-
-    /**
      * Iterates through all buckets and deletes all locks, which have no requests on them. This
      * call is kind of expensive and should only be used for reducing the memory footprint of
      * the lock manager.

@@ -380,11 +380,6 @@ void Locker::lock(OperationContext* opCtx, ResourceId resId, LockMode mode, Date
     _lockComplete(opCtx, resId, mode, deadline, nullptr);
 }
 
-void Locker::downgrade(ResourceId resId, LockMode newMode) {
-    LockRequestsMap::Iterator it = _requests.find(resId);
-    _lockManager->downgrade(it.objAddr(), newMode);
-}
-
 bool Locker::unlock(ResourceId resId) {
     LockRequestsMap::Iterator it = _requests.find(resId);
 

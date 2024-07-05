@@ -268,11 +268,6 @@ public:
               Date_t deadline = Date_t::max());
 
     /**
-     * Downgrades the specified resource's lock mode without changing the reference count.
-     */
-    void downgrade(ResourceId resId, LockMode newMode);
-
-    /**
      * Releases a lock previously acquired through a lock call. It is an error to try to
      * release lock which has not been previously acquired (invariant violation).
      *

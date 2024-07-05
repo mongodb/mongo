@@ -546,28 +546,6 @@ bool LockManager::unlock(LockRequest* request) {
     return (request->recursiveCount == 0);
 }
 
-void LockManager::downgrade(LockRequest* request, LockMode newMode) {
-    invariant(request->lock);
-    invariant(request->recursiveCount > 0);
-
-    // The conflict set of the newMode should be a subset of the conflict set of the old mode.
-    // Can't downgrade from S -> IX for example.
-    invariant((LockConflictsTable[request->mode] | LockConflictsTable[newMode]) ==
-              LockConflictsTable[request->mode]);
-
-    LockHead* lock = request->lock;
-
-    LockBucket* bucket = _getBucket(lock->resourceId);
-    stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
-    invariant(request->status == LockRequest::STATUS_GRANTED);
-
-    lock->incGrantedModeCount(newMode);
-    lock->decGrantedModeCount(request->mode);
-    request->mode = newMode;
-
-    _onLockModeChanged(lock, true);
-}
-
 void LockManager::cleanupUnusedLocks() {
     for (unsigned i = 0; i < _numLockBuckets; i++) {
         LockBucket* bucket = &_lockBuckets[i];

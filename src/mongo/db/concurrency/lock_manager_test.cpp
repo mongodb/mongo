@@ -366,32 +366,6 @@ TEST_F(LockManagerTest, ConflictCancelMultipleWaiting) {
     lockMgr.unlock(&request[0]);
 }
 
-TEST_F(LockManagerTest, Downgrade) {
-    LockManager lockMgr;
-    const ResourceId resId(
-        RESOURCE_COLLECTION,
-        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
-
-    Locker locker1(getServiceContext());
-    LockRequestCombo request1(&locker1);
-    ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
-
-    Locker locker2(getServiceContext());
-    LockRequestCombo request2(&locker2);
-    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_S));
-
-    // Downgrade the X request to S
-    lockMgr.downgrade(&request1, MODE_S);
-
-    ASSERT(request2.numNotifies == 1);
-    ASSERT(request2.lastResult == LOCK_OK);
-    ASSERT(request2.recursiveCount == 1);
-
-    ASSERT(lockMgr.unlock(&request1));
-    ASSERT(lockMgr.unlock(&request2));
-}
-
-
 // Lock conflict matrix tests
 static void checkConflict(ServiceContext* serviceContext,
                           LockMode existingMode,
@@ -552,57 +526,45 @@ TEST_F(LockManagerTest, CompatibleFirstGrantAlreadyQueued) {
 
     // This tests the following behaviors (alternatives indicated with '|'):
     //   Lock held in X, queue: S X|IX IS, where S is compatibleFirst.
-    //   Once X unlocks|downgrades both the S and IS requests should proceed.
+    //   Once X unlocks both the S and IS requests should proceed.
 
-
-    enum UnblockMethod { kDowngrading, kUnlocking };
     LockMode conflictingModes[2] = {MODE_IX, MODE_X};
-    UnblockMethod unblockMethods[2] = {kDowngrading, kUnlocking};
 
     for (LockMode writerMode : conflictingModes) {
-        for (UnblockMethod unblockMethod : unblockMethods) {
-            Locker locker1(getServiceContext());
-            LockRequestCombo request1(&locker1);
+        Locker locker1(getServiceContext());
+        LockRequestCombo request1(&locker1);
 
-            Locker locker2(getServiceContext());
-            LockRequestCombo request2(&locker2);
-            request2.compatibleFirst = true;
+        Locker locker2(getServiceContext());
+        LockRequestCombo request2(&locker2);
+        request2.compatibleFirst = true;
 
-            Locker locker3(getServiceContext());
-            LockRequestCombo request3(&locker3);
+        Locker locker3(getServiceContext());
+        LockRequestCombo request3(&locker3);
 
-            Locker locker4(getServiceContext());
-            LockRequestCombo request4(&locker4);
+        Locker locker4(getServiceContext());
+        LockRequestCombo request4(&locker4);
 
-            // Hold the lock in X and establish the S IX|X IS queue.
-            ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
-            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_S));
-            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request3, writerMode));
-            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request4, MODE_IS));
+        // Hold the lock in X and establish the S IX|X IS queue.
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_S));
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request3, writerMode));
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request4, MODE_IS));
 
-            // Now unlock the initial X, so all readers should be able to proceed, while the writer
-            // remains queued.
-            if (unblockMethod == kUnlocking) {
-                ASSERT(lockMgr.unlock(&request1));
-            } else {
-                invariant(unblockMethod == kDowngrading);
-                lockMgr.downgrade(&request1, MODE_S);
-            }
-            ASSERT(request2.lastResult == LOCK_OK);
-            ASSERT(request3.lastResult == LOCK_INVALID);
-            ASSERT(request4.lastResult == LOCK_OK);
+        // Now unlock the initial X, so all readers should be able to proceed, while the writer
+        // remains queued.
+        ASSERT(lockMgr.unlock(&request1));
 
-            // Now unlock the readers, and the writer succeeds as well.
-            ASSERT(lockMgr.unlock(&request2));
-            ASSERT(lockMgr.unlock(&request4));
-            if (unblockMethod == kDowngrading) {
-                ASSERT(lockMgr.unlock(&request1));
-            }
-            ASSERT(request3.lastResult == LOCK_OK);
+        ASSERT(request2.lastResult == LOCK_OK);
+        ASSERT(request3.lastResult == LOCK_INVALID);
+        ASSERT(request4.lastResult == LOCK_OK);
 
-            // Unlock the writer
-            ASSERT(lockMgr.unlock(&request3));
-        }
+        // Now unlock the readers, and the writer succeeds as well.
+        ASSERT(lockMgr.unlock(&request2));
+        ASSERT(lockMgr.unlock(&request4));
+        ASSERT(request3.lastResult == LOCK_OK);
+
+        // Unlock the writer
+        ASSERT(lockMgr.unlock(&request3));
     }
 }
 
