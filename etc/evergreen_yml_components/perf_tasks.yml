@@ -887,6 +887,27 @@ tasks:
         vars:
           test_control: "tpcc_majority"
 
+  - name: crud_workloads_w1
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "crud_workloads_w1.2023-02"
+
+  - name: crud_workloads_majority
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "crud_workloads_majority"
+
+  - name: cursor_manager
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "cursor_manager"
+
   - name: mixed_workloads_genny_stepdowns
     priority: 5
     commands:
@@ -924,6 +945,13 @@ tasks:
           timeout_secs_overide: 43200 # 12 hours
           test_control: "dbcheck"
           additional_tfvars: "tags: {expire-on-delta: 12}" # increase host expiration to 12 hours.
+
+  - name: misc_workloads
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "misc_workloads"
 
   - name: map_reduce_workloads
     priority: 5
@@ -1007,6 +1035,13 @@ tasks:
       - func: f_dsi_run_workload
         vars:
           test_control: "snapshot_reads"
+
+  - name: secondary_reads
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "secondary_reads"
 
   - name: tpch_1_normalized
     priority: 5

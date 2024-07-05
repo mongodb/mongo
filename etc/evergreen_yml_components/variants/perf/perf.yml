@@ -70,11 +70,13 @@ variables:
     - name: ycsb_single_thread
     - name: ycsb_60GB.2023-09
     - name: ycsb_60GB.long.2023-09
+    - name: crud_workloads_majority
     - name: bestbuy_agg
     - name: bestbuy_agg_merge_different_db
     - name: bestbuy_agg_merge_same_db
     - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
+    - name: cursor_manager
     - name: map_reduce_workloads
     - name: tpcc
     - name: tpcc_majority
@@ -530,6 +532,8 @@ buildvariants:
     tasks:
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
       - name: smoke_test
       - name: ycsb_60GB.2023-09
       - name: ycsb_60GB.long.2023-09
@@ -559,6 +563,7 @@ buildvariants:
       - name: mongos_workloads
       - name: move_chunk_workloads
       - name: move_chunk_waiting_workloads
+
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-shard-all-feature-flags.arm.aws.2023-11
     display_name: all feature flags 3-Shard Cluster ARM AWS 2023-11
@@ -635,6 +640,9 @@ buildvariants:
       - name: ycsb_60GB.long.2023-09
       - name: ycsb_secondary_reads.2023-09
       - name: ycsb_w1.2023-09
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: misc_workloads
       - name: map_reduce_workloads
       - name: refine_shard_key_transaction_stress
       - name: smoke_test
@@ -648,6 +656,7 @@ buildvariants:
       - name: change_streams_latency
       - name: change_streams_listen_throughput
       - name: snapshot_reads
+      - name: secondary_reads
       - name: tpcc
       - name: tpcc_majority
       - name: tpch_1_normalized
@@ -690,6 +699,9 @@ buildvariants:
       - name: ycsb_60GB.long.2023-09
       - name: ycsb_secondary_reads.2023-09
       - name: ycsb_w1.2023-09
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: misc_workloads
       - name: map_reduce_workloads
       - name: refine_shard_key_transaction_stress
       - name: smoke_test
@@ -703,6 +715,7 @@ buildvariants:
       - name: change_streams_latency
       - name: change_streams_listen_throughput
       - name: snapshot_reads
+      - name: secondary_reads
       - name: tpcc
       - name: tpcc_majority
       - name: tpch_1_normalized
@@ -747,6 +760,9 @@ buildvariants:
       - name: ycsb.load
       - name: ycsb_60GB.long.2023-09
       - name: ycsb_secondary_reads.2023-09
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: misc_workloads
       - name: map_reduce_workloads
       - name: refine_shard_key_transaction_stress
       - name: smoke_test
@@ -762,6 +778,7 @@ buildvariants:
       - name: change_streams_preimage_latency
       - name: change_streams_listen_throughput
       - name: snapshot_reads
+      - name: secondary_reads
       - name: tpcc
       - name: tpcc_majority
       - name: tpch_1_normalized
@@ -810,6 +827,7 @@ buildvariants:
     tasks:
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
+      - name: crud_workloads_majority
       - name: ycsb.2023-09
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
@@ -1491,6 +1509,8 @@ buildvariants:
       - name: ycsb_single_thread
       - name: ycsb_60GB.2023-09
       - name: ycsb_60GB.long.2023-09
+      - name: crud_workloads_majority
+      - name: misc_workloads
       - name: map_reduce_workloads
       - name: smoke_test
       - name: canaries_only
@@ -1557,6 +1577,9 @@ buildvariants:
       - name: ycsb_60GB.long.2023-09
         cron: *high-value-workload-cron
       - name: ycsb_secondary_reads.2023-09
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: misc_workloads
       - name: map_reduce_workloads
       - name: smoke_test
       - name: secondary_performance # Uses a special 2 node mongodb setup
@@ -1572,6 +1595,7 @@ buildvariants:
       - name: change_streams_preimage_latency
       - name: change_streams_listen_throughput
       - name: snapshot_reads
+      - name: secondary_reads
       - name: tpcc
       - name: tpcc_majority
         cron: *high-value-workload-cron
@@ -1642,6 +1666,9 @@ buildvariants:
       - name: ycsb_60GB.long.2023-09
         cron: *high-value-workload-cron
       - name: ycsb_secondary_reads.2023-09
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: misc_workloads
       - name: map_reduce_workloads
       - name: smoke_test
       # TODO SERVER-88115: Enable.
@@ -1658,6 +1685,8 @@ buildvariants:
       - name: change_streams_preimage_latency
       - name: change_streams_listen_throughput
       - name: snapshot_reads
+      # TODO SERVER-88115: Enable.
+      # - name: secondary_reads
       - name: tpcc
       - name: tpcc_majority
         cron: *high-value-workload-cron
