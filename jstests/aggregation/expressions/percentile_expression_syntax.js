@@ -2,6 +2,8 @@
  * Tests for the $percentile expression syntax.
  * @tags: [
  *   requires_fcv_81,
+ *   # TO DO SERVER-91582
+ *   assumes_against_mongod_not_mongos,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -125,10 +127,9 @@ assertInvalidSyntax({
 });
 
 if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
-    assertInvalidSyntax({
+    assertValidSyntax({
         pSpec: {$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "discrete"}},
-        errorCode: ErrorCodes.InternalErrorNotSupported,
-        msg: "$percentile should fail because discrete 'method' isn't implemented yet"
+        msg: "Should work with discrete 'method'"
     });
 
     assertInvalidSyntax({
@@ -139,15 +140,15 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
 
 } else {
     assertInvalidSyntax({
-        pSpec: {$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "continuous"}},
-        errorCode: ErrorCodes.BadValue,
-        msg: "$percentile should fail because continuous 'method' isn't supported yet"
-    });
-
-    assertInvalidSyntax({
         pSpec: {$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "discrete"}},
         errorCode: ErrorCodes.BadValue,
         msg: "$percentile should fail because discrete 'method' isn't supported yet"
+    });
+
+    assertInvalidSyntax({
+        pSpec: {$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "continuous"}},
+        errorCode: ErrorCodes.BadValue,
+        msg: "$percentile should fail because continuous 'method' isn't supported yet"
     });
 }
 
@@ -180,10 +181,9 @@ assertInvalidSyntax({
 });
 
 if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
-    assertInvalidSyntax({
+    assertValidSyntax({
         pSpec: {$median: {input: ["$k1", "$k2"], method: "discrete"}},
-        errorCode: ErrorCodes.InternalErrorNotSupported,
-        msg: "$median should fail because discrete 'method' isn't implemented yet"
+        msg: "Should work with discrete 'method'"
     });
 
     assertInvalidSyntax({

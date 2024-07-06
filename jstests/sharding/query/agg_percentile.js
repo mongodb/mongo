@@ -33,6 +33,9 @@ assert.commandWorked(
 assert.commandWorked(
     db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
 
+// TO DO SERVER-91582
+// Add tests for discrete and continuous percentiles
+
 function runTest({testName}) {
     const p = 0.9;
     const percentileSpec = {$percentile: {p: [p], input: "$x", method: "approximate"}};

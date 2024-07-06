@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/accumulator_percentile.h"
 
+#include "mongo/db/pipeline/percentile_algo.h"
 #include <type_traits>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -58,10 +59,10 @@ REGISTER_STABLE_EXPRESSION(median, AccumulatorMedian::parseExpression);
 Status AccumulatorPercentile::validatePercentileMethod(StringData method) {
     if (feature_flags::gFeatureFlagAccuratePercentiles.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        if (method == kDiscrete || method == kContinuous) {
+        if (method == kContinuous) {
             return {ErrorCodes::InternalErrorNotSupported, "Not implemented."};
         }
-        if (method != kApproximate) {
+        if (method != kApproximate && method != kDiscrete) {
             return {ErrorCodes::BadValue,
                     "Currently only 'approximate', 'discrete', and 'continuous' "
                     "can be used as percentile 'method'."};
@@ -80,6 +81,9 @@ namespace {
 PercentileMethod methodNameToEnum(StringData method) {
     if (method == AccumulatorPercentile::kApproximate) {
         return PercentileMethod::Approximate;
+    }
+    if (method == AccumulatorPercentile::kDiscrete) {
+        return PercentileMethod::Discrete;
     }
 
     // The idl should have validated the input string (see 'validatePercentileMethod()').
@@ -224,9 +228,12 @@ std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(PercentileMethod 
     switch (method) {
         case PercentileMethod::Approximate:
             return createTDigestDistributedClassic();
+        case PercentileMethod::Discrete:
+            return createDiscretePercentile();
         default:
             uasserted(7435800,
-                      str::stream() << "Currently only approximate percentiles are supported");
+                      str::stream()
+                          << "Currently only approximate and discrete percentiles are supported");
     }
     return nullptr;
 }
