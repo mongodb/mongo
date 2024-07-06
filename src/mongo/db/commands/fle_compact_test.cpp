@@ -565,6 +565,7 @@ QueryTypeConfig generateQueryTypeConfigForTest(const T& min,
         config.setPrecision(precision.get());
     }
     config.setSparsity(sparsity);
+    config.setTrimFactor(0);
 
     return config;
 }
