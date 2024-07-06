@@ -41,26 +41,26 @@ buildvariants:
   tasks:
   - name: build_metrics_tasks_gen
 
-- name: &enterprise-rhel-80-64-bit-build-metrics enterprise-rhel-80-64-bit-build-metrics
-  display_name: "~ Build Metrics Enterprise RHEL 8.0 "
+- name: &enterprise-rhel-88-64-bit-build-metrics enterprise-rhel-88-64-bit-build-metrics
+  display_name: "~ Build Metrics Enterprise RHEL 8.8 "
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
   stepback: false
   run_on:
-  - rhel80-build
+  - rhel8.8-large
   expansions:
     compile_flags: >-
       --ssl
-      MONGO_DISTMOD=rhel80
+      MONGO_DISTMOD=rhel88
       -j$(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
-    large_distro_name: rhel80-large
-    core_analyzer_distro_name: rhel80-xlarge
+    large_distro_name: rhel8.8-large
+    core_analyzer_distro_name: rhel8.8-xlarge
     num_scons_link_jobs_available: 0.1
   tasks:
   - name: build_metrics_tasks_gen
 
-- name: &enterprise-rhel-80-aarch64-build-metrics enterprise-rhel-80-aarch64-build-metrics
+- name: &enterprise-rhel-88-aarch64-build-metrics enterprise-rhel-88-aarch64-build-metrics
   display_name: "~ Build Metrics Enterprise AL22 ARM"
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
@@ -70,7 +70,7 @@ buildvariants:
   expansions:
     compile_flags: >-
       --ssl
-      MONGO_DISTMOD=rhel82
+      MONGO_DISTMOD=rhel88
       -j$(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
     large_distro_name: amazon2023.3-arm64-large
@@ -105,7 +105,7 @@ buildvariants:
   tags: ["suggested"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - rhel80-small
+  - rhel8.8-small
   expansions:
     multiversion_platform: rhel80
     multiversion_edition: enterprise

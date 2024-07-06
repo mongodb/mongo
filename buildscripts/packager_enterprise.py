@@ -150,7 +150,7 @@ class EnterpriseDistro(packager.Distro):
             return []
 
         if re.search("(redhat|fedora|centos)", self.dname):
-            return ["rhel93", "rhel90", "rhel80", "rhel70", "rhel79", "rhel62", "rhel57"]
+            return ["rhel93", "rhel90", "rhel80", "rhel88", "rhel70", "rhel79", "rhel62", "rhel57"]
         return super(EnterpriseDistro, self).build_os(arch)
 
 
