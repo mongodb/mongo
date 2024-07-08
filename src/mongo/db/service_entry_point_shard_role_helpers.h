@@ -56,9 +56,11 @@
 #include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/idl/generic_argument_gen.h"
@@ -319,6 +321,21 @@ void resetLockerState(OperationContext* opCtx) noexcept {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     shard_role_details::swapLocker(opCtx, std::make_unique<Locker>(opCtx->getServiceContext()), lk);
+}
+
+void createTransactionCoordinator(OperationContext* opCtx,
+                                  TxnNumber clientTxnNumber,
+                                  boost::optional<TxnRetryCounter> clientTxnRetryCounter) {
+    auto clientLsid = opCtx->getLogicalSessionId().value();
+    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
+
+    // If this shard has been selected as the coordinator, set up the coordinator state
+    // to be ready to receive votes.
+    TransactionCoordinatorService::get(opCtx)->createCoordinator(
+        opCtx,
+        clientLsid,
+        {clientTxnNumber, clientTxnRetryCounter ? *clientTxnRetryCounter : 0},
+        clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
 }
 }  // namespace service_entry_point_shard_role_helpers
 }  // namespace mongo

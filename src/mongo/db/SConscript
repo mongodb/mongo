@@ -1029,7 +1029,6 @@ env.Library(
         "s/sharding_migration_critical_section.cpp",
         "s/sharding_statistics.cpp",
         "s/sharding_write_router.cpp",
-        "s/transaction_coordinator_factory.cpp",
         "s/transaction_coordinator_worker_curop_repository.cpp",
         "transaction_resources.cpp",
     ],

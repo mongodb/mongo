@@ -112,7 +112,6 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
-#include "mongo/db/s/transaction_coordinator_factory.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
@@ -1029,7 +1028,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
             // If this shard has been selected as the coordinator, set up the coordinator state
             // to be ready to receive votes.
             if (sessionOptions.getCoordinator() == boost::optional<bool>(true)) {
-                createTransactionCoordinator(
+                service_entry_point_shard_role_helpers::createTransactionCoordinator(
                     opCtx, *sessionOptions.getTxnNumber(), sessionOptions.getTxnRetryCounter());
             }
         }
