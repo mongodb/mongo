@@ -436,6 +436,8 @@ buildvariants:
         activate: false
       - name: ycsb_30GB.100update.rate_limited.2024-05
         activate: false
+      - name: tpcc_majority_small
+        cron: *high-value-workload-cron
 
   # On PERF-730 we changed the initial sync tests to use two nodes instead of three. To avoid
   # losing history, the name remains unchanged, but the display_name reflects the change to 2-Node.

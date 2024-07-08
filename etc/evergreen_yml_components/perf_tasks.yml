@@ -887,6 +887,17 @@ tasks:
         vars:
           test_control: "tpcc_majority"
 
+  - name: tpcc_majority_small
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tpcc_majority"
+          test_control_params: |
+            {tpcc:{
+              warehouses: 25
+            }}
+
   - name: crud_workloads_w1
     priority: 5
     commands:
