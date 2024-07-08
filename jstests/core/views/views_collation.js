@@ -530,12 +530,8 @@ explains.forEach((explain) => {
 // Test that find against a view with a default collation correctly uses the collation.
 // We expect the pipeline to be optimized away, so there should be no pipeline stages in
 // the explain output.
-let findRes = viewsDB.runCommand({find: "case_sensitive_coll", filter: {f: "case"}});
-assert.commandWorked(findRes);
-assert.eq(1, findRes.cursor.firstBatch.length);
-findRes = viewsDB.runCommand({find: "case_insensitive_view", filter: {f: "case"}});
-assert.commandWorked(findRes);
-assert.eq(3, findRes.cursor.firstBatch.length);
+assert.eq(1, viewsDB.case_sensitive_coll.find({f: "case"}).itcount());
+assert.eq(3, viewsDB.case_insensitive_view.find({f: "case"}).itcount());
 explains = getAllNodeExplains(
     viewsDB.runCommand({explain: {find: "case_insensitive_view", filter: {f: "case"}}}));
 explains.forEach((explain) => {

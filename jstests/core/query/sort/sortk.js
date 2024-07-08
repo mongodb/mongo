@@ -6,6 +6,9 @@
 //   requires_non_retryable_writes,
 //   # Uses $where operator
 //   requires_scripting,
+//   # When the config fuzzer changes 'internalQueryFindCommandBatchSize' to a value < 3,
+//   # 'cursor.firstBatch' is too small for the limit.
+//   does_not_support_config_fuzzer,
 // ]
 
 let t = db.jstests_sortk;
@@ -33,7 +36,7 @@ function simpleQuery(extraFields, sort, hint) {
 }
 
 function simpleQueryWithLimit(limit) {
-    if (limit < 0 && TestData.batchSize) {
+    if (limit < 0 && TestData.setParameters.internalQueryFindCommandBatchSize) {
         // A negative limit means to return everything in one batch,
         // so an overridden batchSize will change the results if we're not careful.
         return simpleQuery().batchSize(-limit).limit(limit);

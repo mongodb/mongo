@@ -1,5 +1,7 @@
 // @tags: [
-//   requires_getmore
+//   requires_getmore,
+//   # Requires a batch size greater than one.
+//   does_not_support_config_fuzzer,
 // ]
 
 // Ensure that the find and getMore commands can handle documents nearing the 16 MB size limit for

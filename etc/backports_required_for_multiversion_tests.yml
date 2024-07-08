@@ -711,6 +711,14 @@ last-continuous:
     ticket: SERVER-91406
   - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
     ticket: SERVER-91784
+  - test_file: jstests/core/query/find/finda.js
+    ticket: SERVER-87285
+  - test_file: jstests/core/query/find/find9.js
+    ticket: SERVER-87285
+  - test_file: jstests/core/query/find/find_getmore_cmd.js
+    ticket: SERVER-87285
+  - test_file: jstests/core/exhaust.js
+    ticket: SERVER-87285
   suites: null
 last-lts:
   all:
@@ -1478,4 +1486,12 @@ last-lts:
     ticket: SERVER-91406
   - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
     ticket: SERVER-91784
+  - test_file: jstests/core/query/find/finda.js
+    ticket: SERVER-87285
+  - test_file: jstests/core/query/find/find9.js
+    ticket: SERVER-87285
+  - test_file: jstests/core/query/find/find_getmore_cmd.js
+    ticket: SERVER-87285
+  - test_file: jstests/core/exhaust.js
+    ticket: SERVER-87285
   suites: null

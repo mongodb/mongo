@@ -3,6 +3,8 @@
 // @tags: [
 //   # Before 7.2, $rand was evaluated more than once in sharded find (SERVER-75927).
 //   requires_fcv_72,
+//   # Requires a batch size greater than one.
+//   does_not_support_config_fuzzer,
 // ]
 //
 import {

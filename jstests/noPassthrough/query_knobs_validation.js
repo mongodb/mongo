@@ -72,6 +72,7 @@ const expectedParamDefaults = {
     internalQuerySlotBasedExecutionDisableTimeSeriesPushdown: false,
     internalQueryCollectOptimizerMetrics: false,
     internalQueryDisablePlanCache: false,
+    internalQueryFindCommandBatchSize: 101,
 };
 
 function assertDefaultParameterValues() {
@@ -320,5 +321,9 @@ assertSetParameterSucceeds("internalQueryCollectOptimizerMetrics", false);
 
 assertSetParameterSucceeds("internalQueryDisablePlanCache", true);
 assertSetParameterSucceeds("internalQueryDisablePlanCache", false);
+
+assertSetParameterSucceeds("internalQueryFindCommandBatchSize", 30);
+assertSetParameterFails("internalQueryFindCommandBatchSize", 0);
+assertSetParameterFails("internalQueryFindCommandBatchSize", -1);
 
 MongoRunner.stopMongod(conn);

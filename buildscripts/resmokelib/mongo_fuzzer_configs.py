@@ -176,6 +176,9 @@ def generate_mongod_parameters(rng, mode):
     # We need a higher timeout to account for test slowness
     ret["receiveChunkWaitForRangeDeleterTimeoutMS"] = 300000
     ret["defaultConfigCommandTimeoutMS"] = 90000
+
+    ret["internalQueryFindCommandBatchSize"] = rng.randint(1, 500)
+
     return ret
 
 
@@ -187,6 +190,9 @@ def generate_mongos_parameters(rng, mode):
 
     # We need a higher timeout to account for test slowness
     ret["defaultConfigCommandTimeoutMS"] = 90000
+
+    ret["internalQueryFindCommandBatchSize"] = rng.randint(1, 500)
+
     return ret
 
 

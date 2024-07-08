@@ -4,6 +4,10 @@
  * @tags: [
  *   assumes_read_concern_local,
  *   requires_fcv_80,
+ *   # When the config fuzzer changes 'internalQueryFindCommandBatchSize' to a value < 3,
+ *   # 'cursor.firstBatch' is too small to have all the expected results.
+ *   # TODO(SERVER-91719): unblock if test is rewritten to account for small batch size.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";

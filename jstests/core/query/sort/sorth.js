@@ -1,3 +1,9 @@
+// @tags: [
+//   # When the config fuzzer changes 'internalQueryFindCommandBatchSize' to a value < 3,
+//   # 'cursor.firstBatch' is too small for the limit.
+//   does_not_support_config_fuzzer,
+// ]
+
 // Tests for the $in/sort/limit optimization combined with inequality bounds.  SERVER-5777
 var t = db.jstests_sorth;
 t.drop();
