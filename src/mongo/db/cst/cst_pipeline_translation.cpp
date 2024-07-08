@@ -246,6 +246,7 @@ auto translateMeta(const CNode::ObjectChildren& object, ExpressionContext* expCt
 auto translateFilter(const CNode::ObjectChildren& object,
                      ExpressionContext* expCtx,
                      const VariablesParseState& vps) {
+    using namespace std::string_literals;
     // $filter's syntax guarantees that it's payload is ObjectChildren
     auto&& children = get<CNode::ObjectChildren>(object[0].second.payload);
     auto&& inputElem = children[0].second;

@@ -50,6 +50,8 @@
 namespace mongo {
 namespace {
 
+using namespace std::string_literals;
+
 auto getExpCtx() {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     return ExpressionContextForTest(nss);

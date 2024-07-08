@@ -59,6 +59,7 @@
 namespace mongo {
 
 using std::unique_ptr;
+using namespace std::string_literals;
 
 
 void assertMatchesEqual(const ParsedMatchExpressionForTest& expected,

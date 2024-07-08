@@ -57,8 +57,6 @@ struct _timelib_tzinfo;
 
 namespace mongo {
 
-using namespace std::string_literals;
-
 /**
  * Default format values for date-times, e.g. for $dateToString aggregations.
  */
@@ -406,7 +404,7 @@ private:
         if ((number < 0) || (number > 9999))
             return Status{ErrorCodes::Error{18537},
                           "Could not convert date to string: date component was outside "
-                          "the supported range of 0-9999: "s +
+                          "the supported range of 0-9999: "_sd +
                               std::to_string(number)};
 
         int digits = 1;

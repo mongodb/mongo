@@ -57,6 +57,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::string_literals;
 
 class ChangeStreamRewriteTest : public AggregationContextFixture {
 public:

@@ -228,6 +228,7 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
     const CNode& cst,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback& extensionsCallback) {
+    using namespace std::string_literals;
     if (auto keyField = get_if<KeyFieldname>(&fieldName)) {
         // Top level match expression.
         switch (*keyField) {

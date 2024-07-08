@@ -81,6 +81,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::string_literals;
 
 class CreateCollectionTest : public ServiceContextMongoDTest {
 protected:

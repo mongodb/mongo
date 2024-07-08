@@ -543,7 +543,7 @@ public:
         std::string result;
         for (size_t i = 0; i < errors.size(); ++i) {
             auto error = errors[i];
-            result += error.first += " - "s += error.second;
+            result += error.first += std::string(" - ") += error.second;
             if (i != errors.size() - 1) {
                 result += "; ";
             }

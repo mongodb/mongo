@@ -43,6 +43,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo::stage_builder {
+using namespace std::string_literals;
 
 TypeChecker::TypeChecker() {
     // Define an initial binding level, so that the caller can define variable bindings before

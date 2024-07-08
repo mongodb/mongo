@@ -44,7 +44,9 @@
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/util/assert_util.h"
 
+
 namespace mongo::stage_builder {
+using namespace std::string_literals;
 bool ExpressionConstEval::optimize(optimizer::ABT& n) {
     invariant(_letRefs.empty());
     invariant(_singleRef.empty());
