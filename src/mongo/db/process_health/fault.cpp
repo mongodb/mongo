@@ -111,6 +111,7 @@ void Fault::appendDescription(BSONObjBuilder* builder) const {
     builder->append("id", getId().toBSON());
     builder->append("duration", getDuration().toBSON());
     BSONObjBuilder facetsBuilder;
+    auto lk = stdx::lock_guard(_mutex);
     for (auto& facet : _facets) {
         facetsBuilder.append(FaultFacetType_serializer(facet->getType()), facet->toBSON());
     }
