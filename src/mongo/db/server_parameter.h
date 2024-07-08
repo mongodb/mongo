@@ -59,6 +59,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
@@ -119,6 +120,7 @@ public:
     using Map = std::map<std::string, std::unique_ptr<ServerParameter>, std::less<>>;
 
     ServerParameter(StringData name, ServerParameterType spt);
+    ServerParameter(const ServerParameter& rhs);
     virtual ~ServerParameter() = default;
 
     std::string name() const {
@@ -221,26 +223,32 @@ public:
     }
 
     bool isTestOnly() const {
+        stdx::lock_guard lk(_mutex);
         return _testOnly;
     }
 
     void setTestOnly() {
+        stdx::lock_guard lk(_mutex);
         _testOnly = true;
     }
 
     bool isRedact() const {
+        stdx::lock_guard lk(_mutex);
         return _redact;
     }
 
     void setRedact() {
+        stdx::lock_guard lk(_mutex);
         _redact = true;
     }
 
     bool isOmittedInFTDC() {
+        stdx::lock_guard lk(_mutex);
         return _isOmittedInFTDC;
     }
 
     void setOmitInFTDC() {
+        stdx::lock_guard lk(_mutex);
         _isOmittedInFTDC = true;
     }
 
@@ -249,6 +257,7 @@ private:
 
 public:
     void disable(bool permanent) {
+        stdx::lock_guard lk(_mutex);
         if (_disableState != DisableState::PermanentlyDisabled) {
             _disableState =
                 permanent ? DisableState::PermanentlyDisabled : DisableState::TemporarilyDisabled;
@@ -256,6 +265,7 @@ public:
     }
 
     void enable() {
+        stdx::lock_guard lk(_mutex);
         if (_disableState == DisableState::TemporarilyDisabled) {
             _disableState = DisableState::Enabled;
         }
@@ -271,10 +281,12 @@ public:
     bool canBeEnabledOnVersion(const multiversion::FeatureCompatibilityVersion& targetFCV) const;
 
     void setFeatureFlag(FeatureFlag* featureFlag) {
+        stdx::lock_guard lk(_mutex);
         _featureFlag = featureFlag;
     }
 
     void setMinFCV(const multiversion::FeatureCompatibilityVersion& minFCV) {
+        stdx::lock_guard lk(_mutex);
         _minFCV = minFCV;
     }
 
@@ -287,6 +299,7 @@ protected:
 
     bool minFCVIsLessThanOrEqualToVersion(
         const multiversion::FeatureCompatibilityVersion& fcv) const {
+        stdx::lock_guard lk(_mutex);
         return !_minFCV || fcv >= *_minFCV;
     }
 
@@ -295,12 +308,15 @@ protected:
 
 private:
     std::string _name;
-    FeatureFlag* _featureFlag = nullptr;
-    boost::optional<multiversion::FeatureCompatibilityVersion> _minFCV = boost::none;
     ServerParameterType _type;
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerParameter::_mutex");
+
     bool _testOnly = false;
     bool _redact = false;
     bool _isOmittedInFTDC = false;
+    FeatureFlag* _featureFlag = nullptr;
+    boost::optional<multiversion::FeatureCompatibilityVersion> _minFCV = boost::none;
 
     // Tracks whether a parameter is enabled, temporarily disabled, or permanently disabled. This is
     // used when disabling (permanently) test-only parameters, and when enabling/disabling
