@@ -74,17 +74,30 @@ const mongos = st.s;
 
 const ns1 = "test.foo";
 const ns2 = "bar.baz";
+const ns3 = "test.unsharded";
+const ns4 = "bar.unsharded";
 
 const adminDb = mongos.getDB("admin");
 const testDb = mongos.getDB("test");
 const barDb = mongos.getDB("bar");
 const fooColl = testDb.getCollection("foo");
 const bazColl = barDb.getCollection("baz");
+const unshardedColl1 = testDb.getCollection("unsharded");
+const unshardedColl2 = barDb.getCollection("unsharded");
 
 st.adminCommand({enablesharding: testDb.getName(), primaryShard: st.shard1.shardName});
 st.adminCommand({shardcollection: ns1, key: {skey: 1}});
 st.adminCommand({enablesharding: barDb.getName(), primaryShard: st.shard1.shardName});
 st.adminCommand({shardcollection: ns2, key: {skey: 1}});
+
+// We create and move the unsharded collections to make sure they are tracked
+assert.commandWorked(testDb.runCommand({create: "unsharded"}));
+assert.commandWorked(
+    testDb.adminCommand({moveCollection: "test.unsharded", toShard: st.shard0.shardName}));
+
+assert.commandWorked(barDb.runCommand({create: "unsharded"}));
+assert.commandWorked(
+    barDb.adminCommand({moveCollection: "bar.unsharded", toShard: st.shard0.shardName}));
 
 // Insert data to validate the aggregation stage
 for (let i = 0; i < 6; i++) {
@@ -164,6 +177,11 @@ assert.eq(
 assert.neq(
     0,
     adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {shards: {$size: 2}}}]).itcount());
+
+// Test that verifies unsharded collections are not shown by $shardedDataDistribution
+assert.eq(0,
+          adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: {$in: [ns3, ns4]}}}])
+              .itcount());
 
 st.stop();
 
