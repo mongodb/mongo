@@ -598,13 +598,8 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
                                                             Document{{"b", 1}, {"c", 2}},
                                                             vector<Value>{},
                                                             {1, Document{{"c", 1}}}}}});
-    auto expectedResult = Document{{"a",
-                                    {Value(),
-                                     Document{},
-                                     Document{{"b", 1}},
-                                     Document{{"b", 1}},
-                                     vector<Value>{},
-                                     {Value(), Document{}}}}};
+    auto expectedResult = Document{
+        {"a", {Document{}, Document{{"b", 1}}, Document{{"b", 1}}, vector<Value>{}, {Document{}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -968,8 +963,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
         {"a",
          {1, Document{{"b", 2}, {"c", 3}}, {Document{{"b", 4}, {"c", 5}}}, Document{{"d", 6}}}}});
 
-    auto expectedResult =
-        Document{{"a", {Value(), Document{{"b", 2}}, {Document{{"b", 4}}}, Document{}}}};
+    auto expectedResult = Document{{"a", {Document{{"b", 2}}, {Document{{"b", 4}}}, Document{}}}};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -983,7 +977,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
         {"a",
          {1, Document{{"b", 2}, {"c", 3}}, {Document{{"b", 4}, {"c", 5}}}, Document{{"d", 6}}}}});
 
-    auto expectedResult = Document{{"a", {Value(), Document{{"b", 2}}, Value(), Document{}}}};
+    auto expectedResult = Document{{"a", {Document{{"b", 2}}, Document{}}}};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }

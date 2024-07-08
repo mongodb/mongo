@@ -529,6 +529,8 @@ last-continuous:
     ticket: SERVER-87961
   - test_file: jstests/core/timeseries/timeseries_lastpoint.js
     ticket: SERVER-87961
+  - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
+    ticket: SERVER-91784
   suites: null
 last-lts:
   all:
@@ -1108,4 +1110,6 @@ last-lts:
     ticket: SERVER-87961
   - test_file: jstests/core/timeseries/timeseries_lastpoint.js
     ticket: SERVER-87961
+  - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
+    ticket: SERVER-91784
   suites: null
