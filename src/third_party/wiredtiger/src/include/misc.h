@@ -42,6 +42,7 @@
 #define WT_MILLION (1000000)
 #define WT_BILLION (1000000000)
 
+#define WT_DAY (86400)
 #define WT_MINUTE (60)
 
 #define WT_PROGRESS_MSG_PERIOD (20) /* Seconds. */
