@@ -40,7 +40,8 @@ assert.commandWorked(coll.insert({_id: 1, v: 1}, {writeConcern: {w: 2}}));
 // data situation during oplog application.
 const initialSyncNode = replTest.add({
     rsConfig: {priority: 0},
-    setParameter: {'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'})}
+    setParameter: {'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'})},
+    oplogSize: oplogSizeMB
 });
 
 // Wait until the new node starts and pauses on the fail point.
@@ -83,6 +84,10 @@ function oplogIsRolledOver() {
 }
 
 while (!oplogIsRolledOver()) {
+    // Reducing the number of documents inserted to prevent using too much memory.
+    // The oplog rollover depends on timestamp, sleeping between inserts can significantly reduce
+    // the total number of documents.
+    sleep(20);
     // Insert a large document with a write concern that ensures that before proceeding the
     // operation gets replicated to all 3 nodes in the replica set, since, otherwise, the node that
     // is being initial synced may not be able to catchup due to a small size of the oplog.
