@@ -157,7 +157,7 @@ runTestsExpectFailure(baseCollectionClusterTimeAgg);
 runTestsExpectFailure(fromViewWithClusterTime);
 runTestsExpectFailure(withExprClusterTime);
 
-{
+if (checkSbeRestrictedOrFullyEnabled(db)) {
     // Verify queries referencing $$NOW do not run with SBE.
     function assertEngineUsed(query, isSBE) {
         const explain = coll.explain().aggregate(query);
