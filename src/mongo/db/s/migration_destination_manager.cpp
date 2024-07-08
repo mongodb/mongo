@@ -1381,7 +1381,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         // deleted.
         const auto rangeDeletionWaitDeadline =
             outerOpCtx->getServiceContext()->getFastClockSource()->now() +
-            Milliseconds(receiveChunkWaitForRangeDeleterTimeoutMS.load());
+            Milliseconds(drainOverlappingRangeDeletionsOnStartTimeoutMS.load());
 
         while (rangedeletionutil::checkForConflictingDeletions(
             outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
