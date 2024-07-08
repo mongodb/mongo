@@ -67,6 +67,7 @@ selector:
     - build/install/bin/immutable_absl_comparison_bm*
     - build/install/bin/immutable_std_comparison_bm*
     # These benchmarks are being run as part of the benchmarks_replication.yml test suite.
+    - build/install/bin/replication_waiter_list_bm*
     - build/install/bin/oplog_application_bm*
     - build/install/bin/oplog_applier_utils_bm*
 

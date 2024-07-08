@@ -62,7 +62,9 @@ public:
     }
     enum Orderings {
         kOrderingSame,
-        kOrderingOrdered,
+        kOrderingSequential,
+        // kOrderingScrambled is intended to test inserting in a non-sequential order; it is not
+        // actually implemented.
         kOrderingScrambled,
     };
 
@@ -90,7 +92,7 @@ public:
             for (int i = 0; i < nWaiters; i++) {
                 futures.emplace_back(
                     replCoord->awaitReplicationAsyncNoWTimeout(waitOpTime, wcMajority).semi());
-                if (orderType == kOrderingOrdered) {
+                if (orderType == kOrderingSequential) {
                     waitOpTime = OpTime{waitOpTime.getTimestamp() + 1, 1};
                 }
             }
@@ -263,6 +265,6 @@ void BM_AddWaiter(benchmark::State& state) {
 
 BENCHMARK(BM_UnfulfilledWaiter)->Args({3, 1000})->MinTime(0.05);
 BENCHMARK(BM_UnfulfilledMajorityWaiter)->Args({3, 1000})->MinTime(0.05);
-BENCHMARK(BM_AddWaiter)->Args({3, 1000})->MinTime(0.05);
+BENCHMARK(BM_AddWaiter)->Args({1000, WaiterBM::kOrderingSequential})->MinTime(0.05);
 }  // namespace repl
 }  // namespace mongo
