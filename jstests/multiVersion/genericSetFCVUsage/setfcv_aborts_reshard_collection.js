@@ -165,6 +165,10 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
                 // building index, it is possible that the index build gets aborted first and
                 // resharding fails on IndexBuildAborted.
                 ErrorCodes.IndexBuildAborted,
+                // FCV changing during resharding can lead a recipient to pass an explicitly filled
+                // in simple collation in an index spec to the pre resharding improvements index
+                // creation path that rejects it with InternalError.
+                ErrorCodes.InternalError,
             ]
         });
 
