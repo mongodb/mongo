@@ -31,11 +31,9 @@
 
 #define STACK_ELE(_delta, _name) (ctx->stack[(_delta) + ctx->n]._name)
 
-#define STACK_BSON(_delta) \
-   (((_delta) + ctx->n) == 0 ? bson : &STACK_ELE (_delta, bson))
+#define STACK_BSON(_delta) (((_delta) + ctx->n) == 0 ? bson : &STACK_ELE (_delta, bson))
 
-#define STACK_ITER(_delta) \
-   (((_delta) + ctx->n) == 0 ? &root_iter : &STACK_ELE (_delta, iter))
+#define STACK_ITER(_delta) (((_delta) + ctx->n) == 0 ? &root_iter : &STACK_ELE (_delta, iter))
 
 #define STACK_BSON_PARENT STACK_BSON (-1)
 #define STACK_BSON_CHILD STACK_BSON (0)
@@ -205,10 +203,7 @@ _noop (void)
 /* appends val to the passed bson object.  Meant to be a super simple dispatch
  * table */
 static void
-_bcon_append_single (bson_t *bson,
-                     bcon_type_t type,
-                     const char *key,
-                     bcon_append_t *val)
+_bcon_append_single (bson_t *bson, bcon_type_t type, const char *key, bcon_append_t *val)
 {
    switch ((int) type) {
    case BCON_TYPE_UTF8:
@@ -218,8 +213,7 @@ _bcon_append_single (bson_t *bson,
       BSON_ASSERT (bson_append_double (bson, key, -1, val->DOUBLE));
       break;
    case BCON_TYPE_BIN: {
-      BSON_ASSERT (bson_append_binary (
-         bson, key, -1, val->BIN.subtype, val->BIN.binary, val->BIN.length));
+      BSON_ASSERT (bson_append_binary (bson, key, -1, val->BIN.subtype, val->BIN.binary, val->BIN.length));
       break;
    }
    case BCON_TYPE_UNDEFINED:
@@ -238,13 +232,11 @@ _bcon_append_single (bson_t *bson,
       BSON_ASSERT (bson_append_null (bson, key, -1));
       break;
    case BCON_TYPE_REGEX: {
-      BSON_ASSERT (
-         bson_append_regex (bson, key, -1, val->REGEX.regex, val->REGEX.flags));
+      BSON_ASSERT (bson_append_regex (bson, key, -1, val->REGEX.regex, val->REGEX.flags));
       break;
    }
    case BCON_TYPE_DBPOINTER: {
-      BSON_ASSERT (bson_append_dbpointer (
-         bson, key, -1, val->DBPOINTER.collection, val->DBPOINTER.oid));
+      BSON_ASSERT (bson_append_dbpointer (bson, key, -1, val->DBPOINTER.collection, val->DBPOINTER.oid));
       break;
    }
    case BCON_TYPE_CODE:
@@ -254,15 +246,13 @@ _bcon_append_single (bson_t *bson,
       BSON_ASSERT (bson_append_symbol (bson, key, -1, val->SYMBOL, -1));
       break;
    case BCON_TYPE_CODEWSCOPE:
-      BSON_ASSERT (bson_append_code_with_scope (
-         bson, key, -1, val->CODEWSCOPE.js, val->CODEWSCOPE.scope));
+      BSON_ASSERT (bson_append_code_with_scope (bson, key, -1, val->CODEWSCOPE.js, val->CODEWSCOPE.scope));
       break;
    case BCON_TYPE_INT32:
       BSON_ASSERT (bson_append_int32 (bson, key, -1, val->INT32));
       break;
    case BCON_TYPE_TIMESTAMP: {
-      BSON_ASSERT (bson_append_timestamp (
-         bson, key, -1, val->TIMESTAMP.timestamp, val->TIMESTAMP.increment));
+      BSON_ASSERT (bson_append_timestamp (bson, key, -1, val->TIMESTAMP.timestamp, val->TIMESTAMP.increment));
       break;
    }
    case BCON_TYPE_INT64:
@@ -315,9 +305,7 @@ _bcon_append_single (bson_t *bson,
  *    procedural verification (if a parameter could have multiple types).
  * */
 static bool
-_bcon_extract_single (const bson_iter_t *iter,
-                      bcon_type_t type,
-                      bcon_extract_t *val)
+_bcon_extract_single (const bson_iter_t *iter, bcon_type_t type, bcon_extract_t *val)
 {
    switch ((int) type) {
    case BCON_TYPE_UTF8:
@@ -330,8 +318,7 @@ _bcon_extract_single (const bson_iter_t *iter,
       break;
    case BCON_TYPE_BIN:
       CHECK_TYPE (BSON_TYPE_BINARY);
-      bson_iter_binary (
-         iter, val->BIN.subtype, val->BIN.length, val->BIN.binary);
+      bson_iter_binary (iter, val->BIN.subtype, val->BIN.length, val->BIN.binary);
       break;
    case BCON_TYPE_UNDEFINED:
       CHECK_TYPE (BSON_TYPE_UNDEFINED);
@@ -358,8 +345,7 @@ _bcon_extract_single (const bson_iter_t *iter,
       break;
    case BCON_TYPE_DBPOINTER:
       CHECK_TYPE (BSON_TYPE_DBPOINTER);
-      bson_iter_dbpointer (
-         iter, NULL, val->DBPOINTER.collection, val->DBPOINTER.oid);
+      bson_iter_dbpointer (iter, NULL, val->DBPOINTER.collection, val->DBPOINTER.oid);
       break;
    case BCON_TYPE_CODE:
       CHECK_TYPE (BSON_TYPE_CODE);
@@ -386,8 +372,7 @@ _bcon_extract_single (const bson_iter_t *iter,
       break;
    case BCON_TYPE_TIMESTAMP:
       CHECK_TYPE (BSON_TYPE_TIMESTAMP);
-      bson_iter_timestamp (
-         iter, val->TIMESTAMP.timestamp, val->TIMESTAMP.increment);
+      bson_iter_timestamp (iter, val->TIMESTAMP.timestamp, val->TIMESTAMP.increment);
       break;
    case BCON_TYPE_INT64:
       CHECK_TYPE (BSON_TYPE_INT64);
@@ -772,8 +757,7 @@ bcon_append_ctx_va (bson_t *bson, bcon_append_ctx_t *ctx, va_list *ap)
          }
 
          if (type == BCON_TYPE_DOC_END) {
-            STACK_POP_DOC (
-               bson_append_document_end (STACK_BSON_PARENT, STACK_BSON_CHILD));
+            STACK_POP_DOC (bson_append_document_end (STACK_BSON_PARENT, STACK_BSON_CHILD));
             continue;
          }
 
@@ -797,20 +781,16 @@ bcon_append_ctx_va (bson_t *bson, bcon_append_ctx_t *ctx, va_list *ap)
 
          break;
       case BCON_TYPE_DOC_START:
-         STACK_PUSH_DOC (bson_append_document_begin (
-            STACK_BSON_PARENT, key, -1, STACK_BSON_CHILD));
+         STACK_PUSH_DOC (bson_append_document_begin (STACK_BSON_PARENT, key, -1, STACK_BSON_CHILD));
          break;
       case BCON_TYPE_DOC_END:
-         STACK_POP_DOC (
-            bson_append_document_end (STACK_BSON_PARENT, STACK_BSON_CHILD));
+         STACK_POP_DOC (bson_append_document_end (STACK_BSON_PARENT, STACK_BSON_CHILD));
          break;
       case BCON_TYPE_ARRAY_START:
-         STACK_PUSH_ARRAY (bson_append_array_begin (
-            STACK_BSON_PARENT, key, -1, STACK_BSON_CHILD));
+         STACK_PUSH_ARRAY (bson_append_array_begin (STACK_BSON_PARENT, key, -1, STACK_BSON_CHILD));
          break;
       case BCON_TYPE_ARRAY_END:
-         STACK_POP_ARRAY (
-            bson_append_array_end (STACK_BSON_PARENT, STACK_BSON_CHILD));
+         STACK_POP_ARRAY (bson_append_array_end (STACK_BSON_PARENT, STACK_BSON_CHILD));
          break;
       default:
          _bcon_append_single (STACK_BSON_CHILD, type, key, &u);
@@ -897,8 +877,7 @@ bcon_extract_ctx_va (bson_t *bson, bcon_extract_ctx_t *ctx, va_list *ap)
                return false;
             }
 
-            STACK_PUSH_DOC (
-               bson_iter_recurse (&current_iter, STACK_ITER_CHILD));
+            STACK_PUSH_DOC (bson_iter_recurse (&current_iter, STACK_ITER_CHILD));
             break;
          case BCON_TYPE_ARRAY_START:
 
@@ -906,8 +885,7 @@ bcon_extract_ctx_va (bson_t *bson, bcon_extract_ctx_t *ctx, va_list *ap)
                return false;
             }
 
-            STACK_PUSH_ARRAY (
-               bson_iter_recurse (&current_iter, STACK_ITER_CHILD));
+            STACK_PUSH_ARRAY (bson_iter_recurse (&current_iter, STACK_ITER_CHILD));
             break;
          default:
 

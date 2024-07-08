@@ -21,10 +21,8 @@
 
 #include <bson/bson.h>
 
-#define mcommon_b64_ntop_calculate_target_size \
-   COMMON_NAME (b64_ntop_calculate_target_size)
-#define mcommon_b64_pton_calculate_target_size \
-   COMMON_NAME (b64_pton_calculate_target_size)
+#define mcommon_b64_ntop_calculate_target_size COMMON_NAME (b64_ntop_calculate_target_size)
+#define mcommon_b64_pton_calculate_target_size COMMON_NAME (b64_pton_calculate_target_size)
 #define mcommon_b64_ntop COMMON_NAME (b64_ntop)
 #define mcommon_b64_pton COMMON_NAME (b64_pton)
 
@@ -47,10 +45,7 @@ mcommon_b64_pton_calculate_target_size (size_t base64_encoded_size);
  * hence the obscure name "ntop".
  */
 int
-mcommon_b64_ntop (uint8_t const *src,
-                  size_t srclength,
-                  char *target,
-                  size_t targsize);
+mcommon_b64_ntop (uint8_t const *src, size_t srclength, char *target, size_t targsize);
 
 /** If target is not NULL, the number of bytes written to target on success or
  * -1 on error. If target is NULL, returns the exact number of bytes that would

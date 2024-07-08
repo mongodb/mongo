@@ -47,8 +47,7 @@
    if (!(Cond))      \
    abort ()
 
-static const char Base64[] =
-   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const char Base64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 static const char Pad64 = '=';
 
 /* (From RFC1521 and draft-ietf-dnssec-secext-03.txt)
@@ -114,10 +113,7 @@ static const char Pad64 = '=';
  */
 
 int
-mcommon_b64_ntop (uint8_t const *src,
-                  size_t srclength,
-                  char *target,
-                  size_t targsize)
+mcommon_b64_ntop (uint8_t const *src, size_t srclength, char *target, size_t targsize)
 {
    size_t datalength = 0;
    uint8_t input[3];
@@ -275,8 +271,7 @@ static const uint8_t mongoc_b64rmap_invalid = 0xff;
 #define mongoc_common_once_t INIT_ONCE
 #define MONGOC_COMMON_ONCE_INIT INIT_ONCE_STATIC_INIT
 #define mongoc_common_once(o, c) InitOnceExecuteOnce (o, c, NULL, NULL)
-#define MONGOC_COMMON_ONCE_FUN(n) \
-   BOOL CALLBACK n (PINIT_ONCE _ignored_a, PVOID _ignored_b, PVOID *_ignored_c)
+#define MONGOC_COMMON_ONCE_FUN(n) BOOL CALLBACK n (PINIT_ONCE _ignored_a, PVOID _ignored_b, PVOID *_ignored_c)
 #define MONGOC_COMMON_ONCE_RETURN return true
 #endif
 

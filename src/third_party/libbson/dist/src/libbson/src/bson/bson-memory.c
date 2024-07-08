@@ -26,15 +26,14 @@
 
 
 // Ensure size of exported structs are stable.
-BSON_STATIC_ASSERT2 (bson_mem_vtable_t,
-                     sizeof (bson_mem_vtable_t) == sizeof (void *) * 8u);
+BSON_STATIC_ASSERT2 (bson_mem_vtable_t, sizeof (bson_mem_vtable_t) == sizeof (void *) * 8u);
 
 
 // For compatibility with C standards prior to C11.
 static void *
 _aligned_alloc_impl (size_t alignment, size_t num_bytes)
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L && \
-   !defined(_WIN32) && !defined(__ANDROID__) && !defined(_AIX)
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L && !defined(_WIN32) && !defined(__ANDROID__) && \
+   !defined(_AIX)
 {
    return aligned_alloc (alignment, num_bytes);
 }
@@ -98,9 +97,7 @@ bson_malloc (size_t num_bytes) /* IN */
 
    if (BSON_LIKELY (num_bytes)) {
       if (BSON_UNLIKELY (!(mem = gMemVtable.malloc (num_bytes)))) {
-         fprintf (stderr,
-                  "Failure to allocate memory in bson_malloc(). errno: %d.\n",
-                  errno);
+         fprintf (stderr, "Failure to allocate memory in bson_malloc(). errno: %d.\n", errno);
          abort ();
       }
    }
@@ -138,9 +135,7 @@ bson_malloc0 (size_t num_bytes) /* IN */
 
    if (BSON_LIKELY (num_bytes)) {
       if (BSON_UNLIKELY (!(mem = gMemVtable.calloc (1, num_bytes)))) {
-         fprintf (stderr,
-                  "Failure to allocate memory in bson_malloc0(). errno: %d.\n",
-                  errno);
+         fprintf (stderr, "Failure to allocate memory in bson_malloc0(). errno: %d.\n", errno);
          abort ();
       }
    }
@@ -181,10 +176,8 @@ bson_aligned_alloc (size_t alignment /* IN */, size_t num_bytes /* IN */)
    void *mem = NULL;
 
    if (BSON_LIKELY (num_bytes)) {
-      if (BSON_UNLIKELY (
-             !(mem = gMemVtable.aligned_alloc (alignment, num_bytes)))) {
-         fprintf (stderr,
-                  "Failure to allocate memory in bson_aligned_alloc()\n");
+      if (BSON_UNLIKELY (!(mem = gMemVtable.aligned_alloc (alignment, num_bytes)))) {
+         fprintf (stderr, "Failure to allocate memory in bson_aligned_alloc()\n");
          abort ();
       }
    }
@@ -221,10 +214,8 @@ bson_aligned_alloc0 (size_t alignment /* IN */, size_t num_bytes /* IN */)
    void *mem = NULL;
 
    if (BSON_LIKELY (num_bytes)) {
-      if (BSON_UNLIKELY (
-             !(mem = gMemVtable.aligned_alloc (alignment, num_bytes)))) {
-         fprintf (stderr,
-                  "Failure to allocate memory in bson_aligned_alloc0()\n");
+      if (BSON_UNLIKELY (!(mem = gMemVtable.aligned_alloc (alignment, num_bytes)))) {
+         fprintf (stderr, "Failure to allocate memory in bson_aligned_alloc0()\n");
          abort ();
       }
       memset (mem, 0, num_bytes);
@@ -273,9 +264,7 @@ bson_realloc (void *mem,        /* IN */
    mem = gMemVtable.realloc (mem, num_bytes);
 
    if (BSON_UNLIKELY (!mem)) {
-      fprintf (stderr,
-               "Failure to re-allocate memory in bson_realloc(). errno: %d.\n",
-               errno);
+      fprintf (stderr, "Failure to re-allocate memory in bson_realloc(). errno: %d.\n", errno);
       abort ();
    }
 
@@ -414,8 +403,7 @@ bson_mem_set_vtable (const bson_mem_vtable_t *vtable)
 {
    BSON_ASSERT (vtable);
 
-   if (!vtable->malloc || !vtable->calloc || !vtable->realloc ||
-       !vtable->free) {
+   if (!vtable->malloc || !vtable->calloc || !vtable->realloc || !vtable->free) {
       fprintf (stderr,
                "Failure to install BSON vtable, "
                "missing functions.\n");

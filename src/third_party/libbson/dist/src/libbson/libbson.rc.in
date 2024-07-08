@@ -1,9 +1,8 @@
 // Defines Version Information to include in DLL on Windows.
 // Refer: https://learn.microsoft.com/en-us/windows/win32/menurc/versioninfo-resource
 #include <winver.h> // Defines VS_VERSION_INFO
-#define BSON_COMPILATION // Tell bson-version.h it is part of compilation.
+
 #include <bson/bson-version.h> // Defines BSON_MAJOR_VERSION and other version macros.
-#undef BSON_COMPILATION
 
 #define BSON_OUTPUT_BASENAME "@BSON_OUTPUT_BASENAME@"
 #define BSON_API_VERSION "@BSON_API_VERSION@"
