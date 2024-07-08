@@ -564,18 +564,7 @@ template std::pair<value::TypeTags, value::Value> DoubleBlock::at(size_t idx);
 template std::pair<value::TypeTags, value::Value> BoolBlock::at(size_t idx);
 
 void HeterogeneousBlock::push_back(TypeTags t, Value v) {
-    constexpr auto maxSizeT = std::numeric_limits<size_t>::max();
-
     ValueGuard guard(t, v);
-
-    size_t cap = std::min<size_t>(_vals.capacity(), _tags.capacity());
-    if (_vals.size() == cap) {
-        size_t newCap = cap < maxSizeT / 2 ? (cap ? cap * 2 : 1) : maxSizeT;
-        newCap = std::max<size_t>(newCap, cap + 1);
-
-        _vals.reserve(newCap);
-        _tags.reserve(newCap);
-    }
 
     _vals.push_back(v);
     _tags.push_back(t);
