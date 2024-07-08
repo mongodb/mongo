@@ -51,10 +51,12 @@ def iterable_to_jql(entries: Iterable[str]) -> str:
 
 
 JIRA_PROJECTS = {"Build Failures"}
-END_STATUSES = {"Closed", "Resolved"}
+END_STATUSES = {"Needs Triage", "Open", "In Progress", "Waiting for Bug Fix"}
+PRIORITIES = {"Blocker - P1", "Critical - P2", "Major - P3", "Minor - P4"}
 ACTIVE_BFS_QUERY = (
     f"project in ({iterable_to_jql(JIRA_PROJECTS)})"
-    f" AND status not in ({iterable_to_jql(END_STATUSES)})"
+    f" AND status in ({iterable_to_jql(END_STATUSES)})"
+    f" AND priority in ({iterable_to_jql(PRIORITIES)})"
 )
 
 
