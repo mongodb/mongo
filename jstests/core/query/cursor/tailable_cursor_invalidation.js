@@ -5,6 +5,10 @@
 //   requires_getmore,
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
+//
+//   # The test fails when executed for sharded cluster and mongoD
+//   # 'internalQueryFindCommandBatchSize' parameter > mongoS batchsize.
+//   does_not_support_config_fuzzer,
 // ]
 
 // Tests for the behavior of tailable cursors when a collection is dropped or the cursor is
