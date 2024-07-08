@@ -1474,6 +1474,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     expectAbortTransactions({hostAndPort2}, getSessionId(), txnNum);
     future.default_timed_get();
 
+    txnRouter.setDefaultAtClusterTime(operationContext());
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
 }
@@ -3102,8 +3103,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime
     }
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession,
-       CannotChangeAtClusterTimeAfterStatementThatSelectedIt) {
+TEST_F(TransactionRouterTestWithDefaultSession, CannotChangeAtClusterTime) {
     TxnNumber txnNum{3};
     operationContext()->setTxnNumber(txnNum);
 
@@ -3116,25 +3116,19 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                        << "snapshot"
                                        << "atClusterTime" << kInMemoryLogicalTime.asTimestamp());
 
-    {
-        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                                        shard1,
-                                                        BSON("insert"
-                                                             << "test"));
-        ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
-    }
+    auto originalCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                                         shard1,
+                                                         BSON("insert"
+                                                              << "test"));
+    ASSERT_BSONOBJ_EQ(expectedReadConcern, originalCmd["readConcern"].Obj());
 
-    // Changing the atClusterTime during the statement that selected it is allowed.
+    // Changing the atClusterTime during the statement that selected it is not allowed.
 
     LogicalTime laterTimeSameStmt(Timestamp(100, 1));
     ASSERT_GT(laterTimeSameStmt, kInMemoryLogicalTime);
     VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTimeSameStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
-
-    expectedReadConcern = BSON("level"
-                               << "snapshot"
-                               << "atClusterTime" << laterTimeSameStmt.asTimestamp());
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -3420,6 +3414,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
     {
         ASSERT_FALSE(txnRouter.getParticipant(shard2));
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
@@ -3469,6 +3465,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnlyNewlyCreatedParticipantsClea
         [&] { txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus); });
     expectAbortTransactions({hostAndPort2, hostAndPort3}, getSessionId(), txnNum);
     future.default_timed_get();
+
+    txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Shards 2 and 3 must start a transaction, but shard 1 must not.
     ASSERT_FALSE(
@@ -4060,6 +4058,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, ContinueOnlyOnStaleVersionOnFirs
 
     // It shouldn't hang because there won't be any abort transaction sent at this time
     txnRouter.onStaleShardOrDbError(operationContext(), "find", kStaleConfigStatus);
+    txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Readd the initial participant removed on onStaleShardOrDbError
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);

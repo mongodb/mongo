@@ -230,7 +230,7 @@ std::string actionTypeToString(TransactionRouter::TransactionActions action) {
 void setAtClusterTime(const LogicalSessionId& lsid,
                       const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                       StmtId latestStmtId,
-                      TransactionRouter::AtClusterTime* txnAtClusterTime,
+                      LogicalTime* txnAtClusterTime,
                       const repl::ReadConcernArgs& readConcernArgs,
                       const LogicalTime& candidateTime) {
     auto requestedAtClusterTime = readConcernArgs.getArgsAtClusterTime();
@@ -251,6 +251,7 @@ void setAtClusterTime(const LogicalSessionId& lsid,
         return candidateTime;
     }();
 
+    invariant(atClusterTime != LogicalTime::kUninitialized);
     LOGV2_DEBUG(22888,
                 2,
                 "Setting global snapshot timestamp for transaction",
@@ -259,7 +260,7 @@ void setAtClusterTime(const LogicalSessionId& lsid,
                 "txnRetryCounter"_attr = txnNumberAndRetryCounter.getTxnRetryCounter(),
                 "globalSnapshotTimestamp"_attr = atClusterTime,
                 "latestStmtId"_attr = latestStmtId);
-    txnAtClusterTime->setTime(atClusterTime, latestStmtId);
+    *txnAtClusterTime = atClusterTime;
 }
 
 struct StrippedFields {
@@ -410,7 +411,7 @@ void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCt
 
     if (_atClusterTimeHasBeenSet()) {
         builder->append("globalReadTimestamp",
-                        o().atClusterTimeForSnapshotReadConcern->getTime().asTimestamp());
+                        o().atClusterTimeForSnapshotReadConcern->asTimestamp());
     }
 
     const auto& timingStats = o().metricsTracker->getTimingStats();
@@ -469,7 +470,7 @@ void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCt
 
 bool TransactionRouter::Observer::_atClusterTimeHasBeenSet() const {
     return o().atClusterTimeForSnapshotReadConcern &&
-        o().atClusterTimeForSnapshotReadConcern->timeHasBeenSet();
+        *o().atClusterTimeForSnapshotReadConcern != LogicalTime::kUninitialized;
 }
 
 const LogicalSessionId& TransactionRouter::Observer::_sessionId() const {
@@ -760,35 +761,12 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
     processAdditionalParticipants(true /* okResponse */);
 }
 
-LogicalTime TransactionRouter::AtClusterTime::getTime() const {
-    invariant(_atClusterTime != LogicalTime::kUninitialized);
-    invariant(_stmtIdSelectedAt);
-    return _atClusterTime;
-}
-
-bool TransactionRouter::AtClusterTime::timeHasBeenSet() const {
-    return _atClusterTime != LogicalTime::kUninitialized;
-}
-
-void TransactionRouter::AtClusterTime::setTime(LogicalTime atClusterTime, StmtId currentStmtId) {
-    invariant(atClusterTime != LogicalTime::kUninitialized);
-    _atClusterTime = atClusterTime;
-    _stmtIdSelectedAt = currentStmtId;
-}
-
-bool TransactionRouter::AtClusterTime::canChange(StmtId currentStmtId) const {
-    return !_stmtIdSelectedAt || *_stmtIdSelectedAt == currentStmtId;
-}
-
 boost::optional<LogicalTime> TransactionRouter::Router::getSelectedAtClusterTime() const {
-    return o().atClusterTimeForSnapshotReadConcern
-        ? boost::make_optional(o().atClusterTimeForSnapshotReadConcern->getTime())
-        : boost::none;
+    return o().atClusterTimeForSnapshotReadConcern;
 }
 
 boost::optional<LogicalTime> TransactionRouter::Router::getPlacementConflictTime() const {
-    return o().placementConflictTimeForNonSnapshotReadConcern.map(
-        [](const auto& x) { return x.getTime(); });
+    return o().placementConflictTimeForNonSnapshotReadConcern;
 }
 
 const boost::optional<ShardId>& TransactionRouter::Router::getCoordinatorId() const {
@@ -896,11 +874,11 @@ const TransactionRouter::Participant* TransactionRouter::Router::getParticipant(
 
     if (auto& participantAtClusterTime =
             iter->second.sharedOptions.atClusterTimeForSnapshotReadConcern) {
-        invariant(*participantAtClusterTime == o().atClusterTimeForSnapshotReadConcern->getTime());
+        invariant(*participantAtClusterTime == *o().atClusterTimeForSnapshotReadConcern);
     } else if (auto& participantPlacementConflictTime =
                    iter->second.sharedOptions.placementConflictTimeForNonSnapshotReadConcern) {
         invariant(*participantPlacementConflictTime ==
-                  o().placementConflictTimeForNonSnapshotReadConcern->getTime());
+                  *o().placementConflictTimeForNonSnapshotReadConcern);
     }
 
     return &iter->second;
@@ -920,18 +898,12 @@ TransactionRouter::Participant& TransactionRouter::Router::_createParticipant(
         o(lk).coordinatorId = shard.toString();
     }
 
-    SharedTransactionOptions sharedOptions = {
-        os.txnNumberAndRetryCounter,
-        os.apiParameters,
-        os.readConcernArgs,
-        os.atClusterTimeForSnapshotReadConcern
-            ? boost::optional<LogicalTime>(os.atClusterTimeForSnapshotReadConcern->getTime())
-            : boost::none,
-        os.placementConflictTimeForNonSnapshotReadConcern
-            ? boost::optional<LogicalTime>(
-                  os.placementConflictTimeForNonSnapshotReadConcern->getTime())
-            : boost::none,
-        isInternalSessionForRetryableWrite(_sessionId())};
+    SharedTransactionOptions sharedOptions = {os.txnNumberAndRetryCounter,
+                                              os.apiParameters,
+                                              os.readConcernArgs,
+                                              os.atClusterTimeForSnapshotReadConcern,
+                                              os.placementConflictTimeForNonSnapshotReadConcern,
+                                              isInternalSessionForRetryableWrite(_sessionId())};
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     auto resultPair = o(lk).participants.try_emplace(
@@ -1095,6 +1067,18 @@ void TransactionRouter::Router::onStaleShardOrDbError(OperationContext* opCtx,
     // Remove participants created during the current statement so they are sent the correct options
     // if they are targeted again by the retry.
     _clearPendingParticipants(opCtx, status);
+
+    if (p().latestStmtId != p().firstStmtId) {
+        return;
+    }
+
+    // Reset the global snapshot timestamp so the retry will select a new one.
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    if (o(lk).atClusterTimeForSnapshotReadConcern) {
+        o(lk).atClusterTimeForSnapshotReadConcern.emplace();
+    } else {
+        o(lk).placementConflictTimeForNonSnapshotReadConcern.emplace();
+    }
 }
 
 void TransactionRouter::Router::onViewResolutionError(OperationContext* opCtx,
@@ -1117,9 +1101,12 @@ void TransactionRouter::Router::onViewResolutionError(OperationContext* opCtx,
 bool TransactionRouter::Router::canContinueOnSnapshotError() const {
     if (MONGO_unlikely(enableStaleVersionAndSnapshotRetriesWithinTransactions.shouldFail())) {
         return (o().atClusterTimeForSnapshotReadConcern &&
-                o().atClusterTimeForSnapshotReadConcern->canChange(p().latestStmtId)) ||
+                ((*o().atClusterTimeForSnapshotReadConcern == LogicalTime::kUninitialized) ||
+                 p().latestStmtId == p().firstStmtId)) ||
             (o().placementConflictTimeForNonSnapshotReadConcern &&
-             o().placementConflictTimeForNonSnapshotReadConcern->canChange(p().latestStmtId));
+             ((*o().placementConflictTimeForNonSnapshotReadConcern ==
+               LogicalTime::kUninitialized) ||
+              p().latestStmtId == p().firstStmtId));
     }
 
     return false;
@@ -1137,7 +1124,9 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
                 "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                 "error"_attr = redact(status),
                 "previousGlobalSnapshotTimestamp"_attr =
-                    o().atClusterTimeForSnapshotReadConcern->getTime());
+                    (o().atClusterTimeForSnapshotReadConcern
+                         ? *o().atClusterTimeForSnapshotReadConcern
+                         : *o().placementConflictTimeForNonSnapshotReadConcern));
 
     // The transaction must be restarted on all participants because a new read timestamp will be
     // selected, so clear all pending participants. Snapshot errors are only retryable on the first
@@ -1148,12 +1137,16 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
 
     // Reset the global snapshot timestamp so the retry will select a new one.
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    o(lk).atClusterTimeForSnapshotReadConcern.emplace();
+    if (o(lk).atClusterTimeForSnapshotReadConcern) {
+        o(lk).atClusterTimeForSnapshotReadConcern.emplace();
+    } else {
+        o(lk).placementConflictTimeForNonSnapshotReadConcern.emplace();
+    }
 }
 
 void TransactionRouter::Router::setAtClusterTimeForStartOrContinue(OperationContext* opCtx) {
     if (o().atClusterTimeForSnapshotReadConcern) {
-        if (o().atClusterTimeForSnapshotReadConcern->canChange(p().latestStmtId)) {
+        if (*o().atClusterTimeForSnapshotReadConcern == LogicalTime::kUninitialized) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             auto candidateTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
             uassert(
@@ -1166,7 +1159,7 @@ void TransactionRouter::Router::setAtClusterTimeForStartOrContinue(OperationCont
                              candidateTime.value());
         }
     } else if (o().placementConflictTimeForNonSnapshotReadConcern) {
-        if (o().placementConflictTimeForNonSnapshotReadConcern->canChange(p().latestStmtId)) {
+        if (*o().placementConflictTimeForNonSnapshotReadConcern == LogicalTime::kUninitialized) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             auto candidateTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
             uassert(8676401,
@@ -1186,7 +1179,7 @@ void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx)
     const auto defaultTime = VectorClock::get(opCtx)->getTime();
 
     if (o().atClusterTimeForSnapshotReadConcern) {
-        if (o().atClusterTimeForSnapshotReadConcern->canChange(p().latestStmtId)) {
+        if (*o().atClusterTimeForSnapshotReadConcern == LogicalTime::kUninitialized) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             setAtClusterTime(_sessionId(),
                              o(lk).txnNumberAndRetryCounter,
@@ -1196,7 +1189,7 @@ void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx)
                              defaultTime.clusterTime());
         }
     } else if (o().placementConflictTimeForNonSnapshotReadConcern) {
-        if (o().placementConflictTimeForNonSnapshotReadConcern->canChange(p().latestStmtId)) {
+        if (*o().placementConflictTimeForNonSnapshotReadConcern == LogicalTime::kUninitialized) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
 
             setAtClusterTime(_sessionId(),
@@ -1940,7 +1933,7 @@ void TransactionRouter::Router::_logSlowTransaction(OperationContext* opCtx,
     // variable lasts until the LOGV2 call at the end of this function.
     std::string globalReadTimestampTemp;
     if (_atClusterTimeHasBeenSet()) {
-        globalReadTimestampTemp = o().atClusterTimeForSnapshotReadConcern->getTime().toString();
+        globalReadTimestampTemp = o().atClusterTimeForSnapshotReadConcern->toString();
         attrs.add("globalReadTimestamp", globalReadTimestampTemp);
     }
 

@@ -292,44 +292,6 @@ public:
     };
 
     /**
-     * Encapsulates the logic around selecting a global read timestamp for a sharded transaction at
-     * snapshot level read concern.
-     *
-     * The first command in a transaction to target at least one shard must select a cluster time
-     * timestamp before targeting, but may change the timestamp before contacting any shards to
-     * allow optimizing the timestamp based on the targeted shards. If the first command encounters
-     * a retryable error, e.g. "retargeting needed" or SnapshotTooOld, the retry may also select a
-     * new timestamp. Once the first command has successfully completed, the timestamp cannot be
-     * changed.
-     */
-    class AtClusterTime {
-    public:
-        /**
-         * Cannot be called until a timestamp has been set.
-         */
-        LogicalTime getTime() const;
-
-        /**
-         * Returns true if the _atClusterTime has been changed from the default uninitialized value.
-         */
-        bool timeHasBeenSet() const;
-
-        /**
-         * Sets the timestamp and remembers the statement id of the command that set it.
-         */
-        void setTime(LogicalTime atClusterTime, StmtId currentStmtId);
-
-        /**
-         * True if the timestamp can be changed by a command running at the given statement id.
-         */
-        bool canChange(StmtId currentStmtId) const;
-
-    private:
-        boost::optional<StmtId> _stmtIdSelectedAt;
-        LogicalTime _atClusterTime;
-    };
-
-    /**
      * Class used by observers to examine the state of a TransactionRouter.
      */
     class Observer {
@@ -877,8 +839,8 @@ private:
         // The cluster time of the timestamp all participant shards in the current transaction with
         // snapshot level read concern must read from. Only set for transactions running with
         // snapshot level read concern.
-        boost::optional<AtClusterTime> atClusterTimeForSnapshotReadConcern;
-        boost::optional<AtClusterTime> placementConflictTimeForNonSnapshotReadConcern;
+        boost::optional<LogicalTime> atClusterTimeForSnapshotReadConcern;
+        boost::optional<LogicalTime> placementConflictTimeForNonSnapshotReadConcern;
 
         // String representing the reason a transaction aborted. Either the string name of the error
         // code that led to an implicit abort or "abort" if the client sent abortTransaction.
