@@ -121,6 +121,11 @@ class test_truncate23(wttest.WiredTigerTestCase):
         '''
         Test boundary conditions for truncate with and without prepared transactions.
         '''
+
+        # This test is disabled until we determine how to handle prepare conflicts with keys adjacent
+        # to the truncation range
+        self.skipTest("FIXME-WT-13232")
+
         # First test this without the prepared transactions to ensure that everything works.
         for prepared in [False, True]:
 

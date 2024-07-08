@@ -7,4 +7,5 @@ wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage va
 wiredtiger/src/include/intpack_inline.h Assigned value is garbage or undefined [core.uninitialized.Assign]
 wiredtiger/src/reconcile/rec_row.c Branch condition evaluates to a garbage value [core.uninitialized.Branch]
 wiredtiger/src/schema/schema_create.c Null pointer passed to 1st parameter expecting 'nonnull' [core.NonNullParamChecker]
+wiredtiger/src/session/session_api.c Called function pointer is null (null dereference) [core.CallAndMessage]
 wiredtiger/src/utilities/util_dump.c Null pointer passed to 1st parameter expecting 'nonnull' [core.NonNullParamChecker]

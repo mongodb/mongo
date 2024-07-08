@@ -56,7 +56,11 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     insert = 0.75;
     remove = 0.15;
     set_commit_timestamp = 0.05;
-    truncate = 0.005;
+    /*
+     * FIXME-WT-13232 Enable the eviction operator when we've determined how to handle prepare
+     * conflicts with keys adjacent to the truncation range. Set to 0.005.
+     */
+    truncate = 0.0;
 
     checkpoint = 0.02;
     crash = 0.002;

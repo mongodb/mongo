@@ -1585,12 +1585,11 @@ __wt_session_range_truncate(
     WT_TRUNCATE_INFO *trunc_info, _trunc_info;
     int cmp;
     const char *actual_uri;
-    bool local_start, local_stop, log_op, log_trunc, needs_next_prev, supports_bounds;
+    bool local_start, local_stop, log_op, log_trunc, needs_next_prev;
 
     actual_uri = NULL;
     local_start = local_stop = log_trunc = false;
     orig_start_key = orig_stop_key = NULL;
-    supports_bounds = true;
 
     /* Setup the truncate information structure */
     trunc_info = &_trunc_info;
@@ -1669,47 +1668,16 @@ __wt_session_range_truncate(
     trunc_info->uri = actual_uri;
 
     /*
-     * Don't use bounded cursors for FLCS as it isn't supported, additionally skip using them for
-     * complex types such as column groups and indexes. We can't check support for those complex
-     * types at this abstraction level.
-     */
-    if (CUR2BT(start) == NULL || CUR2BT(start)->type == BTREE_COL_FIX)
-        supports_bounds = false;
-    if (stop != NULL && (CUR2BT(stop) == NULL || CUR2BT(stop)->type == BTREE_COL_FIX))
-        supports_bounds = false;
-
-    /*
      * Truncate does not require keys actually exist so that applications can discard parts of the
-     * object's name space without knowing exactly what records currently appear in the object. When
-     * possible use bounded cursors to position the start and stop cursors, if they aren't available
-     * then use search-near. Search-near is suboptimal, because it may return prepare conflicts
-     * outside of the truncate key range, as it will walk beyond the end key.
+     * object's name space without knowing exactly what records currently appear in the object.
+     * Search-near is suboptimal, because it may return prepare conflicts outside of the truncate
+     * key range, as it will walk beyond the end key.
      *
      * No need to search the record again if it is already pointing to the btree.
      */
     if (!F_ISSET(start, WT_CURSTD_KEY_INT)) {
         needs_next_prev = true;
-        if (supports_bounds) {
-            if (!local_start) {
-                /*
-                 * Use a new cursor, because at this level, we can't set bounds on a positioned
-                 * cursor, and at this abstraction level, we can't use WT_CURSOR_IS_POSITIONED to
-                 * fully check.
-                 */
-                WT_ERR(
-                  __session_open_cursor((WT_SESSION *)session, actual_uri, NULL, NULL, &start));
-                trunc_info->start = start;
-                local_start = true;
-            }
-            if (orig_start_key != NULL) {
-                __wt_cursor_set_raw_key(start, orig_start_key);
-                WT_ERR(start->bound(start, "bound=lower"));
-            }
-            if (orig_stop_key != NULL) {
-                __wt_cursor_set_raw_key(start, orig_stop_key);
-                WT_ERR(start->bound(start, "bound=upper"));
-            }
-        } else if (orig_start_key != NULL) {
+        if (orig_start_key != NULL) {
             WT_ERR_NOTFOUND_OK(start->search_near(start, &cmp), true);
             if (ret == WT_NOTFOUND) {
                 ret = 0;
@@ -1729,28 +1697,13 @@ __wt_session_range_truncate(
         }
     }
     if (stop != NULL && !F_ISSET(stop, WT_CURSTD_KEY_INT)) {
-        needs_next_prev = true;
-        if (supports_bounds) {
-            WT_ERR(__session_open_cursor((WT_SESSION *)session, actual_uri, NULL, NULL, &stop));
-            trunc_info->stop = stop;
-            local_stop = true;
-            if (orig_start_key != NULL) {
-                __wt_cursor_set_raw_key(stop, orig_start_key);
-                WT_ERR(stop->bound(stop, "bound=lower"));
-            }
-            if (orig_stop_key != NULL) {
-                __wt_cursor_set_raw_key(stop, orig_stop_key);
-                WT_ERR(stop->bound(stop, "bound=upper"));
-            }
-        } else {
-            WT_ERR_NOTFOUND_OK(stop->search_near(stop, &cmp), true);
-            if (ret == WT_NOTFOUND) {
-                ret = 0;
-                log_trunc = true;
-                goto done;
-            }
-            needs_next_prev = (cmp > 0);
+        WT_ERR_NOTFOUND_OK(stop->search_near(stop, &cmp), true);
+        if (ret == WT_NOTFOUND) {
+            ret = 0;
+            log_trunc = true;
+            goto done;
         }
+        needs_next_prev = (cmp > 0);
         if (needs_next_prev) {
             WT_ERR_NOTFOUND_OK(stop->prev(stop), true);
             if (ret == WT_NOTFOUND) {
