@@ -236,7 +236,7 @@ private:
 
     void logStartingSubPipeline(const std::vector<BSONObj>& serializedPipeline);
     void logShardedViewFound(
-        const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e);
+        const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) const;
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
     // The original, unresolved namespace to union.
