@@ -75,8 +75,8 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrency) {
         });
 
         // Wait for thread 1 to reach the blocking failpoint. Note that each time we enter the
-        // blocking failpoint, we increment timesEntered by 2, because we first check for shouldFail
-        // and then call pauseWhileSet.
+        // blocking failpoint, we increment "timesEntered" by 2, because we first check for
+        // shouldFail and then call pauseWhileSet.
         blockFp->waitForTimesEntered(initBlockFpTE + 2);
         ASSERT(_refresher->_refreshPromise && !_refresher->_refreshPromise->getFuture().isReady());
 
@@ -129,6 +129,72 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrency) {
                                     Status(ErrorCodes::FailPointEnabled, "..."));
         }
     }
+}
+
+// Verifies that an invocation of 'refreshParameters()' with 'ensureReadYourWritesConsistency'
+// parameter set to 'true' while another cluster-wide parameters refresh request is in progress
+// waits for completion of that request and then initiates a new request.
+TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrencyReadYourWritesConsistency) {
+    ASSERT_EQ(_refresher->_refreshPromise, nullptr);
+
+    // Lookup fail-points.
+    auto blockAndSucceedClusterParameterRefreshFailPoint =
+        globalFailPointRegistry().find("blockAndSucceedClusterParameterRefresh");
+    auto blockAndFailClusterParameterRefreshFailPoint =
+        globalFailPointRegistry().find("blockAndFailClusterParameterRefresh");
+    auto countPromiseWaitersClusterParameterRefreshFailPoint =
+        globalFailPointRegistry().find("countPromiseWaitersClusterParameterRefresh");
+
+    // Program the fail-points.
+    const auto blockAndSucceedClusterParameterRefreshFailPointEntryCount =
+        blockAndSucceedClusterParameterRefreshFailPoint->setMode(FailPoint::alwaysOn);
+    const auto countPromiseWaitersClusterParameterRefreshFailPointEntryCount =
+        countPromiseWaitersClusterParameterRefreshFailPoint->setMode(FailPoint::alwaysOn);
+
+    // Create a thread that creates the in-progress cluster-wide parameters refresh request in the
+    // test scenario.
+    stdx::thread backgroundThread([&]() { ASSERT_OK(_refresher->refreshParameters(opCtx())); });
+
+    // Wait for 'backgroundThread' to block on a fail-point. Note that each time we enter the
+    // blocking failpoint, we increment "timesEntered" by 2, because we first check for
+    // 'shouldFail()' and then call 'pauseWhileSet()'.
+    blockAndSucceedClusterParameterRefreshFailPoint->waitForTimesEntered(
+        blockAndSucceedClusterParameterRefreshFailPointEntryCount + 2);
+
+    // Create a thread which generates a concurrent cluster-wide parameters refresh request with
+    // Read Your Writes consistency.
+    stdx::thread concurrentRequestThread([&]() {
+        const bool kEnsureReadYourWritesConsistency = true;
+        Status status = _refresher->refreshParameters(opCtx(), kEnsureReadYourWritesConsistency);
+
+        // Verify that "blockAndFailClusterParameterRefresh" fail-point was hit since that implies
+        // that a new request to refresh cluster-wide parameters was generated.
+        ASSERT_EQ(status, Status(ErrorCodes::FailPointEnabled, "..."));
+    });
+
+    // Wait until 'concurrentRequestThread' passes the fail-point and blocks on future wait.
+    countPromiseWaitersClusterParameterRefreshFailPoint->waitForTimesEntered(
+        countPromiseWaitersClusterParameterRefreshFailPointEntryCount + 1);
+
+    // Program the failpoint so the 'concurrentRequestThread' fails the cluster-wide parameter
+    // refresh process.
+    const auto blockAndFailClusterParameterRefreshFailPointEntryCount =
+        blockAndFailClusterParameterRefreshFailPoint->setMode(FailPoint::alwaysOn);
+
+    // Unblock 'backgroundThread'.
+    blockAndSucceedClusterParameterRefreshFailPoint->setMode(FailPoint::off);
+
+    backgroundThread.join();
+
+    // Wait until 'concurrentRequestThread' blocks on "blockAndFailClusterParameterRefresh"
+    // fail-point.
+    blockAndFailClusterParameterRefreshFailPoint->waitForTimesEntered(
+        blockAndFailClusterParameterRefreshFailPointEntryCount + 2);
+
+    // Unblock 'concurrentRequestThread'.
+    blockAndFailClusterParameterRefreshFailPoint->setMode(FailPoint::off);
+
+    concurrentRequestThread.join();
 }
 }  // namespace
 }  // namespace mongo

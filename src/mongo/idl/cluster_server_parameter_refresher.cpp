@@ -223,8 +223,26 @@ void ClusterServerParameterRefresher::setPeriod(Milliseconds period) {
     _job->setPeriod(period);
 }
 
-Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCtx) {
+Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCtx,
+                                                          bool ensureReadYourWritesConsistency) {
     stdx::unique_lock<Latch> lk(_mutex);
+
+    // If Read Your Writes consistency is requested and a request to fetch the parameter values is
+    // in progress, then wait until that request completes.
+    if (ensureReadYourWritesConsistency && _refreshPromise) {
+        auto future = _refreshPromise->getFuture();
+        lk.unlock();
+        LOGV2_DEBUG(9119600,
+                    3,
+                    "Waiting for completion of an in-progress request to ensure Read Your Writes "
+                    "consistency");
+        countPromiseWaitersClusterParameterRefresh.shouldFail();
+        future.wait();
+        lk.lock();
+    }
+
+    // Issue a new request to fetch the values of the parameters or wait until the in-progress one
+    // completes.
     if (_refreshPromise) {
         // We expect the future to never be ready here, because we complete the promise and then
         // delete it under a lock, meaning new futures taken out on the current promise under a lock
