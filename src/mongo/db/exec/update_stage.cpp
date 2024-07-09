@@ -497,7 +497,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
                 "update"_sd,
                 collectionPtr()->ns(),
                 [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
-                    planExecutorShardingCriticalSectionFuture(opCtx()) =
+                    planExecutorShardingState(opCtx()).criticalSectionFuture =
                         ex->getCriticalSectionSignal();
                     memberFreer.dismiss();  // Keep this member around so we can retry updating it.
                     prepareToRetryWSM(id, out);
@@ -560,7 +560,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
                 // yield, wait for critical section to finish and then we'll resume the write from
                 // the point we had left. We do this to prevent large multi-writes from repeatedly
                 // failing due to StaleConfig and exhausting the mongos retry attempts.
-                planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
+                planExecutorShardingState(opCtx()).criticalSectionFuture =
+                    ex->getCriticalSectionSignal();
                 memberFreer.dismiss();  // Keep this member around so we can retry updating it.
                 prepareToRetryWSM(id, out);
                 return PlanStage::NEED_YIELD;

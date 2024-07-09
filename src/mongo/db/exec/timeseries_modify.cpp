@@ -575,7 +575,8 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
             // yield, wait for the critical section to finish and then we'll resume the write
             // from the point we had left. We do this to prevent large multi-writes from
             // repeatedly failing due to StaleConfig and exhausting the mongos retry attempts.
-            planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
+            planExecutorShardingState(opCtx()).criticalSectionFuture =
+                ex->getCriticalSectionSignal();
             // We need to retry the bucket, so we should not free the current bucket.
             bucketFreer.dismiss();
             _retryBucket(bucketWsmId);
@@ -629,17 +630,18 @@ TimeseriesModifyStage::_checkIfWritingToOrphanedBucket(ScopeGuard<F>& bucketFree
     if (_params.isExplain || _params.fromMigrate) {
         return {boost::none, _params.fromMigrate};
     }
-    return _preWriteFilter.checkIfNotWritable(_ws->get(id)->doc.value(),
-                                              "timeseries "_sd + _specificStats.opType,
-                                              collectionPtr()->ns(),
-                                              [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
-                                                  planExecutorShardingCriticalSectionFuture(
-                                                      opCtx()) = ex->getCriticalSectionSignal();
-                                                  // Retry the write if we're in the sharding
-                                                  // critical section.
-                                                  bucketFreer.dismiss();
-                                                  _retryBucket(id);
-                                              });
+    return _preWriteFilter.checkIfNotWritable(
+        _ws->get(id)->doc.value(),
+        "timeseries "_sd + _specificStats.opType,
+        collectionPtr()->ns(),
+        [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
+            planExecutorShardingState(opCtx()).criticalSectionFuture =
+                ex->getCriticalSectionSignal();
+            // Retry the write if we're in the sharding
+            // critical section.
+            bucketFreer.dismiss();
+            _retryBucket(id);
+        });
 }
 
 PlanStage::StageState TimeseriesModifyStage::_getNextBucket(WorkingSetID& id) {

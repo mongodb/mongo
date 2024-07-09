@@ -122,22 +122,23 @@ private:
 extern const OperationContext::Decoration<boost::optional<repl::OpTime>>
     clientsLastKnownCommittedOpTime;
 
-/**
- * If a plan yielded because it encountered a sharding critical section,
- * 'planExecutorShardingCriticalSectionFuture' will be set to a future that becomes ready when the
- * critical section ends. This future can be waited on to hold off resuming the plan execution while
- * the critical section is still active.
- */
-extern const OperationContext::Decoration<boost::optional<SharedSemiFuture<void>>>
-    planExecutorShardingCriticalSectionFuture;
 
-/**
- * If a plan yielded because it needed to refresh a sharding catalog cache, then
- * 'planExecutorShardingCatalogCacheRefreshRequired' will be set to the nss for which the
- * CatalogCache needs to be refreshed.
- */
-extern const OperationContext::Decoration<boost::optional<NamespaceString>>
-    planExecutorShardingCatalogCacheRefreshRequired;
+struct PlanExecutorShardingState {
+    /**
+     * If a plan yielded because it encountered a sharding critical section, 'criticalSectionFuture'
+     * will be set to a future that becomes ready when the critical section ends. This future can be
+     * waited on to hold off resuming the plan execution while the critical section is still active.
+     */
+    boost::optional<SharedSemiFuture<void>> criticalSectionFuture;
+    /**
+     * If a plan yielded because it needed to refresh a sharding catalog cache, then
+     * 'catalogCacheRefreshRequired' will be set to the nss for which the CatalogCache needs to be
+     * refreshed.
+     */
+    boost::optional<NamespaceString> catalogCacheRefreshRequired;
+};
+
+extern const OperationContext::Decoration<PlanExecutorShardingState> planExecutorShardingState;
 
 /**
  * A PlanExecutor is the abstraction that knows how to crank a tree of stages into execution.

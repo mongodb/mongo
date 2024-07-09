@@ -282,11 +282,11 @@ void doYield(OperationContext* opCtx) {
     // busy spinning immediately and encountering the same critical section again. It is important
     // that this wait happens after having released the lock hierarchy -- otherwise deadlocks could
     // happen, or the very least, locks would be unnecessarily held while waiting.
-    const auto& shardingCriticalSection = planExecutorShardingCriticalSectionFuture(opCtx);
+    const auto& shardingCriticalSection = planExecutorShardingState(opCtx).criticalSectionFuture;
     if (shardingCriticalSection) {
         OperationShardingState::waitForCriticalSectionToComplete(opCtx, *shardingCriticalSection)
             .ignore();
-        planExecutorShardingCriticalSectionFuture(opCtx).reset();
+        planExecutorShardingState(opCtx).criticalSectionFuture.reset();
     }
 }
 }  // namespace
