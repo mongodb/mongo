@@ -103,6 +103,12 @@ IndexCmpResult cmpIndexAssignments(const OneIndexAssignment& a1,
         return kNotInterchangeable;
     }
 
+    // If both indexes are multikey, fall back to multiplanning, since we can't tell which is better
+    // purely by length. TODO SERVER-86639: make this more granular.
+    if (index1.multikey && index2.multikey) {
+        return kNotInterchangeable;
+    }
+
     // Now we check that the same predicates are used in the scan, in the same positions.
     if (a1.preds.size() != a2.preds.size()) {
         return kNotInterchangeable;
@@ -154,11 +160,15 @@ IndexCmpResult cmpIndexAssignments(const OneIndexAssignment& a1,
         }
     }
 
-    // If we made it here they are dups. We prefer the smaller key pattern.
-    if (index1.keyPattern.nFields() < index2.keyPattern.nFields()) {
-        return kInterchangeableShorter;
+    // If we made it here they are dups. We prefer the smaller key pattern; however:
+    //  - If the shorter index is multikey, we should still multiplan.
+    //  - If there is a tie, we prefer the non-multikey index.
+    if (index1.keyPattern.nFields() == index2.keyPattern.nFields()) {
+        return index2.multikey ? kInterchangeableShorter : kInterchangeableLonger;
+    } else if (index1.keyPattern.nFields() < index2.keyPattern.nFields()) {
+        return index1.multikey ? kNotInterchangeable : kInterchangeableShorter;
     }
-    return kInterchangeableLonger;
+    return index2.multikey ? kNotInterchangeable : kInterchangeableLonger;
 };
 
 /*
