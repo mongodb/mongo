@@ -188,14 +188,15 @@ public:
 
         uassertStatusOK(status.getStatus());
 
-        int64_t bytesFreed = status.getValue();
-        if (bytesFreed < 0) {
+        int64_t bytesForCompact = status.getValue();
+        if (bytesForCompact < 0) {
             // When compacting a collection that is actively being written to, it is possible that
             // the collection is larger at the completion of compaction than when it started.
-            bytesFreed = 0;
+            bytesForCompact = 0;
         }
 
-        result.appendNumber("bytesFreed", static_cast<long long>(bytesFreed));
+        result.appendNumber(options.dryRun ? "estimatedBytesFreed" : "bytesFreed",
+                            static_cast<long long>(bytesForCompact));
 
         return true;
     }
