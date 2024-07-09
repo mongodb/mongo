@@ -1611,8 +1611,8 @@ ShardMergeRecipientService::Instance::_fetchRetryableWritesOplogBeforeStartOpTim
 
         if (retryableWritesEntries.size() != 0) {
             // Wait for enough space.
-            _donorOplogBuffer->waitForSpace(
-                opCtx.get(), toApplyDocumentBytes, toApplyDocumentCount);
+            _donorOplogBuffer->waitForSpace(opCtx.get(),
+                                            {toApplyDocumentBytes, toApplyDocumentCount});
             // Buffer retryable writes entries.
             _donorOplogBuffer->preload(
                 opCtx.get(), retryableWritesEntries.begin(), retryableWritesEntries.end());
@@ -1750,7 +1750,8 @@ Status ShardMergeRecipientService::Instance::_enqueueDocuments(
     if (info.toApplyDocumentCount != 0) {
         auto opCtx = cc().makeOperationContext();
         // Buffer docs for later application.
-        _donorOplogBuffer->push(opCtx.get(), begin, end, info.toApplyDocumentBytes);
+        OplogBuffer::Cost cost{info.toApplyDocumentBytes, info.toApplyDocumentCount};
+        _donorOplogBuffer->push(opCtx.get(), begin, end, cost);
     }
 
     return Status::OK();

@@ -2159,7 +2159,8 @@ Status InitialSyncer::_enqueueDocuments(OplogFetcher::Documents::const_iterator 
     invariant(_oplogBuffer);
 
     // Buffer docs for later application.
-    _oplogApplier->enqueue(makeOpCtx().get(), begin, end, info.toApplyDocumentBytes);
+    OplogBuffer::Cost cost{info.toApplyDocumentBytes, info.toApplyDocumentCount};
+    _oplogApplier->enqueue(makeOpCtx().get(), begin, end, cost);
 
     _lastFetched = info.lastDocument;
 

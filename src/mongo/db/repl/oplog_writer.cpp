@@ -71,14 +71,14 @@ bool OplogWriter::inShutdown() const {
     return _inShutdown;
 }
 
-void OplogWriter::waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count) {
-    _writeBuffer->waitForSpace(opCtx, size, count);
+void OplogWriter::waitForSpace(OperationContext* opCtx, const OplogBuffer::Cost& cost) {
+    _writeBuffer->waitForSpace(opCtx, cost);
 }
 
 void OplogWriter::enqueue(OperationContext* opCtx,
                           OplogBuffer::Batch::const_iterator begin,
                           OplogBuffer::Batch::const_iterator end,
-                          boost::optional<std::size_t> bytes) {
+                          const OplogBuffer::Cost& cost) {
     static Occasionally sampler;
     if (sampler.tick()) {
         LOGV2_DEBUG(8569804,
@@ -86,7 +86,7 @@ void OplogWriter::enqueue(OperationContext* opCtx,
                     "Oplog write buffer size",
                     "oplogWriteBufferSizeBytes"_attr = _writeBuffer->getSize());
     }
-    _writeBuffer->push(opCtx, begin, end, bytes);
+    _writeBuffer->push(opCtx, begin, end, cost);
 }
 
 const OplogWriter::Options& OplogWriter::getOptions() const {

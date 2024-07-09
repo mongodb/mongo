@@ -70,29 +70,21 @@ void OplogBufferProxy::shutdown(OperationContext* opCtx) {
 void OplogBufferProxy::push(OperationContext* opCtx,
                             Batch::const_iterator begin,
                             Batch::const_iterator end,
-                            boost::optional<std::size_t> bytes) {
+                            boost::optional<const Cost&> cost) {
     if (begin == end) {
         return;
     }
     stdx::lock_guard<Latch> lk(_lastPushedMutex);
     _lastPushed = *(end - 1);
-    _target->push(opCtx, begin, end, bytes);
+    _target->push(opCtx, begin, end, cost);
 }
 
-void OplogBufferProxy::waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count) {
-    _target->waitForSpace(opCtx, size, count);
+void OplogBufferProxy::waitForSpace(OperationContext* opCtx, const Cost& cost) {
+    _target->waitForSpace(opCtx, cost);
 }
 
 bool OplogBufferProxy::isEmpty() const {
     return _target->isEmpty();
-}
-
-std::size_t OplogBufferProxy::getMaxSize() const {
-    return _target->getMaxSize();
-}
-
-std::size_t OplogBufferProxy::getMaxCount() const {
-    return _target->getMaxCount();
 }
 
 std::size_t OplogBufferProxy::getSize() const {

@@ -1319,7 +1319,8 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
 
         if (retryableWritesEntries.size() != 0) {
             // Wait for enough space.
-            donorOplogBuffer->waitForSpace(opCtx.get(), toApplyDocumentBytes, toApplyDocumentCount);
+            donorOplogBuffer->waitForSpace(opCtx.get(),
+                                           {toApplyDocumentBytes, toApplyDocumentCount});
             // Buffer retryable writes entries.
             donorOplogBuffer->preload(
                 opCtx.get(), retryableWritesEntries.begin(), retryableWritesEntries.end());
@@ -1474,7 +1475,8 @@ Status TenantMigrationRecipientService::Instance::_enqueueDocuments(
     auto opCtx = cc().makeOperationContext();
     if (info.toApplyDocumentCount != 0) {
         // Buffer docs for later application.
-        donorOplogBuffer->push(opCtx.get(), begin, end, info.toApplyDocumentBytes);
+        OplogBuffer::Cost cost{info.toApplyDocumentBytes, info.toApplyDocumentCount};
+        donorOplogBuffer->push(opCtx.get(), begin, end, cost);
     }
 
     if (info.resumeToken.isNull()) {
@@ -1505,7 +1507,8 @@ Status TenantMigrationRecipientService::Instance::_enqueueDocuments(
     noopEntry.setWallClockTime({});
 
     OplogBuffer::Batch noopVec = {noopEntry.toBSON()};
-    donorOplogBuffer->push(opCtx.get(), noopVec.cbegin(), noopVec.cend(), boost::none);
+    OplogBuffer::Cost cost{static_cast<std::size_t>(noopVec[0].objsize()), 1};
+    donorOplogBuffer->push(opCtx.get(), noopVec.cbegin(), noopVec.cend(), cost);
     return Status::OK();
 }
 

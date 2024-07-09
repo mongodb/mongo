@@ -44,7 +44,7 @@ void OplogBufferBatchedQueue::startup(OperationContext*) {
     invariant(!_isShutdown);
     // Update server status metric to reflect the current oplog buffer's max size.
     if (_counters) {
-        _counters->setMaxSize(getMaxSize());
+        _counters->setMaxSize(_maxSize);
     }
 }
 
@@ -63,14 +63,14 @@ void OplogBufferBatchedQueue::shutdown(OperationContext* opCtx) {
 void OplogBufferBatchedQueue::push(OperationContext*,
                                    Batch::const_iterator begin,
                                    Batch::const_iterator end,
-                                   boost::optional<std::size_t> bytes) {
+                                   boost::optional<const Cost&> cost) {
     if (begin == end) {
         return;
     }
 
-    invariant(bytes);
-    auto size = *bytes;
-    auto count = std::distance(begin, end);
+    invariant(cost);
+    auto size = cost->size;
+    auto count = cost->count;
 
     {
         stdx::unique_lock<Latch> lk(_mutex);
@@ -99,26 +99,16 @@ void OplogBufferBatchedQueue::push(OperationContext*,
     }
 }
 
-void OplogBufferBatchedQueue::waitForSpace(OperationContext* opCtx,
-                                           std::size_t size,
-                                           std::size_t count) {
+void OplogBufferBatchedQueue::waitForSpace(OperationContext* opCtx, const Cost& cost) {
     stdx::unique_lock<Latch> lk(_mutex);
     // This buffer has no limit for count.
-    _waitForSpace_inlock(lk, size);
+    _waitForSpace_inlock(lk, cost.size);
 }
 
 bool OplogBufferBatchedQueue::isEmpty() const {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(!_curCount == _queue.empty());
     return !_curCount;
-}
-
-std::size_t OplogBufferBatchedQueue::getMaxSize() const {
-    return _maxSize;
-}
-
-std::size_t OplogBufferBatchedQueue::getMaxCount() const {
-    return 0;
 }
 
 std::size_t OplogBufferBatchedQueue::getSize() const {

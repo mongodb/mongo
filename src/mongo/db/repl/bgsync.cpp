@@ -642,15 +642,14 @@ Status BackgroundSync::_enqueueDocuments(OplogFetcher::Documents::const_iterator
     }
 
     auto opCtx = cc().makeOperationContext();
+    OplogBuffer::Cost cost{info.toApplyDocumentBytes, info.toApplyDocumentCount};
 
     // Wait for enough space.
     // This should be called outside of the mutex to avoid deadlocks.
     if (_oplogWriter) {
-        _oplogWriter->waitForSpace(
-            opCtx.get(), info.toApplyDocumentBytes, info.toApplyDocumentCount);
+        _oplogWriter->waitForSpace(opCtx.get(), cost);
     } else {
-        _oplogApplier->waitForSpace(
-            opCtx.get(), info.toApplyDocumentBytes, info.toApplyDocumentCount);
+        _oplogApplier->waitForSpace(opCtx.get(), cost);
     }
 
     {
@@ -664,9 +663,9 @@ Status BackgroundSync::_enqueueDocuments(OplogFetcher::Documents::const_iterator
         // Buffer docs for later application.
         // When _oplogWriter is not null, featureFlagReduceMajorityWriteLatency is enabled.
         if (_oplogWriter) {
-            _oplogWriter->enqueue(opCtx.get(), begin, end, info.toApplyDocumentBytes);
+            _oplogWriter->enqueue(opCtx.get(), begin, end, cost);
         } else {
-            _oplogApplier->enqueue(opCtx.get(), begin, end, info.toApplyDocumentBytes);
+            _oplogApplier->enqueue(opCtx.get(), begin, end, cost);
         }
 
         // Update last fetched info.

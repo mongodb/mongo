@@ -70,22 +70,16 @@ public:
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
               Batch::const_iterator end,
-              boost::optional<std::size_t> bytes) override {
+              boost::optional<const Cost&> cost) override {
         for (auto i = begin; i != end; ++i) {
             values.push_back(*i);
         }
     }
-    void waitForSpace(OperationContext*, std::size_t, std::size_t count) override {
+    void waitForSpace(OperationContext*, const Cost& cost) override {
         waitForSpaceCalled = true;
     }
     bool isEmpty() const override {
         return values.empty();
-    }
-    std::size_t getMaxSize() const override {
-        return maxSize;
-    }
-    std::size_t getMaxCount() const override {
-        return maxCount;
     }
     std::size_t getSize() const override {
         std::size_t totalSize = 0;
@@ -202,15 +196,8 @@ TEST_F(OplogBufferProxyTest, ShutdownResetsCachedValues) {
 }
 
 TEST_F(OplogBufferProxyTest, WaitForSpace) {
-    _proxy->waitForSpace(_opCtx, 100U, 1U);
+    _proxy->waitForSpace(_opCtx, {100U, 1U});
     ASSERT_TRUE(_mock->waitForSpaceCalled);
-}
-
-TEST_F(OplogBufferProxyTest, MaxSizeCount) {
-    _mock->maxSize = 8888U;
-    _mock->maxCount = 6666U;
-    ASSERT_EQUALS(_mock->maxSize, _proxy->getMaxSize());
-    ASSERT_EQUALS(_mock->maxCount, _proxy->getMaxCount());
 }
 
 TEST_F(OplogBufferProxyTest, EmptySizeAndCount) {
