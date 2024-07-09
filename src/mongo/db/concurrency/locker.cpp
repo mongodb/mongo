@@ -1008,9 +1008,6 @@ bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadl
             return false;
         }
 
-        // TODO(SERVER-88732): Remove `_timeQueuedForTicketMicros` when we only track admission
-        // context for waiting metrics.
-        _timeQueuedForTicketMicros = ExecutionAdmissionContext::get(opCtx).totalTimeQueuedMicros();
         restoreStateOnErrorGuard.dismiss();
     }
 

@@ -82,7 +82,8 @@ for (let i = 0; i < queuedReaders.length; i++) {
     queuedReaders[i]();
 }
 
-const predicate = new RegExp(`Slow query.*"${coll}.*"ticketWaitMillis"`);
+const predicate = new RegExp(
+    `Slow query.*"${coll}.*"queues".*"execution":{"admissions":\\d+,"totalTimeQueuedMicros":\\d+}`);
 assert(checkLog.checkContainsOnce(primary, predicate),
        "Could not find log containing " + predicate);
 

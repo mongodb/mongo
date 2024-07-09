@@ -65,9 +65,19 @@ int64_t addWaitForLock(OperationContext* opCtx,
     return stats.get(resId, MODE_S).combinedWaitTimeMicros;
 }
 
+void addTicketQueueTime(ExecutionAdmissionContext* admCtx,
+                        TickSourceMock<Microseconds>* tickSource,
+                        Milliseconds& executionTime,
+                        Milliseconds waitForTickets) {
+    WaitingForAdmissionGuard waitForAdmission(admCtx, tickSource);
+    tickSource->advance(waitForTickets);
+    executionTime += waitForTickets;
+}
+
 TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
     auto opCtx = makeOperationContext();
     auto curop = CurOp::get(*opCtx);
+    auto* admCtx = &ExecutionAdmissionContext::get(opCtx.get());
 
     Milliseconds executionTime = Milliseconds(512);
     Milliseconds waitForTickets = Milliseconds(2);
@@ -87,7 +97,7 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
 
     // Check that workingTimeMillis correctly accounts for ticket wait time
     auto locker = shard_role_details::getLocker(opCtx.get());
-    locker->addTicketQueueTime(waitForTickets);
+    addTicketQueueTime(admCtx, tickSourceMock.get(), executionTime, waitForTickets);
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     ASSERT_EQ(curop->debug().workingTimeMillis, executionTime - waitForTickets);
 
@@ -115,6 +125,8 @@ TEST_F(CurOpStatsTest, UnstashingAndStashingTransactionResource) {
     auto opCtx2 = client2->makeOperationContext();
     auto curop1 = CurOp::get(*opCtx1);
     auto curop2 = CurOp::get(*opCtx2);
+    auto* admCtx1 = &ExecutionAdmissionContext::get(opCtx1.get());
+    auto* admCtx2 = &ExecutionAdmissionContext::get(opCtx2.get());
 
     auto tickSourceMock = std::make_unique<TickSourceMock<Microseconds>>();
     // The tick source is initialized to a non-zero value as CurOp equates a value of 0 with a
@@ -139,16 +151,16 @@ TEST_F(CurOpStatsTest, UnstashingAndStashingTransactionResource) {
 
     // Check that ticket wait time on curop1 is not reported on curop2.
     Milliseconds waitForTickets = Milliseconds(2);
-    auto lockerOp1 = shard_role_details::getLocker(opCtx1.get());
-    lockerOp1->addTicketQueueTime(waitForTickets);
+    addTicketQueueTime(admCtx1, tickSourceMock.get(), executionTime, waitForTickets);
     curop1->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     curop2->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
-    ASSERT_EQ(lockerOp1->getTimeQueuedForTicketMicros(), waitForTickets);
+    ASSERT_EQ(admCtx1->totalTimeQueuedMicros(), waitForTickets);
     ASSERT_EQ(curop1->debug().workingTimeMillis, executionTime - waitForTickets);
     ASSERT_EQ(curop2->debug().workingTimeMillis, executionTime);
 
     // Check that flow control ticket wait time on curop1 is not reported on curop2.
     Milliseconds waitForFlowControlTicket = Milliseconds(32);
+    auto lockerOp1 = shard_role_details::getLocker(opCtx1.get());
     lockerOp1->addFlowControlTicketQueueTime(waitForFlowControlTicket);
     curop1->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     curop2->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
@@ -184,22 +196,21 @@ TEST_F(CurOpStatsTest, UnstashingAndStashingTransactionResource) {
               executionTime - waitForTickets - waitForFlowControlTicket -
                   duration_cast<Milliseconds>(Microseconds(waitForLocks)));
 
-    // Simulate unstashing transaction resources to opCtx2. Check that ticket and lock wait time on
+    // Simulate unstashing transaction resources to opCtx2. Check that lock wait time on
     // unstashed locker is not considered blocked for opCtx2.
     shard_role_details::swapLocker(opCtx2.get(), std::move(locker));
     auto lockerOp2 = shard_role_details::getLocker(opCtx2.get());
     curop2->updateStatsOnTransactionUnstash();
     curop2->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
-    ASSERT_EQ(lockerOp2->getTimeQueuedForTicketMicros(), waitForTickets);
     ASSERT_EQ(lockerOp2->getLockerInfo(boost::none).stats.getCumulativeWaitTimeMicros(),
               waitForLocks);
     ASSERT_EQ(curop2->debug().workingTimeMillis, executionTime);
 
     // Check that workingTimeMillis correctly accounts for ticket wait duration on opCtx2.
     Milliseconds waitForTicketsOnOp2 = Milliseconds(8);
-    lockerOp2->addTicketQueueTime(waitForTicketsOnOp2);
+    addTicketQueueTime(admCtx2, tickSourceMock.get(), executionTime, waitForTicketsOnOp2);
     curop2->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
-    ASSERT_EQ(lockerOp2->getTimeQueuedForTicketMicros(), waitForTickets + waitForTicketsOnOp2);
+    ASSERT_EQ(admCtx2->totalTimeQueuedMicros(), waitForTicketsOnOp2);
     ASSERT_EQ(curop2->debug().workingTimeMillis, executionTime - waitForTicketsOnOp2);
 
     // Check that workingTimeMillis correctly accounts for flow control ticket wait duration on
@@ -248,6 +259,7 @@ TEST_F(CurOpStatsTest, UnstashingAndStashingTransactionResource) {
 TEST_F(CurOpStatsTest, CheckWorkingMillisWithBlockedTimeAtStart) {
     auto opCtx = makeOperationContext();
     auto curop = CurOp::get(*opCtx);
+    auto* admCtx = &ExecutionAdmissionContext::get(opCtx.get());
 
     Milliseconds executionTime = Milliseconds(512);
     Milliseconds waitForTickets = Milliseconds(2);
@@ -262,8 +274,8 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisWithBlockedTimeAtStart) {
     // Add blocked time before curop timer starts.
     auto locker = shard_role_details::getLocker(opCtx.get());
 
-    locker->addTicketQueueTime(waitForTickets);
-    ASSERT_EQ(locker->getTimeQueuedForTicketMicros(), waitForTickets);
+    addTicketQueueTime(admCtx, tickSourceMock.get(), executionTime, waitForTickets);
+    ASSERT_EQ(admCtx->totalTimeQueuedMicros(), waitForTickets);
 
     locker->addFlowControlTicketQueueTime(waitForFlowControlTicket);
     ASSERT_EQ(duration_cast<Milliseconds>(
@@ -285,7 +297,7 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisWithBlockedTimeAtStart) {
     ASSERT_EQ(curop->debug().workingTimeMillis, executionTime);
 
     // Add blocked time after timer starts.
-    locker->addTicketQueueTime(waitForTickets);
+    addTicketQueueTime(admCtx, tickSourceMock.get(), executionTime, waitForTickets);
     locker->addFlowControlTicketQueueTime(waitForFlowControlTicket);
     waitForLocks = addWaitForLock(opCtx.get(), getServiceContext(), locker, Milliseconds(16));
 
@@ -316,27 +328,27 @@ TEST_F(CurOpStatsTest, MultipleUnstashingAndStashingTransaction) {
     // Advance execution time.
     curop1->ensureStarted();
     tickSourceMock->advance(Milliseconds{1000});
-    lockerOp1->addTicketQueueTime(Milliseconds{20});
+    lockerOp1->addFlowControlTicketQueueTime(Milliseconds{20});
 
     // Advance counters while stashed
     curop1->updateStatsOnTransactionStash();
     tickSourceMock->advance(Milliseconds{1000});
-    lockerOp1->addTicketQueueTime(Milliseconds{30});
+    lockerOp1->addFlowControlTicketQueueTime(Milliseconds{30});
     curop1->updateStatsOnTransactionUnstash();
 
     // Advance counters while not stashed
     tickSourceMock->advance(Milliseconds{1000});
-    lockerOp1->addTicketQueueTime(Milliseconds{40});
+    lockerOp1->addFlowControlTicketQueueTime(Milliseconds{40});
 
     // Advance counters while stashed
     curop1->updateStatsOnTransactionStash();
     tickSourceMock->advance(Milliseconds{1000});
-    lockerOp1->addTicketQueueTime(Milliseconds{50});
+    lockerOp1->addFlowControlTicketQueueTime(Milliseconds{50});
     curop1->updateStatsOnTransactionUnstash();
 
     // Advance counters while not stashed
     tickSourceMock->advance(Milliseconds{1000});
-    lockerOp1->addTicketQueueTime(Milliseconds{60});
+    lockerOp1->addFlowControlTicketQueueTime(Milliseconds{60});
     curop1->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
 
     // Verify that 120ms are excluded from 5000 execution time.

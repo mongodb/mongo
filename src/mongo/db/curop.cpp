@@ -201,7 +201,9 @@ private:
         // wait time.
         if (_top) {
             auto locker = shard_role_details::getLocker(opCtx());
-            curOp->_lockerStatsBase = CurOp::getAdditiveLockerStats(locker);
+            const boost::optional<ExecutionAdmissionContext> admCtx =
+                ExecutionAdmissionContext::get(opCtx());
+            curOp->_resourceStatsBase = CurOp::getAdditiveResourceStats(locker, admCtx);
         }
 
         _top = curOp;
@@ -437,8 +439,7 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
         // no harm in recording it since we've already computed the value.
         metrics.executionTime = elapsed;
         metrics.clusterWorkingTime = metrics.clusterWorkingTime.value_or(Milliseconds(0)) +
-            (duration_cast<Milliseconds>(
-                elapsed - (std::get<0>(_getAndSumBlockedTimeTotal()) - _blockedTimeAtStart)));
+            (duration_cast<Milliseconds>(elapsed - (_sumBlockedTimeTotal() - _blockedTimeAtStart)));
 
         try {
             // If we need them, try to fetch the storage stats. We use an unlimited timeout here,
@@ -490,10 +491,10 @@ void CurOp::updateStatsOnTransactionUnstash() {
     // accrued outside of this CurOp instance so we will ignore/subtract them when reporting on this
     // operation.
     auto locker = shard_role_details::getLocker(opCtx());
-    if (!_lockerStatsBase) {
-        _lockerStatsBase.emplace();
+    if (!_resourceStatsBase) {
+        _resourceStatsBase.emplace();
     }
-    _lockerStatsBase->append(getAdditiveLockerStats(locker));
+    _resourceStatsBase->addForUnstash(getAdditiveResourceStats(locker, boost::none));
 }
 
 void CurOp::updateStatsOnTransactionStash() {
@@ -502,10 +503,10 @@ void CurOp::updateStatsOnTransactionStash() {
     // the snapshot of locker stats when it was unstashed. This stats delta on stashing is added
     // when reporting on this operation.
     auto locker = shard_role_details::getLocker(opCtx());
-    if (!_lockerStatsBase) {
-        _lockerStatsBase.emplace();
+    if (!_resourceStatsBase) {
+        _resourceStatsBase.emplace();
     }
-    _lockerStatsBase->subtract(getAdditiveLockerStats(locker));
+    _resourceStatsBase->subtractForStash(getAdditiveResourceStats(locker, boost::none));
 }
 
 void CurOp::setNS_inlock(NamespaceString nss) {
@@ -528,7 +529,7 @@ TickSource::Tick CurOp::startTime() {
         _cpuTimer->start();
     }
 
-    std::tie(_blockedTimeAtStart, std::ignore) = _getAndSumBlockedTimeTotal();
+    _blockedTimeAtStart = _sumBlockedTimeTotal();
 
     // The '_start' value is initialized to 0 and gets assigned on demand the first time it gets
     // accessed. The above thread ownership requirement ensures that there will never be
@@ -561,22 +562,20 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
     return _tickSource->ticksTo<Microseconds>(endTime - startTime);
 }
 
-std::tuple<Milliseconds, Milliseconds> CurOp::_getAndSumBlockedTimeTotal() {
+Milliseconds CurOp::_sumBlockedTimeTotal() {
     auto locker = shard_role_details::getLocker(opCtx());
     auto cumulativeLockWaitTime = Microseconds(locker->stats().getCumulativeWaitTimeMicros());
-    auto timeQueuedForTickets = locker->getTimeQueuedForTicketMicros();
+    auto timeQueuedForTickets = ExecutionAdmissionContext::get(opCtx()).totalTimeQueuedMicros();
     auto timeQueuedForFlowControl = Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
 
-    if (_lockerStatsBase) {
-        cumulativeLockWaitTime -= _lockerStatsBase->cumulativeLockWaitTime;
-        timeQueuedForTickets -= _lockerStatsBase->timeQueuedForTickets;
-        timeQueuedForFlowControl -= _lockerStatsBase->timeQueuedForFlowControl;
+    if (_resourceStatsBase) {
+        cumulativeLockWaitTime -= _resourceStatsBase->cumulativeLockWaitTime;
+        timeQueuedForTickets -= _resourceStatsBase->timeQueuedForTickets;
+        timeQueuedForFlowControl -= _resourceStatsBase->timeQueuedForFlowControl;
     }
 
-    return std::make_pair(duration_cast<Milliseconds>(cumulativeLockWaitTime +
-                                                      timeQueuedForTickets +
-                                                      timeQueuedForFlowControl),
-                          duration_cast<Milliseconds>(timeQueuedForTickets));
+    return duration_cast<Milliseconds>(cumulativeLockWaitTime + timeQueuedForTickets +
+                                       timeQueuedForFlowControl);
 }
 
 void CurOp::enter_inlock(NamespaceString nss, int dbProfileLevel) {
@@ -635,10 +634,8 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         oplogGetMoreStats.recordMillis(executionTimeMillis);
     }
 
-    Milliseconds totalBlockedTime;
-    std::tie(totalBlockedTime, _debug.waitForTicketDurationMillis) = _getAndSumBlockedTimeTotal();
     auto workingMillis =
-        Milliseconds(executionTimeMillis) - (totalBlockedTime - _blockedTimeAtStart);
+        Milliseconds(executionTimeMillis) - (_sumBlockedTimeTotal() - _blockedTimeAtStart);
     // Round up to zero if necessary to allow precision errors from FastClockSource used by flow
     // control ticketholder.
     _debug.workingTimeMillis = (workingMillis < Milliseconds(0) ? Milliseconds(0) : workingMillis);
@@ -1042,28 +1039,31 @@ void CurOp::reportState(BSONObjBuilder* builder,
     }
 }
 
-CurOp::AdditiveLockerStats CurOp::getAdditiveLockerStats(const Locker* locker) {
-    CurOp::AdditiveLockerStats stats;
+CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats(
+    const Locker* locker, const boost::optional<ExecutionAdmissionContext>& admCtx) {
+    CurOp::AdditiveResourceStats stats;
     stats.lockStats = locker->stats();
     stats.cumulativeLockWaitTime = Microseconds(stats.lockStats.getCumulativeWaitTimeMicros());
-    stats.timeQueuedForTickets = locker->getTimeQueuedForTicketMicros();
     stats.timeQueuedForFlowControl =
         Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
+    if (admCtx != boost::none) {
+        stats.timeQueuedForTickets = admCtx->totalTimeQueuedMicros();
+    }
     return stats;
 }
 
-void CurOp::AdditiveLockerStats::append(const CurOp::AdditiveLockerStats& other) {
+void CurOp::AdditiveResourceStats::addForUnstash(const CurOp::AdditiveResourceStats& other) {
     lockStats.append(other.lockStats);
     cumulativeLockWaitTime += other.cumulativeLockWaitTime;
-    timeQueuedForTickets += other.timeQueuedForTickets;
     timeQueuedForFlowControl += other.timeQueuedForFlowControl;
+    // timeQueuedForTickets is intentionally excluded as it is tracked separately
 }
 
-void CurOp::AdditiveLockerStats::subtract(const CurOp::AdditiveLockerStats& other) {
+void CurOp::AdditiveResourceStats::subtractForStash(const CurOp::AdditiveResourceStats& other) {
     lockStats.subtract(other.lockStats);
     cumulativeLockWaitTime -= other.cumulativeLockWaitTime;
-    timeQueuedForTickets -= other.timeQueuedForTickets;
     timeQueuedForFlowControl -= other.timeQueuedForFlowControl;
+    // timeQueuedForTickets is intentionally excluded as it is tracked separately
 }
 
 namespace {
@@ -1299,12 +1299,6 @@ void OpDebug::report(OperationContext* opCtx,
         }
     }
 
-    if (gFeatureFlagLogSlowOpsBasedOnTimeWorking.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        waitForTicketDurationMillis > Milliseconds::zero()) {
-        pAttrs->add("ticketWaitMillis", waitForTicketDurationMillis.count());
-    }
-
     if (lockStats) {
         BSONObjBuilder locks;
         lockStats->report(&locks);
@@ -1384,9 +1378,13 @@ void OpDebug::report(OperationContext* opCtx,
     for (auto&& [queueName, lookup] : gQueueMetricsRegistry) {
         AdmissionContext* admCtx = lookup(opCtx);
         BSONObjBuilder bb;
-        bb.append("admissions", admCtx->getAdmissions());
-        bb.append("totalTimeQueuedMicros",
-                  durationCount<Microseconds>(admCtx->totalTimeQueuedMicros()));
+        if (auto admissions = admCtx->getAdmissions(); admissions > 0) {
+            bb.append("admissions", admissions);
+        }
+        if (auto queued = durationCount<Microseconds>(admCtx->totalTimeQueuedMicros());
+            queued > 0) {
+            bb.append("totalTimeQueuedMicros", queued);
+        }
         queuesBuilder.append(queueName, bb.obj());
     }
 
