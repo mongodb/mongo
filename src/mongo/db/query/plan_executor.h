@@ -132,6 +132,14 @@ extern const OperationContext::Decoration<boost::optional<SharedSemiFuture<void>
     planExecutorShardingCriticalSectionFuture;
 
 /**
+ * If a plan yielded because it needed to refresh a sharding catalog cache, then
+ * 'planExecutorShardingCatalogCacheRefreshRequired' will be set to the nss for which the
+ * CatalogCache needs to be refreshed.
+ */
+extern const OperationContext::Decoration<boost::optional<NamespaceString>>
+    planExecutorShardingCatalogCacheRefreshRequired;
+
+/**
  * A PlanExecutor is the abstraction that knows how to crank a tree of stages into execution.
  * The executor is usually part of a larger abstraction that is interacting with the cache
  * and/or the query optimizer.

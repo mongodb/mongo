@@ -93,7 +93,8 @@ reshardingTest.withReshardingInBackground(  //
                 assert.commandFailedWithCode(res, [
                     ErrorCodes.StaleConfig,
                     ErrorCodes.NoSuchTransaction,
-                    ErrorCodes.ShardCannotRefreshDueToLocksHeld
+                    ErrorCodes.ShardCannotRefreshDueToLocksHeld,
+                    ErrorCodes.WriteConflict,
                 ]);
                 return false;
             },
@@ -125,10 +126,12 @@ reshardingTest.withReshardingInBackground(  //
                 assert.commandFailedWithCode(res, [
                     ErrorCodes.NoSuchTransaction,
                     ErrorCodes.ShardCannotRefreshDueToLocksHeld,
-                    ErrorCodes.NoSuchTransaction
+                    ErrorCodes.NoSuchTransaction,
+                    ErrorCodes.WriteConflict,
                 ]);
             } else {
-                assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
+                assert.commandFailedWithCode(
+                    res, [ErrorCodes.NoSuchTransaction, ErrorCodes.WriteConflict]);
             }
             session.abortTransaction();
             return false;

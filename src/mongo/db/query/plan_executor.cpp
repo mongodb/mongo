@@ -51,6 +51,10 @@ const OperationContext::Decoration<boost::optional<SharedSemiFuture<void>>>
     planExecutorShardingCriticalSectionFuture =
         OperationContext::declareDecoration<boost::optional<SharedSemiFuture<void>>>();
 
+const OperationContext::Decoration<boost::optional<NamespaceString>>
+    planExecutorShardingCatalogCacheRefreshRequired =
+        OperationContext::declareDecoration<boost::optional<NamespaceString>>();
+
 std::string PlanExecutor::stateToStr(ExecState execState) {
     switch (execState) {
         case PlanExecutor::ADVANCED:
