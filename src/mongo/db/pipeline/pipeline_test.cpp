@@ -42,6 +42,8 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
@@ -90,6 +92,25 @@ void setMockReplicationCoordinatorOnOpCtx(OperationContext* opCtx) {
     repl::ReplicationCoordinator::set(
         opCtx->getServiceContext(),
         std::make_unique<repl::ReplicationCoordinatorMock>(opCtx->getServiceContext()));
+}
+
+DocumentSource* getStageAtPos(const Pipeline::SourceContainer& stages, int pos) {
+    if (pos >= 0) {
+        auto it = stages.begin();
+        std::advance(it, pos);
+        return (*it).get();
+    } else {
+        auto it = stages.rbegin();
+        std::advance(
+            it,
+            -pos - 1);  // Subtract 1 because rbegin() points to the element before the last one.
+        return (*it).get();
+    }
+}
+
+template <typename T>
+void assertStageAtPos(const Pipeline::SourceContainer& stages, int pos) {
+    ASSERT(dynamic_cast<T*>(getStageAtPos(stages, pos)));
 }
 
 namespace Optimizations {
@@ -3105,155 +3126,171 @@ TEST(PipelineOptimizationTest, MatchOnFmodShouldSwapWithAdjacentStage) {
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
-TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
-    QueryTestServiceContext testServiceContext;
-    auto opCtx = testServiceContext.makeOperationContext();
+class ChangeStreamPipelineOptimizationTest : public ServiceContextTest {
+public:
+    struct ExpressionContextOptionsStruct {
+        bool inMongos;
+    };
 
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(kTestNss));
-    expCtx->opCtx = opCtx.get();
-    expCtx->uuid = UUID::gen();
-    setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
+    ChangeStreamPipelineOptimizationTest()
+        : ChangeStreamPipelineOptimizationTest({.inMongos = false}) {}
 
-    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
-    // filters out newly added events.
-    auto spec = BSON("$changeStream" << BSON(
-                         "fullDocument"
-                         << "updateLookup"
-                         << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true));
-    auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), getChangeStreamStageSize());
+    ChangeStreamPipelineOptimizationTest(ExpressionContextOptionsStruct options) {
+        _opCtx = _testServiceContext.makeOperationContext();
+        _expCtx = make_intrusive<ExpressionContextForTest>(
+            _opCtx.get(),
+            NamespaceString::createNamespaceString_forTest(
+                boost::none, "unittests", "pipeline_test"));
+        _expCtx->opCtx = _opCtx.get();
+        _expCtx->uuid = UUID::gen();
+        _expCtx->inMongos = options.inMongos;
+        setMockReplicationCoordinatorOnOpCtx(_expCtx->opCtx);
+    }
+    BSONObj changestreamStage(const std::string& stageStr) {
+        return fromjson("{$changeStream: " + stageStr + "}");
+    }
+    BSONObj matchStage(const std::string& stageStr) {
+        return fromjson("{$match: " + stageStr + "}");
+    }
+    BSONObj redactStage(const std::string& stageStr) {
+        return fromjson("{$redact: " + stageStr + "}");
+    }
+    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
+        const std::vector<BSONObj>& rawPipeline) {
+        auto pipeline = Pipeline::parse(rawPipeline, _expCtx);
+        return pipeline;
+    }
+
+    static std::string generateEventResumeToken() {
+        ResumeTokenData resumeTokenDataIn{Timestamp{1001, 3},
+                                          ResumeTokenData::kDefaultTokenVersion,
+                                          0,
+                                          UUID::gen(),
+                                          Value(Document{{"operationType", "drop"_sd}})};
+        return ResumeToken(resumeTokenDataIn).toBSON().toString();
+    }
+
+private:
+    QueryTestServiceContext _testServiceContext;
+    ServiceContext::UniqueOperationContext _opCtx;
+    boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
+};
+
+TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookUpSize) {
+    auto pipeline = makePipeline(
+        {changestreamStage("{fullDocument: 'updateLookup', showExpandedEvents: true}")});
+    ASSERT_EQ(pipeline->getSources().size(), getChangeStreamStageSize());
     // Make sure the change lookup is at the end.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamAddPostImage*>(stages.back().get()));
+    assertStageAtPos<DocumentSourceChangeStreamAddPostImage>(pipeline->getSources(), -1 /* pos */);
+}
 
-    auto matchPredicate = BSON("extra"
-                               << "predicate");
-    stages.push_back(DocumentSourceMatch::create(matchPredicate, expCtx));
-    auto pipeline = Pipeline::create(stages, expCtx);
+TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    auto pipeline =
+        makePipeline({changestreamStage("{fullDocument: 'updateLookup', showExpandedEvents: true}"),
+                      matchStage("{extra: 'predicate'}")});
     pipeline->optimizePipeline();
-
     // Make sure the $match stage has swapped before the change look up.
-    ASSERT(
-        dynamic_cast<DocumentSourceChangeStreamAddPostImage*>(pipeline->getSources().back().get()));
+    assertStageAtPos<DocumentSourceChangeStreamAddPostImage>(pipeline->getSources(), -1 /* pos */);
 }
 
-TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage) {
-    QueryTestServiceContext testServiceContext;
-    auto opCtx = testServiceContext.makeOperationContext();
-
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(kTestNss));
-    expCtx->opCtx = opCtx.get();
-    expCtx->uuid = UUID::gen();
-    setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
-
+TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage) {
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
-    // filters out newly added events.
-    auto spec = BSON("$changeStream" << BSON(
-                         "fullDocument"
-                         << "updateLookup"
-                         << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true));
-    auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), getChangeStreamStageSize());
-    // Make sure the change lookup is at the end.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamAddPostImage*>(stages.back().get()));
-
-    stages.push_back(DocumentSourceMatch::create(
-        BSON(DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName << BSONNULL), expCtx));
-    auto pipeline = Pipeline::create(stages, expCtx);
+    // filters out newly added eve
+    auto pipeline =
+        makePipeline({changestreamStage("{fullDocument: 'updateLookup', showExpandedEvents: true}"),
+                      matchStage("{fullDocument: null}")});
     pipeline->optimizePipeline();
-
     // Make sure the $match stage stays at the end.
-    ASSERT(dynamic_cast<DocumentSourceMatch*>(pipeline->getSources().back().get()));
+    assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1 /* pos */);
 }
 
-TEST(PipelineOptimizationTest, FullDocumentBeforeChangeLookupSwapsWithIndependentMatch) {
-    QueryTestServiceContext testServiceContext;
-    auto opCtx = testServiceContext.makeOperationContext();
-
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(kTestNss));
-    expCtx->opCtx = opCtx.get();
-    expCtx->uuid = UUID::gen();
-    setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
-
+TEST_F(ChangeStreamPipelineOptimizationTest, FullDocumentBeforeChangeLookupSize) {
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
-    auto spec = BSON("$changeStream" << BSON(
-                         "fullDocumentBeforeChange"
-                         << "required"
-                         << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true));
-    auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), getChangeStreamStageSize());
+    auto pipeline = makePipeline(
+        {changestreamStage("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}")});
+    ASSERT_EQ(pipeline->getSources().size(), getChangeStreamStageSize());
     // Make sure the pre-image lookup is at the end.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamAddPreImage*>(stages.back().get()));
+    assertStageAtPos<DocumentSourceChangeStreamAddPreImage>(pipeline->getSources(), -1 /* pos */);
+}
 
-    auto matchPredicate = BSON("extra"
-                               << "predicate");
-    stages.push_back(DocumentSourceMatch::create(matchPredicate, expCtx));
-    auto pipeline = Pipeline::create(stages, expCtx);
+TEST_F(ChangeStreamPipelineOptimizationTest,
+       FullDocumentBeforeChangeLookupSwapsWithIndependentMatch) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    auto pipeline = makePipeline(
+        {changestreamStage("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}"),
+         matchStage("{extra: 'predicate'}")});
     pipeline->optimizePipeline();
-
     // Make sure the $match stage has swapped before the change look up.
-    ASSERT(
-        dynamic_cast<DocumentSourceChangeStreamAddPreImage*>(pipeline->getSources().back().get()));
+    assertStageAtPos<DocumentSourceChangeStreamAddPreImage>(pipeline->getSources(), -1 /* pos */);
 }
 
-TEST(PipelineOptimizationTest, FullDocumentBeforeChangeDoesNotSwapWithMatchOnPreImage) {
-    QueryTestServiceContext testServiceContext;
-    auto opCtx = testServiceContext.makeOperationContext();
-
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(kTestNss));
-    expCtx->opCtx = opCtx.get();
-    expCtx->uuid = UUID::gen();
-    setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
-
+TEST_F(ChangeStreamPipelineOptimizationTest,
+       FullDocumentBeforeChangeDoesNotSwapWithMatchOnPreImage) {
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
-    auto spec = BSON("$changeStream" << BSON(
-                         "fullDocumentBeforeChange"
-                         << "required"
-                         << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true));
-    auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), getChangeStreamStageSize());
-    // Make sure the pre-image lookup is at the end.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamAddPreImage*>(stages.back().get()));
-
-    stages.push_back(DocumentSourceMatch::create(
-        BSON(DocumentSourceChangeStreamAddPreImage::kFullDocumentBeforeChangeFieldName << BSONNULL),
-        expCtx));
-    auto pipeline = Pipeline::create(stages, expCtx);
+    auto pipeline = makePipeline(
+        {changestreamStage("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}"),
+         matchStage("{fullDocumentBeforeChange: null}")});
     pipeline->optimizePipeline();
-
     // Make sure the $match stage stays at the end.
-    ASSERT(dynamic_cast<DocumentSourceMatch*>(pipeline->getSources().back().get()));
+    assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1 /* pos */);
 }
 
-TEST(PipelineOptimizationTest, ChangeStreamHandleTopologyChangeSwapsWithRedact) {
-    QueryTestServiceContext testServiceContext;
-    auto opCtx = testServiceContext.makeOperationContext();
+TEST_F(ChangeStreamPipelineOptimizationTest,
+       ChangeStreamEnsureResumeTokenSwapsWithJsonSchemaMatch) {
+    auto pipeline = makePipeline(
+        {changestreamStage("{resumeAfter: " + generateEventResumeToken() + "}"),
+         matchStage(
+             "{$jsonSchema: {properties: {documentKey: {properties: {_id: {enum: [1, 2]}}}}}}")});
 
-    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(kTestNss));
-    expCtx->opCtx = opCtx.get();
-    expCtx->uuid = UUID::gen();
-    expCtx->inMongos = true;  // To enforce the $_internalChangeStreamHandleTopologyChange stage.
-    setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
+    // Assert $match is the last stage before optimization.
+    assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1);
 
-    auto stages = DocumentSourceChangeStream::createFromBson(
-        fromjson("{$changeStream: {showExpandedEvents: true}}").firstElement(), expCtx);
-
-    // Assert that the last stage is $_internalChangeStreamHandleTopologyChange.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamHandleTopologyChange*>(stages.back().get()));
-
-    // Add $redact as the last stage.
-    stages.push_back(DocumentSourceRedact::createFromBson(
-        fromjson("{$redact: '$$PRUNE'}").firstElement(), expCtx));
-
-    auto pipeline = Pipeline::create(stages, expCtx);
     pipeline->optimizePipeline();
 
+    // Assert that $match swaps with $_internalChangeStreamHandleTopologyChange after optimization.
+    assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -2);
+    assertStageAtPos<DocumentSourceChangeStreamEnsureResumeTokenPresent>(pipeline->getSources(),
+                                                                         -1);
+}
+
+// To enforce the $_internalChangeStreamHandleTopologyChange stage.
+class ChangeStreamPipelineOptimizationTestWithMongoS : public ChangeStreamPipelineOptimizationTest {
+public:
+    ChangeStreamPipelineOptimizationTestWithMongoS()
+        : ChangeStreamPipelineOptimizationTest({.inMongos = true}) {}
+};
+
+TEST_F(ChangeStreamPipelineOptimizationTestWithMongoS,
+       ChangeStreamHandleTopologyChangeSwapsWithRedact) {
+    auto pipeline =
+        makePipeline({changestreamStage("{showExpandedEvents: true}"), redactStage("'$$PRUNE'")});
+    pipeline->optimizePipeline();
     // Assert that $redact swaps with $_internalChangeStreamHandleTopologyChange after optimization.
-    ASSERT(dynamic_cast<DocumentSourceRedact*>(
-        std::prev(std::prev(pipeline->getSources().end()))->get()));
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamHandleTopologyChange*>(
-        pipeline->getSources().back().get()));
+    assertStageAtPos<DocumentSourceRedact>(pipeline->getSources(), -2 /* pos */);
+    assertStageAtPos<DocumentSourceChangeStreamHandleTopologyChange>(pipeline->getSources(),
+                                                                     -1 /* pos */);
+}
+
+TEST_F(ChangeStreamPipelineOptimizationTestWithMongoS,
+       ChangeStreamHandleTopologyChangeSwapsWithJsonSchemaMatch) {
+    auto pipeline = makePipeline(
+        {changestreamStage("{}"),
+         matchStage(
+             "{$jsonSchema: {properties: {documentKey: {properties: {_id: {enum: [1, 2]}}}}}}")});
+
+    // Assert $match is the last stage before optimization.
+    assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1);
+
+    pipeline->optimizePipeline();
+
+    // Assert that $match swaps with $_internalChangeStreamHandleTopologyChange after optimization.
+    assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -2);
+    assertStageAtPos<DocumentSourceChangeStreamHandleTopologyChange>(pipeline->getSources(), -1);
 }
 
 TEST(PipelineOptimizationTest, SortLimProjLimBecomesTopKSortProj) {
