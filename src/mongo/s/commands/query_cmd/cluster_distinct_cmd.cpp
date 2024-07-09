@@ -131,7 +131,6 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
 
     auto parsedDistinct =
         parsed_distinct_command::parse(expCtx,
-                                       cmdObj,
                                        std::move(distinctCommand),
                                        extensionsCallback,
                                        MatchExpressionParser::kAllowAllSpecialFeatures);

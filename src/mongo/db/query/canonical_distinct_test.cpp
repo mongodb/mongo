@@ -90,7 +90,6 @@ std::unique_ptr<ParsedDistinctCommand> bsonToParsedDistinct(
                          SerializationContext::stateDefault()),
         cmd));
     return parsed_distinct_command::parse(expCtx,
-                                          cmd,
                                           std::move(distinctCommand),
                                           ExtensionsCallbackNoop(),
                                           MatchExpressionParser::kAllowAllSpecialFeatures);

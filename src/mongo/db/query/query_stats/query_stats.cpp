@@ -330,8 +330,9 @@ void registerRequest(OperationContext* opCtx,
     }
 
     if (opDebug.queryStatsInfo.key) {
-        // A find() request may have already registered the shapifier. Ie, it's a find command over
-        // a non-physical collection, eg view, which is implemented by generating an agg pipeline.
+        // A find() or distinct() request may have already registered the shapifier. Ie, it's
+        // a find or distinct command over a non-physical collection, eg view, which is
+        // implemented by generating an agg pipeline.
         LOGV2_DEBUG(7198700,
                     2,
                     "Query stats request shapifier already registered",

@@ -59,8 +59,8 @@ public:
                              SerializationContext::stateDefault()),
             distinct));
 
-        auto parsedDistinct = parsed_distinct_command::parse(
-            expCtx, std::move(distinct), std::move(dcr), ExtensionsCallbackNoop(), {});
+        auto parsedDistinct =
+            parsed_distinct_command::parse(expCtx, std::move(dcr), ExtensionsCallbackNoop(), {});
         return std::make_unique<DistinctKey>(expCtx, *parsedDistinct, collectionType);
     }
 };

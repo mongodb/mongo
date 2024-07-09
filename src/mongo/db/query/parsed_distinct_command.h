@@ -83,7 +83,6 @@ BSONObj getDistinctProjection(const std::string& field);
  */
 std::unique_ptr<ParsedDistinctCommand> parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const BSONObj& cmd,
     std::unique_ptr<DistinctCommandRequest> distinctCommand,
     const ExtensionsCallback& extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures);

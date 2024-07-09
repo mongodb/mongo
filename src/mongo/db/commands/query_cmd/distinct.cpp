@@ -83,6 +83,10 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_shape/distinct_cmd_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_stats/distinct_key.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -116,10 +120,12 @@ namespace {
 
 std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     OperationContext* opCtx,
+    const CollectionOrViewAcquisition& collOrViewAcquisition,
     const NamespaceString& nss,
     const BSONObj& cmdObj,
     const ExtensionsCallback& extensionsCallback,
     const CollatorInterface* defaultCollator,
+    const bool isExplain,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto vts = auth::ValidatedTenancyScope::get(opCtx);
     const auto serializationContext = vts != boost::none
@@ -144,10 +150,18 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
 
     auto parsedDistinct =
         parsed_distinct_command::parse(expCtx,
-                                       cmdObj,
                                        std::move(distinctCommand),
                                        extensionsCallback,
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !isExplain) {
+        query_stats::registerRequest(opCtx, nss, [&]() {
+            return std::make_unique<query_stats::DistinctKey>(
+                expCtx, *parsedDistinct, collOrViewAcquisition.getCollectionType());
+        });
+    }
 
     // TODO: SERVER-73632 Remove feature flag for PM-635.
     // Query settings will only be looked up on mongos and therefore should be part of command body
@@ -333,8 +347,14 @@ public:
             ? collectionOrView->getCollectionPtr()->getDefaultCollator()
             : nullptr;
 
-        auto canonicalQuery = parseDistinctCmd(
-            opCtx, nss, cmdObj, ExtensionsCallbackReal(opCtx, &nss), defaultCollator, verbosity);
+        auto canonicalQuery = parseDistinctCmd(opCtx,
+                                               *collectionOrView,
+                                               nss,
+                                               cmdObj,
+                                               ExtensionsCallbackReal(opCtx, &nss),
+                                               defaultCollator,
+                                               true, /* isExplain */
+                                               verbosity);
 
         if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
@@ -425,8 +445,14 @@ public:
             ? collectionOrView->getCollectionPtr()->getDefaultCollator()
             : nullptr;
 
-        auto canonicalQuery = parseDistinctCmd(
-            opCtx, nss, cmdObj, ExtensionsCallbackReal(opCtx, &nss), defaultCollation, {});
+        auto canonicalQuery = parseDistinctCmd(opCtx,
+                                               *collectionOrView,
+                                               nss,
+                                               cmdObj,
+                                               ExtensionsCallbackReal(opCtx, &nss),
+                                               defaultCollation,
+                                               false, /* isExplain */
+                                               {});
         const CanonicalDistinct& canonicalDistinct = *canonicalQuery->getDistinct();
 
         if (canonicalDistinct.isMirrored()) {
@@ -549,6 +575,14 @@ public:
         }
 
         uassert(31299, "distinct too big, 16mb cap", result.len() < kMaxResponseSize);
+
+        if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            auto* cq = executor->getCanonicalQuery();
+            collectQueryStatsMongod(
+                opCtx, cq->getExpCtx(), std::move(curOp->debug().queryStatsInfo.key));
+        }
+
         return true;
     }
 

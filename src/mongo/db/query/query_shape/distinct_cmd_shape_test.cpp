@@ -52,7 +52,7 @@ BSONObj distinctJsonToShapeBSON(const char* json,
                          SerializationContext::stateDefault()),
         distinct));
     auto pd = parsed_distinct_command::parse(
-        expCtx, std::move(distinct), std::move(distinctCommand), ExtensionsCallbackNoop(), {});
+        expCtx, std::move(distinctCommand), ExtensionsCallbackNoop(), {});
     auto shape = std::make_unique<DistinctCmdShape>(*pd, expCtx);
 
     return shape->toBson(expCtx->opCtx, opts, {});
@@ -69,7 +69,7 @@ QueryShapeHash distinctQueryShapeHash(const char* json,
                          SerializationContext::stateDefault()),
         distinct));
     auto pd = parsed_distinct_command::parse(
-        expCtx, std::move(distinct), std::move(distinctCommand), ExtensionsCallbackNoop(), {});
+        expCtx, std::move(distinctCommand), ExtensionsCallbackNoop(), {});
     auto shape = std::make_unique<DistinctCmdShape>(*pd, expCtx);
 
     return shape->sha256Hash(expCtx->opCtx, {});
@@ -260,7 +260,7 @@ TEST_F(DistinctShapeSizeTest, SizeOfShapeComponents) {
                          SerializationContext::stateDefault()),
         distinct));
     auto pd = parsed_distinct_command::parse(
-        expCtx, std::move(distinct), std::move(distinctCommand), ExtensionsCallbackNoop(), {});
+        expCtx, std::move(distinctCommand), ExtensionsCallbackNoop(), {});
     auto components = std::make_unique<DistinctCmdShapeComponents>(*pd, expCtx);
     const auto minimumSize = sizeof(CmdSpecificShapeComponents) + sizeof(BSONObj) +
         sizeof(std::string) + components->key.size() +

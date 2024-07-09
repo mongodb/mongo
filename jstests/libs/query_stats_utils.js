@@ -83,7 +83,7 @@ export function getQueryStats(conn, options = {
     collName: ""
 }) {
     let match = {"key.client.application.name": kShellApplicationName, ...options.extraMatch};
-    if (options.collName && options.collName) {
+    if (options.collName) {
         match["key.queryShape.cmdNs.coll"] = options.collName;
     }
     const result = conn.adminCommand({
@@ -112,6 +112,45 @@ export function getQueryStatsFindCmd(conn, options = {
         "key.queryShape.command": "find",
         "key.client.application.name": kShellApplicationName
     };
+
+    return getQueryStatsWithTransform(conn, matchExpr, options);
+}
+
+/**
+ * @param {object} conn - connection to database
+ * @param {object} options {
+ *  {BinData} hmacKey
+ *  {String} collName - name of collection
+ *  {boolean} transformIdentifiers - whether to include transform identifiers
+ * }
+ */
+export function getQueryStatsDistinctCmd(conn, options = {
+    collName: "",
+    transformIdentifiers: false,
+    hmacKey: kDefaultQueryStatsHmacKey
+}) {
+    let matchExpr = {
+        "key.queryShape.command": "distinct",
+        "key.client.application.name": kShellApplicationName
+    };
+
+    return getQueryStatsWithTransform(conn, matchExpr, options);
+}
+
+/**
+ * @param {object} conn - connection to database
+ * @param {object} matchExpr - match expression for either find or distinct
+ * @param {object} options {
+ *  {BinData} hmacKey
+ *  {String} collName - name of collection
+ *  {boolean} transformIdentifiers - whether to include transform identifiers
+ * }
+ */
+export function getQueryStatsWithTransform(conn, matchExpr, options = {
+    collName: "",
+    transformIdentifiers: false,
+    hmacKey: kDefaultQueryStatsHmacKey
+}) {
     if (options.collName) {
         matchExpr["key.queryShape.cmdNs.coll"] = options.collName;
     }
@@ -378,8 +417,9 @@ export function getValueAtPath(object, dottedPath) {
  * once with a mongos.
  * @param {String} collName - The desired collection name to use. The db will be "test".
  * @param {Function} callbackFn - The function to make the assertion on each connection.
+ * @param {Boolean} runShardingTest - Whether or not to run a sharding test on mongos
  */
-export function withQueryStatsEnabled(collName, callbackFn) {
+export function withQueryStatsEnabled(collName, callbackFn, runShardingTest = true) {
     const options = {
         setParameter: {internalQueryStatsRateLimit: -1},
     };
@@ -394,6 +434,10 @@ export function withQueryStatsEnabled(collName, callbackFn) {
         MongoRunner.stopMongod(conn);
     }
 
+    // TODO SERVER-90650: add testing support for distinct queryStats on mongos
+    if (!runShardingTest)
+        return;
+
     {
         const st = new ShardingTest({shards: 2, mongosOptions: options});
         const testDB = st.getDB("test");
@@ -404,6 +448,7 @@ export function withQueryStatsEnabled(collName, callbackFn) {
         st.stop();
     }
 }
+
 /**
  * We run the command on an new database with an empty collection that has an index {v:1}. We then
  * obtain the queryStats key entry that is created and check the following things.
@@ -412,8 +457,10 @@ export function withQueryStatsEnabled(collName, callbackFn) {
  * shapeFields.
  * 3. The list of fields of the key exactly matches those given by keyFields.
  * /**
- * @param {string} commandName -  string name of type of command, ex. "find" or "aggregate"
- * @param {object} commandObj - The command that will be  run
+ * @param {object} coll - The given collection to run on
+ * @param {string} commandName - string name of type of command, ex. "find", "aggregate", or
+ *     "distinct"
+ * @param {object} commandObj - The command that will be run
  * @param {object} shapeFields - List of fields that are part of the queryShape and should be nested
  *     inside of Query Shape
  * @param {object} keyFields - List of outer fields not nested inside queryShape but should be part

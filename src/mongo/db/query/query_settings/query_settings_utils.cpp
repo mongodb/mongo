@@ -230,7 +230,6 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
     auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nssOrUuid);
     auto parsedDistinctCommand =
         parsed_distinct_command::parse(expCtx,
-                                       queryInstance,
                                        std::move(distinctCommandRequest),
                                        ExtensionsCallbackNoop(),
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
