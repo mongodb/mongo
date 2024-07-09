@@ -1852,7 +1852,6 @@ if wiredtiger:
             "tenant_migration_access_blocker_util_test.cpp",
             "tenant_migration_recipient_access_blocker_test.cpp",
             "tenant_migration_recipient_entry_helpers_test.cpp",
-            "tenant_migration_recipient_service_test.cpp",
             "tenant_oplog_applier_test.cpp",
             "tenant_oplog_applier_shard_merge_test.cpp",
             "tenant_oplog_batcher_test.cpp",
