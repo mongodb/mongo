@@ -1524,13 +1524,11 @@ void restoreTransactionResourcesToOperationContext(
             try {
                 return restoreFn();
             } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
-                if (ShardVersion::isPlacementVersionIgnored(ex->getVersionReceived()) &&
-                    ex->getCriticalSectionSignal()) {
-                    // If ShardVersion is IGNORED and we encountered a critical section, then yield,
-                    // wait for the critical section to finish and then we'll resume the write from
-                    // the point we had left. We do this to prevent large multi-writes from
-                    // repeatedly failing due to StaleConfig and exhausting the mongos retry
-                    // attempts. Yield the locks.
+                if (ex->getCriticalSectionSignal()) {
+                    // If we encountered a critical section, then yield, wait for the critical
+                    // section to finish and then we'll resume the write from the point we had left.
+                    // We do this to prevent large multi-writes from repeatedly failing due to
+                    // StaleConfig and exhausting the mongos retry attempts. Yield the locks.
                     Locker::LockSnapshot lockSnapshot;
                     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
                     shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);

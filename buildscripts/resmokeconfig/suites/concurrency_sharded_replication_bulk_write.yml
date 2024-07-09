@@ -52,6 +52,9 @@ selector:
     # infrastructure. See SERVER-77039 for full details.
     - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
+    # TODO (SERVER-92189) Reenable
+    - jstests/concurrency/fsm_workloads/random_update_delete_with_resharding.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - requires_replication
