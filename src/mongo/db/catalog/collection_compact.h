@@ -40,7 +40,6 @@ namespace mongo {
  * Returns the number of bytes of stable storage and index size that were freed. If the total
  * size decreased, the return value is positive. Otherwise, the return value is negative.
  */
-StatusWith<int64_t> compactCollection(OperationContext* opCtx,
-                                      const NamespaceString& collectionNss);
+StatusWith<int64_t> compactCollection(OperationContext* opCtx, const CollectionPtr& collection);
 
 }  // namespace mongo

@@ -32,14 +32,21 @@
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_compact.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 
 namespace mongo {
@@ -87,7 +94,7 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
+        NamespaceString collectionNss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(ErrorCodes::IllegalOperation,
@@ -98,7 +105,47 @@ public:
         // This command is internal to the storage engine and should not block oplog application.
         ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
 
-        StatusWith<int64_t> status = compactCollection(opCtx, nss);
+        Lock::GlobalLock lk(opCtx,
+                            MODE_IX,
+                            Date_t::max(),
+                            Lock::InterruptBehavior::kThrow,
+                            {.skipFlowControlTicket = true, .skipRSTLLock = true});
+
+        // Hold reference to the catalog for collection lookup without locks to be safe.
+        auto collectionCatalog = CollectionCatalog::get(opCtx);
+
+        CollectionPtr collection = [&]() {
+            if (CollectionPtr collection = CollectionPtr(
+                    collectionCatalog->lookupCollectionByNamespace(opCtx, collectionNss))) {
+                return collection;
+            }
+
+            // Check if this is a time-series collection.
+            auto bucketsNs = collectionNss.makeTimeseriesBucketsNamespace();
+            if (CollectionPtr collection = CollectionPtr(
+                    collectionCatalog->lookupCollectionByNamespace(opCtx, bucketsNs))) {
+                return collection;
+            }
+
+            return CollectionPtr();
+        }();
+
+        if (!collection) {
+            std::shared_ptr<const ViewDefinition> view =
+                collectionCatalog->lookupView(opCtx, collectionNss);
+            uassert(ErrorCodes::CommandNotSupportedOnView, "can't compact a view", !view);
+            uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
+        }
+
+        AutoStatsTracker statsTracker(
+            opCtx,
+            collectionNss,
+            Top::LockType::NotLocked,
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+            collectionCatalog->getDatabaseProfileLevel(collectionNss.dbName()));
+
+        StatusWith<int64_t> status = compactCollection(opCtx, collection);
+
         uassertStatusOK(status.getStatus());
 
         int64_t bytesFreed = status.getValue();
