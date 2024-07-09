@@ -266,6 +266,7 @@ assert.commandWorked(
 
 // Create an unsharded collection.
 assert.commandWorked(testDBMongos.createCollection(unshardedCollName));
+st.awaitReplicationOnShards();
 
 function testAgainstCollection(collName) {
     // Test that the search index commands fail against a secondary replica set member. However,

@@ -503,8 +503,8 @@ public:
         if (!elem.eoo()) {
             MongotMockStateGuard stateGuard = getMongotMockState(opCtx->getServiceContext());
             uassert(ErrorCodes::InvalidOptions,
-                    "A response has already been set. 'manageSearchIndex' be called before setting "
-                    "a new response",
+                    "A response has already been set. 'manageSearchIndex' must be called before "
+                    "setting a new response",
                     stateGuard->getMockManageSearchIndexResponse().isEmpty());
             stateGuard->setMockManageSearchIndexResponse(elem.Obj());
         }
