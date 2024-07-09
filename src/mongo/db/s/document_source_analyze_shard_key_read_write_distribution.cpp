@@ -93,8 +93,9 @@ namespace {
 std::unique_ptr<CollatorInterface> getDefaultCollator(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
     AutoGetCollectionForReadCommand collection(opCtx, nss);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Cannot analyze a shard key for a non-existing collection",
+    uassert(ErrorCodes::QueryPlanKilled,
+            str::stream() << "Can no longer find the collection being analyzed. This is likely "
+                             "caused by concurrent dropCollection or data movement",
             collection);
 
     if (auto defaultCollator = collection->getDefaultCollator()) {
