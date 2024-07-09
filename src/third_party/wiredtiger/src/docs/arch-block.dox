@@ -101,8 +101,8 @@ API at the time of file creation.
 
 @subsection alloc_size Allocation size
 
-The allocation_size configuration controls the file unit allocation_size.
-Any blocks allocated by the block manager must be a multiple of this value.
+A block's size must be a multiple of the underlying file allocation unit.
+This unit is controlled by the @ref allocation_size parameter.
 
 For example, if we specify an allocation_size of \c 4KB, blocks of size
 \c 8KB and \c 12KB would be permitted but NOT \c 10KB. The allocation_size

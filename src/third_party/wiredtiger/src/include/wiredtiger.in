@@ -5975,7 +5975,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: modified pages evicted */
 #define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		1195
 /*! cache: multi-block reconciliation blocked whilst checkpoint is running */
-#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MULTI_BLOCK_RECONCILATION_DURING_CHECKPOINT	1196
+#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MULTI_BLOCK_RECONCILIATION_DURING_CHECKPOINT	1196
 /*! cache: operations timed out waiting for space in cache */
 #define	WT_STAT_CONN_CACHE_TIMED_OUT_OPS		1197
 /*!
@@ -7505,7 +7505,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: modified pages evicted */
 #define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		2106
 /*! cache: multi-block reconciliation blocked whilst checkpoint is running */
-#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_MULTI_BLOCK_RECONCILATION_DURING_CHECKPOINT	2107
+#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_MULTI_BLOCK_RECONCILIATION_DURING_CHECKPOINT	2107
 /*!
  * cache: overflow keys on a multiblock row-store page blocked its
  * eviction
