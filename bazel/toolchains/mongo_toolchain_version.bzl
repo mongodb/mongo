@@ -95,17 +95,13 @@ TOOLCHAIN_MAP = {
         "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2204/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_ubuntu2204_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
     },
     "ubuntu24_aarch64": {
-        # TODO(SERVER-87441): Change this to a waterfall built toolchain before using in CI!
-        # Note: Do not regenerate automatically! This is a special build for initial ubuntu24 support in Mongo 8.0 and uses a different patch build from the others.
         "platform_name": "ubuntu2404-arm64",
-        "sha": "1b5e76147ee512559ebe446b560fd28e49e26aab1805f0acd00fc811a8b4ef6d",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2404-arm64/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_ubuntu2404_arm64_patch_11bae3c145a48dd7be9ee8aa44e5591783f787aa_667bb8d7f0a0ee00072a1968_24_06_26_06_44_41.tar.gz",
+        "sha": "02ec959be765bf9f89bd39df78366af05d60d00bec44963feeda1274bc7a4a91",
+        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2404-arm64/e0a4b30be5b1d4667d4adeed82f0f806626038f7/bazel_v4_toolchain_builder_ubuntu2404_arm64_e0a4b30be5b1d4667d4adeed82f0f806626038f7_24_07_02_18_20_40.tar.gz",
     },
     "ubuntu24_x86_64": {
-        # TODO(SERVER-87441): Change this to a waterfall built toolchain before using in CI!
-        # Note: Do not regenerate automatically! This is a special build for initial ubuntu24 support in Mongo 8.0 and uses a different patch build from the others.
         "platform_name": "ubuntu2404",
-        "sha": "4db6b4b1f8e7d75e31c727ef8e12322c85a81dfce0970fd1a7a911095f6c71f0",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2404/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_ubuntu2404_patch_11bae3c145a48dd7be9ee8aa44e5591783f787aa_667bb8d7f0a0ee00072a1968_24_06_26_06_44_41.tar.gz",
+        "sha": "c9193240f96a1112edb24b816a87cb6bd9e1393c2757b0b76a3182460ed9498b",
+        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2404/e0a4b30be5b1d4667d4adeed82f0f806626038f7/bazel_v4_toolchain_builder_ubuntu2404_e0a4b30be5b1d4667d4adeed82f0f806626038f7_24_07_02_18_20_40.tar.gz",
     },
 }
