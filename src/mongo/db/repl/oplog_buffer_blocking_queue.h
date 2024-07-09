@@ -69,11 +69,9 @@ public:
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
               Batch::const_iterator end,
-              boost::optional<std::size_t> bytes = boost::none) override;
-    void waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count) override;
+              boost::optional<const Cost&> cost = boost::none) override;
+    void waitForSpace(OperationContext* opCtx, const Cost& cost) override;
     bool isEmpty() const override;
-    std::size_t getMaxSize() const override;
-    std::size_t getMaxCount() const override;
     std::size_t getSize() const override;
     std::size_t getCount() const override;
     void clear(OperationContext* opCtx) override;
@@ -89,8 +87,9 @@ public:
     void exitDrainMode() final;
 
 private:
-    void _waitForSpace_inlock(stdx::unique_lock<Latch>& lk, std::size_t size, std::size_t count);
+    void _waitForSpace_inlock(stdx::unique_lock<Latch>& lk, const Cost& cost);
     void _clear_inlock(WithLock lk);
+    void _push(Batch::const_iterator begin, Batch::const_iterator end, const Cost& cost);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogBufferBlockingQueue::_mutex");
     stdx::condition_variable _notEmptyCV;
@@ -98,6 +97,7 @@ private:
     const std::size_t _maxSize;
     const std::size_t _maxCount;
     std::size_t _curSize = 0;
+    std::size_t _curCount = 0;
     std::size_t _waitSize = 0;
     std::size_t _waitCount = 0;
     bool _drainMode = false;

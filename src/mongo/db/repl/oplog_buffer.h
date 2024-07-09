@@ -71,6 +71,11 @@ public:
     using Batch = std::vector<Value>;
 
     /**
+     * Cost of items in this oplog buffer.
+     */
+    struct Cost;
+
+    /**
      * Counters for this oplog buffer.
      */
     class Counters;
@@ -100,32 +105,17 @@ public:
     virtual void push(OperationContext* opCtx,
                       Batch::const_iterator begin,
                       Batch::const_iterator end,
-                      boost::optional<std::size_t> bytes = boost::none) = 0;
+                      boost::optional<const Cost&> cost = boost::none) = 0;
 
     /**
      * Returns when enough space is available.
      */
-    virtual void waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count) = 0;
+    virtual void waitForSpace(OperationContext* opCtx, const Cost& cost) = 0;
 
     /**
      * Returns true if oplog buffer is empty.
      */
     virtual bool isEmpty() const = 0;
-
-    /**
-     * Maximum size of all oplog entries that can be stored in this oplog buffer as measured by the
-     * BSONObj::objsize() function.
-     *
-     * Returns 0 if this oplog buffer has no size constraints.
-     */
-    virtual std::size_t getMaxSize() const = 0;
-
-    /**
-     * Maximum count of all oplog entries that can be stored in this oplog buffer.
-     *
-     * Returns 0 if this oplog buffer has no count constraints.
-     */
-    virtual std::size_t getMaxCount() const = 0;
 
     /**
      * Total size of all oplog entries in this oplog buffer as measured by the BSONObj::objsize()
@@ -212,6 +202,11 @@ public:
     virtual void exitDrainMode() {
         MONGO_UNIMPLEMENTED;
     }
+};
+
+struct OplogBuffer::Cost {
+    std::size_t size = 0;
+    std::size_t count = 0;
 };
 
 class OplogBuffer::Counters {

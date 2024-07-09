@@ -73,7 +73,7 @@ void OplogBufferMock::shutdown(OperationContext* opCtx) {
 void OplogBufferMock::push(OperationContext* opCtx,
                            Batch::const_iterator begin,
                            Batch::const_iterator end,
-                           boost::optional<std::size_t> bytes) {
+                           boost::optional<const Cost&> cost) {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_hasStartedUp);
     invariant(!_hasShutDown);

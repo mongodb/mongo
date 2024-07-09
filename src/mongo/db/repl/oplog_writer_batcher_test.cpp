@@ -59,7 +59,7 @@ public:
     void push(OperationContext*,
               Batch::const_iterator begin,
               Batch::const_iterator end,
-              boost::optional<std::size_t> bytes) override {
+              boost::optional<const Cost&> cost) override {
         MONGO_UNIMPLEMENTED;
     }
 
@@ -69,21 +69,13 @@ public:
         _notEmptyCv.notify_one();
     }
 
-    void waitForSpace(OperationContext*, std::size_t size, std::size_t count) override {
+    void waitForSpace(OperationContext*, const Cost& cost) override {
         MONGO_UNIMPLEMENTED;
     }
 
     bool isEmpty() const override {
         stdx::lock_guard<Latch> lk(_mutex);
         return _queue.empty();
-    }
-
-    std::size_t getMaxSize() const override {
-        MONGO_UNIMPLEMENTED;
-    }
-
-    std::size_t getMaxCount() const override {
-        MONGO_UNIMPLEMENTED;
     }
 
     std::size_t getSize() const override {

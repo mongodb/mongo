@@ -166,7 +166,7 @@ void OplogBufferCollection::shutdown(OperationContext* opCtx) {
 void OplogBufferCollection::push(OperationContext* opCtx,
                                  Batch::const_iterator begin,
                                  Batch::const_iterator end,
-                                 boost::optional<std::size_t> bytes) {
+                                 boost::optional<const Cost&> cost) {
     if (begin == end) {
         return;
     }
@@ -249,21 +249,11 @@ void OplogBufferCollection::_push(WithLock,
     _cvNoLongerEmpty.notify_all();
 }
 
-void OplogBufferCollection::waitForSpace(OperationContext* opCtx,
-                                         std::size_t size,
-                                         std::size_t count) {}
+void OplogBufferCollection::waitForSpace(OperationContext* opCtx, const Cost& cost) {}
 
 bool OplogBufferCollection::isEmpty() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return _count == 0;
-}
-
-std::size_t OplogBufferCollection::getMaxSize() const {
-    return 0;
-}
-
-std::size_t OplogBufferCollection::getMaxCount() const {
-    return 0;
 }
 
 std::size_t OplogBufferCollection::getSize() const {

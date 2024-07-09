@@ -66,15 +66,9 @@ public:
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
               Batch::const_iterator end,
-              boost::optional<std::size_t> bytes = boost::none) final;
-    void waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count) final{};
+              boost::optional<const Cost&> cost = boost::none) final;
+    void waitForSpace(OperationContext* opCtx, const Cost& cost) final{};
     bool isEmpty() const final;
-    std::size_t getMaxSize() const final {
-        return 0;
-    };
-    std::size_t getMaxCount() const final {
-        return 0;
-    };
     std::size_t getSize() const final;
     std::size_t getCount() const final;
     void clear(OperationContext* opCtx) final;

@@ -40,17 +40,31 @@ namespace repl {
 
 namespace {
 
-std::size_t getSingleDocumentSize(const BSONObj& doc) {
-    return static_cast<size_t>(doc.objsize());
+std::size_t getDocumentOpCount(const BSONObj& doc) {
+    if (doc[OplogEntry::kOpTypeFieldName].String() != "c"_sd) {
+        return 1U;
+    }
+
+    // Get the number of operations enclosed in 'applyOps'. Use The 'count'
+    // field if it exists, otherwise fallback to use BSONObj::nFields().
+    auto obj = doc["o"].Obj();
+    auto applyOps = obj[ApplyOpsCommandInfoBase::kOperationsFieldName];
+
+    if (!applyOps.ok()) {
+        return 1U;
+    }
+
+    auto count = obj.getIntField(ApplyOpsCommandInfoBase::kCountFieldName);
+    if (count > 0) {
+        return std::size_t(count);
+    }
+    count = applyOps.Obj().nFields();
+
+    return count > 0 ? std::size_t(count) : 1U;
 }
 
-std::size_t getTotalDocumentSize(OplogBuffer::Batch::const_iterator begin,
-                                 OplogBuffer::Batch::const_iterator end) {
-    std::size_t totalSize = 0;
-    for (auto it = begin; it != end; ++it) {
-        totalSize += getSingleDocumentSize(*it);
-    }
-    return totalSize;
+OplogBuffer::Cost getDocumentCost(const BSONObj& doc) {
+    return {static_cast<std::size_t>(doc.objsize()), getDocumentOpCount(doc)};
 }
 
 }  // namespace
@@ -69,8 +83,8 @@ void OplogBufferBlockingQueue::startup(OperationContext*) {
     invariant(!_isShutdown);
     // Update server status metric to reflect the current oplog buffer's max size.
     if (_counters) {
-        _counters->setMaxSize(getMaxSize());
-        _counters->setMaxCount(getMaxCount());
+        _counters->setMaxSize(_maxSize);
+        _counters->setMaxCount(_maxCount);
     }
 }
 
@@ -94,25 +108,49 @@ void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
 void OplogBufferBlockingQueue::push(OperationContext*,
                                     Batch::const_iterator begin,
                                     Batch::const_iterator end,
-                                    boost::optional<std::size_t> bytes) {
+                                    boost::optional<const Cost&> cost) {
     if (begin == end) {
         return;
     }
 
-    // Get the total byte size if caller did not provide one.
-    //
-    // It is the caller's responsibility to make sure that the total byte
-    // size provided is equal to the sum of all document sizes, we do not
-    // verify it here.
-    auto size = bytes ? *bytes : getTotalDocumentSize(begin, end);
-    auto count = std::distance(begin, end);
+    // If caller knows the cost, use it, otherwise calculate the cost.
+    if (cost) {
+        _push(begin, end, *cost);
+        return;
+    }
 
+    Cost sumCost;
+    Cost maxCost{_maxSize / 2, _maxCount / 2};
+    auto lower = begin;
+
+    // The cost of the batch could be larger than the limit, break it into
+    // smaller batches.
+    for (auto upper = begin; upper != end; ++upper) {
+        if (sumCost.size < maxCost.size && sumCost.count < maxCost.count) {
+            auto docCost = getDocumentCost(*upper);
+            sumCost.size += docCost.size;
+            sumCost.count += docCost.count;
+            continue;
+        }
+        _push(lower, upper, sumCost);
+        lower = upper;
+        auto docCost = getDocumentCost(*upper);
+        sumCost.size = docCost.size;
+        sumCost.count = docCost.count;
+    }
+    _push(lower, end, sumCost);
+}
+
+void OplogBufferBlockingQueue::_push(Batch::const_iterator begin,
+                                     Batch::const_iterator end,
+                                     const Cost& cost) {
+    invariant(begin != end);
     {
         stdx::unique_lock<Latch> lk(_mutex);
 
         // Block until enough space is available.
         invariant(!_drainMode);
-        _waitForSpace_inlock(lk, size, count);
+        _waitForSpace_inlock(lk, cost);
 
         // Do not push anything if already shutdown.
         if (_isShutdown) {
@@ -121,7 +159,8 @@ void OplogBufferBlockingQueue::push(OperationContext*,
 
         bool startedEmpty = _queue.empty();
         _queue.insert(_queue.end(), begin, end);
-        _curSize += size;
+        _curSize += cost.size;
+        _curCount += cost.count;
 
         if (startedEmpty) {
             _notEmptyCV.notify_one();
@@ -129,28 +168,18 @@ void OplogBufferBlockingQueue::push(OperationContext*,
     }
 
     if (_counters) {
-        _counters->incrementN(count, size);
+        _counters->incrementN(cost.count, cost.size);
     }
 }
 
-void OplogBufferBlockingQueue::waitForSpace(OperationContext*,
-                                            std::size_t size,
-                                            std::size_t count) {
+void OplogBufferBlockingQueue::waitForSpace(OperationContext*, const Cost& cost) {
     stdx::unique_lock<Latch> lk(_mutex);
-    _waitForSpace_inlock(lk, size, count);
+    _waitForSpace_inlock(lk, cost);
 }
 
 bool OplogBufferBlockingQueue::isEmpty() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return _queue.empty();
-}
-
-std::size_t OplogBufferBlockingQueue::getMaxSize() const {
-    return _maxSize;
-}
-
-std::size_t OplogBufferBlockingQueue::getMaxCount() const {
-    return _maxCount;
 }
 
 std::size_t OplogBufferBlockingQueue::getSize() const {
@@ -160,7 +189,7 @@ std::size_t OplogBufferBlockingQueue::getSize() const {
 
 std::size_t OplogBufferBlockingQueue::getCount() const {
     stdx::lock_guard<Latch> lk(_mutex);
-    return _queue.size();
+    return _curCount;
 }
 
 void OplogBufferBlockingQueue::clear(OperationContext*) {
@@ -175,6 +204,7 @@ void OplogBufferBlockingQueue::clear(OperationContext*) {
 }
 
 bool OplogBufferBlockingQueue::tryPop(OperationContext*, Value* value) {
+    Cost cost;
     {
         stdx::lock_guard<Latch> lk(_mutex);
 
@@ -184,18 +214,20 @@ bool OplogBufferBlockingQueue::tryPop(OperationContext*, Value* value) {
 
         *value = _queue.front();
         _queue.pop_front();
-        _curSize -= getSingleDocumentSize(*value);
-        invariant(_curSize >= 0);
+        cost = getDocumentCost(*value);
+        _curSize -= cost.size;
+        _curCount -= cost.count;
+        invariant(_curSize >= 0 && _curCount >= 0);
 
         // Only notify producer if there is a waiting producer and enough space available.
         if ((_waitSize || _waitCount) && (_curSize + _waitSize <= _maxSize) &&
-            (_queue.size() + _waitCount <= _maxCount)) {
+            (_curCount + _waitCount <= _maxCount)) {
             _notFullCV.notify_one();
         }
     }
 
     if (_counters) {
-        _counters->decrement(*value);
+        _counters->decrementN(cost.count, cost.size);
     }
 
     return true;
@@ -254,15 +286,16 @@ void OplogBufferBlockingQueue::exitDrainMode() {
 }
 
 void OplogBufferBlockingQueue::_waitForSpace_inlock(stdx::unique_lock<Latch>& lk,
-                                                    std::size_t size,
-                                                    std::size_t count) {
-    invariant(size > 0 && count > 0);
+                                                    const Cost& cost) {
+    invariant(cost.size > 0 && cost.count > 0);
     invariant(!_waitSize && !_waitCount);
 
-    while ((_curSize + size > _maxSize || _queue.size() + count > _maxCount) && !_isShutdown) {
+    // Allow any cost if queue is empty, caller should do appropriate batching.
+    while ((_curSize + cost.size > _maxSize || _curCount + cost.count > _maxCount) &&
+           !_queue.empty() && !_isShutdown) {
         // We only support one concurrent producer.
-        _waitSize = size;
-        _waitCount = count;
+        _waitSize = cost.size;
+        _waitCount = cost.count;
         _notFullCV.wait(lk);
         _waitSize = 0;
         _waitCount = 0;
@@ -272,6 +305,7 @@ void OplogBufferBlockingQueue::_waitForSpace_inlock(stdx::unique_lock<Latch>& lk
 void OplogBufferBlockingQueue::_clear_inlock(WithLock lk) {
     _queue = {};
     _curSize = 0;
+    _curCount = 0;
     _notFullCV.notify_one();
     _notEmptyCV.notify_one();
 }

@@ -46,7 +46,38 @@ BSONObj makeNoopOplogEntry(int t) {
         boost::none,                                               // fromMigrate
         boost::none,                                               // checkExistenceForDiffInsert
         repl::OplogEntry::kOplogVersion,                           // version
-        BSON("count" << t),                                        // o
+        BSON("data" << t),                                         // o
+        boost::none,                                               // o2
+        {},                                                        // sessionInfo
+        boost::none,                                               // upsert
+        Date_t(),                                                  // wall clock time
+        {},                                                        // statement ids
+        boost::none,   // optime of previous write within same transaction
+        boost::none,   // pre-image optime
+        boost::none,   // post-image optime
+        boost::none,   // ShardId of resharding recipient
+        boost::none,   // _id
+        boost::none);  // needsRetryImage
+    return oplogEntry.toBSON();
+}
+
+BSONObj makeApplyOpsOplogEntry(int t, int num) {
+    BSONObjBuilder oField;
+    BSONArrayBuilder applyOps = oField.subarrayStart("applyOps");
+    for (int i = 0; i < num; ++i) {
+        applyOps.append(BSON("data" << i));
+    }
+    applyOps.doneFast();
+
+    auto oplogEntry = repl::DurableOplogEntry(
+        OpTime(Timestamp(t, 1), 1),                                // optime
+        OpTypeEnum::kCommand,                                      // opType
+        NamespaceString::createNamespaceString_forTest("test.t"),  // namespace
+        boost::none,                                               // uuid
+        boost::none,                                               // fromMigrate
+        boost::none,                                               // checkExistenceForDiffInsert
+        repl::OplogEntry::kOplogVersion,                           // version
+        oField.obj(),                                              // o
         boost::none,                                               // o2
         {},                                                        // sessionInfo
         boost::none,                                               // upsert
@@ -114,19 +145,19 @@ TEST_F(OplogBufferBlockingQueueTest, BasicBlockingQueueOperations) {
     OplogBufferBlockingQueue buffer(1024 * 1024, 1024);
     buffer.startup(opCtx());
 
-    // Push some entries and provide the total size.
+    // Push initial one entry.
     std::vector<BSONObj> ops1;
     ops1.push_back(makeNoopOplogEntry(1));
 
     std::size_t size1 = kOpSize;
-    buffer.push(opCtx(), ops1.begin(), ops1.end(), size1);
+    buffer.push(opCtx(), ops1.begin(), ops1.end());
 
     // Verify the size and count.
     ASSERT(!buffer.isEmpty());
     ASSERT_EQ(size1, buffer.getSize());
     ASSERT_EQ(ops1.size(), buffer.getCount());
 
-    // Push some entries without providing the total size.
+    // Push some more entries.
     std::vector<BSONObj> ops2;
     ops2.push_back(makeNoopOplogEntry(2));
     ops2.push_back(makeNoopOplogEntry(3));
@@ -173,7 +204,7 @@ TEST_F(OplogBufferBlockingQueueTest, ClearAndShutdownBuffer) {
     ops.push_back(makeNoopOplogEntry(2));
 
     std::size_t size = kOpSize * 2;
-    buffer.push(opCtx(), ops.begin(), ops.end(), size);
+    buffer.push(opCtx(), ops.begin(), ops.end());
 
     ASSERT(!buffer.isEmpty());
     ASSERT_EQ(size, buffer.getSize());
@@ -188,7 +219,7 @@ TEST_F(OplogBufferBlockingQueueTest, ClearAndShutdownBuffer) {
     ASSERT_EQ(0, buffer.getCount());
 
     // Clear should not prevent new data from being pushed.
-    buffer.push(opCtx(), ops.begin(), ops.end(), size);
+    buffer.push(opCtx(), ops.begin(), ops.end());
 
     ASSERT(!buffer.isEmpty());
     ASSERT_EQ(size, buffer.getSize());
@@ -203,7 +234,7 @@ TEST_F(OplogBufferBlockingQueueTest, ClearAndShutdownBuffer) {
     ASSERT_EQ(0, buffer.getCount());
 
     // Shutdown should prevent new data from being pushed.
-    buffer.push(opCtx(), ops.begin(), ops.end(), size);
+    buffer.push(opCtx(), ops.begin(), ops.end());
 
     ASSERT(buffer.isEmpty());
     ASSERT_EQ(0, buffer.getSize());
@@ -221,7 +252,7 @@ TEST_F(OplogBufferBlockingQueueTest, ShutdownNoClear) {
     ops1.push_back(makeNoopOplogEntry(2));
 
     std::size_t size1 = kOpSize * 2;
-    buffer.push(opCtx(), ops1.begin(), ops1.end(), size1);
+    buffer.push(opCtx(), ops1.begin(), ops1.end());
 
     ASSERT(!buffer.isEmpty());
     ASSERT_EQ(size1, buffer.getSize());
@@ -240,8 +271,7 @@ TEST_F(OplogBufferBlockingQueueTest, ShutdownNoClear) {
     ops2.push_back(makeNoopOplogEntry(3));
 
     // Shutdown should prevent new data from being pushed.
-    std::size_t size2 = kOpSize * 1;
-    buffer.push(opCtx(), ops2.begin(), ops2.end(), size2);
+    buffer.push(opCtx(), ops2.begin(), ops2.end());
 
     ASSERT(!buffer.isEmpty());
     ASSERT_EQ(size1, buffer.getSize());
@@ -260,7 +290,59 @@ TEST_F(OplogBufferBlockingQueueTest, PushWaitForSpaceInBytes) {
     ops1.push_back(makeNoopOplogEntry(4));
 
     std::size_t size1 = kOpSize * 4;
-    buffer.push(opCtx(), ops1.begin(), ops1.end(), size1);
+    buffer.push(opCtx(), ops1.begin(), ops1.end());
+
+    // Push another 2 entries, this should block.
+    std::vector<BSONObj> ops2;
+    ops2.push_back(makeNoopOplogEntry(5));
+    ops2.push_back(makeNoopOplogEntry(6));
+
+    stdx::thread pushThread([&, this] {
+        // Will block until there is space for 2 entries.
+        buffer.push(opCtx(), ops2.begin(), ops2.end());
+    });
+
+    // Wait for some time and check that the second batch has
+    // not been pushed in.
+    sleepsecs(3);
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(size1, buffer.getSize());
+    ASSERT_EQ(ops1.size(), buffer.getCount());
+
+    // Pop one entry, wait for some time and check that the
+    // second batch has still not been pushed in.
+    BSONObj nextOp;
+    ASSERT_TRUE(buffer.tryPop(opCtx(), &nextOp));
+
+    sleepsecs(3);
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(size1 - kOpSize, buffer.getSize());
+    ASSERT_EQ(ops1.size() - 1, buffer.getCount());
+
+    // Pop another entry, now there should be enough space
+    // to push the second batch and unblock the pushThread.
+    ASSERT_TRUE(buffer.tryPop(opCtx(), &nextOp));
+
+    pushThread.join();
+
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(size1, buffer.getSize());
+    ASSERT_EQ(ops1.size(), buffer.getCount());
+}
+
+TEST_F(OplogBufferBlockingQueueTest, PushSingleOpsWaitForSpaceInCount) {
+    OplogBufferBlockingQueue buffer(1024 * 1024, 4);
+    buffer.startup(opCtx());
+
+    // Push 4 entries, the buffer should be full now.
+    std::vector<BSONObj> ops1;
+    ops1.push_back(makeNoopOplogEntry(1));
+    ops1.push_back(makeNoopOplogEntry(2));
+    ops1.push_back(makeNoopOplogEntry(3));
+    ops1.push_back(makeNoopOplogEntry(4));
+
+    std::size_t size1 = kOpSize * 4;
+    buffer.push(opCtx(), ops1.begin(), ops1.end());
 
     // Push again with 2 entries, this should block.
     std::vector<BSONObj> ops2;
@@ -269,8 +351,7 @@ TEST_F(OplogBufferBlockingQueueTest, PushWaitForSpaceInBytes) {
 
     stdx::thread pushThread([&, this] {
         // Will block until there is space for 2 entries.
-        std::size_t size2 = kOpSize * 2;
-        buffer.push(opCtx(), ops2.begin(), ops2.end(), size2);
+        buffer.push(opCtx(), ops2.begin(), ops2.end());
     });
 
     // Wait for some time and check that the second batch has
@@ -300,37 +381,32 @@ TEST_F(OplogBufferBlockingQueueTest, PushWaitForSpaceInBytes) {
     ASSERT_EQ(ops1.size(), buffer.getCount());
 }
 
-TEST_F(OplogBufferBlockingQueueTest, PushWaitForSpaceInCount) {
-    OplogBufferBlockingQueue buffer(1024 * 1024, 4);
+TEST_F(OplogBufferBlockingQueueTest, PushMultiOpsWaitForSpaceInCount) {
+    OplogBufferBlockingQueue buffer(1024 * 1024, 10);
     buffer.startup(opCtx());
 
-    // Push 4 entries, the buffer should be full now.
+    // Push 3 entries with 10 ops, the buffer should be full now.
     std::vector<BSONObj> ops1;
-    ops1.push_back(makeNoopOplogEntry(1));
-    ops1.push_back(makeNoopOplogEntry(2));
-    ops1.push_back(makeNoopOplogEntry(3));
-    ops1.push_back(makeNoopOplogEntry(4));
+    ops1.push_back(makeApplyOpsOplogEntry(1, 3));
+    ops1.push_back(makeApplyOpsOplogEntry(2, 3));
+    ops1.push_back(makeApplyOpsOplogEntry(3, 4));
 
-    std::size_t size1 = kOpSize * 4;
-    buffer.push(opCtx(), ops1.begin(), ops1.end(), size1);
+    buffer.push(opCtx(), ops1.begin(), ops1.end());
 
-    // Push again with 2 entries, this should block.
+    // Push another entry with 5 ops, this should block.
     std::vector<BSONObj> ops2;
-    ops2.push_back(makeNoopOplogEntry(5));
-    ops2.push_back(makeNoopOplogEntry(6));
+    ops2.push_back(makeApplyOpsOplogEntry(4, 5));
 
     stdx::thread pushThread([&, this] {
-        // Will block until there is space for 2 entries.
-        std::size_t size2 = kOpSize * 2;
-        buffer.push(opCtx(), ops2.begin(), ops2.end(), size2);
+        // Will block until there is space for 5 ops.
+        buffer.push(opCtx(), ops2.begin(), ops2.end());
     });
 
     // Wait for some time and check that the second batch has
     // not been pushed in.
     sleepsecs(3);
     ASSERT(!buffer.isEmpty());
-    ASSERT_EQ(size1, buffer.getSize());
-    ASSERT_EQ(ops1.size(), buffer.getCount());
+    ASSERT_EQ(10, buffer.getCount());
 
     // Pop one entry, wait for some time and check that the
     // second batch has still not been pushed in.
@@ -339,8 +415,7 @@ TEST_F(OplogBufferBlockingQueueTest, PushWaitForSpaceInCount) {
 
     sleepsecs(3);
     ASSERT(!buffer.isEmpty());
-    ASSERT_EQ(size1 - kOpSize, buffer.getSize());
-    ASSERT_EQ(ops1.size() - 1, buffer.getCount());
+    ASSERT_EQ(7, buffer.getCount());
 
     // Pop another entry, now there should be enough space
     // to push the second batch and unblock the pushThread.
@@ -348,8 +423,42 @@ TEST_F(OplogBufferBlockingQueueTest, PushWaitForSpaceInCount) {
 
     pushThread.join();
     ASSERT(!buffer.isEmpty());
-    ASSERT_EQ(size1, buffer.getSize());
-    ASSERT_EQ(ops1.size(), buffer.getCount());
+    ASSERT_EQ(9, buffer.getCount());
+}
+
+TEST_F(OplogBufferBlockingQueueTest, PushAlwaysAllowOneEntryIfEmpty) {
+    OplogBufferBlockingQueue buffer(1024 * 1024, 10);
+    buffer.startup(opCtx());
+
+    // Push 2 entries with the first one being larger than max count.
+    // The first one should be allowed while the rest are blocked.
+    std::vector<BSONObj> ops1;
+    ops1.push_back(makeApplyOpsOplogEntry(1, 12));
+    ops1.push_back(makeApplyOpsOplogEntry(2, 3));
+    ops1.push_back(makeApplyOpsOplogEntry(3, 4));
+
+    bool doneWait = false;
+    stdx::thread pushThread([&, this] {
+        // Will block until the first large entry is popped.
+        buffer.push(opCtx(), ops1.begin(), ops1.end());
+        doneWait = true;
+    });
+
+    // Wait for some time and check only the first entry is pushed.
+    sleepsecs(3);
+    ASSERT(!doneWait);
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(12, buffer.getCount());
+
+    // Pop another entry, now there should be enough space to push
+    // the rest of the entries in the batch.
+    BSONObj nextOp;
+    ASSERT_TRUE(buffer.tryPop(opCtx(), &nextOp));
+
+    pushThread.join();
+    ASSERT(doneWait);
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(7, buffer.getCount());
 }
 
 TEST_F(OplogBufferBlockingQueueTest, shutdownUnblocksWaitForSpace) {
@@ -362,18 +471,16 @@ TEST_F(OplogBufferBlockingQueueTest, shutdownUnblocksWaitForSpace) {
     ops1.push_back(makeNoopOplogEntry(2));
     ops1.push_back(makeNoopOplogEntry(3));
 
-    std::size_t size1 = kOpSize * 3;
-    buffer.push(opCtx(), ops1.begin(), ops1.end(), size1);
+    buffer.push(opCtx(), ops1.begin(), ops1.end());
 
-    // Push again with 2 entries, this should block.
+    // Push another 2 entries, this should block.
     std::vector<BSONObj> ops2;
     ops2.push_back(makeNoopOplogEntry(4));
     ops2.push_back(makeNoopOplogEntry(5));
 
     stdx::thread pushThread([&, this] {
         // Will block until there is space for 2 entries.
-        std::size_t size2 = kOpSize * 2;
-        buffer.push(opCtx(), ops2.begin(), ops2.end(), size2);
+        buffer.push(opCtx(), ops2.begin(), ops2.end());
     });
 
     // Shutdown will clear the buffer and unblock the pushThread,
@@ -409,7 +516,7 @@ TEST_F(OplogBufferBlockingQueueTest, pushUnblocksWaitForData) {
     ops.push_back(makeNoopOplogEntry(2));
 
     std::size_t size = kOpSize * 2;
-    buffer.push(opCtx(), ops.begin(), ops.end(), size);
+    buffer.push(opCtx(), ops.begin(), ops.end());
 
     waitForDataThread.join();
 
@@ -483,7 +590,7 @@ TEST_F(OplogBufferBlockingQueueTest, drainModeUnblocksWaitForData) {
     });
 
     sleepsecs(3);
-    ASSERT_FALSE(doneWait);
+    ASSERT(!doneWait);
 
     opCtx()->markKilled(ErrorCodes::InterruptedAtShutdown);
     waitForDataThread2.join();

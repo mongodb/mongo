@@ -153,7 +153,7 @@ public:
     /**
      * Blocks until enough space is available.
      */
-    void waitForSpace(OperationContext* opCtx, std::size_t size, std::size_t count);
+    void waitForSpace(OperationContext* opCtx, const OplogBuffer::Cost& cost);
 
     /**
      * Pushes operations read into oplog buffer.
@@ -164,11 +164,11 @@ public:
     void enqueue(OperationContext* opCtx,
                  std::vector<OplogEntry>::const_iterator begin,
                  std::vector<OplogEntry>::const_iterator end,
-                 boost::optional<std::size_t> bytes = boost::none);
+                 boost::optional<const OplogBuffer::Cost&> cost = boost::none);
     void enqueue(OperationContext* opCtx,
                  OplogBuffer::Batch::const_iterator begin,
                  OplogBuffer::Batch::const_iterator end,
-                 boost::optional<std::size_t> bytes = boost::none);
+                 boost::optional<const OplogBuffer::Cost&> cost = boost::none);
     /**
      * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
      * using a set of threads to apply the operations.
