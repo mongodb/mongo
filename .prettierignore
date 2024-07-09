@@ -30,3 +30,7 @@ version_expansions.yml
 
 # Ignore all formatting in third_party/*
 src/third_party
+
+# Ignore anything in the build output directories
+build
+bazel-*
