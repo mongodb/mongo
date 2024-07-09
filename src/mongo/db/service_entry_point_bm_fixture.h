@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #ifdef __linux__
 #include <linux/perf_event.h>
 #include <sys/ioctl.h>
@@ -44,13 +46,12 @@
 #include "mongo/db/client_strand.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/basic.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/uuid.h"
 
@@ -153,10 +154,9 @@ private:
     const uint64_t _start;
 };
 
-
-class ServiceEntryPointCommonBenchmarkFixture : public benchmark::Fixture {
+class ServiceEntryPointBenchmarkFixture : public benchmark::Fixture {
 public:
-    ServiceEntryPointCommonBenchmarkFixture() {
+    ServiceEntryPointBenchmarkFixture() {
         // Do not emit logs that impact performance measurements. The following assumes that this
         // benchmark will have its own process-global state (i.e. has its own target).
         auto& settings = logv2::LogManager::global().getGlobalSettings();
@@ -181,11 +181,8 @@ public:
         ReadWriteConcernDefaults::create(service, _lookupMock.getFetchDefaultsFn());
         _lookupMock.setLookupCallReturnValue({});
 
-        auto replCoordMock = std::make_unique<repl::ReplicationCoordinatorMock>(service);
-        // Transition to primary so that the server can accept writes.
-        invariant(replCoordMock->setFollowerMode(repl::MemberState::RS_PRIMARY));
-        repl::ReplicationCoordinator::set(service, std::move(replCoordMock));
-        service->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+        setupImpl(service);
+        setServiceEntryPoint(service);
 
         _instructions.store(0);
         _cycles.store(0);
@@ -207,6 +204,10 @@ public:
         state.counters["cycles"] = cycles;
         state.counters["cycles_per_iteration"] = static_cast<double>(cycles) / iterations;
     }
+
+    virtual void setServiceEntryPoint(ServiceContext* service) const = 0;
+
+    virtual void setupImpl(ServiceContext* service){};
 
     void doRequest(ServiceEntryPoint* sep, Client* client, Message& msg) {
         auto newOpCtx = client->makeOperationContext();
@@ -235,37 +236,34 @@ public:
         state.SetItemsProcessed(int64_t(state.iterations()));
     }
 
+    static auto makePingCommand() {
+        return BSON("ping" << 1 << "$db"
+                           << "admin");
+    }
+
 private:
-    AtomicWord<uint64_t> _nextClientId{0};
+    Atomic<uint64_t> _nextClientId{0};
 
-    AtomicWord<uint64_t> _instructions;
-    AtomicWord<uint64_t> _cycles;
-    AtomicWord<uint64_t> _iterations;
+    Atomic<uint64_t> _instructions;
+    Atomic<uint64_t> _cycles;
+    Atomic<uint64_t> _iterations;
 
-    ReadWriteConcernDefaultsLookupMock _lookupMock;
     Mutex _setupMutex;
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
     size_t _configuredThreads = 0;
 };
-
-BENCHMARK_DEFINE_F(ServiceEntryPointCommonBenchmarkFixture, BM_SEP_PING)(benchmark::State& state) {
-    runBenchmark(state,
-                 BSON("ping" << 1 << "$db"
-                             << "admin"));
-}
 
 /**
  * ASAN can't handle the # of threads the benchmark creates.
  * With sanitizers, run this in a diminished "correctness check" mode.
  */
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
-const auto kMaxThreads = 1;
+const auto kSEPBMMaxThreads = 1;
 #else
 /** 2x to benchmark the case of more threads than cores for curiosity's sake. */
-const auto kMaxThreads = 2 * ProcessInfo::getNumLogicalCores();
+const auto kSEPBMMaxThreads = 2 * ProcessInfo::getNumLogicalCores();
 #endif
 
-BENCHMARK_REGISTER_F(ServiceEntryPointCommonBenchmarkFixture, BM_SEP_PING)
-    ->ThreadRange(1, kMaxThreads);
 
 /**
  * Required initializers, but this is a benchmark so nothing needs to be done.

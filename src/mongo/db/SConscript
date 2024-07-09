@@ -3054,9 +3054,9 @@ env.Benchmark(
 )
 
 env.Benchmark(
-    target="service_entry_point_common_bm",
+    target="service_entry_point_shard_role_bm",
     source=[
-        "service_entry_point_common_bm.cpp",
+        "service_entry_point_shard_role_bm.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/util/periodic_runner_factory",
