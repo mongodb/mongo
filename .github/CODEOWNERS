@@ -164,6 +164,9 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/index/**/index_access_method* @10gen/server-storage-execution
 /src/mongo/db/index/**/index_build_interceptor* @10gen/server-storage-execution
 
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/docs/testing/OWNERS.yml
+/src/mongo/db/modules/enterprise/docs/testing/**/* @10gen/devprod-correctness
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/hot_backups/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/hot_backups/**/* @10gen/server-rss-sydney
 
