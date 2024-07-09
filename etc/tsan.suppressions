@@ -42,3 +42,55 @@ race:_mongoc_handshake_freeze
 #
 # TODO SERVER-84514: remove this suppression once we clarify the synchronization.
 race:mongo::AsyncResultsMerger::_askForNextBatch
+
+# TODO SERVER-91819
+deadlock:mongo::WiredTigerKVEngine::beginNonBlockingBackup
+deadlock:mongo::WiredTigerKVEngine::endNonBlockingBackup
+
+# TODO SERVER-91826
+deadlock:mongo::executor::EgressConnectionCloserManager::add
+deadlock:mongo::executor::EgressConnectionCloserManager::setKeepOpen
+deadlock:mongo::ShardRegistry::_initConfigShard
+
+# TODO SERVER-71207
+deadlock:mongo::repl::TenantOplogBatcher::_doStartup_inlock
+deadlock:mongo::repl::TenantMigrationRecipientService::Instance::_interrupt
+
+# TODO SERVER-91827
+deadlock:mongo::executor::EgressConnectionCloserManager::remove
+deadlock:mongo::repl::ReplicationCoordinatorExternalStateImpl::tooStale 
+deadlock:mongo::RemoteCommandTargeterFactoryImpl::create
+deadlock:mongo::ShardRegistry::getConfigShard
+deadlock:mongo::executor::ConnectionPool::dropConnections
+
+# TODO SERVER-91838
+# deadlock:mongo::ShardRegistry::getConfigShard (relevant to this and above deadlock)
+deadlock:mongo::ReplicaSetMonitorManager::getOrCreateMonitor
+deadlock:mongo::ShardingTaskExecutorPoolController::ReplicaSetChangeListener::onDroppedSet
+
+# TODO SERVER-91869
+deadlock:mongo::executor::ConnectionPool::lease
+deadlock:mongo::executor::PinnedConnectionTaskExecutor::_doNetworking
+
+# TODO SERVER-91871
+# Unittest authz manager race between main thread setting and background job getting via observer
+race:mongo::AuthorizationManager::set
+race:mongo::AuthorizationManager::get
+
+# TODO SERVER-91872 Race on FCBIS::_stats
+race:mongo::repl::FileCopyBasedInitialSyncer::_extendBackupCursor
+race:mongo::repl::FileCopyBasedInitialSyncer::_getInitialSyncProgress
+
+# TODO SERVER-91873 inversion between _keystoreMetadataMutex and encrypedCustomizeMutex
+# rotateMasterKey -> makeKeystore -> WTDataStore -> customize
+# WTFactory::create->_openWiredTiger->customize->getKey->initLocalKeystore
+deadlock:mongo::EncryptionKeyManager::_initLocalKeystore
+deadlock:mongo::(anonymous namespace)::customize
+
+# TODO SERVER-91877 inversion b/w SSL manager and some crypto mutex
+deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
+
+# TODO SERVER-91875 inversion b/w replication corodinator impl mutex and FCBIS mutex
+# ReplCoord::_startInitialSync->~FCBIS
+# ReplCoord::_startInitialSnyc->FCBIS::startup->ReplCoord::getMemberState
+deadlock:mongo::repl::ReplicationCoordinatorImpl::_startInitialSync
