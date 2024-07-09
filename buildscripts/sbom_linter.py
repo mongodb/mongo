@@ -21,9 +21,7 @@ SKIP_FILE_CHECKING = False
 UNDEFINED_THIRD_PARTY_ERROR = (
     "The following files in src/third_party do not have components defined in the sbom:"
 )
-FORMATTING_ERROR = (
-    "file has incorrect formatting, re-run this linter with the `--format` option to fix this."
-)
+FORMATTING_ERROR = "file has incorrect formatting, re-run `buildscripts/sbom_linter.py` with the `--format` option to fix this."
 MISSING_PURL_CPE_ERROR = "component must include a 'purl' or 'cpe' field."
 MISSING_EVIDENCE_ERROR = (
     "component must include an 'evidence.occurrences' field when the scope is required."
@@ -145,7 +143,8 @@ def main() -> int:
     )
     # the only files in this dir that are not third party libs
     third_party_libs.remove("scripts")
-
+    # wiredtiger will not be included in the sbom since it is considered part of the server
+    third_party_libs.remove("wiredtiger")
     errors = lint_sbom(input_file, output_file, third_party_libs, should_format)
 
     if errors:
