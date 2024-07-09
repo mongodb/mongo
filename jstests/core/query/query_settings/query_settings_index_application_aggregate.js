@@ -270,13 +270,13 @@ function instantiateTestCasesNoSecondaryView(...testCases) {
 
 if (FixtureHelpers.isSharded(coll) || FixtureHelpers.isSharded(secondaryColl)) {
     // TODO: SERVER-88883 Report 'indexesUsed' for $lookup over sharded collections.
-    instantiateTestCases(testAggregateQuerySettingsApplicationWithGraphLookup);
-
-    instantiateTestCasesNoSecondaryView(
-        testAggregateQuerySettingsApplicationWithoutSecondaryCollections,
-        // TODO: SERVER-88810 View resolution error on sharded view with $unionWith in explain.
+    instantiateTestCases(
+        testAggregateQuerySettingsApplicationWithGraphLookup,
         testAggregateQuerySettingsApplicationWithUnionWithPipeline,
     );
+
+    instantiateTestCasesNoSecondaryView(
+        testAggregateQuerySettingsApplicationWithoutSecondaryCollections);
 } else {
     instantiateTestCases(
         testAggregateQuerySettingsApplicationWithLookupEquiJoin,
