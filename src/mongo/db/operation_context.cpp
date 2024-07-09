@@ -400,7 +400,10 @@ void OperationContext::setIsExecutingShutdown() {
 
     _isExecutingShutdown = true;
 
-    pushIgnoreInterrupts();
+    // The OperationContext executing shutdown is immune from interruption.
+    _hasArtificialDeadline = true;
+    setDeadlineByDate(Date_t::max(), ErrorCodes::ExceededTimeLimit);
+    _ignoreInterrupts = true;
 }
 
 void OperationContext::setLogicalSessionId(LogicalSessionId lsid) {

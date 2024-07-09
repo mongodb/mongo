@@ -107,28 +107,6 @@ protected:
      * Returns the equivalent of Date_t::now() + waitFor for the InterruptibleBase's clock
      */
     virtual Date_t getExpirationDateForWaitForValue(Milliseconds waitFor) = 0;
-
-    struct IgnoreInterruptsState {
-        bool ignoreInterrupts;
-        DeadlineState deadline;
-    };
-
-    /**
-     * Pushes an ignore interruption critical section into the InterruptibleBase.
-     * Until an associated popIgnoreInterrupts() is invoked, the InterruptibleBase should ignore
-     * interruptions related to explicit interruption or previously set deadlines.
-     *
-     * Note that new deadlines can be set after this is called, which will again introduce the
-     * possibility of interruption.
-     *
-     * Returns state needed to pop interruption.
-     */
-    virtual IgnoreInterruptsState pushIgnoreInterrupts() = 0;
-
-    /**
-     * Pops the ignored interruption critical section introduced by push.
-     */
-    virtual void popIgnoreInterrupts(IgnoreInterruptsState iis) = 0;
 };
 
 /**
@@ -192,44 +170,6 @@ private:
 
     DeadlineGuard makeDeadlineGuard(Date_t deadline, ErrorCodes::Error error) {
         return DeadlineGuard(*this, deadline, error);
-    }
-
-    /**
-     * An interruption guard provides a region where interruption is ignored.
-     *
-     * Note that this causes the deadline to be reset to Date_t::max(), but that it can also be
-     * subsequently reduced in size after the fact.
-     */
-    class IgnoreInterruptionsGuard {
-    public:
-        IgnoreInterruptionsGuard(const IgnoreInterruptionsGuard&) = delete;
-        IgnoreInterruptionsGuard& operator=(const IgnoreInterruptionsGuard&) = delete;
-
-        IgnoreInterruptionsGuard(IgnoreInterruptionsGuard&& other)
-            : _interruptible(other._interruptible), _oldState(other._oldState) {
-            other._interruptible = nullptr;
-        }
-
-        IgnoreInterruptionsGuard& operator=(IgnoreInterruptionsGuard&&) = delete;
-
-        ~IgnoreInterruptionsGuard() {
-            if (_interruptible) {
-                _interruptible->popIgnoreInterrupts(_oldState);
-            }
-        }
-
-    private:
-        friend Interruptible;
-
-        explicit IgnoreInterruptionsGuard(Interruptible& interruptible)
-            : _interruptible(&interruptible), _oldState(_interruptible->pushIgnoreInterrupts()) {}
-
-        Interruptible* _interruptible;
-        IgnoreInterruptsState _oldState;
-    };
-
-    IgnoreInterruptionsGuard makeIgnoreInterruptionsGuard() {
-        return IgnoreInterruptionsGuard(*this);
     }
 
 public:
@@ -303,24 +243,6 @@ public:
 
     bool hasDeadline() const {
         return getDeadline() != Date_t::max();
-    }
-
-    /**
-     * Invokes the passed callback with an interruption guard active.  Additionally handles the
-     * dance of try/catching the invocation and checking checkForInterrupt with the guard inactive
-     * (to allow a higher level timeout to override a lower level one, or for top level interruption
-     * to propagate)
-     */
-    template <typename Callback>
-    decltype(auto) runWithoutInterruptionExceptAtGlobalShutdown(Callback&& cb) {
-        try {
-            const auto guard = makeIgnoreInterruptionsGuard();
-            return std::forward<Callback>(cb)();
-        } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
-            // May throw replacement exception
-            checkForInterrupt();
-            throw;
-        }
     }
 
     /**
@@ -589,19 +511,6 @@ class Interruptible::NotInterruptible final : public Interruptible {
 
     Status checkForInterruptNoAssert() noexcept override {
         return Status::OK();
-    }
-
-    // It's invalid to call the deadline or ignore interruption guards on a possibly noop
-    // Interruptible.
-    //
-    // The noop Interruptible should only be invoked as a default arg at the bottom of the call
-    // stack (with types that won't modify it's invocation)
-    IgnoreInterruptsState pushIgnoreInterrupts() override {
-        MONGO_UNREACHABLE;
-    }
-
-    void popIgnoreInterrupts(IgnoreInterruptsState) override {
-        MONGO_UNREACHABLE;
     }
 
     DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {

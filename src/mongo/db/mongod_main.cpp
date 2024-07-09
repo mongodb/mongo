@@ -1471,7 +1471,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             uniqueOpCtx = client->makeOperationContext();
             opCtx = uniqueOpCtx.get();
         }
-        opCtx->setIsExecutingShutdown();
+        {
+            stdx::lock_guard lg(*client);
+            opCtx->setIsExecutingShutdown();
+        }
 
         // This can wait a long time while we drain the secondary's apply queue, especially if
         // it is building an index.
