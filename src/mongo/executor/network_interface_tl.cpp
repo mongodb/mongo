@@ -1152,10 +1152,15 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
     }
 
     auto onAnyResponse = RemoteCommandOnAnyResponse(requestState->host, response);
-    if (!catchingInvoke([&] { doMetadataHook(onAnyResponse); },
-                        [&](Status& err) { finalResponsePromise.setError(err); },
-                        "Exhaust command metadata hook readReplyMetadata"))
+    try {
+        doMetadataHook(onAnyResponse);
+    } catch (const DBException& ex) {
+        Status err = ex.toStatus();
+        LOGV2(
+            9183100, "Exhaust command metadata hook readReplyMetadata failed", "error"_attr = err);
+        finalResponsePromise.setError(err);
         return;
+    }
 
     // If the command failed, we will call 'onReply' as a part of the future chain paired with
     // the promise. This is to be sure that all error paths will run 'onReply' only once upon
@@ -1168,10 +1173,14 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
         return;
     }
 
-    if (!catchingInvoke([&] { onReplyFn(onAnyResponse); },
-                        [&](Status& err) { finalResponsePromise.setError(err); },
-                        "Exhaust command onReplyFn"))
+    try {
+        onReplyFn(onAnyResponse);
+    } catch (const DBException& ex) {
+        Status err = ex.toStatus();
+        LOGV2(9183101, "Exhaust command onReplyFn failed", "error"_attr = err);
+        finalResponsePromise.setError(err);
         return;
+    }
 
     // Reset the stopwatch to measure the correct duration for the following reply
     {
@@ -1182,10 +1191,14 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
         deadline = stopwatch.start() + requestOnAny.timeout;
     }
 
-    if (!catchingInvoke([&] { setTimer(requestState); },
-                        [&](Status& err) { finalResponsePromise.setError(err); },
-                        "Exhaust command setTimer"))
+    try {
+        setTimer(requestState);
+    } catch (const DBException& ex) {
+        Status err = ex.toStatus();
+        LOGV2(9183102, "Exhaust command setTimer failed", "error"_attr = err);
+        finalResponsePromise.setError(err);
         return;
+    }
 
     requestState->getClient(requestState->conn)
         ->awaitExhaustCommand(baton)
