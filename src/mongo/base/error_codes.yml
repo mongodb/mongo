@@ -762,13 +762,13 @@ error_codes:
       categories: [ExceededTimeLimitError, RetriableError],
     }
 
+  - {code: 408, name: CannotInsertTimeseriesBucketsWithMixedSchema}
+
   - {
-      code: 408,
+      code: 409,
       name: TimeseriesBucketCompressionFailed,
       extra: "timeseries::BucketCompressionFailure",
     }
-
-  - {code: 409, name: CannotInsertTimeseriesBucketsWithMixedSchema}
 
   - {code: 410, name: TimeseriesBucketFrozen, categories: [InternalOnly]}
 
