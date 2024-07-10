@@ -65,9 +65,8 @@ variables:
 
   _src_dir: &src_dir src/mongo
   _modules: &modules
-    - mongo-tools
-    # - mongo
     - dsi
+    # - mongo
     - genny
     - workloads
     - linkbench
@@ -154,13 +153,6 @@ modules:
   #    repo: mongo
   #    prefix: ${workdir}/src
   #    branch: master
-  ###
-  # Pinned to version 100.7.2
-  - name: mongo-tools
-    owner: mongodb
-    repo: mongo-tools
-    prefix: mongo-tools/src/github.com/mongodb
-    branch: db8c5c4
   - name: PrivateWorkloads
     owner: 10gen
     repo: PrivateWorkloads
@@ -705,8 +697,6 @@ tasks:
       - command: git.get_project
         params:
           directory: src
-          revisions:
-            mongo-tools: ${mongo-tools_rev}
       - func: "compile prep"
       - func: "get engflow creds perf"
       - func: "download mongo tools"
