@@ -8932,6 +8932,9 @@ TEST_F(BSONColumnTest, BlockFuzzerDiscoveredEdgeCases) {
         // Blockbased API didn't update last to EOO when Iterative API did for interleaved data
         // (SERVER-89612).
         "8hQAAAAF+P//////FCgAAAAAAAAABgAIAACBKg7/+///////MP8V/3EAAACBeHFYDAAA/3RhZ3P//wEAAAA="_sd,
+        // Blockbased API doesn't fail an interleaved mode that has leftover data in some decoders
+        // while the iterative version does (SERVER-92150)
+        "8jIAAAAHVvkCAAEAAAAAAgABAAAAAAxTdGNydHVfaWQAAQAAAAABMg5faWQAAQAAAAAA/wD/AP8Aj4+Pj4+Pj4+Pj4+Pj4+Pj4//AP8A/wD/AP8A/wD/AP8A/wCPj4+Pj4+Pj4+PAAD/AP8A/wD/AP8A/wCPj4+Pj4+Pj49vj4+Pj4+Pj/8A/041j4+Pj4+Pj4+Pj48BAFXeV6t2AI+Pj4+Pj4+Pj4+Pj8SPj4+Pj4+Pj4//AP8A/wD/AP8A/wAA"_sd,
     };
 
     for (auto&& binaryBase64 : binariesBase64) {
