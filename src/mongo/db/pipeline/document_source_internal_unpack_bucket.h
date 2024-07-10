@@ -320,5 +320,9 @@ private:
     bool _optimizedEndOfPipeline = false;
     bool _triedInternalizeProject = false;
     bool _triedLastpointRewrite = false;
+
+    // The $project or $addFields stages which we have tried to apply the computed meta project push
+    // down optimization to.
+    std::vector<DocumentSource*> _triedComputedMetaPushDownFor;
 };
 }  // namespace mongo
