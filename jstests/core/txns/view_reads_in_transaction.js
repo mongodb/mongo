@@ -1,5 +1,8 @@
 // Tests that reads on views are supported in transactions.
 // @tags: [uses_transactions, uses_snapshot_read_concern]
+
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+
 const session = db.getMongo().startSession({causalConsistency: false});
 const testDB = session.getDatabase("test");
 const coll = testDB.getCollection("view_reads_in_transaction_data_coll");
@@ -20,35 +23,34 @@ assert.commandWorked(view.runCommand(
 
 // Run a dummy find to start the transaction.
 jsTestLog("Starting transaction.");
-session.startTransaction({readConcern: {level: "snapshot"}});
-// Refresh the router's and shard's database versions so the distinct run below can succeed.
-// This is necessary because shards always abort their local transaction on stale version
-// errors and mongos is not allowed to retry on these errors in a transaction if the stale
-// shard has completed at least one earlier statement.
-assert.eq(view.distinct("_id"), ["kyle"]);
-let cursor = coll.find();
-cursor.next();
+withTxnAndAutoRetryOnMongos(session, () => {
+    // Refresh the router's and shard's database versions so the distinct run below can succeed.
+    // This is necessary because shards always abort their local transaction on stale version
+    // errors and mongos is not allowed to retry on these errors in a transaction if the stale
+    // shard has completed at least one earlier statement.
+    assert.eq(view.distinct("_id"), ["kyle"]);
+    let cursor = coll.find();
+    cursor.next();
 
-// Insert a document outside of the transaction. Subsequent reads should not see this document.
-jsTestLog("Inserting document outside of transaction.");
-assert.commandWorked(db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).insert({
-    _id: "not_visible_in_transaction",
-}));
+    // Insert a document outside of the transaction. Subsequent reads should not see this document.
+    jsTestLog("Inserting document outside of transaction.");
+    assert.commandWorked(db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).insert({
+        _id: "not_visible_in_transaction",
+    }));
 
-// Perform reads on views, which will be transformed into aggregations on the backing
-// collection.
-jsTestLog("Performing reads on the view inside the transaction.");
-cursor = view.find();
-assert.docEq(testDoc, cursor.next());
-assert(!cursor.hasNext());
+    // Perform reads on views, which will be transformed into aggregations on the backing
+    // collection.
+    jsTestLog("Performing reads on the view inside the transaction.");
+    cursor = view.find();
+    assert.docEq(testDoc, cursor.next());
+    assert(!cursor.hasNext());
 
-cursor = view.aggregate({$match: {}});
-assert.docEq(testDoc, cursor.next());
-assert(!cursor.hasNext());
+    cursor = view.aggregate({$match: {}});
+    assert.docEq(testDoc, cursor.next());
+    assert(!cursor.hasNext());
 
-assert.eq(view.find({_id: {$exists: 1}}).itcount(), 1);
+    assert.eq(view.find({_id: {$exists: 1}}).itcount(), 1);
 
-assert.eq(view.distinct("_id"), ["kyle"]);
-
-assert.commandWorked(session.commitTransaction_forTesting());
+    assert.eq(view.distinct("_id"), ["kyle"]);
+}, {readConcern: {level: "snapshot"}});
 jsTestLog("Transaction committed.");
