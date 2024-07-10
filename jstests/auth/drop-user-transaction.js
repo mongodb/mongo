@@ -51,7 +51,6 @@ function runTest(conn, testCB) {
 
     runTest(mongod, function(test) {
         // Pause and cause next op to block.
-        const start = Date.now();
         const parallelShell = startParallelShell(
             `
             db.getSiblingDB('admin').auth('admin', 'pwd');
@@ -62,7 +61,11 @@ function runTest(conn, testCB) {
         // Other UMCs block.
         assert.commandWorked(test.runCommand({updateRole: 'role2', privileges: []}));
         parallelShell();
-        assert.gte(Date.now() - start, kFailpointDelay);
+
+        jsTest.log("Verify the failpoint is triggered.");
+        const kUMCTransactionCommitDelayLogId = 4993100;
+        checkLog.containsJson(
+            mongod, kUMCTransactionCommitDelayLogId, {durationMillis: kFailpointDelay});
     });
 
     MongoRunner.stopMongod(mongod);
