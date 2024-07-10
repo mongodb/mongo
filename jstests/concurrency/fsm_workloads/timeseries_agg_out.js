@@ -127,14 +127,36 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         if (isMongos(db) && this.tid === 0) {
             jsTestLog(`Running shardCollection: coll=${this.outputCollName} key=${this.shardKey}`);
 
-            assert.commandWorkedOrFailedWithCode(
-                db.adminCommand(
-                    {shardCollection: db[this.outputCollName].getFullName(), key: this.shardKey}),
-                [
-                    ErrorCodes.ConflictingOperationInProgress,
-                    // Can't shard a capped collection.
-                    ErrorCodes.InvalidOptions
-                ]);
+            assert.commandWorkedOrFailedWithCode(db.adminCommand({
+                shardCollection: db[this.outputCollName].getFullName(),
+                key: this.shardKey,
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName}
+            }),
+                                                 [
+                                                     ErrorCodes.ConflictingOperationInProgress,
+                                                     // Can't shard a capped collection.
+                                                     ErrorCodes.InvalidOptions
+                                                 ]);
+        }
+    };
+
+    /**
+     * Ensures all the indexes exist. This will have no affect unless some thread has already
+     * dropped an index.
+     */
+    $config.states.createIndexes = function createIndexes(db, unusedCollName) {
+        // Create timeseries_agg_out as timeseries before running createIndex to prevent the case
+        // the collection is created for the first time by the createIndex itself.
+        assert.commandWorkedOrFailedWithCode(
+            db.createCollection(this.outputCollName,
+                                {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            [ErrorCodes.NamespaceExists]);
+
+        for (var i = 0; i < this.indexSpecs; ++i) {
+            const indexSpecs = this.indexSpecs[i];
+            jsTestLog(`Running createIndex: coll=${this.outputCollName} indexSpec=${indexSpecs}`);
+            assert.commandWorkedOrFailedWithCode(db[this.outputCollName].createIndex(indexSpecs),
+                                                 ErrorCodes.MovePrimaryInProgress);
         }
     };
 
