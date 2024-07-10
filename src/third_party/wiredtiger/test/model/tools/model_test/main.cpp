@@ -35,6 +35,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "wiredtiger.h"
@@ -283,6 +284,154 @@ load_workload(const char *file)
 }
 
 /*
+ * reduce_counterexample_context_t --
+ *     The context for counterexample reduction.
+ */
+struct reduce_counterexample_context_t {
+    const std::string conn_config;
+    const std::string main_home;
+    const std::string reduce_home;
+    const std::string table_config;
+
+    size_t round;
+
+    /*
+     * reduce_counterexample_context_t::reduce_counterexample_context_t --
+     *     Initialize the context.
+     */
+    reduce_counterexample_context_t(const std::string &main_home, const std::string &reduce_home,
+      const std::string &conn_config, const std::string &table_config)
+        : main_home(main_home), reduce_home(reduce_home), conn_config(conn_config),
+          table_config(table_config), round(0)
+    {
+    }
+};
+
+/*
+ * reduce_counterexample_by_aspect --
+ *     Try to find a smaller workload that reproduces a failure, focusing on a specific aspect
+ *     specified by the corresponding lambda arguments for detecting and extracting the operation
+ *     aspect (e.g., its sequence number or its table ID) and any other condition under which the
+ *     operation should be always included in the tested workload. The parameters to the lambdas are
+ *     the operation itself and its index in the workload. Return the reduced workload, or the
+ *     workload parameter itself if no reduction has been found.
+ */
+template <typename T>
+static std::shared_ptr<model::kv_workload>
+reduce_counterexample_by_aspect(reduce_counterexample_context_t &context,
+  std::shared_ptr<model::kv_workload> workload, const char *aspect_name_plural,
+  std::function<bool(const model::kv_workload_operation &, size_t)> has_aspect,
+  std::function<T(const model::kv_workload_operation &, size_t)> aspect_value,
+  std::function<bool(const model::kv_workload_operation &, size_t)> always_include)
+{
+    /* Extract the list of aspect values and associate each one with a 0-based index. */
+    std::unordered_map<T, size_t> aspect_value_to_index;
+    for (size_t i = 0; i < workload->size(); i++) {
+        model::kv_workload_operation &op = (*workload)[i];
+        if (!has_aspect(op, i))
+            continue;
+        const T value = aspect_value(op, i);
+        if (aspect_value_to_index.find(value) == aspect_value_to_index.end())
+            aspect_value_to_index[value] = aspect_value_to_index.size();
+    }
+
+    if (aspect_value_to_index.size() <= 1)
+        return workload; /* Nothing to reduce on. */
+
+    /*
+     * Find the minimal subset that causes a failure by using an algorithm similar to binary search:
+     * Remove the first half of the workload and then see if the failure happens again. If it does,
+     * then that part of the workload can be eliminated. If the failure does not happen, it means
+     * that the eliminated part of the workload includes something that contributes to the failure.
+     * In the next iteration, try removing only half of the removed range - first the first half and
+     * then the second half.
+     */
+    std::vector<bool> enabled(aspect_value_to_index.size(), true);
+    std::shared_ptr<model::kv_workload> reduced;
+
+    std::deque<std::pair<size_t, size_t>> ranges_to_remove;
+    ranges_to_remove.push_back(std::pair<size_t, size_t>(0, aspect_value_to_index.size() / 2));
+    ranges_to_remove.push_back(
+      std::pair<size_t, size_t>(aspect_value_to_index.size() / 2, aspect_value_to_index.size()));
+
+    while (!ranges_to_remove.empty()) {
+        std::pair<size_t, size_t> range = ranges_to_remove.front();
+        ranges_to_remove.pop_front();
+        if (range.first >= range.second)
+            continue;
+
+        /* Print progress. Print the range as 1-based, inclusive range. */
+        context.round++;
+        std::cout << "Counterexample reduction: Round " << context.round << ", remove "
+                  << aspect_name_plural << " " << range.first + 1 << "-" << range.second
+                  << std::endl;
+
+        /* Create a workload with a subset of the operations. */
+        std::shared_ptr<model::kv_workload> w = std::make_shared<model::kv_workload>();
+        for (size_t i = 0; i < workload->size(); i++) {
+            const model::kv_workload_operation &op = (*workload)[i];
+
+            /*
+             * Always include operations that are not applicable to the aspect of the workload on
+             * which we are focusing.
+             */
+            if (!has_aspect(op, i) || always_include(op, i)) {
+                *w << op;
+                continue;
+            }
+
+            /* Include the operation depending on the aspect value. */
+            const T value = aspect_value(op, i);
+            size_t index = aspect_value_to_index[value];
+            if (enabled[index] && !(index >= range.first && index < range.second))
+                *w << op;
+        }
+
+        /*
+         * Validate that we didn't just produce a malformed workload.
+         *
+         * The workload construction algorithm above already guarantees that the transactions are
+         * included or removed in their entirety and that the workload creates all of its tables, so
+         * we don't need to check for undefined transaction or table IDs.
+         */
+        bool skip = false;
+        if (!w->verify_timestamps())
+            skip = true;
+
+        /* Clean up the previous database directory, if it exists. */
+        if (!skip)
+            testutil_remove(context.reduce_home.c_str());
+
+        /* Try the reduced workload. */
+        try {
+            if (!skip)
+                run_and_verify(w, context.reduce_home, context.conn_config, context.table_config);
+            else
+                std::cout << "Counterexample reduction: Skip running a malformed workload"
+                          << std::endl;
+
+            /* There was no error, so try removing only just the halves. */
+            if (range.first + 1 < range.second) {
+                size_t m = (range.first + range.second) / 2;
+                ranges_to_remove.push_back(std::pair<size_t, size_t>(range.first, m));
+                ranges_to_remove.push_back(std::pair<size_t, size_t>(m, range.second));
+            }
+        } catch (std::exception &e) {
+            std::cout << "Counterexample reduction: " << e.what() << std::endl;
+
+            /* There was an error, so we can remove the range from next iteration. */
+            for (size_t i = range.first; i < range.second; i++)
+                enabled[i] = false;
+
+            /* This is the best workload reduction so far, so save it. */
+            reduced = w;
+        }
+    }
+
+    return reduced ? reduced : workload;
+}
+
+/*
  * reduce_counterexample --
  *     Try to find a smaller workload that reproduces a failure.
  */
@@ -290,6 +439,8 @@ static void
 reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::string &main_home,
   const std::string &reduce_home, const std::string &conn_config, const std::string &table_config)
 {
+    reduce_counterexample_context_t context{main_home, reduce_home, conn_config, table_config};
+
     /*
      * Separate the workload back into sequences, where a sequence is a transaction or just a single
      * non-transactional operations, such as database restart or set stable timestamp. We will not
@@ -352,100 +503,52 @@ reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::s
         }
     }
 
-    /*
-     * Find the minimal subset that causes a failure by using an algorithm similar to binary search:
-     * Remove the first half of the workload and then see if the failure happens again. If it does,
-     * then that part of the workload can be eliminated. If the failure does not happen, it means
-     * that the eliminated part of the workload includes something that contributes to the failure.
-     * In the next iteration, try removing only half of the removed range - first the first half and
-     * then the second half.
-     */
-    std::vector<bool> enabled(sequences.size(), true);
-    std::shared_ptr<model::kv_workload> reduced;
+    std::shared_ptr<model::kv_workload> w = workload;
 
-    std::deque<std::pair<size_t, size_t>> ranges_to_remove;
-    ranges_to_remove.push_back(std::pair<size_t, size_t>(0, sequences.size() / 2));
-    ranges_to_remove.push_back(std::pair<size_t, size_t>(sequences.size() / 2, sequences.size()));
+    /* Reduce the workload based on sequences. */
+    w = reduce_counterexample_by_aspect<size_t>(
+      context, w, "sequences",
+      [](
+        const model::kv_workload_operation &op, size_t) { return op.seq_no != model::k_no_seq_no; },
+      [](const model::kv_workload_operation &op, size_t) { return op.seq_no; },
+      [](const model::kv_workload_operation &op, size_t) {
+          /*
+           * Always include metadata operations in the workload, so that we don't produce a
+           * malformed workload at this stage due to a missing table.
+           */
+          return std::holds_alternative<model::operation::create_table>(op.operation);
+      });
 
-    size_t round = 0;
-    while (!ranges_to_remove.empty()) {
-        std::pair<size_t, size_t> range = ranges_to_remove.front();
-        ranges_to_remove.pop_front();
-        if (range.first >= range.second)
-            continue;
+    /* Reduce the workload based on tables. */
+    w = reduce_counterexample_by_aspect<model::table_id_t>(
+      context, w, "tables",
+      [](const model::kv_workload_operation &op, size_t) {
+          return model::operation::table_op(op.operation);
+      },
+      [](const model::kv_workload_operation &op, size_t) {
+          return model::operation::table_id(op.operation);
+      },
+      [](const model::kv_workload_operation &, size_t) { return false; });
 
-        round++;
-        std::cout << "Counterexample reduction: Round " << round << ", remove " << range.first
-                  << "-" << range.second << std::endl;
-
-        /* Create a workload with a subset of the operations. */
-        std::shared_ptr<model::kv_workload> w = std::make_shared<model::kv_workload>();
-        for (size_t i = 0; i < workload->size(); i++) {
-            const model::kv_workload_operation &op = (*workload)[i];
-
-            /*
-             * Keep only enabled operations, operations that are not in the removed range, and
-             * metadata operations (currently just "create table," so that the workload doesn't fail
-             * due to a missing table).
-             *
-             * We don't expect the first comparison to model::k_no_seq_no to evaluate to false, but
-             * this is a precaution against an out of bounds access for vector "enabled" below.
-             */
-            if (op.seq_no == model::k_no_seq_no ||
-              (enabled[op.seq_no] && !(op.seq_no >= range.first && op.seq_no < range.second)) ||
-              std::holds_alternative<model::operation::create_table>(op.operation))
-                *w << op;
-        }
-
-        /*
-         * Validate that we didn't just produce a malformed workload.
-         *
-         * The workload construction algorithm above already guarantees that the transactions are
-         * included or removed in their entirety and that the workload creates all of its tables, so
-         * we don't need to check for undefined transaction or table IDs.
-         */
-        bool skip = false;
-        if (!w->verify_timestamps())
-            skip = true;
-
-        /* Clean up the previous database directory, if it exists. */
-        if (!skip)
-            testutil_remove(reduce_home.c_str());
-
-        /* Try the reduced workload. */
-        try {
-            if (!skip)
-                run_and_verify(w, reduce_home, conn_config, table_config);
-            else
-                std::cout << "Counterexample reduction: Skip running a malformed workload"
-                          << std::endl;
-
-            /* There was no error, so try removing only just the halves. */
-            if (range.first + 1 < range.second) {
-                size_t m = (range.first + range.second) / 2;
-                ranges_to_remove.push_back(std::pair<size_t, size_t>(range.first, m));
-                ranges_to_remove.push_back(std::pair<size_t, size_t>(m, range.second));
-            }
-        } catch (std::exception &e) {
-            std::cout << "Counterexample reduction: " << e.what() << std::endl;
-
-            /* There was an error, so we can remove the range from next iteration. */
-            for (size_t i = range.first; i < range.second; i++)
-                enabled[i] = false;
-
-            /* This is the best workload reduction so far, so save it. */
-            reduced = w;
-        }
-    }
+    /* Now try to remove individual operations within a transaction. */
+    w = reduce_counterexample_by_aspect<size_t>(
+      context, w, "operations",
+      [](const model::kv_workload_operation &op, size_t) {
+          return (model::operation::transactional(op.operation) &&
+                   model::operation::table_op(op.operation)) ||
+            std::holds_alternative<model::operation::set_commit_timestamp>(op.operation);
+      },
+      [](const model::kv_workload_operation &, size_t index) { return index; },
+      [](const model::kv_workload_operation &, size_t) { return false; });
 
     /* Save the reduced workload. */
-    if (reduced) {
+    if (w.get() != workload.get()) {
         std::string workload_file = main_home + DIR_DELIM_STR + REDUCED_WORKLOAD_FILE;
         std::ofstream workload_out;
         workload_out.open(workload_file);
         if (!workload_out.is_open())
             throw std::runtime_error("Failed to create file: " + workload_file);
-        workload_out << *reduced.get();
+        workload_out << *w.get();
         workload_out.close();
         if (!workload_out.good())
             throw std::runtime_error("Failed to close file: " + workload_file);

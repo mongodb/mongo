@@ -107,10 +107,71 @@ struct without_txn_id {
 };
 
 /*
+ * with_table_id --
+ *     Annotates operations with table IDs.
+ */
+struct with_table_id {
+    table_id_t table_id;
+
+    /*
+     * with_table_id::with_table_id --
+     *     Create the operation.
+     */
+    inline with_table_id(table_id_t table_id) : table_id(table_id) {}
+
+    /*
+     * with_table_id::table_op --
+     *     Return whether the operation works on a specific table.
+     */
+    inline bool
+    table_op() const
+    {
+        return true;
+    }
+
+    /*
+     * with_table_id::table_id --
+     *     Get the table ID.
+     */
+    inline table_id_t
+    table() const
+    {
+        return table_id;
+    }
+};
+
+/*
+ * without_table_id --
+ *     Annotates operations that do not specify tables.
+ */
+struct without_table_id {
+
+    /*
+     * without_table_id::table_op --
+     *     Return whether the operation works on a specific table.
+     */
+    inline bool
+    table_op() const
+    {
+        return false;
+    }
+
+    /*
+     * without_table_id::table_id --
+     *     Get the table ID.
+     */
+    inline table_id_t
+    table() const
+    {
+        throw model_exception("The operation does not specify a table");
+    }
+};
+
+/*
  * begin_transaction --
  *     A representation of this workload operation.
  */
-struct begin_transaction : public with_txn_id {
+struct begin_transaction : public with_txn_id, public without_table_id {
 
     /*
      * begin_transaction::begin_transaction --
@@ -154,7 +215,7 @@ operator<<(std::ostream &out, const begin_transaction &op)
  * checkpoint --
  *     A representation of this workload operation.
  */
-struct checkpoint : public without_txn_id {
+struct checkpoint : public without_txn_id, public without_table_id {
     std::string name;
 
     /*
@@ -199,7 +260,7 @@ operator<<(std::ostream &out, const checkpoint &op)
  * commit_transaction --
  *     A representation of this workload operation.
  */
-struct commit_transaction : public with_txn_id {
+struct commit_transaction : public with_txn_id, public without_table_id {
     timestamp_t commit_timestamp;
     timestamp_t durable_timestamp;
 
@@ -252,7 +313,7 @@ operator<<(std::ostream &out, const commit_transaction &op)
  * crash --
  *     A representation of this workload operation.
  */
-struct crash : public without_txn_id {
+struct crash : public without_txn_id, public without_table_id {
 
     /*
      * crash::crash --
@@ -296,8 +357,7 @@ operator<<(std::ostream &out, const crash &op)
  * create_table --
  *     A representation of this workload operation.
  */
-struct create_table : public without_txn_id {
-    table_id_t table_id; /* This will be the table's public ID. */
+struct create_table : public without_txn_id, public with_table_id {
     std::string name;
     std::string key_format;
     std::string value_format;
@@ -308,7 +368,7 @@ struct create_table : public without_txn_id {
      */
     inline create_table(
       table_id_t table_id, const char *name, const char *key_format, const char *value_format)
-        : table_id(table_id), name(name), key_format(key_format), value_format(value_format)
+        : with_table_id(table_id), name(name), key_format(key_format), value_format(value_format)
     {
     }
 
@@ -350,15 +410,14 @@ operator<<(std::ostream &out, const create_table &op)
  * evict --
  *     A representation of this workload operation.
  */
-struct evict : public without_txn_id {
-    table_id_t table_id;
+struct evict : public without_txn_id, public with_table_id {
     data_value key;
 
     /*
      * evict::evict --
      *     Create the operation.
      */
-    inline evict(table_id_t table_id, const data_value &key) : table_id(table_id), key(key) {}
+    inline evict(table_id_t table_id, const data_value &key) : with_table_id(table_id), key(key) {}
 
     /*
      * evict::operator== --
@@ -396,8 +455,7 @@ operator<<(std::ostream &out, const evict &op)
  * insert --
  *     A representation of this workload operation.
  */
-struct insert : public with_txn_id {
-    table_id_t table_id;
+struct insert : public with_txn_id, public with_table_id {
     data_value key;
     data_value value;
 
@@ -407,7 +465,7 @@ struct insert : public with_txn_id {
      */
     inline insert(
       table_id_t table_id, txn_id_t txn_id, const data_value &key, const data_value &value)
-        : with_txn_id(txn_id), table_id(table_id), key(key), value(value)
+        : with_txn_id(txn_id), with_table_id(table_id), key(key), value(value)
     {
     }
 
@@ -449,7 +507,7 @@ operator<<(std::ostream &out, const insert &op)
  * prepare_transaction --
  *     A representation of this workload operation.
  */
-struct prepare_transaction : public with_txn_id {
+struct prepare_transaction : public with_txn_id, public without_table_id {
     timestamp_t prepare_timestamp;
 
     /*
@@ -497,8 +555,7 @@ operator<<(std::ostream &out, const prepare_transaction &op)
  * remove --
  *     A representation of this workload operation.
  */
-struct remove : public with_txn_id {
-    table_id_t table_id;
+struct remove : public with_txn_id, public with_table_id {
     data_value key;
 
     /*
@@ -506,7 +563,7 @@ struct remove : public with_txn_id {
      *     Create the operation.
      */
     inline remove(table_id_t table_id, txn_id_t txn_id, const data_value &key)
-        : with_txn_id(txn_id), table_id(table_id), key(key)
+        : with_txn_id(txn_id), with_table_id(table_id), key(key)
     {
     }
 
@@ -546,7 +603,7 @@ operator<<(std::ostream &out, const remove &op)
  * restart --
  *     A representation of this workload operation.
  */
-struct restart : public without_txn_id {
+struct restart : public without_txn_id, public without_table_id {
 
     /*
      * restart::restart --
@@ -590,7 +647,7 @@ operator<<(std::ostream &out, const restart &op)
  * rollback_to_stable --
  *     A representation of this workload operation.
  */
-struct rollback_to_stable : public without_txn_id {
+struct rollback_to_stable : public without_txn_id, public without_table_id {
 
     /*
      * rollback_to_stable::rollback_to_stable --
@@ -634,7 +691,7 @@ operator<<(std::ostream &out, const rollback_to_stable &op)
  * rollback_transaction --
  *     A representation of this workload operation.
  */
-struct rollback_transaction : public with_txn_id {
+struct rollback_transaction : public with_txn_id, public without_table_id {
 
     /*
      * rollback_transaction::rollback_transaction --
@@ -678,7 +735,7 @@ operator<<(std::ostream &out, const rollback_transaction &op)
  * set_commit_timestamp --
  *     A representation of this workload operation.
  */
-struct set_commit_timestamp : public with_txn_id {
+struct set_commit_timestamp : public with_txn_id, public without_table_id {
     timestamp_t commit_timestamp;
 
     /*
@@ -726,7 +783,7 @@ operator<<(std::ostream &out, const set_commit_timestamp &op)
  * set_oldest_timestamp --
  *     A representation of this workload operation.
  */
-struct set_oldest_timestamp : public without_txn_id {
+struct set_oldest_timestamp : public without_txn_id, public without_table_id {
     timestamp_t oldest_timestamp;
 
     /*
@@ -773,7 +830,7 @@ operator<<(std::ostream &out, const set_oldest_timestamp &op)
  * set_stable_timestamp --
  *     A representation of this workload operation.
  */
-struct set_stable_timestamp : public without_txn_id {
+struct set_stable_timestamp : public without_txn_id, public without_table_id {
     timestamp_t stable_timestamp;
 
     /*
@@ -820,8 +877,7 @@ operator<<(std::ostream &out, const set_stable_timestamp &op)
  * truncate --
  *     A representation of this workload operation.
  */
-struct truncate : public with_txn_id {
-    table_id_t table_id;
+struct truncate : public with_txn_id, public with_table_id {
     data_value start;
     data_value stop;
 
@@ -831,7 +887,7 @@ struct truncate : public with_txn_id {
      */
     inline truncate(
       table_id_t table_id, txn_id_t txn_id, const data_value &start, const data_value &stop)
-        : with_txn_id(txn_id), table_id(table_id), start(start), stop(stop)
+        : with_txn_id(txn_id), with_table_id(table_id), start(start), stop(stop)
     {
     }
 
@@ -929,6 +985,32 @@ transaction_id(const any &op)
 {
     txn_id_t r = k_txn_none;
     std::visit([&r](auto &&x) { r = x.transaction_id(); }, op);
+    return r;
+}
+
+/*
+ * table_op --
+ *     Check if the workload operation is a table operation.
+ */
+inline bool
+table_op(const any &op)
+{
+    bool r = false;
+    std::visit([&r](auto &&x) { r = x.table_op(); }, op);
+    return r;
+}
+
+/*
+ * table_id --
+ *     Extract the table ID.
+ */
+inline table_id_t
+table_id(const any &op)
+{
+    table_id_t r = -1;
+    std::visit([&r](auto &&x) { r = x.table(); }, op);
+    if (r == -1)
+        throw std::runtime_error("The operation does not specify a table");
     return r;
 }
 

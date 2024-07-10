@@ -5343,6 +5343,46 @@ tasks:
           comparison_op: "lt"
           expected-stats: '{"Warning Idle (drop)": 50, "Latency drop(in sec.) Max1": 500, "Latency warnings (read, insert, update)": 500}'
 
+  - name: prefetch-off-verify
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          test_type: workgen
+          exec_path: ${python_binary|python3}
+          perf-test-path: ../../../bench/workgen/runner
+          perf-test-name: microbenchmark_prefetch_off_verify.py
+          maxruns: 1
+          wtarg: -ops ['"block_read"']
+      - func: "upload stats to atlas"
+        vars:
+          test-name: microbenchmark_prefetch_off_verify.py
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: microbenchmark_prefetch_off_verify.py
+
+  - name: prefetch-on-verify
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          test_type: workgen
+          exec_path: ${python_binary|python3}
+          perf-test-path: ../../../bench/workgen/runner
+          perf-test-name: microbenchmark_prefetch_on_verify.py
+          maxruns: 1
+          wtarg: -ops ['"block_read"']
+      - func: "upload stats to atlas"
+        vars:
+          test-name: microbenchmark_prefetch_on_verify.py
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: microbenchmark_prefetch_on_verify.py
+
   - name: bench-wt2853-perf-test-row
     tags: ["wt2853-perf"]
     depends_on:
@@ -5428,6 +5468,12 @@ tasks:
 
   - <<: *workgen-test
     name: "workgen-test-small_btree_reopen"
+
+  - <<: *workgen-test
+    name: "workgen-test-microbenchmark_prefetch_off_verify"
+
+  - <<: *workgen-test
+    name: "workgen-test-microbenchmark_prefetch_on_verify"
 
 #######################################
 #     Antithesis Integration          #
