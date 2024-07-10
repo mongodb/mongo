@@ -186,6 +186,61 @@ private:
     StringMap<SimpleMemoryUsageTokenWith<long long>> _fieldPositions;
 };
 
+/**
+ * The custom positional accumulator $push for $bucketAuto stage. Similar to
+ * AccumulatorFirstLastNForBucketAuto, this custom accumulator consumes the wrapped documents and
+ * determines the accumulated results based on their original positions.
+ */
+class AccumulatorPushForBucketAuto : public AccumulatorState {
+public:
+    using KeyOutPair = std::pair<long long, Value>;
+
+    static constexpr auto kName = "$push"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
+    AccumulatorPushForBucketAuto(ExpressionContext* expCtx,
+                                 boost::optional<int> maxMemoryUsageBytes)
+        : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
+        _memUsageTracker.set(sizeof(*this));
+    }
+
+    void processInternal(const Value& input, bool merging) final;
+
+    Value getValue(bool toBeMerged) final {
+        std::vector<Value> array;
+        for (const auto& [_, value] : _inputPositionToValueMap) {
+            array.push_back(std::move(value.value()));
+        }
+        return Value(array);
+    }
+
+    void reset() final {
+        std::map<long long, SimpleMemoryUsageTokenWith<Value>>().swap(_inputPositionToValueMap);
+        _memUsageTracker.set(sizeof(*this));
+    }
+
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx) {
+        return new AccumulatorPushForBucketAuto(expCtx, boost::none);
+    }
+
+    Document serialize(boost::intrusive_ptr<Expression> initializer,
+                       boost::intrusive_ptr<Expression> argument,
+                       const SerializationOptions& options) const final {
+        // Similar to 'AccumulatorFirstLastNForBucketAuto::serialize()', this accumulator
+        // serializes itself as a user-facing '$push' instead of the internal accumulator
+        // created in 'replaceAccumulationStatementForBucketAuto()'.
+        auto nullInitializer =
+            ExpressionConstant::create(initializer->getExpressionContext(), Value(BSONNULL));
+        return AccumulatorState::serialize(std::move(nullInitializer), argument, options);
+    }
+
+private:
+    std::map<long long, SimpleMemoryUsageTokenWith<Value>> _inputPositionToValueMap;
+};
+
 namespace {
 
 /**
@@ -226,6 +281,12 @@ static FactoryFnMap factoryFnMap{
      [](ExpressionContext* const expCtx) {
          return [expCtx] {
              return AccumulatorMergeObjectsForBucketAuto::create(expCtx);
+         };
+     }},
+    {"$push",
+     [](ExpressionContext* const expCtx) {
+         return [expCtx] {
+             return AccumulatorPushForBucketAuto::create(expCtx);
          };
      }},
 };
@@ -385,6 +446,60 @@ void AccumulatorMergeObjectsForBucketAuto::processInternal(const Value& compound
 
             // Update the output.
             _output.setField(inputFieldName, std::move(inputFieldValue));
+        }
+    }
+}
+
+void AccumulatorPushForBucketAuto::processInternal(const Value& compoundInput, bool merging) {
+    auto addToMap = [&_inputPositionToValueMap = _inputPositionToValueMap,
+                     &_memUsageTracker = _memUsageTracker](long long inputPosition,
+                                                           Value input) -> void {
+        const auto memUsage = sizeof(long long) + input.getApproximateSize() + sizeof(KeyOutPair);
+
+        tassert(9059700,
+                str::stream() << "Recieved a duplicate input position: " << inputPosition,
+                !_inputPositionToValueMap.contains(inputPosition));
+
+        _memUsageTracker.add(input.getApproximateSize());
+        uassert(
+            ErrorCodes::ExceededMemoryLimit,
+            str::stream() << "$push used too much memory and cannot spill to disk. Memory limit: "
+                          << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+            _memUsageTracker.withinMemoryLimit());
+
+        _inputPositionToValueMap.insert(
+            std::pair{inputPosition,
+                      SimpleMemoryUsageTokenWith<Value>{
+                          SimpleMemoryUsageToken{memUsage, &_memUsageTracker}, std::move(input)}});
+    };
+
+    if (!merging) {
+        // 'compoundInput' is made of two parts:
+        // - 'input' is the value that the user specified in their {$push: _}
+        //   accumulator-expression.
+        // - 'inputPosition' is the position in the input where this value occurred.
+        std::pair<long long, Value> inputPositionAndValue = genKeyOutPair(compoundInput);
+        auto inputPosition = inputPositionAndValue.first;
+        auto input = inputPositionAndValue.second;
+        if (!input.missing()) {
+            addToMap(inputPosition, std::move(input));
+        }
+    } else {
+        // If we're merging, we need to take apart the arrays we receive and put their elements into
+        // the array we are collecting.  If we didn't, then we'd get an array of arrays, with one
+        // array from each merge source.
+        invariant(compoundInput.getType() == Array);
+
+        const std::vector<Value>& vec = compoundInput.getArray();
+        for (auto&& val : vec) {
+            // 'compoundInput' is an array where each element is made of two parts:
+            // - 'input' is the value that the user specified in their {$push: _}
+            //   accumulator-expression.
+            // - 'inputPosition' is the position in the input where this value occurred.
+            std::pair<long long, Value> inputPositionAndValue = genKeyOutPair(val);
+            auto inputPosition = inputPositionAndValue.first;
+            auto input = inputPositionAndValue.second;
+            addToMap(inputPosition, std::move(input));
         }
     }
 }
