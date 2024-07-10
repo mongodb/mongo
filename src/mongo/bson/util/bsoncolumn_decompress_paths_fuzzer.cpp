@@ -243,15 +243,6 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
             << iteratorBlocks.size() << " paths. The block-based API decompressed "
             << blockBasedResults.size() << " paths.");
 
-    static auto printValsErrMsg = [&](const SBEColumnMaterializer::Element& iterator,
-                                      const SBEColumnMaterializer::Element& block,
-                                      const sbe::value::CellBlock::PathRequest path) {
-        return "For the input: " + base64::encode(StringData(Data, Size)) +
-            " For the path: " + path.toString() + ". Iterator API returned " +
-            sbe::value::print(iterator) + ". The block based API returned " +
-            sbe::value::print(block);
-    };
-
     // Validate the decompressed elements from the different APIs are the same for each 'SBEPath'.
     auto blockBasedRes = blockBasedResults.begin();
     for (auto&& iteratorBlock : iteratorBlocks) {
@@ -281,10 +272,18 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
             invariant(
                 iteratorElem.first == blockElem.first ||
                     (blockElem.first == sbe::value::TypeTags::bsonString && iteratorTagIsAString),
-                printValsErrMsg(iteratorElem, blockElem, (*blockBasedRes).first._pathRequest));
-            invariant(
-                bsoncolumn::areSBEBinariesEqual(blockElem, iteratorElem),
-                printValsErrMsg(iteratorElem, blockElem, (*blockBasedRes).first._pathRequest));
+                str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                              << " For the path: " << (*blockBasedRes).first._pathRequest.toString()
+                              << ". The types differ. Iterator API returned " << iteratorElem.first
+                              << ". The block based API returned " << blockElem.first);
+
+            invariant(bsoncolumn::areSBEBinariesEqual(blockElem, iteratorElem),
+                      str::stream()
+                          << "For the input: " << base64::encode(StringData(Data, Size))
+                          << " For the path: " << (*blockBasedRes).first._pathRequest.toString()
+                          << ".  The values differ. Iterator API returned "
+                          << sbe::value::print(iteratorElem) << ". The block based API returned "
+                          << sbe::value::print(blockElem));
         }
         ++blockBasedRes;
     }

@@ -30,6 +30,7 @@
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/util/bsoncolumn_test_util.h"
 
 // Returns true if the binary contains interleaved data. This function just scans the binary for an
 // interleaved start control byte, it does no validation nor decompression.
@@ -100,37 +101,28 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         iteratorError = e.toString();
     }
 
-    // The logger does not work with the fuzzer, so we manually construct the error message.
-    static auto printErrMsg = [&]() {
-        auto printDecoderResult = [&](const std::vector<BSONElement>& elems) {
-            std::string res = "{";
-            for (auto&& elem : elems) {
-                res += elem.toString() + ", ";
-            }
-            res += "}";
-            return res;
-        };
-
-        return "Returned results are not equal. Iterator API returned " +
-            (iteratorError.empty() ? printDecoderResult(iteratorElems)
-                                   : "error: " + iteratorError) +
-            ". The block based API returned " +
-            (blockBasedError.empty() ? printDecoderResult(blockBasedElems)
-                                     : "error: " + blockBasedError);
-    };
-
     // If one API failed, then both APIs must fail.
     if (!iteratorError.empty() || !blockBasedError.empty()) {
-        invariant(!(iteratorError.empty() || blockBasedError.empty()), printErrMsg());
+        invariant(!(iteratorError.empty() || blockBasedError.empty()),
+                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                                << ". Iterator API returned "
+                                << (iteratorError.empty() ? "results" : iteratorError)
+                                << ". The block based API returned "
+                                << (blockBasedError.empty() ? "results" : blockBasedError));
         return 0;
     }
 
     // If both APIs succeeded, the results must be the same.
-    invariant(iteratorElems.size() == blockBasedElems.size(), printErrMsg());
+    invariant(iteratorElems.size() == blockBasedElems.size(),
+              str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                            << " the number of elements decompressed is different.");
 
     auto it = iteratorElems.begin();
     for (auto&& elem : blockBasedElems) {
-        invariant(elem.binaryEqualValues(*it), printErrMsg());
+        invariant(elem.binaryEqualValues(*it),
+                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                                << ". The block-based API returned: " << elem.toString()
+                                << ". The iterator API returned: " << (*it).toString());
         ++it;
     }
     return 0;
