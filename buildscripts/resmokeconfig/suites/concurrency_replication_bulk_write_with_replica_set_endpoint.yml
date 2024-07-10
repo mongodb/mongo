@@ -44,9 +44,6 @@ selector:
     # could fail with FailedToSatisfyReadPreference
     - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
 
-    # TODO (SERVER-92189) Reenable
-    - jstests/concurrency/fsm_workloads/random_update_delete_with_resharding.js
-
   exclude_with_any_tags:
     - requires_sharding
 
