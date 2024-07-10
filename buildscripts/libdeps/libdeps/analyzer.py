@@ -701,7 +701,8 @@ class BazelOrder(Analyzer):
         order = []
         for node in networkx.lexicographical_topological_sort(self._dependents_graph):
             node_type = self._dependents_graph.nodes()[node].get(NodeProps.bin_type.name, "Unknown")
-            order.append({"type": node_type, "name": node})
+            if node_type != "ThinTarget":
+                order.append({"type": node_type, "name": node})
         return order
 
     def report(self, report):
@@ -1160,13 +1161,14 @@ class GaPrettyPrinter(GaPrinter):
 
         if DependsReportTypes.BAZEL_ORDER.name in results:
             res = results[DependsReportTypes.BAZEL_ORDER.name]
+            builder_names = ("Bazel", "ThinTarget")
             print("\nBazel Target Conversion Order:")
             print(f"\tTotal targets: {len(res)}")
             print(
-                f"\tTargets Converted: {len([node for node in res if node['type'].startswith('Bazel')])}"
+                f"\tTargets Converted: {len([node for node in res if node['type'].startswith(builder_names)])}"
             )
             print(
-                f"\tTargets left to convert: {len([node for node in res if not node['type'].startswith('Bazel')])}"
+                f"\tTargets left to convert: {len([node for node in res if not node['type'].startswith(builder_names)])}"
             )
             print("\tList of targets to convert (==== bars means independency groups):")
             last_node = None
@@ -1176,7 +1178,7 @@ class GaPrettyPrinter(GaPrinter):
                 if last_node != min(last_node, node["name"].lower()):
                     print("\t\t" + "=" * 60)
                 last_node = node["name"].lower()
-                target_type = "Bazel" if node["type"].startswith("Bazel") else "SCons"
+                target_type = "Bazel" if node["type"].startswith(builder_names) else "SCons"
                 print(f"\t\t{num}. {target_type}: {node['name']}")
 
         if LinterTypes.EFFICIENCY_LINT.name in results:

@@ -985,30 +985,37 @@ def _get_node_with_ixes(env, node, node_builder_type):
 _get_node_with_ixes.node_type_ixes = dict()
 
 
-def add_node_from(env, node):
+def add_node_from(env, node, bazel=False):
+    if bazel:
+        builder = "Bazel"
+    elif node.has_builder():
+        builder = node.builder.get_name(env)
+    else:
+        builder = "Unkown"
+
+    node_path = node if bazel else node.abspath
+
     env.GetLibdepsGraph().add_nodes_from(
         [
             (
-                node.abspath,
-                {
-                    NodeProps.bin_type.name: node.builder.get_name(env)
-                    if node.has_builder()
-                    else "Unknown",
-                },
+                node_path,
+                {NodeProps.bin_type.name: builder},
             )
         ]
     )
 
+    return node_path
 
-def add_edge_from(env, from_node, to_node, visibility, direct):
-    add_node_from(env, from_node)
-    add_node_from(env, to_node)
+
+def add_edge_from(env, from_node, to_node, visibility, direct, bazel=False):
+    from_node_path = add_node_from(env, from_node)
+    to_node_path = add_node_from(env, to_node, bazel)
 
     env.GetLibdepsGraph().add_edges_from(
         [
             (
-                from_node.abspath,
-                to_node.abspath,
+                from_node_path,
+                to_node_path,
                 {
                     EdgeProps.direct.name: direct,
                     EdgeProps.visibility.name: int(visibility),
@@ -1271,6 +1278,7 @@ def process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_sig):
     bazel_libs = []
     bazel_targets_checked = set()
     signature = []
+    bazel_libs_to_append = []
     start_time = time.time()
     try:
         # check the cache for any queries we need to run, and add the hidden deps to the list to link
@@ -1298,8 +1306,6 @@ def process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_sig):
         # add any per library link flags (whole archive flags)
         if bazel_libs:
             bazel_libs_to_append = handle_bazel_lib_link_flags(env, libdeps_ext, bazel_libs)
-        else:
-            bazel_libs_to_append = []
 
     except:
         traceback.print_exc()
@@ -1397,6 +1403,7 @@ def generate_libdeps_graph(env):
         symbol_deps = []
         for symbols_file, target_node in env.get("LIBDEPS_SYMBOL_DEP_FILES", []):
             direct_libdeps = []
+            bazel_libdeps = []
             for direct_libdep in _get_sorted_direct_libdeps(target_node):
                 add_node_from(env, direct_libdep.target_node)
                 add_edge_from(
@@ -1407,6 +1414,21 @@ def generate_libdeps_graph(env):
                     direct=True,
                 )
                 direct_libdeps.append(direct_libdep.target_node.abspath)
+                if direct_libdep.target_node.builder.get_name(env) == "ThinTarget":
+                    add_bazel_libdep(env, direct_libdep.target_node, bazel_libdeps)
+            _, bazel_libdeps = process_bazel_libdeps(
+                env, bazel_libdeps, env.subst("$SHLIBSUFFIX"), False
+            )
+            for libdep in bazel_libdeps:
+                add_node_from(env, libdep, bazel=True)
+                add_edge_from(
+                    env,
+                    direct_libdep.target_node,
+                    libdep,
+                    visibility=int(deptype.Private),
+                    direct=False,
+                    bazel=True,
+                )
 
             for libdep in _get_libdeps(target_node):
                 if libdep.abspath not in direct_libdeps:
@@ -1422,9 +1444,14 @@ def generate_libdeps_graph(env):
                 sep = " "
             else:
                 sep = ":"
-            ld_path = sep.join(
-                [os.path.dirname(str(libdep)) for libdep in _get_libdeps(target_node)]
+            ld_path = [os.path.dirname(str(libdep)) for libdep in _get_libdeps(target_node)]
+            ld_path.extend(
+                [
+                    path.replace(env.Dir("$BUILD_DIR").path, f"{env['BAZEL_OUT_DIR']}/src")
+                    for path in ld_path
+                ]
             )
+            ld_path = sep.join(ld_path)
             symbol_deps.append(
                 env.Command(
                     target=symbols_file,
