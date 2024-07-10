@@ -2,6 +2,8 @@
 // cluster only has a single shard, and that it can therefore successfully look up a document in a
 // sharded collection.
 // @tags: [
+//   # If a rollback is triggered during a stepdown, the change stream cursor can become invalid.
+//   does_not_support_stepdowns,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
