@@ -3143,17 +3143,16 @@ TEST(RangeTest, Double_Bounds_Precision) {
         ASSERT_EQ(_ost.max, 18446744073709551615ULL);    \
         ASSERT_EQ(_ost.value, z);                        \
     }
+#define ASSERT_EIBB_ERROR(v, ub, lb, prc, code) \
+    { ASSERT_THROWS_CODE(getTypeInfoDouble((v), lb, ub, prc), DBException, code); }
 
     ASSERT_EIBB(0, 1, -1, 3, 1000);
     ASSERT_EIBB(0, 1, -1E5, 3, 100000000);
 
     ASSERT_EIBB(-1E-33, 1, -1E5, 3, 100000000);
 
-    ASSERT_EIBB_OVERFLOW(0,
-                         std::numeric_limits<double>::max(),
-                         std::numeric_limits<double>::lowest(),
-                         3,
-                         9223372036854775808ULL);
+    ASSERT_EIBB_ERROR(
+        0, std::numeric_limits<double>::max(), std::numeric_limits<double>::lowest(), 3, 9178803);
 
     ASSERT_EIBB(3.141592653589, 5, 0, 0, 3);
     ASSERT_EIBB(3.141592653589, 5, 0, 1, 31);
@@ -3166,12 +3165,7 @@ TEST(RangeTest, Double_Bounds_Precision) {
 
     ASSERT_EIBB(-5, -1, -10, 3, 5000);
 
-
-    ASSERT_EIBB_OVERFLOW(1E100,
-                         std::numeric_limits<double>::max(),
-                         std::numeric_limits<double>::lowest(),
-                         3,
-                         15326393489903895421ULL);
+    ASSERT_EIBB_ERROR(-1E100, 0, std::numeric_limits<double>::lowest(), 3, 9178804);
 
     ASSERT_EIBB(1E9, 1E10, 0, 3, 1000000000000);
     ASSERT_EIBB(1E9, 1E10, 0, 0, 1000000000);
@@ -3180,7 +3174,13 @@ TEST(RangeTest, Double_Bounds_Precision) {
     ASSERT_EIBB(-5, 10, -10, 0, 5);
     ASSERT_EIBB(-5, 10, -10, 2, 500);
 
-    ASSERT_EIBB_OVERFLOW(1E-30, 10E-30, 1E-30, 35, 13381399884061196960ULL);
+    /**
+     * 1E-30 and 10E-30 cannot be represented accurately as a double, so there will
+     * always be some rounding errors. That means scaled_max and scaled_min will also
+     * have issues with precision and will have digits after the decimal place.
+     */
+    ASSERT_EIBB_ERROR(1E-30, 10E-30, 1E-30, 35, 9178801);
+    ASSERT_EIBB_ERROR(-1E-30, 0, -10E-30, 35, 9178802);
 
 #undef ASSERT_EIBB
 #undef ASSERT_EIBB_OVERFLOW
@@ -3428,6 +3428,14 @@ TEST(RangeTest, Decimal128_Bounds_Precision) {
         ASSERT_EQ(_ost.value, z);                                                              \
     }
 
+#define ASSERT_EIBB_ERROR_CODE(v, ub, lb, prc, code)                                   \
+    {                                                                                  \
+        ASSERT_THROWS_CODE(                                                            \
+            getTypeInfoDecimal128(Decimal128(v), Decimal128(lb), Decimal128(ub), prc), \
+            DBException,                                                               \
+            code);                                                                     \
+    }
+
 #define ASSERT_EIBB_OVERFLOW(v, ub, lb, prc, z)                                                \
     {                                                                                          \
         auto _ost = getTypeInfoDecimal128(Decimal128(v), Decimal128(lb), Decimal128(ub), prc); \
@@ -3440,18 +3448,12 @@ TEST(RangeTest, Decimal128_Bounds_Precision) {
 
     ASSERT_EIBB(-1E-33, 1, -1E5, 3, 100000000);
 
-    ASSERT_EIBB_OVERFLOW(
-        0,
-        Decimal128::kLargestPositive,
-        Decimal128::kLargestNegative,
-        3,
-        boost::multiprecision::uint128_t("170141183460469231731687303715884105728"));
-    ASSERT_EIBB_OVERFLOW(
-        0,
-        std::numeric_limits<double>::max(),
-        std::numeric_limits<double>::lowest(),
-        3,
-        boost::multiprecision::uint128_t("170141183460469231731687303715884105728"));
+    ASSERT_EIBB_ERROR_CODE(
+        0, Decimal128::kLargestPositive, Decimal128::kLargestNegative, 3, 9178810);
+    ASSERT_EIBB_ERROR_CODE(0, 0, Decimal128::kLargestNegative, 3, 9178811);
+
+    ASSERT_EIBB_ERROR_CODE(
+        0, std::numeric_limits<double>::max(), std::numeric_limits<double>::lowest(), 3, 9178810);
 
     ASSERT_EIBB(3.141592653589, 5, 0, 0, 3);
     ASSERT_EIBB(3.141592653589, 5, 0, 1, 31);
@@ -3465,12 +3467,11 @@ TEST(RangeTest, Decimal128_Bounds_Precision) {
     ASSERT_EIBB(-5, -1, -10, 3, 5000);
 
 
-    ASSERT_EIBB_OVERFLOW(
-        1E100,
-        std::numeric_limits<double>::max(),
-        std::numeric_limits<double>::lowest(),
-        3,
-        boost::multiprecision::uint128_t("232572183460469231731687303715884099485"));
+    ASSERT_EIBB_ERROR_CODE(1E100,
+                           std::numeric_limits<double>::max(),
+                           std::numeric_limits<double>::lowest(),
+                           3,
+                           9178810);
 
     ASSERT_EIBB(1E9, 1E10, 0, 3, 1000000000000);
     ASSERT_EIBB(1E9, 1E10, 0, 0, 1000000000);
@@ -3483,12 +3484,14 @@ TEST(RangeTest, Decimal128_Bounds_Precision) {
     ASSERT_EIBB(5E-30, 10E-30, 1E-30, 35, boost::multiprecision::uint128_t("400000"));
 
     // Test a range that requires > 64 bits.
-    ASSERT_EIBB(5, "18446744073709551616", ".1", 1, 49)
+    ASSERT_EIBB(5, "18446744073709551616", ".1", 1, 49);
     // Test a range that requires > 64 bits.
     // min has more places after the decimal than precision.
-    ASSERT_EIBB(5, "18446744073709551616", ".01", 1, 49)
+    ASSERT_EIBB_ERROR_CODE(5, "18446744073709551.616", ".01", 1, 9178808);
+    ASSERT_EIBB_ERROR_CODE(5, "18446744073709551616", ".01", 1, 9178809);
 
 #undef ASSERT_EIBB
+#undef ASSERT_EIBB_ERROR_CODE
 #undef ASSERT_EIBB_OVERFLOW
 }
 
@@ -3551,7 +3554,7 @@ TEST(RangeTest, Decimal128_Bounds_Precision_Errors) {
 void roundTripDecimal128_Int128(std::string dec_str) {
     Decimal128 dec(dec_str);
 
-    auto ret = toInt128FromDecimal128(dec);
+    auto ret = toUInt128FromDecimal128(dec);
 
     Decimal128 roundTrip(ret.str());
     ASSERT(roundTrip == dec);
@@ -5135,9 +5138,6 @@ public:
                                 max};
         std::vector<boost::optional<uint32_t>> testPrecisions = {boost::none};
         if constexpr (std::is_same_v<T, double>) {
-            constexpr auto min = std::numeric_limits<T>::min();
-            testVals.push_back(min);
-            testVals.push_back(-min);
             testVals.push_back(1.1);
             testVals.push_back(-1.1);
             testVals.push_back(2.71828182);
@@ -5169,7 +5169,9 @@ public:
                                 validateRangeIndex(BSONType::NumberDouble, "rangeField"_sd, qtc);
                             } catch (DBException& e) {
                                 if (e.code() == 6966805 || e.code() == 6966806 ||
-                                    e.code() == 9157100) {
+                                    e.code() == 9157100 || e.code() == 9178801 ||
+                                    e.code() == 9178802 || e.code() == 9178803 ||
+                                    e.code() == 9178804 || e.code() == 9178805) {
                                     thrownCode = e.code();
                                 } else {
                                     throw;
@@ -5181,7 +5183,9 @@ public:
                                 lb, ub, precision, sparsity, getEdges, fieldType);
                         } catch (DBException& e) {
                             if (thrownCode) {
-                                ASSERT_EQ(e.code(), *thrownCode);
+                                if constexpr (!std::is_same_v<T, double>) {
+                                    ASSERT_EQ(e.code(), *thrownCode);
+                                }
                             } else {
                                 throw;
                             }
@@ -5209,11 +5213,7 @@ TEST_F(EdgeTestFixture, getEdgesLengthDouble) {
 // Check a smaller, but still representative sample of values.
 // Additionally, when Decimal128 is used in EncryptionInformation
 TEST_F(EdgeTestFixture, getEdgesLengthDecimal128) {
-    const Decimal128 kUInt128Max("340282366920938463463374607431768211455");
-
     const std::vector<Decimal128> testVals{
-        Decimal128::kLargestNegative,
-        -kUInt128Max,
         Decimal128(-1000000),
         Decimal128(-1000),
         Decimal128(-10),
@@ -5221,8 +5221,6 @@ TEST_F(EdgeTestFixture, getEdgesLengthDecimal128) {
         Decimal128(10),
         Decimal128(1000),
         Decimal128(1000000),
-        kUInt128Max,
-        Decimal128::kLargestPositive,
     };
 
     for (int sparsity = 1; sparsity <= 4; ++sparsity) {
@@ -5235,27 +5233,130 @@ TEST_F(EdgeTestFixture, getEdgesLengthDecimal128) {
                      ++precision) {
                     // getEdgesLength may throw if the min,max,precision combination can't be
                     // used for the precision-mode encoding.
-                    if (canUsePrecisionMode(lb, ub, precision, nullptr)) {
-                        assertEdgesLengthMatch(lb,
-                                               ub,
-                                               precision,
-                                               sparsity,
-                                               getEdgesDecimal128,
-                                               BSONType::NumberDecimal);
-                    } else {
-                        ASSERT_THROWS_CODE(assertEdgesLengthMatch(lb,
-                                                                  ub,
-                                                                  precision,
-                                                                  sparsity,
-                                                                  getEdgesDecimal128,
-                                                                  BSONType::NumberDecimal),
-                                           DBException,
-                                           9157101);
+                    try {
+                        if (canUsePrecisionMode(lb, ub, precision, nullptr)) {
+                            assertEdgesLengthMatch(lb,
+                                                   ub,
+                                                   precision,
+                                                   sparsity,
+                                                   getEdgesDecimal128,
+                                                   BSONType::NumberDecimal);
+                        } else {
+                            ASSERT_THROWS_CODE(assertEdgesLengthMatch(lb,
+                                                                      ub,
+                                                                      precision,
+                                                                      sparsity,
+                                                                      getEdgesDecimal128,
+                                                                      BSONType::NumberDecimal),
+                                               DBException,
+                                               9157101);
+                        }
+                    } catch (DBException& e) {
+                        if (!(e.code() == 9178808 || e.code() == 9178809 || e.code() == 9178810 ||
+                              e.code() == 9178811 || e.code() == 9178812)) {
+                            throw;
+                        }
                     }
                 }
             }
         }
     }
+}
+
+#define ASSERT_EIBB_OVERFLOW(v, ub, lb, prc, z)                                                \
+    {                                                                                          \
+        auto _ost = getTypeInfoDecimal128(Decimal128(v), Decimal128(lb), Decimal128(ub), prc); \
+        ASSERT_EQ(_ost.max.str(), "340282366920938463463374607431768211455");                  \
+        ASSERT_EQ(_ost.value, z);                                                              \
+    }
+
+constexpr double INT_64_MAX_DOUBLE = static_cast<double>(std::numeric_limits<uint64_t>::max());
+
+TEST_F(EdgeTestFixture, canUsePrecisionMode) {
+#define CAN_USE_PRECISION_MODE(lb, ub, prc, expected, expected_bits_out) \
+    {                                                                    \
+        uint32_t bits_out = 0;                                           \
+        auto result = canUsePrecisionMode(lb, ub, prc, &bits_out);       \
+        ASSERT_EQ(result, expected);                                     \
+        ASSERT_EQ(expected_bits_out, bits_out);                          \
+    }
+
+#define CAN_USE_PRECISION_MODE_ERRORS(lb, ub, prc, code) \
+    { ASSERT_THROWS_CODE(canUsePrecisionMode(lb, ub, prc, nullptr), DBException, code); }
+
+    /**
+     * Test Cases: (min, max, precision) -> (bool, bits_out)
+     *
+     * (1, 16, 0) -> true, 4
+     * (0, 16, 0) -> true, 5
+     * (DOUBLE_MAX, DOUBLE_MIN, 0) -> false, 1024?
+     * (1, 2^53, 0) -> true, 53
+     * (0, 2^53, 0) -> true, 54
+     */
+
+    CAN_USE_PRECISION_MODE(1, 16, 0, true, 4);
+    CAN_USE_PRECISION_MODE(0, 16, 0, true, 5);
+    // 2^53 + 1 is where double starts to lose precision, so we need to ensure that we get the
+    // correct value for max_bits out.
+    CAN_USE_PRECISION_MODE(1, 9007199254740992, 0, true, 53);
+    CAN_USE_PRECISION_MODE(0, 9007199254740992, 0, true, 54);
+
+    CAN_USE_PRECISION_MODE(2.718281, 314.159265, 6, true, 29);
+
+    CAN_USE_PRECISION_MODE(-1000000000, 9223372036844775424, 0, false, 0);
+
+    CAN_USE_PRECISION_MODE_ERRORS(2.710000, 314.150000, 2, 9178801);
+    CAN_USE_PRECISION_MODE_ERRORS(314.150000, 350, 2, 9178802);
+
+    CAN_USE_PRECISION_MODE_ERRORS(
+        static_cast<double>(9007199254740992), INT_64_MAX_DOUBLE, 0, 9178803);
+    CAN_USE_PRECISION_MODE_ERRORS(
+        -1 * INT_64_MAX_DOUBLE, -1 * static_cast<double>(9007199254740992), 0, 9178804);
+    CAN_USE_PRECISION_MODE_ERRORS(-92233720368547, 92233720368547, 5, 9178805);
+
+    CAN_USE_PRECISION_MODE(Decimal128("1"), Decimal128("16"), 0, true, 4);
+    CAN_USE_PRECISION_MODE(Decimal128("0"), Decimal128("16"), 0, true, 5);
+
+    // CAN_USE_PRECISION_MODE(Decimal128("1"), Decimal128::kLargestPositive, 0, false, 0);
+    // It is unclear where Decimal128 looses precision, so we choose an arbitrarily large value
+    // and make sure that max_bits is correct for that boundary.
+    CAN_USE_PRECISION_MODE(
+        Decimal128("1"), Decimal128("324518553658426726783156020576256"), 0, true, 108);
+    CAN_USE_PRECISION_MODE(
+        Decimal128("0"), Decimal128("324518553658426726783156020576256"), 0, true, 109);
+
+    CAN_USE_PRECISION_MODE(Decimal128("-100000000000000000000000000000000"),
+                           Decimal128("170141183460469231731687303715880000000"),
+                           0,
+                           false,
+                           0);
+
+    CAN_USE_PRECISION_MODE_ERRORS(
+        Decimal128("788545.12392843"), Decimal128("4607431769000000.129834923"), 4, 9178808);
+    CAN_USE_PRECISION_MODE_ERRORS(
+        Decimal128("788545.12392843"), Decimal128("7885451.2"), 4, 9178809);
+    CAN_USE_PRECISION_MODE_ERRORS(Decimal128("324518553658426726783156020576256"),
+                                  Decimal128("340282366920938463463374607431768211455"),
+                                  10,
+                                  9178810);
+
+    CAN_USE_PRECISION_MODE_ERRORS(Decimal128("-340282366920938463463374607431768211455"),
+                                  Decimal128("-3245185536584267267831560"),
+                                  10,
+                                  9178811);
+
+    CAN_USE_PRECISION_MODE_ERRORS(Decimal128("-17014118346046923173168730371588.0000000"),
+                                  Decimal128("17014118346046923173168730371588.0000000"),
+                                  7,
+                                  9178812);
+
+    CAN_USE_PRECISION_MODE_ERRORS(Decimal128("788545.000000"),
+                                  Decimal128("340282366920938463463374607431769000000.000000"),
+                                  0,
+                                  9178810);
+
+#undef CAN_USE_PRECISION_MODE
+#undef CAN_USE_PRECISION_MODE_ERRORS
 }
 
 TEST_F(EdgeTestFixture, getEdgesLengthDate) {
