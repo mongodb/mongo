@@ -25,7 +25,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 const coll = db.index_deduplication;
 coll.drop();
 
-coll.insert({a: 1, b: 1, c: 1});
+coll.insert({a: 1, b: 1, c: 1, m: [1, 2, 3]});
 
 const interestingScenarios = [
     // Indexes can be deduped.
@@ -72,6 +72,36 @@ const interestingScenarios = [
     {index1: {a: 1}, index2: {b: 1, a: 1}, find: {a: 1}, dedup: false},
     {index1: {a: 1, b: 1}, index2: {b: 1, a: 1}, find: {a: 1}, dedup: false},
     {index1: {a: 1, b: 1}, index2: {b: 1, a: 1}, find: {a: 1, b: 1}, dedup: false},
+
+    // In case of a multikey & non-multikey index of the same length, we should pick the
+    // non-multikey one.
+    {
+        index1: {a: 1, b: 1, m: 1},
+        index2: {a: 1, b: 1, c: 1},
+        find: {a: 1, b: 1},
+        dedup: true,
+        multikey: true,
+        expected: {a: 1, b: 1, c: 1}
+    },
+    // If both are multikey, we must multiplan.
+    {
+        index1: {a: 1, b: 1, m: 1},
+        index2: {a: 1, m: 1, c: 1},
+        find: {a: 1},
+        dedup: false,
+        multikey: true
+    },
+    // If the shorter index is multikey, we should multiplan.
+    {index1: {a: 1, m: 1}, index2: {a: 1, b: 1, c: 1}, find: {a: 1}, dedup: false, multikey: true},
+    // If the longer index is multikey, we pick the shorter index.
+    {
+        index1: {a: 1, b: 1},
+        index2: {a: 1, b: 1, m: 1},
+        find: {a: 1},
+        dedup: true,
+        multikey: true,
+        expected: {a: 1, b: 1}
+    },
 ];
 
 function getIxscan(explain) {
@@ -147,6 +177,15 @@ function doesDedup(query) {
         assert.eq(getIxscan(explains.after).length, 1, testDebugInfo);
         const ixscan = getIxscan(explains.after)[0];
         assert.eq(query.index1, ixscan.keyPattern, testDebugInfo);
+    } else if (query.expected) {
+        // With the scenarios we test there wouldn't be any rejected alternatives once the other
+        // indexes are pruned.
+        assert.eq(getRejectedPlans(explains.after).length, 0, testDebugInfo);
+
+        // Each plan should only have one index scan; in this case, the one we expected.
+        assert.eq(getIxscan(explains.after).length, 1, testDebugInfo);
+        const ixscan = getIxscan(explains.after)[0];
+        assert.eq(query.expected, ixscan.keyPattern, testDebugInfo);
     }
 }
 
@@ -171,6 +210,10 @@ function neverDedupSpecialIndexes() {
 
     // Similar but one of the indexes is hashed.
     for (const setup of interestingScenarios) {
+        if (setup.multikey) {
+            // Hashed indexes don't support multikey values.
+            continue;
+        }
         coll.dropIndexes();
         const index1WithZHashed = Object.assign({z: 'hashed'}, setup.index1);
         assert.commandWorked(coll.createIndex(index1WithZHashed));
