@@ -391,25 +391,27 @@ AccumulationStatement mergeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pE
                 BSONObjBuilder outputBuilder(
                     accArgsBuilder.subobjStart(AccumulatorN::kFieldNameOutput));
                 for (auto accIdx : accIndices) {
-                    getOutputArgExpr(accStmts[accIdx].expr.argument)
-                        ->serialize()
-                        .addToBsonObj(&outputBuilder, accStmts[accIdx].fieldName);
-                    // Recomputes the rewritten nested accumulator fields to the user-requeted
-                    // fields.
                     {
-                        BSONObjBuilder prjExprBuilder(prjArgsBuilder.subobjStart(
-                            accStmts[accIdx].fieldName));  // user-requested field
+                        // This block opens "fieldName": {...} within "output": {...}
+                        BSONObjBuilder ifNullOutputBuilder(
+                            outputBuilder.subobjStart(accStmts[accIdx].fieldName));
                         {
-                            using namespace fmt::literals;
-                            // Composes {$ifNull: ["$rewrittenField", null]}.
-                            BSONArrayBuilder ifNullExprBuilder(
-                                prjExprBuilder.subarrayStart("$ifNull"_sd));
-                            ifNullExprBuilder
-                                .append("${}.{}"_format(mergeFieldName.toString(),
-                                                        accStmts[accIdx].fieldName))
-                                .appendNull();
+                            // Composes {$ifNull: ["outputExpression", null]}.
+                            BSONArrayBuilder ifNullArrayBuilder(
+                                ifNullOutputBuilder.subarrayStart("$ifNull"_sd));
+                            getOutputArgExpr(accStmts[accIdx].expr.argument)
+                                ->serialize()
+                                .addToBsonArray(&ifNullArrayBuilder);
+                            ifNullArrayBuilder.appendNull();
                         }
                     }
+
+                    // Recomputes the rewritten nested accumulator fields to the user-requested
+                    // fields.
+                    using namespace fmt::literals;
+                    prjArgsBuilder.append(
+                        accStmts[accIdx].fieldName,
+                        "${}.{}"_format(mergeFieldName.toString(), accStmts[accIdx].fieldName));
                 }
                 outputBuilder.doneFast();
             }
