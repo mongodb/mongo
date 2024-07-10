@@ -71,8 +71,11 @@ public:
      * Refreshes all cluster server parameters from the config servers. Called periodically in the
      * run method, which executes in a background thread. Also called in-line during
      * getClusterParameter on mongos to ensure that cached values returned are up-to-date.
+     * If 'ensureReadYourWritesConsistency' is true, then effect of all preceeding operations issued
+     * by the current thread on the cluster parameters is visible after this method returns.
+     * Otherwise, the values of the cluster parameters may be stale after this method returns.
      */
-    Status refreshParameters(OperationContext* opCtx);
+    Status refreshParameters(OperationContext* opCtx, bool ensureReadYourWritesConsistency = false);
 
     // What the actual refresh job runs to do a refresh.
     Status _refreshParameters(OperationContext* opCtx);

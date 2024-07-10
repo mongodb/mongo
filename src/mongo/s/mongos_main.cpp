@@ -840,7 +840,11 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupMongoS);
     ChangeStreamOptionsManager::create(serviceContext);
     query_settings::QuerySettingsManager::create(serviceContext, [](OperationContext* opCtx) {
-        uassertStatusOK(ClusterServerParameterRefresher::get(opCtx)->refreshParameters(opCtx));
+        // QuerySettingsManager modifies a cluster-wide parameter and thus a refresh of the
+        // parameter after that modification should observe results of preceeding writes.
+        const bool kEnsureReadYourWritesConsistency = true;
+        uassertStatusOK(ClusterServerParameterRefresher::get(opCtx)->refreshParameters(
+            opCtx, kEnsureReadYourWritesConsistency));
     });
 
     auto opCtxHolder = tc->makeOperationContext();
