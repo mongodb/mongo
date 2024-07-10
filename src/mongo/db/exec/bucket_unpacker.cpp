@@ -1667,7 +1667,7 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
 
     if (version == 1) {
         _unpackingImpl = std::make_unique<BucketUnpackerV1>(timeFieldElem);
-    } else if (version == 2) {
+    } else if (version == 2 || version == 3) {
         auto countField = controlField.Obj()[timeseries::kBucketControlCountFieldName];
         _unpackingImpl =
             std::make_unique<BucketUnpackerV2>(timeFieldElem,
