@@ -119,7 +119,7 @@ MONGO_WARN_UNUSED_RESULT_FUNCTION PlanStage::StageState handlePlanStageYield(
         // while locks are being held. We handle this by requesting a yield and then refreshing the
         // CatalogCache after having released the locks.
         const auto& extraInfo = ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
-        planExecutorShardingCatalogCacheRefreshRequired(expCtx->opCtx) = extraInfo->getNss();
+        planExecutorShardingState(expCtx->opCtx).catalogCacheRefreshRequired = extraInfo->getNss();
         yieldHandler();
         return PlanStage::NEED_YIELD;
     }

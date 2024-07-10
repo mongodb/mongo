@@ -58,7 +58,8 @@ void YieldPolicyCallbacksImpl::duringYield(OperationContext* opCtx) const {
 
     // If we yielded because we encountered the need to refresh the sharding CatalogCache, refresh
     // it here while the locks are yielded.
-    auto& catalogCacheRefreshRequired = planExecutorShardingCatalogCacheRefreshRequired(opCtx);
+    auto& catalogCacheRefreshRequired =
+        planExecutorShardingState(opCtx).catalogCacheRefreshRequired;
     if (catalogCacheRefreshRequired) {
         auto catalogCache = Grid::get(opCtx)->catalogCache();
         uassertStatusOK(
