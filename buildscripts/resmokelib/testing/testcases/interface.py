@@ -186,8 +186,13 @@ class ProcessTestCase(TestCase, UndoDBUtilsMixin):
         finished_time = timeit.default_timer()
         if self.return_code != 0:
             raise self.failureException(
-                "%s failed. Duration of process %fs"
-                % (self.short_description(), finished_time - start_time)
+                "%s failed with exit code %s, pid %s. Duration of process %fs"
+                % (
+                    self.short_description(),
+                    self.return_code,
+                    process.pid,
+                    finished_time - start_time,
+                )
             )
 
         self.logger.info(
