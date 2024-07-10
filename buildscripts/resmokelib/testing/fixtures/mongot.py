@@ -122,6 +122,16 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
                     self.port, self.mongot.pid, exit_code
                 )
             )
+        # It is necessary for correctness purposes to delete the config journals during fixture teardown
+        # (instead of in a hook) to ensure that there are no zombie index entries left from a previous
+        # test that exited abruptly due to a failure.
+        self.logger.info("Begin deleting mongot data files in fixture teardown")
+        try:
+            shutil.rmtree(self.data_dir)
+        except OSError as error:
+            self.logger.error("Hit OS error trying to delete mongot config journal: %s", error)
+            pass
+        self.logger.info("Finished deleting mongot data files in fixture teardown")
 
     def is_running(self):
         """Return true if the mongot is still operating."""

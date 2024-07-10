@@ -659,15 +659,29 @@ DBCollection.prototype._runCreateSearchIndexOnPrimary = function(
     let name = response["indexesCreated"][0]["name"];
     let collname = this.getName();
     let searchIndexArray = primaryDB[collname].aggregate([{$listSearchIndexes: {name}}]).toArray();
-    assert.eq(searchIndexArray.length, 1, searchIndexArray);
-    let queryable = searchIndexArray[0]["queryable"];
+    // TODO SERVER-92200 renable the commented out assert and logic as mongot should have wiped
+    // all non-existent index entries.
+    // assert.eq(searchIndexArray.length, 1, searchIndexArray);
+    // let queryable = searchIndexArray[0]["queryable"];
 
-    if (queryable) {
-        return response;
+    // if (queryable) {
+    //     return response;
+    // }
+    let searchIndexId;
+    for (const {id, status, queryable} of searchIndexArray) {
+        if (status != "DOES_NOT_EXIST") {
+            if (queryable) {
+                return response;
+            }
+            searchIndexId = id;
+            break;
+        }
     }
+
     // This default times out in 90 seconds.
+    // TODO SERVER-92200 query by name and not ID.
     assert.soon(() => primaryDB[collname]
-                          .aggregate([{$listSearchIndexes: {name}}])
+                          .aggregate([{$listSearchIndexes: {id: searchIndexId}}])
                           .toArray()[0]["queryable"]);
     return response;
 };

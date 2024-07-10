@@ -22,9 +22,6 @@ selector:
     - jstests/with_mongot/e2e_infrastructure_tests/*.js
 
 executor:
-  archive:
-    hooks:
-      - MongotHook
   config:
     shell_options:
       global_vars:
@@ -38,8 +35,6 @@ executor:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
         jsTest.authenticate(db.getMongo());
       <<: *authOptions
-  hooks:
-    - class: MongotHook
   fixture:
     class: ShardedClusterFixture
     auth_options: *authOptions
