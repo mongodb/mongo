@@ -120,8 +120,8 @@ class EnterpriseDistro(packager.Distro):
     def build_os(self, arch):
         """Return the build os label in the binary package to download.
 
-        The labels "rhel57", "rhel62", "rhel67", "rhel70", "rhel79", "rhel80", "rhel90" are for redhat,
-        the others are delegated to the super class.
+        The labels "rhel57", "rhel62", "rhel67", "rhel70", "rhel79", "rhel80", "rhel88", "rhel90"
+        are for redhat, the others are delegated to the super class.
         """
         if arch == "ppc64le":
             if self.dname == 'ubuntu':
@@ -142,7 +142,7 @@ class EnterpriseDistro(packager.Distro):
                 return ["ubuntu1804", "ubuntu2004", "ubuntu2204"]
         if arch == "aarch64":
             if self.dname == 'redhat':
-                return ["rhel82", "rhel90", "rhel93"]
+                return ["rhel82", "rhel88", "rhel90", "rhel93"]
             if self.dname == 'amazon2':
                 return ["amazon2"]
             if self.dname == 'amazon2023':
@@ -150,7 +150,7 @@ class EnterpriseDistro(packager.Distro):
             return []
 
         if re.search("(redhat|fedora|centos)", self.dname):
-            return ["rhel93", "rhel90", "rhel80", "rhel88", "rhel70", "rhel79", "rhel62", "rhel57"]
+            return ["rhel93", "rhel90", "rhel88", "rhel80", "rhel70", "rhel79", "rhel62", "rhel57"]
         return super(EnterpriseDistro, self).build_os(arch)
 
 
