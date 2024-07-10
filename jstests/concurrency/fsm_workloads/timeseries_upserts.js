@@ -20,15 +20,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // measurement without a sensorId.
     $config.states.updateMany = function updateMany(db, collName) {
         const readingNo = Random.randInt(this.nTotalReadings);
-        assert.commandWorked(db.runCommand({
-            update: collName,
-            updates: [{
-                q: {readingNo: readingNo},
-                u: {$set: {ts: this.dateTime, updatedMany: 1}},
-                multi: true,
-                upsert: true,
-            }]
-        }));
+        retryOnRetryableError(() => {
+            assert.commandWorked(db.runCommand({
+                update: collName,
+                updates: [{
+                    q: {readingNo: readingNo},
+                    u: {$set: {ts: this.dateTime, updatedMany: 1}},
+                    multi: true,
+                    upsert: true,
+                }]
+            }));
+        }, 100, undefined, TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : []);
     };
     // Update one measurement for a random sensor. If no match is found, upsert one measurement for
     // that sensor.

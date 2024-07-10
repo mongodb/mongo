@@ -59,8 +59,10 @@ export const $config = (function() {
                 ErrorCodes.DocumentValidationFailure);
 
             // Update all the documents in the collection.
-            assert.commandWorked(db[collName].update(
-                {}, {$set: {a: 5, array: [2, 3]}, $inc: {counter: 1}}, {multi: true}));
+            retryOnRetryableError(() => {
+                assert.commandWorked(db[collName].update(
+                    {}, {$set: {a: 5, array: [2, 3]}, $inc: {counter: 1}}, {multi: true}));
+            }, 100, undefined, TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : []);
 
             // Validation fails when elements of 'array' doesn't add up to 5.
             assert.commandFailedWithCode(

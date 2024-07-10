@@ -118,13 +118,14 @@ export const $config = (function() {
 
         // Takes a random subset of documents potentially being batch deleted and updates them.
         function updateConflict(db, collName) {
-            const updateRes = db[collName].updateMany({
-                deleter_tid: {$ne: this.tid},  // Exclude self.
-                delete_query_match: true,      // Select documents that might be being deleted.
-                subset_id: getRandomUpTo(this.numInsertSubsets)  // Select subset.
-            },
-                                                      {$set: {delete_query_match: false}});
-            assert.commandWorked(updateRes);
+            retryOnRetryableError(() => {
+                assert.commandWorked(db[collName].updateMany({
+                    deleter_tid: {$ne: this.tid},  // Exclude self.
+                    delete_query_match: true,      // Select documents that might be being deleted.
+                    subset_id: getRandomUpTo(this.numInsertSubsets)  // Select subset.
+                },
+                                                             {$set: {delete_query_match: false}}));
+            }, 100, undefined, TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : []);
         }
 
         // Takes a random subset of documents potentially being batch deleted and re-delete them.

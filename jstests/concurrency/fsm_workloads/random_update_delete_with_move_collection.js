@@ -8,6 +8,11 @@
  * requires_sharding,
  * requires_fcv_80,
  * assumes_balancer_off,
+ * # Changes server parameters.
+ * incompatible_with_concurrency_simultaneous,
+ * # TODO (SERVER-91251): Run this with stepdowns on sanitizers.
+ * tsan_incompatible,
+ * incompatible_aubsan,
  * ];
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
@@ -25,15 +30,50 @@ const $baseConfig = {
     },
     transitions: {init: {init: 1}},
     setup: function setup(db, collName, cluster) {
+        if (!TestData.runningWithShardStepdowns) {
+            // Set reshardingMinimumOperationDurationMillis so that moveCollection runs faster.
+            cluster.executeOnConfigNodes((db) => {
+                const res = assert.commandWorked(db.adminCommand(
+                    {setParameter: 1, reshardingMinimumOperationDurationMillis: 0}));
+                this.originalReshardingMinimumOperationDurationMillis = res.was;
+            });
+        }
+
+        // Increase yielding so that moveCollection more often commits in the middle of a
+        // multi-write.
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 50}));
+            this.internalQueryExecYieldIterationsDefault = res.was;
+        });
+
         // The runner will implicitly shard the collection if we are in a sharded cluster, so
         // unshard it.
         assert.commandWorked(db.adminCommand({unshardCollection: `${db}.${collName}`}));
         const bulk = db[collName].initializeUnorderedBulkOp();
-        for (let i = 0; i < this.threadCount * 100; ++i) {
+        for (let i = 0; i < this.threadCount * 200; ++i) {
             bulk.insert({_id: i});
         }
         assert.commandWorked(bulk.execute());
     },
+    teardown: function setup(db, collName, cluster) {
+        if (!TestData.runningWithShardStepdowns) {
+            cluster.executeOnConfigNodes((db) => {
+                const res = assert.commandWorked(db.adminCommand({
+                    setParameter: 1,
+                    reshardingMinimumOperationDurationMillis:
+                        this.originalReshardingMinimumOperationDurationMillis
+                }));
+            });
+
+            cluster.executeOnMongodNodes((db) => {
+                const res = assert.commandWorked(db.adminCommand({
+                    setParameter: 1,
+                    internalQueryExecYieldIterations: this.internalQueryExecYieldIterationsDefault
+                }));
+            });
+        }
+    }
 };
 
 const $partialConfig = extendWorkload($baseConfig, randomUpdateDelete);
@@ -74,8 +114,7 @@ export const $config = extendWorkload($partialConfig, function($config, $super) 
         this.moveCollectionsPerformed++;
     };
 
-    // TODO SERVER-91634: Set weight for moveCollection to 0.2.
-    const weights = {moveCollection: 0.0, performUpdates: 0.4, performDeletes: 0.4};
+    const weights = {moveCollection: 0.1, performUpdates: 0.45, performDeletes: 0.45};
     $config.transitions = {
         init: weights,
         moveCollection: weights,

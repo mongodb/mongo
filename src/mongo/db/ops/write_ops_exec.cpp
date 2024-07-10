@@ -895,10 +895,30 @@ UpdateResult performUpdate(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
     }
 
-    docFound = advanceExecutor(opCtx,
-                               exec.get(),
-                               remove,
-                               updateRequest->shouldReturnAnyDocs() ? "findAndModify" : "update");
+    try {
+        docFound =
+            advanceExecutor(opCtx,
+                            exec.get(),
+                            remove,
+                            updateRequest->shouldReturnAnyDocs() ? "findAndModify" : "update");
+    } catch (ExceptionFor<ErrorCodes::StaleConfig>& ex) {
+        // An update plan can fail with StaleConfig error after having performed some writes but not
+        // completed. This can happen when the collection is moved. Routers consider StaleConfig as
+        // retryable. However, it is unsafe to retry, because if the update is not idempotent it
+        // would cause some documents to be updated twice. To prevent that, we rewrite the error
+        // code to QueryPlanKilled, which routers won't retry on.
+        const auto updateResult = exec->getUpdateResult();
+        tassert(9146501,
+                "An update plan should never yield after having performed an upsert",
+                updateResult.upsertedId.isEmpty());
+        if (updateResult.numDocsModified > 0 && !opCtx->isRetryableWrite()) {
+            ex.addContext("Update plan failed after having partially executed");
+            uasserted(ErrorCodes::QueryPlanKilled, ex.reason());
+        } else {
+            throw;
+        }
+    }
+
     // Nothing after advancing the plan executor should throw a WriteConflictException,
     // so the following bookkeeping with execution stats won't end up being done
     // multiple times.

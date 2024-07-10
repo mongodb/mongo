@@ -43,6 +43,7 @@ export function randomUpdateDelete($config, $super) {
 
     $config.data.expectPartialMultiWrites = inNonTransactionalStepdownSuite();
     $config.data.expectExtraMultiWrites = false;
+    $config.data.maxWriteBatchSize = 2;
 
     $config.data.getShardKey = function getShardKey(collName) {
         // If the final workload is operating on a sharded collection and doesn't always use the
@@ -60,6 +61,16 @@ export function randomUpdateDelete($config, $super) {
         // This test assumes that the shard key is on a single field.
         assert.eq(fields.length, 1);
         return fields[0];
+    };
+
+    $config.data.getExpectedErrors = function getExpectedErrors() {
+        const expected = [];
+
+        if (this.expectPartialMultiWrites) {
+            expected.push(ErrorCodes.QueryPlanKilled);
+        }
+
+        return expected;
     };
 
     $config.data.getTargetedDocuments = function getTargetedDocuments(collName, query) {
@@ -86,7 +97,7 @@ export function randomUpdateDelete($config, $super) {
     };
 
     $config.data.createRandomUpdateBatch = function createRandomUpdateBatch(collName) {
-        const batchSize = 1 + Random.randInt(2);
+        const batchSize = 1 + Random.randInt(this.maxWriteBatchSize);
         const updates = [];
         for (let i = 0; i < batchSize; i++) {
             updates.push(this.createRandomUpdate(collName));
@@ -177,22 +188,34 @@ export function randomUpdateDelete($config, $super) {
         return map;
     };
 
-    $config.data.verifyDocumentCounters = function verifyDocumentCounters(onDisk) {
+    $config.data.verifyDocumentCounters = function verifyDocumentCounters(onDiskBefore,
+                                                                          onDiskAfter) {
         for (const key of this.expectedDocs.keys()) {
             // Verify the counter separately from the rest of the document to account for differing
             // semantics around retries.
             const expectedDoc = this.expectedDocs.get(key);
-            const actualDoc = onDisk.get(key);
+            const actualDoc = onDiskAfter.get(key);
+            const priorDoc = onDiskBefore.get(key);
+            if (actualDoc === undefined) {
+                // An expected document is only allowed to be missing if it didn't exist prior to
+                // executing the update batch. It's possible that we expected to upsert a document
+                // later in the batch, but it was never executed because a multi update earlier in
+                // the batch was killed.
+                assert(priorDoc === undefined);
+                assert(this.expectPartialMultiWrites);
+                continue;
+            }
             const {counter: expectedCounter, ...expectedDocNoCounter} = expectedDoc;
             const {counter: actualCounter, ...actualDocNoCounter} = actualDoc;
+            const priorCounter = priorDoc ? priorDoc.counter : 0;
             assert.docEq(expectedDocNoCounter, actualDocNoCounter);
-            assert(this.counterWithinRange(expectedCounter, actualCounter),
+            assert(this.counterWithinRange(expectedCounter, actualCounter, priorCounter),
                    `Expected counter ${tojson(expectedDoc)} and on disk counter ${
                        tojson(actualDoc)} differ by more than allowed`);
         }
     };
 
-    $config.data.counterWithinRange = function counterWithinRange(expected, actual) {
+    $config.data.counterWithinRange = function counterWithinRange(expected, actual, prior) {
         // It's always correct for the counter to be the expected value.
         if (actual === expected) {
             return true;
@@ -205,9 +228,11 @@ export function randomUpdateDelete($config, $super) {
         // For unsharded collections or when failovers are enabled, we expect that sometimes a multi
         // update operation will be killed and fail to update some of the documents that match its
         // filter.
-        if (actual === expected - 1) {
+        if (actual < expected && actual >= prior) {
             return this.expectPartialMultiWrites;
         }
+        // If we reach this far, it means the counter is lower than its value prior to executing the
+        // updates. This should not be possible.
         return false;
     };
 
@@ -217,8 +242,15 @@ export function randomUpdateDelete($config, $super) {
             assert.lte(actual.nModified, expected.nModified);
             return;
         }
-        // Even if we expect extra multi updates due to retries, a single operation can only update
-        // as many documents as actually exist.
+        // When we expect extra multi updates, we can at least assert that at most two times the
+        // number of actual documents were modified. This happens when a multi-update router with
+        // ShardVersion::IGNORED completely executes on one shard before resharding commits, and on
+        // the other after it commits.
+        if (this.expectExtraMultiWrites) {
+            assert.lte(actual.n, 2 * expected.n);
+            assert.lte(actual.nModified, 2 * expected.nModified);
+            return;
+        }
         assert.eq(actual.n, expected.n);
         assert.eq(actual.nModified, expected.nModified);
     };
@@ -260,12 +292,13 @@ export function randomUpdateDelete($config, $super) {
 
     $config.states.performUpdates = function multiUpdate(db, collName, connCache) {
         runWithManualRetriesIfInNonTransactionalStepdownSuite(() => {
-            this.expectedDocs = this.readOwnedDocuments(db, collName);
+            const onDiskBefore = this.readOwnedDocuments(db, collName);
+            this.expectedDocs = new Map(onDiskBefore);
             const updates = this.createRandomUpdateBatch(collName);
             jsTestLog("Executing updates: " + tojson(updates));
             const result = db.runCommand({update: collName, updates});
             jsTestLog("Result: " + tojson(result));
-            assert.commandWorked(result);
+            assert.commandWorkedOrFailedWithCode(result, this.getExpectedErrors());
             let totalUpdates = 0;
             let totalUpserts = 0;
             for (const update of updates) {
@@ -278,8 +311,8 @@ export function randomUpdateDelete($config, $super) {
                     this.incrementCounterForDoc(key);
                 }
             }
-            const onDisk = this.readOwnedDocuments(db, collName);
-            this.verifyDocumentCounters(onDisk);
+            const onDiskAfter = this.readOwnedDocuments(db, collName);
+            this.verifyDocumentCounters(onDiskBefore, onDiskAfter);
             this.verifyUpdateResult({n: totalUpdates, nModified: totalUpdates - totalUpserts},
                                     result);
         });
@@ -287,12 +320,13 @@ export function randomUpdateDelete($config, $super) {
 
     $config.states.performDeletes = function multiDelete(db, collName, connCache) {
         runWithManualRetriesIfInNonTransactionalStepdownSuite(() => {
-            this.expectedDocs = this.readOwnedDocuments(db, collName);
+            const onDiskBefore = this.readOwnedDocuments(db, collName);
+            this.expectedDocs = new Map(onDiskBefore);
             const deletes = this.createRandomDeleteBatch(collName);
             jsTestLog("Executing deletes: " + tojson(deletes));
             const result = db.runCommand({delete: collName, deletes});
             jsTestLog("Result: " + tojson(result));
-            assert.commandWorked(result);
+            assert.commandWorkedOrFailedWithCode(result, this.getExpectedErrors());
             let uniqueDeletes = new Set();
             for (const deleteOp of deletes) {
                 const deletedKeys = this.getTargetedDocuments(collName, deleteOp.q);
@@ -301,11 +335,11 @@ export function randomUpdateDelete($config, $super) {
                     this.expectedDocs.delete(key);
                 }
             }
-            const onDisk = this.readOwnedDocuments(db, collName);
-            this.verifyDocumentCounters(onDisk);
+            const onDiskAfter = this.readOwnedDocuments(db, collName);
+            this.verifyDocumentCounters(onDiskBefore, onDiskAfter);
             this.verifyDeleteResult(uniqueDeletes.size, result.n);
 
-            if (this.expectedDocs.size > 0) {
+            if (onDiskAfter.size > 0) {
                 return;
             }
             jsTestLog(`Thread ${this.tid} has deleted all of its documents and will now reset to its initial state`);
