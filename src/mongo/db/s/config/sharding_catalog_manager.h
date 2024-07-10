@@ -282,6 +282,13 @@ public:
                                   const NamespaceString& nss,
                                   const BSONObj& query);
 
+    /**
+     * Checks if the shard keys are valid for the timeseries collections in the given database.
+     * If dbName is DatabaseName::kEmpty it checks in all database.
+     */
+    Status checkTimeseriesShardKeys(OperationContext* opCtx,
+                                    const DatabaseName& dbName = DatabaseName::kEmpty);
+
     //
     // Chunk Operations
     //

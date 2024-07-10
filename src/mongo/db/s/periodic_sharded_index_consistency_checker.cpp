@@ -77,6 +77,8 @@
 namespace mongo {
 namespace {
 
+static const int shardedTimeseriesShardkeyCheckIntervalMS{12 * 60 * 60 * 1000};  // 12 hours
+
 const auto getPeriodicShardedIndexConsistencyChecker =
     ServiceContext::declareDecoration<PeriodicShardedIndexConsistencyChecker>();
 
@@ -248,6 +250,37 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
     _shardedIndexConsistencyChecker.start();
 }
 
+void PeriodicShardedIndexConsistencyChecker::_launchOrResumeShardedTimeseriesShardkeyChecker(
+    WithLock, ServiceContext* serviceContext) {
+    auto periodicRunner = serviceContext->getPeriodicRunner();
+    invariant(periodicRunner);
+
+    if (_shardedTimeseriesShardkeyChecker.isValid()) {
+        _shardedTimeseriesShardkeyChecker.resume();
+        return;
+    }
+
+    PeriodicRunner::PeriodicJob job(
+        "PeriodicShardedTimeseriesShardkeyChecker",
+        [this](Client* client) {
+            auto uniqueOpCtx = client->makeOperationContext();
+            auto opCtx = uniqueOpCtx.get();
+
+            // TODO: SERVER-82965 Remove wait
+            try {
+                ShardingState::get(opCtx)->awaitClusterRoleRecovery().get(opCtx);
+            } catch (DBException&) {
+                return;
+            }
+
+            uassertStatusOK(ShardingCatalogManager::get(opCtx)->checkTimeseriesShardKeys(opCtx));
+        },
+        Milliseconds(shardedTimeseriesShardkeyCheckIntervalMS),
+        false);
+    _shardedTimeseriesShardkeyChecker = periodicRunner->makeJob(std::move(job));
+    _shardedTimeseriesShardkeyChecker.start();
+}
+
 void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceContext) {
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_isPrimary) {
@@ -260,6 +293,7 @@ void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceCon
             // If we're stepping up again after having stepped down, just resume the existing task.
             _shardedIndexConsistencyChecker.resume();
         }
+        _launchOrResumeShardedTimeseriesShardkeyChecker(lk, serviceContext);
     }
 }
 
@@ -272,6 +306,7 @@ void PeriodicShardedIndexConsistencyChecker::onStepDown() {
         // running, otherwise this would deadlock when the index check tries to lock _mutex when
         // updating the inconsistent index count.
         _shardedIndexConsistencyChecker.pause();
+        _shardedTimeseriesShardkeyChecker.pause();
         // Clear the counter to prevent a secondary from reporting an out-of-date count.
         _numShardedCollsWithInconsistentIndexes = 0;
     }
@@ -280,6 +315,7 @@ void PeriodicShardedIndexConsistencyChecker::onStepDown() {
 void PeriodicShardedIndexConsistencyChecker::onShutDown() {
     if (_shardedIndexConsistencyChecker.isValid()) {
         _shardedIndexConsistencyChecker.stop();
+        _shardedTimeseriesShardkeyChecker.stop();
     }
 }
 

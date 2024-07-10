@@ -1198,6 +1198,121 @@ BSONObj ShardingCatalogManager::findOneConfigDocument(OperationContext* opCtx,
     return client.findOne(findCommand);
 }
 
+Status ShardingCatalogManager::checkTimeseriesShardKeys(OperationContext* opCtx,
+                                                        const DatabaseName& dbName) {
+
+    // The following aggregation pipeline collects all the collections that are timeseries and are
+    // sharded based on the timeField key. This supposed to run on the config.collections
+    // collection.
+    //
+    // The stages are the following:
+    //
+    // 1. Match all the documents that has timeseriesField property. This is only true for the
+    // timeseries collections
+    //
+    // 2. Add shardKeys and viewName fields.
+    // The shardKeys will be an array with the keys of the elements in the original `key` field.
+    // Eg: { meta.sensorID: 1, timestamp: 1 } -> [ "meta.sensorID", "timestamp" ]
+    // The viewName will be the value of the `_id` field without the `.system.buckets` part.
+    // Eg: `test.system.buckets.shardedCollectionName` -> `test.shardedCollectionName`
+    //
+    // 3. Project the timeShardKey, timeField and viewName into a new document
+    // The timeShardKey is the previously added shardKeys where the element matches the
+    // `.*\.$timeseriesFields.timeField` pattern where $timeseriesFields.timeField is the timeField
+    // of the original timeseries collection.
+    // Eg: [ "meta.sensorID", "timestamp" ] -> [ "timestamp" ]
+    // The timeField is the field name of the timeField in the original timeseries collection
+    // The viewName is the same as previously explained
+    //
+    // 4. Match all documents where the timeShardKey is not empty
+    static const auto rawPipelineStages = [] {
+        auto rawPipelineBSON = fromjson(R"({pipeline: [
+            {
+                "$match":{
+                    "timeseriesFields":{
+                        "$ne":null
+                    }
+                }
+            },
+            {
+                "$addFields":{
+                    "shardKeys":{
+                        "$map":{
+                            "input":{
+                                "$objectToArray":"$key"
+                            },
+                            "in":"$$this.k"
+                        }
+                    },
+                    "viewName":{
+                        "$replaceOne":{
+                            "input":"$_id",
+                            "find":".system.buckets",
+                            "replacement":""
+                        }
+                    }
+                }
+            },
+            {
+                "$project":{
+                    "timeShardKey":{
+                        "$filter":{
+                            "input":"$shardKeys",
+                            "cond":{
+                                "$regexMatch":{
+                                    "input":"$$this",
+                                    "regex":{
+                                        "$concat":[
+                                            ".*\\.",
+                                            "$timeseriesFields.timeField"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "timeField":"$timeseriesFields.timeField",
+                    "viewName":"$viewName"
+                }
+            },
+            {
+                "$match":{
+                    "timeShardKey":{
+                        "$ne":[]
+                    }
+                }
+            }
+        ]})");
+        return parsePipelineFromBSON(rawPipelineBSON.firstElement());
+    }();
+
+    AggregateCommandRequest timeFieldIndexedTimeSeriesAggRequest{
+        NamespaceString::kConfigsvrCollectionsNamespace, rawPipelineStages};
+    auto documents =
+        _localCatalogClient->runCatalogAggregation(opCtx,
+                                                   timeFieldIndexedTimeSeriesAggRequest,
+                                                   {repl::ReadConcernLevel::kMajorityReadConcern});
+
+    for (auto&& document : documents) {
+        const auto viewNameField = document.getField("viewName");
+        const auto viewName = NamespaceStringUtil::deserialize(
+            boost::none, viewNameField.String(), SerializationContext::stateDefault());
+
+        const auto timeFieldField = document.getField("timeField");
+        const auto timeField = timeFieldField.String();
+
+        LOGV2_WARNING(
+            8864701,
+            "The time-series collection is currently using timeField as a shard key. Sharding on "
+            "time will be disabled in future versions. Please reshard your collection using "
+            "metaField as recommended in our time-series sharding documentation.",
+            logAttrs(viewName),
+            "timeField"_attr = timeField);
+    }
+
+    return Status::OK();
+}
+
 void ShardingCatalogManager::withTransactionAPI(OperationContext* opCtx,
                                                 const NamespaceString& namespaceForInitialFind,
                                                 txn_api::Callback callback) {

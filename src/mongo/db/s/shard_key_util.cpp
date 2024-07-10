@@ -71,6 +71,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
@@ -81,6 +82,8 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace shardkeyutil {
@@ -343,6 +346,11 @@ void validateTimeseriesShardKey(StringData timeFieldName,
     BSONObjIterator shardKeyElems{shardKeyPattern};
     while (auto elem = shardKeyElems.next()) {
         if (elem.fieldNameStringData() == timeFieldName) {
+            LOGV2_WARNING(
+                8864700,
+                "Using timeField as a shard key in time-series collections is deprecated and will "
+                "not be supported in future versions. Please reshard your collection using "
+                "metaField as recommended in our time-series sharding documentation.");
             uassert(5914000,
                     str::stream() << "the time field '" << timeFieldName
                                   << "' can be only at the end of the shard key pattern",
