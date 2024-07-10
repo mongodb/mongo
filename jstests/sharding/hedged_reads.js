@@ -83,8 +83,6 @@ function verifyCommandWorksWhenHedgeOperationsFailWithNetworkTimeout(
         errorCode: NumberInt(ErrorCodes.NetworkInterfaceExceededTimeLimit),
     });
 
-    assert.commandWorked(st.shard0.adminCommand({clearLog: 'global'}));
-
     const ps = startParallelShell(
         funWithArgs(function(dbName, collName) {
             const testDB = db.getSiblingDB(dbName);
@@ -99,8 +97,6 @@ function verifyCommandWorksWhenHedgeOperationsFailWithNetworkTimeout(
     fp1.off();
 
     ps();
-
-    checkLog.contains(st.shard0, "Hedged reads have been deprecated");
 }
 
 const st = new ShardingTest({
@@ -138,6 +134,8 @@ assert.commandWorked(testDB.runCommand({
     query: {$where: "sleep(100); return true;", x: {$gte: 0}},
     $readPreference: {mode: "nearest", hedge: {enabled: true}}
 }));
+
+checkLog.contains(st.s, "Hedged reads have been deprecated");
 
 let sortedNodes = [...st.rs0.nodes].sort((node1, node2) => node1.host.localeCompare(node2.host));
 

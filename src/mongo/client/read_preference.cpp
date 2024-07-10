@@ -131,9 +131,6 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromReadPreferenceIdl(
     boost::optional<HedgingMode> hedgingMode;
     if (rp.getHedge()) {
         hedgingMode = rp.getHedge();
-        LOGV2_WARNING(9029001,
-                      "Hedged reads have been deprecated. For more information please see "
-                      "https://dochub.mongodb.org/core/hedged-reads-deprecated");
         if (hedgingMode->getEnabled() && rp.getMode() == ReadPreference::PrimaryOnly) {
             return {
                 ErrorCodes::InvalidOptions,

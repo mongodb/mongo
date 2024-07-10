@@ -87,6 +87,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
@@ -591,6 +593,15 @@ void ParseAndRunCommand::_parseCommand() {
         namespaces = _invocation->allNamespaces();
     }
     validateSessionOptions(_osi, command, namespaces, allowTransactionsOnConfigDatabase);
+
+    if (ReadPreferenceSetting::get(opCtx).hedgingMode) {
+        static logv2::SeveritySuppressor logSeverity{
+            Minutes{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(5)};
+        LOGV2_DEBUG(9206200,
+                    logSeverity().toInt(),
+                    "Hedged reads have been deprecated. For more information please see "
+                    "https://dochub.mongodb.org/core/hedged-reads-deprecated");
+    }
 
     _wc.emplace(uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body)));
 
