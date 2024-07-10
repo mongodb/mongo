@@ -2,6 +2,7 @@
  * Test time-based window bounds.
  */
 import "jstests/libs/sbe_assert_error_override.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.setWindowFields_time;
 coll.drop();
@@ -231,6 +232,14 @@ assert.sameMembers(res, [
     {"res": 36472996377170790000},
     {"res": 36472996377170790000}
 ]);
+
+// There is a bug in SBE setWindowFileds stage that makes the following tests fail. The bug has been
+// fixed in v8.0 with the ticket SERVER-86373.
+const sbeDisabled = checkSbeCompletelyDisabled(db);
+if (!sbeDisabled) {
+    jsTestLog("Skipping tests because SBE is enabled");
+    quit();
+}
 
 // Test with large bound over large data values
 const res2 =
