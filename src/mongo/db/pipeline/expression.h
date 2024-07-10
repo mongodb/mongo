@@ -75,8 +75,6 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/monotonic_expression.h"
-#include "mongo/db/pipeline/percentile_algo.h"
-#include "mongo/db/pipeline/percentile_algo_discrete.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -755,84 +753,6 @@ private:
     boost::intrusive_ptr<Expression> _output;
 };
 
-template <typename TAccumulator>
-class ExpressionFromAccumulatorQuantile : public Expression {
-public:
-    explicit ExpressionFromAccumulatorQuantile(ExpressionContext* const expCtx,
-                                               std::vector<double>& ps,
-                                               boost::intrusive_ptr<Expression> input,
-                                               PercentileMethod method)
-        : Expression(expCtx, {input}), _ps(ps), _input(input), _method(method) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-    }
-
-    const char* getOpName() const {
-        return TAccumulator::kName.rawData();
-    }
-
-    Value serialize(const SerializationOptions& options = {}) const final {
-        MutableDocument md;
-        TAccumulator::serializeHelper(_input, options, _ps, _method, md);
-        return Value(DOC(getOpName() << md.freeze()));
-    }
-
-    Value evaluate(const Document& root, Variables* variables) const final {
-        auto input = _input->evaluate(root, variables);
-        if (input.numeric()) {
-            // On a scalar value, all percentiles are the same for all methods.
-            return TAccumulator::formatFinalValue(
-                _ps.size(), std::vector<double>(_ps.size(), input.coerceToDouble()));
-        }
-
-        if (input.isArray() && input.getArrayLength() > 0) {
-            if (_method != PercentileMethod::Continuous) {
-                // On small datasets, which are likely to be the inputs for the expression, creating
-                // t-digests is inefficient, so instead we use DiscretePercentile algo directly for
-                // both "discrete" and "approximate" methods.
-                std::vector<double> samples;
-                samples.reserve(input.getArrayLength());
-                for (const auto& item : input.getArray()) {
-                    if (item.numeric()) {
-                        samples.push_back(item.coerceToDouble());
-                    }
-                }
-                DiscretePercentile dp;
-                dp.incorporate(samples);
-                return TAccumulator::formatFinalValue(_ps.size(), dp.computePercentiles(_ps));
-            } else {
-                // Delegate to the accumulator. Note: it would be more efficient to use the
-                // percentile algorithms directly rather than an accumulator, as it would reduce
-                // heap alloc, virtual calls and avoid unnecessary for expressions memory tracking.
-                // This path currently cannot be executed as we only support discrete percentiles.
-                TAccumulator accum(this->getExpressionContext(), _ps, _method);
-                for (const auto& item : input.getArray()) {
-                    accum.process(item, false /* merging */);
-                }
-                return accum.getValue(false /* toBeMerged */);
-            }
-        }
-
-        // No numeric values have been found for the expression to process.
-        return TAccumulator::formatFinalValue(_ps.size(), {});
-    }
-
-    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
-        return visitor->visit(this);
-    }
-
-    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
-        return visitor->visit(this);
-    }
-
-
-private:
-    std::vector<double> _ps;
-    boost::intrusive_ptr<Expression> _input;
-    PercentileMethod _method;
-
-    template <typename H>
-    friend class ExpressionHashVisitor;
-};
 
 /**
  * Inherit from this class if your expression takes exactly one numeric argument.

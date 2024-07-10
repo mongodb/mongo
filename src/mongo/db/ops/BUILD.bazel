@@ -48,6 +48,9 @@ mongo_cc_library(
     srcs = [
         ":delete_request_gen",
     ],
+    hdrs = [
+        "//src/mongo/db/pipeline:expression_from_accumulator_quantile.h",
+    ],
     header_deps = [
         "//src/mongo/db/repl:oplog_buffer_batched_queue",
         "//src/mongo/db/commands:server_status_core",

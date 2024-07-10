@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
 #include <vector>
 
@@ -36,9 +37,11 @@
 namespace mongo {
 
 /**
- * 'AccuratePercentile' class for common functionality between discrete and continuous percentiles
+ * 'AccuratePercentile' class for common functionality between discrete and continuous
+ * percentiles
  */
 class AccuratePercentile : public PercentileAlgorithm {
+
 public:
     AccuratePercentile() = default;  // no config required for this algorithm
 
@@ -62,5 +65,7 @@ protected:
 
     bool _shouldSort = true;
 };
+std::unique_ptr<AccuratePercentile> createDiscretePercentile();
+std::unique_ptr<AccuratePercentile> createContinuousPercentile();
 
 }  // namespace mongo

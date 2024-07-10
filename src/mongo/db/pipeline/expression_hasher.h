@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
+#include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
 #include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/query/expression_walker.h"

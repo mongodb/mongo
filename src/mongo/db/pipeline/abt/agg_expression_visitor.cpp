@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
+#include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/field_path.h"

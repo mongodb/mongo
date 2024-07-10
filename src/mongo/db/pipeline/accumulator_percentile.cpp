@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/accumulator_percentile.h"
 
 #include "mongo/db/pipeline/percentile_algo.h"
+#include "mongo/db/pipeline/percentile_algo_accurate.h"
 #include <type_traits>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -41,6 +42,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulator_percentile_gen.h"
+#include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -228,8 +230,9 @@ std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(PercentileMethod 
     switch (method) {
         case PercentileMethod::Approximate:
             return createTDigestDistributedClassic();
-        case PercentileMethod::Discrete:
+        case PercentileMethod::Discrete: {
             return createDiscretePercentile();
+        }
         default:
             uasserted(7435800,
                       str::stream()

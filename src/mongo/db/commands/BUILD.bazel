@@ -518,6 +518,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_match.h",
         "//src/mongo/db/pipeline:document_source_set_window_fields_gen",
         "//src/mongo/db/pipeline:expression_dependencies.h",
+        "//src/mongo/db/pipeline:expression_from_accumulator_quantile.h",
         "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
         "//src/mongo/db/pipeline:match_processor.h",
         "//src/mongo/db/pipeline:memory_token_container_util.h",

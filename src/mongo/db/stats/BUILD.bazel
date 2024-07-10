@@ -58,6 +58,9 @@ mongo_cc_library(
     srcs = [
         "counters.cpp",
     ],
+    hdrs = [
+        "//src/mongo/db/pipeline:expression_from_accumulator_quantile.h",
+    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/commands:server_status_core",

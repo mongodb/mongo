@@ -36,7 +36,7 @@
 
 #include <benchmark/benchmark.h>
 
-#include "mongo/db/pipeline/percentile_algo.h"
+#include "mongo/db/pipeline/percentile_algo_accurate.h"
 #include "mongo/db/pipeline/percentile_algo_bm_fixture.h"
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
 

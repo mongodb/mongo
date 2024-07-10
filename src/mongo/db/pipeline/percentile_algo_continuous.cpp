@@ -87,7 +87,7 @@ boost::optional<double> ContinuousPercentile::computePercentile(double p) {
     }
 }
 
-std::unique_ptr<PercentileAlgorithm> createContinuousPercentile() {
+std::unique_ptr<AccuratePercentile> createContinuousPercentile() {
     return std::make_unique<ContinuousPercentile>();
 }
 

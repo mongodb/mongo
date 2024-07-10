@@ -42,6 +42,7 @@
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
+#include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/field_path.h"

@@ -681,6 +681,7 @@ mongo_cc_library(
     hdrs = [
         "aggregated_index_usage_tracker.h",
         "collection_index_usage_tracker.h",
+        "//src/mongo/db/pipeline:expression_from_accumulator_quantile.h",
     ],
     deps = [
         ":server_base",
@@ -733,6 +734,9 @@ mongo_cc_library(
     name = "feature_compatibility_version_metrics",
     srcs = [
         "feature_compatibility_version_metrics.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/pipeline:expression_from_accumulator_quantile.h",
     ],
     deps = [
         ":server_base",

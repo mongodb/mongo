@@ -98,8 +98,6 @@ struct PartialPercentile {
 /**
  * Factory methods for instantiating concrete algorithms.
  */
-std::unique_ptr<PercentileAlgorithm> createDiscretePercentile();
-std::unique_ptr<PercentileAlgorithm> createContinuousPercentile();
 
 std::unique_ptr<PercentileAlgorithm> createTDigest();
 std::unique_ptr<PercentileAlgorithm> createTDigestDistributedClassic();

@@ -47,7 +47,6 @@ public:
     double linearInterpolate(double rank, int rank_ceil, int rank_floor);
 
     boost::optional<double> computePercentile(double p) final;
-    // std::vector<double> computePercentiles(const std::vector<double>& ps) final;
 };
 
 }  // namespace mongo

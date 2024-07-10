@@ -70,6 +70,7 @@ void AccuratePercentile::incorporate(const std::vector<double>& inputs) {
 }
 
 vector<double> AccuratePercentile::computePercentiles(const vector<double>& ps) {
+
     if (_accumulatedValues.empty() && _negInfCount == 0 && _posInfCount == 0) {
         return {};
     }
@@ -92,5 +93,4 @@ vector<double> AccuratePercentile::computePercentiles(const vector<double>& ps) 
     }
     return pctls;
 }
-
 }  // namespace mongo
