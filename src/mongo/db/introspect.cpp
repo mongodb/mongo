@@ -202,6 +202,12 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
 
     const auto dbProfilingNS = NamespaceString::makeSystemDotProfileNamespace(db->name());
 
+    if (!dbProfilingNS.isValid(DatabaseName::DollarInDbNameBehavior::Disallow)) {
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream()
+                          << "Invalid database name: " << db->name().toStringForErrorMsg());
+    }
+
     // Checking the collection exists must also be done in the WCE retry loop. Only retrying
     // collection creation would endlessly throw errors because the collection exists: must check
     // and see the collection exists in order to break free.
