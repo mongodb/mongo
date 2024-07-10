@@ -1225,7 +1225,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildGroup(const Query
 
     tassert(
         5851600, "should have one and only one child for GROUP", groupNode->children.size() == 1);
-    tassert(
+    uassert(
         6360401,
         "GROUP cannot propagate a record id slot, but the record id was requested by the parent",
         !reqs.has(kRecordId));
