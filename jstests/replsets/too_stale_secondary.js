@@ -30,30 +30,8 @@
  *
  */
 
+import {rollOver1MBOplog} from "jstests/replsets/libs/oplog_rollover_test.js";
 import {getFirstOplogEntry} from "jstests/replsets/rslib.js";
-
-/**
- * Overflows the oplog of a given node.
- *
- * To detect oplog overflow, we continuously insert large documents until we
- * detect that the first entry of the oplog is no longer the same as when we started. This
- * implies that the oplog attempted to grow beyond its maximum size i.e. it
- * has overflowed/rolled over.
- *
- * Each document will be inserted with a writeConcern given by 'writeConcern'.
- *
- */
-function overflowOplog(conn, db, writeConcern) {
-    var firstOplogEntry = getFirstOplogEntry(primary);
-    var collName = "overflow";
-
-    // Keep inserting large documents until the oplog rolls over.
-    const largeStr = new Array(32 * 1024).join('aaaaaaaa');
-    while (bsonWoCompare(getFirstOplogEntry(conn), firstOplogEntry) === 0) {
-        assert.commandWorked(
-            db[collName].insert({data: largeStr}, {writeConcern: {w: writeConcern}}));
-    }
-}
 
 /**
  * True if a node's entry in "members" has tooStale: true.
@@ -82,7 +60,10 @@ var replTest = new ReplSetTest({
     name: testName,
     nodes:
         [{oplogSize: smallOplogSizeMB}, {oplogSize: bigOplogSizeMB}, {oplogSize: smallOplogSizeMB}],
-    nodeOptions: {syncdelay: 1},
+    nodeOptions: {
+        syncdelay: 1,
+        setParameter: {'failpoint.hangOplogCapMaintainerThread': tojson({mode: 'alwaysOn'})}
+    },
 });
 
 var nodes = replTest.startSet();
@@ -114,12 +95,20 @@ replTest.stop(2);
 jsTestLog("3: Wait until Node 2 is down.");
 replTest.waitForState(replTest.nodes[2], ReplSetTest.State.DOWN);
 
-var firstOplogEntryNode1 = getFirstOplogEntry(replTest.nodes[1]);
+const firstOplogEntryPrimary = getFirstOplogEntry(primary);
+const firstOplogEntryNode1 = getFirstOplogEntry(replTest.nodes[1]);
 
 jsTestLog("4: Overflow the primary's oplog.");
-overflowOplog(primary, primaryTestDB, 2);
+rollOver1MBOplog(replTest);
 
-// Make sure that Node 1's oplog didn't overflow.
+// Test that oplog entry of the initial insert rolls over on the primary.
+// Use assert.soon to wait for oplog cap maintainer thread to run.
+assert.soon(() => {
+    return getFirstOplogEntry(primary) != firstOplogEntryPrimary;
+}, "Timeout waiting for oplog to roll over on primary");
+
+// Make sure that Node 1's oplog didn't overflow. (This is best effort
+// as this check could race with the maintainer thread running.)
 assert.eq(firstOplogEntryNode1,
           getFirstOplogEntry(replTest.nodes[1]),
           "Node 1's oplog overflowed unexpectedly.");

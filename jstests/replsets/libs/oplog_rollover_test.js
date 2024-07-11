@@ -4,42 +4,31 @@
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
-export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless = false) {
-    jsTestLog("Testing with storageEngine: " + storageEngine);
-    if (initialSyncMethod) {
-        jsTestLog("  and initial sync method: " + initialSyncMethod);
-    }
+function numInsertOplogEntry(oplog) {
+    print(`Oplog times for ${oplog.getMongo().host}: ${
+        tojsononeline(oplog.find().projection({ts: 1, t: 1, op: 1, ns: 1}).toArray())}`);
+    let result;
+    assert.soon(() => {
+        try {
+            result = oplog.find({op: "i", "ns": "test.foo"}).itcount();
+            return true;
+        } catch (e) {
+            if (e.code !== ErrorCodes.CappedPositionLost) {
+                throw e;
+            }
+            // If we get a CappedPositionLost here, it means the oplog collection is being
+            // truncated so we return false and retry.
+            return false;
+        }
+    }, "Timeout finding the number of insert oplog entry");
+    return result;
+}
 
-    // Pause the oplog cap maintainer thread for this test until oplog truncation is needed. The
-    // truncation thread can hold a mutex for a short period of time which prevents new oplog
-    // truncate markers from being created during an insertion if the mutex cannot be obtained
-    // immediately. Instead, the next insertion will attempt to create a new oplog truncate marker,
-    // which this test does not do.
-    let parameters = {
-        logComponentVerbosity: tojson({storage: 2}),
-        'failpoint.hangOplogCapMaintainerThread': tojson({mode: 'alwaysOn'})
-    };
-    if (initialSyncMethod) {
-        parameters = Object.merge(parameters, {initialSyncMethod: initialSyncMethod});
-    }
-
-    let replSetOptions = {
-        // Set the syncdelay to 1s to speed up checkpointing.
-        nodeOptions: {
-            syncdelay: 1,
-            setParameter: parameters,
-        },
-        nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]
-    };
-
-    if (serverless)
-        replSetOptions = Object.merge(replSetOptions, {serverless: true});
-
-    const replSet = new ReplSetTest(replSetOptions);
-    // Set max oplog size to 1MB.
-    replSet.startSet({storageEngine: storageEngine, oplogSize: 1});
-    replSet.initiate();
-
+// Given a repl set with a primary and a secondary, inserts enough data
+// to overflow the oplog(s) of any nodes that have a maximum oplog size of 1MB.
+// Assumes the `hangOplogCapMaintainerThread` thread failpoint was enabled on both thee
+// primary and secondary at startup.
+export function rollOver1MBOplog(replSet) {
     const primary = replSet.getPrimary();
     const primaryOplog = primary.getDB("local").oplog.rs;
     const secondary = replSet.getSecondary();
@@ -60,26 +49,6 @@ export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless =
     const coll = primary.getDB("test").foo;
     // 400KB each so that oplog can keep at most two insert oplog entries.
     const longString = new Array(400 * 1024).join("a");
-
-    function numInsertOplogEntry(oplog) {
-        print(`Oplog times for ${oplog.getMongo().host}: ${
-            tojsononeline(oplog.find().projection({ts: 1, t: 1, op: 1, ns: 1}).toArray())}`);
-        let result;
-        assert.soon(() => {
-            try {
-                result = oplog.find({op: "i", "ns": "test.foo"}).itcount();
-                return true;
-            } catch (e) {
-                if (e.code !== ErrorCodes.CappedPositionLost) {
-                    throw e;
-                }
-                // If we get a CappedPositionLost here, it means the oplog collection is being
-                // truncated so we return false and retry.
-                return false;
-            }
-        }, "Timeout finding the number of insert oplog entry");
-        return result;
-    }
 
     // Insert the first document.
     const firstInsertTimestamp =
@@ -161,6 +130,50 @@ export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless =
         primary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
     assert.commandWorked(
         secondary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+}
+
+export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless = false) {
+    jsTestLog("Testing with storageEngine: " + storageEngine);
+    if (initialSyncMethod) {
+        jsTestLog("  and initial sync method: " + initialSyncMethod);
+    }
+
+    // Pause the oplog cap maintainer thread for this test until oplog truncation is needed. The
+    // truncation thread can hold a mutex for a short period of time which prevents new oplog
+    // truncate markers from being created during an insertion if the mutex cannot be obtained
+    // immediately. Instead, the next insertion will attempt to create a new oplog truncate marker,
+    // which this test does not do.
+    let parameters = {
+        logComponentVerbosity: tojson({storage: 2}),
+        'failpoint.hangOplogCapMaintainerThread': tojson({mode: 'alwaysOn'})
+    };
+    if (initialSyncMethod) {
+        parameters = Object.merge(parameters, {initialSyncMethod: initialSyncMethod});
+    }
+
+    let replSetOptions = {
+        // Set the syncdelay to 1s to speed up checkpointing.
+        nodeOptions: {
+            syncdelay: 1,
+            setParameter: parameters,
+        },
+        nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]
+    };
+
+    if (serverless)
+        replSetOptions = Object.merge(replSetOptions, {serverless: true});
+
+    const replSet = new ReplSetTest(replSetOptions);
+    // Set max oplog size to 1MB.
+    replSet.startSet({storageEngine: storageEngine, oplogSize: 1});
+    replSet.initiate();
+
+    const primary = replSet.getPrimary();
+    const primaryOplog = primary.getDB("local").oplog.rs;
+    const secondary = replSet.getSecondary();
+    const secondaryOplog = secondary.getDB("local").oplog.rs;
+
+    rollOver1MBOplog(replSet);
 
     // Test that oplog entry of the initial insert rolls over on both primary and secondary.
     // Use assert.soon to wait for oplog cap maintainer thread to run.
