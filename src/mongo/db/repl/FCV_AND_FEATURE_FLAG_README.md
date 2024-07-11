@@ -698,6 +698,14 @@ See the [section about checking the in-memory FCV for more information](#checkin
 If the feature flag has `shouldBeFCVGated` set to false, then `isEnabled` will simply return
 whether the feature flag is enabled.
 
+If the registration of a command should be gated by a feature flag, use `requiresFeatureFlag` when
+registering it with `MONGO_REGISTER_COMMAND`. For example:
+
+```c++
+MONGO_REGISTER_COMMAND(CommandOnlyEnabledWithToaster)
+    .requiresFeatureFlag(&mongo::gFeatureFlagToaster);
+```
+
 ### Feature Flag Gating During Initial Sync
 
 **_IMPORTANT NOTE ABOUT INITIAL SYNC_**:
