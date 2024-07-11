@@ -117,7 +117,7 @@ void CollectionTruncateMarkers::createNewMarkerIfNeeded(const RecordId& lastReco
         return;
     }
 
-    if (_currentBytes.load() < _minBytesPerMarker) {
+    if (_currentBytes.load() < _minBytesPerMarker.load()) {
         // Must have raced to create a new marker, someone else already triggered it.
         return;
     }
@@ -158,7 +158,8 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
 
             collectionMarkers->_currentRecords.addAndFetch(countInserted);
             int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
-            if (wallTime != Date_t() && newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
+            if (wallTime != Date_t() &&
+                newCurrentBytes >= collectionMarkers->_minBytesPerMarker.load()) {
                 // When other transactions commit concurrently, an uninitialized wallTime may delay
                 // the creation of a new marker. This delay is limited to the number of concurrently
                 // running transactions, so the size difference should be inconsequential.
@@ -169,10 +170,7 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
 
 void CollectionTruncateMarkers::setMinBytesPerMarker(int64_t size) {
     invariant(size > 0);
-
-    stdx::lock_guard<Latch> lk(_markersMutex);
-
-    _minBytesPerMarker = size;
+    _minBytesPerMarker.store(size);
 }
 
 CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::createMarkersByScanning(
@@ -563,7 +561,7 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarker(
     _currentRecords.addAndFetch(numRecordsAdded);
     int64_t newCurrentBytes = _currentBytes.addAndFetch(bytesAdded);
     if (highestWallTime != Date_t() && highestRecordId.isValid() &&
-        newCurrentBytes >= _minBytesPerMarker) {
+        newCurrentBytes >= _minBytesPerMarker.load()) {
         createNewMarkerIfNeeded(highestRecordId, highestWallTime);
     }
 }

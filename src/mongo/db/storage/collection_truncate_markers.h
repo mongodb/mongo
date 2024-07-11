@@ -295,7 +295,7 @@ private:
 
     // Minimum number of bytes the marker being filled should contain before it gets added to the
     // deque of collection markers.
-    int64_t _minBytesPerMarker;
+    AtomicWord<int64_t> _minBytesPerMarker;
 
     AtomicWord<int64_t> _currentRecords;  // Number of records in the marker being filled.
     AtomicWord<int64_t> _currentBytes;    // Number of bytes in the marker being filled.
