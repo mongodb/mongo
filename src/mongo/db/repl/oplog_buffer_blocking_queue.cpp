@@ -220,9 +220,11 @@ bool OplogBufferBlockingQueue::tryPop(OperationContext*, Value* value) {
         invariant(_curSize >= 0 && _curCount >= 0);
 
         // Only notify producer if there is a waiting producer and enough space available.
-        if ((_waitSize || _waitCount) && (_curSize + _waitSize <= _maxSize) &&
-            (_curCount + _waitCount <= _maxCount)) {
-            _notFullCV.notify_one();
+        if (_waitSize || _waitCount) {
+            if (_queue.empty() ||
+                ((_curSize + _waitSize <= _maxSize) && (_curCount + _waitCount <= _maxCount))) {
+                _notFullCV.notify_one();
+            }
         }
     }
 
