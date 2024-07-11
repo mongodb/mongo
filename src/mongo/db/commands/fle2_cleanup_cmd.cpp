@@ -208,8 +208,16 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
     bool createEcoc = false;
     bool renameEcoc = false;
     {
-        AutoGetCollection ecoc(opCtx, namespaces.ecocNss, MODE_IS);
-        AutoGetCollection ecocCompact(opCtx, namespaces.ecocRenameNss, MODE_IS);
+        // Acquire IS locks on ecocNss and ecocRenameNss in ascending resourceId order
+        std::vector<NamespaceStringOrUUID> secondaryNss = {namespaces.ecocRenameNss};
+        AutoGetCollection ecoc(opCtx,
+                               namespaces.ecocNss,
+                               MODE_IS,
+                               AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                   secondaryNss.cbegin(), secondaryNss.cend()));
+        auto catalog = CollectionCatalog::get(opCtx);
+        auto ecocCompact =
+            CollectionPtr(catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss));
 
         // Early exit if there's no ECOC
         if (!ecoc && !ecocCompact) {

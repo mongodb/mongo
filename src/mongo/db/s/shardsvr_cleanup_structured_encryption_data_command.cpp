@@ -138,16 +138,28 @@ public:
                 uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(
                     *(baseColl.getCollection().get())));
 
-            AutoGetCollection ecocColl(opCtx, namespaces.ecocNss, MODE_IX);
-            AutoGetCollection ecocTempColl(opCtx, namespaces.ecocRenameNss, MODE_IX);
-
             CleanupStructuredEncryptionDataState cleanup;
 
-            if (ecocColl.getCollection()) {
-                cleanup.setEcocUuid(ecocColl->uuid());
-            }
-            if (ecocTempColl.getCollection()) {
-                cleanup.setEcocRenameUuid(ecocTempColl->uuid());
+            // To avoid deadlock, IX locks for ecocRenameNss and ecocNss must be acquired in the
+            // same order they'd be acquired during renameCollection (ascending ResourceId order).
+            // Providing ecocRenameNss as a secondary to ecocNss in AutoGetCollection ensures the
+            // locks for both namespaces are acquired in correct order.
+            {
+                std::vector<NamespaceStringOrUUID> secondaryNss = {namespaces.ecocRenameNss};
+                AutoGetCollection ecocColl(opCtx,
+                                           namespaces.ecocNss,
+                                           MODE_IX,
+                                           AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                               secondaryNss.cbegin(), secondaryNss.cend()));
+                if (ecocColl.getCollection()) {
+                    cleanup.setEcocUuid(ecocColl->uuid());
+                }
+                auto catalog = CollectionCatalog::get(opCtx);
+                auto ecocTempColl = CollectionPtr(
+                    catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss));
+                if (ecocTempColl) {
+                    cleanup.setEcocRenameUuid(ecocTempColl->uuid());
+                }
             }
 
             cleanup.setShardingDDLCoordinatorMetadata(
