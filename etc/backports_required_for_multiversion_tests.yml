@@ -719,6 +719,8 @@ last-continuous:
     ticket: SERVER-87285
   - test_file: jstests/core/exhaust.js
     ticket: SERVER-87285
+  - test_file: jstests/sharding/timeseries_shard_collection_with_deprecation_message.js
+    ticket: SERVER-88647
   suites: null
 last-lts:
   all:
@@ -1494,4 +1496,6 @@ last-lts:
     ticket: SERVER-87285
   - test_file: jstests/core/exhaust.js
     ticket: SERVER-87285
+  - test_file: jstests/sharding/timeseries_shard_collection_with_deprecation_message.js
+    ticket: SERVER-88647
   suites: null

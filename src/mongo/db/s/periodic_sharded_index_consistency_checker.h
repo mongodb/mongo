@@ -94,6 +94,16 @@ private:
      */
     void _launchShardedIndexConsistencyChecker(WithLock, ServiceContext* serviceContext);
 
+    /**
+     * Initializes and starts the periodic job for timeseries shard key checking.
+     * If the shard key for a sharded timeseries contains the time field then this job emits a
+     * warning.
+     *
+     * This supposed to be temporary since the sharding on the time field will be deprecated in 9.0,
+     * hence there is no need for the periodic check anymore.
+     */
+    void _launchOrResumeShardedTimeseriesShardkeyChecker(WithLock, ServiceContext* serviceContext);
+
     // Protects the variables below. Uses acquisition level 1 because it will be held while starting
     // a periodic job, which resolves a future.
     mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1),
@@ -101,6 +111,9 @@ private:
 
     // Periodic job for counting inconsistent indexes in the cluster.
     PeriodicJobAnchor _shardedIndexConsistencyChecker;
+
+    // Periodic job for counting inconsistent indexes in the cluster.
+    PeriodicJobAnchor _shardedTimeseriesShardkeyChecker;
 
     // The latest count of sharded collections with inconsistent indexes.
     long long _numShardedCollsWithInconsistentIndexes{0};
