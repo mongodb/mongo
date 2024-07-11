@@ -118,15 +118,16 @@ public:
                 uassert(ErrorCodes::IllegalOperation,
                         "Can't move an internal resharding collection",
                         !ns().isTemporaryReshardingCollection());
-
-                FixedFCVRegion fixedFcvRegion{opCtx};
-                bool isReshardingForTimeseriesEnabled =
-                    mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(
-                        fixedFcvRegion->acquireFCVSnapshot());
-                uassert(ErrorCodes::IllegalOperation,
-                        "Can't move a timeseries collection",
-                        !ns().isTimeseriesBucketsCollection() || isReshardingForTimeseriesEnabled);
-
+                {
+                    FixedFCVRegion fixedFcvRegion{opCtx};
+                    bool isReshardingForTimeseriesEnabled =
+                        mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(
+                            fixedFcvRegion->acquireFCVSnapshot());
+                    uassert(ErrorCodes::IllegalOperation,
+                            "Can't move a timeseries collection",
+                            !ns().isTimeseriesBucketsCollection() ||
+                                isReshardingForTimeseriesEnabled);
+                }
                 // TODO (SERVER-88623): re-evalutate the need to track the collection before calling
                 // into moveCollection
                 ShardsvrCreateCollectionRequest trackCollectionRequest;
