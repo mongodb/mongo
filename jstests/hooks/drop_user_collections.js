@@ -1,6 +1,5 @@
 /**
- * Drops all sharded collections (except for collections used internally,
- * like config.system.sessions).
+ * Drops all user collections.
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -12,15 +11,17 @@ if (balSettingResult.mode !== 'off') {
     assert.commandWorked(db.adminCommand({balancerStop: 1}));
 }
 
-db.getSiblingDB('config').collections.find().forEach(collEntry => {
-    if (collEntry._id !== 'config.system.sessions') {
-        let nsSplit = collEntry._id.split('.');
-        const dbName = nsSplit.shift();
-        const collName = nsSplit.join('.');
+db.adminCommand({listDatabases: 1}).databases.forEach(dbEntry => {
+    const dbName = dbEntry.name;
+    if (dbName == 'admin' || dbName == 'config' || dbName == 'local')
+        return;
+    // This will drop collections and views (including timeseries collections).
+    db.getSiblingDB(dbName).getCollectionNames().forEach(collName => {
+        if (collName.startsWith('system.'))
+            return;
 
-        // Note: drop also cleans up tags and chunks associated with ns.
         assert.commandWorked(db.getSiblingDB(dbName).runCommand({drop: collName}));
-    }
+    });
 });
 
 // Turn balancer back on if it was not off earlier.
