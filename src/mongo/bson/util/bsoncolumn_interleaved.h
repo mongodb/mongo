@@ -575,6 +575,11 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
         flushPositionsToBuffers(bufferToPositions);
     }
 
+    // Once we finish with interleaved mode, verify all decoders are exhausted.
+    for (auto iter = decoderStates.begin() + 1; iter != decoderStates.end(); ++iter) {
+        uassert(9215000, "Invalid BSON Column interleaved encoding", !moreData(*iter, control));
+    }
+
     invariant(*control == EOO, "expected EOO that ends interleaved mode");
 
     // Advance past the EOO that ends interleaved mode.
