@@ -74,9 +74,22 @@ activate_venv
 echo "Upgrading pip to 21.0.1"
 
 python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
-if ! python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log; then
-  echo "Pip install error"
-  cat install.log || true
-  exit 1
-fi
+count=0
+while :; do
+  if ! python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log; then
+    count=$((count + 1))
+    if [[ $count < 5 ]]; then
+      rand=$((1 + $RANDOM % 3))
+      # delay = 20+[1-3] -> 80+[4-12] -> 180+[9-27] -> 320+[16-48]
+      sleep $((count * count * (20 + rand)))
+      continue
+    fi
+    echo "Pip install error"
+    cat install.log || true
+    exit 1
+  else
+    break
+  fi
+done
+
 python -m pip freeze > pip-requirements.txt
