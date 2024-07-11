@@ -55,7 +55,7 @@ TEST(SupplementalMetricsStats, ClassicMetrics) {
                     "sum": 1,
                     "max": 1,
                     "min": 1,
-                    "sumOfSquares": 1
+                    "sumOfSquares": {"$numberDecimal":"1.0000000000000000000000000000"}
                 }
             }
         })",
@@ -71,7 +71,7 @@ TEST(SupplementalMetricsStats, ClassicMetrics) {
                     "sum": 11,
                     "max": 10,
                     "min": 1,
-                    "sumOfSquares": 101
+                    "sumOfSquares": {"$numberDecimal":"101.0000000000000000000000000000"}
                 }
             }
         })",
@@ -92,7 +92,7 @@ TEST(SupplementalMetricsStats, SbeMetrics) {
                     "sum": 1,
                     "max": 1,
                     "min": 1,
-                    "sumOfSquares": 1
+                    "sumOfSquares": {"$numberDecimal":"1.0000000000000000000000000000"}
                 }
             }
         })",
@@ -113,19 +113,19 @@ TEST(SupplementalMetricsStats, BonsaiM2Metrics) {
                     "sum": 1,
                     "max": 1,
                     "min": 1,
-                    "sumOfSquares": 1
+                    "sumOfSquares": {"$numberDecimal":"1.0000000000000000000000000000"}
                 },
                 "estimatedCost": {
                     "sum": 10.5,
                     "max": 10.5,
                     "min": 10.5,
-                    "sumOfSquares": 110.25
+                    "sumOfSquares": {"$numberDecimal":"110.25000000000000000000000000"}
                 },
                 "estimatedCardinality": {
                     "sum": 100.5,
                     "max": 100.5,
                     "min": 100.5,
-                    "sumOfSquares": 10100.25
+                    "sumOfSquares": {"$numberDecimal":"10100.250000000000000000000000"}
                 }
             }
         })",
@@ -146,19 +146,19 @@ TEST(SupplementalMetricsStats, BonsaiM4Metrics) {
                     "sum": 1,
                     "max": 1,
                     "min": 1,
-                    "sumOfSquares": 1
+                    "sumOfSquares": {"$numberDecimal":"1.0000000000000000000000000000"}
                 },
                 "estimatedCost": {
                     "sum": 10,
                     "max": 10,
                     "min": 10,
-                    "sumOfSquares": 100
+                    "sumOfSquares": {"$numberDecimal":"100.00000000000000000000000000"}
                 },
                 "estimatedCardinality": {
                     "sum": 101,
                     "max": 101,
                     "min": 101,
-                    "sumOfSquares": 10201
+                    "sumOfSquares": {"$numberDecimal":"10201.000000000000000000000000"}
                 }
             }
         })",

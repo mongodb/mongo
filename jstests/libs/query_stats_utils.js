@@ -261,11 +261,11 @@ export function assertExpectedResults(results,
     for (const field of distributionFields) {
         assert.neq(totalExecMicros[field], NumberLong(0));
         assert.neq(firstResponseExecMicros[field], NumberLong(0));
-        assert.gte(workingTimeMillis[field], NumberLong(0));
+        assert(bsonWoCompare(workingTimeMillis[field], NumberLong(0)) >= 0);
         if (metrics.execCount > 1) {
             // If there are prior executions of the same query shape, we can't be certain if those
             // runs had getMores or not, so we can only check totalExec >= firstResponse.
-            assert.gte(totalExecMicros[field], firstResponseExecMicros[field]);
+            assert(bsonWoCompare(totalExecMicros[field], firstResponseExecMicros[field]) >= 0);
         } else if (getMores) {
             // If there are getMore calls, totalExecMicros fields should be greater than or equal to
             // firstResponseExecMicros.
@@ -274,7 +274,7 @@ export function assertExpectedResults(results,
                 // possible for the min or max to be equal.
                 assert.gte(totalExecMicros[field], firstResponseExecMicros[field]);
             } else {
-                assert.gt(totalExecMicros[field], firstResponseExecMicros[field]);
+                assert(bsonWoCompare(totalExecMicros[field], firstResponseExecMicros[field]) > 0);
             }
         } else {
             // If there are no getMore calls, totalExecMicros fields should be equal to

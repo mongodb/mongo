@@ -37,6 +37,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/util/summation.h"
 
 namespace mongo::query_stats {
@@ -84,6 +85,9 @@ template <typename T>
 long long bsonValue(const T& x) {
     return static_cast<long long>(x);
 }
+inline Decimal128 bsonValue(const Decimal128& x) {
+    return x;
+}
 inline double bsonValue(double x) {
     return x;
 }
@@ -101,14 +105,14 @@ public:
 
     explicit AggregatedMetric(const T& val) : max{val}, min{val} {
         sum += val;
-        sumOfSquares += val * val;
+        sumOfSquares = sumOfSquares.add(Decimal128(val).multiply(Decimal128(val)));
     }
 
     void combine(const AggregatedMetric& other) {
         sum += other.sum;
         max = std::max(other.max, max);
         min = std::min(other.min, min);
-        sumOfSquares += other.sumOfSquares;
+        sumOfSquares = sumOfSquares.add(other.sumOfSquares);
     }
 
     /**
@@ -118,7 +122,7 @@ public:
         sum += val;
         max = std::max(val, max);
         min = std::min(val, min);
-        sumOfSquares += val * val;
+        sumOfSquares = sumOfSquares.add(Decimal128(val).multiply(Decimal128(val)));
     }
 
     void appendTo(BSONObjBuilder& builder, StringData fieldName) const {
@@ -138,7 +142,7 @@ private:
      * The sum of squares along with (an externally stored) count will allow us to compute the
      * variance/stddev.
      */
-    Summation<T> sumOfSquares{kInitialSummation<T>};
+    Decimal128 sumOfSquares{};
 };
 
 extern template void AggregatedMetric<uint64_t>::appendTo(BSONObjBuilder& builder,

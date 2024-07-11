@@ -36,6 +36,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -66,6 +67,7 @@
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -1463,6 +1465,13 @@ BSONObj toBSON(AggregatedBool& ab) {
     return builder.obj();
 }
 
+template <typename T>
+BSONObj toBSON(AggregatedMetric<T>& am) {
+    BSONObjBuilder builder;
+    am.appendTo(builder, "m");
+    return builder.obj();
+}
+
 TEST(AggBool, Basic) {
 
     AggregatedBool ab;
@@ -1479,6 +1488,43 @@ TEST(AggBool, Basic) {
     ab.aggregate(false);
 
     ASSERT_BSONOBJ_EQ(toBSON(ab), BSON("b" << boolMetricBson(2, 1)));
+}
+
+template <typename T>
+void SumOfSquaresOverflowTest() {
+    // Ensure sumOfSquares is initialized correctly.
+    AggregatedMetric<T> aggMetric;
+    Decimal128 res = toBSON(aggMetric).getObjectField("m").getField("sumOfSquares").Decimal();
+
+    ASSERT_EQ(res, Decimal128());
+
+    // Aggregating with the maximum int value does not overflow the sumOfSquares field.
+    T maxVal = std::numeric_limits<T>::max();
+    aggMetric.aggregate(maxVal);
+    res = toBSON(aggMetric).getObjectField("m").getField("sumOfSquares").Decimal();
+
+    ASSERT_EQ(res, Decimal128(maxVal).power(Decimal128(2.0)));
+
+    // Combining with another large AggregatedMetric also does not overflow the sumOfSquares field.
+    // Initialize the AggregatedMetrics with a value so the sum field does not overflow.
+    AggregatedMetric<T> aggMetricToBeCombinedWith(maxVal / 2);
+    AggregatedMetric<T> otherAggMetric(maxVal / 2);
+    aggMetricToBeCombinedWith.combine(otherAggMetric);
+    res = toBSON(aggMetricToBeCombinedWith).getObjectField("m").getField("sumOfSquares").Decimal();
+
+    ASSERT_EQ(res, Decimal128(maxVal / 2).power(Decimal128(2.0)).multiply(Decimal128(2.0)));
+}
+
+TEST_F(QueryStatsStoreTest, SumOfSquaresOverflowInt64Test) {
+    SumOfSquaresOverflowTest<int64_t>();
+}
+
+TEST_F(QueryStatsStoreTest, SumOfSquaresOverflowUInt64Test) {
+    SumOfSquaresOverflowTest<uint64_t>();
+}
+
+TEST_F(QueryStatsStoreTest, SumOfSquaresOverflowDoubleTest) {
+    SumOfSquaresOverflowTest<double>();
 }
 
 TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
