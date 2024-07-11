@@ -111,10 +111,14 @@ public:
 
 protected:
     bool shouldOptimizeSaveState(size_t idx) const final {
-        // HashLookupUnwindStage::getNext() only guarantees that outer child's getNext() was called.
-        // Thus, it is safe to propagate disableSlotAccess to the outer child, but not to the inner
-        // child.
-        return idx == 0;
+        if (idx == 0) {
+            // HashLookupUnwindStage::getNext() guarantees that the outer child's getNext() method
+            // will be called when '_outerKeyOpen' is false.
+            return !_outerKeyOpen;
+        } else {
+            // HashLookupUnwindStage::getNext() doesn't make any guarantees about the inner child.
+            return false;
+        }
     }
 
     void doAttachToOperationContext(OperationContext* opCtx) override;
