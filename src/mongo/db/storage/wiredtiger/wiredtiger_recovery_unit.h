@@ -147,6 +147,8 @@ public:
         _multiTimestampConstraintTracker.ignoreAllMultiTimestampConstraints = true;
     }
 
+    void setCacheMaxWaitTimeout(Milliseconds) override;
+
     // ---- WT STUFF
 
     WiredTigerSession* getSession();
@@ -283,6 +285,8 @@ private:
     std::vector<BSONObj> _writeContextForDebugging;
 
     WiredTigerStats _sessionStatsAfterLastOperation;
+
+    Milliseconds _cacheMaxWaitTimeout{0};
 };
 
 }  // namespace mongo

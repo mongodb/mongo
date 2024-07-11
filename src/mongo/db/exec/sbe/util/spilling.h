@@ -29,9 +29,14 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
+#include <utility>
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
 
 namespace mongo {
@@ -50,40 +55,104 @@ std::pair<RecordId, KeyString::TypeBits> encodeKeyString(KeyString::Builder&,
 // Reconstructs the KeyString carried in RecordId using 'typeBits'.
 KeyString::Value decodeKeyString(const RecordId& rid, KeyString::TypeBits typeBits);
 
-// Reads a materialized row from the record store.
-boost::optional<value::MaterializedRow> readFromRecordStore(OperationContext* opCtx,
-                                                            RecordStore* rs,
-                                                            const RecordId& rid);
+/**
+ * SpillingStore is a wrapper around a temporary record store than maintains its own transaction as
+ * we do not want to intermingle operations running in the main query with spill reads and writes.
+ */
+class SpillingStore {
+public:
+    SpillingStore(OperationContext* opCtx, KeyFormat format = KeyFormat::String);
+    ~SpillingStore();
 
-/**
- * Inserts or updates a key/value into 'rs'. The 'update' flag controls whether or not an update
- * will be performed. If a key/value pair is inserted into the 'rs' that already exists and
- * 'update' is false, this function will tassert.
- *
- * Returns the size of the new record in bytes, including the record id and value portions.
- */
-int upsertToRecordStore(OperationContext* opCtx,
-                        RecordStore* rs,
-                        const RecordId& key,
-                        const value::MaterializedRow& val,
-                        const KeyString::TypeBits& typeBits,
-                        bool update);
-/**
- * When a collator is provided, the key is encoded using the collator before being converted to a
- * record id. In this case, it is not possible to recover the key from the record id, thus we need
- * to store the original value of the key as well.
- */
-int upsertToRecordStore(OperationContext* opCtx,
-                        RecordStore* rs,
-                        const RecordId& recordKey,
-                        const value::MaterializedRow& key,
-                        const value::MaterializedRow& val,
-                        bool update);
-int upsertToRecordStore(OperationContext* opCtx,
-                        RecordStore* rs,
-                        const RecordId& key,
-                        BufBuilder& buf,
-                        const KeyString::TypeBits& typeBits,  // recover type of value.
-                        bool update);
+    /**
+     * When a collator is provided, the key is encoded using the collator before being converted to
+     * a record id. In this case, it is not possible to recover the key from the record id, thus we
+     * need to store the original value of the key as well.
+     */
+    int upsertToRecordStore(OperationContext* opCtx,
+                            const RecordId& recordKey,
+                            const value::MaterializedRow& key,
+                            const value::MaterializedRow& val,
+                            bool update);
+    /**
+     * Inserts or updates a key/value into 'rs'. The 'update' flag controls whether or not an update
+     * will be performed. If a key/value pair is inserted into the 'rs' that already exists and
+     * 'update' is false, this function will tassert.
+     *
+     * Returns the size of the new record in bytes, including the record id and value portions.
+     */
+    int upsertToRecordStore(OperationContext* opCtx,
+                            const RecordId& key,
+                            const value::MaterializedRow& val,
+                            const KeyString::TypeBits& typeBits,
+                            bool update);
+    int upsertToRecordStore(OperationContext* opCtx,
+                            const RecordId& key,
+                            BufBuilder& buf,
+                            const KeyString::TypeBits& typeBits,  // recover type of value.
+                            bool update);
+    int upsertToRecordStore(OperationContext* opCtx,
+                            const RecordId& key,
+                            BufBuilder& buf,
+                            bool update);
+
+
+    Status insertRecords(OperationContext* opCtx,
+                         std::vector<Record>* inOutRecords,
+                         const std::vector<Timestamp>& timestamps);
+
+    // Reads a materialized row from the record store.
+    boost::optional<value::MaterializedRow> readFromRecordStore(OperationContext* opCtx,
+                                                                const RecordId& rid);
+
+    bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* out);
+
+    auto rs() {
+        return _recordStore->rs();
+    }
+
+    auto getCursor(OperationContext* opCtx) {
+        switchToSpilling(opCtx);
+        ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
+        return rs()->getCursor(opCtx);
+    }
+
+    void resetCursor(OperationContext* opCtx, std::unique_ptr<SeekableRecordCursor>& cursor) {
+        switchToSpilling(opCtx);
+        ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
+        cursor.reset();
+    }
+
+    auto saveCursor(OperationContext* opCtx, std::unique_ptr<SeekableRecordCursor>& cursor) {
+        switchToSpilling(opCtx);
+        ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
+
+        return cursor->save();
+    }
+
+    auto restoreCursor(OperationContext* opCtx, std::unique_ptr<SeekableRecordCursor>& cursor) {
+        switchToSpilling(opCtx);
+        ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
+
+        return cursor->restore();
+    }
+
+    void saveState();
+    void restoreState();
+
+private:
+    void switchToSpilling(OperationContext* opCtx);
+    void switchToOriginal(OperationContext* opCtx);
+
+    std::unique_ptr<TemporaryRecordStore> _recordStore;
+
+    std::unique_ptr<RecoveryUnit> _originalUnit;
+    WriteUnitOfWork::RecoveryUnitState _originalState;
+
+    std::unique_ptr<RecoveryUnit> _spillingUnit;
+    WriteUnitOfWork::RecoveryUnitState _spillingState;
+
+    size_t _counter{0};
+};
 }  // namespace sbe
 }  // namespace mongo
