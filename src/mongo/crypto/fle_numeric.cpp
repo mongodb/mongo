@@ -29,13 +29,19 @@
 
 #include "mongo/crypto/fle_numeric.h"
 
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include <algorithm>
+#include <boost/container/small_vector.hpp>
+#include <boost/multiprecision/cpp_int/import_export.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-
 #include <boost/optional/optional.hpp>
+#include <cmath>
+#include <iterator>
+#include <limits>
+
+#include "mongo/platform/bits.h"
+#include "mongo/platform/overflow_arithmetic.h"
 
 namespace mongo {
 
@@ -43,6 +49,25 @@ namespace {
 constexpr boost::multiprecision::uint128_t k1(1);
 constexpr boost::multiprecision::int128_t k10(10);
 constexpr boost::multiprecision::uint128_t k10ui(10);
+
+constexpr double SCALED_DOUBLE_BOUNDS(static_cast<double>(9223372036854775807));  // 2^63 - 1
+constexpr double INT_64_MAX_DOUBLE = static_cast<double>(std::numeric_limits<uint64_t>::max());
+const Decimal128 scaled_decimal_bounds("170141183460469231731687303715884105727");  // 2^127 - 1
+
+template <typename T>
+uint32_t ceil_log2(T t) {
+    invariant(t != 0);
+    // We count the leading zeros in the value. If there
+    // is more than one bit set, then we can just take
+    // 64 - value. If there is only one bit set, then
+    // we take 64 - value - 1.
+    auto clz = getFirstBitSet(t);
+    if ((t & (t - 1)) == 0) {
+        return clz - 1;
+    }
+    return clz;
+}
+
 }  // namespace
 
 boost::multiprecision::int128_t exp10(int x) {
@@ -280,7 +305,7 @@ OSTType_Double getTypeInfoDouble(double value,
     return {uv, 0, std::numeric_limits<uint64_t>::max()};
 }
 
-boost::multiprecision::uint128_t toInt128FromDecimal128(Decimal128 dec) {
+boost::multiprecision::uint128_t toUInt128FromDecimal128(Decimal128 dec) {
     // This algorithm only works because it assumes we are dealing with Decimal128 numbers that are
     // valid uint128 numbers. This means the Decimal128 has to be an integer or else the result is
     // undefined.
@@ -309,9 +334,27 @@ boost::multiprecision::uint128_t toInt128FromDecimal128(Decimal128 dec) {
     Decimal128 roundTrip(ret.str());
     uassert(8574713,
             "Conversion from Decimal128 to UInt128 did not survive round trip",
-            roundTrip == dec);
+            roundTrip.isEqual(dec));
 
     return ret;
+}
+
+boost::multiprecision::int128_t toInt128FromDecimal128(Decimal128 dec) {
+    uassert(9178814,
+            "Unable to convert Decimal128 to Int128, out of bounds",
+            dec.toAbs().isLess(scaled_decimal_bounds));
+    bool negative = false;
+    if (dec.isLess(Decimal128(0))) {
+        negative = true;
+        dec = Decimal128(0).subtract(dec);
+    }
+
+    auto uint_dec = toUInt128FromDecimal128(dec);
+    auto int_dec = static_cast<boost::multiprecision::int128_t>(uint_dec);
+    if (negative) {
+        return -int_dec;
+    }
+    return int_dec;
 }
 
 // For full algorithm see SERVER-68542
@@ -408,7 +451,7 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
             }
         }
 
-        boost::multiprecision::uint128_t u_ret = toInt128FromDecimal128(v_prime2);
+        boost::multiprecision::uint128_t u_ret = toUInt128FromDecimal128(v_prime2);
 
         boost::multiprecision::uint128_t max_dec =
             (boost::multiprecision::uint128_t(1) << bits_range) - 1;
@@ -485,58 +528,137 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
 }
 
 bool canUsePrecisionMode(Decimal128 min, Decimal128 max, uint32_t precision, uint32_t* maxBitsOut) {
-    invariant(min < max);
+    const Decimal128 int_128_max_decimal("340282366920938463463374607431768211455");
 
-    uint32_t bits_range;
+    uassert(9178807,
+            "Invalid upper and lower bounds for Decimal128 precision. Min must be strictly less "
+            "than max.",
+            min < max);
 
-    Decimal128 bounds = max.subtract(min).add(Decimal128(1));
-    if (bounds.isFinite()) {
-        Decimal128 bits_range_dec = bounds.scale(precision).logarithm(Decimal128(2));
+    const auto scaled_min = min.scale(precision);
+    const auto scaled_max = max.scale(precision);
 
-        if (bits_range_dec.isFinite() && bits_range_dec < Decimal128(128)) {
-            // kRoundTowardPositive is the same as C99 ceil()
+    const auto scaled_min_trunc = scaled_min.round(Decimal128::RoundingMode::kRoundTowardZero);
+    const auto scaled_max_trunc = scaled_max.round(Decimal128::RoundingMode::kRoundTowardZero);
 
-            bits_range = bits_range_dec.toIntExact(Decimal128::kRoundTowardPositive);
+    uassert(9178808,
+            "Invalid upper bounds for Decimal128 precision. Digits after the decimal must be less "
+            "than specified precision value",
+            scaled_max.isEqual(scaled_max_trunc));
 
-            // bits_range is always >= 0 but coverity cannot be sure since it does not
-            // understand Decimal128 math so we add a check for positive integers.
-            if (bits_range >= 0 && bits_range < 128) {
-                if (maxBitsOut) {
-                    *maxBitsOut = bits_range;
-                }
-                return true;
-            }
-        }
+    uassert(9178809,
+            "Invalid lower bounds for Decimal128 precision. Digits after the decimal must be less "
+            "than specified precision value",
+            scaled_min.isEqual(scaled_min_trunc));
+
+    uassert(9178810,
+            "Invalid upper bounds for Decimal128 precision, must be less than "
+            "170141183460469231731687303715884105727",
+            scaled_max.toAbs() < scaled_decimal_bounds);
+
+    uassert(9178811,
+            "Invalid lower bounds for Decimal128 precision, must be less than "
+            "170141183460469231731687303715884105727",
+            scaled_min.toAbs() < scaled_decimal_bounds);
+
+    const auto t_1 = scaled_max.subtract(scaled_min);
+    const auto t_4 = int_128_max_decimal.subtract(t_1);
+    const auto t_5 =
+        t_4.logarithm(Decimal128(10)).round(Decimal128::RoundingMode::kRoundTowardZero);
+
+    uassert(9178812, "Invalid value for precision", t_5.isGreaterEqual(Decimal128(precision)));
+
+    const auto i_1 = toInt128FromDecimal128(scaled_max);
+    const auto i_2 = toInt128FromDecimal128(scaled_min);
+
+    // We do not need to check for overflow for int128 in boost because boost represents their
+    // integers as "128-bits of precision plus an extra sign bit".
+    // https://www.boost.org/doc/libs/1_74_0/libs/multiprecision/doc/html/boost_multiprecision/tut/ints/cpp_int.html
+    const auto i_3 = i_1 - i_2 + toInt128FromDecimal128(Decimal128(1).scale(precision));
+
+    uassert(9178813,
+            "Invalid upper and lower bounds for Decimal128 precision. Min must be strictly less "
+            "than max.",
+            i_3 > 0);
+
+    const auto ui_3 = static_cast<boost::multiprecision::uint128_t>(i_3);
+
+    const uint64_t bits = ceil_log2(ui_3);
+
+    if (bits >= 128) {
+        return false;
     }
-    return false;
+
+    if (maxBitsOut) {
+        *maxBitsOut = bits;
+    }
+
+    return true;
 }
 
 bool canUsePrecisionMode(double min, double max, uint32_t precision, uint32_t* maxBitsOut) {
-    invariant(min < max);
+    uassert(
+        9178800,
+        "Invalid upper and lower bounds for double precision. Min must be strictly less than max.",
+        min < max);
 
-    uint32_t bits_range;
+    const auto scaled_prc = exp10Double(precision);
 
-    double range = max - min;
-    if (std::isfinite(range)) {
+    auto scaled_max = max * scaled_prc;
+    auto scaled_min = min * scaled_prc;
 
-        // This creates a range which is wider then we permit by our min/max bounds check with
-        // the +1 but it is as the algorithm is written in the paper.
-        double rangeAndPrecision = (range + 1) * exp10Double(precision);
+    uassert(9178801,
+            "Invalid upper bounds for double precision. Digits after the decimal must be less than "
+            "specified precision value",
+            scaled_max == trunc(scaled_max));
 
-        if (std::isfinite(rangeAndPrecision)) {
+    uassert(9178802,
+            "Invalid lower bounds for double precision. Digits after the decimal must be less than "
+            "specified precision value",
+            scaled_min == trunc(scaled_min));
 
-            double bits_range_double = log2(rangeAndPrecision);
-            bits_range = ceil(bits_range_double);
+    uassert(9178803,
+            "Invalid upper bounds for double precision, must be less than 9223372036854775807",
+            std::fabs(scaled_max) < SCALED_DOUBLE_BOUNDS);
 
-            if (bits_range < 64) {
-                if (maxBitsOut) {
-                    *maxBitsOut = bits_range;
-                }
-                return true;
-            }
-        }
+    uassert(9178804,
+            "Invalid lower bounds for double precision, must be less than 9223372036854775807",
+            std::fabs(scaled_min) < SCALED_DOUBLE_BOUNDS);
+
+    const auto t_1 = scaled_max - scaled_min;
+    const auto t_4 = INT_64_MAX_DOUBLE - t_1;
+    const auto t_5 = floor(log10(t_4)) - 1;
+
+    uassert(9178805, "Invalid value for precision", static_cast<double>(precision) <= t_5);
+
+    const auto i_1 = static_cast<int64_t>(scaled_max);
+    const auto i_2 = static_cast<int64_t>(scaled_min);
+    int64_t i_range, i_3;
+
+    if (overflow::sub(i_1, i_2, &i_range)) {
+        return false;
     }
-    return false;
+
+    if (overflow::add(i_range, static_cast<int64_t>(std::lround(scaled_prc)), &i_3)) {
+        return false;
+    }
+
+    uassert(
+        9178806,
+        "Invalid value for upper and lower bounds for double precision. Min must be less than max.",
+        i_3 > 0);
+    const auto ui_3 = static_cast<uint64_t>(i_3);
+
+    const uint32_t bits = ceil_log2(ui_3);
+
+    if (bits >= 64) {
+        return false;
+    }
+
+    if (maxBitsOut) {
+        *maxBitsOut = bits;
+    }
+    return true;
 }
 
 }  // namespace mongo

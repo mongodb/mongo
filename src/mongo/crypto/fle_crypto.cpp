@@ -1662,19 +1662,6 @@ size_t getEstimatedTagCount(const std::vector<EDCServerPayloadInfo>& serverPaylo
     return total;
 }
 
-/**
- * Return the first bit set in a integer. 1 indexed.
- */
-template <typename T>
-int getFirstBitSet(T v) {
-    return 64 - countLeadingZeros64(v);
-}
-
-template <>
-int getFirstBitSet<boost::multiprecision::uint128_t>(const boost::multiprecision::uint128_t v) {
-    return boost::multiprecision::msb(v) + 1;
-}
-
 template <typename T>
 std::string toBinaryString(T v) {
     static_assert(std::numeric_limits<T>::is_integer);
