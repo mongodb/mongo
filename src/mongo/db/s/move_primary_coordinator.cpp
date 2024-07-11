@@ -113,11 +113,10 @@ bool isMovableUnshardedCollection(const NamespaceString& nss, bool timeseriesRes
         return timeseriesReshardingSupported;
     }
 
-    if (nss.isLegalClientSystemNS()) {
-        // TODO (SERVER-90876): Make movePrimaryFailIfNeedToCloneMovableCollections only allow
-        // movePrimary to move unsharded collections that are not movable by moveCollection.
+    if (nss.isNamespaceAlwaysUntracked()) {
         return false;
     }
+
     return true;
 }
 
