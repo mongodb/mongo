@@ -389,7 +389,7 @@ function runTestCase({
     });
 })();
 
-(function testOptimizableTopsByArrayAsc() {
+(function testOptimizableTopNsByArrayAsc() {
     runTestCase({
         docs: [
             doc_t1_sD_adotb_0_,
@@ -409,7 +409,7 @@ function runTestCase({
         }],
         expected: [
             {_id: "A", tt: ISODate("2024-01-02T00:00:28Z"), tadotb: [1, 99], tadotc: []},
-            // For "B", the "a" field's value is not an array and array traversal does not happen
+            // For "B", the "a" field's value is not an array and array traversal does not happend
             // and so "a.b" is missing and returned as null.
             {_id: "B", tt: ISODate("2024-01-02T00:05:17Z"), tadotb: 2, tadotc: null},
             {_id: "C", tt: ISODate("2024-01-02T00:21:06Z"), tadotb: [], tadotc: []},
@@ -418,7 +418,7 @@ function runTestCase({
     });
 })();
 
-(function testOptimizableTopsByArrayDesc() {
+(function testOptimizableTopNsByArrayDesc() {
     runTestCase({
         docs: [
             doc_t1_sD_adotb_0_,
@@ -441,147 +441,6 @@ function runTestCase({
             {_id: "B", badotb: 2, tt: ISODate("2024-01-02T00:05:17Z"), tadotb: 2},
             {_id: "C", badotb: [], tt: ISODate("2024-01-02T00:20:06Z"), tadotb: [100]},
             {_id: "D", badotb: [0], tt: ISODate("2024-01-01T23:50:00Z"), tadotb: [0]}
-        ]
-    });
-})();
-
-(function testOptimizableTopNsAndBottomNsWithArrayFields() {
-    runTestCase({
-        docs: [
-            doc_t1_sD_adotb_0_,
-            doc_t2_sA_adotb_1_99_,
-            doc_t3_sB_adotb2,
-            doc_t5_sA_adotb_50_98_,
-            doc_t6_sC_adotb_100_,
-            doc_t7_sC_a_50_51_,
-        ],
-        pipeline: [{
-            $group: {
-                _id: "$s",
-                tadotb: {$topN: {n: 1, output: "$a.b", sortBy: {"a.b": 1}}},
-                tadotc: {$topN: {n: 1, output: "$a.c", sortBy: {"a.b": 1}}},
-                badotb: {$bottomN: {n: 1, output: "$a.b", sortBy: {"a.b": 1}}},
-                badotc: {$bottomN: {n: 1, output: "$a.c", sortBy: {"a.b": 1}}},
-            }
-        }],
-        expected: [
-            {_id: "A", tadotb: [[1, 99]], tadotc: [[]], badotb: [[50, 98]], badotc: [[]]},
-            {_id: "B", tadotb: [2], tadotc: [null], badotb: [2], badotc: [null]},
-            {_id: "C", tadotb: [[]], tadotc: [[]], badotb: [[100]], badotc: [[]]},
-            {_id: "D", tadotb: [[0]], tadotc: [[]], badotb: [[0]], badotc: [[]]}
-        ]
-    });
-})();
-
-(function testOptimizableTopNsAndBottomNsWithMissingFields() {
-    runTestCase({
-        docs: [
-            doc_t1_sD_x3_y10,
-            doc_t1_sD_adotb_0_,
-            doc_t2_sA_x10_y5,
-        ],
-        pipeline: [{
-            $group: {
-                _id: "$s",
-                // "z" is a missing field
-                t1: {$topN: {n: 1, output: "$z", sortBy: {"s": 1}}},
-                t2: {$topN: {n: 1, output: "$z", sortBy: {"s": 1}}},
-                b1: {$bottomN: {n: 1, output: "$z", sortBy: {"s": 1}}},
-                b2: {$bottomN: {n: 1, output: "$z", sortBy: {"s": 1}}},
-            }
-        }],
-        expected: [
-            {_id: "A", t1: [null], t2: [null], b1: [null], b2: [null]},
-            {_id: "D", t1: [null], t2: [null], b1: [null], b2: [null]},
-        ]
-    });
-})();
-
-(function testOptimizableTopNsWithHighNsAndMissingFields() {
-    runTestCase({
-        docs: [
-            doc_t1_sD_x3_y10,
-            doc_t1_sD_adotb_0_,
-            doc_t3_sB_adotb2,
-            doc_t2_sA_x10_y5,
-            doc_t6_sC_x5_y9,
-            doc_t6_sC_adotb_100_,
-            doc_t7_sC_x7_y300,
-            doc_t9_sC_x6_y1000,
-        ],
-        pipeline: [{
-            $group: {
-                _id: "$s",
-                // "z" is always missing, "y" is sometimes missing
-                t1: {$topN: {n: 3, output: "$z", sortBy: {"y": 1}}},
-                t2: {$topN: {n: 3, output: "$y", sortBy: {"y": 1}}},
-            }
-        }],
-        expected: [
-            {_id: "A", t1: [null], t2: [5]},
-            {_id: "B", t1: [null], t2: [null]},
-            {_id: "C", t1: [null, null, null], t2: [null, 9, 300]},
-            {_id: "D", t1: [null, null], t2: [null, 10]},
-        ]
-    });
-})();
-
-(function testOptimizableTopNsWithDottedPathsAsMissingFields() {
-    runTestCase({
-        docs: [
-            doc_t1_sD_adotb_0_,
-            doc_t2_sA_adotb_1_99_,
-        ],
-        pipeline: [{
-            $group: {
-                _id: "$s",
-                // "z" and "z.z" are missing fields
-                tzdotz1: {$topN: {n: 1, output: "$z.z", sortBy: {"s": 1}}},
-                tzdotz2: {$topN: {n: 1, output: "$z.z", sortBy: {"s": 1}}},
-                // "a" exists but "a.z" is missing
-                tadotz1: {$topN: {n: 1, output: "$a.z", sortBy: {"s": 1}}},
-                tadotz2: {$topN: {n: 1, output: "$a.z", sortBy: {"s": 1}}},
-            }
-        }],
-        expected: [
-            {_id: "A", tzdotz1: [null], tzdotz2: [null], tadotz1: [[]], tadotz2: [[]]},
-            {_id: "D", tzdotz1: [null], tzdotz2: [null], tadotz1: [[]], tadotz2: [[]]},
-        ]
-    });
-})();
-
-(function testOptimizableTopNsWithHighNsAndDottedPathsAsMissingFields() {
-    runTestCase({
-        docs: [
-            doc_t1_sD_adotb_0_,
-            doc_t2_sA_adotb_1_99_,
-            doc_t6_sC_x5_y9,
-            doc_t6_sC_adotb_100_,
-            doc_t7_sC_a_50_51_,
-            doc_t7_sC_x7_y300,
-            doc_t9_sC_x6_y1000,
-        ],
-        pipeline: [{
-            $group: {
-                _id: "$s",
-                // "z" and "z.z" are missing fields
-                tzdotz1: {$topN: {n: 3, output: "$z.z", sortBy: {"s": 1}}},
-                tzdotz2: {$topN: {n: 3, output: "$z.z", sortBy: {"s": 1}}},
-                // "a" sometimes exists but "a.z" is always missing
-                tadotz1: {$topN: {n: 3, output: "$a.z", sortBy: {"s": 1}}},
-                tadotz2: {$topN: {n: 3, output: "$a.z", sortBy: {"s": 1}}},
-            }
-        }],
-        expected: [
-            {_id: "A", tzdotz1: [null], tzdotz2: [null], tadotz1: [[]], tadotz2: [[]]},
-            {
-                _id: "C",
-                tzdotz1: [null, null, null],
-                tzdotz2: [null, null, null],
-                tadotz1: [null, [], []],
-                tadotz2: [null, [], []]
-            },
-            {_id: "D", tzdotz1: [null], tzdotz2: [null], tadotz1: [[]], tadotz2: [[]]},
         ]
     });
 })();
