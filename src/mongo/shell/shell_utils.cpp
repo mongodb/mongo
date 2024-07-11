@@ -748,6 +748,10 @@ BSONObj _buildBsonObj(const BSONObj& args, void*) {
         if (name.type() == BSONType::EOO) {
             break;
         }
+
+        uassert(9197700,
+                str::stream() << "BSON field name must not contain null terminators.",
+                std::string::npos == name.str().find('\0'));
         uassert(7587900,
                 str::stream() << "BSON field name must be a string: " << name,
                 name.type() == BSONType::String);

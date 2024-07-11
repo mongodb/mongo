@@ -178,6 +178,13 @@ function runObjectEntriesArrayTypesTest() {
     assert.eq([["0", 5], ["1", 6], ["2", 7], ["3", 8], ["4", 9]], Object.entries(res.a[10]));
 }
 
+function runBuildInvalidBsonTest() {
+    // We want to ensure that fieldnames in BSONObj can't contain null terminators.
+    assert.throws(function() {
+        var invalidBson = _buildBsonObj('_id', 2, '\0\0', 3);
+    }, [], "BSON field name must not contain null terminators.");
+}
+
 // Run the tests which work the same for both comparators.
 runTests(bsonWoCompareWrapper, "bsonWoCompare");
 runTests(bsonBinaryEqual, "bsonBinaryEqual");
@@ -197,3 +204,4 @@ testObjectsAreEqual(NumberLong("1"), NumberDecimal("1.0"), bsonWoCompareWrapper,
 testObjectsAreNotEqual(NumberLong("1"), NumberDecimal("1.0"), bsonBinaryEqual, "bsonBinaryEqual");
 runObjectEntriesTest();
 runObjectEntriesArrayTypesTest();
+runBuildInvalidBsonTest();
