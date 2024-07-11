@@ -443,35 +443,46 @@ bool ReshardingOplogFetcher::consume(Client* client,
                 // wasteful.
                 try {
                     auto lastOplogTs = postBatchResumeToken->getField("ts").timestamp();
-                    auto startAt = ReshardingDonorOplogId(lastOplogTs, lastOplogTs);
+                    auto newStartAt = ReshardingDonorOplogId(lastOplogTs, lastOplogTs);
 
-                    WriteUnitOfWork wuow(opCtx);
+                    // If newStartAt == _startAt then inserting a reshardProgressMark is not needed.
+                    // This is because:
+                    //   1. There is already an oplog with timestamp == newStartAt in the toWriteTo
+                    //      collection from which the fetcher knows to resume from.
+                    //   2. Or newStartAt equals the initial value for _startAt (typically the
+                    //      minFetchTimestamp) in which case, the fetcher is going to resume from
+                    //      there anyways.
+                    if (newStartAt != _startAt) {
+                        WriteUnitOfWork wuow(opCtx);
 
-                    repl::MutableOplogEntry oplog;
-                    oplog.setNss(_toWriteInto);
-                    oplog.setOpType(repl::OpTypeEnum::kNoop);
-                    oplog.setUuid(_collUUID);
-                    oplog.set_id(Value(startAt.toBSON()));
-                    oplog.setObject(BSON("msg"
-                                         << "Latest oplog ts from donor's cursor response"));
-                    oplog.setObject2(BSON("type" << resharding::kReshardProgressMark));
-                    oplog.setOpTime(OplogSlot());
-                    oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+                        repl::MutableOplogEntry oplog;
+                        oplog.setNss(_toWriteInto);
+                        oplog.setOpType(repl::OpTypeEnum::kNoop);
+                        oplog.setUuid(_collUUID);
+                        oplog.set_id(Value(newStartAt.toBSON()));
+                        oplog.setObject(BSON("msg"
+                                             << "Latest oplog ts from donor's cursor response"));
+                        oplog.setObject2(BSON("type" << resharding::kReshardProgressMark));
+                        oplog.setOpTime(OplogSlot());
+                        oplog.setWallClockTime(
+                            opCtx->getServiceContext()->getFastClockSource()->now());
 
-                    uassertStatusOK(Helpers::insert(opCtx, toWriteTo, oplog.toBSON()));
-                    wuow.commit();
+                        uassertStatusOK(Helpers::insert(opCtx, toWriteTo, oplog.toBSON()));
+                        wuow.commit();
 
-                    // Also include synthetic oplog in the fetched count so it can match up with the
-                    // total oplog applied count in the end.
-                    _env->metrics()->onOplogEntriesFetched(1);
+                        // Also include synthetic oplog in the fetched count
+                        // so it can match up with the total oplog applied
+                        // count in the end.
+                        _env->metrics()->onOplogEntriesFetched(1);
 
-                    auto [p, f] = makePromiseFuture<void>();
-                    {
-                        stdx::lock_guard lk(_mutex);
-                        _startAt = startAt;
-                        _onInsertPromise.emplaceValue();
-                        _onInsertPromise = std::move(p);
-                        _onInsertFuture = std::move(f);
+                        auto [p, f] = makePromiseFuture<void>();
+                        {
+                            stdx::lock_guard lk(_mutex);
+                            _startAt = newStartAt;
+                            _onInsertPromise.emplaceValue();
+                            _onInsertPromise = std::move(p);
+                            _onInsertFuture = std::move(f);
+                        }
                     }
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
                     // It's possible that the donor shard has not generated new oplog entries since

@@ -113,6 +113,29 @@
 namespace mongo {
 namespace {
 
+repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
+                                  const UUID& uuid,
+                                  const repl::OpTypeEnum& opType,
+                                  const BSONObj& oField,
+                                  const BSONObj& o2Field,
+                                  const ReshardingDonorOplogId& oplogId) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setNss(nss);
+    oplogEntry.setUuid(uuid);
+    oplogEntry.setOpType(opType);
+    oplogEntry.setObject(oField);
+
+    if (!o2Field.isEmpty()) {
+        oplogEntry.setObject2(o2Field);
+    }
+
+    oplogEntry.setOpTime({{}, {}});
+    oplogEntry.setWallClockTime({});
+    oplogEntry.set_id(Value(oplogId.toBSON()));
+
+    return oplogEntry;
+}
+
 /**
  * RAII type for operating at a timestamp. Will remove any timestamping when the object destructs.
  */
@@ -239,6 +262,12 @@ public:
         return ret;
     }
 
+    BSONObj getLast(NamespaceString nss) {
+        BSONObj ret;
+        Helpers::getLast(_opCtx, nss, ret);
+        return ret;
+    }
+
     BSONObj queryOplog(const BSONObj& query) {
         OneOffRead oor(_opCtx, Timestamp::min());
         return queryCollection(NamespaceString::kRsOplogNamespace, query);
@@ -290,7 +319,8 @@ public:
 
     template <typename T>
     T requestPassthroughHandler(executor::NetworkTestEnv::FutureHandle<T>& future,
-                                int maxBatches = -1) {
+                                int maxBatches = -1,
+                                boost::optional<BSONObj> mockResponse = boost::none) {
 
         int maxNumRequests = 1000;  // No unittests would request more than this?
         if (maxBatches > -1) {
@@ -301,15 +331,20 @@ public:
         bool hasMore = true;
         for (int batchNum = 0; hasMore && batchNum < maxNumRequests; ++batchNum) {
             onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-                DBDirectClient client(cc().getOperationContext());
-                BSONObj result;
-                bool res = client.runCommand(request.dbname, request.cmdObj, result);
-                if (res == false || result.hasField("cursorsKilled") ||
-                    result["cursor"]["id"].Long() == 0) {
+                if (mockResponse) {
                     hasMore = false;
-                }
+                    return StatusWith<BSONObj>(mockResponse.get());
+                } else {
+                    DBDirectClient client(cc().getOperationContext());
+                    BSONObj result;
+                    bool res = client.runCommand(request.dbname, request.cmdObj, result);
+                    if (res == false || result.hasField("cursorsKilled") ||
+                        result["cursor"]["id"].Long() == 0) {
+                        hasMore = false;
+                    }
 
-                return result;
+                    return result;
+                }
             });
         }
 
@@ -547,14 +582,13 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
                                    _destinationShard,
                                    outputCollectionNss);
 
-    // The ReshardingOplogFetcher hasn't inserted a record for
-    // {_id: {clusterTime: _fetchTimestamp, ts: _fetchTimestamp}} so awaitInsert(startAt) won't be
+    // The ReshardingOplogFetcher hasn't inserted a record yet so awaitInsert(startAt) won't be
     // immediately ready.
     auto hasSeenStartAtFuture = fetcher.awaitInsert(startAt);
     ASSERT_FALSE(hasSeenStartAtFuture.isReady());
 
-    // Because no writes have happened to the data collection, the fetcher will insert a no-op entry
-    // with the latestOplogTimestamp, so `hasSeenStartAtFuture` will be ready.
+    // Because no writes have happened to the data collection, the `hasSeenStartAtFuture` will still
+    // not be ready.
     auto fetcherJob = launchAsync([&, this] {
         ThreadClient tc("RunnerForFetcher", _svcCtx->getService(), Client::noSession());
         fetcher.useReadConcernForTest(false);
@@ -564,7 +598,7 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
     });
 
     ASSERT_TRUE(requestPassthroughHandler(fetcherJob));
-    ASSERT_TRUE(hasSeenStartAtFuture.isReady());
+    ASSERT_FALSE(hasSeenStartAtFuture.isReady());
 
     // Insert a document into the data collection and have it generate an oplog entry with a
     // "destinedRecipient" field.
@@ -599,6 +633,109 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
     // However, asking for `dataWriteTimestamp` wouldn't become ready until the next record is
     // inserted into the output collection.
     ASSERT_FALSE(fetcher.awaitInsert({dataWriteTimestamp, dataWriteTimestamp}).isReady());
+}
+
+TEST_F(ReshardingOplogFetcherTest, TestProgressMarkOplogInsert) {
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    auto buildMockResponse = [](Timestamp postBatchResumeToken, BSONArray oplogEntries) {
+        return BSON("cursor" << BSON("firstBatch"
+                                     << oplogEntries << "postBatchResumeToken"
+                                     << BSON("ts" << postBatchResumeToken) << "id" << 0LL << "ns"
+                                     << NamespaceString::kRsOplogNamespace.toString_forTest()));
+    };
+
+    ReshardingDonorOplogId startAt{_fetchTimestamp, _fetchTimestamp};
+    ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                   _reshardingUUID,
+                                   collectionUUID,
+                                   startAt,
+                                   _donorShard,
+                                   _destinationShard,
+                                   outputCollectionNss);
+
+    // A progressMarkOplog should not be inserted if the donor's cursor response has the same
+    // timestamp as the initial startAt timestamp.
+    auto postBatchResumeToken = startAt.getTs();
+    auto oplogEntries = BSONArrayBuilder().arr();
+    auto mockCursorResponse = buildMockResponse(postBatchResumeToken, oplogEntries);
+    ASSERT_EQ(postBatchResumeToken, startAt.getTs());
+
+    auto fetcherJob = launchAsync([&, this] {
+        ThreadClient tc("RunnerForFetcher", _svcCtx->getService(), Client::noSession());
+        auto factory = makeCancelableOpCtx();
+        return fetcher.iterate(&cc(), factory);
+    });
+    ASSERT_TRUE(requestPassthroughHandler(fetcherJob, -1, mockCursorResponse));
+    ASSERT_EQ(0, metricsFetchedCount()) << " Verify reported metrics";
+    ASSERT_TRUE(getLast(outputCollectionNss).isEmpty());
+
+    // A progressMarkOplog should be inserted if the donor's cursor response has an empty batch, and
+    // a timestamp larger than the lastSeenTimestamp.
+    postBatchResumeToken = _fetchTimestamp + 1;
+    oplogEntries = BSONArrayBuilder().arr();
+    mockCursorResponse = buildMockResponse(postBatchResumeToken, oplogEntries);
+    ASSERT_GT(postBatchResumeToken, fetcher.getLastSeenTimestamp().getTs());
+
+    fetcherJob = launchAsync([&, this] {
+        ThreadClient tc("RunnerForFetcher", _svcCtx->getService(), Client::noSession());
+        auto factory = makeCancelableOpCtx();
+        return fetcher.iterate(&cc(), factory);
+    });
+    ASSERT_TRUE(requestPassthroughHandler(fetcherJob, -1, mockCursorResponse));
+    ASSERT_EQ(1, metricsFetchedCount()) << " Verify reported metrics";
+    auto lastOplogInOuptut = getLast(outputCollectionNss);
+    ASSERT_EQ(resharding::kReshardProgressMark,
+              lastOplogInOuptut.getObjectField("o2").getField("type").String());
+    ASSERT_EQ(postBatchResumeToken,
+              lastOplogInOuptut.getObjectField("_id").getField("ts").timestamp());
+
+    // A progressMarkOplog should not be inserted if the donor's cursor response has a non-empty
+    // batch.
+    postBatchResumeToken = _fetchTimestamp + 2;
+    auto oplog = makeOplog(dataCollectionNss,
+                           collectionUUID,
+                           repl::OpTypeEnum::kInsert,
+                           BSONObj(),
+                           BSONObj(),
+                           ReshardingDonorOplogId(postBatchResumeToken, postBatchResumeToken))
+                     .toBSON();
+    oplogEntries = BSON_ARRAY(oplog);
+    mockCursorResponse = buildMockResponse(postBatchResumeToken, oplogEntries);
+
+    fetcherJob = launchAsync([&, this] {
+        ThreadClient tc("RunnerForFetcher", _svcCtx->getService(), Client::noSession());
+        auto factory = makeCancelableOpCtx();
+        return fetcher.iterate(&cc(), factory);
+    });
+    ASSERT_TRUE(requestPassthroughHandler(fetcherJob, -1, mockCursorResponse));
+    ASSERT_EQ(2, metricsFetchedCount()) << " Verify reported metrics";
+    ASSERT_EQ(getLast(outputCollectionNss).woCompare(oplog), 0);
+
+    // A progressMarkOplog should not be inserted if the donor's cursor response has the same
+    // timestamp as the lastSeenTimestamp.
+    oplogEntries = BSONArrayBuilder().arr();
+    mockCursorResponse = buildMockResponse(postBatchResumeToken, oplogEntries);
+    ASSERT_EQ(postBatchResumeToken, fetcher.getLastSeenTimestamp().getTs());
+
+    fetcherJob = launchAsync([&, this] {
+        ThreadClient tc("RunnerForFetcher", _svcCtx->getService(), Client::noSession());
+        auto factory = makeCancelableOpCtx();
+        return fetcher.iterate(&cc(), factory);
+    });
+    ASSERT_TRUE(requestPassthroughHandler(fetcherJob, -1, mockCursorResponse));
+    ASSERT_EQ(2, metricsFetchedCount()) << " Verify reported metrics";
+    ASSERT_EQ(getLast(outputCollectionNss).woCompare(oplog), 0);
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
