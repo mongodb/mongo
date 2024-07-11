@@ -41,9 +41,6 @@ selector:
   # checkConsistency state.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
-  # TODO (SERVER-92189) Reenable
-  - jstests/concurrency/fsm_workloads/random_update_delete_with_resharding.js
-
   exclude_with_any_tags:
   - requires_sharding
 

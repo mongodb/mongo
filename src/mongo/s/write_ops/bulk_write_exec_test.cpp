@@ -1958,6 +1958,104 @@ TEST_F(BulkWriteOpTest, TestGetBaseChildBatchCommandSizeEstimate) {
     ASSERT_GTE(baseSizeEstimate, realSize);
 }
 
+// Ordered batch consisting of two operations on the same nss: One multi=true update that broadcasts
+// to both shards and a multi=false update targeted to one shard. Tests that when the first
+// operation fails with a retryable error on one shard but succeeds on the other, the second
+// operation in the batch must go in a separate batch because it uses a different ShardVersion
+// (ShardVersion::IGNORE for the first op vs an actual ShardVersion for the second).
+TEST_F(BulkWriteOpTest, MultiAndTargetedOrderedOpsStaleConfig) {
+    ShardId shardIdA("shardA");
+    ShardId shardIdB("shardB");
+    CollectionGeneration collGeneration = {OID::gen(), Timestamp(1000, 1)};
+    NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpointA(
+        shardIdA,
+        ShardVersionFactory::make(ChunkVersion(collGeneration, {1, 0}), boost::none),
+        boost::none);
+    ShardEndpoint endpointB(
+        shardIdB,
+        ShardVersionFactory::make(ChunkVersion(collGeneration, {1, 1}), boost::none),
+        boost::none);
+
+    // Used for assertions below; equivalent to the endpoints that multi-target ops will use (same
+    // as those above but no shard version.)
+    ShardEndpoint endpointANoVersion(
+        shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpointBNoVersion(
+        shardIdB, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterSplitRange(nss0, endpointA, endpointB));
+
+    // Expected targets:
+    // ops[0] -> shardA and shardB
+    // ops[1] -> shardA
+    BulkWriteCommandRequest request(
+        {BulkWriteUpdateOp(
+             0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)), BSON("$set" << BSON("y" << 2))),
+         BulkWriteUpdateOp(0, BSON("x" << -1), BSON("$set" << BSON("z" << 3)))},
+        {NamespaceInfoEntry(nss0)});
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    // The resulting batches should be:
+    // {shardA: [ops[0]]}, {shardB: [ops[0]]}
+    // {shardA: [ops[1]}
+    TargetedBatchMap targeted;
+
+    // {shardA: [ops[0]]}, {shardB: [ops[0]]}
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+    ASSERT_EQUALS(targeted.size(), 2u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[0]->writeOpRef.first, 0);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointANoVersion);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites()[0]->writeOpRef.first, 0);
+    assertEndpointsEqual(targeted[shardIdB]->getWrites()[0]->endpoint, endpointBNoVersion);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+
+    // Simulate StaleConfig from shardA.
+    {
+        auto error = Status{StaleConfigInfo(nss0, *endpointA.shardVersion, boost::none, shardIdA),
+                            "Mock error: shard version mismatch"};
+        bulkWriteOp.noteChildBatchError(*targeted[shardIdA], error);
+    }
+
+    // Simulate OK response from shardB.
+    {
+        auto replyB = BulkWriteReplyItem(0);
+        replyB.setN(2);
+        auto reply = makeBWCommandReply({replyB}, {});
+        bulkWriteOp.noteChildBatchResponse(*targeted[shardIdB], reply, boost::none);
+    }
+
+    // We should have marked the write as ready so we can retarget as needed.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Ready);
+
+    // Retarget. Note that even though only shardA need to be retargetted for ops[0], we cannot send
+    // ops[1] along it yet. This is because ops[0] uses ShardVersion::IGNORED, whereas ops[1] uses
+    // an actual ShardVersion.
+    targeted.clear();
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[0]->writeOpRef.first, 0);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointANoVersion);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+
+    // {shardA: [ops[1]}
+    targeted.clear();
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[0]->writeOpRef.first, 1);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointA);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+}
+
 // Used to test cases where we get an error for an entire batch (as opposed to errors for one or
 // more individual writes within the batch.)
 class BulkWriteOpChildBatchErrorTest : public ServiceContextTest {
