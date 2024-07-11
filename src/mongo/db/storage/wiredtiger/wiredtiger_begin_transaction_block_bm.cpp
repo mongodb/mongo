@@ -64,7 +64,7 @@ public:
         ss << extraStrings;
         std::string config = ss.str();
         int ret = wiredtiger_open(dbpath.toString().c_str(), nullptr, config.c_str(), &_conn);
-        invariant(wtRCToStatus(ret, nullptr).isOK());
+        invariant(wtRCToStatus(ret, nullptr));
     }
     ~WiredTigerConnection() {
         _conn->close(_conn, nullptr);
@@ -89,8 +89,8 @@ public:
         auto ru = WiredTigerRecoveryUnit::get(_opCtxHolder.get());
         _session = ru->getSession();
         auto wt_session = _session->getSession();
-        invariant(wtRCToStatus(wt_session->create(wt_session, "table:mytable", nullptr), wt_session)
-                      .isOK());
+        invariant(
+            wtRCToStatus(wt_session->create(wt_session, "table:mytable", nullptr), wt_session));
         ru->abandonSnapshot();
     }
 

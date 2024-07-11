@@ -95,7 +95,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     : _dir(kTempDirStem.toString()) {
     if (!skipGlobalInitializers) {
         auto ret = runGlobalInitializers(std::vector<std::string>{});
-        invariant(ret.isOK());
+        invariant(ret);
     }
 
     setGlobalServiceContext(ServiceContext::make());

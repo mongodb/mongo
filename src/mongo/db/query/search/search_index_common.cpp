@@ -48,7 +48,7 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     invariant(!globalSearchIndexParams.host.empty());
     auto swHostAndPort = HostAndPort::parse(globalSearchIndexParams.host);
     // This host and port string is configured and validated at startup.
-    invariant(swHostAndPort.getStatus().isOK());
+    invariant(swHostAndPort.getStatus());
 
     // Format the command request.
     ManageSearchIndexRequest manageSearchIndexRequest;

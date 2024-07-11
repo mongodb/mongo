@@ -195,8 +195,8 @@ StatusWith<std::string> icuX509DNPrep(StringData str) try {
  */
 MONGO_INITIALIZER_GENERAL(LoadIcuPrep, ("LoadICUData"), ("default"))(InitializerContext*) {
     // Force ICU to load its caches by calling each function.
-    invariant(icuSaslPrep("a"_sd).isOK());
-    invariant(icuX509DNPrep("a"_sd).isOK());
+    invariant(icuSaslPrep("a"_sd).getStatus());
+    invariant(icuX509DNPrep("a"_sd).getStatus());
 }
 
 }  // namespace mongo

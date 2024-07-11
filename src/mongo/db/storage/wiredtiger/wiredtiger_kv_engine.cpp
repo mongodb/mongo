@@ -2653,7 +2653,8 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
                     stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
                     // When a write is updating the value from an earlier pin to a later one, use
                     // rounding to make a best effort to repin the earlier value.
-                    invariant(_pinOldestTimestamp(lock, svcName, previousTimestamp, true).isOK());
+                    invariant(
+                        _pinOldestTimestamp(lock, svcName, previousTimestamp, true).getStatus());
                 }
             });
     }

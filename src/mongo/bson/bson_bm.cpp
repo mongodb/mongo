@@ -219,7 +219,7 @@ void BM_validate(benchmark::State& state) {
     auto status = validateBSON(elem.objdata(), elem.objsize());
     if (!status.isOK())
         LOGV2(4440100, "Validate failed", "elem"_attr = elem, "status"_attr = status);
-    invariant(status.isOK());
+    invariant(status);
 
     for (auto _ : state) {
         benchmark::ClobberMemory();
@@ -241,7 +241,7 @@ void BM_validate_contents(benchmark::State& state) {
     auto status = validateBSON(elem.objdata(), elem.objsize(), BSONValidateModeEnum::kFull);
     if (!status.isOK())
         LOGV2(6752100, "Validate failed", "elem"_attr = elem, "status"_attr = status);
-    invariant(status.isOK());
+    invariant(status);
 
     for (auto _ : state) {
         benchmark::ClobberMemory();

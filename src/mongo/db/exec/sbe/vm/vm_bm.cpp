@@ -144,7 +144,7 @@ public:
     std::unique_ptr<CollatorInterface> createCollator() {
         auto statusWithCollator = _collatorFactory.makeFromBSON(BSON("locale"
                                                                      << "en_US"));
-        invariant(statusWithCollator.isOK());
+        invariant(statusWithCollator.getStatus());
         return std::move(statusWithCollator.getValue());
     }
 

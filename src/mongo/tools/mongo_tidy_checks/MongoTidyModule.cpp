@@ -35,6 +35,7 @@
 #include "MongoCxx20StdChronoCheck.h"
 #include "MongoFCVConstantCheck.h"
 #include "MongoHeaderBracketCheck.h"
+#include "MongoInvariantStatusIsOKCheck.h"
 #include "MongoMacroDefinitionLeaksCheck.h"
 #include "MongoMutexCheck.h"
 #include "MongoNoUniqueAddressCheck.h"
@@ -86,6 +87,8 @@ public:
         CheckFactories.registerCheck<MongoStringDataConstRefCheck>(
             "mongo-stringdata-const-ref-check");
         CheckFactories.registerCheck<MongoRWMutexCheck>("mongo-rwmutex-check");
+        CheckFactories.registerCheck<MongoInvariantStatusIsOKCheck>(
+            "mongo-invariant-status-is-ok-check");
     }
 };
 

@@ -254,7 +254,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
         }
     }
     // The tree must always be valid after normalization.
-    dassert(parsed_find_command::isValid(_primaryMatchExpression.get(), *_findCommand).isOK());
+    dassert(parsed_find_command::isValid(_primaryMatchExpression.get(), *_findCommand).getStatus());
     if (auto status = isValidNormalized(_primaryMatchExpression.get()); !status.isOK()) {
         uasserted(status.code(), status.reason());
     }

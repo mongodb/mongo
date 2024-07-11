@@ -209,9 +209,8 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
 
     auto indexCatalogEntry = getWritableEntry(opCtx, collection);
     if (indexCatalogEntry) {
-        invariant(collection->getIndexCatalog()
-                      ->dropIndexEntry(opCtx, collection, indexCatalogEntry)
-                      .isOK());
+        invariant(
+            collection->getIndexCatalog()->dropIndexEntry(opCtx, collection, indexCatalogEntry));
         if (_indexBuildInterceptor) {
             indexCatalogEntry->setIndexBuildInterceptor(nullptr);
         }

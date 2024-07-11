@@ -469,7 +469,7 @@ stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAct
             }
             break;
         case HeartbeatResponseAction::Reconfig:
-            invariant(responseStatus.isOK());
+            invariant(responseStatus.getStatus());
             _scheduleHeartbeatReconfig(lock, responseStatus.getValue().getConfig());
             break;
         case HeartbeatResponseAction::RetryReconfig:

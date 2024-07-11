@@ -140,7 +140,7 @@ LogDomainGlobal::Impl::Impl(LogDomainGlobal& parent) : _parent(parent) {
     _consoleSink->set_filter(ComponentSettingsFilter(_parent, _settings));
 
     // Set default configuration
-    invariant(configure({}).isOK());
+    invariant(configure({}));
 
     // Make a call to source() to make sure the internal thread_local is created as early as
     // possible and thus destroyed as late as possible.

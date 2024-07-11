@@ -460,7 +460,7 @@ public:
                                               ->makeFromBSON(collationElem.Obj());
                     // validateIndexSpecCollation() should have checked that the _id index collation
                     // spec is valid.
-                    invariant(collatorStatus.isOK());
+                    invariant(collatorStatus.getStatus());
                     idIndexCollator = std::move(collatorStatus.getValue());
                 }
                 if (!CollatorInterface::collatorsMatch(defaultCollator.get(),

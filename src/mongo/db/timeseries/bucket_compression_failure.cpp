@@ -47,7 +47,7 @@ BucketCompressionFailure::BucketCompressionFailure(const UUID& collectionUUID,
 
 std::shared_ptr<const ErrorExtraInfo> BucketCompressionFailure::parse(const BSONObj& obj) {
     auto uuidSW = UUID::parse(obj[kUUIDFieldName]);
-    invariant(uuidSW.isOK());
+    invariant(uuidSW.getStatus());
     auto collectionUUID = uuidSW.getValue();
     return std::make_shared<BucketCompressionFailure>(
         collectionUUID,

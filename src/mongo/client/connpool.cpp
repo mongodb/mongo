@@ -624,7 +624,7 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
             // as our label for connPoolStats. Note that these stats will collide
             // with any existing stats for the chosen host.
             auto uri = ConnectionString::parse(i->first.ident);
-            invariant(uri.isOK());
+            invariant(uri.getStatus());
             HostAndPort host = uri.getValue().getServers().front();
 
             executor::ConnectionStatsPer hostStats{static_cast<size_t>(i->second.numInUse()),

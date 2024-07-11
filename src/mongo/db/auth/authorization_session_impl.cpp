@@ -717,7 +717,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
     }
 
     // !ok check above should never fallthrough.
-    invariant(swUser.isOK());
+    invariant(swUser.getStatus());
 
     if (currentUser.isValid() && !currentUser->isInvalidated()) {
         // Current user may carry on, no need to update.

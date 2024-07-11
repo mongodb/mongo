@@ -78,7 +78,7 @@ void aggregateResults(const DBStatsCommand& cmd,
     double indexFreeStorageSize = 0;
 
     for (const auto& response : responses) {
-        invariant(response.swResponse.getStatus().isOK());
+        invariant(response.swResponse.getStatus());
         const BSONObj& b = response.swResponse.getValue().data;
         auto resp = DBStats::parse(IDLParserContext{"dbstats"}, b);
 

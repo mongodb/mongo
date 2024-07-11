@@ -668,7 +668,7 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
         awaitDataState(opCtx).waitForInsertsDeadline =
             opCtx->getServiceContext()->getPreciseClockSource()->now() + timeout;
         awaitDataState(opCtx).shouldWaitForInserts = true;
-        invariant(cursor->setAwaitDataTimeout(timeout).isOK());
+        invariant(cursor->setAwaitDataTimeout(timeout));
     } else if (cmd.getMaxTimeMS()) {
         return {ErrorCodes::BadValue,
                 "maxTimeMS can only be used with getMore for tailable, awaitData cursors"};

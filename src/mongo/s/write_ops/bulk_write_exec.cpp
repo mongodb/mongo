@@ -1259,7 +1259,7 @@ void BulkWriteOp::processChildBatchResponseFromRemote(
     const TargetedWriteBatch& writeBatch,
     const AsyncRequestsSender::Response& response,
     boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace) {
-    invariant(response.swResponse.getStatus().isOK(), "Response status was unexpectedly not OK");
+    invariant(response.swResponse.getStatus(), "Response status was unexpectedly not OK");
 
     auto childBatchResponse = response.swResponse.getValue();
     LOGV2_DEBUG(7279200,

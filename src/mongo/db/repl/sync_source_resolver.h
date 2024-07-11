@@ -88,7 +88,7 @@ struct SyncSourceResolverResponse {
     }
 
     HostAndPort getSyncSource() {
-        invariant(syncSourceStatus.isOK());
+        invariant(syncSourceStatus.getStatus());
         return syncSourceStatus.getValue();
     }
 };

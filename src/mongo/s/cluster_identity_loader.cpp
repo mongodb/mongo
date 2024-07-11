@@ -76,7 +76,7 @@ Status ClusterIdentityLoader::loadClusterId(OperationContext* opCtx,
                                             const repl::ReadConcernLevel& readConcernLevel) {
     stdx::unique_lock<Latch> lk(_mutex);
     if (_initializationState == InitializationState::kInitialized) {
-        invariant(_lastLoadResult.isOK());
+        invariant(_lastLoadResult.getStatus());
         return Status::OK();
     }
 

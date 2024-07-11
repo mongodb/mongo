@@ -91,7 +91,7 @@ private:
     void setupAppender() {
         logv2::LogDomainGlobal::ConfigurationOptions config;
         config.makeDisabled();
-        invariant(logv2::LogManager::global().getGlobalDomainInternal().configure(config).isOK());
+        invariant(logv2::LogManager::global().getGlobalDomainInternal().configure(config));
 
         auto backend = boost::make_shared<boost::log::sinks::text_ostream_backend>();
         backend->add_stream(makeNullStream());
@@ -108,7 +108,7 @@ private:
 
     void tearDownAppender() {
         boost::log::core::get()->remove_sink(_sink);
-        invariant(logv2::LogManager::global().getGlobalDomainInternal().configure({}).isOK());
+        invariant(logv2::LogManager::global().getGlobalDomainInternal().configure({}));
     }
 
     boost::shared_ptr<boost::log::sinks::synchronous_sink<boost::log::sinks::text_ostream_backend>>

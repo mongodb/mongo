@@ -158,7 +158,7 @@ executor::RemoteCommandRequest getRemoteCommandRequest(OperationContext* opCtx,
     doThrowIfNotRunningWithMongotHostConfigured();
     auto swHostAndPort = HostAndPort::parse(globalMongotParams.host);
     // This host and port string is configured and validated at startup.
-    invariant(swHostAndPort.getStatus().isOK());
+    invariant(swHostAndPort.getStatus());
     executor::RemoteCommandRequest rcr(
         executor::RemoteCommandRequest(swHostAndPort.getValue(), nss.dbName(), cmdObj, opCtx));
     rcr.sslMode = transport::ConnectSSLMode::kDisableSSL;

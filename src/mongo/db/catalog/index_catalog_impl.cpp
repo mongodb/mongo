@@ -1276,7 +1276,7 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
         if (onDropFn) {
             onDropFn(writableEntry->descriptor());
         }
-        invariant(dropIndexEntry(opCtx, collection, writableEntry).isOK());
+        invariant(dropIndexEntry(opCtx, collection, writableEntry));
     }
 
     // verify state is sane post cleaning

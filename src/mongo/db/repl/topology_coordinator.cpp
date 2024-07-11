@@ -2846,7 +2846,7 @@ bool TopologyCoordinator::isSafeToStepDown() {
     }
 
     auto tagStatus = _rsConfig.findCustomWriteMode(ReplSetConfig::kMajorityWriteConcernModeName);
-    invariant(tagStatus.isOK());
+    invariant(tagStatus.getStatus());
 
     // Check if a majority of nodes have reached the last applied optime.
     if (!haveTaggedNodesReachedOpTime(lastApplied, tagStatus.getValue(), false)) {

@@ -458,7 +458,7 @@ repl::OpTime getLatestOplogOpTime(OperationContext* opCtx) {
     });
 
     auto optime = repl::OpTime::parseFromOplogEntry(oplogEntryBSON);
-    invariant(optime.isOK(),
+    invariant(optime.getStatus(),
               str::stream() << "Found an invalid oplog entry: " << oplogEntryBSON
                             << ", error: " << optime.getStatus());
     return optime.getValue();

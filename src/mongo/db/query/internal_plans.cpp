@@ -187,7 +187,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::sampleColl
     auto statusWithPlanExecutor = plan_executor_factory::make(
         expCtx, std::move(ws), std::move(root), collection, yieldPolicy, false);
 
-    invariant(statusWithPlanExecutor.isOK());
+    invariant(statusWithPlanExecutor.getStatus());
     return std::move(statusWithPlanExecutor.getValue());
 }
 
@@ -229,7 +229,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
                                     collection,
                                     yieldPolicy,
                                     false /* whether owned BSON must be returned */);
-    invariant(statusWithPlanExecutor.isOK());
+    invariant(statusWithPlanExecutor.getStatus());
     return std::move(statusWithPlanExecutor.getValue());
 }
 
@@ -255,7 +255,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
                                     &collection,
                                     yieldPolicy,
                                     false /* whether owned BSON must be returned */);
-    invariant(statusWithPlanExecutor.isOK());
+    invariant(statusWithPlanExecutor.getStatus());
     return std::move(statusWithPlanExecutor.getValue());
 }
 

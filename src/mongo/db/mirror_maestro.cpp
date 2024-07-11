@@ -408,7 +408,7 @@ void MirrorMaestroImpl::tryMirror(const std::shared_ptr<CommandInvocation>& invo
                 }
             });
             if (!ErrorCodes::isShutdownError(status)) {
-                invariant(status.isOK());
+                invariant(status);
                 requestState->mirror();
             }
             clientExecutorHandle.schedule([requestState = std::move(requestState)](

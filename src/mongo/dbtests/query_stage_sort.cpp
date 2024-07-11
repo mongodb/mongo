@@ -177,7 +177,7 @@ public:
                                         &coll,
                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                         QueryPlannerParams::DEFAULT);
-        invariant(statusWithPlanExecutor.isOK());
+        invariant(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
     }
 

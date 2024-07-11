@@ -1027,7 +1027,7 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
     auto op = entryOrGroupedInserts.getOp();
     if (op->getOpType() == OpTypeEnum::kNoop) {
         // No-ops should never fail application, since there's nothing to do.
-        invariant(status.isOK());
+        invariant(status);
 
         auto opObj = op->getObject();
         if (opObj.hasField(ReplicationCoordinator::newPrimaryMsgField) &&

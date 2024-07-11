@@ -133,7 +133,7 @@ void MigrationBatchInserter::run(Status status) const try {
     // already shutdown.  If we were to schedule a task on a shutdown ThreadPool,
     // then there is a logic error in our code.  Therefore, we assert that here.
 
-    invariant(status.isOK());
+    invariant(status);
     auto arr = _batch["objects"].Obj();
     if (arr.isEmpty())
         return;

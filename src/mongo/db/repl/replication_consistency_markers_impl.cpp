@@ -252,8 +252,7 @@ void ReplicationConsistencyMarkersImpl::ensureFastCountOnOplogTruncateAfterPoint
     if (result.getStatus() == ErrorCodes::CollectionIsEmpty) {
         // The count is updated before successful commit of a write, so unclean shutdown can leave
         // the value incorrectly set to one.
-        invariant(
-            _storageInterface->setCollectionCount(opCtx, _oplogTruncateAfterPointNss, 0).isOK());
+        invariant(_storageInterface->setCollectionCount(opCtx, _oplogTruncateAfterPointNss, 0));
         return;
     }
 
@@ -270,7 +269,7 @@ void ReplicationConsistencyMarkersImpl::ensureFastCountOnOplogTruncateAfterPoint
 
     // We can safely set a count of one. We know that we only ever write one document, and the
     // success of findSingleton above confirms only one document exists in the collection.
-    invariant(_storageInterface->setCollectionCount(opCtx, _oplogTruncateAfterPointNss, 1).isOK());
+    invariant(_storageInterface->setCollectionCount(opCtx, _oplogTruncateAfterPointNss, 1));
 }
 
 Status ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument(

@@ -1357,13 +1357,13 @@ Timestamp StorageInterfaceImpl::getLatestOplogTimestamp(OperationContext* opCtx)
         invariant(Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntryBSON));
 
         auto optime = OpTime::parseFromOplogEntry(oplogEntryBSON);
-        invariant(optime.isOK(),
+        invariant(optime.getStatus(),
                   str::stream() << "Found an invalid oplog entry: " << oplogEntryBSON
                                 << ", error: " << optime.getStatus());
         return optime.getValue().getTimestamp();
     }
 
-    invariant(statusWithTimestamp.isOK(),
+    invariant(statusWithTimestamp.getStatus(),
               str::stream() << "Expected oplog entries to exist: "
                             << statusWithTimestamp.getStatus());
 

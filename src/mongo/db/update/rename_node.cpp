@@ -141,8 +141,8 @@ Status RenameNode::init(BSONElement modExpr,
     // Parsing {$rename: {'from': 'to'}} places nodes in the UpdateNode tree for both the "from" and
     // "to" paths via UpdateObjectNode::parseAndMerge(), which will enforce this isUpdatable
     // property.
-    dassert(fieldchecker::isUpdatable(fromFieldRef).isOK());
-    dassert(fieldchecker::isUpdatable(toFieldRef).isOK());
+    dassert(fieldchecker::isUpdatable(fromFieldRef));
+    dassert(fieldchecker::isUpdatable(toFieldRef));
 
     // Though we could treat this as a no-op, it is illegal in the current implementation.
     if (fromFieldRef == toFieldRef) {

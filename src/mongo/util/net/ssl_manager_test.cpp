@@ -768,7 +768,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
             Timer timer;
             while (timer.elapsed() < Seconds(2)) {
                 auto swContext = tla.createTransientSSLContext(transientSSLParams);
-                invariant(swContext.getStatus().isOK());
+                invariant(swContext.getStatus());
                 std::shared_ptr<const transport::SSLConnectionContext> ctxToDelete;
                 {
                     auto lk = stdx::lock_guard(mutex);
@@ -815,11 +815,10 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
                     SSLManagerInterface::create(params, transientParams, true /* isSSLServer */);
 
                 auto egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
-                invariant(manager
-                              ->initSSLContext(egress->native_handle(),
-                                               params,
-                                               SSLManagerInterface::ConnectionDirection::kOutgoing)
-                              .isOK());
+                invariant(
+                    manager->initSSLContext(egress->native_handle(),
+                                            params,
+                                            SSLManagerInterface::ConnectionDirection::kOutgoing));
                 std::shared_ptr<SSLManagerInterface> managerToDelete;
                 {
                     auto lk = stdx::lock_guard(mutex);

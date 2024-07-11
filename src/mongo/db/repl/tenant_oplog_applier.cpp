@@ -304,7 +304,7 @@ bool TenantOplogApplier::_shouldStopApplying(Status status) {
             return true;
         }
 
-        dassert(_finalStatus.isOK());
+        dassert(_finalStatus);
         // Set the _finalStatus. This guarantees that the shutdown() called after releasing
         // the mutex will signal donor opTime waiters with the 'status' error code and not with
         // ErrorCodes::CallbackCanceled.

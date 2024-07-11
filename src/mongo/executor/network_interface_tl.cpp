@@ -431,7 +431,7 @@ auto NetworkInterfaceTL::CommandState::make(NetworkInterfaceTL* interface,
                  .tapAll([state](const auto& swRequest) {
                      // swRequest is either populated from the success path or the value returning
                      // onError above. swRequest.isOK() should not be possible.
-                     invariant(swRequest.isOK());
+                     invariant(swRequest.getStatus());
 
                      // At this point, the command has either been sent and returned an RCRsp or
                      // has received a local interruption that was wrapped in a RCRsp.
@@ -637,7 +637,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         .thenRunOn(makeGuaranteedExecutor(baton, _reactor))
         .getAsync([cmdState = cmdState,
                    onFinish = std::move(onFinish)](StatusWith<RemoteCommandOnAnyResponse> swr) {
-            invariant(swr.isOK(),
+            invariant(swr.getStatus(),
                       "Remote command response failed with an error: {}"_format(
                           swr.getStatus().toString()));
             auto rs = std::move(swr.getValue());
@@ -1288,7 +1288,7 @@ Status NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill, size
 
     std::move(future).getAsync(
         [this, operationKey, killOpRequest](StatusWith<RemoteCommandOnAnyResponse> swr) {
-            invariant(swr.isOK());
+            invariant(swr.getStatus());
             auto rs = std::move(swr.getValue());
             LOGV2_DEBUG(51813,
                         2,

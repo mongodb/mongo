@@ -317,8 +317,7 @@ CollectionType ConfigServerTestFixture::setupCollection(
         // create the db
         auto swShardDoc = findOneOnConfigCollection(
             operationContext(), NamespaceString::kConfigsvrShardsNamespace, BSONObj());
-        invariant(swShardDoc.isOK(),
-                  "At least one shard should be setup when initializing a collection");
+        invariant(swShardDoc, "At least one shard should be setup when initializing a collection");
         auto shard = uassertStatusOK(ShardType::fromBSON(swShardDoc.getValue()));
         setupDatabase(nss.dbName(), ShardId(shard.getName()));
     }

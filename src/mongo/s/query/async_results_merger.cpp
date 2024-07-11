@@ -429,7 +429,7 @@ ClusterQueryResult AsyncResultsMerger::_nextReadySorted(WithLock) {
     _mergeQueue.pop();
 
     invariant(!_remotes[smallestRemote].docBuffer.empty());
-    invariant(_remotes[smallestRemote].status.isOK());
+    invariant(_remotes[smallestRemote].status);
 
     ClusterQueryResult front = _remotes[smallestRemote].docBuffer.front();
     _remotes[smallestRemote].docBuffer.pop();
@@ -455,7 +455,7 @@ ClusterQueryResult AsyncResultsMerger::_nextReadyUnsorted(WithLock) {
     size_t remotesAttempted = 0;
     while (remotesAttempted < _remotes.size()) {
         // It is illegal to call this method if there is an error received from any shard.
-        invariant(_remotes[_gettingFromRemote].status.isOK());
+        invariant(_remotes[_gettingFromRemote].status);
 
         if (_remotes[_gettingFromRemote].hasNext()) {
             ClusterQueryResult front = _remotes[_gettingFromRemote].docBuffer.front();

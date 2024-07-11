@@ -466,6 +466,20 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoInvariantStatusIsOKCheck(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-invariant-status-is-ok-check'
+                WarningsAsErrors: '*'
+                """)
+        )
+
+        self.expected_output = [
+            "Found invariant(status.isOK()) or dassert(status.isOK()), use invariant(status) for better diagnostics",
+        ]
+
+        self.run_clang_tidy()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

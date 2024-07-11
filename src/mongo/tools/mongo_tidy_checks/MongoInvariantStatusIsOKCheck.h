@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,44 +26,24 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/s/migration_batch_inserter.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_chunk.h"
-
 #pragma once
 
-namespace mongo {
+#include <clang-tidy/ClangTidy.h>
+#include <clang-tidy/ClangTidyCheck.h>
+namespace mongo::tidy {
 
-class MigrationBatchMockInserter {
+/**
+ * Check for any instances of invariant(status.isOK()).
+ * Overrides the default registerMatchers function to add matcher to match the
+ * usage of invariant(status.isOK()). Overrides the default check function to
+ * flag the uses of invariant(status.isOK()) to enforce usage of invariant(status) instead.
+ */
+class MongoInvariantStatusIsOKCheck : public clang::tidy::ClangTidyCheck {
+
 public:
-    void run(Status status) const {
-        // Run is passed in a non-ok status if this function runs inline.
-        // That happens if we schedule this task on a ThreadPool that is
-        // already shutdown.  We should never do that.  Therefore,
-        // we assert that here.
-        invariant(status);
-    }
-    MigrationBatchMockInserter(OperationContext*,
-                               OperationContext*,
-                               BSONObj,
-                               NamespaceString,
-                               ChunkRange,
-                               WriteConcernOptions,
-                               UUID,
-                               std::shared_ptr<MigrationCloningProgressSharedState>,
-                               UUID,
-                               int,
-                               SemaphoreTicketHolder*) {}
-
-    static void onCreateThread(const std::string& threadName) {}
-
-private:
-    BSONObj _batch;
+    MongoInvariantStatusIsOKCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
+    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
 };
 
-}  // namespace mongo
+}  // namespace mongo::tidy

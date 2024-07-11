@@ -138,7 +138,7 @@ protected:
                 if (elem = elem[part]; !elem.ok())
                     break;
             if (elem.ok())
-                invariant(elem.remove().isOK());
+                invariant(elem.remove());
         }
         return doc.getObject();
     }
