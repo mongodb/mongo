@@ -1102,6 +1102,7 @@ tasks:
         "incompatible_ppc",
         "incompatible_s390x",
         "incompatible_debian",
+        "incompatible_oscrypto",
       ]
     commands:
       - func: "f_expansions_write"
@@ -1386,8 +1387,8 @@ tasks:
     tags: [
         "assigned_to_jira_team_server_security",
         "release_critical",
-        # TODO SERVER-89541 Remove incompatible_debian tag once oscrypto gets updated
-        "incompatible_debian",
+        # TODO SERVER-89541 Remove incompatible_oscrypto tag once oscrypto gets updated
+        "incompatible_oscrypto",
         "ssl",
         "encrypt",
         "ocsp",

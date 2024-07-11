@@ -88,6 +88,63 @@ buildvariants:
     tasks:
       - name: .powercycle
 
+  - &ubuntu2404-template
+    name: &ubuntu2404 ubuntu2404
+    display_name: Ubuntu 24.04
+    tags: []
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2404-small
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_name: linux
+      push_arch: x86_64-ubuntu2404
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=ubuntu2404
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      multiversion_platform: ubuntu2404
+      multiversion_edition: targeted
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: x86_64
+      packager_distro: ubuntu2404
+      repo_edition: org
+      scons_cache_scope: shared
+      large_distro_name: ubuntu2404-large
+      compile_variant: ubuntu2404
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - ubuntu2404-large
+      - name: test_packages
+        distros:
+          - ubuntu2404-large
+      - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_oscrypto
+      - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_oscrypto
+        distros:
+          - ubuntu2404-large
+      - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_oscrypto
+      - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_oscrypto
+        distros:
+          - ubuntu2404-large
+
+  - <<: *ubuntu2404-template
+    name: ubuntu2404-powercycle
+    display_name: Ubuntu 24.04 Powercycle
+    tags: []
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: *ubuntu2404
+    tasks:
+      - name: .powercycle
+
   - name: ubuntu2004
     display_name: Ubuntu 20.04
     tags: []
@@ -516,12 +573,12 @@ buildvariants:
       - name: test_packages_release
         distros:
           - ubuntu2404-large
-      - name: .development_critical !.requires_large_host !.incompatible_debian
-      - name: .development_critical .requires_large_host !.incompatible_debian
+      - name: .development_critical !.requires_large_host !.incompatible_oscrypto
+      - name: .development_critical .requires_large_host !.incompatible_oscrypto
         distros:
           - ubuntu2404-large
-      - name: .release_critical !.requires_large_host !.incompatible_debian
-      - name: .release_critical .requires_large_host !.incompatible_debian
+      - name: .release_critical !.requires_large_host !.incompatible_oscrypto
+      - name: .release_critical .requires_large_host !.incompatible_oscrypto
         distros:
           - ubuntu2404-large
 
@@ -563,12 +620,12 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2404-arm64-large
-      - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_debian
-      - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_debian
+      - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_oscrypto
+      - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_oscrypto
         distros:
           - ubuntu2404-arm64-large
-      - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_debian
-      - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_debian
+      - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_oscrypto
+      - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_oscrypto
         distros:
           - ubuntu2404-arm64-large
 
@@ -609,11 +666,11 @@ buildvariants:
       - name: test_packages_release
         distros:
           - ubuntu2404-arm64-large
-      - name: .development_critical !.requires_large_host !.incompatible_debian
-      - name: .development_critical .requires_large_host !.incompatible_debian
+      - name: .development_critical !.requires_large_host !.incompatible_oscrypto
+      - name: .development_critical .requires_large_host !.incompatible_oscrypto
         distros:
           - ubuntu2404-arm64-large
-      - name: .release_critical !.requires_large_host !.incompatible_debian
-      - name: .release_critical .requires_large_host !.incompatible_debian
+      - name: .release_critical !.requires_large_host !.incompatible_oscrypto
+      - name: .release_critical .requires_large_host !.incompatible_oscrypto
         distros:
           - ubuntu2404-arm64-large

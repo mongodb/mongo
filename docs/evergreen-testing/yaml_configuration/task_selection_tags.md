@@ -46,9 +46,9 @@ Every task could be tagged with any number of the following tags:
 - `incompatible_community` - the task should be excluded from the community variants.
 - `incompatible_windows` - the task should be excluded from Windows variants.
 - `incompatible_mac` - the task should be excluded from MacOS variants.
-- `incompatible_debian` - the task should be excluded from Debian variants.
 - `incompatible_ppc` - the task should be excluded from IBM PPC variants.
 - `incompatible_s390x` - the task should be excluded from IBM s390x variants.
+- `incompatible_debian` - the task should be excluded from debian variants.
 - `incompatible_inmemory` - the task should be excluded from in-memory variants.
 - `incompatible_aubsan` - the task should be excluded from {A,UB}SAN variants.
 - `incompatible_tsan` - the task should be excluded from TSAN variants.
@@ -56,6 +56,7 @@ Every task could be tagged with any number of the following tags:
 - `incompatible_system_allocator` - the task should be excluded from variants that use the system allocator.
 - `incompatible_all_feature_flags` - the task should be excluded from all-feature-flags variants.
 - `incompatible_development_variant` - the task should be excluded from the development variants.
+- `incompatible_oscrypto` - the task should be excluded from variants unsupported by oscrypto.
 - `requires_compile_variant` - the task can (or should) only run on variants that has compile releated expansions.
 - `requires_large_host` - the task requires a large host to run.
 - `requires_large_host_tsan` - the task requires a large host to run on TSAN variants.

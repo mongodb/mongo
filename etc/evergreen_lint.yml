@@ -111,6 +111,7 @@ rules:
           - incompatible_windows
           - incompatible_mac
           - incompatible_debian
+          - incompatible_oscrypto
           - incompatible_ppc
           - incompatible_s390x
           - incompatible_aubsan
