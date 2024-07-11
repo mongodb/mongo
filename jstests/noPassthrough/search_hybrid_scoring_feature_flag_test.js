@@ -1,16 +1,18 @@
 /**
- * Test that checks if search hybrid scoring feature flag is present and enabled.
+ * Test that checks a call to $rankFusion fails when search hybrid scoring feature flag is turned
+ * off.
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
-const conn = MongoRunner.runMongod({
-    setParameter: {featureFlagSearchHybridScoring: true},
-});
-assert.neq(null, conn, 'failed to start mongod');
-const test = conn.getDB('test');
 
 // TODO SERVER-85426 Remove this test when 'featureFlagSearchHybridScoring' is removed.
-assert(FeatureFlagUtil.isPresentAndEnabled(test, "SearchHybridScoring"),
-       "featureFlagSearchHybridScoring is undefined or not enabled");
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagSearchHybridScoring: false},
+});
+assert.neq(null, conn, 'failed to start mongod');
+const testDB = conn.getDB('test');
+
+// Pipeline to run $rankFusion should fail without feature flag turned on.
+assert.commandFailedWithCode(
+    testDB.runCommand({aggregate: 1, pipeline: [{$rankFusion: {}}], cursor: {}}),
+    ErrorCodes.QueryFeatureNotAllowed);
 
 MongoRunner.stopMongod(conn);
