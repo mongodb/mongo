@@ -192,7 +192,10 @@ if (isShardSvrRst) {
         setParameter: "featureFlagTransitionToCatalogShard=true",
     });
     authutil.asCluster(mongos, keyFile, () => {
-        assert.commandWorked(mongos.adminCommand({transitionFromDedicatedConfigServer: 1}));
+        assert.soonRetryOnAcceptableErrors(() => {
+            assert.commandWorked(mongos.adminCommand({transitionFromDedicatedConfigServer: 1}));
+            return true;
+        }, ErrorCodes.HostUnreachable);
     });
     // Each client connection may only be authenticated once.
     configRstPrimary = new Mongo(rst.getPrimary().host);
