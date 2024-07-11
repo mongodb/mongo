@@ -169,6 +169,6 @@ assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7406103);
 if (!FixtureHelpers.isMongos(testDB)) {  // can not shard a view.
     assert.commandWorked(testDB.createCollection("view_out", {viewOn: "out"}));
     pipeline = TimeseriesAggTests.generateOutPipeline("view_out", dbName, {timeField: "time"});
-    assert.throwsWithCode(() => inColl.aggregate(pipeline), 7268703);
-    assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7268703);
+    assert.throwsWithCode(() => inColl.aggregate(pipeline), 7268700);
+    assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7268700);
 }

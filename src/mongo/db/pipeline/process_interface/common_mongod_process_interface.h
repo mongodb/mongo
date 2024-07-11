@@ -120,6 +120,8 @@ public:
                                 const NamespaceString& nss,
                                 BSONObjBuilder* builder) const final;
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override;
+    query_shape::CollectionType getCollectionType(OperationContext* opCtx,
+                                                  const NamespaceString& nss) override;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) final;
@@ -179,6 +181,9 @@ public:
 
 protected:
     BSONObj getCollectionOptionsLocally(OperationContext* opCtx, const NamespaceString& nss);
+
+    query_shape::CollectionType getCollectionTypeLocally(OperationContext* opCtx,
+                                                         const NamespaceString& nss);
 
     boost::optional<Document> doLookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

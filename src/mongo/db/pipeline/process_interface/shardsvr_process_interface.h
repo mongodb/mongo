@@ -130,6 +130,9 @@ public:
 
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
 
+    query_shape::CollectionType getCollectionType(OperationContext* opCtx,
+                                                  const NamespaceString& nss) final;
+
     std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
                                      const NamespaceString& ns,
                                      bool includeBuildUUIDs) final;
@@ -201,6 +204,12 @@ protected:
 private:
     boost::optional<TimeseriesOptions> _getTimeseriesOptions(OperationContext* opCtx,
                                                              const NamespaceString& ns) final;
+
+    /**
+     * Utility to run a 'listCollections' command on the primary. This is used to confirm different
+     * collection properties, such as collection options and if the collection exists.
+     */
+    BSONObj _runListCollectionsCommand(OperationContext* opCtx, const NamespaceString& nss);
 };
 
 }  // namespace mongo

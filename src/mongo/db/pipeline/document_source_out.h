@@ -204,8 +204,9 @@ private:
     void waitWhileFailPointEnabled() override;
 
     /**
-     * Determines if an error exists with the user input and existing collections.
-     * The function will error if:
+     * Determines if an error exists with the user input and existing collections. This function
+     * sets the '_timeseries' member variable and must be run before referencing '_timeseries'
+     * variable. The function will error if:
      * 1. The user provides the 'timeseries' field, but a non time-series collection or view exists
      * in that namespace.
      * 2. The user provides the 'timeseries' field with a specification that does not match an
@@ -215,6 +216,12 @@ private:
     boost::optional<TimeseriesOptions> validateTimeseries();
 
     NamespaceString makeBucketNsIfTimeseries(const NamespaceString& ns);
+
+    /**
+     * Runs a createCollection command on the temporary namespace. Returns
+     * nothing, but if the function returns, we assume the temporary collection is created.
+     */
+    void createTemporaryCollection();
 
     /**
      * Runs a renameCollection from the temporary namespace to the user requested namespace. Returns
@@ -238,7 +245,8 @@ private:
     WriteConcernOptions _writeConcern;
 
     // Holds on to the original collection options and index specs so we can check they didn't
-    // change during computation.
+    // change during computation. For time-series collection these values will be on the buckets
+    // namespace.
     BSONObj _originalOutOptions;
     std::list<BSONObj> _originalIndexes;
 
@@ -246,7 +254,8 @@ private:
     NamespaceString _tempNs;
 
     // Set if $out is writing to a time-series collection. This is how $out determines if it is
-    // writing to a time-series collection or not.
+    // writing to a time-series collection or not. Any reference to this variable **must** be after
+    // 'validateTimeseries', since 'validateTimeseries' sets this value.
     boost::optional<TimeseriesOptions> _timeseries;
 
     // Tracks the current state of the temporary collection, and is used for cleanup.

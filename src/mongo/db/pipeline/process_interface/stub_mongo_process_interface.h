@@ -182,6 +182,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    query_shape::CollectionType getCollectionType(OperationContext* opCtx,
+                                                  const NamespaceString& nss) final {
+        MONGO_UNREACHABLE;
+    }
+
     void renameIfOptionsAndIndexesHaveNotChanged(
         OperationContext* opCtx,
         const NamespaceString& sourceNs,
