@@ -450,9 +450,66 @@ TEST_F(OplogBufferBlockingQueueTest, PushAlwaysAllowOneEntryIfEmpty) {
     ASSERT(!buffer.isEmpty());
     ASSERT_EQ(12, buffer.getCount());
 
-    // Pop another entry, now there should be enough space to push
+    // Pop the first entry, now there should be enough space to push
     // the rest of the entries in the batch.
     BSONObj nextOp;
+    ASSERT_TRUE(buffer.tryPop(opCtx(), &nextOp));
+
+    pushThread.join();
+    ASSERT(doneWait);
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(7, buffer.getCount());
+}
+
+TEST_F(OplogBufferBlockingQueueTest, PushAlwaysAllowOneEntryIfEmpty2) {
+    OplogBufferBlockingQueue buffer(1024 * 1024, 10);
+    buffer.startup(opCtx());
+
+    // Push one entry with 2 ops, this should make the queue non-empty.
+    std::vector<BSONObj> ops1;
+    ops1.push_back(makeApplyOpsOplogEntry(1, 2));
+
+    buffer.push(opCtx(), ops1.begin(), ops1.end());
+
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(2, buffer.getCount());
+
+    // Push another 3 entries with the first one being larger than max
+    // count. Since the buffer is not empty, this should be blocked.
+    std::vector<BSONObj> ops2;
+    ops2.push_back(makeApplyOpsOplogEntry(2, 12));
+    ops2.push_back(makeApplyOpsOplogEntry(3, 3));
+    ops2.push_back(makeApplyOpsOplogEntry(4, 4));
+
+    bool doneWait = false;
+    stdx::thread pushThread([&, this] {
+        // Will block until the first large entry is popped.
+        buffer.push(opCtx(), ops2.begin(), ops2.end());
+        doneWait = true;
+    });
+
+    // Wait for some time and check that the first entry has not been
+    // pushed in.
+    sleepsecs(3);
+    ASSERT(!doneWait);
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(2, buffer.getCount());
+
+    // Pop the initial entry, now the buffer is empty, so the first
+    // entry in the batch should be allowed to get in even though
+    // it is larger than the max count.
+    BSONObj nextOp;
+    ASSERT_TRUE(buffer.tryPop(opCtx(), &nextOp));
+
+    // Wait for some time and check the first entry in the batch is
+    // pushed in.
+    sleepsecs(3);
+    ASSERT(!doneWait);
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(12, buffer.getCount());
+
+    // Pop the first entry, now there should be enough space to push
+    // the rest of the entries in the batch.
     ASSERT_TRUE(buffer.tryPop(opCtx(), &nextOp));
 
     pushThread.join();
