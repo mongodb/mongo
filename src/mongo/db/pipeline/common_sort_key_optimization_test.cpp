@@ -79,7 +79,7 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleTopsWithSameSortKeyOptimizedIntoOn
         _id: {$const: null},
         ts: {
             $top: {
-                output: {tm: "$m", ti: "$i"},
+                output: {tm: {$ifNull: ["$m", {$const: null}]}, ti: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
             }
         }
@@ -90,8 +90,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleTopsWithSameSortKeyOptimizedIntoOn
 {
     $project: {
         _id: true,
-        tm: {$ifNull: ["$ts.tm", {$const: null}]},
-        ti: {$ifNull: ["$ts.ti", {$const: null}]}
+        tm: "$ts.tm",
+        ti: "$ts.ti"
     }
 }
     )");
@@ -129,7 +129,7 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomNsWithSameSortKeySameNOptimi
         bns: {
             $bottomN: {
                 n: {$cond: [{$eq: ["$tag", {$const: "WA"}]}, {$const: 10}, {$const: 4}]},
-                output: {bnm: "$m", bni: "$i"},
+                output: {bnm: {$ifNull: ["$m", {$const: null}]}, bni: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
             }
         }
@@ -140,8 +140,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomNsWithSameSortKeySameNOptimi
 {
     $project: {
         _id: true,
-        bnm: {$ifNull: ["$bns.bnm", {$const: null}]},
-        bni: {$ifNull: ["$bns.bni", {$const: null}]}
+        bnm: "$bns.bnm",
+        bni: "$bns.bni"
     }
 }
     )");
@@ -167,7 +167,7 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleTopNsWithSameSortKeyOptimizedIntoO
         tns: {
             $topN: {
                 n: {$const: 2},
-                output: {tm: "$m", ti: "$i"},
+                output: {tm: {$ifNull: ["$m", {$const: null}]}, ti: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
             }
         }
@@ -178,8 +178,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleTopNsWithSameSortKeyOptimizedIntoO
 {
     $project: {
         _id: true,
-        tm: {$ifNull: ["$tns.tm", {$const: null}]},
-        ti: {$ifNull: ["$tns.ti", {$const: null}]}
+        tm: "$tns.tm",
+        ti: "$tns.ti"
     }
 }
     )");
@@ -204,7 +204,7 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomsWithSameSortKeyOptimizedInt
         _id: {$const: null},
         bs: {
             $bottom: {
-                output: {bm: "$m", bi: "$i"},
+                output: {bm: {$ifNull: ["$m", {$const: null}]}, bi: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
             }
         }
@@ -215,8 +215,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomsWithSameSortKeyOptimizedInt
 {
     $project: {
         _id: true,
-        bm: {$ifNull: ["$bs.bm", {$const: null}]},
-        bi: {$ifNull: ["$bs.bi", {$const: null}]}
+        bm: "$bs.bm",
+        bi: "$bs.bi"
     }
 }
     )");
@@ -241,7 +241,7 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomNsWithSameSortKeyOptimizedIn
         bns: {
             $bottomN: {
                 n: {$const: 3},
-                output: {bm: "$m", bi: "$i"},
+                output: {bm: {$ifNull: ["$m", {$const: null}]}, bi: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
             }
         }
@@ -252,8 +252,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomNsWithSameSortKeyOptimizedIn
 {
     $project: {
         _id: true,
-        bm: {$ifNull: ["$bns.bm", {$const: null}]},
-        bi: {$ifNull: ["$bns.bi", {$const: null}]}
+        bm: "$bns.bm",
+        bi: "$bns.bi"
     }
 }
     )");
@@ -281,14 +281,14 @@ TEST_F(CommonSortKeyOptimizationTest,
         _id: {$const: null},
         ts: {
             $top: {
-                output: {t_a: "$a", t_b: "$b", t_c: "$c"},
+                output: {t_a: {$ifNull: ["$a", {$const: null}]}, t_b: {$ifNull: ["$b", {$const: null}]}, t_c: {$ifNull: ["$c", {$const: null}]}},
                 sortBy: {time: 1, g: -1}
             }
         },
         bns: {
             $bottomN: {
                 n: {$const: 2},
-                output: {b_a: "$a", b_b: "$b"},
+                output: {b_a: {$ifNull: ["$a", {$const: null}]}, b_b: {$ifNull: ["$b", {$const: null}]}},
                 sortBy: {time: 1, g: 1}
             }
         }
@@ -299,11 +299,11 @@ TEST_F(CommonSortKeyOptimizationTest,
 {
     $project: {
         _id: true,
-        t_a: {$ifNull: ["$ts.t_a", {$const: null}]},
-        t_b: {$ifNull: ["$ts.t_b", {$const: null}]},
-        t_c: {$ifNull: ["$ts.t_c", {$const: null}]},
-        b_a: {$ifNull: ["$bns.b_a", {$const: null}]},
-        b_b: {$ifNull: ["$bns.b_b", {$const: null}]}
+        t_a: "$ts.t_a",
+        t_b: "$ts.t_b",
+        t_c: "$ts.t_c",
+        b_a: "$bns.b_a",
+        b_b: "$bns.b_b"
     }
 }
     )");
@@ -425,7 +425,7 @@ TEST_F(CommonSortKeyOptimizationTest, OptimizableTopNsMixedWithIneligibleAccumul
         tns: {
             $topN: {
                 n: {$const: 5},
-                output: {t_a: "$a", t_b: "$b"},
+                output: {t_a: {$ifNull: ["$a", {$const: null}]}, t_b: {$ifNull: ["$b", {$const: null}]}},
                 sortBy: {time: 1, g: -1}
             }
         },
@@ -438,8 +438,8 @@ TEST_F(CommonSortKeyOptimizationTest, OptimizableTopNsMixedWithIneligibleAccumul
 {
     $project: {
         _id: true,
-        t_a: {$ifNull: ["$tns.t_a", {$const: null}]},
-        t_b: {$ifNull: ["$tns.t_b", {$const: null}]},
+        t_a: "$tns.t_a",
+        t_b: "$tns.t_b",
         fc: true,
         ld: true
     }
@@ -473,7 +473,7 @@ TEST_F(CommonSortKeyOptimizationTest,
         tns: {
             $topN: {
                 n: {$const: 5},
-                output: {t_a: "$a", t_b: "$b"},
+                output: {t_a: {$ifNull: ["$a", {$const: null}]}, t_b: {$ifNull: ["$b", {$const: null}]}},
                 sortBy: {time: 1, g: -1}
             }
         },
@@ -487,8 +487,8 @@ TEST_F(CommonSortKeyOptimizationTest,
     $project: {
         _id: true,
         b_k: true,
-        t_a: {$ifNull: ["$tns.t_a", {$const: null}]},
-        t_b: {$ifNull: ["$tns.t_b", {$const: null}]},
+        t_a: "$tns.t_a",
+        t_b: "$tns.t_b",
         fc: true,
         ld: true
     }

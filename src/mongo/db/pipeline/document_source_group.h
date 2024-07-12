@@ -132,10 +132,15 @@ protected:
      * {
      *   $group: {
      *     _id: ...,
-     *     ts: {$top: {sortBy: {time: -1}, output: {tm: "$m", ti: "$i"}}}
+     *     ts: {
+     *       $top: {
+     *         sortBy: {time: -1},
+     *         output: {tm: {$ifNull: ["$m", null]}, ti: {$ifNull: ["$i", null]}}
+     *       }
+     *     }
      *   }
      * },
-     * {$project: {tm: {$ifNull: ["$ts.tm", null]}}, ti: {$ifNull: ["$ts.ti", null]}}}
+     * {$project: {tm: "$ts.tm", ti: "$ts.ti"}}
      */
     bool tryToGenerateCommonSortKey(Pipeline::SourceContainer::iterator itr,
                                     Pipeline::SourceContainer* container);
