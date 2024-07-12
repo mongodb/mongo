@@ -38,7 +38,7 @@
 #include "mongo/unittest/framework.h"
 
 namespace mongo {
-
+namespace {
 
 TEST(FLEValidationUtils, ValidateDoublePrecisionRange) {
     ASSERT(validateDoublePrecisionRange(3.000, 0));
@@ -129,17 +129,17 @@ TEST(FLEValidationUtils, ValidateTrimFactorRange) {
     ASSERT_OK(validateRangeIndexTest(1, BSONType::NumberInt, Value(0), Value(2)));
     ASSERT_NOT_OK(validateRangeIndexTest(2, BSONType::NumberInt, Value(0), Value(2)));
 
-    ASSERT_OK(validateRangeIndexTest(31, BSONType::NumberInt, Value(INT32_MIN), Value(INT32_MAX)));
+    ASSERT_OK(validateRangeIndexTest(3, BSONType::NumberInt, Value(INT32_MIN), Value(INT32_MAX)));
     ASSERT_NOT_OK(
         validateRangeIndexTest(32, BSONType::NumberInt, Value(INT32_MIN), Value(INT32_MAX)));
 
     ASSERT_OK(validateRangeIndexTest(
-        63, BSONType::NumberLong, Value((long long)INT64_MIN), Value((long long)INT64_MAX)));
+        3, BSONType::NumberLong, Value((long long)INT64_MIN), Value((long long)INT64_MAX)));
     ASSERT_NOT_OK(validateRangeIndexTest(
         64, BSONType::NumberLong, Value((long long)INT64_MIN), Value((long long)INT64_MAX)));
 
     ASSERT_OK(
-        validateRangeIndexTest(63, BSONType::Date, Value(Date_t::min()), Value(Date_t::max())));
+        validateRangeIndexTest(3, BSONType::Date, Value(Date_t::min()), Value(Date_t::max())));
     ASSERT_NOT_OK(
         validateRangeIndexTest(64, BSONType::Date, Value(Date_t::min()), Value(Date_t::max())));
 
@@ -149,7 +149,7 @@ TEST(FLEValidationUtils, ValidateTrimFactorRange) {
     ASSERT_NOT_OK(validateRangeIndexTest(
         10, BSONType::NumberDouble, Value(0.), Value(100.), 1 /* precision */));
 
-    ASSERT_OK(validateRangeIndexTest(63, BSONType::NumberDouble, boost::none, boost::none));
+    ASSERT_OK(validateRangeIndexTest(3, BSONType::NumberDouble, boost::none, boost::none));
     ASSERT_NOT_OK(validateRangeIndexTest(64, BSONType::NumberDouble, boost::none, boost::none));
 
     ASSERT_OK(validateRangeIndexTest(9,
@@ -163,7 +163,149 @@ TEST(FLEValidationUtils, ValidateTrimFactorRange) {
                                          Value(Decimal128(100)),
                                          1 /* precision */));
 
-    ASSERT_OK(validateRangeIndexTest(127, BSONType::NumberDecimal, boost::none, boost::none));
+    ASSERT_OK(validateRangeIndexTest(7, BSONType::NumberDecimal, boost::none, boost::none));
     ASSERT_NOT_OK(validateRangeIndexTest(128, BSONType::NumberDecimal, boost::none, boost::none));
 }
+
+TEST(FLEValidationUtils, ValidateTrimFactorRangeInt32) {
+    // Positive: Santiy check
+    validateRangeBoundsInt32(1, 100, 1, 1);
+    validateRangeBoundsInt32(1, 1000000, 1, 1);
+
+    // Positive: Small bounds but bogus tf and sp
+    validateRangeBoundsInt32(1, 100, 100, 100);
+
+    // Negative: Bogus tf or sp
+    ASSERT_THROWS_CODE(validateRangeBoundsInt32(1, 1000000, 100, 1), AssertionException, 9203504);
+    ASSERT_THROWS_CODE(validateRangeBoundsInt32(1, 1000000, 1, 100), AssertionException, 9203504);
+
+    // Limits
+    validateRangeBoundsInt32(0, INT32_MAX, 1, 1);
+    validateRangeBoundsInt32(INT32_MIN, 0, 1, 1);
+    validateRangeBoundsInt32(INT32_MIN, INT32_MAX, 1, 1);
+
+    // Negative: High sp + tf
+    ASSERT_THROWS_CODE(validateRangeBoundsInt32(1, 10000000, 8, 13), AssertionException, 9203504);
+
+    // Negative: High sp + tf + domain
+    ASSERT_THROWS_CODE(validateRangeBoundsInt32(1, 10000000, 8, 11), AssertionException, 9203508);
+}
+
+TEST(FLEValidationUtils, ValidateTrimFactorRangeInt64) {
+    // Positive: Santiy check
+    validateRangeBoundsInt64(1, 100, 1, 1);
+    validateRangeBoundsInt64(1, 1000000, 1, 1);
+
+    // Positive: Small bounds but bogus tf and sp
+    validateRangeBoundsInt64(1, 100, 100, 100);
+
+    // Negative: Bogus tf or sp
+    ASSERT_THROWS_CODE(validateRangeBoundsInt64(1, 1000000, 100, 1), AssertionException, 9203504);
+    ASSERT_THROWS_CODE(validateRangeBoundsInt64(1, 1000000, 1, 100), AssertionException, 9203504);
+
+    // Limits
+    validateRangeBoundsInt64(0, INT64_MAX, 1, 1);
+    validateRangeBoundsInt64(INT64_MIN, 0, 1, 1);
+    validateRangeBoundsInt64(INT64_MIN, INT64_MAX, 1, 1);
+
+    // Negative: High sp + tf
+    ASSERT_THROWS_CODE(validateRangeBoundsInt64(1, 1000000, 8, 13), AssertionException, 9203504);
+
+    // Negative: High sp + tf + domain
+    ASSERT_THROWS_CODE(validateRangeBoundsInt64(1, 10000000, 8, 11), AssertionException, 9203508);
+}
+
+TEST(FLEValidationUtils, ValidateTrimFactorRangeDouble) {
+    // Positive: Santiy check
+    validateRangeBoundsDouble(1, 100, 1, 1, boost::none);
+    validateRangeBoundsDouble(1, 1000000, 1, 1, boost::none);
+
+    // Negative: Small bounds but bogus tf and sp
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDouble(1, 100, 100, 100, boost::none), AssertionException, 9203504);
+
+    // Negative: Bogus tf or sp
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDouble(1, 1000000, 100, 1, boost::none), AssertionException, 9203504);
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDouble(1, 1000000, 1, 100, boost::none), AssertionException, 9203504);
+
+    // Limits
+    // Negative: High sp + tf
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDouble(1, 1000000, 8, 13, 1), AssertionException, 9203504);
+
+    // Negative: High sp + tf + domain
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDouble(1, 10000000, 8, 11, 1), AssertionException, 9203508);
+
+
+    validateRangeBoundsDouble(0, DBL_MAX, 1, 1, boost::none);
+    validateRangeBoundsDouble(DBL_MIN, 1, 1, 1, boost::none);
+    validateRangeBoundsDouble(DBL_TRUE_MIN, 1, 1, 1, boost::none);
+    validateRangeBoundsDouble(DBL_MIN, DBL_MAX, 1, 1, boost::none);
+
+    // Negative: High sp + tf
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDouble(1, 1000000, 8, 13, boost::none), AssertionException, 9203504);
+
+    // Negative: High sp + tf + domain
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDouble(1, 10000000, 8, 11, boost::none), AssertionException, 9203508);
+
+    // precision testing
+    // force dmoain to be smaller then max tags and ignore tf/sp
+    validateRangeBoundsDouble(1, 100, 100, 100, 2);
+}
+
+TEST(FLEValidationUtils, ValidateTrimFactorRangeDecimal128) {
+    // Positive: Santiy check
+    validateRangeBoundsDecimal128(Decimal128(1), Decimal128(100), 1, 1, boost::none);
+    validateRangeBoundsDecimal128(Decimal128(1), Decimal128(1000000), 1, 1, boost::none);
+
+    // Negative: Small bounds but bogus tf and sp
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDecimal128(Decimal128(1), Decimal128(100), 100, 100, boost::none),
+        AssertionException,
+        9203504);
+
+    // Negative: Bogus tf or sp
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDecimal128(Decimal128(1), Decimal128(1000000), 100, 1, boost::none),
+        AssertionException,
+        9203504);
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDecimal128(Decimal128(1), Decimal128(1000000), 1, 100, boost::none),
+        AssertionException,
+        9203504);
+
+    // Limits
+    // Negative: High sp + tf
+    ASSERT_THROWS_CODE(validateRangeBoundsDecimal128(Decimal128(1), Decimal128(1000000), 8, 13, 1),
+                       AssertionException,
+                       9203504);
+
+    // Negative: High sp + tf + domain
+    ASSERT_THROWS_CODE(validateRangeBoundsDecimal128(Decimal128(1), Decimal128(10000000), 8, 11, 1),
+                       AssertionException,
+                       9203508);
+
+    // Negative: High sp + tf
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDecimal128(Decimal128(1), Decimal128(1000000), 8, 13, boost::none),
+        AssertionException,
+        9203504);
+
+    // Negative: High sp + tf + domain
+    ASSERT_THROWS_CODE(
+        validateRangeBoundsDecimal128(Decimal128(1), Decimal128(10000000), 8, 11, boost::none),
+        AssertionException,
+        9203508);
+
+    // precision testing
+    // force dmoain to be smaller then max tags and ignore tf/sp
+    validateRangeBoundsDecimal128(Decimal128(1), Decimal128(100), 100, 100, 2);
+}
+
+}  // namespace
 }  // namespace mongo

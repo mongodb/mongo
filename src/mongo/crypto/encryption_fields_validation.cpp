@@ -32,6 +32,7 @@
 #include <fmt/format.h>
 
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <utility>
 #include <variant>
@@ -188,6 +189,77 @@ std::pair<mongo::Value, mongo::Value> getRangeMinMaxDefaults(BSONType fieldType)
     }
     MONGO_UNREACHABLE;
 }
+
+uint64_t exp2UInt64(uint32_t exp) {
+    uassert(9203501, "Exponent out of bounds for uint64", exp < 64);
+
+    return 1ULL << exp;
+}
+
+// Validates that this assertion is true:
+//
+//            sp-1      tf
+// min ( n, 2^     * (2^   + 2 log2(n) - 1 ) )  < CBSON
+//
+void validateRangeBoundsBase(double domainSizeLog2, uint32_t sparsity, uint32_t trimFactor) {
+    uassert(
+        9203502, "domainSizeLog2 is out of bounds", domainSizeLog2 > 0 && domainSizeLog2 <= 128);
+
+    // Before we do the formula, sanity check that 2^tf * 2^{sp-1} = 2^{tf + sp - 1} <
+    // ceil(log2(CBSON)) is sane
+    uassert(9203504,
+            "Sparsity and trimFactor together are too large and could create queries that exceed "
+            "the BSON size limit",
+
+            (trimFactor + sparsity - 1) < kMaxTagLimitLog2);
+
+    // Since we now know that {tf + sp - 1} < ceil(log2(CBSON)), which means that the remainder of
+    // the formula:  2log2(N) -1 cannot cause us to overflow a double.
+
+    // trimfactor = 1 .. log2(bits) so 2^tf should be less then max_size of a type but we bounds
+    // check anyway
+    uint64_t tf_exp = exp2UInt64(trimFactor);
+
+    // sparsity = 1 .. 4 so 2^{sp-1} should be less then max_size of a type but we bounds check
+    // anyway
+    uint64_t sp_exp = exp2UInt64(sparsity);
+
+    // Compute the number of bits we need
+    // domainSizeLog2 is <= 128 at this point
+
+    double log_part2 = 2 * domainSizeLog2 - 1;
+    // log_part2 is <= 256 at this point
+
+    double log_part3 = log_part2 + tf_exp;
+
+    double total = sp_exp * log_part3;
+
+    uassert(9203508,
+            "Sparsity, trimFactor, min, and max together are too large and could create queries "
+            "that exceed the BSON size limit",
+            total < kMaxTagLimit);
+}
+
+template <typename T>
+void validateRangeBoundsInt(T typeInfo, uint32_t sparsity, uint32_t trimFactor) {
+
+    if (typeInfo.max < kMaxTagLimit) {
+        return;
+    }
+
+    double domainSizeLog2 = sizeof(typeInfo.max) * 8;
+
+    if (typeInfo.max < std::numeric_limits<decltype(typeInfo.max)>::max()) {
+        // +1 since we want the number of values between min and max, inclusive
+        domainSizeLog2 = log2(typeInfo.max - typeInfo.min + 1);
+    }
+
+    // Compute the number of bits we need
+    // domainSizeLog2 is <= 128 at this point
+    validateRangeBoundsBase(domainSizeLog2, sparsity, trimFactor);
+}
+
+
 }  // namespace
 
 uint32_t getNumberOfBitsInDomain(BSONType fieldType,
@@ -321,19 +393,25 @@ void validateRangeIndex(BSONType fieldType, StringData fieldPath, QueryTypeConfi
 
     if (query.getTrimFactor().has_value()) {
         uint32_t tf = query.getTrimFactor().value();
+        auto precision = query.getPrecision().map([](int32_t i) { return (uint32_t)(i); });
 
         auto [defMin, defMax] = getRangeMinMaxDefaults(fieldType);
         uint32_t bits = getNumberOfBitsInDomain(
-            fieldType,
-            query.getMin().value_or(defMin),
-            query.getMax().value_or(defMax),
-            query.getPrecision().map([](int32_t i) { return (uint32_t)(i); }));
+            fieldType, query.getMin().value_or(defMin), query.getMax().value_or(defMax), precision);
+
         // We allow the case where #bits = TF = 0.
         uassert(8574000,
                 fmt::format("The field 'trimFactor' must be >= 0 and less than the total "
                             "number of bits needed to represent elements in the domain ({})",
                             bits),
                 tf == 0 || tf < bits);
+
+        validateRangeBounds(fieldType,
+                            query.getMin().value_or(defMin),
+                            query.getMax().value_or(defMax),
+                            query.getSparsity().value_or(kFLERangeSparsityDefault),
+                            tf,
+                            precision);
     }
 }
 
@@ -469,5 +547,81 @@ void setRangeDefaults(BSONType fieldType, StringData fieldPath, QueryTypeConfig*
     query.setMax(query.getMax().value_or(defMax));
     query.setSparsity(query.getSparsity().value_or(kFLERangeSparsityDefault));
 }
+
+void validateRangeBounds(BSONType fieldType,
+                         const boost::optional<Value>& min,
+                         const boost::optional<Value>& max,
+                         uint32_t sparsity,
+                         uint32_t trimFactor,
+                         const boost::optional<uint32_t>& precision) {
+    switch (fieldType) {
+        case NumberInt:
+            return validateRangeBoundsInt32(
+                min.map(valToInt), max.map(valToInt), sparsity, trimFactor);
+        case NumberLong:
+            return validateRangeBoundsInt64(
+                min.map(valToLong), max.map(valToLong), sparsity, trimFactor);
+        case Date:
+            return validateRangeBoundsInt64(
+                min.map(valToDateToLong), max.map(valToDateToLong), sparsity, trimFactor);
+        case NumberDouble:
+            return validateRangeBoundsDouble(
+                min.map(valToDouble), max.map(valToDouble), sparsity, trimFactor, precision);
+        case NumberDecimal:
+            return validateRangeBoundsDecimal128(
+                min.map(valToDecimal), max.map(valToDecimal), sparsity, trimFactor, precision);
+        default:
+            uasserted(9203507,
+                      "Field type is invalid; must be one of int, long, date, double, or decimal");
+    }
+}
+
+void validateRangeBoundsInt32(const boost::optional<int32_t>& min,
+                              const boost::optional<int32_t>& max,
+                              uint32_t sparsity,
+                              uint32_t trimFactor) {
+    validateRangeBoundsInt(getTypeInfo32(min.value_or(0), min, max), sparsity, trimFactor);
+}
+
+void validateRangeBoundsInt64(const boost::optional<int64_t>& min,
+                              const boost::optional<int64_t>& max,
+                              uint32_t sparsity,
+                              uint32_t trimFactor) {
+    validateRangeBoundsInt(getTypeInfo64(min.value_or(0), min, max), sparsity, trimFactor);
+}
+
+void validateRangeBoundsDouble(const boost::optional<double>& min,
+                               const boost::optional<double>& max,
+                               uint32_t sparsity,
+                               uint32_t trimFactor,
+                               const boost::optional<uint32_t>& precision) {
+    validateRangeBoundsInt(
+        getTypeInfoDouble(min.value_or(0), min, max, precision), sparsity, trimFactor);
+}
+
+void validateRangeBoundsDecimal128(const boost::optional<Decimal128>& min,
+                                   const boost::optional<Decimal128>& max,
+                                   uint32_t sparsity,
+                                   uint32_t trimFactor,
+                                   const boost::optional<uint32_t>& precision) {
+    auto typeInfo =
+        getTypeInfoDecimal128(min.value_or(Decimal128::kNormalizedZero), min, max, precision);
+
+    if (typeInfo.max < kMaxTagLimit) {
+        return;
+    }
+
+    double domainSizeLog2 = 128;
+
+    if (typeInfo.max < std::numeric_limits<boost::multiprecision::uint128_t>::max()) {
+        // +1 since we want the number of values between min and max, inclusive
+        domainSizeLog2 = boost::multiprecision::msb(typeInfo.max - typeInfo.min + 1) + 1;
+    }
+
+    // Compute the number of bits we need
+    // domainSizeLog2 is <= 128 at this point
+    validateRangeBoundsBase(domainSizeLog2, sparsity, trimFactor);
+}
+
 
 }  // namespace mongo

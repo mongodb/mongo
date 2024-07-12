@@ -75,4 +75,41 @@ uint32_t getNumberOfBitsInDomain(BSONType fieldType,
                                  const boost::optional<uint32_t>& precision);
 
 void setRangeDefaults(BSONType fieldType, StringData fieldPath, QueryTypeConfig* query);
+
+/**
+ * Maximum number of edges  (aka tags) that fit in a bson document. The actual limit is a higher but
+ * we use a lower limit do allow for other content in a bson document.
+ */
+constexpr uint32_t kMaxTagLimit = 300000;
+constexpr uint32_t kMaxTagLimitLog2 = 19;  // ceil(log2(kMaxTagLimit))
+
+/**
+ * Validate for a range field that sparsity and trimfactor to not lead to queries that would require
+ * more edges then can fit in a BSON document.
+ */
+void validateRangeBounds(BSONType fieldType,
+                         const boost::optional<Value>& min,
+                         const boost::optional<Value>& max,
+                         uint32_t sparsity,
+                         uint32_t trimFactor,
+                         const boost::optional<uint32_t>& precision);
+void validateRangeBoundsInt32(const boost::optional<int32_t>& min,
+                              const boost::optional<int32_t>& max,
+                              uint32_t sparsity,
+                              uint32_t trimFactor);
+void validateRangeBoundsInt64(const boost::optional<int64_t>& min,
+                              const boost::optional<int64_t>& max,
+                              uint32_t sparsity,
+                              uint32_t trimFactor);
+void validateRangeBoundsDouble(const boost::optional<double>& min,
+                               const boost::optional<double>& max,
+                               uint32_t sparsity,
+                               uint32_t trimFactor,
+                               const boost::optional<uint32_t>& precision);
+void validateRangeBoundsDecimal128(const boost::optional<Decimal128>& min,
+                                   const boost::optional<Decimal128>& max,
+                                   uint32_t sparsity,
+                                   uint32_t trimFactor,
+                                   const boost::optional<uint32_t>& precision);
+
 }  // namespace mongo
