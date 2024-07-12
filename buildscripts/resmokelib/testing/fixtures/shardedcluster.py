@@ -144,7 +144,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
             # Reduce migration throttling to increase frequency of random migrations
             self.mongod_options["set_parameters"]["balancerMigrationsThrottlingMs"] = (
-                self.mongod_options["set_parameters"].get("balancerMigrationsThrottlingMs", 100)
+                self.mongod_options["set_parameters"].get("balancerMigrationsThrottlingMs", 250)
             )  # millis
 
         self._dbpath_prefix = os.path.join(

@@ -181,7 +181,7 @@ executor:
         defaultConfigCommandTimeoutMS: 90000
         skipDroppingHashedShardKeyIndex: true
         reshardingMinimumOperationDurationMillis: 0
-        balancerMigrationsThrottlingMs: 100
+        balancerMigrationsThrottlingMs: 250
         featureFlagReshardingForTimeseries: true
         failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
           data:
