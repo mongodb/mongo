@@ -183,7 +183,7 @@ OS_DOCKER_LOOKUP = {
     "suse11": None,
     "suse12": None,
     "suse15": (
-        "registry.suse.com/suse/sle15:latest",
+        "registry.suse.com/suse/sle15:15.5",
         "zypper",
         frozenset(["python3", "wget", "pkg-config", "systemd", "procps", "file"]),
         "python3",
