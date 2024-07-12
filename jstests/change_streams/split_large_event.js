@@ -287,4 +287,40 @@ for (const postImageMode of ["required", "updateLookup"]) {
         () => testColl.watch([], {resumeAfter: resumeTokens[resumeTokens.length - 2]}),
         ErrorCodes.ChangeStreamFatalError);
 }
+
+{
+    // Get a resume token from a real event as opposed to a post-batch resume token.
+    const csCursor1 = testColl.watch([]);
+    assert.commandWorked(testColl.insertOne({_id: "ccc", a: 42, b: [42]}));
+    assert.soon(() => csCursor1.hasNext());
+    const eventResumeToken = csCursor1.next()._id;
+    csCursor1.close();
+
+    const expectedFullDocument = {_id: "ddd", a: 42, b: [42]};
+    assert.commandWorked(testColl.insertOne(expectedFullDocument));
+
+    // The following expressions will block its $match stage from moving ahead of other stages,
+    // unless those are the internal change stream stages allowed in the router (mongoS) pipeline.
+    // TODO SERVER-55492 Update these comments depending on the implementation progress.
+    const nonRenameableExpressions = [
+        // Array path match expressions are non-renameable.
+        {"fullDocument.b": {$size: 1}},
+        // Expressions of 'other' category, like $jsonSchema with nested properties, are
+        // non-renameable.
+        {$jsonSchema: {properties: {fullDocument: {properties: {a: {type: "number"}}}}}}
+    ];
+
+    // Test that $changeStreamSplitLargeEvent works correctly in the presence of a $match stage that
+    // cannot be pushed down (moved ahead of other stages).
+    for (const expr of nonRenameableExpressions) {
+        const csCursor2 = testColl.watch([{$match: expr}, {$changeStreamSplitLargeEvent: {}}],
+                                         {resumeAfter: eventResumeToken});
+
+        // Assert the change stream pipeline works and can produce events.
+        assert.soon(() => csCursor2.hasNext());
+        assert.docEq(expectedFullDocument, csCursor2.next().fullDocument);
+
+        csCursor2.close();
+    }
+}
 }());
