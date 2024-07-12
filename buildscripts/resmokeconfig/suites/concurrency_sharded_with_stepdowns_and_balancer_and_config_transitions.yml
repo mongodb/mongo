@@ -234,7 +234,7 @@ executor:
           data:
             skipMoveCollectionThreshold: 0.5
           mode: alwaysOn
-        balancerMigrationsThrottlingMs: 250
+        balancerMigrationsThrottlingMs: 100
         featureFlagReshardingForTimeseries: true
         failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
           data:
