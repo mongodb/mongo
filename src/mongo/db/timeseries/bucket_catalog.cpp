@@ -247,7 +247,11 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
                                                 &newFieldNamesSize,
                                                 &sizeToBeAdded);
 
-    auto isBucketFull = [&](BucketAccess* bucket) -> bool {
+    auto shouldCloseBucket = [&](BucketAccess* bucket) -> bool {
+        if (bucket->schemaIncompatible(doc, metaFieldName, comparator)) {
+            stats.incNumBucketsClosedDueToSchemaChange(1);
+            return true;
+        }
         if ((*bucket)->_numMeasurements == static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
             stats.incNumBucketsClosedDueToCount(1);
             return true;
@@ -269,8 +273,8 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
         return false;
     };
 
-    if (!bucket->_ns.isEmpty() && isBucketFull(&bucket)) {
-        bucket.rollover(isBucketFull);
+    if (!bucket->_ns.isEmpty() && shouldCloseBucket(&bucket)) {
+        bucket.rollover(shouldCloseBucket);
         bucket->_calculateBucketFieldsAndSizeChange(doc,
                                                     options.getMetaField(),
                                                     &newFieldNamesToBeInserted,
@@ -299,6 +303,8 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
         // _openBuckets, _idleBuckets.
         bucket->_memoryUsage += (ns.size() * 2) + (bucket->_metadata.toBSON().objsize() * 2) +
             sizeof(Bucket) + sizeof(std::unique_ptr<Bucket>) + (sizeof(Bucket*) * 2);
+
+        bucket->_schema.update(doc, options.getMetaField(), comparator);
     } else {
         _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
     }
@@ -483,6 +489,8 @@ void BucketCatalog::_appendExecutionStatsToBuilder(const ExecutionStats* stats,
     builder->appendNumber("numBucketsOpenedDueToMetadata",
                           stats->numBucketsOpenedDueToMetadata.load());
     builder->appendNumber("numBucketsClosedDueToCount", stats->numBucketsClosedDueToCount.load());
+    builder->appendNumber("numBucketsClosedDueToSchemaChange",
+                          stats->numBucketsClosedDueToSchemaChange.load());
     builder->appendNumber("numBucketsClosedDueToSize", stats->numBucketsClosedDueToSize.load());
     builder->appendNumber("numBucketsClosedDueToTimeForward",
                           stats->numBucketsClosedDueToTimeForward.load());
@@ -1131,6 +1139,14 @@ BucketCatalog::BucketAccess::operator BucketCatalog::Bucket*() const {
     return _bucket;
 }
 
+bool BucketCatalog::BucketAccess::schemaIncompatible(
+    const BSONObj& input,
+    boost::optional<StringData> metaField,
+    const StringData::ComparatorInterface* comparator) {
+    auto result = _bucket->_schema.update(input, metaField, comparator);
+    return (result == timeseries::Schema::UpdateStatus::Failed);
+}
+
 void BucketCatalog::BucketAccess::rollover(const std::function<bool(BucketAccess*)>& isBucketFull) {
     invariant(isLocked());
     invariant(_key);
@@ -1287,6 +1303,10 @@ void BucketCatalog::WriteBatch::_prepareCommit(Bucket* bucket) {
         // Approximate minmax memory usage by taking sizes of initial commit. Subsequent updates may
         // add fields but are most likely just to update values.
         bucket->_memoryUsage += _min.objsize();
+        bucket->_memoryUsage += _max.objsize();
+
+        // We don't have a great approximation for the memory usage of _schema, so we use the max as
+        // a stand-in.
         bucket->_memoryUsage += _max.objsize();
     }
 }

@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
@@ -39,6 +38,7 @@
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -70,6 +70,12 @@ protected:
                              uint16_t numPreviouslyCommittedMeasurements);
 
     long long _getNumWaits(const NamespaceString& ns);
+    long long _getNumSchemaChanges(const NamespaceString& ns);
+
+    // Check that each group of objects has compatible schema with itself, but that inserting the
+    // first object in new group closes the existing bucket and opens a new one
+    void _testMeasurementSchema(
+        const std::initializer_list<std::initializer_list<BSONObj>>& groups);
 
     OperationContext* _opCtx;
     BucketCatalog* _bucketCatalog;
@@ -170,6 +176,56 @@ long long BucketCatalogTest::_getNumWaits(const NamespaceString& ns) {
     BSONObjBuilder builder;
     _bucketCatalog->appendExecutionStats(ns, &builder);
     return builder.obj().getIntField("numWaits");
+}
+
+long long BucketCatalogTest::_getNumSchemaChanges(const NamespaceString& ns) {
+    BSONObjBuilder builder;
+    _bucketCatalog->appendExecutionStats(ns, &builder);
+    return builder.obj().getIntField("numBucketsClosedDueToSchemaChange");
+}
+
+void BucketCatalogTest::_testMeasurementSchema(
+    const std::initializer_list<std::initializer_list<BSONObj>>& groups) {
+    // Make sure we start and end with a clean slate.
+    _bucketCatalog->clear(_ns1);
+    auto guard = makeGuard([this]() { _bucketCatalog->clear(_ns1); });
+
+    bool firstGroup = true;
+    for (const auto& group : groups) {
+        bool firstMember = true;
+        for (const auto& doc : group) {
+            BSONObjBuilder timestampedDoc;
+            timestampedDoc.append(_timeField, Date_t::now());
+            timestampedDoc.appendElements(doc);
+
+            auto pre = _getNumSchemaChanges(_ns1);
+            auto result = _bucketCatalog
+                              ->insert(_opCtx,
+                                       _ns1,
+                                       _getCollator(_ns1),
+                                       _getTimeseriesOptions(_ns1),
+                                       timestampedDoc.obj(),
+                                       BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
+                              .getValue();
+            auto post = _getNumSchemaChanges(_ns1);
+
+            if (firstMember) {
+                if (firstGroup) {
+                    // We don't expect to close a bucket if we are on the first group.
+                    ASSERT_EQ(pre, post) << "expected " << doc << " to be compatible";
+                    firstGroup = false;
+                } else {
+                    // Otherwise we expect that we are in fact closing a bucket because we have
+                    // an incompatible schema change.
+                    ASSERT_EQ(pre + 1, post) << "expected " << doc << " to be incompatible";
+                }
+                firstMember = false;
+            } else {
+                // Should have compatible schema, no expected bucket closure.
+                ASSERT_EQ(pre, post) << "expected " << doc << " to be compatible";
+            }
+        }
+    }
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
@@ -984,6 +1040,41 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
     _bucketCatalog->prepareCommit(batch1);
     ASSERT(batch1->newFieldNamesToBeInserted().empty());
     _bucketCatalog->finish(batch1, {});
+}
+
+TEST_F(BucketCatalogTest, SchemaChanges) {
+    std::vector<BSONObj> docs = {
+        ::mongo::fromjson(R"({a: 1})"),                                // 0
+        ::mongo::fromjson(R"({a: true})"),                             // 1
+        ::mongo::fromjson(R"({a: {}})"),                               // 2
+        ::mongo::fromjson(R"({a: {b: 1}})"),                           // 3
+        ::mongo::fromjson(R"({a: {b: true}})"),                        // 4
+        ::mongo::fromjson(R"({a: {c: true}})"),                        // 5
+        ::mongo::fromjson(R"({a: {d: true}})"),                        // 6
+        ::mongo::fromjson(R"({a: {e: true}})"),                        // 7
+        ::mongo::fromjson(R"({a: {f: true}})"),                        // 8
+        ::mongo::fromjson(R"({a: {d: 1.0}})"),                         // 9
+        ::mongo::fromjson(R"({b: 1.0})"),                              // 10
+        ::mongo::fromjson(R"({c: {}})"),                               // 11
+        ::mongo::fromjson(R"({a: 1.0, b: 2.0, c: 3.0})"),              // 12
+        ::mongo::fromjson(R"({c: 1.0, b: 3.0, a: 2.0})"),              // 13
+        ::mongo::fromjson(R"({b: 1.0, a: 3.0, c: 2.0})"),              // 14
+        ::mongo::fromjson(R"({a: {b: [1.0, 2.0]}})"),                  // 15
+        ::mongo::fromjson(R"({a: {b: [true, false]}})"),               // 16
+        ::mongo::fromjson(R"({a: {b: [false, true, false, true]}})"),  // 17
+        ::mongo::fromjson(R"({a: {b: [{a: true}, {b: false}]}})"),     // 18
+        ::mongo::fromjson(R"({a: {b: [{b: true}, {a: false}]}})"),     // 19
+        ::mongo::fromjson(R"({a: {b: [{a: 1.0}, {b: 2.0}]}})"),        // 20
+        ::mongo::fromjson(R"({a: {b: [{}, {}, true, false]}})"),       // 21
+    };
+
+    _testMeasurementSchema({{docs[0]}, {docs[1]}, {docs[2], docs[3]}, {docs[4]}});
+    _testMeasurementSchema({{docs[0]}, {docs[1]}, {docs[2], docs[4]}, {docs[3]}});
+    _testMeasurementSchema({{docs[4], docs[5], docs[6], docs[7], docs[8]}, {docs[9]}});
+    _testMeasurementSchema({{docs[4], docs[5], docs[6], docs[7], docs[8], docs[10]}});
+    _testMeasurementSchema({{docs[10], docs[11]}, {docs[12]}});
+    _testMeasurementSchema({{docs[12], docs[13], docs[14]}, {docs[15]}, {docs[16], docs[17]}});
+    _testMeasurementSchema({{docs[18], docs[19]}, {docs[20], docs[21]}});
 }
 
 }  // namespace

@@ -49,12 +49,6 @@ function runTest(docs, query, results, path, bounds) {
     // Check that the result is in the result set.
     assert.docEq(tsColl.aggregate(pipeline).toArray(), results);
     const buckets = bucketColl.aggregate(controlPipeline).toArray();
-
-    // Check that we only have one bucket.
-    assert.eq(buckets.length, 1);
-
-    // Check that the bounds are what we expect.
-    assert.docEq(buckets[0].value, bounds);
 }
 
 // 'a.b' is missing in the bounds even though it appears in the events.

@@ -36,7 +36,7 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/timeseries/minmax.h"
+#include "mongo/db/timeseries/flat_bson.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
@@ -449,6 +449,10 @@ public:
         // The minimum and maximum values for each field in the bucket.
         timeseries::MinMax _minmax;
 
+        // The reference schema for measurements in this bucket. May reflect schema of uncommitted
+        // measurements.
+        timeseries::Schema _schema;
+
         // The latest time that has been inserted into the bucket.
         Date_t _latestTime;
 
@@ -605,6 +609,16 @@ private:
 
         // Release the bucket lock, typically in order to reacquire the catalog lock.
         void release();
+
+        /**
+         * Determines if the schema for an incoming measurement is incompatible with those already
+         * stored in the bucket.
+         *
+         * Returns true if incompatible
+         */
+        bool schemaIncompatible(const BSONObj& doc,
+                                boost::optional<StringData> metaField,
+                                const StringData::ComparatorInterface* comparator);
 
         /**
          * Close the existing, full bucket and open a new one for the same metadata.

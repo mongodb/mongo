@@ -62,9 +62,7 @@ TimeseriesTest.run((insert) => {
                                          ['control.max.' + timeFieldName]: 0
                                      })
                                .toArray();
-        assert.eq(bucketDocs.length, 1);
-
-        const bucketDoc = bucketDocs[0];
+        const bucketDoc = bucketDocs[bucketDocs.length - 1];
         jsTestLog('Bucket collection document: ' + tojson(bucketDoc));
 
         assert.docEq(
@@ -90,32 +88,28 @@ TimeseriesTest.run((insert) => {
     runTest(
         {a: {x: 2, y: 1}, b: [2, 1]}, {a: {x: 1, y: 1}, b: [1, 1]}, {a: {x: 2, y: 2}, b: [2, 2]});
 
-    // Multiple levels of nesting are also updated element-wise.
+    // Schema change, new bucket.
     runTest({a: {x: {z: [3, 4]}}, b: [{x: 3, y: 4}]},
-            {a: {x: 1, y: 1}, b: [1, 1]},
-            {a: {x: {z: [3, 4]}, y: 2}, b: [{x: 3, y: 4}, 2]});
+            {a: {x: {z: [3, 4]}}, b: [{x: 3, y: 4}]},
+            {a: {x: {z: [3, 4]}}, b: [{x: 3, y: 4}]});
+    // Sub-objects and arrays also updated element-wise
     runTest({a: {x: {z: [4, 3]}}, b: [{x: 4, y: 3}, 3, 1]},
-            {a: {x: 1, y: 1}, b: [1, 1, 1]},
-            {a: {x: {z: [4, 4]}, y: 2}, b: [{x: 4, y: 4}, 3, 1]});
+            {a: {x: {z: [3, 3]}}, b: [{x: 3, y: 3}, 3, 1]},
+            {a: {x: {z: [4, 4]}}, b: [{x: 4, y: 4}, 3, 1]});
     clearColl();
 
-    // If the two types being compared are not both objects or both arrays, a woCompare is used. We
-    // can transition in max from Object to Array.
+    // If the two types being compared are not both objects or both arrays, we'll detect a schema
+    // change and open a new bucket.
     runTest({a: 1}, {a: 1}, {a: 1});
-    runTest({a: {b: 1}}, {a: 1}, {a: {b: 1}});
-    runTest({a: []}, {a: 1}, {a: []});
-    runTest({a: [5]}, {a: 1}, {a: [5]});
-    clearColl();
-
-    // We can transition in min from empty Array to Object
+    runTest({a: {b: 1}}, {a: {b: 1}}, {a: {b: 1}});
     runTest({a: []}, {a: []}, {a: []});
-    runTest({a: {b: 1}}, {a: {b: 1}}, {a: []});
-    runTest({a: [5]}, {a: {b: 1}}, {a: [5]});
+    runTest({a: [5]}, {a: [5]}, {a: [5]});
     clearColl();
 
-    // We can transition in min from non-empty Array to Object
-    runTest({a: [1, 2, 3]}, {a: [1, 2, 3]}, {a: [1, 2, 3]});
-    runTest({a: {b: 5}}, {a: {b: 5}}, {a: [1, 2, 3]});
+    // We correctly detect schema changes from Array to Object and back
+    runTest({a: []}, {a: []}, {a: []});
+    runTest({a: {b: 1}}, {a: {b: 1}}, {a: {b: 1}});
+    runTest({a: [5]}, {a: [5]}, {a: [5]});
     clearColl();
 
     // Sparse measurements only affect the min/max for the fields present.
