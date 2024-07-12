@@ -396,7 +396,7 @@ TEST_F(CreateCollectionTest,
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
 }
 
-// TODO SERVER-91195 consider removing TimeseriesBucketingParametersChangedFlagAlwaysTrue
+// TODO SERVER-92265 consider removing TimeseriesBucketingParametersChangedFlagAlwaysTrue
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagAlwaysTrue) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", false);

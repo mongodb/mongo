@@ -58,14 +58,13 @@ replTest.awaitReplication();
 
 const timeseriesBucketsMayHaveMixedSchemaData = function(node) {
     return node.getDB(db.getName())[bucketsColl.getName()]
-        .aggregate([{$listCatalog: {}}])
-        .toArray()[0]
-        .md.timeseriesBucketsMayHaveMixedSchemaData;
+               .aggregate([{$listCatalog: {}}])
+               .toArray()[0]
+               .md.options.storageEngine.wiredTiger.configString ==
+        "app_metadata=(timeseriesBucketsMayHaveMixedSchemaData=true)";
 };
 
 assert(timeseriesBucketsMayHaveMixedSchemaData(primary));
-// TODO (SERVER-91195): Enable assertion once the catalog flag is properly cloned.
-// assert(timeseriesBucketsMayHaveMixedSchemaData(secondary));
+assert(timeseriesBucketsMayHaveMixedSchemaData(secondary));
 
-// TODO (SERVER-91195): Enable validation once the catalog flag is properly cloned.
-replTest.stopSet(null, null, {skipValidation: true});
+replTest.stopSet();

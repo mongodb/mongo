@@ -52,6 +52,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/catalog/backwards_compatible_collection_options_util.h"
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/coll_mod.h"
@@ -1028,7 +1029,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
           const auto& entry = *op;
-          const auto& cmd = entry.getObject();
+          const auto cmd =
+              backwards_compatible_collection_options::parseCollModCmdFromOplogEntry(entry);
 
           const auto tenantId = entry.getNss().tenantId();
           const auto vts = tenantId

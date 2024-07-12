@@ -44,6 +44,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/backwards_compatible_collection_options_util.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -1280,11 +1281,18 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
                                const BSONObj& collModCmd,
                                const CollectionOptions& oldCollOptions,
                                boost::optional<IndexCollModInfo> indexInfo) {
+    const auto [collModOplogCmd, additionalO2Field] =
+        backwards_compatible_collection_options::getCollModCmdAndAdditionalO2Field(collModCmd);
 
     if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         // Create the 'o2' field object. We save the old collection metadata and TTL expiration.
         BSONObjBuilder o2Builder;
+
         o2Builder.append("collectionOptions_old", oldCollOptions.toBSON());
+        if (!additionalO2Field.isEmpty()) {
+            o2Builder.append(backwards_compatible_collection_options::additionalCollModO2Field,
+                             additionalO2Field);
+        }
         if (indexInfo) {
             BSONObjBuilder oldIndexOptions;
             if (indexInfo->oldExpireAfterSeconds) {
@@ -1309,7 +1317,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         oplogEntry.setTid(nss.tenantId());
         oplogEntry.setNss(nss.getCommandNS());
         oplogEntry.setUuid(uuid);
-        oplogEntry.setObject(makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo));
+        oplogEntry.setObject(makeCollModCmdObj(collModOplogCmd, oldCollOptions, indexInfo));
         oplogEntry.setObject2(o2Builder.done());
         auto opTime =
             logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
