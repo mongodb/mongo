@@ -361,7 +361,7 @@ JSString* ModuleLoader::fetchSource(JSContext* cx,
 
 enum GlobalAppSlot { GlobalAppSlotModuleRegistry, GlobalAppSlotCount };
 JSObject* ModuleLoader::getOrCreateModuleRegistry(JSContext* cx) {
-    JS::RootedObject global(cx, JS::CurrentGlobalOrNull(cx));
+    JSObject* global = JS::CurrentGlobalOrNull(cx);
     if (!global) {
         return nullptr;
     }
@@ -371,7 +371,7 @@ JSObject* ModuleLoader::getOrCreateModuleRegistry(JSContext* cx) {
         return &value.toObject();
     }
 
-    JS::RootedObject registry(cx, JS::NewMapObject(cx));
+    JSObject* registry = JS::NewMapObject(cx);
     if (!registry) {
         return nullptr;
     }

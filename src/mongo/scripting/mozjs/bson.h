@@ -73,8 +73,7 @@ struct BSONInfo : public BaseInfo {
                             JS::ObjectOpResult& result);
 
     static const char* const className;
-    static const unsigned classFlags =
-        JSCLASS_HAS_RESERVED_SLOTS(BSONInfoSlotCount) | BaseInfo::finalizeFlag;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(BSONInfoSlotCount);
     static const InstallType installType = InstallType::Private;
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
 

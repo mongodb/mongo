@@ -66,8 +66,7 @@ struct BinDataInfo : public BaseInfo {
     static const JSFunctionSpec freeFunctions[4];
 
     static const char* const className;
-    static const unsigned classFlags =
-        JSCLASS_HAS_RESERVED_SLOTS(BinDataSlotCount) | BaseInfo::finalizeFlag;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(BinDataSlotCount);
 };
 
 }  // namespace mozjs

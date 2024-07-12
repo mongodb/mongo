@@ -147,9 +147,6 @@ sources = [
     "extract/js/src/wasm/WasmCode-platform.cpp",
 ]
 
-if get_option('spider-monkey-dbg') == "on":
-    sources.extend(["extract/js/src/util/Utility.cpp"])
-
 if env['TARGET_ARCH'] == 'x86_64' and not env.TargetOSIs('windows'):
     env.Append(CCFLAGS=['-mavx2'])
     sources.extend(["extract/mozglue/misc/SIMD_avx2.cpp", "extract/mozglue/misc/SSE.cpp"])

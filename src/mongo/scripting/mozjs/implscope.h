@@ -449,6 +449,8 @@ private:
     struct MozRuntime {
     public:
         MozRuntime(const MozJSScriptEngine* engine, boost::optional<int> jsHeapLimitMB);
+
+        std::unique_ptr<JSRuntime, std::function<void(JSRuntime*)>> _runtime;
         std::unique_ptr<JSContext, std::function<void(JSContext*)>> _context;
     };
 
@@ -514,10 +516,7 @@ private:
 
     std::unique_ptr<ModuleLoader> _moduleLoader;
     std::unique_ptr<EnvironmentPreparer> _environmentPreparer;
-    // _promiseResult must be a persistentRootedValue (instead of a simple RootedValue). Using a
-    // simple RootedValue here affects the stack cleanup conditions in the promise's execution
-    // context.
-    JS::PersistentRootedValue _promiseResult;
+    boost::optional<JS::RootedValue> _promiseResult;
 
     WrapType<BinDataInfo> _binDataProto;
     WrapType<BSONInfo> _bsonProto;

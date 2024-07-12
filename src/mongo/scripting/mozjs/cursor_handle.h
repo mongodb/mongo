@@ -61,8 +61,7 @@ struct CursorHandleInfo : public BaseInfo {
     static const JSFunctionSpec methods[2];
 
     static const char* const className;
-    static const unsigned classFlags =
-        JSCLASS_HAS_RESERVED_SLOTS(CursorHandleInfoSlotCount) | BaseInfo::finalizeFlag;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(CursorHandleInfoSlotCount);
     static const InstallType installType = InstallType::Private;
 
     /**

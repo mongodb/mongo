@@ -61,8 +61,8 @@ struct NumberDecimalInfo : public BaseInfo {
     static const JSFunctionSpec methods[3];
 
     static const char* const className;
-    static const unsigned classFlags =
-        JSCLASS_HAS_RESERVED_SLOTS(NumberDecimalInfoSlotCount) | BaseInfo::finalizeFlag;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(NumberDecimalInfoSlotCount);
+
     static Decimal128 ToNumberDecimal(JSContext* cx, JS::HandleObject object);
     static Decimal128 ToNumberDecimal(JSContext* cx, JS::HandleValue value);
 

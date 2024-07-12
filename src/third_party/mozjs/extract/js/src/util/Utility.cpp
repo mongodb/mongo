@@ -100,9 +100,6 @@ bool js::gExtraPoisoningEnabled = false;
 #  endif
 #endif
 
-// MONGODB MODIFICATION: We don't want to compile the below code when running in mongo embedding. 
-// Instead, we would like to rely on our own JS custom allocator implementation in mongo_sources.
-#ifndef JS_USE_CUSTOM_ALLOCATOR
 JS_PUBLIC_DATA arena_id_t js::MallocArena;
 JS_PUBLIC_DATA arena_id_t js::ArrayBufferContentsArena;
 JS_PUBLIC_DATA arena_id_t js::StringBufferArena;
@@ -124,7 +121,6 @@ void js::ShutDownMallocAllocator() {
   // moz_dispose_arena(MallocArena);
   // moz_dispose_arena(ArrayBufferContentsArena);
 }
-#endif
 
 extern void js::AssertJSStringBufferInCorrectArena(const void* ptr) {
 //  `jemalloc_ptr_info()` only exists if MOZ_MEMORY is defined, and it only

@@ -24,7 +24,7 @@ import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 const debugBuild = db.adminCommand("buildInfo").debug;
 if (debugBuild || !_optimizationsEnabled() || _isAddressSanitizerActive() ||
     _isLeakSanitizerActive() || _isThreadSanitizerActive() ||
-    _isUndefinedBehaviorSanitizerActive() || _isSpiderMonkeyDebugEnabled()) {
+    _isUndefinedBehaviorSanitizerActive()) {
     jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     return;
 }

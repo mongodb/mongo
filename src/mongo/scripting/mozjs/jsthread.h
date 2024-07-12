@@ -74,8 +74,7 @@ struct JSThreadInfo : public BaseInfo {
     static const JSFunctionSpec freeFunctions[3];
 
     static const char* const className;
-    static const unsigned classFlags =
-        JSCLASS_HAS_RESERVED_SLOTS(JSThreadInfoSlotCount) | BaseInfo::finalizeFlag;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(JSThreadInfoSlotCount);
     static const InstallType installType = InstallType::Private;
 };
 
