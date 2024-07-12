@@ -105,6 +105,14 @@ void BalancerStatsRegistry::onStepUpComplete(OperationContext* opCtx, long long 
     dassert(_state.load() == State::kSecondary);
     _state.store(State::kPrimaryIdle);
 
+    // Different threads can trigger ReplicationCoordinator events concurrently.
+    stdx::lock_guard lk{_mutex};
+
+    if (!_threadPool) {
+        // The registry service has already been shut down.
+        return;
+    }
+
     _initializeAsync(opCtx);
 }
 
@@ -190,7 +198,7 @@ void BalancerStatsRegistry::_terminate() {
 }
 
 void BalancerStatsRegistry::onStepDown() {
-    // Different threads can notify stepdown and shutdown events concurrently.
+    // Different threads can trigger ReplicationCoordinator events concurrently.
     stdx::lock_guard lk{_mutex};
 
     if (!_threadPool) {
@@ -203,7 +211,7 @@ void BalancerStatsRegistry::onStepDown() {
 }
 
 void BalancerStatsRegistry::onShutdown() {
-    // Different threads can notify stepdown and shutdown events concurrently.
+    // Different threads can trigger ReplicationCoordinator events concurrently.
     stdx::lock_guard lk{_mutex};
 
     if (!_threadPool) {
