@@ -125,7 +125,16 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
             as: "matchingShardedCollection"
         }
     })");
-    static const BSONObj kMatchObj = fromjson("{$match: {matchingShardedCollection: {$ne: []}}}");
+    static const BSONObj kMatchObj = fromjson(R"({
+        $match: {
+            $and: [{
+                matchingShardedCollection: {$ne: []}
+            },
+            {
+                'matchingShardedCollection.unsplittable': {$ne: true}
+            }]
+            }
+    })");
     static const BSONObj kFinalProjectObj = fromjson(R"({
         $project: {
             _id: 0,
