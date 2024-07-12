@@ -11,7 +11,6 @@ from evergreen import EvergreenApi
 LOGGER = structlog.get_logger(__name__)
 
 TASK_FAILED_STATUSES = ["failed", "timed_out"]
-TASK_END_STATUSES = ["failed", "timed_out", "succeeded"]
 
 
 class EvgProjectsInfo(NamedTuple):
@@ -47,17 +46,6 @@ class TaskStatusCounts(NamedTuple):
     version_id: Optional[str] = None
     build_id: Optional[str] = None
     failed: Optional[int] = 0
-    completed: Optional[int] = 0
-
-    def failure_rate(self) -> float:
-        """
-        Calculate failure rate.
-
-        :return: Failure rate.
-        """
-        if self.completed == 0:
-            return 0.0
-        return self.failed / self.completed
 
     def add(self, other: Any) -> TaskStatusCounts:
         """
@@ -81,7 +69,6 @@ class TaskStatusCounts(NamedTuple):
                 version_id=version_id,
                 build_id=build_id,
                 failed=self.failed + other.failed,
-                completed=self.completed + other.completed,
             )
 
         raise TypeError
@@ -177,18 +164,12 @@ class EvergreenService:
             for status, count in build.status_counts.json.items()
             if status in TASK_FAILED_STATUSES
         )
-        completed_tasks_count = sum(
-            count
-            for status, count in build.status_counts.json.items()
-            if status in TASK_END_STATUSES
-        )
 
         task_status_counts = TaskStatusCounts(
             project=build.project_identifier,
             version_id=build.version,
             build_id=build.id,
             failed=failed_tasks_count,
-            completed=completed_tasks_count,
         )
         LOGGER.info("Got Evergreen build status", task_status_counts=task_status_counts)
 

@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 import sys
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, List, Tuple
+from statistics import median
+from typing import Dict, Iterable, List, Tuple
 
 import structlog
 import typer
@@ -43,7 +44,6 @@ OVERALL_PERF_BF_COUNT_THRESHOLD = 30
 PER_TEAM_HOT_BF_COUNT_THRESHOLD = 7
 PER_TEAM_COLD_BF_COUNT_THRESHOLD = 20
 PER_TEAM_PERF_BF_COUNT_THRESHOLD = 10
-EVERGREEN_WATERFALL_FAILURE_RATE_THRESHOLD = 0.05
 
 
 def iterable_to_jql(entries: Iterable[str]) -> str:
@@ -91,15 +91,12 @@ class MonitorBuildStatusOrchestrator:
         window_start = window_end - timedelta(days=EVERGREEN_LOOKBACK_DAYS)
 
         waterfall_report = self._make_waterfall_report(
-            evg_project_names=evg_project_names, window_start=window_start, window_end=window_end
+            evg_project_names=evg_project_names, window_end=window_end
         )
-        waterfall_failure_rate_status_msg, waterfall_failure_rate_percentages = (
-            self._get_waterfall_failure_rate_status(
-                reports=waterfall_report, window_start=window_start, window_end=window_end
-            )
+        waterfall_failure_rate_status_msg = self._get_waterfall_redness_status(
+            waterfall_report=waterfall_report, window_start=window_start, window_end=window_end
         )
         status_message = f"{status_message}\n{waterfall_failure_rate_status_msg}\n"
-        threshold_percentages.extend(waterfall_failure_rate_percentages)
 
         if any(percentage > 100 for percentage in threshold_percentages):
             status_message = (
@@ -220,19 +217,32 @@ class MonitorBuildStatusOrchestrator:
         return status_message, percentages
 
     def _make_waterfall_report(
-        self, evg_project_names: List[str], window_start: datetime, window_end: datetime
-    ) -> List[TaskStatusCounts]:
-        LOGGER.info(
-            "Getting Evergreen waterfall data",
-            projects=evg_project_names,
-            window_start=window_start.isoformat(),
-            window_end=window_end.isoformat(),
-        )
-        waterfall_status = self.evg_service.get_waterfall_status(
-            evg_project_names=evg_project_names, window_start=window_start, window_end=window_end
-        )
+        self, evg_project_names: List[str], window_end: datetime
+    ) -> Dict[str, List[TaskStatusCounts]]:
+        task_status_counts = []
+        for day in range(EVERGREEN_LOOKBACK_DAYS):
+            day_window_end = window_end - timedelta(days=day)
+            day_window_start = day_window_end - timedelta(days=1)
+            LOGGER.info(
+                "Getting Evergreen waterfall data",
+                projects=evg_project_names,
+                window_start=day_window_start.isoformat(),
+                window_end=day_window_end.isoformat(),
+            )
+            waterfall_status = self.evg_service.get_waterfall_status(
+                evg_project_names=evg_project_names,
+                window_start=day_window_start,
+                window_end=day_window_end,
+            )
+            task_status_counts.extend(
+                self._accumulate_project_statuses(evg_project_names, waterfall_status)
+            )
 
-        return self._accumulate_project_statuses(evg_project_names, waterfall_status)
+        waterfall_report = {evg_project_name: [] for evg_project_name in evg_project_names}
+        for task_status_count in task_status_counts:
+            waterfall_report[task_status_count.project].append(task_status_count)
+
+        return waterfall_report
 
     @staticmethod
     def _accumulate_project_statuses(
@@ -250,26 +260,33 @@ class MonitorBuildStatusOrchestrator:
         return project_statuses
 
     @staticmethod
-    def _get_waterfall_failure_rate_status(
-        reports: List[TaskStatusCounts], window_start: datetime, window_end: datetime
-    ) -> Tuple[str, List[float]]:
-        percentages = []
+    def _get_waterfall_redness_status(
+        waterfall_report: Dict[str, List[TaskStatusCounts]],
+        window_start: datetime,
+        window_end: datetime,
+    ) -> str:
+        date_format = "%Y-%m-%d"
         status_message = (
-            f"`[STATUS]` Evergreen waterfall failure rate between '{window_start.isoformat()}'"
-            f" and '{window_end.isoformat()}'"
+            f"`[STATUS]` Evergreen waterfall red and purple boxes median count per day"
+            f" between {window_start.strftime(date_format)}"
+            f" and {window_end.strftime(date_format)}"
         )
 
-        for project_status in reports:
-            failure_rate = project_status.failure_rate()
-            percentage = failure_rate / EVERGREEN_WATERFALL_FAILURE_RATE_THRESHOLD * 100
-            percentages.append(percentage)
+        for evg_project_name, daily_task_status_counts in waterfall_report.items():
+            daily_per_project_red_box_counts = [
+                task_status_counts.failed for task_status_counts in daily_task_status_counts
+            ]
+            LOGGER.info(
+                "Daily per project red box counts",
+                project=evg_project_name,
+                daily_red_box_counts=daily_per_project_red_box_counts,
+            )
+            median_per_day_red_box_count = median(daily_per_project_red_box_counts)
             status_message = (
-                f"{status_message}\n"
-                f"{project_status.project}: {failure_rate:.4f} ({percentage:.2f}% of threshold"
-                f" {EVERGREEN_WATERFALL_FAILURE_RATE_THRESHOLD})"
+                f"{status_message}\n{evg_project_name}: {median_per_day_red_box_count:.0f}"
             )
 
-        return status_message, percentages
+        return status_message
 
 
 def main(
