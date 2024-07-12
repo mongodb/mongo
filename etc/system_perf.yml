@@ -78,9 +78,8 @@ variables:
   _src_dir: &src_dir src/mongo
   _modules: &modules
     - enterprise
-    - mongo-tools
-    # - mongo
     - dsi
+    # - mongo
     - genny
     - workloads
     - linkbench
@@ -173,12 +172,6 @@ modules:
     repo: mongo-enterprise-modules
     prefix: src/mongo/db/modules
     branch: v7.3
-  # Pinned to version 100.7.2
-  - name: mongo-tools
-    owner: mongodb
-    repo: mongo-tools
-    prefix: mongo-tools/src/github.com/mongodb
-    branch: db8c5c4
   - name: PrivateWorkloads
     owner: 10gen
     repo: PrivateWorkloads
@@ -654,7 +647,6 @@ tasks:
           directory: src
           revisions:
             enterprise: ${enterprise_rev}
-            mongo-tools: ${mongo-tools_rev}
       - func: "compile prep"
       - func: "download mongo tools"
       - func: "generate feature flag list"
