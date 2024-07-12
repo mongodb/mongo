@@ -27,7 +27,7 @@ from buildscripts.util.teststats import TestRuntime, HistoricTaskData
 
 CONFIG_FILE = ".evergreen.yml"
 DEFAULT_PROJECT = "mongodb-mongo-master"
-DEFAULT_VARIANT = "enterprise-rhel-80-64-bit-dynamic-required"
+DEFAULT_VARIANT = "enterprise-rhel-8-64-bit-dynamic-required"
 EVERGREEN_FILE = "etc/evergreen.yml"
 BURN_IN_TESTS_GEN_TASK = "burn_in_tests_gen"
 BURN_IN_TESTS_TASK = "burn_in_tests"

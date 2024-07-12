@@ -36,7 +36,7 @@ SPECIFIC_TASK_OVERRIDES = {
         "replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30),
     },
     "ubuntu1804-debug-suggested": {"replica_sets_jscore_passthrough": timedelta(hours=3), },
-    "enterprise-rhel-80-64-bit-coverage": {
+    "enterprise-rhel-8-64-bit-coverage": {
         "replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30),
     },
     "macos": {

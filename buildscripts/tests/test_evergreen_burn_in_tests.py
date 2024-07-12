@@ -100,7 +100,7 @@ class TestAcceptance(unittest.TestCase):
         # You can see the test file it is using below. This test is used in the 'auth' and
         # 'auth_audit' test suites. It needs to be in at least one of those for the test to pass.
         _config.NAMED_SUITES = None
-        variant = "enterprise-rhel-80-64-bit"
+        variant = "enterprise-rhel-8-64-bit"
         repos = [mock_changed_git_files(["jstests/auth/auth1.js"])]
         repeat_config = under_test.RepeatConfig()
         gen_config = under_test.GenerateConfig(

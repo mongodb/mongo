@@ -88,7 +88,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
   set -o errexit
 
   # Reduce the JSHeapLimit for the serial_run task task on Code Coverage builder variant.
-  if [[ "${build_variant}" = "enterprise-rhel-80-64-bit-coverage" && "${task_name}" = "serial_run" ]]; then
+  if [[ "${build_variant}" = "enterprise-rhel-8-64-bit-coverage" && "${task_name}" = "serial_run" ]]; then
     extra_args="$extra_args --mongodSetParameter \"{'jsHeapLimitMB':10}\""
   fi
 

@@ -35,7 +35,7 @@ def ns(relative_name):  # pylint: disable-invalid-name
 def get_expansions_data():
     return {
             "branch_name": "fake_branch",
-            "build_variant": "enterprise-rhel-80-64-bit",
+            "build_variant": "enterprise-rhel-8-64-bit",
             "check_evergreen": 2,
             "distro_id": "rhel80-small",
             "is_patch": "true",
@@ -56,16 +56,16 @@ def get_evergreen_config() -> EvergreenProjectConfig:
 class TestCreateEvgBuildVariantMap(unittest.TestCase):
     def test_create_evg_buildvariant_map(self):
         evg_conf_mock = get_evergreen_config()
-        expansions_file_data = {"build_variant": "enterprise-rhel-80-64-bit"}
+        expansions_file_data = {"build_variant": "enterprise-rhel-8-64-bit"}
 
         buildvariant_map = under_test._create_evg_build_variant_map(expansions_file_data,
                                                                     evg_conf_mock)
 
         expected_buildvariant_map = {
-            "enterprise-rhel-80-64-bit-majority-read-concern-off":
-                "enterprise-rhel-80-64-bit-majority-read-concern-off-required",
-            "enterprise-rhel-80-64-bit-inmem":
-                "enterprise-rhel-80-64-bit-inmem-required"
+            "enterprise-rhel-8-64-bit-majority-read-concern-off":
+                "enterprise-rhel-8-64-bit-majority-read-concern-off-required",
+            "enterprise-rhel-8-64-bit-inmem":
+                "enterprise-rhel-8-64-bit-inmem-required"
         }
         self.assertEqual(buildvariant_map, expected_buildvariant_map)
 
@@ -83,9 +83,9 @@ class TestCreateEvgBuildVariantMap(unittest.TestCase):
 class TestGenerateEvgBuildVariants(unittest.TestCase):
     def test_generate_evg_buildvariant_one_base_variant(self):
         evg_conf_mock = get_evergreen_config()
-        base_variant = "enterprise-rhel-80-64-bit-inmem"
-        generated_variant = "enterprise-rhel-80-64-bit-inmem-required"
-        burn_in_tags_gen_variant = "enterprise-rhel-80-64-bit"
+        base_variant = "enterprise-rhel-8-64-bit-inmem"
+        generated_variant = "enterprise-rhel-8-64-bit-inmem-required"
+        burn_in_tags_gen_variant = "enterprise-rhel-8-64-bit"
         variant = evg_conf_mock.get_variant(base_variant)
 
         build_variant = under_test._generate_evg_build_variant(variant, generated_variant,
@@ -107,9 +107,9 @@ class TestGenerateEvgTasks(unittest.TestCase):
         create_tests_by_task_mock.return_value = {}
         expansions_file_data = get_expansions_data()
         buildvariant_map = {
-            "enterprise-rhel-80-64-bit-inmem": "enterprise-rhel-80-64-bit-inmem-required",
-            "enterprise-rhel-80-64-bit-majority-read-concern-off":
-                "enterprise-rhel-80-64-bit-majority-read-concern-off-required",
+            "enterprise-rhel-8-64-bit-inmem": "enterprise-rhel-8-64-bit-inmem-required",
+            "enterprise-rhel-8-64-bit-majority-read-concern-off":
+                "enterprise-rhel-8-64-bit-majority-read-concern-off-required",
         }  # yapf: disable
         shrub_config = ShrubProject()
         evergreen_api = MagicMock()
@@ -135,9 +135,9 @@ class TestGenerateEvgTasks(unittest.TestCase):
         }  # yapf: disable
         expansions_file_data = get_expansions_data()
         buildvariant_map = {
-            "enterprise-rhel-80-64-bit-inmem": "enterprise-rhel-80-64-bit-inmem-required",
-            "enterprise-rhel-80-64-bit-majority-read-concern-off":
-                "enterprise-rhel-80-64-bit-majority-read-concern-off-required",
+            "enterprise-rhel-8-64-bit-inmem": "enterprise-rhel-8-64-bit-inmem-required",
+            "enterprise-rhel-8-64-bit-majority-read-concern-off":
+                "enterprise-rhel-8-64-bit-majority-read-concern-off-required",
         }  # yapf: disable
         shrub_config = ShrubProject.empty()
         evergreen_api = MagicMock()
@@ -164,7 +164,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
 
 
 EXPANSIONS_FILE_DATA = {
-    "build_variant": "enterprise-rhel-80-64-bit",
+    "build_variant": "enterprise-rhel-8-64-bit",
     "revision": "badf00d000000000000000000000000000000000", "max_revisions": "1000",
     "branch_name": "mongodb-mongo-master", "is_patch": "false", "distro_id": "rhel62-small",
     "repeat_tests_min": "2", "repeat_tests_max": "1000", "repeat_tests_secs": "600", "project":
@@ -172,10 +172,10 @@ EXPANSIONS_FILE_DATA = {
 }
 
 CREATE_EVG_BUILD_VARIANT_MAP = {
-    'enterprise-rhel-80-64-bit-majority-read-concern-off':
-        'enterprise-rhel-80-64-bit-majority-read-concern-off-required',
-    'enterprise-rhel-80-64-bit-inmem':
-        'enterprise-rhel-80-64-bit-inmem-required'
+    'enterprise-rhel-8-64-bit-majority-read-concern-off':
+        'enterprise-rhel-8-64-bit-majority-read-concern-off-required',
+    'enterprise-rhel-8-64-bit-inmem':
+        'enterprise-rhel-8-64-bit-inmem-required'
 }
 
 CREATE_TEST_MEMBERSHIP_MAP = {
