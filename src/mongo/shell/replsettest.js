@@ -2406,7 +2406,7 @@ var ReplSetTest = function ReplSetTest(opts) {
                     print("ReplSetTest awaitReplication: caught exception " + e);
 
                     // We might have a new primary now
-                    awaitLastOpTimeWrittenFn();
+                    awaitLastOpTimeWrittenFn(this);
 
                     print("ReplSetTest awaitReplication: resetting: optime for target " + target +
                           " is " + tojson(targetLatestOpTime));
