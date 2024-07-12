@@ -52,6 +52,9 @@ versions earlier than v5.2 may have mixed-schema data in buckets. This flag gets
 part of the upgrade process and is removed as part of the downgrade process through the
 [collMod command](https://github.com/mongodb/mongo/blob/cf80c11bc5308d9b889ed61c1a3eeb821839df56/src/mongo/db/catalog/coll_mod.cpp#L644-L663).
 
+Starting in v7.1, catalog entries for time-series collections have a new flag called
+`timeseriesBucketingParametersHaveChanged` in the `md` field.
+
 **Example**: an entry in the durable catalog for a collection `test.employees` with an in-progress
 index build on `{lastName: 1}`:
 
@@ -75,7 +78,9 @@ index build on `{lastName: 1}`:
                                'name': 'lastName_1',
                                'v': 2}}],
           'ns': 'test.employees',
-          'options': {'uuid': UUID('795453e9-867b-4804-a432-43637f500cf7')}},
+          'options': {'uuid': UUID('795453e9-867b-4804-a432-43637f500cf7')},
+          'timeseriesBucketsMayHaveMixedSchemaData': False,
+          'timeseriesBucketingParametersHaveChanged': False},
   'ns': 'test.employees'}
 ```
 
