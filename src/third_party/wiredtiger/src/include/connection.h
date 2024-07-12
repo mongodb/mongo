@@ -438,6 +438,7 @@ struct __wt_connection_impl {
     WT_THREAD_GROUP evict_threads;
     uint32_t evict_threads_max; /* Max eviction threads */
     uint32_t evict_threads_min; /* Min eviction threads */
+    bool evict_sample_inmem;
 
 #define WT_STATLOG_FILENAME "WiredTigerStat.%d.%H"
     WT_SESSION_IMPL *stat_session; /* Statistics log session */

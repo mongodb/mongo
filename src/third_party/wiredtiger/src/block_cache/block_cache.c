@@ -588,7 +588,9 @@ __blkcache_init(WT_SESSION_IMPL *session, size_t cache_size, u_int hash_size, u_
 
     __wt_verbose(session, WT_VERB_BLKCACHE,
       "block cache initialized: type=%s, size=%" WT_SIZET_FMT " path=%s",
-      (type == BLKCACHE_NVRAM) ? "nvram" : (type == BLKCACHE_DRAM) ? "dram" : "unconfigured",
+      (type == BLKCACHE_NVRAM)  ? "nvram" :
+        (type == BLKCACHE_DRAM) ? "dram" :
+                                  "unconfigured",
       cache_size, (blkcache->nvram_device_path == NULL) ? "--" : blkcache->nvram_device_path);
 
     return (ret);

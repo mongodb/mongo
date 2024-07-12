@@ -72,7 +72,7 @@ test_value(int64_t val)
           ", got %" WT_SIZET_FMT "\n",
           sinput, used_len,
           cp > p ? used_len + (size_t)(cp - p) : /* More than buf used */
-            used_len - (size_t)(p - cp));        /* Less than buf used */
+                   used_len - (size_t)(p - cp));        /* Less than buf used */
         abort();
     }
 
