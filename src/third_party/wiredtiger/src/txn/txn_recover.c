@@ -33,6 +33,7 @@ typedef struct {
     WT_LSN max_ckpt_lsn; /* Maximum checkpoint LSN seen. */
     WT_LSN max_rec_lsn;  /* Maximum recovery LSN seen. */
 
+    bool backup_only;   /* Set to only recover backup. */
     bool missing;       /* Were there missing files? */
     bool metadata_only; /*
                          * Set during the first recovery pass,
@@ -98,6 +99,116 @@ __recovery_cursor(
         WT_RET(__wt_open_cursor(session, r->files[id].uri, NULL, cfg, &c));
 
     *cp = c;
+    return (0);
+}
+
+/*
+ * __txn_backup_post_recovery --
+ *     Perform any necessary backup related activity after recovery.
+ */
+static void
+__txn_backup_post_recovery(WT_RECOVERY *r)
+{
+    WT_BLKINCR *blk;
+    WT_CONNECTION_IMPL *conn;
+    WT_SESSION_IMPL *session;
+    uint32_t i;
+    bool clear;
+
+    session = r->session;
+    conn = S2C(session);
+
+    /*
+     * The backup IDs are written as individual operations for each slot. Walk the backup array and
+     * check if all items are invalid. If so, turn off backups in the connection. This will happen
+     * when we log a force stop operation as the final backup related log records.
+     */
+    clear = true;
+    for (i = 0; i < WT_BLKINCR_MAX; ++i) {
+        blk = &conn->incr_backups[i];
+        if (F_ISSET(blk, WT_BLKINCR_VALID))
+            clear = false;
+    }
+    if (clear) {
+        F_CLR(conn, WT_CONN_INCR_BACKUP);
+        FLD_CLR(conn->log_flags, WT_CONN_LOG_INCR_BACKUP);
+        conn->incr_granularity = 0;
+    }
+    return;
+}
+
+/*
+ * __txn_system_op_apply --
+ *     Apply a system record during recovery.
+ */
+static int
+__txn_system_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end)
+{
+    WT_BLKINCR *blk;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    uint64_t granularity;
+    uint32_t index, optype, opsize;
+    const char *id_str;
+
+    session = r->session;
+    conn = S2C(session);
+
+    /* Right now the only system record we care about is the backup id. Skip anything else. */
+    WT_ERR(__wt_logop_read(session, pp, end, &optype, &opsize));
+    end = *pp + opsize;
+    /* If it is not a backup id system operation type, we're done. */
+    if (optype != WT_LOGOP_BACKUP_ID) {
+        *pp += opsize;
+        goto done;
+    }
+
+    WT_ERR(__wt_logop_backup_id_unpack(session, pp, end, &index, &granularity, &id_str));
+    /*
+     * Set up incremental information from the record. Only record information for as many slots as
+     * this system accepts. There could be a future change that allows additional incremental
+     * identifiers that this system cannot handle. A log record is written when a force stop happens
+     * and indicates the entries are empty. That is indicated by the out of range granularity.
+     */
+    if (index < WT_BLKINCR_MAX) {
+        blk = &conn->incr_backups[index];
+        if (granularity != UINT64_MAX) {
+            __wt_verbose_multi(session, WT_VERB_RECOVERY_ALL,
+              "Backup ID: LSN [%" PRIu32 ",%" PRIu32 "]: Applying slot %" PRIu32
+              " granularity %" PRIu64 " ID string %s",
+              lsnp->l.file, lsnp->l.offset, index, granularity, id_str);
+            WT_ERR(__wt_backup_set_blkincr(session, index, granularity, id_str, strlen(id_str)));
+        } else {
+            __wt_verbose_multi(session, WT_VERB_RECOVERY_ALL,
+              "Backup ID: LSN [%" PRIu32 ",%" PRIu32 "]: Clearing slot %" PRIu32, lsnp->l.file,
+              lsnp->l.offset, index);
+            /* This is the result of a force stop, clear the entry. */
+            WT_CLEAR(*blk);
+        }
+    } else
+        __wt_verbose_multi(session, WT_VERB_RECOVERY_ALL,
+          "Ignoring out-of-range (%d) backup ID index %" PRIu32, WT_BLKINCR_MAX, index);
+
+done:
+    return (0);
+err:
+    __wt_err(session, ret, "backup id apply failed during recovery: at LSN %" PRIu32 "%" PRIu32,
+      lsnp->l.file, lsnp->l.offset);
+    return (ret);
+}
+
+/*
+ * __txn_system_apply --
+ *     Apply a system record during recovery.
+ */
+static int
+__txn_system_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end)
+{
+    /* The logging subsystem zero-pads records. */
+    while (*pp < end && **pp)
+        WT_RET(__txn_system_op_apply(r, lsnp, pp, end));
+
     return (0);
 }
 
@@ -369,6 +480,12 @@ __txn_log_recover(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, WT_LS
 
     /* First, peek at the log record type. */
     WT_RET(__wt_logrec_read(session, &p, end, &rectype));
+    /*
+     * If we're in backup only mode, skip anything that isn't a system record. We need to return
+     * here so that we don't try to apply any other records at this time.
+     */
+    if (r->backup_only && rectype != WT_LOGREC_SYSTEM)
+        return (0);
 
     /*
      * Record the highest LSN we process during the metadata phase. If not the metadata phase, then
@@ -384,11 +501,14 @@ __txn_log_recover(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, WT_LS
         if (r->metadata_only)
             WT_RET(__wt_txn_checkpoint_logread(session, &p, end, &r->ckpt_lsn));
         break;
-
     case WT_LOGREC_COMMIT:
         if ((ret = __wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &txnid_unused)) != 0)
             WT_RET_MSG(session, ret, "txn_log_recover: unpack failure");
         WT_RET(__txn_commit_apply(r, lsnp, &p, end));
+        break;
+    case WT_LOGREC_SYSTEM:
+        if (r->backup_only || r->metadata_only)
+            WT_RET(__txn_system_apply(r, lsnp, &p, end));
         break;
     }
 
@@ -855,42 +975,53 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
      * want to recover whatever part of the data we can from the last checkpoint up until whatever
      * problem we detect in the log file. In salvage, we ignore errors from scanning the log so
      * recovery can continue. Other errors remain errors.
+     *
+     * We only need to recover the metadata if we weren't a backup. But a backup needs to recover
+     * system records with incremental IDs. So the first pass may recover only backup information or
+     * metadata (and also backup information).
      */
-    if (!was_backup) {
+    if (was_backup) {
+        r.metadata_only = false;
+        r.backup_only = true;
+    } else {
         r.metadata_only = true;
-        /*
-         * If this is a read-only connection, check if the checkpoint LSN in the metadata file is up
-         * to date, indicating a clean shutdown.
-         */
-        if (F_ISSET(conn, WT_CONN_READONLY)) {
-            WT_ERR(__wt_log_needs_recovery(session, &metafile->ckpt_lsn, &needs_rec));
-            if (needs_rec)
-                WT_ERR_MSG(session, WT_RUN_RECOVERY, "Read-only database needs recovery");
-        }
-        if (WT_IS_INIT_LSN(&metafile->ckpt_lsn))
-            ret = __wt_log_scan(session, NULL, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r);
-        else {
-            /*
-             * Start at the last checkpoint LSN referenced in the metadata. If we see the end of a
-             * checkpoint while scanning, we will change the full scan to start from there.
-             */
-            WT_ASSIGN_LSN(&r.ckpt_lsn, &metafile->ckpt_lsn);
-            ret = __wt_log_scan(session, &metafile->ckpt_lsn, NULL, WT_LOGSCAN_RECOVER_METADATA,
-              __txn_log_recover, &r);
-        }
-        if (F_ISSET(conn, WT_CONN_SALVAGE))
-            ret = 0;
-        /*
-         * If log scan couldn't find a file we expected to be around, this indicates a corruption of
-         * some sort.
-         */
-        if (ret == ENOENT) {
-            F_SET(conn, WT_CONN_DATA_CORRUPTION);
-            ret = WT_ERROR;
-        }
-
-        WT_ERR(ret);
+        r.backup_only = false;
     }
+    /*
+     * If this is a read-only connection, check if the checkpoint LSN in the metadata file is up to
+     * date, indicating a clean shutdown.
+     */
+    if (F_ISSET(conn, WT_CONN_READONLY)) {
+        WT_ERR(__wt_log_needs_recovery(session, &metafile->ckpt_lsn, &needs_rec));
+        if (needs_rec)
+            WT_ERR_MSG(session, WT_RUN_RECOVERY, "Read-only database needs recovery");
+    }
+    if (WT_IS_INIT_LSN(&metafile->ckpt_lsn))
+        ret = __wt_log_scan(session, NULL, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r);
+    else {
+        /*
+         * Start at the last checkpoint LSN referenced in the metadata. If we see the end of a
+         * checkpoint while scanning, we will change the full scan to start from there.
+         */
+        WT_ASSIGN_LSN(&r.ckpt_lsn, &metafile->ckpt_lsn);
+        ret = __wt_log_scan(
+          session, &metafile->ckpt_lsn, NULL, WT_LOGSCAN_RECOVER_METADATA, __txn_log_recover, &r);
+    }
+    if (F_ISSET(conn, WT_CONN_SALVAGE))
+        ret = 0;
+    /* We need to do some work after recovering backup information. Do that now. */
+    __txn_backup_post_recovery(&r);
+    /*
+     * If log scan couldn't find a file we expected to be around, this indicates a corruption of
+     * some sort.
+     */
+    if (ret == ENOENT) {
+        F_SET(conn, WT_CONN_DATA_CORRUPTION);
+        ret = WT_ERROR;
+    }
+
+    r.backup_only = false;
+    WT_ERR(ret);
 
     /* Scan the metadata to find the live files and their IDs. */
     WT_ERR(__recovery_file_scan(&r));

@@ -410,8 +410,10 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint64_t flags, va_list ap)
         WT_ERR(__wt_cursor_kv_not_set(cursor, true));
 
     /* Force an allocated copy when using cursor copy debug. */
-    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY))
+    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY)) {
         WT_ERR(__wt_buf_grow(session, &cursor->key, cursor->key.size));
+        F_SET(cursor, WT_CURSTD_DEBUG_COPY_KEY);
+    }
 
     if (WT_CURSOR_RECNO(cursor)) {
         if (LF_ISSET(WT_CURSTD_RAW)) {
@@ -559,8 +561,10 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
         WT_ERR(__wt_cursor_kv_not_set(cursor, false));
 
     /* Force an allocated copy when using cursor copy debug. */
-    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY))
+    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY)) {
         WT_ERR(__wt_buf_grow(session, &cursor->value, cursor->value.size));
+        F_SET(cursor, WT_CURSTD_DEBUG_COPY_VALUE);
+    }
 
     /* Fast path some common cases. */
     fmt = cursor->value_format;
@@ -598,8 +602,12 @@ __wt_cursor_get_raw_key_value(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value)
         WT_ERR(__wt_cursor_kv_not_set(cursor, false));
 
     /* Force an allocated copy when using cursor copy debug. */
-    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY))
+    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY)) {
+        WT_ERR(__wt_buf_grow(session, &cursor->key, cursor->key.size));
+        F_SET(cursor, WT_CURSTD_DEBUG_COPY_KEY);
         WT_ERR(__wt_buf_grow(session, &cursor->value, cursor->value.size));
+        F_SET(cursor, WT_CURSTD_DEBUG_COPY_VALUE);
+    }
 
     if (key != NULL) {
         key->data = cursor->key.data;

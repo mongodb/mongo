@@ -167,7 +167,7 @@ __reconcile_post_wrapup(
         WT_STAT_CONN_DATA_INCR(session, rec_pages_eviction);
     if (r->cache_write_hs)
         WT_STAT_CONN_DATA_INCR(session, cache_write_hs);
-    if (r->cache_write_restore)
+    if (r->cache_write_restore_invisible || F_ISSET(r, WT_REC_SCRUB))
         WT_STAT_CONN_DATA_INCR(session, cache_write_restore);
     if (!WT_IS_HS(btree->dhandle)) {
         if (r->rec_page_cell_with_txn_id)
@@ -286,13 +286,15 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
      */
     if (ret == 0 && !(btree->evict_disabled > 0 || !F_ISSET(btree->dhandle, WT_DHANDLE_OPEN)) &&
       F_ISSET(r, WT_REC_EVICT) && !WT_PAGE_IS_INTERNAL(r->page) && r->multi_next == 1 &&
-      F_ISSET(r, WT_REC_CALL_URGENT) && !r->update_used && r->cache_write_restore) {
+      F_ISSET(r, WT_REC_CALL_URGENT) && !r->update_used && r->cache_write_restore_invisible &&
+      !r->cache_upd_chain_all_aborted) {
         /*
          * If eviction didn't make any progress, let application threads know they should refresh
          * the transaction's snapshot (and try to evict the latest content).
          */
         if (F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
             F_SET(session->txn, WT_TXN_REFRESH_SNAPSHOT);
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_no_progress);
         ret = __wt_set_return(session, EBUSY);
     }
     addr = ref->addr;
@@ -717,7 +719,7 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
 
     r->salvage = salvage;
 
-    r->cache_write_hs = r->cache_write_restore = false;
+    r->cache_write_hs = r->cache_write_restore_invisible = r->cache_upd_chain_all_aborted = false;
 
     /*
      * The fake cursor used to figure out modified update values points to the enclosing WT_REF as a
@@ -1289,7 +1291,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key,
      * key.
      */
     max = r->last;
-    if (r->cache_write_restore)
+    if (r->cache_write_restore_invisible)
         for (i = r->supd_next; i > 0; --i) {
             supd = &r->supd[i - 1];
             if (supd->ins == NULL)
@@ -2050,8 +2052,11 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
      * If reconciliation requires multiple blocks and checkpoint is running we'll eventually fail,
      * unless we're the checkpoint thread. Big pages take a lot of writes, avoid wasting work.
      */
-    if (!last_block && WT_BTREE_SYNCING(btree) && !WT_SESSION_BTREE_SYNC(session))
+    if (!last_block && WT_BTREE_SYNCING(btree) && !WT_SESSION_BTREE_SYNC(session)) {
+        WT_STAT_CONN_DATA_INCR(
+          session, cache_eviction_blocked_multi_block_reconciliation_during_checkpoint);
         return (__wt_set_return(session, EBUSY));
+    }
 
     /* Make sure there's enough room for another write. */
     WT_RET(__wt_realloc_def(session, &r->multi_allocated, r->multi_next + 1, &r->multi));

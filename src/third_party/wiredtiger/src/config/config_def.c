@@ -7,10 +7,10 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_close[] = {
   {"use_timestamp", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_debug_info[] = {
-  {"cache", "boolean", NULL, NULL, NULL, 0}, {"cursors", "boolean", NULL, NULL, NULL, 0},
-  {"handles", "boolean", NULL, NULL, NULL, 0}, {"log", "boolean", NULL, NULL, NULL, 0},
-  {"sessions", "boolean", NULL, NULL, NULL, 0}, {"txn", "boolean", NULL, NULL, NULL, 0},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
+  {"backup", "boolean", NULL, NULL, NULL, 0}, {"cache", "boolean", NULL, NULL, NULL, 0},
+  {"cursors", "boolean", NULL, NULL, NULL, 0}, {"handles", "boolean", NULL, NULL, NULL, 0},
+  {"log", "boolean", NULL, NULL, NULL, 0}, {"sessions", "boolean", NULL, NULL, NULL, 0},
+  {"txn", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_load_extension[] = {
   {"config", "string", NULL, NULL, NULL, 0}, {"early_load", "boolean", NULL, NULL, NULL, 0},
@@ -1243,9 +1243,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
   {"WT_CONNECTION.close", "final_flush=false,leak_memory=false,use_timestamp=true",
     confchk_WT_CONNECTION_close, 3},
   {"WT_CONNECTION.debug_info",
-    "cache=false,cursors=false,handles=false,log=false,sessions=false"
-    ",txn=false",
-    confchk_WT_CONNECTION_debug_info, 6},
+    "backup=false,cache=false,cursors=false,handles=false,log=false,"
+    "sessions=false,txn=false",
+    confchk_WT_CONNECTION_debug_info, 7},
   {"WT_CONNECTION.load_extension",
     "config=,early_load=false,entry=wiredtiger_extension_init,"
     "terminate=wiredtiger_extension_terminate",

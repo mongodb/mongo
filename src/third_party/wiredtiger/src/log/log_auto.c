@@ -723,6 +723,61 @@ __wt_logop_prev_lsn_print(
 }
 
 int
+__wt_logop_backup_id_pack(
+  WT_SESSION_IMPL *session, WT_ITEM *logrec, uint32_t index, uint64_t granularity, const char *id)
+{
+    const char *fmt = WT_UNCHECKED_STRING(IIIQS);
+    size_t size;
+    uint32_t optype, recsize;
+
+    optype = WT_LOGOP_BACKUP_ID;
+    WT_RET(__wt_struct_size(session, &size, fmt, optype, 0, index, granularity, id));
+
+    __wt_struct_size_adjust(session, &size);
+    WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
+    recsize = (uint32_t)size;
+    WT_RET(__wt_struct_pack(session, (uint8_t *)logrec->data + logrec->size, size, fmt, optype,
+      recsize, index, granularity, id));
+
+    logrec->size += (uint32_t)size;
+    return (0);
+}
+
+int
+__wt_logop_backup_id_unpack(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+  uint32_t *indexp, uint64_t *granularityp, const char **idp)
+{
+    WT_DECL_RET;
+    const char *fmt = WT_UNCHECKED_STRING(IIIQS);
+    uint32_t optype, size;
+
+    if ((ret = __wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt, &optype, &size, indexp,
+           granularityp, idp)) != 0)
+        WT_RET_MSG(session, ret, "logop_backup_id: unpack failure");
+    WT_ASSERT(session, optype == WT_LOGOP_BACKUP_ID);
+
+    *pp += size;
+    return (0);
+}
+
+int
+__wt_logop_backup_id_print(
+  WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, WT_TXN_PRINTLOG_ARGS *args)
+{
+    uint32_t index;
+    uint64_t granularity;
+    const char *id;
+
+    WT_RET(__wt_logop_backup_id_unpack(session, pp, end, &index, &granularity, &id));
+
+    WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"backup_id\",\n"));
+    WT_RET(__wt_fprintf(session, args->fs, "        \"index\": %" PRIu32 ",\n", index));
+    WT_RET(__wt_fprintf(session, args->fs, "        \"granularity\": %" PRIu64 ",\n", granularity));
+    WT_RET(__wt_fprintf(session, args->fs, "        \"id\": \"%s\"", id));
+    return (0);
+}
+
+int
 __wt_logop_txn_timestamp_pack(WT_SESSION_IMPL *session, WT_ITEM *logrec, uint64_t time_sec,
   uint64_t time_nsec, uint64_t commit_ts, uint64_t durable_ts, uint64_t first_commit_ts,
   uint64_t prepare_ts, uint64_t read_ts)
@@ -840,6 +895,10 @@ __wt_txn_op_printlog(
 
     case WT_LOGOP_PREV_LSN:
         WT_RET(__wt_logop_prev_lsn_print(session, pp, end, args));
+        break;
+
+    case WT_LOGOP_BACKUP_ID:
+        WT_RET(__wt_logop_backup_id_print(session, pp, end, args));
         break;
 
     case WT_LOGOP_TXN_TIMESTAMP:
