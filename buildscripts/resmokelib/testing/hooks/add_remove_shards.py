@@ -459,7 +459,13 @@ class _AddRemoveShardThread(threading.Thread):
             )
         )
         for database in databases:
-            for collection in self._client.get_database(database["_id"]).list_collections():
+            # listCollections will return the bucket collection and the timeseries views and
+            # adding them both to the list of untracked collections to move will trigger two
+            # moveCollections for the same bucket collection. We can exclude the bucket collections
+            # from the list of collections to move since it doesn't give us any extra test coverage.
+            for collection in self._client.get_database(database["_id"]).list_collections(
+                filter={"name": {"$not": {"$regex": ".*system\.buckets.*"}}}
+            ):
                 namespace = database["_id"] + "." + collection["name"]
                 coll_doc = self._client.config.collections.find_one({"_id": namespace})
                 if not coll_doc:
