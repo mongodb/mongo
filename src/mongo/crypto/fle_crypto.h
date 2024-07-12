@@ -851,6 +851,7 @@ public:
                                                               FLEUserKeyAndId userKey,
                                                               const std::vector<std::string>& edges,
                                                               uint64_t maxContentionFactor,
+                                                              uint32_t sparsity,
                                                               const FLE2RangeFindSpec& spec);
 
     static FLE2FindRangePayloadV2 serializeFindRangeStubV2(const FLE2RangeFindSpec& spec);
@@ -1486,6 +1487,11 @@ struct ParsedFindRangePayload {
     std::int32_t payloadId{};
 
     std::int64_t maxCounter{};
+    boost::optional<std::int32_t> sparsity{};
+    boost::optional<std::int32_t> trimFactor{};
+    boost::optional<std::int32_t> precision{};
+    boost::optional<IDLAnyType> indexMin{};
+    boost::optional<IDLAnyType> indexMax{};
 
     explicit ParsedFindRangePayload(BSONElement fleFindRangePayload);
     explicit ParsedFindRangePayload(const Value& fleFindRangePayload);

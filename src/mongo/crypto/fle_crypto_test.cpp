@@ -2160,6 +2160,131 @@ TEST(FLE_EDC, DuplicateSafeContent_IncompatibleType) {
     ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault), DBException, 6373510);
 }
 
+std::vector<char> generateRangeIntPlaceholder(BSONElement value,
+                                              Operation operation,
+                                              double indexMin,
+                                              double indexMax,
+                                              uint64_t contention,
+                                              uint32_t trimFactor,
+                                              uint32_t precision,
+                                              uint32_t sparsity) {
+    FLE2EncryptionPlaceholder ep;
+
+    if (operation == Operation::kFind) {
+        ep.setType(mongo::Fle2PlaceholderType::kFind);
+    } else if (operation == Operation::kInsert) {
+        ep.setType(mongo::Fle2PlaceholderType::kInsert);
+    }
+
+    ep.setAlgorithm(Fle2AlgorithmInt::kRange);
+    ep.setUserKeyId(userKeyId);
+    ep.setIndexKeyId(indexKeyId);
+    ep.setSparsity(sparsity);
+
+    FLE2RangeInsertSpec insertSpec;
+
+    BSONObj lowerDoc = BSON("lb" << indexMin);
+    BSONObj upperDoc = BSON("ub" << indexMax);
+    insertSpec.setValue(value);
+    insertSpec.setPrecision(precision);
+    insertSpec.setTrimFactor(trimFactor);
+
+    insertSpec.setMinBound(boost::optional<IDLAnyType>(lowerDoc.firstElement()));
+    insertSpec.setMaxBound(boost::optional<IDLAnyType>(upperDoc.firstElement()));
+    auto specDoc = BSON("s" << insertSpec.toBSON());
+
+    FLE2RangeFindSpecEdgesInfo edgesInfo;
+    FLE2RangeFindSpec findSpec;
+
+    edgesInfo.setLowerBound(lowerDoc.firstElement());
+    edgesInfo.setLbIncluded(true);
+    edgesInfo.setUpperBound(upperDoc.firstElement());
+    edgesInfo.setUbIncluded(true);
+
+    BSONObj indexMinDoc = BSON("lb" << indexMin);
+    BSONObj indexMaxDoc = BSON("ub" << indexMax);
+
+    edgesInfo.setIndexMin(indexMinDoc.firstElement());
+    edgesInfo.setIndexMax(indexMaxDoc.firstElement());
+    edgesInfo.setTrimFactor(trimFactor);
+    edgesInfo.setPrecision(precision);
+
+    findSpec.setEdgesInfo(edgesInfo);
+
+    findSpec.setFirstOperator(Fle2RangeOperator::kGt);
+
+    findSpec.setPayloadId(1234);
+
+    auto findDoc = BSON("s" << findSpec.toBSON());
+
+    if (operation == Operation::kFind) {
+        ep.setValue(IDLAnyType(findDoc.firstElement()));
+    } else if (operation == Operation::kInsert) {
+        ep.setValue(IDLAnyType(specDoc.firstElement()));
+    }
+
+    ep.setSparsity(sparsity);
+    ep.setMaxContentionCounter(contention);
+
+    BSONObj obj = ep.toBSON();
+
+    std::vector<char> v;
+    v.resize(obj.objsize() + 1);
+    v[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2Placeholder);
+    std::copy(obj.objdata(), obj.objdata() + obj.objsize(), v.begin() + 1);
+    return v;
+}
+
+TEST(FLE_EDC, RangeParamtersFlow_Insert) {
+
+    TestKeyVault keyVault;
+    auto obj = BSON("encrypted" << 1.23);
+    auto buf =
+        generateRangeIntPlaceholder(obj.firstElement(), Operation::kInsert, 1, 42, 3, 5, 4, 2);
+
+    BSONObjBuilder builder;
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+
+    auto result = FLEClientCrypto::transformPlaceholders(builder.obj(), &keyVault);
+    auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
+    ASSERT_EQ(serverPayload.size(), 1);
+    auto payload = serverPayload[0];
+    ASSERT_TRUE(payload.isRangePayload());
+
+    ASSERT_EQ(payload.payload.getPrecision().get(), 4);
+    ASSERT_EQ(payload.payload.getTrimFactor().get(), 5);
+    ASSERT_EQ(payload.payload.getSparsity().get(), 2);
+    auto minExpected = BSON("mn" << 1.0);
+    auto maxExpected = BSON("mx" << 42.0);
+    ASSERT(
+        payload.payload.getIndexMin().get().getElement().binaryEqual(minExpected.firstElement()));
+    ASSERT(
+        payload.payload.getIndexMax().get().getElement().binaryEqual(maxExpected.firstElement()));
+}
+
+TEST(FLE_EDC, RangeParamtersFlow_Find) {
+
+    TestKeyVault keyVault;
+    auto obj = BSON("encrypted" << 123456.7);
+    auto buf = generateRangeIntPlaceholder(obj.firstElement(), Operation::kFind, 1, 42, 3, 5, 4, 2);
+
+    BSONObjBuilder builder;
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+
+    auto result = FLEClientCrypto::transformPlaceholders(builder.obj(), &keyVault);
+
+    auto rangePayload = ParsedFindRangePayload(result.firstElement());
+
+    ASSERT_EQ(rangePayload.precision.get(), 4);
+    ASSERT_EQ(rangePayload.trimFactor.get(), 5);
+    ASSERT_EQ(rangePayload.sparsity.get(), 2);
+    auto minExpected = BSON("mn" << 1.0);
+    auto maxExpected = BSON("mx" << 42.0);
+    ASSERT(rangePayload.indexMin.get().getElement().binaryEqual(minExpected.firstElement()));
+    ASSERT(rangePayload.indexMax.get().getElement().binaryEqual(maxExpected.firstElement()));
+}
+
+
 TEST(FLE_ECOC, EncryptedTokensRoundTrip) {
     std::vector<uint8_t> value(4);
 
