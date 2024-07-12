@@ -1117,6 +1117,12 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForRan
     auto edgeTokenSet = getEdgeTokenSet(
         spec, sparsity, contentionFactor, edcToken, escToken, ecocToken, serverDerivationToken);
 
+    iupayload.setSparsity(sparsity);
+    iupayload.setPrecision(spec.getPrecision());
+    iupayload.setTrimFactor(spec.getTrimFactor());
+    iupayload.setIndexMin(spec.getMinBound());
+    iupayload.setIndexMax(spec.getMaxBound());
+
     if (!edgeTokenSet.empty()) {
         iupayload.setEdgeTokenSet(edgeTokenSet);
     }
@@ -1387,6 +1393,8 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                             userKey,
                             std::move(edges),
                             ep.getMaxContentionCounter(),
+                            ep.getSparsity()
+                                .value(),  // Enforced as non-optional in this case in IDL
                             rangeFindSpec);
                     } else {
                         return FLEClientCrypto::serializeFindRangeStubV2(rangeFindSpec);
@@ -3024,6 +3032,7 @@ FLE2FindRangePayloadV2 FLEClientCrypto::serializeFindRangePayloadV2(
     FLEUserKeyAndId userKey,
     const std::vector<std::string>& edges,
     uint64_t maxContentionFactor,
+    uint32_t sparsity,
     const FLE2RangeFindSpec& spec) {
     auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
     auto serverToken =
@@ -3061,6 +3070,15 @@ FLE2FindRangePayloadV2 FLEClientCrypto::serializeFindRangePayloadV2(
     payload.setFirstOperator(spec.getFirstOperator());
     payload.setSecondOperator(spec.getSecondOperator());
     payload.setPayloadId(spec.getPayloadId());
+
+    if (spec.getEdgesInfo().has_value()) {
+        auto specEdgeInfo = spec.getEdgesInfo().get();
+        payload.setPrecision(specEdgeInfo.getPrecision());
+        payload.setTrimFactor(specEdgeInfo.getTrimFactor());
+        payload.setIndexMin(specEdgeInfo.getIndexMin());
+        payload.setIndexMax(specEdgeInfo.getIndexMax());
+        payload.setSparsity(sparsity);
+    }
 
     return payload;
 }
@@ -4132,6 +4150,11 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
     payloadId = payload.getPayloadId();
     firstOp = payload.getFirstOperator();
     secondOp = payload.getSecondOperator();
+    precision = payload.getPrecision();
+    trimFactor = payload.getTrimFactor();
+    sparsity = payload.getSparsity();
+    indexMin = payload.getIndexMin();
+    indexMax = payload.getIndexMax();
 
     if (!payload.getPayload()) {
         return;
