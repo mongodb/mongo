@@ -629,16 +629,6 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     createRetryableFindAndModifyTable(opCtx);
 }
 
-boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {
-    AutoGetCollection coll(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
-
-    if (!coll) {
-        return boost::none;
-    }
-
-    return coll->uuid();
-}
-
 void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationContext* opCtx,
                                                                   BSONObj singleSessionDoc) {
     disallowDirectWritesUnderSession(opCtx);

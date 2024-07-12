@@ -300,6 +300,10 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
                   findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
+    // Throw out cached information.
+    ShardingCatalogManager::get(operationContext())
+        ->discardCachedConfigDatabaseInitializationState();
+
     // Re-create the config.version document.
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));

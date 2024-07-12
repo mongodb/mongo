@@ -1454,9 +1454,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         }
 
         // Invalidate the image collection if collectionUUID does not resolve and this op returns
-        // a preimage or postimage. We only expect this to happen when in kInitialSync mode but
-        // this can sometimes occur in recovering mode during rollback-via-refetch. In either case
-        // we want to do image invalidation.
+        // a preimage or postimage. We only expect this to happen when in kInitialSync mode.
         if (!collection && op.getNeedsRetryImage()) {
             tassert(735200,
                     "mode should be in initialSync or recovering",

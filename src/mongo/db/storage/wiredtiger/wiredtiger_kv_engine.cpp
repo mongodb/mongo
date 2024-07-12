@@ -552,19 +552,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         }
     }
 
-    // If there's no recovery timestamp, MDB has not produced a consistent snapshot of
-    // data. `_oldestTimestamp` and `_initialDataTimestamp` are only meaningful when there's a
-    // consistent snapshot of data.
-    //
-    // Note, this code is defensive (i.e: protects against a theorized, unobserved case) and is
-    // primarily concerned with restarts of a process that was performing an eMRC=off rollback via
-    // refetch.
-    if (_recoveryTimestamp.isNull() && _oldestTimestamp.load() > 0) {
-        LOGV2_FOR_RECOVERY(5380108, 0, "There is an oldestTimestamp without a recoveryTimestamp");
-        _oldestTimestamp.store(0);
-        _initialDataTimestamp.store(0);
-    }
-
     _sessionCache.reset(new WiredTigerSessionCache(this));
 
     _sessionSweeper = std::make_unique<WiredTigerSessionSweeper>(_sessionCache.get());
@@ -2327,11 +2314,9 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
     }
 
     if (force) {
-        // The oldest timestamp should only be forced backwards during replication recovery in order
-        // to do rollback via refetch. This refetching process invalidates any timestamped snapshots
-        // until after it completes. Components that register a pinned timestamp must synchronize
-        // with events that invalidate their snapshots, unpin themselves and either fail themselves,
-        // or reacquire a new snapshot after the rollback event.
+        // Components that register a pinned timestamp must synchronize with events that invalidate
+        // their snapshots, unpin themselves and either fail themselves, or reacquire a new snapshot
+        // after the rollback event.
         //
         // Forcing the oldest timestamp forward -- potentially past a pin request raises the
         // question of whether the pin should be honored. For now we will invariant there is no pin,

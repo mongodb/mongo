@@ -189,7 +189,7 @@ private:
      * potentially be starved.
      *
      * If the stable timestamp is at a hole, this will move the stable timestamp back to the new
-     * top of oplog.  This can happen on primaries when EMRC=false or in single-node replica sets.
+     * top of oplog.  This can happen on primaries in single-node replica sets.
      */
     void _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(
         OperationContext* opCtx, boost::optional<Timestamp>* stableTimestamp);

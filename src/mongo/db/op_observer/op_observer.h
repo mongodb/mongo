@@ -700,8 +700,7 @@ public:
      * it will not be called inside an existing WriteUnitOfWork. Any work done inside this handler
      * is expected to handle this on its own.
      *
-     * This method is only applicable to the "rollback to a stable timestamp" algorithm, and is not
-     * called when using any other rollback algorithm i.e "rollback via refetch".
+     * This method is applicable to the "rollback to a stable timestamp" algorithm.
      *
      * Note: It's not always safe to reload in-memory states in this callback. For in-memory states
      * that choose to reload here instead of ReplicaSetAwareInterface::onConsistentDataAvailable,

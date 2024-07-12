@@ -91,14 +91,6 @@ public:
     void onStepUp(OperationContext* opCtx);
 
     /**
-     * Fetches the UUID of the transaction table, or an empty optional if the collection does not
-     * exist or has no UUID. Acquires a lock on the collection.
-     *
-     * Required for rollback via refetch.
-     */
-    boost::optional<UUID> getTransactionTableUUID(OperationContext* opCtx);
-
-    /**
      * Callback to be invoked in response to insert/update/delete of 'config.transactions' in order
      * to notify the session catalog that the on-disk contents are out of sync with the in-memory
      * state. The 'singleSessionDoc' must contain the _id of the session which was updated.

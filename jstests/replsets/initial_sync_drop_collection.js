@@ -136,9 +136,7 @@ runDropTest({
 let expectedLogFor3and4 =
     '{code: 21132, attr: { namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid)}}';
 
-// We don't support 4.2 style two-phase drops with EMRC=false - in that configuration, the
-// collection will instead be renamed to a <db>.system.drop.* namespace before being dropped. Since
-// the cloner queries collection by UUID, it may observe the first drop phase as a rename.
+// Since the cloner queries collection by UUID, it may observe the first drop phase as a rename.
 // We still want to check that initial sync succeeds in such a case.
 if (TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replTest)) {
     expectedLogFor3and4 =

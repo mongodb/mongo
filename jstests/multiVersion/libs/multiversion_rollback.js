@@ -1,8 +1,7 @@
 /**
  * The purpose of this test is to verify that simple CRUD operations are rolled back
  * successfully in multiversion replica sets. This test induces communication between
- * the rollback node and the sync source during rollback. This is done in order to
- * exercise rollback via refetch in the case that refetch is necessary.
+ * the rollback node and the sync source during rollback.
  */
 
 import {restartServerReplication} from "jstests/libs/write_concern_util.js";
