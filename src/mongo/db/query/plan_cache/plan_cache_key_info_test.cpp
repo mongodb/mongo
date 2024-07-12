@@ -90,7 +90,7 @@ PlanCacheKeyInfo makeKey(const CanonicalQuery& cq,
     plan_cache_detail::encodeIndexability(
         cq.getPrimaryMatchExpression(), indexabilityState, &indexabilityKeyBuilder);
 
-    return {cq.encodeKey(), indexabilityKeyBuilder.str(), settings};
+    return {encodeKey(cq), indexabilityKeyBuilder.str(), settings};
 }
 
 /**

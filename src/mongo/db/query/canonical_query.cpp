@@ -411,14 +411,6 @@ std::string CanonicalQuery::toStringShort(bool forErrMsg) const {
     return ss;
 }
 
-CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
-    return (!getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled() &&
-            _sbeCompatible)
-        ? canonical_query_encoder::encodeSBE(*this,
-                                             canonical_query_encoder::Optimizer::kSbeStageBuilders)
-        : canonical_query_encoder::encodeClassic(*this);
-}
-
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKeyForPlanCacheCommand() const {
     return canonical_query_encoder::encodeForPlanCacheCommand(*this);
 }

@@ -154,10 +154,13 @@ protected:
      * Test functions for computeKey, when no indexes are present. Cache keys are intentionally
      * obfuscated and are meaningful only within the current lifetime of the server process. Users
      * should treat plan cache keys as opaque.
+     *
+     * This function is intended for classic encoding. The function `testComputeSBEKey` can be used
+     * for the SBE encoding.
      */
-    void testComputeKey(unittest::GoldenTestContext& gctx, const CanonicalQuery& cq) {
+    void testComputeClassicKey(unittest::GoldenTestContext& gctx, const CanonicalQuery& cq) {
         gctx.outStream() << "==== VARIATION: cq=" << cq.toString() << std::endl;
-        const auto key = cq.encodeKey();
+        const auto key = canonical_query_encoder::encodeClassic(cq);
         gctx.outStream() << key << std::endl;
     }
 
@@ -169,7 +172,7 @@ protected:
         gctx.outStream() << "==== VARIATION: query=" << query << ", sort=" << sort
                          << ", proj=" << proj << std::endl;
         unique_ptr<CanonicalQuery> cq(canonicalize(opCtx(), query, sort, proj, collation));
-        const auto key = cq->encodeKey();
+        const auto key = encodeKey(*cq);
         gctx.outStream() << key << std::endl;
     }
 
@@ -507,7 +510,7 @@ TEST_F(CanonicalQueryEncoderTest, CheckCollationIsEncoded) {
     unique_ptr<CanonicalQuery> cq(canonicalize(
         opCtx(), fromjson("{a: 1, b: 1}"), {}, {}, fromjson("{locale: 'mock_reverse_string'}")));
 
-    testComputeKey(gctx, *cq);
+    testComputeClassicKey(gctx, *cq);
 }
 
 TEST_F(CanonicalQueryEncoderTest, CheckSubplanningQueriesAreEncodedDifferentlyWhenSbeCompatible) {

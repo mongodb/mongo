@@ -702,7 +702,10 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                const ReadPreferenceSetting& readPref,
                                std::vector<BSONObj>* results,
                                bool* partialResultsReturned) {
-    CurOp::get(opCtx)->debug().queryHash = canonical_query_encoder::computeHash(query.encodeKey());
+    CurOp::get(opCtx)->debug().queryHash = canonical_query_encoder::computeHash(
+        /* Mongos doesn't know beforehand which execution engine will be used, so we use the classic
+           encoding method by default. */
+        canonical_query_encoder::encodeClassic(query));
 
     // If the user supplied a 'partialResultsReturned' out-parameter, default it to false here.
     if (partialResultsReturned) {

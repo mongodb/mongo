@@ -34,12 +34,20 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+/**
+ * Utility function for getting the encoding from a canonical query. It is used to cover both
+ * cases with classic and SBE encoding based on wheter classic was enforced or wheter the query is
+ * compatible with SBE.
+ */
+CanonicalQuery::QueryShapeString encodeKey(const CanonicalQuery& cq);
+
 class CanonicalQueryTest : public unittest::Test {
 public:
     CanonicalQueryTest() : _opCtx(_serviceContext.makeOperationContext()) {}

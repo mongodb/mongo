@@ -144,7 +144,7 @@ PlanCacheKey makeKey(const CanonicalQuery& cq, const std::vector<CoreIndexInfo>&
         cq.getPrimaryMatchExpression(), indexabilityState, &indexabilityKeyBuilder);
 
     return {PlanCacheKeyInfo{
-        cq.encodeKey(), indexabilityKeyBuilder.str(), query_settings::QuerySettings()}};
+        encodeKey(cq), indexabilityKeyBuilder.str(), query_settings::QuerySettings()}};
 }
 
 /**

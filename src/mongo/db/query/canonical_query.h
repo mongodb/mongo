@@ -225,13 +225,6 @@ public:
     }
 
     /**
-     * Compute the "shape" of this query by encoding the match, projection and sort, and stripping
-     * out the appropriate values. Note that different types of PlanCache use different encoding
-     * approaches.
-     */
-    QueryShapeString encodeKey() const;
-
-    /**
      * Similar to 'encodeKey()' above, but intended for use with plan cache commands rather than
      * the plan cache itself.
      */
