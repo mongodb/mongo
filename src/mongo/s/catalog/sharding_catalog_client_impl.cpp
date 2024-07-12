@@ -1111,7 +1111,7 @@ ShardingCatalogClientImpl::getCollectionAndShardingIndexCatalogEntries(
 }
 
 StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollection(
-    OperationContext* opCtx, const NamespaceString& nss) {
+    OperationContext* opCtx, const NamespaceString& nss, boost::optional<long long> limit) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               getConfigReadPreference(opCtx),
                                               repl::ReadConcernLevel::kMajorityReadConcern,
@@ -1119,7 +1119,7 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
                                               BSON(TagsType::ns(NamespaceStringUtil::serialize(
                                                   nss, SerializationContext::stateDefault()))),
                                               BSON(TagsType::min() << 1),
-                                              boost::none);  // no limit
+                                              limit);
     if (!findStatus.isOK()) {
         return findStatus.getStatus().withContext("Failed to load tags");
     }

@@ -308,8 +308,10 @@ public:
      *
      * Returns a !OK status if an error occurs.
      */
-    virtual StatusWith<std::vector<TagsType>> getTagsForCollection(OperationContext* opCtx,
-                                                                   const NamespaceString& nss) = 0;
+    virtual StatusWith<std::vector<TagsType>> getTagsForCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<long long> limit = boost::none) = 0;
 
     /**
      * Retrieves all namespaces that have zones associated with a database.

@@ -161,7 +161,7 @@ ShardingCatalogClientMock::getCollectionAndShardingIndexCatalogEntries(
 }
 
 StatusWith<std::vector<TagsType>> ShardingCatalogClientMock::getTagsForCollection(
-    OperationContext* opCtx, const NamespaceString& nss) {
+    OperationContext* opCtx, const NamespaceString& nss, boost::optional<long long> limit) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

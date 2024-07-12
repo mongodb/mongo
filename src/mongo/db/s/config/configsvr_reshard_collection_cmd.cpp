@@ -155,9 +155,9 @@ public:
                         !collator);
             }
 
-            const auto& authoritativeTags =
-                uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss));
-            if (!authoritativeTags.empty() && !request().getForceRedistribution()) {
+            const auto& authoritativeTagsExist =
+                !uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss, 1)).empty();
+            if (authoritativeTagsExist && !request().getForceRedistribution()) {
                 uassert(ErrorCodes::BadValue,
                         "Must specify value for zones field",
                         request().getZones());
