@@ -3583,6 +3583,8 @@ void js::AssertJSClassInvariants(const JSClass* clasp) {
   //
   // Environment objects unfortunately use these hooks, but environment objects
   // are not exposed directly to script so they're generally less of an issue.
+  // MONGODB MODIFICATION: Disable the below MOZ_ASSERT calls when JIT is disabled, as these appear to be JIT specific checks.
+#ifndef JS_CODEGEN_NONE
   if (clasp->isNativeObject() && clasp != &WithEnvironmentObject::class_ &&
       clasp != &ModuleEnvironmentObject::class_ &&
       clasp != &RuntimeLexicalErrorObject::class_) {
@@ -3595,6 +3597,7 @@ void js::AssertJSClassInvariants(const JSClass* clasp) {
     MOZ_ASSERT(!clasp->getOpsGetOwnPropertyDescriptor());
     MOZ_ASSERT(!clasp->getOpsDeleteProperty());
   }
+#endif
 }
 
 /* static */

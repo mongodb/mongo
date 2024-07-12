@@ -108,6 +108,7 @@ globals:
   _isLeakSanitizerActive: true
   _isThreadSanitizerActive: true
   _isUndefinedBehaviorSanitizerActive: true
+  _isSpiderMonkeyDebugEnabled: true
   _optimizationsEnabled: true
   allocatePort: true
   allocatePorts: true

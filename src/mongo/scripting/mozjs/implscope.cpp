@@ -560,7 +560,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
 }
 
 MozJSImplScope::~MozJSImplScope() {
-    invariant(!_promiseResult.has_value());
+    invariant(!_promiseResult.initialized());
     currentJSScope = nullptr;
 
     for (auto&& x : _funcs) {
@@ -712,7 +712,8 @@ void MozJSImplScope::_MozJSCreateFunction(StringData raw, JS::MutableHandleValue
 bool MozJSImplScope::onSyncPromiseResolved(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     auto scope = getScope(cx);
-    scope->_promiseResult.emplace(cx, args[0]);
+    invariant(!scope->_promiseResult.initialized());
+    scope->_promiseResult.init(cx, args[0]);
     args.rval().setUndefined();
     return true;
 }
@@ -763,9 +764,9 @@ bool MozJSImplScope::awaitPromise(JSContext* cx,
         return false;
     }
 
-    invariant(scope->_promiseResult.has_value());
-    out.set(*scope->_promiseResult);
-    scope->_promiseResult = boost::none;
+    invariant(scope->_promiseResult.initialized());
+    out.set(scope->_promiseResult);
+    scope->_promiseResult.reset();
     return true;
 }
 
@@ -1166,6 +1167,11 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     if (_status.isOK()) {
         JS::RootedValue excn(_context);
         if (JS_GetPendingException(_context, &excn)) {
+            // The pending JS exception needs to be cleared before we call ValueWriter below to
+            // print the exception. ValueWriter::toStringData() may call back into the Interpret,
+            // which asserts that we don't have an exception pending in DEBUG builds.
+            JS_ClearPendingException(_context);
+
             if (excn.isObject()) {
                 str::stream ss;
                 // Exceptions originating from C++ should not get the "uncaught exception: " prefix.
@@ -1210,6 +1216,8 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
             _status = Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
         }
     }
+    // We always unconditionally clear any pending exception, as this method _checkErrorState is
+    // expected to report and clear the errors before returning.
     JS_ClearPendingException(_context);
 
     if (auto extraInfo = _status.extraInfo<JSExceptionInfo>()) {

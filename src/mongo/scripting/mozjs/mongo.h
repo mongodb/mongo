@@ -112,7 +112,8 @@ struct MongoBase : public BaseInfo {
     static const JSFunctionSpec methods[31];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(MongoBaseSlotCount);
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(MongoBaseSlotCount) | BaseInfo::finalizeFlag;
 };
 
 /**

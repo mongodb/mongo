@@ -62,6 +62,7 @@ variables:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
   # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_dynamic_compile_variant_dependency
     depends_on:
@@ -80,6 +81,7 @@ variables:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
   # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
     multiversion_platform: rhel80
@@ -94,6 +96,7 @@ variables:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &enterprise-rhel-88-64-bit-dynamic-expansions
     <<: *linux_x86_generic_expansions

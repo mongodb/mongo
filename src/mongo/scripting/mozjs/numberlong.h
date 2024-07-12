@@ -77,7 +77,8 @@ struct NumberLongInfo : public BaseInfo {
     static const JSFunctionSpec methods[6];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(NumberLongInfoSlotCount);
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(NumberLongInfoSlotCount) | BaseInfo::finalizeFlag;
 
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
 
