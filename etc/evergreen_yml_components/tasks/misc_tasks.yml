@@ -1370,7 +1370,7 @@ tasks:
       - func: "extract binaries"
       - func: "run selinux tests"
         vars:
-          distro: rhel80-selinux
+          distro: rhel8.8-selinux
           test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
 
   - name: selinux_rhel8_org
@@ -1388,7 +1388,7 @@ tasks:
       - func: "extract binaries"
       - func: "run selinux tests"
         vars:
-          distro: rhel80-selinux
+          distro: rhel8.8-selinux
           test_list: jstests/selinux/*.js
 
   - name: selinux_rhel9_enterprise

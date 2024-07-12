@@ -17,10 +17,10 @@ buildvariants:
       burn_in_tag_include_all_required_and_suggested: true
       burn_in_tag_exclude_build_variants: >-
         macos-debug-suggested
-        enterprise-rhel-88-64-bit-dynamic-embedded-router
+        enterprise-rhel-8-64-bit-dynamic-embedded-router
       burn_in_tag_include_build_variants: >-
-        enterprise-rhel-88-64-bit-inmem
-        enterprise-rhel-88-64-bit-multiversion
+        enterprise-rhel-8-64-bit-inmem
+        enterprise-rhel-8-64-bit-multiversion
         amazon-linux2-arm64-try-sbe-engine
       burn_in_tag_compile_task_dependency: archive_dist_test_debug
       compile_variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
@@ -189,8 +189,8 @@ buildvariants:
     tasks:
       - name: compile_ninja_fast_icecc_TG
 
-  - name: enterprise-rhel-88-64-bit-dynamic-ninja
-    display_name: "Ninja Build: Enterprise RHEL 8.8"
+  - name: enterprise-rhel-8-64-bit-dynamic-ninja
+    display_name: "Ninja Build: Enterprise RHEL 8"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:

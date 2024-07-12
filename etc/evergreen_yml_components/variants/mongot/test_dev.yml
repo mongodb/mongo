@@ -236,21 +236,21 @@ buildvariants:
 
   # This RHEL variant runs search integration tests against latest/HEAD of 10gen/mongot. It is not
   # configured with any project trigger on mongot.
-  - name: &enterprise-rhel-80-64-mongot-integration enterprise-rhel-80-64-mongot-integration
-    display_name: "Enterprise RHEL 8.0 Mongot Integration"
+  - name: &enterprise-rhel-8-64-mongot-integration enterprise-rhel-8-64-mongot-integration
+    display_name: "Enterprise RHEL 8 Mongot Integration"
     cron: "0 */4 * * *" # Run these tasks every 4 hours
     run_on:
-      - rhel80-medium
+      - rhel8.8-medium
     tags: []
     expansions:
       scons_cache_scope: shared
       scons_cache_mode: all
-      compile_variant: *enterprise-rhel-80-64-mongot-integration
+      compile_variant: *enterprise-rhel-8-64-mongot-integration
       has_packages: false
       build_mongot: true
       compile_flags: >-
         --ssl
-        MONGO_DISTMOD=rhel80
+        MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
@@ -258,6 +258,6 @@ buildvariants:
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
-          - rhel80-large
+          - rhel8.8-large
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node

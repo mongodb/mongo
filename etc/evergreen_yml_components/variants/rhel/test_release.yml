@@ -37,8 +37,8 @@ buildvariants:
         distros:
           - rhel8.8-large
 
-  - name: rhel88
-    display_name: RHEL 8.8
+  - name: rhel8
+    display_name: RHEL 8
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
@@ -56,7 +56,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
         --enableEnterpriseTests=off
-      multiversion_platform: rhel80
+      multiversion_platform: rhel8
       multiversion_edition: targeted
       has_packages: true
       packager_script: packager.py
@@ -83,13 +83,13 @@ buildvariants:
         distros:
           - rhel8.8-large
 
-  - name: enterprise-rhel-88-64-bit
-    display_name: "Enterprise RHEL 8.8"
+  - name: enterprise-rhel-8-64-bit
+    display_name: "Enterprise RHEL 8"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-small
-    expansions: &enterprise-rhel-88-64-bit-expansions
+    expansions: &enterprise-rhel-8-64-bit-expansions
       additional_package_targets: >-
         archive-mongocryptd
         archive-mongocryptd-debug
@@ -105,7 +105,7 @@ buildvariants:
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CFLAGS="-fno-gnu-unique"
-      multiversion_platform: rhel80
+      multiversion_platform: rhel8
       multiversion_edition: enterprise
       has_packages: true
       packager_script: packager_enterprise.py
@@ -120,7 +120,7 @@ buildvariants:
       large_distro_name: rhel8.8-medium
       # TODO SERVER-64479 remove external_auth_jobs_max once resolved
       external_auth_jobs_max: 1
-      compile_variant: enterprise-rhel-88-64-bit
+      compile_variant: enterprise-rhel-8-64-bit
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
@@ -141,8 +141,8 @@ buildvariants:
         distros:
           - rhel8.8-large
 
-  - name: rhel-88-arm64
-    display_name: RHEL 8.8 arm64
+  - name: rhel-8-arm64
+    display_name: RHEL 8 arm64
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     tags: ["bazel_check"]
     run_on:
@@ -167,7 +167,7 @@ buildvariants:
       repo_edition: org
       scons_cache_scope: shared
       large_distro_name: rhel8.8-arm64-large
-      compile_variant: rhel-88-arm64
+      compile_variant: rhel-8-arm64
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
@@ -184,8 +184,8 @@ buildvariants:
         distros:
           - rhel8.8-arm64-large
 
-  - name: enterprise-rhel-88-arm64
-    display_name: "Enterprise RHEL 8.8 arm64"
+  - name: enterprise-rhel-8-arm64
+    display_name: "Enterprise RHEL 8 arm64"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
@@ -215,7 +215,7 @@ buildvariants:
       scons_cache_scope: shared
       # TODO SERVER-64479 remove external_auth_jobs_max once resolved
       external_auth_jobs_max: 1
-      compile_variant: enterprise-rhel-88-arm64
+      compile_variant: enterprise-rhel-8-arm64
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
@@ -418,8 +418,8 @@ buildvariants:
         distros:
           - rhel93-arm64-large
 
-  - name: enterprise-rhel-88-arm64-grpc
-    display_name: "Enterprise RHEL 8.8 arm64 GRPC"
+  - name: enterprise-rhel-8-arm64-grpc
+    display_name: "Enterprise RHEL 8 arm64 GRPC"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
@@ -437,7 +437,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
         ENABLE_GRPC_BUILD=1
-      compile_variant: enterprise-rhel-88-arm64-grpc
+      compile_variant: enterprise-rhel-8-arm64-grpc
       scons_cache_scope: shared
     tasks:
       - name: compile_test_parallel_unittest_stream_TG

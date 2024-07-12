@@ -58,7 +58,7 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    multiversion_platform: rhel80
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
@@ -72,7 +72,7 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &enterprise-rhel-88-64-bit-dynamic-expansions
+  - &enterprise-rhel-8-64-bit-dynamic-expansions
     <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -108,16 +108,16 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - &enterprise-rhel-88-64-bit-dynamic-template
+  - &enterprise-rhel-8-64-bit-dynamic-template
     <<: *linux_x86_dynamic_compile_variant_dependency
-    name: &enterprise-rhel-88-64-bit-dynamic enterprise-rhel-88-64-bit-dynamic
-    display_name: "* Shared Library Enterprise RHEL 8.8"
+    name: &enterprise-rhel-8-64-bit-dynamic enterprise-rhel-8-64-bit-dynamic
+    display_name: "* Shared Library Enterprise RHEL 8"
     tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-small
     expansions:
-      <<: *enterprise-rhel-88-64-bit-dynamic-expansions
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
     depends_on:
       - name: archive_dist_test_debug
         variant: *linux_x86_dynamic_compile_variant_name
@@ -142,17 +142,17 @@ buildvariants:
 
   # TODO (SERVER-75884): Remove this variant once we switch to config shard as the default.
   # This build variant is used to test suites that use sharded cluster fixture with config shard mode.
-  - &enterprise-rhel-88-64-bit-dynamic-config-shard
+  - &enterprise-rhel-8-64-bit-dynamic-config-shard
     <<: *linux_x86_dynamic_compile_variant_dependency
-    name: enterprise-rhel-88-64-bit-dynamic-config-shard
-    display_name: "* Shared Library Enterprise RHEL 8.8 (Config Shard)"
+    name: enterprise-rhel-8-64-bit-dynamic-config-shard
+    display_name: "* Shared Library Enterprise RHEL 8 (Config Shard)"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-small
     stepback: false
-    expansions: &enterprise-rhel-88-64-bit-dynamic-config-shard-expansions
-      <<: *enterprise-rhel-88-64-bit-dynamic-expansions
+    expansions: &enterprise-rhel-8-64-bit-dynamic-config-shard-expansions
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
       test_flags: >-
         --configShard=any
         --excludeWithAnyTags=config_shard_incompatible
@@ -193,17 +193,17 @@ buildvariants:
           - rhel8.8-medium
       - name: .multi_shard
 
-  - &enterprise-rhel-88-64-bit-dynamic-classic-engine
+  - &enterprise-rhel-8-64-bit-dynamic-classic-engine
     <<: *linux_x86_dynamic_compile_variant_dependency
-    name: enterprise-rhel-88-64-bit-dynamic-classic-engine
-    display_name: "Shared Library Enterprise RHEL 8.8 (Classic Engine)"
+    name: enterprise-rhel-8-64-bit-dynamic-classic-engine
+    display_name: "Shared Library Enterprise RHEL 8 (Classic Engine)"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-small
     stepback: false
     expansions:
-      <<: *enterprise-rhel-88-64-bit-dynamic-expansions
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
       jstestfuzz_num_generated_files: 40
       jstestfuzz_concurrent_num_files: 10
       target_resmoke_time: 10

@@ -32,7 +32,7 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    multiversion_platform: rhel80
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
@@ -41,8 +41,8 @@ variables:
     compile_variant: *linux_x86_dynamic_compile_variant_name
 
 buildvariants:
-  - name: enterprise-rhel-88-64-bit-inmem
-    display_name: Enterprise RHEL 8.8 (inMemory)
+  - name: enterprise-rhel-8-64-bit-inmem
+    display_name: Enterprise RHEL 8 (inMemory)
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
@@ -60,12 +60,12 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --use-diagnostic-latches=on
-      multiversion_platform: rhel80
+      multiversion_platform: rhel8
       multiversion_edition: enterprise
       scons_cache_scope: shared
       large_distro_name: rhel8.8-large
       core_analyzer_distro_name: rhel8.8-xlarge
-      compile_variant: enterprise-rhel-88-64-bit-inmem
+      compile_variant: enterprise-rhel-8-64-bit-inmem
     tasks:
       - name: compile_test_serial_no_unittests_TG
         distros:
@@ -116,8 +116,8 @@ buildvariants:
       - name: generate_buildid_to_debug_symbols_mapping
 
   - <<: *linux_x86_dynamic_compile_variant_dependency
-    name: &enterprise-rhel-88-64-bit-large-txns-format enterprise-rhel-88-64-bit-large-txns-format
-    display_name: "Enterprise RHEL 8.8 (large transactions format)"
+    name: &enterprise-rhel-8-64-bit-large-txns-format enterprise-rhel-8-64-bit-large-txns-format
+    display_name: "Enterprise RHEL 8 (large transactions format)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
     run_on:

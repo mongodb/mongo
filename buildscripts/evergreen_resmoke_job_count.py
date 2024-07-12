@@ -30,18 +30,18 @@ SYS_PLATFORM = sys.platform
 
 # Apply factor for a task based on the build variant it is running on.
 VARIANT_TASK_FACTOR_OVERRIDES = {
-    "enterprise-rhel-88-64-bit": [{"task": r"logical_session_cache_replication.*", "factor": 0.75}],
-    "enterprise-rhel-88-64-bit-inmem": [
+    "enterprise-rhel-8-64-bit": [{"task": r"logical_session_cache_replication.*", "factor": 0.75}],
+    "enterprise-rhel-8-64-bit-inmem": [
         {"task": "secondary_reads_passthrough", "factor": 0.3},
         {"task": "multi_stmt_txn_jscore_passthrough_with_migration", "factor": 0.3},
     ],
-    "enterprise-rhel88-debug-tsan": [
+    "enterprise-rhel8-debug-tsan": [
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125}
     ],
-    "rhel88-debug-aubsan-classic-engine": [
+    "rhel8-debug-aubsan-classic-engine": [
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
     ],
-    "rhel88-debug-aubsan-all-feature-flags": [
+    "rhel8-debug-aubsan-all-feature-flags": [
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
     ],
     "enterprise-windows-all-feature-flags-required": [{"task": "noPassthrough", "factor": 0.5}],
