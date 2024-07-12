@@ -355,7 +355,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
+        BAZEL_FLAGS="--subcommands"
         --modules=
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
