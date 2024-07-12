@@ -259,6 +259,35 @@ function runTestCase({
     });
 })();
 
+(function testMultipleTopsWithSameSortKeyOptimizedIntoOneTopPerSortKey() {
+    runTestCase({
+        docs: [
+            doc_t1_sD_x3_y10,
+            doc_t2_sA_x10_y5,
+            doc_t4_sB_x5_y24,
+            doc_t9_sC_x6_y1000,  // This has the largest 'y'
+            doc_t5_sA_x4_y1,
+            doc_t6_sC_x5_y9,
+            doc_t7_sC_x7_y300,
+            doc_t8_sD_x20_y3,
+        ],
+        pipeline: [{
+            $group: {
+                _id: null,
+                ts: {$top: {output: "$s", sortBy: {y: -1}}},
+                tx: {$top: {output: "$x", sortBy: {y: -1}}},
+                // Missing field should be returned as null.
+                tz: {$top: {output: "$z", sortBy: {y: -1}}},
+                ts2: {$top: {output: "$s", sortBy: {x: -1}}},
+                tx2: {$top: {output: "$x", sortBy: {x: -1}}},
+                // Missing field should be returned as null.
+                tz2: {$top: {output: "$z", sortBy: {x: -1}}},
+            }
+        }],
+        expected: [{_id: null, ts: "C", tx: 6, tz: null, ts2: "D", tx2: 20, tz2: null}]
+    });
+})();
+
 (function testMultipleTopNsWithSameSortKeyOptimizedIntoOneTopN() {
     runTestCase({
         docs: [
@@ -279,6 +308,37 @@ function runTestCase({
             }
         }],
         expected: [{_id: null, tns: ["C", "C", "D", "C"], tny: [9, 300, 3, 1000]}]
+    });
+})();
+
+(function testMultipleTopNsWithSameSortKeyOptimizedIntoOneTopNPerSortKey() {
+    runTestCase({
+        docs: [
+            doc_t6_sC_x5_y9,     // Top 3
+            doc_t1_sD_x3_y10,    // Bottom 0
+            doc_t2_sA_x10_y5,    // Bottom 1
+            doc_t9_sC_x6_y1000,  // Top 0
+            doc_t5_sA_x4_y1,     // Bottom 3
+            doc_t4_sB_x5_y24,    // Bottom 2
+            doc_t8_sD_x20_y3,    // Top 1
+            doc_t7_sC_x7_y300,   // Top 2
+        ],
+        pipeline: [{
+            $group: {
+                _id: null,
+                tns: {$topN: {n: 4, output: "$s", sortBy: {t: -1}}},
+                tny: {$topN: {n: 4, output: "$y", sortBy: {t: -1}}},
+                tns2: {$topN: {n: 4, output: "$s", sortBy: {t: 1}}},
+                tny2: {$topN: {n: 4, output: "$y", sortBy: {t: 1}}}
+            }
+        }],
+        expected: [{
+            _id: null,
+            tns: ["C", "D", "C", "C"],
+            tny: [1000, 3, 300, 9],
+            tns2: ["D", "A", "B", "A"],
+            tny2: [10, 5, 24, 1]
+        }]
     });
 })();
 
@@ -305,6 +365,31 @@ function runTestCase({
     });
 })();
 
+(function testMultipleBottomsWithSameSortKeyOptimizedIntoOneBottomPerSortKey() {
+    runTestCase({
+        docs: [
+            doc_t1_sD_x3_y10,
+            doc_t2_sA_x10_y5,
+            doc_t4_sB_x5_y24,
+            doc_t5_sA_x4_y1,
+            doc_t6_sC_x5_y9,
+            doc_t7_sC_x7_y300,  // Bottom 0 by 'y'
+            doc_t8_sD_x20_y3,   // Bottom 0 by 'x'
+            doc_t10_sB_x6_y1,
+        ],
+        pipeline: [{
+            $group: {
+                _id: null,
+                bs: {$bottom: {output: "$s", sortBy: {x: 1}}},
+                by: {$bottom: {output: "$y", sortBy: {x: 1}}},
+                bs2: {$bottom: {output: "$s", sortBy: {y: 1}}},
+                by2: {$bottom: {output: "$y", sortBy: {y: 1}}},
+            }
+        }],
+        expected: [{_id: null, bs: "D", by: 3, bs2: "C", by2: 300}]
+    });
+})();
+
 (function testMultipleBottomNsWithSameSortKeyOptimizedIntoOneBottom() {
     runTestCase({
         docs: [
@@ -325,6 +410,41 @@ function runTestCase({
             }
         }],
         expected: [{_id: null, bns: ["A", "D", "A"], bnx: [10, 20, 4]}]
+    });
+})();
+
+(function testMultipleBottomNsWithSameSortKeyOptimizedIntoOneBottomPerSortKeyAndN() {
+    runTestCase({
+        docs: [
+            doc_t1_sD_x3_y10,
+            doc_t2_sA_x10_y5,  // Bottom 2
+            doc_t4_sB_x5_y24,  // Top 2
+            doc_t5_sA_x4_y1,   // Bottom 0
+            doc_t6_sC_x5_y9,
+            doc_t7_sC_x7_y300,   // Top 1
+            doc_t8_sD_x20_y3,    // Bottom 1
+            doc_t9_sC_x6_y1000,  // Top 0
+        ],
+        pipeline: [{
+            $group: {
+                _id: null,
+                bns: {$bottomN: {n: 3, output: "$s", sortBy: {y: -1}}},
+                bnx: {$bottomN: {n: 3, output: "$x", sortBy: {y: -1}}},
+                bns2: {$bottomN: {n: 3, output: "$s", sortBy: {y: 1}}},
+                bnx2: {$bottomN: {n: 3, output: "$x", sortBy: {y: 1}}},
+                bns3: {$bottomN: {n: 1, output: "$s", sortBy: {y: -1}}},
+                bnx3: {$bottomN: {n: 1, output: "$x", sortBy: {y: -1}}}
+            }
+        }],
+        expected: [{
+            _id: null,
+            bns: ["A", "D", "A"],
+            bnx: [10, 20, 4],
+            bns2: ["B", "C", "C"],
+            bnx2: [5, 6, 7],
+            bns3: ["A"],
+            bnx3: [4]
+        }]
     });
 })();
 

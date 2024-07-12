@@ -332,7 +332,7 @@ TopBottomAccKey getTopBottomAccKey(AccumulatorN* accN) {
 }
 
 template <TopBottomSense sense, bool single>
-constexpr StringData getMergeFieldName() {
+constexpr StringData getMergeFieldNameForAcc() {
     if constexpr (sense == TopBottomSense::kTop && single) {
         return "ts"_sd;
     } else if constexpr (sense == TopBottomSense::kTop && !single) {
@@ -365,7 +365,13 @@ AccumulationStatement mergeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pE
                                       const SortPattern& sortPattern,
                                       const AccIndices& accIndices,
                                       BSONObjBuilder& prjArgsBuilder) {
-    constexpr auto mergeFieldName = getMergeFieldName<sense, single>();
+    constexpr auto prefix = getMergeFieldNameForAcc<sense, single>();
+
+    // In order to account for multiple instances of the same accumulator (e.g. $topN), we
+    // incorporate the first index of an accumulator that will be merged into the field name.
+    std::stringstream ss;
+    ss << prefix << "_" << accIndices[0];
+    const auto mergeFieldName = ss.str();
 
     // To comply with any internal parsing logic for $top and $bottom accumulators, we need to
     // compose a BSON object that represents the accumulator statement and then parse it.
@@ -411,7 +417,7 @@ AccumulationStatement mergeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pE
                     using namespace fmt::literals;
                     prjArgsBuilder.append(
                         accStmts[accIdx].fieldName,
-                        "${}.{}"_format(mergeFieldName.toString(), accStmts[accIdx].fieldName));
+                        "${}.{}"_format(mergeFieldName, accStmts[accIdx].fieldName));
                 }
                 outputBuilder.doneFast();
             }
