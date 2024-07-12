@@ -596,6 +596,21 @@ class NinjaState:
                 "restat": 1,
             },
         }
+        if "darwin" in sys.platform:
+            self.rules["LINK"] = {
+                "command": "$env$LINK $rspc",
+                "description": "Linking $out",
+                "rspfile": "$out.rsp",
+                "rspfile_content": "$rspc",
+                "pool": "local_pool",
+            }
+            self.rules["AR"] = {
+                "command": "$env$AR $rspc",
+                "description": "Archived $out",
+                "rspfile": "$out.rsp",
+                "rspfile_content": "$rspc",
+                "pool": "local_pool",
+            }
         num_jobs = self.env.get('NINJA_MAX_JOBS', self.env.GetOption("num_jobs"))
         self.pools = {
             "local_pool": num_jobs,
