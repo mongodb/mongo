@@ -721,7 +721,9 @@ Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
 
     // Add all new data keys into the index.
     for (const auto& keyString : ticket.added) {
-        bool dupsAllowed = !entry->descriptor()->prepareUnique() && ticket.dupsAllowed;
+        bool dupsAllowed =
+            (!entry->descriptor()->prepareUnique() || !opCtx->isEnforcingConstraints()) &&
+            ticket.dupsAllowed;
         auto status = _newInterface->insert(opCtx, keyString, dupsAllowed);
         if (!status.isOK())
             return status;
