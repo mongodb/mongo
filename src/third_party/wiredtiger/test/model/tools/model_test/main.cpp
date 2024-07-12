@@ -26,6 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -440,6 +443,30 @@ reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::s
   const std::string &reduce_home, const std::string &conn_config, const std::string &table_config)
 {
     reduce_counterexample_context_t context{main_home, reduce_home, conn_config, table_config};
+
+    /*
+     * Turn off generating core dumps during the counterexample reduction. Each failed run could
+     * possibly result in dumping a core, leading to tens or even hundreds of core dumps.
+     */
+    struct rlimit prev_core_limit;
+    int r = getrlimit(RLIMIT_CORE, &prev_core_limit);
+    if (r != 0)
+        throw std::runtime_error(
+          std::string("Failed to get the current core dump limit: ") + strerror(errno));
+
+    model::at_cleanup reset_core_limit([&prev_core_limit]() {
+        int r = setrlimit(RLIMIT_CORE, &prev_core_limit);
+        if (r != 0)
+            std::cerr << "Failed to reset the core dump limit: " << strerror(errno) << std::endl;
+    });
+
+    struct rlimit new_core_limit;
+    memset(&new_core_limit, 0, sizeof(new_core_limit));
+    /* Preserve the maximum limit for resetting the current value to work at cleanup. */
+    new_core_limit.rlim_max = prev_core_limit.rlim_max;
+    r = setrlimit(RLIMIT_CORE, &new_core_limit);
+    if (r != 0)
+        throw std::runtime_error(std::string("Failed to set core dump limit: ") + strerror(errno));
 
     /*
      * Separate the workload back into sequences, where a sequence is a transaction or just a single

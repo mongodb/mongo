@@ -76,12 +76,12 @@ proc __wt_cell {} {
           ssection extra {
             xentry extra { format_bits [set extra [uint8]] $WT_CELL_extra_b }
             if {$extra & $WT_CELL_PREPARE} { entry "prepared" "prepared" 1 [expr {[pos] - 1}] }
-            if {$extra & $WT_CELL_TS_DURABLE_START} { xentry "durable start ts" vuint }
-            if {$extra & $WT_CELL_TS_DURABLE_STOP} { xentry "durable stop ts" vuint }
             if {$extra & $WT_CELL_TS_START} { xentry "start ts" vuint }
-            if {$extra & $WT_CELL_TS_STOP} { xentry "stop ts" vuint }
             if {$extra & $WT_CELL_TXN_START} { xentry "start txn" vuint }
+            if {$extra & $WT_CELL_TS_DURABLE_START} { xentry "durable start ts" vuint }
+            if {$extra & $WT_CELL_TS_STOP} { xentry "stop ts" vuint }
             if {$extra & $WT_CELL_TXN_STOP} { xentry "stop txn" vuint }
+            if {$extra & $WT_CELL_TS_DURABLE_STOP} { xentry "durable stop ts" vuint }
           }
         }
 
@@ -179,6 +179,7 @@ proc wt_page {{allocsize 4096}} {
     set block_start [pos]
     set block_size $allocsize
     set title "block"
+    set compressed 0
 
     ssection __wt_page_header {
       uint64 recno
@@ -192,7 +193,8 @@ proc wt_page {{allocsize 4096}} {
         set type_fmt [format_enum [set type [uint8]] $WT_PAGE_n]
       }
       set title [strcut $type_fmt WT_PAGE_]
-      xentry flags { format_bits [uint8] $WT_PAGE_f }
+      xentry flags { format_bits [set flags [uint8]] $WT_PAGE_f }
+      set compressed [expr {$flags & $WT_PAGE_COMPRESSED}]
       bytes 1 unused
       xentry version { format_enum [uint8] $WT_PAGE_VERSION_n }
     }
@@ -214,104 +216,108 @@ proc wt_page {{allocsize 4096}} {
       entry "--ERROR--" "mem_size < headers size" 1 [pos]
     }
 
-    # __wt_cell
-    if {$type == $WT_PAGE_BLOCK_MANAGER} {
-      ssection "block manager: extlist" {
-        # __wt_block_extlist_write __wt_block_extlist_read
-        ssection -collapsed "pair (magic)" {
-          xentry -var offset vuint
-          xentry -var size vuint
-          sectionvalue "offset: $offset, size: $size (magic $WT_BLOCK_EXTLIST_MAGIC => [pack_vuint $WT_BLOCK_EXTLIST_MAGIC])"
-        }
-        while {$offset != 0 && [peek uint8] != 0} {
-          ssection -collapsed "pair" {
+    if {!$compressed} {
+      # __wt_cell
+      if {$type == $WT_PAGE_BLOCK_MANAGER} {
+        ssection "block manager: extlist" {
+          # __wt_block_extlist_write __wt_block_extlist_read
+          ssection -collapsed "pair (magic)" {
             xentry -var offset vuint
             xentry -var size vuint
-            sectionvalue "offset: $offset, size: $size"
-            nswitch $offset {
-              $WT_BLOCK_EXTLIST_MAGIC { sectionname "pair (magic)" }
-              0 {
-                sectionname "pair (closing)"
-                sectionvalue "final_ckpt: [format_enum $size $WT_BLOCK_EXTLIST_VERSION_n]"
+            sectionvalue "offset: $offset, size: $size (magic $WT_BLOCK_EXTLIST_MAGIC => [pack_vuint $WT_BLOCK_EXTLIST_MAGIC])"
+          }
+          while {$offset != 0 && [peek uint8] != 0} {
+            ssection -collapsed "pair" {
+              xentry -var offset vuint
+              xentry -var size vuint
+              sectionvalue "offset: $offset, size: $size"
+              nswitch $offset {
+                $WT_BLOCK_EXTLIST_MAGIC { sectionname "pair (magic)" }
+                0 {
+                  sectionname "pair (closing)"
+                  sectionvalue "final_ckpt: [format_enum $size $WT_BLOCK_EXTLIST_VERSION_n]"
+                }
+                default {}
               }
-              default {}
+            }
+          }
+        }
+        if {$size} {
+          peek {
+            # __ckpt_update: If this is the final block, we append an incomplete copy of the checkpoint information to the avail list for standalone retrieval.
+            # __wt_block_checkpoint_final:
+            ssection "final_ckpt hack" {
+              xentry -var write_gen vuint
+              set title "$title ckpt: $write_gen"
+              union {
+                { xentry final_file_size { dx [vuint] } }
+                { bytes 9 }
+              }
+
+              ssection -collapsed metadata {
+                xentry -var metadata_len vuint
+                sectionvalue [ascii $metadata_len metadata]
+              }
+
+              ssection -collapsed checkpoints_text {
+                xentry -var ckpts_len vuint
+                sectionvalue [ascii $ckpts_len ckpts]
+              }
+              ssection -collapsed checkpoint_raw {
+                xentry -varname ckpt_raw_len len vuint ;#not-quite-right_len
+                set ckpt_raw_start [pos]
+                union {
+                  { bytes ${ckpt_raw_len} bytes }
+                  { ssection __block_ckpt_unpack {
+                    # comment next to WT_BM_CHECKPOINT_VERSION:
+                    #   [1] [root addr] [alloc addr] [avail addr] [discard addr]
+                    #       [file size] [checkpoint size] [write generation]
+                    xentry version { format_enum [uint8] WT_BM_CHECKPOINT_VERSION }
+                    __block_addr_unpack__bm root
+                    __block_addr_unpack__bm alloc
+                    __block_addr_unpack__bm avail
+                    __block_addr_unpack__bm discard
+                    xentry file_size { xd [vuint] }
+                    xentry ckpt_size { xd [vuint] }
+                    if {[remaining $ckpt_raw_start $ckpt_raw_len] > 0 && [peek uint8]} {
+                      xentry objectid vuint
+                    }
+                  }}
+                }
+              }
+            } || {}
+            if {[pos] > $block_start + $disk_size} {
+              set sz [expr {[pos] - ($block_start + $disk_size)}]
+              entry "-ERROR-" "Metadata overflows the block by $sz bytes" $sz [expr {[pos] - $sz}]
+            }
+          }
+        }
+      } else {
+        if {$entries} {
+          ssection -collapsed cells {
+            #__wt_cell
+            sectionvalue $entries
+            for {set cell_idx 0} {$cell_idx < $entries} {incr cell_idx} {
+              if {![__wt_cell]} {
+                sectionvalue "$cell_idx of $entries"
+                entry "ERROR in cell" $errorInfo 1 [expr {[pos] - 1}]
+                break
+              }
             }
           }
         }
       }
-      if {$size} {
-        peek {
-          # __ckpt_update: If this is the final block, we append an incomplete copy of the checkpoint information to the avail list for standalone retrieval.
-          # __wt_block_checkpoint_final:
-          ssection "final_ckpt hack" {
-            xentry -var write_gen vuint
-            set title "$title ckpt: $write_gen"
-            union {
-              { xentry final_file_size { dx [vuint] } }
-              { bytes 9 }
-            }
 
-            ssection -collapsed metadata {
-              xentry -var metadata_len vuint
-              sectionvalue [ascii $metadata_len metadata]
-            }
-
-            ssection -collapsed checkpoints_text {
-              xentry -var ckpts_len vuint
-              sectionvalue [ascii $ckpts_len ckpts]
-            }
-            ssection -collapsed checkpoint_raw {
-              xentry -varname ckpt_raw_len len vuint ;#not-quite-right_len
-              set ckpt_raw_start [pos]
-              union {
-                { bytes ${ckpt_raw_len} bytes }
-                { ssection __block_ckpt_unpack {
-                  # comment next to WT_BM_CHECKPOINT_VERSION:
-                  #   [1] [root addr] [alloc addr] [avail addr] [discard addr]
-                  #       [file size] [checkpoint size] [write generation]
-                  xentry version { format_enum [uint8] WT_BM_CHECKPOINT_VERSION }
-                  __block_addr_unpack__bm root
-                  __block_addr_unpack__bm alloc
-                  __block_addr_unpack__bm avail
-                  __block_addr_unpack__bm discard
-                  xentry file_size { xd [vuint] }
-                  xentry ckpt_size { xd [vuint] }
-                  if {[remaining $ckpt_raw_start $ckpt_raw_len] > 0 && [peek uint8]} {
-                    xentry objectid vuint
-                  }
-                }}
-              }
-            }
-          } || {}
-          if {[pos] > $block_start + $disk_size} {
-            set sz [expr {[pos] - ($block_start + $disk_size)}]
-            entry "-ERROR-" "Metadata overflows the block by $sz bytes" $sz [expr {[pos] - $sz}]
-          }
-        }
+      set mem_size_check [expr {[pos] - $block_start}]
+      if {$mem_size_check > $mem_size} {
+        set extra [expr {$mem_size_check - $mem_size}]
+        entry "--ERROR--" "mem_size incorrect? Used $mem_size_check bytes out of $mem_size ($extra extra)" 1 [expr {[pos] - $extra}]
+      } elseif {$mem_size_check < $mem_size} {
+        set extra [expr {$mem_size - $mem_size_check}]
+        entry "--ERROR--" "mem_size incorrect: Used $mem_size_check bytes out of $mem_size ($extra left)" $extra [pos]
       }
     } else {
-      if {$entries} {
-        ssection -collapsed cells {
-          #__wt_cell
-          sectionvalue $entries
-          for {set cell_idx 0} {$cell_idx < $entries} {incr cell_idx} {
-            if {![__wt_cell]} {
-              sectionvalue "$cell_idx of $entries"
-              entry "ERROR in cell" $errorInfo 1 [expr {[pos] - 1}]
-              break
-            }
-          }
-        }
-      }
-    }
-
-    set mem_size_check [expr {[pos] - $block_start}]
-    if {$mem_size_check > $mem_size} {
-      set extra [expr {$mem_size_check - $mem_size}]
-      entry "--ERROR--" "mem_size incorrect? Used $mem_size_check bytes out of $mem_size ($extra extra)" 1 [expr {[pos] - $extra}]
-    } elseif {$mem_size_check < $mem_size} {
-      set extra [expr {$mem_size - $mem_size_check}]
-      entry "--ERROR--" "mem_size incorrect: Used $mem_size_check bytes out of $mem_size ($extra left)" $extra [pos]
+      bytes [remaining $block_start $block_size] "compressed_data"
     }
 
     #bytes [expr {$allocsize - ([pos] - $block_start)}] data
@@ -322,7 +328,7 @@ proc wt_page {{allocsize 4096}} {
     pad $block_start $block_size
 
     sectionname $title
-    sectionvalue "block size: [hx $block_size] ($alloc_count blocks)"
+    sectionvalue "block size: [hx $block_size] ($alloc_count allocs)"
   }
   gotoend $block_start $block_size
 }

@@ -139,6 +139,8 @@ CONFIG configuration_list[] = {
 
 {"cache.minimum", "minimum cache size (MB)", C_IGNORE, 0, 0, 100 * 1024}
 
+{"cache.maximum", "maximum cache size (MB)", C_IGNORE, 0, 0, UINT_MAX}
+
 {"checkpoint", "checkpoint type (on | off | wiredtiger)", C_IGNORE | C_STRING, 0, 0, 0}
 
 {"checkpoint.log_size", "MB of log to wait if wiredtiger checkpoints configured", 0x0, 20, 200, 1024}
