@@ -59,28 +59,8 @@ public:
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             const auto& nss = ns();
-            ShardsvrReshardCollection shardsvrReshardCollection(nss);
-            shardsvrReshardCollection.setDbName(request().getDbName());
-
-            ReshardCollectionRequest reshardCollectionRequest;
-            reshardCollectionRequest.setKey(cluster::unsplittable::kUnsplittableCollectionShardKey);
-            reshardCollectionRequest.setProvenance(ProvenanceEnum::kUnshardCollection);
-
-            boost::optional<std::vector<mongo::ShardKeyRange>> distribution = boost::none;
-            if (request().getToShard().has_value()) {
-                auto toShard = request().getToShard().get();
-                mongo::ShardKeyRange destinationRange(toShard);
-                destinationRange.setMin(cluster::unsplittable::kUnsplittableCollectionMinKey);
-                destinationRange.setMax(cluster::unsplittable::kUnsplittableCollectionMaxKey);
-                distribution.emplace(std::vector<mongo::ShardKeyRange>{destinationRange});
-            }
-
-            reshardCollectionRequest.setShardDistribution(distribution);
-            reshardCollectionRequest.setForceRedistribution(true);
-            reshardCollectionRequest.setNumInitialChunks(1);
-
-            shardsvrReshardCollection.setReshardCollectionRequest(
-                std::move(reshardCollectionRequest));
+            auto unshardCollectionRequest = cluster::unsplittable::makeUnshardCollectionRequest(
+                request().getDbName(), nss, request().getToShard());
 
             LOGV2(8018400,
                   "Running a reshard collection command for the unshard collection request.",
@@ -95,7 +75,7 @@ public:
                 opCtx,
                 DatabaseName::kAdmin,
                 dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(shardsvrReshardCollection.toBSON(),
+                CommandHelpers::appendMajorityWriteConcern(unshardCollectionRequest.toBSON(),
                                                            opCtx->getWriteConcern()),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);

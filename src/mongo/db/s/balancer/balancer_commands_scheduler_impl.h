@@ -324,22 +324,13 @@ public:
           _dbVersion(dbVersion) {}
 
     BSONObj serialise() const override {
-        ShardsvrReshardCollection shardsvrReshardCollection(getNameSpace());
-        shardsvrReshardCollection.setDbName(getNameSpace().dbName());
-
-        ReshardCollectionRequest reshardCollectionRequest;
-        reshardCollectionRequest.setKey(BSON("_id" << 1));
-        reshardCollectionRequest.setProvenance(ProvenanceEnum::kBalancerMoveCollection);
-
-        std::vector<mongo::ShardKeyRange> destinationShard = {_toShardId};
-        reshardCollectionRequest.setShardDistribution(destinationShard);
-        reshardCollectionRequest.setForceRedistribution(true);
-        reshardCollectionRequest.setNumInitialChunks(1);
-
-        shardsvrReshardCollection.setReshardCollectionRequest(std::move(reshardCollectionRequest));
+        auto moveCollectionRequest = cluster::unsplittable::makeMoveCollectionRequest(
+            getNameSpace().dbName(),
+            getNameSpace(),
+            _toShardId,
+            ProvenanceEnum::kBalancerMoveCollection);
         return appendDbVersionIfPresent(
-            CommandHelpers::appendMajorityWriteConcern(shardsvrReshardCollection.toBSON()),
-            _dbVersion);
+            CommandHelpers::appendMajorityWriteConcern(moveCollectionRequest.toBSON()), _dbVersion);
     }
 
 private:

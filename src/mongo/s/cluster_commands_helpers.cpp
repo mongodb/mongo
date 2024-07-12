@@ -73,6 +73,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/transaction_router.h"
@@ -91,6 +92,50 @@ using mongo::repl::ReadConcernArgs;
 using mongo::repl::ReadConcernLevel;
 
 namespace mongo {
+
+namespace cluster::unsplittable {
+ShardsvrReshardCollection makeMoveCollectionOrUnshardCollectionRequest(
+    const DatabaseName& dbName,
+    const NamespaceString& nss,
+    const boost::optional<ShardId>& destinationShard,
+    ProvenanceEnum provenance) {
+    ShardsvrReshardCollection shardsvrReshardCollection(nss);
+    shardsvrReshardCollection.setDbName(dbName);
+
+    ReshardCollectionRequest reshardCollectionRequest;
+    reshardCollectionRequest.setKey(kUnsplittableCollectionShardKey);
+    reshardCollectionRequest.setProvenance(provenance);
+
+    if (destinationShard) {
+        mongo::ShardKeyRange destinationRange(*destinationShard);
+        destinationRange.setMin(kUnsplittableCollectionMinKey);
+        destinationRange.setMax(kUnsplittableCollectionMaxKey);
+        std::vector<mongo::ShardKeyRange> distribution = {destinationRange};
+        reshardCollectionRequest.setShardDistribution(distribution);
+    }
+
+    reshardCollectionRequest.setForceRedistribution(true);
+    reshardCollectionRequest.setNumInitialChunks(1);
+
+    shardsvrReshardCollection.setReshardCollectionRequest(std::move(reshardCollectionRequest));
+    return shardsvrReshardCollection;
+}
+
+ShardsvrReshardCollection makeMoveCollectionRequest(const DatabaseName& dbName,
+                                                    const NamespaceString& nss,
+                                                    const ShardId& destinationShard,
+                                                    ProvenanceEnum provenance) {
+    return makeMoveCollectionOrUnshardCollectionRequest(dbName, nss, destinationShard, provenance);
+}
+
+ShardsvrReshardCollection makeUnshardCollectionRequest(
+    const DatabaseName& dbName,
+    const NamespaceString& nss,
+    const boost::optional<ShardId>& destinationShard) {
+    return makeMoveCollectionOrUnshardCollectionRequest(
+        dbName, nss, destinationShard, ProvenanceEnum::kUnshardCollection);
+}
+}  // namespace cluster::unsplittable
 
 void appendWriteConcernErrorDetailToCmdResponse(const ShardId& shardId,
                                                 WriteConcernErrorDetail wcError,
