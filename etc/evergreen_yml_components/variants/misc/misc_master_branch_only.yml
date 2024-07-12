@@ -41,8 +41,8 @@ buildvariants:
   tasks:
   - name: build_metrics_tasks_gen
 
-- name: &enterprise-rhel-88-64-bit-build-metrics enterprise-rhel-88-64-bit-build-metrics
-  display_name: "~ Build Metrics Enterprise RHEL 8.8 "
+- name: &enterprise-rhel-8-64-bit-build-metrics enterprise-rhel-8-64-bit-build-metrics
+  display_name: "~ Build Metrics Enterprise RHEL 8 "
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
   stepback: false
@@ -60,7 +60,7 @@ buildvariants:
   tasks:
   - name: build_metrics_tasks_gen
 
-- name: &enterprise-rhel-88-aarch64-build-metrics enterprise-rhel-88-aarch64-build-metrics
+- name: &enterprise-rhel-8-aarch64-build-metrics enterprise-rhel-8-aarch64-build-metrics
   display_name: "~ Build Metrics Enterprise AL22 ARM"
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
@@ -107,7 +107,7 @@ buildvariants:
   run_on:
   - rhel8.8-small
   expansions:
-    multiversion_platform: rhel80
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
     compile_variant: *stm-daily-cron
   stepback: false

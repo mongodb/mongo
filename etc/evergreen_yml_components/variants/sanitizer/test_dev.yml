@@ -111,7 +111,7 @@ variables:
   num_scons_link_jobs_available: 0.99
   large_distro_name: rhel8.8-large
   xlarge_distro_name: rhel8.8-xxlarge
-  multiversion_platform: rhel80
+  multiversion_platform: rhel8
   multiversion_edition: enterprise
   gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
@@ -183,10 +183,10 @@ buildvariants:
   - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
   - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
 
-- &rhel88-debug-aubsan-lite-template
+- &rhel8-debug-aubsan-lite-template
   <<: *linux_debug_aubsan_compile_variant_dependency
-  name: &rhel88-debug-aubsan-lite rhel88-debug-aubsan-lite
-  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.8 DEBUG"
+  name: &rhel8-debug-aubsan-lite rhel8-debug-aubsan-lite
+  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG"
   tags: ["required"]
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
@@ -200,8 +200,8 @@ buildvariants:
   - name: jsCore
   - name: jsCore_txns
 
-- name: rhel88-asan
-  display_name: ~ ASAN RHEL 8.8
+- name: rhel8-asan
+  display_name: ~ ASAN RHEL 8
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -220,7 +220,7 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
       --modules=
-    multiversion_platform: rhel80
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
@@ -229,7 +229,7 @@ buildvariants:
       --excludeWithAnyTags=requires_fast_memory,corrupts_data
       --enableEnterpriseTests=off
     separate_debug: off
-    compile_variant: rhel88-asan
+    compile_variant: rhel8-asan
   tasks:
     - name: compile_test_serial_TG
     - name: compile_test_parallel_unittest_stream_TG
@@ -237,8 +237,8 @@ buildvariants:
     - name: .jstestfuzz !.initsync !.feature_flag_guarded
     - name: generate_buildid_to_debug_symbols_mapping
 
-- name: rhel88-debug-asan
-  display_name: ~ ASAN Enterprise RHEL 8.8 DEBUG
+- name: rhel8-debug-asan
+  display_name: ~ ASAN Enterprise RHEL 8 DEBUG
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -264,7 +264,7 @@ buildvariants:
       --excludeWithAnyTags=requires_fast_memory,requires_increased_memlock_limits,corrupts_data
       --benchmarkRepetitions=1
       --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-    multiversion_platform: rhel80
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
@@ -272,7 +272,7 @@ buildvariants:
     exec_timeout_secs: 14400 # 3 hour timeout
     separate_debug: off
     large_distro_name: rhel8.8-large
-    compile_variant: rhel88-debug-asan
+    compile_variant: rhel8-debug-asan
   tasks:
   - name: compile_test_benchmark_serial_TG
     distros:
@@ -329,8 +329,8 @@ buildvariants:
   - name: server_selection_json_test
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: rhel88-debug-ubsan
-  display_name: ~ UBSAN Enterprise RHEL 8.8 DEBUG
+- name: rhel8-debug-ubsan
+  display_name: ~ UBSAN Enterprise RHEL 8 DEBUG
   tags: ["bazel_check"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -357,13 +357,13 @@ buildvariants:
       --excludeWithAnyTags=requires_increased_memlock_limits,corrupts_data
       --benchmarkRepetitions=1
       --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-    multiversion_platform: rhel80
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
     separate_debug: off
     large_distro_name: rhel8.8-large
-    compile_variant: rhel88-debug-ubsan
+    compile_variant: rhel8-debug-ubsan
   tasks:
   - name: compile_test_benchmark_serial_TG
     distros:
@@ -415,9 +415,9 @@ buildvariants:
   - name: server_selection_json_test
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &rhel88-debug-aubsan-lite_fuzzer-template
-  name: &rhel88-debug-aubsan-lite_fuzzer rhel88-debug-aubsan-lite_fuzzer
-  display_name: "{A,UB}SAN Enterprise RHEL 8.8 FUZZER"
+- &rhel8-debug-aubsan-lite_fuzzer-template
+  name: &rhel8-debug-aubsan-lite_fuzzer rhel8-debug-aubsan-lite_fuzzer
+  display_name: "{A,UB}SAN Enterprise RHEL 8 FUZZER"
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -450,7 +450,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     separate_debug: off
-    compile_variant: *rhel88-debug-aubsan-lite_fuzzer
+    compile_variant: *rhel8-debug-aubsan-lite_fuzzer
   display_tasks:
   - name: libfuzzertests!
     execution_tasks:
@@ -459,21 +459,21 @@ buildvariants:
   tasks:
   - name: compile_archive_and_run_libfuzzertests_TG
 
-- &enterprise-rhel88-debug-tsan-template
-  name: &enterprise-rhel88-debug-tsan enterprise-rhel88-debug-tsan
-  display_name: "* TSAN Enterprise RHEL 8.8 DEBUG"
+- &enterprise-rhel8-debug-tsan-template
+  name: &enterprise-rhel8-debug-tsan enterprise-rhel8-debug-tsan
+  display_name: "* TSAN Enterprise RHEL 8 DEBUG"
   tags: ["suggested"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel8.8-large
   stepback: false
-  expansions: &enterprise-rhel88-debug-tsan-expansions-template
+  expansions: &enterprise-rhel8-debug-tsan-expansions-template
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
     toolchain_version: stable
-    compile_variant: *enterprise-rhel88-debug-tsan
+    compile_variant: *enterprise-rhel8-debug-tsan
     # If you add anything to san_options, make sure the appropriate
     # changes are also made to SConstruct.
     #
@@ -507,7 +507,7 @@ buildvariants:
     large_distro_name: rhel8.8-xlarge
     xlarge_distro_name: rhel8.8-xxlarge
     core_analyzer_distro_name: rhel8.8-xxlarge
-    multiversion_platform: rhel80
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --excludeWithAnyTags=tsan_incompatible,requires_latch_analyzer

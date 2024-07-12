@@ -47,7 +47,7 @@ variables:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
-  multiversion_platform: rhel80
+  multiversion_platform: rhel8
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel8.8-medium
@@ -60,7 +60,7 @@ variables:
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &enterprise-rhel-88-64-bit-dynamic-expansions
+- &enterprise-rhel-8-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions
   scons_cache_scope: shared
   scons_cache_mode: all
@@ -108,7 +108,7 @@ variables:
   num_scons_link_jobs_available: 0.99
   large_distro_name: rhel8.8-large
   xlarge_distro_name: rhel8.8-xxlarge
-  multiversion_platform: rhel80
+  multiversion_platform: rhel8
   multiversion_edition: enterprise
   gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
@@ -119,16 +119,16 @@ buildvariants:
 #          Redhat buildvariants           #
 ###########################################
 
-- name: &enterprise-rhel-88-64-bit-dynamic-debug-mode enterprise-rhel-88-64-bit-dynamic-debug-mode
-  display_name: "Shared Library Enterprise RHEL 8.8 Debug Mode"
+- name: &enterprise-rhel-8-64-bit-dynamic-debug-mode enterprise-rhel-8-64-bit-dynamic-debug-mode
+  display_name: "Shared Library Enterprise RHEL 8 Debug Mode"
   tags: []
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   run_on:
   - rhel8.8-small
   stepback: false
   expansions:
-    <<: *enterprise-rhel-88-64-bit-dynamic-expansions
-    compile_variant: *enterprise-rhel-88-64-bit-dynamic-debug-mode
+    <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+    compile_variant: *enterprise-rhel-8-64-bit-dynamic-debug-mode
     test_flags: >-
       --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     compile_flags: >-
@@ -428,9 +428,9 @@ buildvariants:
 #     Experimental buildvariants          #
 ###########################################
 
-- &rhel88-debug-ubsan-all-feature-flags-template
-  name: &rhel88-debug-ubsan-all-feature-flags rhel88-debug-ubsan-all-feature-flags
-  display_name: "* Shared Library UBSAN Enterprise RHEL 8.8 DEBUG (all feature flags)"
+- &rhel8-debug-ubsan-all-feature-flags-template
+  name: &rhel8-debug-ubsan-all-feature-flags rhel8-debug-ubsan-all-feature-flags
+  display_name: "* Shared Library UBSAN Enterprise RHEL 8 DEBUG (all feature flags)"
   tags: ["suggested"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -453,14 +453,14 @@ buildvariants:
       --allocator=tcmalloc-gperf
       -j$(grep -c ^processor /proc/cpuinfo)
       --use-diagnostic-latches=on
-    compile_variant: *rhel88-debug-ubsan-all-feature-flags
+    compile_variant: *rhel8-debug-ubsan-all-feature-flags
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible
       --runAllFeatureFlagTests
       --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-    multiversion_platform: rhel80
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
@@ -472,10 +472,10 @@ buildvariants:
   - name: disk_wiredtiger
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &rhel88-debug-aubsan-lite-all-feature-flags-required-template
+- &rhel8-debug-aubsan-lite-all-feature-flags-required-template
   <<: *linux_debug_aubsan_compile_variant_dependency
-  name: &rhel88-debug-aubsan-lite-all-feature-flags-required rhel88-debug-aubsan-lite-all-feature-flags-required
-  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.8 DEBUG (all feature flags)"
+  name: &rhel8-debug-aubsan-lite-all-feature-flags-required rhel8-debug-aubsan-lite-all-feature-flags-required
+  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
   tags: ["required"]
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
@@ -493,9 +493,9 @@ buildvariants:
   - name: jsCore_column_store_indexes
   - name: jsCore_wildcard_indexes
 
-- <<: *rhel88-debug-aubsan-lite-all-feature-flags-required-template
-  name: &rhel88-debug-aubsan-all-feature-flags rhel88-debug-aubsan-all-feature-flags
-  display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.8 DEBUG (all feature flags)"
+- <<: *rhel8-debug-aubsan-lite-all-feature-flags-required-template
+  name: &rhel8-debug-aubsan-all-feature-flags rhel8-debug-aubsan-all-feature-flags
+  display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
   tags: ["suggested"]
   cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
   expansions:
@@ -513,8 +513,8 @@ buildvariants:
   - name: .default !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan #!.incompatible_all_feature_flags
   - name: .non_deterministic !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan #!.incompatible_all_feature_flags
 
-- name: &enterprise-rhel88-unoptimized-64-bit enterprise-rhel88-unoptimized-64-bit
-  display_name: "~ Enterprise RHEL 8.8 DEBUG (Unoptimized)"
+- name: &enterprise-rhel8-unoptimized-64-bit enterprise-rhel8-unoptimized-64-bit
+  display_name: "~ Enterprise RHEL 8 DEBUG (Unoptimized)"
   tags: ["bazel_check"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
@@ -533,7 +533,7 @@ buildvariants:
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
-    compile_variant: *enterprise-rhel88-unoptimized-64-bit
+    compile_variant: *enterprise-rhel8-unoptimized-64-bit
   tasks:
   - name: compile_test_parallel_core_stream_TG
     distros:
