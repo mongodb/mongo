@@ -75,33 +75,19 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 }
             ]
         });
-
-        const killCursors = (db) => {
-            const adminDB = db.getSiblingDB("admin");
-
-            const curOpCursor = adminDB.aggregate([
-                {$currentOp: {idleCursors: true, localOps: true}},
-                {$match: {"cursor.originatingCommand.comment": this.commentStr}},
-                {$project: {"cursor.cursorId": 1}},
-            ]);
-
-            while (curOpCursor.hasNext()) {
-                let result = curOpCursor.next();
-                if (result.cursor) {
-                    const cursorId = result.cursor.cursorId;
-                    jsTestLog(`Killing cursor: ${cursorId}, database ${db.getName()}`);
-                    assert.commandWorked(
-                        db.runCommand({killCursors: collName, cursors: [cursorId]}));
-                }
-            }
-        };
-
-        cluster.executeOnMongodNodes(killCursors);
-        cluster.executeOnMongosNodes(killCursors);
-        if (cluster.isSharded()) {
-            cluster.executeOnConfigNodes(killCursors);
+        const curOpCursor = db.getSiblingDB("admin").aggregate([
+            {$currentOp: {idleCursors: true}},
+            {$match: {"cursor.originatingCommand.comment": this.commentStr}},
+            {$project: {shard: 1, host: 1, "cursor.cursorId": 1}},
+        ]);
+        while (curOpCursor.hasNext()) {
+            let result = curOpCursor.next();
+            assert.commandWorked(
+                new Mongo(`${result.shard}/${result.host}`).getDB(db.getName()).runCommand({
+                    killCursors: collName,
+                    cursors: [result.cursor.cursorId]
+                }));
         }
-
         const remainingOps = () =>
             db.getSiblingDB("admin")
                 .aggregate([
