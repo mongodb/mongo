@@ -94,7 +94,7 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     release_buid: true
-    test_flags: --excludeWithAnyTags=incompatible_with_s390x,requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=incompatible_with_s390x,requires_latch_analyzer,resource_intensive
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel83
