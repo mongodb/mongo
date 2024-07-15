@@ -208,12 +208,139 @@ public:
     }
 };
 
+class PrepareUniqueIndexRecords : IndexCatalogTestBase {
+public:
+    ~PrepareUniqueIndexRecords() {
+        auto opCtx = cc().makeOperationContext();
+        AutoGetDb db{opCtx.get(), _nss.dbName(), LockMode::MODE_X};
+        WriteUnitOfWork wuow{opCtx.get()};
+        ASSERT_OK(db.getDb()->dropCollection(opCtx.get(), _nss));
+        wuow.commit();
+    }
+
+    void run() {
+        auto opCtx = cc().makeOperationContext();
+        dbtests::WriteContextForTests ctx{opCtx.get(), _nss.ns_forTest()};
+
+        ASSERT_OK(dbtests::createIndexFromSpec(
+            opCtx.get(),
+            _nss.ns_forTest(),
+            BSON(IndexDescriptor::kIndexVersionFieldName
+                 << static_cast<int>(kIndexVersion) << IndexDescriptor::kIndexNameFieldName << "a_1"
+                 << IndexDescriptor::kKeyPatternFieldName << BSON("a" << 1)
+                 << IndexDescriptor::kPrepareUniqueFieldName << true)));
+
+        AutoGetCollection coll{opCtx.get(), _nss, LockMode::MODE_X};
+        auto doc1 = BSON("_id" << 1 << "a" << 1);
+        auto doc2 = BSON("_id" << 2 << "a" << 1);
+
+        {
+            WriteUnitOfWork wuow{opCtx.get()};
+            ASSERT_OK(indexCatalog(opCtx.get())
+                          ->indexRecords(opCtx.get(), *coll, {{RecordId{1}, {}, &doc1}}, nullptr));
+            wuow.commit();
+        }
+
+        {
+            WriteUnitOfWork wuow{opCtx.get()};
+            ASSERT_NOT_OK(
+                indexCatalog(opCtx.get())
+                    ->indexRecords(opCtx.get(), *coll, {{RecordId{2}, {}, &doc2}}, nullptr));
+        }
+
+        opCtx->setEnforceConstraints(false);
+
+        {
+            WriteUnitOfWork wuow{opCtx.get()};
+            ASSERT_OK(indexCatalog(opCtx.get())
+                          ->indexRecords(opCtx.get(), *coll, {{RecordId{2}, {}, &doc2}}, nullptr));
+            wuow.commit();
+        }
+    }
+};
+
+class PrepareUniqueUpdateRecord : IndexCatalogTestBase {
+public:
+    ~PrepareUniqueUpdateRecord() {
+        auto opCtx = cc().makeOperationContext();
+        AutoGetDb db{opCtx.get(), _nss.dbName(), LockMode::MODE_X};
+        WriteUnitOfWork wuow{opCtx.get()};
+        ASSERT_OK(db.getDb()->dropCollection(opCtx.get(), _nss));
+        wuow.commit();
+    }
+
+    void run() {
+        auto opCtx = cc().makeOperationContext();
+        dbtests::WriteContextForTests ctx{opCtx.get(), _nss.ns_forTest()};
+
+        ASSERT_OK(dbtests::createIndexFromSpec(
+            opCtx.get(),
+            _nss.ns_forTest(),
+            BSON(IndexDescriptor::kIndexVersionFieldName
+                 << static_cast<int>(kIndexVersion) << IndexDescriptor::kIndexNameFieldName << "a_1"
+                 << IndexDescriptor::kKeyPatternFieldName << BSON("a" << 1)
+                 << IndexDescriptor::kPrepareUniqueFieldName << true)));
+
+        AutoGetCollection coll{opCtx.get(), _nss, LockMode::MODE_X};
+        auto doc1 = BSON("_id" << 1 << "a" << 1);
+        auto doc2 = BSON("_id" << 2 << "a" << 2);
+        auto updatedDoc2 = BSON("_id" << 2 << "a" << 1);
+
+        {
+            WriteUnitOfWork wuow{opCtx.get()};
+            ASSERT_OK(indexCatalog(opCtx.get())
+                          ->indexRecords(opCtx.get(),
+                                         *coll,
+                                         {{RecordId{1}, {}, &doc1}, {RecordId{2}, {}, &doc2}},
+                                         nullptr));
+            wuow.commit();
+        }
+
+        {
+            WriteUnitOfWork wuow{opCtx.get()};
+            int64_t keysInsertedOut, keysDeletedOut;
+            ASSERT_NOT_OK(indexCatalog(opCtx.get())
+                              ->updateRecord(opCtx.get(),
+                                             *coll,
+                                             doc2,
+                                             updatedDoc2,
+                                             nullptr,
+                                             RecordId{2},
+                                             &keysInsertedOut,
+                                             &keysDeletedOut));
+            ASSERT_EQ(keysInsertedOut, 0);
+            ASSERT_EQ(keysDeletedOut, 0);
+        }
+
+        opCtx->setEnforceConstraints(false);
+
+        {
+            WriteUnitOfWork wuow{opCtx.get()};
+            int64_t keysInsertedOut, keysDeletedOut;
+            ASSERT_OK(indexCatalog(opCtx.get())
+                          ->updateRecord(opCtx.get(),
+                                         *coll,
+                                         doc2,
+                                         updatedDoc2,
+                                         nullptr,
+                                         RecordId{2},
+                                         &keysInsertedOut,
+                                         &keysDeletedOut));
+            ASSERT_EQ(keysInsertedOut, 1);
+            ASSERT_EQ(keysDeletedOut, 1);
+            wuow.commit();
+        }
+    }
+};
+
 class IndexCatalogTests : public unittest::OldStyleSuiteSpecification {
 public:
     IndexCatalogTests() : OldStyleSuiteSpecification("indexcatalogtests") {}
     void setupTests() override {
         add<IndexIteratorTests>();
         add<RefreshEntry>();
+        add<PrepareUniqueIndexRecords>();
+        add<PrepareUniqueUpdateRecord>();
     }
 };
 
