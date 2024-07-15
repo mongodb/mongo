@@ -42,14 +42,12 @@ namespace mongo {
 namespace executor {
 
 MongotTaskExecutorCursorGetMoreStrategy::MongotTaskExecutorCursorGetMoreStrategy(
-    std::function<boost::optional<long long>()> calcDocsNeededFn,
     boost::optional<long long> startingBatchSize,
     DocsNeededBounds docsNeededBounds,
     boost::optional<TenantId> tenantId,
     std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
         searchIdLookupMetrics)
-    : _calcDocsNeededFn(calcDocsNeededFn),
-      _currentBatchSize(startingBatchSize),
+    : _currentBatchSize(startingBatchSize),
       _docsNeededBounds(docsNeededBounds),
       _batchSizeHistory({}),
       _tenantId(tenantId),
@@ -57,16 +55,16 @@ MongotTaskExecutorCursorGetMoreStrategy::MongotTaskExecutorCursorGetMoreStrategy
     if (startingBatchSize.has_value()) {
         _batchSizeHistory.emplace_back(*startingBatchSize);
     }
-    tassert(8953000,
-            "Only one of docsRequested or batchSize should be enabled for mongot getMore requests.",
-            _calcDocsNeededFn == nullptr || !_currentBatchSize.has_value());
 }
 
 BSONObj MongotTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(
-    const CursorId& cursorId, const NamespaceString& nss, long long prevBatchNumReceived) {
+    const CursorId& cursorId,
+    const NamespaceString& nss,
+    long long prevBatchNumReceived,
+    long long totalNumReceived) {
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
 
-    boost::optional<long long> docsNeeded = _calcDocsNeededFn ? _calcDocsNeededFn() : boost::none;
+    boost::optional<long long> docsNeeded = _getNextDocsRequested(totalNumReceived);
 
     // TODO SERVER-74941 Remove docsRequested alongside featureFlagSearchBatchSizeLimit.
     if (_currentBatchSize.has_value() || docsNeeded.has_value()) {
@@ -133,6 +131,26 @@ long long MongotTaskExecutorCursorGetMoreStrategy::_getNextBatchSize(
     }
     _batchSizeHistory.emplace_back(*_currentBatchSize);
     return *_currentBatchSize;
+}
+
+boost::optional<long long> MongotTaskExecutorCursorGetMoreStrategy::_getNextDocsRequested(
+    long long totalNumReceived) {
+    auto extractableLimit = docs_needed_bounds::calcExtractableLimit(_docsNeededBounds);
+    if (!extractableLimit.has_value()) {
+        return boost::none;
+    }
+
+    if (_searchIdLookupMetrics) {
+        // The return value will start at _mongotDocsRequested and will decrease by one
+        // for each document that gets returned by the $idLookup stage. If a document gets
+        // filtered out, docsReturnedByIdLookup will not change and so docsNeeded will stay the
+        // same.
+        return extractableLimit.get() - _searchIdLookupMetrics->getDocsReturnedByIdLookup();
+    } else {
+        // In the stored source case, the return value will start at _mongotDocsRequested and
+        // will decrease by one for each document returned by this stage.
+        return extractableLimit.get() - totalNumReceived;
+    }
 }
 
 bool MongotTaskExecutorCursorGetMoreStrategy::_mustNeedAnotherBatch(

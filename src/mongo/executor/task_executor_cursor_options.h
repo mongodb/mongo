@@ -56,7 +56,8 @@ public:
      */
     virtual BSONObj createGetMoreRequest(const CursorId& cursorId,
                                          const NamespaceString& nss,
-                                         long long prevBatchNumReceived) = 0;
+                                         long long prevBatchNumReceived,
+                                         long long totalNumReceived) = 0;
 
     /**
      * If true, we'll fetch the next batch as soon as the current one is received. If false, we'll
@@ -87,7 +88,8 @@ public:
 
     BSONObj createGetMoreRequest(const CursorId& cursorId,
                                  const NamespaceString& nss,
-                                 long long prevBatchNumReceived) final;
+                                 long long prevBatchNumReceived,
+                                 long long totalNumReceived) final;
 
     bool shouldPrefetch(long long totalNumReceived, long long numBatchesReceived) const final {
         return _preFetchNextBatch;

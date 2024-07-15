@@ -91,7 +91,6 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     const InternalSearchMongotRemoteSpec& spec,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     boost::optional<int64_t> userBatchSize = boost::none,
-    std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr,
     std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
         searchIdLookupMetrics = nullptr);

@@ -240,7 +240,6 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     const InternalSearchMongotRemoteSpec& spec,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     boost::optional<int64_t> userBatchSize,
-    std::function<boost::optional<long long>()> calcDocsNeededFn,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy,
     std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
         searchIdLookupMetrics) {
@@ -275,8 +274,6 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     if (batchSize.has_value() ||
         !feature_flags::gFeatureFlagSearchBatchSizeLimit.isEnabledAndIgnoreFCVUnsafe()) {
         docsRequested = boost::none;
-        // Set calcDocsNeededFn to disable docsRequested for getMore requests.
-        calcDocsNeededFn = nullptr;
     } else {
         // If we're enabling the docsRequested option, min/max bounds can be set to the
         // docsRequested value.
@@ -286,7 +283,6 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     }
 
     auto getMoreStrategy = std::make_unique<executor::MongotTaskExecutorCursorGetMoreStrategy>(
-        calcDocsNeededFn,
         batchSize,
         bounds.value_or(
             DocsNeededBounds(docs_needed_bounds::Unknown(), docs_needed_bounds::Unknown())),

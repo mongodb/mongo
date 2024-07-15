@@ -34,7 +34,10 @@
 namespace mongo {
 namespace executor {
 BSONObj DefaultTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(
-    const CursorId& cursorId, const NamespaceString& nss, long long prevBatchNumReceived) {
+    const CursorId& cursorId,
+    const NamespaceString& nss,
+    long long prevBatchNumReceived,
+    long long totalNumReceived) {
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(_batchSize);
     return getMoreRequest.toBSON();

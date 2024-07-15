@@ -50,7 +50,6 @@ public:
     static constexpr int kAlwaysPrefetchAfterNBatches = 3;
 
     MongotTaskExecutorCursorGetMoreStrategy(
-        std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
         boost::optional<long long> startingBatchSize = mongot_cursor::kDefaultMongotBatchSize,
         DocsNeededBounds docsNeededBounds = DocsNeededBounds(docs_needed_bounds::Unknown(),
                                                              docs_needed_bounds::Unknown()),
@@ -70,7 +69,8 @@ public:
      */
     BSONObj createGetMoreRequest(const CursorId& cursorId,
                                  const NamespaceString& nss,
-                                 long long prevBatchNumReceived) final;
+                                 long long prevBatchNumReceived,
+                                 long long totalNumReceived) final;
 
     /**
      * For the mongot cursor, we want to prefetch the next batch if we know we'll need another batch
@@ -103,9 +103,11 @@ private:
      */
     long long _getNextBatchSize(long long prevBatchNumReceived);
 
-    // TODO SERVER-92111 Remove Remove _calcDocsNeededFn and use _searchIdLookupMetrics to compute
-    // docsRequested instead. Set to nullptr if docsRequested should not be set on getMore requests.
-    std::function<boost::optional<long long>()> _calcDocsNeededFn;
+    /**
+     * Computes the next docsRequested value when the docsRequested option is enabled for mongot
+     * requests.
+     */
+    boost::optional<long long> _getNextDocsRequested(long long totalNumReceived);
 
     // Set to boost::none if batchSize should not be set on getMore requests.
     boost::optional<long long> _currentBatchSize;

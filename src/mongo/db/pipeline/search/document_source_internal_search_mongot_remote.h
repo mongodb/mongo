@@ -124,12 +124,6 @@ public:
     }
 
     /**
-     * Calculate the number of documents needed to satisfy a user-defined limit. This information
-     * can be used in a getMore sent to mongot.
-     */
-    boost::optional<long long> calcDocsNeeded();
-
-    /**
      * If a cursor establishment phase was run and returned no documents, make sure we don't later
      * repeat the query to mongot.
      */
