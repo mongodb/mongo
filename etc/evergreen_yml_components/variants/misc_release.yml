@@ -773,8 +773,8 @@ buildvariants:
   - name: sharding_gen
   - name: replica_sets_gen
 
-- name: rhel80
-  display_name: RHEL 8.0
+- name: rhel8
+  display_name: RHEL 8
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-build
@@ -824,12 +824,12 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-rhel-80-64-bit
-  display_name: "Enterprise RHEL 8.0"
+- name: enterprise-rhel-8-64-bit
+  display_name: "Enterprise RHEL 8"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-expansions
+  expansions: &enterprise-rhel-8-64-bit-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -945,8 +945,8 @@ buildvariants:
   - name: vector_search_auth
   - name: vector_search_ssl
 
-- name: rhel-82-arm64
-  display_name: RHEL 8.2 arm64
+- name: rhel-8-arm64
+  display_name: RHEL 8 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel82-arm64-small
@@ -992,8 +992,8 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-rhel-82-arm64
-  display_name: "Enterprise RHEL 8.2 arm64"
+- name: enterprise-rhel-8-arm64
+  display_name: "Enterprise RHEL 8 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel82-arm64-small

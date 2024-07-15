@@ -40,7 +40,7 @@ EXTERNAL_LOGGERS = {
     "urllib3",
 }
 
-DEFAULT_VARIANT = "enterprise-rhel-80-64-bit-dynamic-required"
+DEFAULT_VARIANT = "enterprise-rhel-8-64-bit-dynamic-required"
 ENTERPRISE_MODULE_PATH = "src/mongo/db/modules/enterprise"
 DEFAULT_REPO_LOCATIONS = ["."]
 REPEAT_SUITES = 2

@@ -19,15 +19,15 @@ overrides:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
-  enterprise-rhel-80-64-bit-coverage:
+  enterprise-rhel-8-64-bit-coverage:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours.
 
-  enterprise-rhel80-debug-complete-tsan:
+  enterprise-rhel8-debug-complete-tsan:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
-  enterprise-rhel80-debug-tsan:
+  enterprise-rhel8-debug-tsan:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
@@ -39,27 +39,27 @@ overrides:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
-  rhel80-asan:
+  rhel8-asan:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
-  rhel80-debug-ubsan:
+  rhel8-debug-ubsan:
   - task: update_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
-  rhel80-debug-suggested:
+  rhel8-debug-suggested:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 180  # 3 hours.
 
-  rhel80-debug-ubsan-all-feature-flags:
+  rhel8-debug-ubsan-all-feature-flags:
   - task: update_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
-  rhel80-debug-ubsan-classic-engine:
+  rhel8-debug-ubsan-classic-engine:
   - task: update_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
-  rhel80-debug-v4ubsan-all-feature-flags-experimental:
+  rhel8-debug-v4ubsan-all-feature-flags-experimental:
   - task: update_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 

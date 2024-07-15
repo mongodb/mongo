@@ -135,7 +135,7 @@ class TestAcceptance(unittest.TestCase):
 
         # assert that generated suite files have the suite name and the variant name in the
         # filename, to prevent tasks on different variants from using the same suite file
-        self.assertIn("auth_enterprise-rhel-80-64-bit-dynamic-required_0.yml", files_to_generate)
+        self.assertIn("auth_enterprise-rhel-8-64-bit-dynamic-required_0.yml", files_to_generate)
 
         generated_evg_config_raw = [
             gen_file.content for gen_file in generated_config.file_list
@@ -147,7 +147,7 @@ class TestAcceptance(unittest.TestCase):
         # jstests/auth/auth1.js belongs to two suites, auth and auth_audit,
         rhel_80_with_generated_tasks = next(
             (variant for variant in build_variants_with_generated_tasks
-             if variant["name"] == "enterprise-rhel-80-64-bit-dynamic-required"), None)
+             if variant["name"] == "enterprise-rhel-8-64-bit-dynamic-required"), None)
         self.assertEqual(len(rhel_80_with_generated_tasks["tasks"]), 2)
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
@@ -168,7 +168,7 @@ class TestAcceptance(unittest.TestCase):
         mock_task_mapping = TaskMapping(
             branch="master", project="mongodb-mongo-master", repo="mongodb/mongo",
             source_file="src/file1.cpp", source_file_seen_count=8,
-            tasks=[TaskMapInstance(name="auth", variant="enterprise-rhel-80", flip_count=5)])
+            tasks=[TaskMapInstance(name="auth", variant="enterprise-rhel-8", flip_count=5)])
         mock_selected_tests_client = MagicMock()
         mock_selected_tests_client.get_task_mappings.return_value = TaskMappingsResponse(
             task_mappings=[mock_task_mapping])
@@ -194,7 +194,7 @@ class TestAcceptance(unittest.TestCase):
         build_variants_with_generated_tasks = generated_evg_config["buildvariants"]
         rhel_80_with_generated_tasks = next(
             (variant for variant in build_variants_with_generated_tasks
-             if variant["name"] == "enterprise-rhel-80-64-bit-dynamic-required"), None)
+             if variant["name"] == "enterprise-rhel-8-64-bit-dynamic-required"), None)
         self.assertEqual(len(rhel_80_with_generated_tasks["tasks"]), 5)
 
 

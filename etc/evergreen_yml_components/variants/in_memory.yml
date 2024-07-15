@@ -1,8 +1,8 @@
 # InMemory build variants that need to be run on LTS but not Rapid releases.
 
 buildvariants:
-- name: enterprise-rhel-80-64-bit-inmem
-  display_name: Enterprise RHEL 8.0 (inMemory)
+- name: enterprise-rhel-8-64-bit-inmem
+  display_name: Enterprise RHEL 8 (inMemory)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small

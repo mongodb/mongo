@@ -163,13 +163,13 @@ buildvariants:
   - name: snmp
   - name: unittest_shell_hang_analyzer_gen
 
-- &enterprise-rhel-80-64-bit-dynamic-required-template
-  name: enterprise-rhel-80-64-bit-dynamic-required
-  display_name: "! Shared Library Enterprise RHEL 8.0"
+- &enterprise-rhel-8-64-bit-dynamic-required-template
+  name: enterprise-rhel-8-64-bit-dynamic-required
+  display_name: "! Shared Library Enterprise RHEL 8"
   cron: "0 */4 * * *" # Every 4 hours starting at midnight
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-dynamic-required-expansions
+  expansions: &enterprise-rhel-8-64-bit-dynamic-required-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
@@ -365,7 +365,7 @@ buildvariants:
   - name: jsCore_txns
   - name: unittest_shell_hang_analyzer_gen
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
+- <<: *enterprise-rhel-8-64-bit-dynamic-required-template
   name: commit-queue
   display_name: "~ Commit Queue"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -389,12 +389,12 @@ buildvariants:
   - name: check_feature_flag_tags
 
 # Temporary variant to stress a component and gather more data.
-- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
-  name: enterprise-rhel-80-64-bit-dynamic-stress-initialsyncid  # For BF-25011
-  display_name: "~ Shared Library Enterprise RHEL 8.0 (initialSyncId stress test)"
+- <<: *enterprise-rhel-8-64-bit-dynamic-required-template
+  name: enterprise-rhel-8-64-bit-dynamic-stress-initialsyncid  # For BF-25011
+  display_name: "~ Shared Library Enterprise RHEL 8 (initialSyncId stress test)"
   cron: "0 */1 * * *" # Every hour starting at midnight
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
+    <<: *enterprise-rhel-8-64-bit-dynamic-required-expansions
     max_sub_suites: 10
     # Set a low target time to run only 1 test per generated Evergreen task. Increase timeout.
     target_resmoke_time: 1
@@ -409,8 +409,8 @@ buildvariants:
         - rhel80-xlarge
     - name: .sharding
 
-- name: enterprise-rhel-80-64-bit-large-txns-format
-  display_name: "Enterprise RHEL 8.0 (large transactions format)"
+- name: enterprise-rhel-8-64-bit-large-txns-format
+  display_name: "Enterprise RHEL 8 (large transactions format)"
   run_on:
   - rhel80-small
   cron: "0 4 * * 0"
@@ -481,9 +481,9 @@ buildvariants:
     - rhel80-medium
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &enterprise-rhel-80-64-bit-dynamic-classic-engine
-  name: enterprise-rhel-80-64-bit-dynamic-classic-engine
-  display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
+- &enterprise-rhel-8-64-bit-dynamic-classic-engine
+  name: enterprise-rhel-8-64-bit-dynamic-classic-engine
+  display_name: "Shared Library Enterprise RHEL 8 (Classic Engine)"
   cron: "0 4 * * 0"
   run_on:
   - rhel80-small

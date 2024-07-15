@@ -30,7 +30,7 @@ from buildscripts.util.taskname import name_generated_task
 from buildscripts.util.teststats import TestRuntime, HistoricTaskData
 
 DEFAULT_PROJECT = "mongodb-mongo-master"
-DEFAULT_VARIANT = "enterprise-rhel-80-64-bit-dynamic-required"
+DEFAULT_VARIANT = "enterprise-rhel-8-64-bit-dynamic-required"
 BURN_IN_TESTS_GEN_TASK = "burn_in_tests_gen"
 BURN_IN_TESTS_TASK = "burn_in_tests"
 BURN_IN_ENV_VAR = "BURN_IN_TESTS"

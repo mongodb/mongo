@@ -1,7 +1,7 @@
 """
 Get the display task name from the execution task and the variant.
 
-Get an execution task name like this: multiversion_auth_0_enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
+Get an execution task name like this: multiversion_auth_0_enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required
 Into a display task name like this: multiversion_auth
 """
 

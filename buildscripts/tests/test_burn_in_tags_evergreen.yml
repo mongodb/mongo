@@ -60,11 +60,11 @@ tasks:
       resmoke_args: --suites=aggregation --storageEngine=wiredTiger
 
 buildvariants:
-- name: enterprise-rhel-80-64-bit
-  display_name: "! Enterprise RHEL 8.0"
+- name: enterprise-rhel-8-64-bit
+  display_name: "! Enterprise RHEL 8"
   expansions:
     multiversion_platform: rhel80
-    burn_in_tag_include_build_variants: enterprise-rhel-80-64-bit-majority-read-concern-off enterprise-rhel-80-64-bit-inmem
+    burn_in_tag_include_build_variants: enterprise-rhel-8-64-bit-majority-read-concern-off enterprise-rhel-8-64-bit-inmem
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -80,11 +80,11 @@ buildvariants:
     multiversion_platform: rhel80
   tasks:
   - name: burn_in_tags_gen
-- name: enterprise-rhel-80-64-bit-majority-read-concern-off
-  display_name: "Enterprise RHEL 8.0 (majority read concern off)"
+- name: enterprise-rhel-8-64-bit-majority-read-concern-off
+  display_name: "Enterprise RHEL 8 (majority read concern off)"
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-majority-read-concern-off-expansions
+  expansions: &enterprise-rhel-8-64-bit-majority-read-concern-off-expansions
     multiversion_edition: enterprise
   tasks:
   - name: compile_all_run_unittests_TG
@@ -92,11 +92,11 @@ buildvariants:
     - rhel80-large
   - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation
-- name: enterprise-rhel-80-64-bit-inmem
-  display_name: Enterprise RHEL 8.0 (inMemory)
+- name: enterprise-rhel-8-64-bit-inmem
+  display_name: Enterprise RHEL 8 (inMemory)
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-inmem-expansions
+  expansions: &enterprise-rhel-8-64-bit-inmem-expansions
     test_flags: >-
       --majorityReadConcern=off
       --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction,uses_atclustertime
@@ -113,8 +113,8 @@ buildvariants:
     large_distro_name: rhel80-large
   tasks:
   - name: compile
-- name: enterprise-rhel-80-64-bit-inmem
-  display_name: Enterprise RHEL 8.0 (inMemory)
+- name: enterprise-rhel-8-64-bit-inmem
+  display_name: Enterprise RHEL 8 (inMemory)
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo)
