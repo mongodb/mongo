@@ -161,8 +161,8 @@ void validateIDLFLE2RangeFindSpec(const FLE2RangeFindSpec* placeholder) {
                 min.type() == BSONType::NumberDecimal || min.type() == BSONType::NumberDouble);
     }
 
-    {
-        auto tf = edgesInfo.getTrimFactor();
+    if (edgesInfo.getTrimFactor().has_value()) {
+        auto tf = edgesInfo.getTrimFactor().value();
         uassert(8574100,
                 "Trim factor must be less than the number of bits used to represent the domain.",
                 tf == 0 ||
