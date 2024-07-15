@@ -553,7 +553,10 @@ public:
         if (collection) {
             CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, stats);
         }
+
+        long long nReturned = stats.nReturned;
         curOp->debug().setPlanSummaryMetrics(std::move(stats));
+        curOp->setEndOfOpMetrics(nReturned);
 
         if (curOp->shouldDBProfile()) {
             auto&& [stats, _] =

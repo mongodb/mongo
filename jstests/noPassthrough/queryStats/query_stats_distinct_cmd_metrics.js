@@ -6,6 +6,7 @@
  */
 import {
     assertAggregatedMetricsSingleExec,
+    assertExpectedResults,
     getLatestQueryStatsEntry,
     withQueryStatsEnabled
 } from "jstests/libs/query_stats_utils.js";
@@ -39,4 +40,12 @@ withQueryStatsEnabled(collName, (coll) => {
         fromMultiPlanner: false,
         fromPlanCache: false
     });
+    assertExpectedResults(firstEntry,
+                          firstEntry.key,
+                          /* expectedExecCount */ 1,
+                          /* expectedDocsReturnedSum */ 3,
+                          /* expectedDocsReturnedMax */ 3,
+                          /* expectedDocsReturnedMin */ 3,
+                          /* expectedDocsReturnedSumOfSq */ 9,
+                          /* getMores */ false);
 }, false);
