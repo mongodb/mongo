@@ -17,6 +17,9 @@
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
 
     // Ensure min time is rounded down to nearest minute.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:10:14.134Z")}));
@@ -35,6 +38,9 @@
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
 
     // Ensure min time is rounded down to nearest hour.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:10:14.134Z")}));
@@ -53,6 +59,9 @@
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: 't', granularity: 'hours'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
 
     // Ensure min time is rounded down to nearest day.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:10:14.134Z")}));
@@ -71,6 +80,9 @@
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
 
     // Ensure min time is rounded down to nearest minute.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:10:14.134Z")}));
@@ -102,6 +114,9 @@
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    if (TestData.runningWithBalancer) {
+        assert.commandWorked(coll.createIndex({'t': 1}));
+    }
 
     // Ensure min time is rounded down to nearest hour.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:10:14.134Z")}));
