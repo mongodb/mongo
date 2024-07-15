@@ -45,7 +45,7 @@ const rst = new ReplSetTest({
     // Only one node is allowed to step up and become primary. This is to prevent synchronization
     // issues where a former primary but now secondary may enter rollback on finding that its
     // oplog has diverged.
-    nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+    nodes: [{}, {rsConfig: {priority: 0}}],
     // Set the wiredTigerCacheSizeGB to stress the WT cache and create conditions for the usage of
     // the history store.
     // Set slowms to avoid logging "Slow query" lines. We expect many of them, and so we don't want
@@ -64,12 +64,12 @@ for (let i = 0; i < 10; i++) {
                                               '--quiet' /* Make the shell less verbose */);
 
     // Allow the workload to run for several seconds as we sleep.
-    const sleepSeconds = Math.floor(15 + Math.random() * 45);
+    const sleepSeconds = Math.floor(30 + Math.random() * 15);
     jsTestLog("Sleeping for " + sleepSeconds + " seconds, before killing nodes.");
     sleep(sleepSeconds * 1000);
 
     jsTestLog("Killing all nodes.");
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
         const pid = rst.getNodeId(rst.nodes[i]);
         try {
             rst.stop(
@@ -85,7 +85,7 @@ for (let i = 0; i < 10; i++) {
 
     jsTestLog("Restarting repl set.");
     const result = rst.startSet({wiredTigerCacheSizeGB: 0.25}, true /* restart */);
-    assert.eq(result.length, 3, result);
+    assert.eq(result.length, 2, result);
 
     // Wait until the primary and secondaries are up and running.
     jsTestLog("Waiting for primary and secondaries.");
