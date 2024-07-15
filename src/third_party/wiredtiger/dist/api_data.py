@@ -730,6 +730,20 @@ connection_runtime_config = [
         the number of milliseconds to wait for a resource to drain before timing out in diagnostic
         mode. Default will wait for 4 minutes, 0 will wait forever''',
         min=0),
+    Config('heuristic_controls', '', r'''
+        control the behavior of various optimizations. This is primarily used as a mechanism for
+        rolling out changes to internal heuristics while providing a mechanism for quickly
+        reverting to prior behavior in the field''',
+        type='category', subconfig=[
+            Config('obsolete_tw_btree_max', '100', r'''
+                maximum number of btrees that can be checked for obsolete time window cleanup in a
+                single checkpoint''',
+                min=0, max=500000),
+            Config('obsolete_tw_pages_dirty_max', '100', r'''
+                maximum number of pages that can be marked dirty because of obsolete time window
+                information per btree in a single checkpoint''',
+                min=0, max=100000),
+        ]),
     Config('history_store', '', r'''
         history store configuration options''',
         type='category', subconfig=[
@@ -740,16 +754,6 @@ connection_runtime_config = [
             space as the filesystem will accommodate. The minimum non-zero setting is 100MB.''',
             # !!! Must match WT_HS_FILE_MIN
             min='0')
-        ]),
-    Config('heuristic_controls', '', r'''
-        control the behavior of various optimizations. This is primarily used as a mechanism for
-        rolling out changes to internal heuristics while providing a mechanism for quickly
-        reverting to prior behavior in the field''',
-        type='category', subconfig=[
-            Config('obsolete_tw_pages_dirty', '100', r'''
-                eviction to mark the number of obsolete time window pages that are marked as dirty
-                per btree in a single checkpoint''',
-                min=0, max=100000),
         ]),
     Config('io_capacity', '', r'''
         control how many bytes per second are written and read. Exceeding the capacity results
