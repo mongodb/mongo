@@ -15,6 +15,9 @@
  *   # This test expects stable query plans, creating unanticipated indexes can lead to variations
  *   # in the plans.
  *   assumes_no_implicit_index_creation,
+ *   # The canonical query encoding is not guaranteed to remain the same across versions, and it was
+ *   # changed from v7.0 to v8.0. This test should not run in multiversion suites against v8.0.
+ *   requires_fcv_80,
  * ]
  */
 import {getOptimizer} from "jstests/libs/analyze_plan.js";
