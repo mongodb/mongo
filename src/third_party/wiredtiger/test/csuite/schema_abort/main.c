@@ -573,6 +573,7 @@ thread_ckpt_run(void *arg)
     int i;
     char ckpt_flush_config[128], ckpt_config[128];
     bool created_ready, flush_tier, ready_for_kill;
+    uint64_t diff_sec;
 
     td = (THREAD_DATA *)arg;
     /*
@@ -605,14 +606,18 @@ thread_ckpt_run(void *arg)
              */
             if (!stable_set) {
                 __wt_epoch(NULL, &now);
-                if (WT_TIMEDIFF_SEC(now, start) >= 1)
-                    printf("CKPT: !stable_set time %" PRIu64 "\n", WT_TIMEDIFF_SEC(now, start));
-                if (WT_TIMEDIFF_SEC(now, start) > MAX_STARTUP) {
+                diff_sec = WT_TIMEDIFF_SEC(now, start);
+                if (diff_sec >= 1 && (i % 100) == 0)
+                    printf("CKPT: !stable_set time %" PRIu64 "\n", diff_sec);
+                if (diff_sec > MAX_STARTUP) {
                     fprintf(
                       stderr, "After %d seconds stable still not set. Aborting.\n", MAX_STARTUP);
                     dump_ts();
                     abort();
                 }
+                __wt_sleep(0, WT_THOUSAND);
+                /* Give timestamp thread a chance to run and move the timestamps forward. */
+                __wt_yield();
                 continue;
             }
         }
