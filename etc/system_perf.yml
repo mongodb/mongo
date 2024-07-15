@@ -313,6 +313,11 @@ functions:
           /opt/mongodbtoolchain/v4/bin/python3 -m venv "${workdir}/compile_venv"
           source "${workdir}/compile_venv/bin/activate"
 
+          poetry_dir="${workdir}/poetry_dir"
+          mkdir -p $poetry_dir
+          export POETRY_CONFIG_DIR="$poetry_dir/config"
+          export POETRY_DATA_DIR="$poetry_dir/data"
+          export POETRY_CACHE_DIR="$poetry_dir/cache"
           python -m pip install "poetry==1.5.1"
           # See BF-29897 / https://github.com/python-poetry/poetry/issues/7584
           poetry config installer.max-workers 10
