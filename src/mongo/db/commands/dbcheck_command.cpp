@@ -576,7 +576,6 @@ void DbCheckJob::run() {
         _dbChecksInProgress.push_back(info);
         // Wait for the dbcheck job this thread enqueued to be at the front of the queue.
         // Once it is at the front, we can start that job.
-
         try {
             opCtx->waitForConditionOrInterrupt(_dbCheckNotifier, lock, [&] {
                 return _dbChecksInProgress.front().get().toBSON().toString().compare(
@@ -1000,8 +999,10 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
         oplogBatch.setNss(_info.nss);
         oplogBatch.setReadTimestamp(*readTimestamp);
         oplogBatch.setMd5(md5);
-        oplogBatch.setBatchStart(firstBsonWithoutRecordId);
-        oplogBatch.setBatchEnd(lastBsonWithoutRecordId);
+        oplogBatch.setBatchStart(
+            key_string::rehydrateKey(index->keyPattern(), firstBsonWithoutRecordId));
+        oplogBatch.setBatchEnd(
+            key_string::rehydrateKey(index->keyPattern(), lastBsonWithoutRecordId));
 
         if (_info.secondaryIndexCheckParameters) {
             oplogBatch.setSecondaryIndexCheckParameters(_info.secondaryIndexCheckParameters);
