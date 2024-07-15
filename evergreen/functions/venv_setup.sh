@@ -33,6 +33,11 @@ if uname -a | grep -q 's390x\|ppc64le'; then
   # They are pinned deps as well
   EXTRA_IBM_ARGS="cryptography==2.3 pyOpenSSL==19.0.0"
 fi
+poetry_dir="${workdir}/poetry_dir"
+mkdir -p $poetry_dir
+export POETRY_CONFIG_DIR="$poetry_dir/config"
+export POETRY_DATA_DIR="$poetry_dir/data"
+export POETRY_CACHE_DIR="$poetry_dir/cache"
 for i in {1..5}; do
   $POETRY_VENV_PYTHON -m pip install "poetry==1.5.1" ${EXTRA_IBM_ARGS} && RET=0 && break || RET=$? && sleep 1
   echo "Python failed to install poetry, retrying..."
