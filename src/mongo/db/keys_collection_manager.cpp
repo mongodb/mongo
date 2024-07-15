@@ -119,7 +119,7 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionManager::getKeysFo
     auto swInternalKey = _keysCache.getInternalKeyById(keyId, forThisTime);
 
     if (swInternalKey == ErrorCodes::KeyNotFound) {
-        _refresher.refreshNow(opCtx);
+        refreshNow(opCtx);
         swInternalKey = _keysCache.getInternalKeyById(keyId, forThisTime);
     }
 
@@ -168,7 +168,17 @@ StatusWith<KeysCollectionDocument> KeysCollectionManager::getKeyForSigning(
 }
 
 void KeysCollectionManager::refreshNow(OperationContext* opCtx) {
-    _refresher.refreshNow(opCtx);
+    auto refreshRequest = _refresher.requestRefreshAsync(opCtx);
+    // note: waitFor waits min(maxTimeMS, kDefaultRefreshWaitTime).
+    // waitFor also throws if timeout, so also throw when notification was not satisfied after
+    // waiting.
+    if (!refreshRequest->waitFor(opCtx, kDefaultRefreshWaitTime)) {
+        uasserted(ErrorCodes::ExceededTimeLimit, "timed out waiting for refresh");
+    }
+}
+
+void KeysCollectionManager::requestRefreshAsync(OperationContext* opCtx) {
+    _refresher.requestRefreshAsync(opCtx);
 }
 
 void KeysCollectionManager::startMonitoring(ServiceContext* service) {
@@ -232,7 +242,8 @@ void KeysCollectionManager::cacheExternalKey(ExternalKeysCollectionDocument key)
     }
 }
 
-void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) {
+std::shared_ptr<Notification<void>> KeysCollectionManager::PeriodicRunner::requestRefreshAsync(
+    OperationContext* opCtx) {
     auto refreshRequest = [this]() {
         stdx::lock_guard<Latch> lk(_mutex);
 
@@ -247,13 +258,7 @@ void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) 
         _refreshNeededCV.notify_all();
         return _refreshRequest;
     }();
-
-    // note: waitFor waits min(maxTimeMS, kDefaultRefreshWaitTime).
-    // waitFor also throws if timeout, so also throw when notification was not satisfied after
-    // waiting.
-    if (!refreshRequest->waitFor(opCtx, kDefaultRefreshWaitTime)) {
-        uasserted(ErrorCodes::ExceededTimeLimit, "timed out waiting for refresh");
-    }
+    return refreshRequest;
 }
 
 void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* service,
@@ -284,7 +289,9 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
                 return true;
             }
         }
-        return false;
+        // Possible that we were signaled by condvar in the shutdown of this class without the opCtx
+        // being killed.
+        return _inShutdown;
     };
 
     unsigned totalErrorCount = 0;
