@@ -98,6 +98,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             skippableErrors.push(...stepdownErrors);
         }
 
+        // If we're killing sessions, retrying an interrupted retryable write may fail with
+        // ConflictingOperationInProgress if the write's transaction number has already been used to
+        // start a transaction on the router. This should only happen if the original attempt was
+        // interrupted after starting its transaction on the router but *before* sending a
+        // transaction command to mongod, otherwise the retry will be rejected by mongod with
+        // IncompleteTransactionHistory. This also means we know the write must not have committed.
+        const interruptionRetryErrors = [ErrorCodes.ConflictingOperationInProgress];
+        if (this.retryOnKilledSession) {
+            skippableErrors.push(...interruptionRetryErrors);
+        }
+
         // Failed in the document shard key path, but not with a duplicate key error
         if (errMsg.includes(otherErrorsInChangeShardKeyMsg)) {
             return skippableErrors.includes(errCode);
