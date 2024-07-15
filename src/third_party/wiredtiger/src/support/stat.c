@@ -1386,6 +1386,7 @@ static const char *const __stats_connection_desc[] = {
   "background-compact: background compact running",
   "background-compact: background compact skipped file as it is part of the exclude list",
   "background-compact: background compact skipped file as not meeting requirements for compaction",
+  "background-compact: background compact sleeps due to cache pressure",
   "background-compact: background compact successful calls",
   "background-compact: background compact timeout",
   "background-compact: number of files tracked by background compaction",
@@ -2149,6 +2150,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->background_compact_running = 0;
     stats->background_compact_exclude = 0;
     stats->background_compact_skipped = 0;
+    stats->background_compact_sleep_cache_pressure = 0;
     stats->background_compact_success = 0;
     stats->background_compact_timeout = 0;
     stats->background_compact_files_tracked = 0;
@@ -2861,6 +2863,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->background_compact_running += WT_STAT_READ(from, background_compact_running);
     to->background_compact_exclude += WT_STAT_READ(from, background_compact_exclude);
     to->background_compact_skipped += WT_STAT_READ(from, background_compact_skipped);
+    to->background_compact_sleep_cache_pressure +=
+      WT_STAT_READ(from, background_compact_sleep_cache_pressure);
     to->background_compact_success += WT_STAT_READ(from, background_compact_success);
     to->background_compact_timeout += WT_STAT_READ(from, background_compact_timeout);
     to->background_compact_files_tracked += WT_STAT_READ(from, background_compact_files_tracked);

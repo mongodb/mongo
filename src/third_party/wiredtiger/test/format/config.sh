@@ -157,6 +157,8 @@ CONFIG configuration_list[] = {
 
 {"compact.free_space_target", "free space target for compaction (MB)", 0x0, 1, 100, UINT_MAX}
 
+{"debug.background_compact", "background compaction processes files more often", C_BOOL, 5, 0, 0}
+
 {"debug.checkpoint_retention", "adjust log removal to retain the log records", 0x0, 0, 10, 1024}
 
 {"debug.cursor_reposition", "cursor temporarily releases any page requiring forced eviction and then repositions back to the page for further operations", C_BOOL, 5, 0, 0}
