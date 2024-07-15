@@ -77,7 +77,7 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleTopsWithSameSortKeyOptimizedIntoOn
 {
     $group: {
         _id: {$const: null},
-        ts: {
+        ts_0: {
             $top: {
                 output: {tm: {$ifNull: ["$m", {$const: null}]}, ti: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
@@ -90,8 +90,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleTopsWithSameSortKeyOptimizedIntoOn
 {
     $project: {
         _id: true,
-        tm: "$ts.tm",
-        ti: "$ts.ti"
+        tm: "$ts_0.tm",
+        ti: "$ts_0.ti"
     }
 }
     )");
@@ -126,7 +126,7 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomNsWithSameSortKeySameNOptimi
 {
     $group: {
         _id: "$tag",
-        bns: {
+        bns_0: {
             $bottomN: {
                 n: {$cond: [{$eq: ["$tag", {$const: "WA"}]}, {$const: 10}, {$const: 4}]},
                 output: {bnm: {$ifNull: ["$m", {$const: null}]}, bni: {$ifNull: ["$i", {$const: null}]}},
@@ -140,8 +140,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomNsWithSameSortKeySameNOptimi
 {
     $project: {
         _id: true,
-        bnm: "$bns.bnm",
-        bni: "$bns.bni"
+        bnm: "$bns_0.bnm",
+        bni: "$bns_0.bni"
     }
 }
     )");
@@ -164,7 +164,7 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleTopNsWithSameSortKeyOptimizedIntoO
 {
     $group: {
         _id: {$const: null},
-        tns: {
+        tns_0: {
             $topN: {
                 n: {$const: 2},
                 output: {tm: {$ifNull: ["$m", {$const: null}]}, ti: {$ifNull: ["$i", {$const: null}]}},
@@ -178,8 +178,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleTopNsWithSameSortKeyOptimizedIntoO
 {
     $project: {
         _id: true,
-        tm: "$tns.tm",
-        ti: "$tns.ti"
+        tm: "$tns_0.tm",
+        ti: "$tns_0.ti"
     }
 }
     )");
@@ -202,7 +202,7 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomsWithSameSortKeyOptimizedInt
 {
     $group: {
         _id: {$const: null},
-        bs: {
+        bs_0: {
             $bottom: {
                 output: {bm: {$ifNull: ["$m", {$const: null}]}, bi: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
@@ -215,8 +215,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomsWithSameSortKeyOptimizedInt
 {
     $project: {
         _id: true,
-        bm: "$bs.bm",
-        bi: "$bs.bi"
+        bm: "$bs_0.bm",
+        bi: "$bs_0.bi"
     }
 }
     )");
@@ -238,7 +238,7 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomNsWithSameSortKeyOptimizedIn
 {
     $group: {
         _id: {$const: null},
-        bns: {
+        bns_0: {
             $bottomN: {
                 n: {$const: 3},
                 output: {bm: {$ifNull: ["$m", {$const: null}]}, bi: {$ifNull: ["$i", {$const: null}]}},
@@ -252,8 +252,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomNsWithSameSortKeyOptimizedIn
 {
     $project: {
         _id: true,
-        bm: "$bns.bm",
-        bi: "$bns.bi"
+        bm: "$bns_0.bm",
+        bi: "$bns_0.bi"
     }
 }
     )");
@@ -279,13 +279,13 @@ TEST_F(CommonSortKeyOptimizationTest,
 {
     $group: {
         _id: {$const: null},
-        ts: {
+        ts_0: {
             $top: {
                 output: {t_a: {$ifNull: ["$a", {$const: null}]}, t_b: {$ifNull: ["$b", {$const: null}]}, t_c: {$ifNull: ["$c", {$const: null}]}},
                 sortBy: {time: 1, g: -1}
             }
         },
-        bns: {
+        bns_3: {
             $bottomN: {
                 n: {$const: 2},
                 output: {b_a: {$ifNull: ["$a", {$const: null}]}, b_b: {$ifNull: ["$b", {$const: null}]}},
@@ -299,11 +299,11 @@ TEST_F(CommonSortKeyOptimizationTest,
 {
     $project: {
         _id: true,
-        t_a: "$ts.t_a",
-        t_b: "$ts.t_b",
-        t_c: "$ts.t_c",
-        b_a: "$bns.b_a",
-        b_b: "$bns.b_b"
+        t_a: "$ts_0.t_a",
+        t_b: "$ts_0.t_b",
+        t_c: "$ts_0.t_c",
+        b_a: "$bns_3.b_a",
+        b_b: "$bns_3.b_b"
     }
 }
     )");
@@ -422,7 +422,7 @@ TEST_F(CommonSortKeyOptimizationTest, OptimizableTopNsMixedWithIneligibleAccumul
 {
     $group: {
         _id: {$const: null},
-        tns: {
+        tns_0: {
             $topN: {
                 n: {$const: 5},
                 output: {t_a: {$ifNull: ["$a", {$const: null}]}, t_b: {$ifNull: ["$b", {$const: null}]}},
@@ -438,8 +438,8 @@ TEST_F(CommonSortKeyOptimizationTest, OptimizableTopNsMixedWithIneligibleAccumul
 {
     $project: {
         _id: true,
-        t_a: "$tns.t_a",
-        t_b: "$tns.t_b",
+        t_a: "$tns_0.t_a",
+        t_b: "$tns_0.t_b",
         fc: true,
         ld: true
     }
@@ -470,7 +470,7 @@ TEST_F(CommonSortKeyOptimizationTest,
     $group: {
         _id: {$const: null},
         b_k: {$bottom: {output: "$k", sortBy: {time: 1, g: -1}}},
-        tns: {
+        tns_1: {
             $topN: {
                 n: {$const: 5},
                 output: {t_a: {$ifNull: ["$a", {$const: null}]}, t_b: {$ifNull: ["$b", {$const: null}]}},
@@ -487,8 +487,8 @@ TEST_F(CommonSortKeyOptimizationTest,
     $project: {
         _id: true,
         b_k: true,
-        t_a: "$tns.t_a",
-        t_b: "$tns.t_b",
+        t_a: "$tns_1.t_a",
+        t_b: "$tns_1.t_b",
         fc: true,
         ld: true
     }
@@ -497,5 +497,93 @@ TEST_F(CommonSortKeyOptimizationTest,
     verify(groupWithOptimizableTopNsMixedWithFirstLastOneBottom,
            makeVector(expectedOptimizedGroup, expectedOptimizedProject));
 }
+
+TEST_F(CommonSortKeyOptimizationTest,
+       OptimizableTopNsBottomsWithDifferentNsAndSortOrdersAccumulators) {
+    const auto groupWithTopNsBottomsWithDifferentNsAndSortOrders = fromjson(R"(
+{
+    $group: {
+        _id: null,
+        b_a_a: {$bottom: {output: "$a", sortBy: {a: 1}}},
+        b_ab_b: {$bottom: {output: "$b", sortBy: {a: 1, b: 1}}},
+        b_a_b: {$bottom: {output: "$b", sortBy: {a: 1}}},
+        t3_a_b: {$topN: {n: 3, output: "$b", sortBy: {a: 1}}},
+        b_ab_c: {$bottom: {output: "$c", sortBy: {a: 1, b: 1}}},
+        b_ab_d: {$bottom: {output: "$d", sortBy: {a: 1, b: 1}}},
+        t3_a_c: {$topN: {n: 3, output: "$c", sortBy: {a: 1}}},
+        t5_a_c: {$topN: {n: 5, output: "$c", sortBy: {a: 1}}},
+        t3_a_d: {$topN: {n: 3, output: "$d", sortBy: {a: 1}}},
+        t5_a_d: {$topN: {n: 5, output: "$d", sortBy: {a: 1}}}
+    }
+}
+    )");
+    const auto expectedOptimizedGroup = fromjson(R"(
+{
+    $group: {
+        _id: {$const: null},
+        bs_0: {
+            $bottom: {
+                output: {
+                    b_a_a: {$ifNull: ["$a", {$const: null}]},
+                    b_a_b: {$ifNull: ["$b", {$const: null}]}
+                },
+                sortBy: {a: 1}
+            }
+        },
+        bs_1: {
+            $bottom: {
+                output: {
+                    b_ab_b: {$ifNull: ["$b", {$const: null}]},
+                    b_ab_c: {$ifNull: ["$c", {$const: null}]},
+                    b_ab_d: {$ifNull: ["$d", {$const: null}]}
+                },
+                sortBy: {a: 1, b: 1}
+            }
+        },
+        tns_3: {
+            $topN: {
+                n: { $const: 3 },
+                output: {
+                    t3_a_b: {$ifNull: ["$b", {$const: null}]},
+                    t3_a_c: {$ifNull: ["$c", {$const: null}]},
+                    t3_a_d: {$ifNull: ["$d", {$const: null}]}
+                },
+                sortBy: {a: 1}
+            }
+        },
+        tns_7: {
+            $topN: {
+                n: { $const: 5 },
+                output: {
+                    t5_a_c: {$ifNull: ["$c", {$const: null}]},
+                    t5_a_d: {$ifNull: ["$d", {$const: null}]}
+                },
+                sortBy: {a: 1}
+            }
+        }
+    }
+}
+    )");
+    const auto expectedOptimizedProject = fromjson(R"(
+{
+    $project: {
+        _id: true,
+        b_a_a: "$bs_0.b_a_a",
+        b_ab_b: "$bs_1.b_ab_b",
+        b_a_b: "$bs_0.b_a_b",
+        t3_a_b: "$tns_3.t3_a_b",
+        b_ab_c: "$bs_1.b_ab_c",
+        b_ab_d: "$bs_1.b_ab_d",
+        t3_a_c: "$tns_3.t3_a_c",
+        t5_a_c: "$tns_7.t5_a_c",
+        t3_a_d: "$tns_3.t3_a_d",
+        t5_a_d: "$tns_7.t5_a_d"
+    }
+}
+    )");
+    verify(groupWithTopNsBottomsWithDifferentNsAndSortOrders,
+           makeVector(expectedOptimizedGroup, expectedOptimizedProject));
+}
+
 }  // namespace
 }  // namespace mongo
