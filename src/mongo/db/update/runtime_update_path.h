@@ -58,14 +58,22 @@ public:
     RuntimeUpdatePath() = default;
     RuntimeUpdatePath(FieldRef fr, ComponentTypeVector types)
         : _fieldRef(std::move(fr)), _types(std::move(types)) {
-        invariant(good());
+        validate();
     }
+
+    // We don't allow move construction/assignment since we don't want to worry about a moved-from
+    // RuntimeUpdatePath passing validate().
+    RuntimeUpdatePath(RuntimeUpdatePath&&) = delete;
+    RuntimeUpdatePath& operator=(RuntimeUpdatePath&&) = delete;
+
+    RuntimeUpdatePath(const RuntimeUpdatePath&) = default;
+    RuntimeUpdatePath& operator=(const RuntimeUpdatePath&) = default;
 
     /**
      * Returns the underlying FieldRef.
      */
     const FieldRef& fieldRef() const {
-        invariant(good());
+        validate();
         return _fieldRef;
     }
 
@@ -73,37 +81,53 @@ public:
      * Returns the type array, which is guaranteed to be the same length as the backing FieldRef.
      */
     const ComponentTypeVector& types() const {
-        invariant(good());
+        validate();
         return _types;
     }
 
     bool empty() const {
-        invariant(good());
+        validate();
         return _fieldRef.empty();
     }
 
     size_t size() const {
-        invariant(good());
+        validate();
         return _fieldRef.numParts();
     }
 
     void append(StringData fieldName, ComponentType type) {
-        invariant(good());
+        validate();
         _fieldRef.appendPart(fieldName);
         _types.push_back(type);
+        // AF-419 fails in fieldRef() with unmatched _fieldRef and _types size, so we'd like to
+        // validate to twice here to find where unmatching happens.
+        validate();
     }
 
     void popBack() {
-        invariant(good());
+        validate();
         invariant(_fieldRef.numParts() > 0);
         _fieldRef.removeLastPart();
         _types.pop_back();
+        // AF-419 fails in fieldRef() with unmatched _fieldRef and _types size, so we'd like to
+        // validate to twice here to find where unmatching happens.
+        validate();
     }
 
 private:
     // Returns whether the RuntimeUpdatePath is in a valid state.
     bool good() const {
         return _fieldRef.numParts() == _types.size();
+    }
+
+    void reportError() const;
+
+    // If RuntimeUpdatePath is not in a valid state, report the error with detail info in the log
+    // without exposing PPID.
+    void validate() const {
+        if (MONGO_unlikely(!good())) {
+            reportError();
+        }
     }
 
     // There is an invariant that the number of components in field ref is equal to the number of

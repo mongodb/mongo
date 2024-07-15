@@ -25,6 +25,7 @@ env.Library(
     source=[
         "field_checker.cpp",
         "path_support.cpp",
+        "runtime_update_path.cpp",
         "storage_validation.cpp",
         "v2_log_builder.cpp",
         "update_oplog_entry_serialization.cpp",
