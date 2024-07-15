@@ -1106,8 +1106,8 @@ buildvariants:
     distros:
     - rhel80-large
 
-- name: rhel80
-  display_name: RHEL 8.0
+- name: rhel8
+  display_name: RHEL 8
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-build
@@ -1131,7 +1131,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel80-build
-    compile_variant: rhel80
+    compile_variant: rhel8
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1164,12 +1164,12 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-rhel-80-64-bit
-  display_name: "Enterprise RHEL 8.0"
+- name: enterprise-rhel-8-64-bit
+  display_name: "Enterprise RHEL 8"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-expansions
+  expansions: &enterprise-rhel-8-64-bit-expansions
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -1200,7 +1200,7 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 3
     large_distro_name: rhel80-medium
-    compile_variant: enterprise-rhel-80-64-bit
+    compile_variant: enterprise-rhel-8-64-bit
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1291,8 +1291,8 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: rhel-82-arm64
-  display_name: RHEL 8.2 arm64
+- name: rhel-8-arm64
+  display_name: RHEL 8 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel82-arm64-small
@@ -1314,7 +1314,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel82-arm64-large
-    compile_variant: rhel-82-arm64
+    compile_variant: rhel-8-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1345,8 +1345,8 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-rhel-82-arm64
-  display_name: "Enterprise RHEL 8.2 arm64"
+- name: enterprise-rhel-8-arm64
+  display_name: "Enterprise RHEL 8 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel82-arm64-small
@@ -1375,7 +1375,7 @@ buildvariants:
     packager_distro: rhel82
     repo_edition: enterprise
     scons_cache_scope: shared
-    compile_variant: enterprise-rhel-82-arm64
+    compile_variant: enterprise-rhel-8-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -2702,8 +2702,8 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
 
-- name: enterprise-rhel-82-arm64-grpc
-  display_name: "Enterprise RHEL 8.2 arm64 GRPC"
+- name: enterprise-rhel-8-arm64-grpc
+  display_name: "Enterprise RHEL 8 arm64 GRPC"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel82-arm64-large
@@ -2718,7 +2718,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
       ENABLE_GRPC_BUILD=1
-    compile_variant: enterprise-rhel-82-arm64-grpc
+    compile_variant: enterprise-rhel-8-arm64-grpc
     scons_cache_scope: shared
   tasks:
     - name: compile_test_and_package_parallel_unittest_stream_TG

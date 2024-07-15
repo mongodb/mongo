@@ -15,8 +15,8 @@ variables:
 
 buildvariants:
 
-- name: rhel80-asan
-  display_name: ~ ASAN RHEL 8.0
+- name: rhel8-asan
+  display_name: ~ ASAN RHEL 8
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
     - rhel80-build
@@ -40,7 +40,7 @@ buildvariants:
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling --enableEnterpriseTests=off
     separate_debug: off
-    compile_variant: rhel80-asan
+    compile_variant: rhel8-asan
   tasks:
     - name: compile_test_and_package_serial_TG
     - name: compile_test_and_package_parallel_unittest_stream_TG
@@ -48,8 +48,8 @@ buildvariants:
     - name: .jstestfuzz !.initsync
     - name: generate_buildid_to_debug_symbols_mapping
 
-- name: rhel80-debug-asan
-  display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG
+- name: rhel8-debug-asan
+  display_name: ~ ASAN Enterprise RHEL 8 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-build
@@ -78,7 +78,7 @@ buildvariants:
     exec_timeout_secs: 14400 # 3 hour timeout
     separate_debug: off
     large_distro_name: rhel80-build
-    compile_variant: rhel80-debug-asan
+    compile_variant: rhel8-debug-asan
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
   - name: compile_test_and_package_parallel_unittest_stream_TG
@@ -134,8 +134,8 @@ buildvariants:
   - name: server_selection_json_test_TG
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: rhel80-debug-ubsan
-  display_name: ~ UBSAN Enterprise RHEL 8.0 DEBUG
+- name: rhel8-debug-ubsan
+  display_name: ~ UBSAN Enterprise RHEL 8 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-build
@@ -161,7 +161,7 @@ buildvariants:
     scons_cache_scope: shared
     separate_debug: off
     large_distro_name: rhel80-build
-    compile_variant: rhel80-debug-ubsan
+    compile_variant: rhel8-debug-ubsan
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
   - name: compile_test_and_package_parallel_unittest_stream_TG
@@ -212,9 +212,9 @@ buildvariants:
   - name: server_selection_json_test_TG
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &rhel80-debug-aubsan-lite_fuzzer-template
-  name: &rhel80-debug-aubsan-lite_fuzzer rhel80-debug-aubsan-lite_fuzzer
-  display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
+- &rhel8-debug-aubsan-lite_fuzzer-template
+  name: &rhel8-debug-aubsan-lite_fuzzer rhel8-debug-aubsan-lite_fuzzer
+  display_name: "{A,UB}SAN Enterprise RHEL 8 FUZZER"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-build
@@ -244,7 +244,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     separate_debug: off
-    compile_variant: *rhel80-debug-aubsan-lite_fuzzer
+    compile_variant: *rhel8-debug-aubsan-lite_fuzzer
   display_tasks:
   - name: libfuzzertests!
     execution_tasks:

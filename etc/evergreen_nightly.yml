@@ -200,14 +200,14 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
 
-- &enterprise-rhel-80-64-bit-dynamic-template
+- &enterprise-rhel-8-64-bit-dynamic-template
   <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel-80-64-bit-dynamic-required enterprise-rhel-80-64-bit-dynamic-required
-  display_name: "! Shared Library Enterprise RHEL 8.0"
+  name: &enterprise-rhel-8-64-bit-dynamic-required enterprise-rhel-8-64-bit-dynamic-required
+  display_name: "! Shared Library Enterprise RHEL 8"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-dynamic-expansions
+  expansions: &enterprise-rhel-8-64-bit-dynamic-expansions
     <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -220,8 +220,8 @@ buildvariants:
     exec_timeout_factor: 1.5
     large_distro_name: rhel80-medium
     burn_in_tag_buildvariants: >-
-      enterprise-rhel-80-64-bit-inmem
-      enterprise-rhel-80-64-bit-multiversion
+      enterprise-rhel-8-64-bit-inmem
+      enterprise-rhel-8-64-bit-multiversion
     burn_in_tag_compile_task_dependency: archive_dist_test_debug
     test_flags: --excludeWithAnyTags=requires_latch_analyzer
   depends_on:
@@ -323,10 +323,10 @@ buildvariants:
   - name: vector_search_auth
   - name: vector_search_ssl
 
-- &rhel80-debug-aubsan-lite-template
+- &rhel8-debug-aubsan-lite-template
   <<: *linux_debug_aubsan_compile_variant_dependency
-  name: &rhel80-debug-aubsan-lite-required rhel80-debug-aubsan-lite-required
-  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
+  name: &rhel8-debug-aubsan-lite-required rhel8-debug-aubsan-lite-required
+  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - rhel80-build
@@ -358,7 +358,7 @@ buildvariants:
     burn_in_tag_exclude_build_variants: >-
       macos-debug-suggested
     burn_in_tag_include_build_variants: >-
-      enterprise-rhel-80-64-bit-inmem
+      enterprise-rhel-8-64-bit-inmem
     burn_in_tag_compile_task_dependency: archive_dist_test_debug
     compile_variant: *linux_x86_dynamic_compile_variant_name
   depends_on:
@@ -377,7 +377,7 @@ buildvariants:
   tasks:
   - name: burn_in_tags_gen
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-template
+- <<: *enterprise-rhel-8-64-bit-dynamic-template
   name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
