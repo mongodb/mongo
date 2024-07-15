@@ -168,7 +168,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
             // Next, append the stripped-down version of the generic cursor. This will avoid
             // duplicating information reported at the top level.
             cursorObj.append("cursor",
-                             CurOp::truncateAndSerializeGenericCursor(&cursor, boost::none));
+                             CurOp::truncateAndSerializeGenericCursor(cursor, boost::none));
 
             ops.emplace_back(cursorObj.obj());
         }

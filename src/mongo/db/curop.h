@@ -577,7 +577,7 @@ public:
      * output. If 'maxQuerySize' is given, truncates the cursor's originatingCommand but preserves
      * the comment.
      */
-    static BSONObj truncateAndSerializeGenericCursor(GenericCursor* cursor,
+    static BSONObj truncateAndSerializeGenericCursor(GenericCursor cursor,
                                                      boost::optional<size_t> maxQuerySize);
 
     /**

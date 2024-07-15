@@ -45,6 +45,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -785,84 +786,68 @@ BSONObj appendCommentField(OperationContext* opCtx, const BSONObj& cmdObj) {
 }
 
 /**
- * Appends {<name>: obj} to the provided builder.  If obj is greater than maxSize, appends a
- * string summary of obj as { <name>: { $truncated: "obj" } }. If a comment parameter is
- * present, add it to the truncation object.
+ * Converts 'obj' to a string (excluding the "comment" field), truncates the string to ensure it is
+ * no greater than the 'maxSize' limit, and appends a "$truncated" element to 'builder' with the
+ * truncated string. If 'obj' has a "comment" field, appends it to 'builder' unchanged.
  */
-void appendAsObjOrString(StringData name,
-                         const BSONObj& obj,
-                         const boost::optional<size_t> maxSize,
-                         BSONObjBuilder* builder) {
-    if (!maxSize || static_cast<size_t>(obj.objsize()) <= *maxSize) {
-        builder->append(name, obj);
-    } else {
-        // Generate an abbreviated serialization for the object, by passing false as the "full"
-        // argument to obj.toString(). Remove "comment" field from the object, if present, since
-        // this will be promoted to a top-level field in the output.
-        std::string objToString =
-            (obj.hasField("comment") ? obj.removeField("comment") : obj).toString();
-        if (objToString.size() > *maxSize) {
-            // objToString is still too long, so we append to the builder a truncated form
-            // of objToString concatenated with "...".  Instead of creating a new string
-            // temporary, mutate objToString to do this (we know that we can mutate
-            // characters in objToString up to and including objToString[maxSize]).
-            objToString[*maxSize - 3] = '.';
-            objToString[*maxSize - 2] = '.';
-            objToString[*maxSize - 1] = '.';
-            LOGV2_INFO(4760300,
-                       "Gathering currentOp information, operation of size {size} exceeds the size "
-                       "limit of {limit} and will be truncated.",
-                       "size"_attr = objToString.size(),
-                       "limit"_attr = *maxSize);
-        }
+void buildTruncatedObject(const BSONObj& obj, size_t maxSize, BSONObjBuilder& builder) {
+    auto comment = obj["comment"];
 
-        StringData truncation = StringData(objToString).substr(0, *maxSize);
+    auto truncatedObj = (comment.eoo() ? obj : obj.removeField("comment")).toString();
 
-        // Append the truncated representation of the object to the builder. If a comment
-        // parameter is present, write it to the object alongside the truncated op. This object
-        // will appear as
-        // {$truncated: "{find: \"collection\", filter: {x: 1, ...", comment: "comment text" }
-        BSONObjBuilder truncatedBuilder(builder->subobjStart(name));
-        truncatedBuilder.append("$truncated", truncation);
+    // 'BSONObj::toString()' abbreviates large strings and deeply nested objects, so it may not be
+    // necessary to truncate the string.
+    if (truncatedObj.size() > maxSize) {
+        LOGV2_INFO(4760300,
+                   "Truncating object that exceeds limit for command objects in currentOp results",
+                   "size"_attr = truncatedObj.size(),
+                   "limit"_attr = maxSize);
 
-        if (auto comment = obj["comment"]) {
-            truncatedBuilder.append(comment);
-        }
-
-        truncatedBuilder.doneFast();
+        truncatedObj.resize(maxSize - 3);
+        truncatedObj.append("...");
     }
+
+    builder.append("$truncated", truncatedObj);
+    if (!comment.eoo()) {
+        builder.append(comment);
+    }
+}
+
+/**
+ * If 'obj' is smaller than the 'maxSize' limit or if there is no limit, append 'obj' to 'builder'
+ * as an element with 'fieldName' as its name. If 'obj' exceeds the limit, append an abbreviated
+ * object that preserves the "comment" field (if it exists) but converts the rest to a string that
+ * gets truncated to fit the limit.
+ */
+void appendObjectTruncatingAsNecessary(StringData fieldName,
+                                       const BSONObj& obj,
+                                       boost::optional<size_t> maxSize,
+                                       BSONObjBuilder& builder) {
+    if (!maxSize || static_cast<size_t>(obj.objsize()) <= maxSize) {
+        builder.append(fieldName, obj);
+        return;
+    }
+
+    BSONObjBuilder truncatedBuilder(builder.subobjStart(fieldName));
+    buildTruncatedObject(obj, *maxSize, builder);
+    truncatedBuilder.doneFast();
 }
 }  // namespace
 
-BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor* cursor,
+BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor cursor,
                                                  boost::optional<size_t> maxQuerySize) {
-    // This creates a new builder to truncate the object that will go into the curOp output. In
-    // order to make sure the object is not too large but not truncate the comment, we only
-    // truncate the originatingCommand and not the entire cursor.
-    if (maxQuerySize) {
-        BSONObjBuilder tempObj;
-        appendAsObjOrString(
-            "truncatedObj", cursor->getOriginatingCommand().value(), maxQuerySize, &tempObj);
-        auto originatingCommand = tempObj.done().getObjectField("truncatedObj");
-        cursor->setOriginatingCommand(originatingCommand.getOwned());
+    if (maxQuerySize && cursor.getOriginatingCommand() &&
+        static_cast<size_t>(cursor.getOriginatingCommand()->objsize()) > *maxQuerySize) {
+        BSONObjBuilder truncatedBuilder;
+        buildTruncatedObject(*cursor.getOriginatingCommand(), *maxQuerySize, truncatedBuilder);
+        cursor.setOriginatingCommand(truncatedBuilder.obj());
     }
-    // lsid, ns, and planSummary exist in the top level curop object, so they need to be
-    // temporarily removed from the cursor object to avoid duplicating information.
-    auto lsid = cursor->getLsid();
-    auto ns = cursor->getNs();
-    auto originalPlanSummary(cursor->getPlanSummary() ? boost::optional<std::string>(
-                                                            cursor->getPlanSummary()->toString())
-                                                      : boost::none);
-    cursor->setLsid(boost::none);
-    cursor->setNs(boost::none);
-    cursor->setPlanSummary(boost::none);
-    auto serialized = cursor->toBSON();
-    cursor->setLsid(lsid);
-    cursor->setNs(ns);
-    if (originalPlanSummary) {
-        cursor->setPlanSummary(StringData(*originalPlanSummary));
-    }
-    return serialized;
+
+    // Remove fields that are present in the parent "curop" object.
+    cursor.setLsid(boost::none);
+    cursor.setNs(boost::none);
+    cursor.setPlanSummary(boost::none);
+    return cursor.toBSON();
 }
 
 void CurOp::reportState(BSONObjBuilder* builder,
@@ -902,21 +887,22 @@ void CurOp::reportState(BSONObjBuilder* builder,
 
     // If flag is true, add command field to builder without sensitive information.
     if (omitAndRedactInformation) {
-        BSONObjBuilder bob;
-        bob.append(obj.firstElement());
-        bob.append(obj["$db"]);
+        BSONObjBuilder redactedCommandBuilder;
+        redactedCommandBuilder.append(obj.firstElement());
+        redactedCommandBuilder.append(obj["$db"]);
         auto commentElement = obj["comment"];
         if (commentElement.ok()) {
-            bob.append(commentElement);
+            redactedCommandBuilder.append(commentElement);
         }
 
         if (obj.firstElementFieldNameStringData() == "getMore"_sd) {
-            bob.append(obj["collection"]);
+            redactedCommandBuilder.append(obj["collection"]);
         }
 
-        appendAsObjOrString("command", bob.done(), maxQuerySize, builder);
+        appendObjectTruncatingAsNecessary(
+            "command", redactedCommandBuilder.done(), maxQuerySize, *builder);
     } else {
-        appendAsObjOrString("command", obj, maxQuerySize, builder);
+        appendObjectTruncatingAsNecessary("command", obj, maxQuerySize, *builder);
     }
 
 
@@ -946,8 +932,7 @@ void CurOp::reportState(BSONObjBuilder* builder,
     }
 
     if (_genericCursor) {
-        builder->append("cursor",
-                        truncateAndSerializeGenericCursor(&(*_genericCursor), maxQuerySize));
+        builder->append("cursor", truncateAndSerializeGenericCursor(*_genericCursor, maxQuerySize));
     }
 
     if (!_message.empty()) {
@@ -1435,12 +1420,13 @@ void OpDebug::append(OperationContext* opCtx,
 
     b.append("ns", curop.getNS());
 
-    appendAsObjOrString(
-        "command", appendCommentField(opCtx, curop.opDescription()), appendMaxElementSize, &b);
+    appendObjectTruncatingAsNecessary(
+        "command", appendCommentField(opCtx, curop.opDescription()), appendMaxElementSize, b);
 
     auto originatingCommand = curop.originatingCommand();
     if (!originatingCommand.isEmpty()) {
-        appendAsObjOrString("originatingCommand", originatingCommand, appendMaxElementSize, &b);
+        appendObjectTruncatingAsNecessary(
+            "originatingCommand", originatingCommand, appendMaxElementSize, b);
     }
 
     if (!resolvedViews.empty()) {
@@ -1686,16 +1672,17 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("ns", [](auto field, auto args, auto& b) { b.append(field, args.curop.getNS()); });
 
     addIfNeeded("command", [](auto field, auto args, auto& b) {
-        appendAsObjOrString(field,
-                            appendCommentField(args.opCtx, args.curop.opDescription()),
-                            appendMaxElementSize,
-                            &b);
+        appendObjectTruncatingAsNecessary(
+            field,
+            appendCommentField(args.opCtx, args.curop.opDescription()),
+            appendMaxElementSize,
+            b);
     });
 
     addIfNeeded("originatingCommand", [](auto field, auto args, auto& b) {
         auto originatingCommand = args.curop.originatingCommand();
         if (!originatingCommand.isEmpty()) {
-            appendAsObjOrString(field, originatingCommand, appendMaxElementSize, &b);
+            appendObjectTruncatingAsNecessary(field, originatingCommand, appendMaxElementSize, b);
         }
     });
 
