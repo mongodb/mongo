@@ -87,6 +87,10 @@ export const logQueries = {
         "msg": "too many dbcheck runs in queue",
         "data.dbCheckParameters": {$exists: true}
     },
+    primarySteppedDown: {
+        severity: "warning",
+        "msg": "abandoning dbCheck batch due to stepdown.",
+    }
 };
 
 // Apply function on all secondary nodes except arbiters.
