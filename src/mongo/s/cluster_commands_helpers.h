@@ -59,6 +59,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/database_version.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_version.h"
 
 namespace mongo {
@@ -67,6 +68,16 @@ namespace cluster::unsplittable {
 const auto kUnsplittableCollectionShardKey = BSON("_id" << 1);
 const auto kUnsplittableCollectionMinKey = BSON("_id" << MINKEY);
 const auto kUnsplittableCollectionMaxKey = BSON("_id" << MAXKEY);
+
+ShardsvrReshardCollection makeMoveCollectionRequest(const DatabaseName& dbName,
+                                                    const NamespaceString& nss,
+                                                    const ShardId& destinationShard,
+                                                    ProvenanceEnum provenance);
+
+ShardsvrReshardCollection makeUnshardCollectionRequest(
+    const DatabaseName& dbName,
+    const NamespaceString& nss,
+    const boost::optional<ShardId>& destinationShard);
 }  // namespace cluster::unsplittable
 
 struct RawResponsesResult {
