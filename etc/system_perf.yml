@@ -65,9 +65,8 @@ variables:
 
   _src_dir: &src_dir src/mongo
   _modules: &modules
-    - mongo-tools
-    # - mongo
     - dsi
+    # - mongo
     - genny
     - workloads
     - linkbench
@@ -153,12 +152,6 @@ modules:
 #    repo: git@github.com:mongodb/mongo.git
 #    prefix: ${workdir}/src
 #    branch: master
-  ###
-  - name: mongo-tools
-    owner: mongodb
-    repo: mongo-tools
-    prefix: mongo-tools/src/github.com/mongodb
-    branch: master
   - name: PrivateWorkloads
     owner: 10gen
     repo: PrivateWorkloads
@@ -682,8 +675,6 @@ tasks:
       - command: git.get_project
         params:
           directory: src
-          revisions:
-            mongo-tools: ${mongo-tools_rev}
       - func: "compile prep"
       - func: "download mongo tools"
       - func: "generate feature flag list"
