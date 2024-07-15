@@ -149,8 +149,8 @@ TimeseriesModifyStage::~TimeseriesModifyStage() {
         // writes when the whole update operation is done.
         auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx());
         for (const auto bucketId : _insertedBucketIds) {
-            timeseries::bucket_catalog::directWriteFinish(
-                bucketCatalog.bucketStateRegistry, collectionUUID, bucketId);
+            timeseries::bucket_catalog::directWriteFinish(bucketCatalog.bucketStateRegistry,
+                                                          bucketId);
         }
         // Merges the execution stats of the side bucket catalog to the main one.
         timeseries::bucket_catalog::internal::mergeExecutionStatsToBucketCatalog(

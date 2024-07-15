@@ -211,8 +211,8 @@ protected:
     // when performing time-series updates,
     std::unique_ptr<timeseries::bucket_catalog::BucketCatalog> _sideBucketCatalog = nullptr;
 
-    // OIDs of newly inserted buckets for the updated measurements.
-    std::set<OID> _insertedBucketIds{};
+    // BucketIds of newly inserted buckets for the updated measurements.
+    std::set<timeseries::bucket_catalog::BucketId> _insertedBucketIds{};
 
 private:
     bool _isMultiWrite() const {

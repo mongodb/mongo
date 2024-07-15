@@ -73,7 +73,7 @@ MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeFinish);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningBucket);
 MONGO_FAIL_POINT_DEFINE(runPostCommitDebugChecks);
 
-const std::size_t kDefaultNumberOfStripes = 32;
+constexpr std::size_t kDefaultNumberOfStripes = 32;
 
 /**
  * Prepares the batch for commit. Sets min/max appropriately, records the number of
@@ -210,12 +210,12 @@ BucketCatalog& BucketCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& handle) {
-    auto const& stripe = *catalog.stripes[handle.stripe];
+BSONObj getMetadata(BucketCatalog& catalog, const BucketId& bucketId) {
+    auto const& stripe = *catalog.stripes[internal::getStripeNumber(catalog, bucketId)];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     const Bucket* bucket =
-        internal::findBucket(catalog.bucketStateRegistry, stripe, stripeLock, handle.bucketId);
+        internal::findBucket(catalog.bucketStateRegistry, stripe, stripeLock, bucketId);
     if (!bucket) {
         return {};
     }
@@ -547,7 +547,7 @@ Status prepareCommit(BucketCatalog& catalog,
         return getBatchStatus();
     }
 
-    auto& stripe = *catalog.stripes[batch->bucketHandle.stripe];
+    auto& stripe = *catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
     internal::waitToCommitBatch(catalog.bucketStateRegistry, stripe, batch);
 
     stdx::lock_guard stripeLock{stripe.mutex};
@@ -563,16 +563,15 @@ Status prepareCommit(BucketCatalog& catalog,
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
                                                   stripe,
                                                   stripeLock,
-                                                  batch->bucketHandle.bucketId,
+                                                  batch->bucketId,
                                                   internal::BucketPrepareAction::kPrepare);
 
     if (!bucket) {
-        internal::abort(
-            catalog,
-            stripe,
-            stripeLock,
-            batch,
-            internal::getTimeseriesBucketClearedError(nss, batch->bucketHandle.bucketId.oid));
+        internal::abort(catalog,
+                        stripe,
+                        stripeLock,
+                        batch,
+                        internal::getTimeseriesBucketClearedError(nss, batch->bucketId.oid));
         return getBatchStatus();
     }
 
@@ -592,14 +591,14 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
 
     finishWriteBatch(*batch, info);
 
-    auto& stripe = *catalog.stripes[batch->bucketHandle.stripe];
+    auto& stripe = *catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     if (MONGO_unlikely(runPostCommitDebugChecks.shouldFail() && opCtx)) {
         Bucket* bucket = internal::useBucket(catalog.bucketStateRegistry,
                                              stripe,
                                              stripeLock,
-                                             batch->bucketHandle.bucketId,
+                                             batch->bucketId,
                                              internal::IgnoreBucketState::kYes);
         if (bucket) {
             internal::runPostCommitDebugChecks(opCtx, nss, *bucket, *batch);
@@ -610,7 +609,7 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
                                                   stripe,
                                                   stripeLock,
-                                                  batch->bucketHandle.bucketId,
+                                                  batch->bucketId,
                                                   internal::BucketPrepareAction::kUnprepare);
     if (bucket) {
         // Move BSONColumnBuilders from WriteBatch to Bucket.
@@ -646,7 +645,7 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
         // It's possible that we cleared the bucket in between preparing the commit and finishing
         // here. In this case, we should abort any other ongoing batches and clear the bucket from
         // the catalog so it's not hanging around idle.
-        auto it = stripe.openBucketsById.find(batch->bucketHandle.bucketId);
+        auto it = stripe.openBucketsById.find(batch->bucketId);
         if (it != stripe.openBucketsById.end()) {
             bucket = it->second.get();
             bucket->preparedBatch.reset();
@@ -690,14 +689,14 @@ void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Stat
         return;
     }
 
-    auto& stripe = *catalog.stripes[batch->bucketHandle.stripe];
+    auto& stripe = *catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     internal::abort(catalog, stripe, stripeLock, batch, status);
 }
 
-void directWriteStart(BucketStateRegistry& registry, const UUID& collectionUUID, const OID& oid) {
-    auto state = addDirectWrite(registry, BucketId{collectionUUID, oid});
+void directWriteStart(BucketStateRegistry& registry, const BucketId& bucketId) {
+    auto state = addDirectWrite(registry, bucketId);
     hangTimeseriesDirectModificationAfterStart.pauseWhileSet();
 
     if (holds_alternative<DirectWriteCounter>(state)) {
@@ -719,9 +718,9 @@ void directWriteStart(BucketStateRegistry& registry, const UUID& collectionUUID,
     throwWriteConflictException("Prepared bucket can no longer be inserted into.");
 }
 
-void directWriteFinish(BucketStateRegistry& registry, const UUID& collectionUUID, const OID& oid) {
+void directWriteFinish(BucketStateRegistry& registry, const BucketId& bucketId) {
     hangTimeseriesDirectModificationBeforeFinish.pauseWhileSet();
-    removeDirectWrite(registry, BucketId{collectionUUID, oid});
+    removeDirectWrite(registry, bucketId);
 }
 
 void clear(BucketCatalog& catalog, tracked_vector<UUID> clearedCollectionUUIDs) {
@@ -735,9 +734,46 @@ void clear(BucketCatalog& catalog, const UUID& collectionUUID) {
     clear(catalog, std::move(clearedCollectionUUIDs));
 }
 
-void freeze(BucketCatalog& catalog, const UUID& collectionUUID, const OID& oid) {
-    internal::getOrInitializeExecutionStats(catalog, collectionUUID).incNumBucketsFrozen();
-    freezeBucket(catalog.bucketStateRegistry, {collectionUUID, oid});
+void freeze(BucketCatalog& catalog, const BucketId& bucketId) {
+    internal::getOrInitializeExecutionStats(catalog, bucketId.collectionUUID).incNumBucketsFrozen();
+    freezeBucket(catalog.bucketStateRegistry, bucketId);
+}
+
+void freeze(BucketCatalog& catalog,
+            const TimeseriesOptions& options,
+            const StringDataComparator* comparator,
+            const UUID& collectionUUID,
+            const BSONObj& bucket) {
+    freeze(catalog, extractBucketId(catalog, options, comparator, collectionUUID, bucket));
+}
+
+BucketId extractBucketId(BucketCatalog& bucketCatalog,
+                         const TimeseriesOptions& options,
+                         const StringDataComparator* comparator,
+                         const UUID& collectionUUID,
+                         const BSONObj& bucket) {
+    const OID bucketOID = bucket[kBucketIdFieldName].OID();
+    const BSONElement metadata = bucket[kBucketMetaFieldName];
+    const BucketKey key{collectionUUID,
+                        BucketMetadata{getTrackingContext(bucketCatalog.trackingContexts,
+                                                          TrackingScope::kOpenBucketsByKey),
+                                       metadata,
+                                       comparator,
+                                       options.getMetaField()}};
+    return {collectionUUID, bucketOID, key.signature()};
+}
+
+BucketKey::Signature getKeySignature(const TimeseriesOptions& options,
+                                     const StringDataComparator* comparator,
+                                     const UUID& collectionUUID,
+                                     const BSONObj& metadataObj) {
+    TrackingContext trackingContext;
+    auto metaField = options.getMetaField();
+    const BSONElement metadata = metaField ? metadataObj[metaField.value()] : BSONElement();
+    const BucketKey key{
+        collectionUUID,
+        BucketMetadata{trackingContext, metadata, comparator, options.getMetaField()}};
+    return key.signature();
 }
 
 void resetBucketOIDCounter() {
@@ -781,7 +817,7 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto stripeNumber = internal::getStripeNumber(key, catalog.numberOfStripes);
+    auto stripeNumber = internal::getStripeNumber(catalog, key);
     InsertContext insertContext{std::move(key), stripeNumber, options, stats};
 
     return {std::make_pair(std::move(insertContext), std::move(time))};

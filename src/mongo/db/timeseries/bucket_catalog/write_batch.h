@@ -96,7 +96,7 @@ struct Sizes {
 struct WriteBatch {
     WriteBatch() = delete;
     WriteBatch(TrackingContexts& trackingContexts,
-               const BucketHandle& bucketHandle,
+               const BucketId& bucketId,
                BucketKey bucketKey,
                OperationId opId,
                ExecutionStatsController& stats,
@@ -153,7 +153,7 @@ struct WriteBatch {
     using BatchMeasurements = boost::container::small_vector<BSONObj, kNumStaticBatchMeasurements>;
     BatchMeasurements measurements;
 
-    const BucketHandle bucketHandle;
+    const BucketId bucketId;
 
     /**
      * In-memory data fields. Allows for quick compression of bucket data.

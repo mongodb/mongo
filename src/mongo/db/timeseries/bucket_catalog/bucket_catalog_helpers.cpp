@@ -51,6 +51,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/redaction.h"
@@ -267,24 +268,31 @@ BSONObj findDocFromOID(OperationContext* opCtx, const Collection* coll, const OI
     return (foundDoc) ? bucketObj.value() : BSONObj();
 }
 
-void handleDirectWrite(OperationContext* opCtx, const UUID& collectionUUID, const OID& bucketId) {
+void handleDirectWrite(OperationContext* opCtx,
+                       const TimeseriesOptions& options,
+                       const StringDataComparator* comparator,
+                       const UUID& collectionUUID,
+                       const BSONObj& bucket) {
+    auto& bucketCatalog = BucketCatalog::get(opCtx);
+    const BucketId bucketId =
+        extractBucketId(bucketCatalog, options, comparator, collectionUUID, bucket);
+
     // First notify the BucketCatalog that we intend to start a direct write, so we can conflict
     // with any already-prepared operation, and also block bucket reopening if it's enabled.
-    auto& bucketCatalog = BucketCatalog::get(opCtx);
-    directWriteStart(bucketCatalog.bucketStateRegistry, collectionUUID, bucketId);
+    directWriteStart(bucketCatalog.bucketStateRegistry, bucketId);
 
     // Then register callbacks so we can let the BucketCatalog know that we are done with our direct
     // write after the actual write takes place (or is abandoned), and allow reopening.
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [svcCtx = opCtx->getServiceContext(), collectionUUID, bucketId](
-            OperationContext*, boost::optional<Timestamp>) {
+        [svcCtx = opCtx->getServiceContext(), bucketId](OperationContext*,
+                                                        boost::optional<Timestamp>) {
             auto& bucketCatalog = BucketCatalog::get(svcCtx);
-            directWriteFinish(bucketCatalog.bucketStateRegistry, collectionUUID, bucketId);
+            directWriteFinish(bucketCatalog.bucketStateRegistry, bucketId);
         });
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-        [svcCtx = opCtx->getServiceContext(), collectionUUID, bucketId](OperationContext*) {
+        [svcCtx = opCtx->getServiceContext(), bucketId](OperationContext*) {
             auto& bucketCatalog = BucketCatalog::get(svcCtx);
-            directWriteFinish(bucketCatalog.bucketStateRegistry, collectionUUID, bucketId);
+            directWriteFinish(bucketCatalog.bucketStateRegistry, bucketId);
         });
 }
 

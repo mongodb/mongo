@@ -103,14 +103,14 @@ protected:
     std::shared_ptr<bucket_catalog::WriteBatch> generateBatch(
         const UUID& uuid, bucket_catalog::BucketMetadata bucketMetadata) {
         OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
-        bucket_catalog::BucketId bucketId(uuid, oid);
         std::uint8_t stripe = 0;
+        bucket_catalog::BucketId bucketId(uuid, oid, stripe);
         auto opId = 0;
         auto collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
         bucket_catalog::ExecutionStatsController stats(collectionStats, _globalStats);
         return std::make_shared<bucket_catalog::WriteBatch>(
             _trackingContexts,
-            bucket_catalog::BucketHandle{bucketId, stripe},
+            bucketId,
             bucket_catalog::BucketKey{uuid, std::move(bucketMetadata)},
             opId,
             stats,
@@ -942,7 +942,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
     {
         std::vector<BSONObj> unchangedMeasurements{
             ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2})")};
-        std::set<OID> bucketIds{};
+        std::set<bucket_catalog::BucketId> bucketIds{};
         bucket_catalog::BucketCatalog sideBucketCatalog{
             1, getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes};
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
@@ -1013,7 +1013,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
         wunit.commit();
     }
 
-    std::set<OID> bucketIds{};
+    std::set<bucket_catalog::BucketId> bucketIds{};
     bucket_catalog::BucketCatalog sideBucketCatalog{
         1, getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes};
 

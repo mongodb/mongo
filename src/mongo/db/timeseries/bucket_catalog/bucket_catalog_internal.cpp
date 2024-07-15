@@ -184,11 +184,18 @@ boost::optional<InsertWaiter> checkForWait(const Stripe& stripe,
 }
 }  // namespace
 
-StripeNumber getStripeNumber(const BucketKey& key, size_t numberOfStripes) {
+StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketKey& key) {
     if (MONGO_unlikely(alwaysUseSameBucketCatalogStripe.shouldFail())) {
         return 0;
     }
-    return key.hash % numberOfStripes;
+    return key.hash % catalog.stripes.size();
+}
+
+StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketId& bucketId) {
+    if (MONGO_unlikely(alwaysUseSameBucketCatalogStripe.shouldFail())) {
+        return 0;
+    }
+    return bucketId.keySignature % catalog.stripes.size();
 }
 
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
@@ -425,7 +432,7 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
     auto minTime = controlField.getObjectField(kBucketControlMinFieldName)
                        .getField(options.getTimeField())
                        .Date();
-    BucketId bucketId{key.collectionUUID, bucketIdElem.OID()};
+    BucketId bucketId{key.collectionUUID, bucketIdElem.OID(), key.signature()};
     unique_tracked_ptr<Bucket> bucket = make_unique_tracked<Bucket>(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
         catalog.trackingContexts,
@@ -519,8 +526,10 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                                       base64::encode(bucketDoc.objdata(), bucketDoc.objsize()));
 
             invariant(!TestingProctor::instance().isEnabled());
-            timeseries::bucket_catalog::freeze(catalog, collectionUUID, bucketId.oid);
-            return Status(BucketCompressionFailure(collectionUUID, bucketId.oid), ex.reason());
+            timeseries::bucket_catalog::freeze(catalog, bucketId);
+            return Status(
+                BucketCompressionFailure(collectionUUID, bucketId.oid, bucketId.keySignature),
+                ex.reason());
         }
     }
 
@@ -724,8 +733,8 @@ void waitToCommitBatch(BucketStateRegistry& registry,
         boost::optional<InsertWaiter> waiter;
         {
             stdx::lock_guard stripeLock{stripe.mutex};
-            Bucket* bucket = useBucket(
-                registry, stripe, stripeLock, batch->bucketHandle.bucketId, IgnoreBucketState::kNo);
+            Bucket* bucket =
+                useBucket(registry, stripe, stripeLock, batch->bucketId, IgnoreBucketState::kNo);
             if (!bucket || isWriteBatchFinished(*batch)) {
                 return;
             }
@@ -739,8 +748,7 @@ void waitToCommitBatch(BucketStateRegistry& registry,
                 // or an archive-based request on this bucket.
                 auto& list = it->second;
                 for (auto&& request : list) {
-                    if (!request->oid.has_value() ||
-                        request->oid.value() == batch->bucketHandle.bucketId.oid) {
+                    if (!request->oid.has_value() || request->oid.value() == batch->bucketId.oid) {
                         waiter = request;
                         break;
                     }
@@ -978,11 +986,8 @@ void abort(BucketCatalog& catalog,
            std::shared_ptr<WriteBatch> batch,
            const Status& status) {
     // Before we access the bucket, make sure it's still there.
-    Bucket* bucket = useBucket(catalog.bucketStateRegistry,
-                               stripe,
-                               stripeLock,
-                               batch->bucketHandle.bucketId,
-                               IgnoreBucketState::kYes);
+    Bucket* bucket = useBucket(
+        catalog.bucketStateRegistry, stripe, stripeLock, batch->bucketId, IgnoreBucketState::kYes);
     if (!bucket) {
         // Special case, bucket has already been cleared, and we need only abort this batch.
         abortWriteBatch(*batch, status);
@@ -1160,7 +1165,7 @@ Bucket& allocateBucket(OperationContext* opCtx,
     bool inserted = false;
     for (int retryAttempts = 0; !inserted && retryAttempts < maxRetries; ++retryAttempts) {
         std::tie(oid, roundedTime) = generateBucketOID(time, info.options);
-        auto bucketId = BucketId{info.key.collectionUUID, oid};
+        auto bucketId = BucketId{info.key.collectionUUID, oid, info.key.signature()};
         std::tie(it, inserted) = stripe.openBucketsById.try_emplace(
             bucketId,
             make_unique_tracked<Bucket>(
@@ -1467,7 +1472,7 @@ void runPostCommitDebugChecks(OperationContext* opCtx,
                               const WriteBatch& batch) {
     // Check in-memory and disk state, caller still has commit rights.
     DBDirectClient client{opCtx};
-    BSONObj queriedBucket = client.findOne(nss, BSON("_id" << batch.bucketHandle.bucketId.oid));
+    BSONObj queriedBucket = client.findOne(nss, BSON("_id" << batch.bucketId.oid));
     if (!queriedBucket.isEmpty()) {
         uint32_t memCount = batch.numPreviouslyCommittedMeasurements + batch.measurements.size();
         uint32_t diskCount = isCompressedBucket(queriedBucket)

@@ -46,7 +46,7 @@
 namespace mongo::timeseries::bucket_catalog {
 
 WriteBatch::WriteBatch(TrackingContexts& tcs,
-                       const BucketHandle& b,
+                       const BucketId& b,
                        BucketKey k,
                        OperationId o,
                        ExecutionStatsController& s,
@@ -55,7 +55,7 @@ WriteBatch::WriteBatch(TrackingContexts& tcs,
       trackingContexts(tcs),
       timeField(timeField),
       stats(s),
-      bucketHandle(b),
+      bucketId(b),
       measurementMap(getTrackingContext(tcs, TrackingScope::kColumnBuilders)),
       bucketKey(std::move(k)) {}
 

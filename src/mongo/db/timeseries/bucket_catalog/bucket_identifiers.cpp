@@ -33,8 +33,8 @@
 
 namespace mongo::timeseries::bucket_catalog {
 
-BucketId::BucketId(const UUID& u, const OID& o)
-    : collectionUUID{u}, oid{o}, hash{absl::Hash<BucketId>{}(*this)} {}
+BucketId::BucketId(const UUID& u, const OID& o, BucketKey::Signature k)
+    : collectionUUID{u}, oid{o}, keySignature{k}, hash{absl::Hash<BucketId>{}(*this)} {}
 
 BucketKey::BucketKey(const UUID& u, BucketMetadata m)
     : collectionUUID(u), metadata(std::move(m)), hash(absl::Hash<BucketKey>{}(*this)) {}

@@ -1763,7 +1763,9 @@ WriteResult performUpdates(OperationContext* opCtx,
             } else if (source == OperationSource::kTimeseriesUpdate) {
                 auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
                 timeseries::bucket_catalog::freeze(
-                    bucketCatalog, ex->collectionUUID(), ex->bucketId());
+                    bucketCatalog,
+                    timeseries::bucket_catalog::BucketId{
+                        ex->collectionUUID(), ex->bucketId(), ex->keySignature()});
                 LOGV2_WARNING(8793901,
                               "Encountered corrupt bucket while performing update",
                               "bucketId"_attr = ex->bucketId());
@@ -2427,9 +2429,8 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
  * Throws if compression fails for any reason.
  */
 void compressUncompressedBucketOnReopen(OperationContext* opCtx,
-                                        const OID& bucketId,
+                                        const timeseries::bucket_catalog::BucketId& bucketId,
                                         const NamespaceString& nss,
-                                        const UUID& uuid,
                                         StringData timeFieldName) {
     bool validateCompression = gValidateTimeseriesCompression.load();
 
@@ -2438,7 +2439,8 @@ void compressUncompressedBucketOnReopen(OperationContext* opCtx,
             timeseries::compressBucket(bucketDoc, timeFieldName, nss, validateCompression);
 
         if (!compressed.compressedBucket) {
-            uassert(timeseries::BucketCompressionFailure(uuid, bucketId),
+            uassert(timeseries::BucketCompressionFailure(
+                        bucketId.collectionUUID, bucketId.oid, bucketId.keySignature),
                     "Time-series compression failed on reopened bucket",
                     compressed.compressedBucket);
         }
@@ -2447,9 +2449,9 @@ void compressUncompressedBucketOnReopen(OperationContext* opCtx,
     };
 
     write_ops::UpdateModification u(std::move(bucketCompressionFunc));
-    write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
-    invariant(!update.getMulti(), bucketId.toString());
-    invariant(!update.getUpsert(), bucketId.toString());
+    write_ops::UpdateOpEntry update(BSON("_id" << bucketId.oid), std::move(u));
+    invariant(!update.getMulti(), bucketId.oid.toString());
+    invariant(!update.getUpsert(), bucketId.oid.toString());
 
     write_ops::UpdateCommandRequest compressionOp(nss, {update});
     write_ops::WriteCommandRequestBase base;
@@ -2560,7 +2562,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                             const write_ops::InsertCommandRequest& request) try {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
-    auto metadata = getMetadata(bucketCatalog, batch->bucketHandle);
+    auto metadata = getMetadata(bucketCatalog, batch->bucketId);
     auto status = prepareCommit(bucketCatalog, request.getNamespace(), batch);
     if (!status.isOK()) {
         invariant(timeseries::bucket_catalog::isWriteBatchFinished(*batch));
@@ -2570,7 +2572,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
     hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 
-    const auto docId = batch->bucketHandle.bucketId.oid;
+    const auto docId = batch->bucketId.oid;
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
     if (performInsert) {
         const auto output =
@@ -2674,7 +2676,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
         std::vector<write_ops::UpdateCommandRequest> updateOps;
 
         for (auto batch : batchesToCommit) {
-            auto metadata = getMetadata(bucketCatalog, batch.get()->bucketHandle);
+            auto metadata = getMetadata(bucketCatalog, batch.get()->bucketId);
             auto prepareCommitStatus = prepareCommit(bucketCatalog, request.getNamespace(), batch);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
@@ -2719,7 +2721,10 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             tryPerformTimeseriesBucketCompression(opCtx, request, *closedBucket);
         }
     } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
-        timeseries::bucket_catalog::freeze(bucketCatalog, ex->collectionUUID(), ex->bucketId());
+        timeseries::bucket_catalog::freeze(
+            bucketCatalog,
+            timeseries::bucket_catalog::BucketId{
+                ex->collectionUUID(), ex->bucketId(), ex->keySignature()});
         LOGV2_WARNING(
             8793900,
             "Encountered corrupt bucket while performing insert, will retry on a new bucket",
@@ -2999,7 +3004,7 @@ insertIntoBucketCatalog(OperationContext* opCtx,
         batches.emplace_back(std::move(insertResult->batch), index);
         const auto& batch = batches.back().first;
         if (isTimeseriesWriteRetryable(opCtx)) {
-            stmtIds[batch->bucketHandle.bucketId.oid].push_back(stmtId);
+            stmtIds[batch->bucketId.oid].push_back(stmtId);
         }
 
         // If this insert closed buckets, rewrite to be a compressed column. If we cannot
@@ -3114,7 +3119,7 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
         if (timeseries::bucket_catalog::claimWriteBatchCommitRights(*batch)) {
             handledHere.insert(batch.get());
             auto stmtIds = isTimeseriesWriteRetryable(opCtx)
-                ? std::move(bucketStmtIds[batch->bucketHandle.bucketId.oid])
+                ? std::move(bucketStmtIds[batch->bucketId.oid])
                 : std::vector<StmtId>{};
             try {
                 canContinue = commitTimeseriesBucket(opCtx,
@@ -3130,11 +3135,12 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
                                                      request);
             } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
                 auto bucketId = ex.extraInfo<timeseries::BucketCompressionFailure>()->bucketId();
+                auto keySignature =
+                    ex.extraInfo<timeseries::BucketCompressionFailure>()->keySignature();
 
                 timeseries::bucket_catalog::freeze(
                     timeseries::bucket_catalog::BucketCatalog::get(opCtx),
-                    collectionUUID,
-                    bucketId);
+                    timeseries::bucket_catalog::BucketId{collectionUUID, bucketId, keySignature});
 
                 LOGV2_WARNING(
                     8607200,

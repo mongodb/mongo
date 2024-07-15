@@ -173,7 +173,7 @@ std::shared_ptr<WriteBatch> activeBatch(TrackingContexts& trackingContexts,
                  .try_emplace(opId,
                               std::make_shared<WriteBatch>(
                                   trackingContexts,
-                                  BucketHandle{bucket.bucketId, stripe},
+                                  bucket.bucketId,
                                   bucket.key,
                                   opId,
                                   stats,
