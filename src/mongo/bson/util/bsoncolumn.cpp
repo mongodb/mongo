@@ -211,6 +211,10 @@ void BSONColumn::Iterator::_initializeInterleaving() {
     uassert(6067610, "Invalid BSONColumn encoding", !interleaved.states.empty());
 
     _control += interleaved.referenceObj.objsize() + 1;
+
+    // Interleaved mode should contain at least one object
+    uassert(
+        9232700, "Invalid BSON Column interleaved encoding", _control < _end && *_control != EOO);
     _incrementInterleaved(interleaved);
 }
 
