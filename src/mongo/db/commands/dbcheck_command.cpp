@@ -991,6 +991,9 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
 
         Status status = hasher->hashForExtraIndexKeysCheck(
             opCtx, collection.get(), firstBsonWithoutRecordId, lastBsonWithoutRecordId);
+        // ErrorCodes::DbCheckSecondaryBatchTimeout should only be thrown by the hasher on the
+        // secondary.
+        invariant(status.code() != ErrorCodes::DbCheckSecondaryBatchTimeout);
         if (!status.isOK()) {
             return status;
         }
@@ -1951,6 +1954,9 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
             return e.toStatus();
         }
 
+        // ErrorCodes::DbCheckSecondaryBatchTimeout should only be thrown by the hasher on the
+        // secondary.
+        invariant(status.code() != ErrorCodes::DbCheckSecondaryBatchTimeout);
         if (!status.isOK()) {
             // dbCheck should still continue if we get an error fetching a record.
             if (status.code() == ErrorCodes::NoSuchKey) {
