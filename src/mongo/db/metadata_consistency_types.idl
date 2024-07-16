@@ -68,7 +68,7 @@ enums:
             kCorruptedZoneShardKey: "Found zone with a shard key pattern violation"
             kHiddenShardedCollection: "Found sharded collection but relative database does not exist"
             kInconsistentIndex: "Found an index of a sharded collection that is inconsistent between different shards"
-            kMisplacedCollection: "Unsharded collection found on shard different from database primary shard"
+            kMisplacedCollection: "Found unsharded collection without the appropriate metadata on a shard different from the database primary shard"
             kMissingLocalCollection: "Collection registered on the sharding catalog not found on the given shards"
             kMissingRoutingTable: "Found sharded collection without any chunk"
             kMissingShardKeyIndex: "Found sharded collection without a shard key index"
