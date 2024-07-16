@@ -66,15 +66,15 @@ flowchart TB
 A(Stable Probe) --> |at minimum and tickets not exhausted|A
 
 A --> |"(above minimum and tickets not exhausted) or at maximum"|C(Probe Down)
-subgraph
+subgraph decrease
 C --> |throughput increased|F{{Decrease stable concurrency}}
-C --> |throughput did not increase|G(Go back to stable concurrency)
+C --> |throughput did not increase|G{{Go back to stable concurrency}}
 end
 F --> H
 G --> H
 
 A --> |below maximum and tickets exhausted| B(Probe Up)
-subgraph
+subgraph increase
 B --> |throughput increased|D{{Increase stable concurrency}}
 B --> |throughput did not increase|E{{Go back to stable concurrency}}
 end
