@@ -143,7 +143,6 @@ __page_inmem_prepare_update(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_UN
     upd->durable_ts = unpack->tw.durable_start_ts;
     upd->start_ts = unpack->tw.start_ts;
     upd->txnid = unpack->tw.start_txn;
-    F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
 
     /*
      * Instantiate both update and tombstone if the prepared update is a tombstone. This is required
@@ -169,13 +168,16 @@ __page_inmem_prepare_update(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_UN
           unpack->tw.start_txn == unpack->tw.stop_txn) {
             upd->durable_ts = WT_TS_NONE;
             upd->prepare_state = WT_PREPARE_INPROGRESS;
-        }
+            F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
+        } else
+            F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
 
         tombstone->next = upd;
         *updp = tombstone;
     } else {
         upd->durable_ts = WT_TS_NONE;
         upd->prepare_state = WT_PREPARE_INPROGRESS;
+        F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
         *updp = upd;
     }
 
