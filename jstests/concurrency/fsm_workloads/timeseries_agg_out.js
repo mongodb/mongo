@@ -12,8 +12,6 @@
  *   requires_timeseries,
  *   does_not_support_transactions,
  *   does_not_support_stepdowns,
- *   requires_fcv_71,
- *   featureFlagAggOutTimeseries,
  *   # `convertToCapped` is not supported in serverless.
  *   command_not_supported_in_serverless,
  * ]

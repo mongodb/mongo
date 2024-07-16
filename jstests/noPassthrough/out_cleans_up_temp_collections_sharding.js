@@ -4,7 +4,6 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   featureFlagAggOutTimeseries,
  *   requires_persistence,
  * ]
  */

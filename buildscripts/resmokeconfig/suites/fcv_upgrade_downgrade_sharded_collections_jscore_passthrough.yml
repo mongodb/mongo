@@ -154,6 +154,8 @@ selector:
   # TODO (SERVER-77935): Investigate timeout from fcv downgrade in jstests/core/query/push/push2.js.
   - jstests/core/query/push/push2.js
   - jstests/core/write/update/update_addToSet2.js
+  # TODO (SERVER-83599): remove this.
+  - jstests/core/timeseries/timeseries_out_non_sharded.js
 
   # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
   # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
