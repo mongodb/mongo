@@ -42,8 +42,8 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .development_critical !.incompatible_community !.incompatible_debian
-  - name: .release_critical !.incompatible_community !.incompatible_debian
+  - name: .development_critical !.incompatible_community !.incompatible_debian !.incompatible_oscrypto
+  - name: .release_critical !.incompatible_community !.incompatible_debian !.incompatible_oscrypto
 
 - name: enterprise-debian12-64
   display_name: Enterprise Debian 12
@@ -86,5 +86,5 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .development_critical !.incompatible_debian
-  - name: .release_critical !.incompatible_debian
+  - name: .development_critical !.incompatible_debian !.incompatible_oscrypto
+  - name: .release_critical !.incompatible_debian !.incompatible_oscrypto

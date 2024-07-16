@@ -785,7 +785,7 @@ tasks:
 
 - <<: *task_template
   name: external_auth
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "incompatible_debian"]
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "incompatible_debian", "incompatible_oscrypto"]
   commands:
   - func: "f_expansions_write"
   - func: "do setup"
@@ -969,8 +969,8 @@ tasks:
 
 - <<: *task_template
   name: ocsp
-  # TODO SERVER-89541 Remove incompatible_debian tag once oscrypto gets updated
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_debian", "ssl", "encrypt", "ocsp", "patch_build", "no_debug_mode"]
+  # TODO SERVER-89541 Remove incompatible_oscrypto tag once oscrypto gets updated
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_oscrypto", "ssl", "encrypt", "ocsp", "patch_build", "no_debug_mode"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1993,6 +1993,7 @@ tasks:
   tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "unsplittable_collections"]
   commands:
   - func: "generate resmoke tasks"
+
 
 ################################################
 #                 Task Groups                  #

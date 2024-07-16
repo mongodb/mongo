@@ -94,4 +94,14 @@ TOOLCHAIN_MAP = {
         "sha": "04ca222c288d6601a8cbc22e1d75f2170cbc24e77dfb59e27249a78872952f16",
         "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2204/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_ubuntu2204_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
     },
+    "ubuntu24_aarch64": {
+        "platform_name": "ubuntu2404-arm64",
+        "sha": "02ec959be765bf9f89bd39df78366af05d60d00bec44963feeda1274bc7a4a91",
+        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2404-arm64/e0a4b30be5b1d4667d4adeed82f0f806626038f7/bazel_v4_toolchain_builder_ubuntu2404_arm64_e0a4b30be5b1d4667d4adeed82f0f806626038f7_24_07_02_18_20_40.tar.gz",
+    },
+    "ubuntu24_x86_64": {
+        "platform_name": "ubuntu2404",
+        "sha": "c9193240f96a1112edb24b816a87cb6bd9e1393c2757b0b76a3182460ed9498b",
+        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2404/e0a4b30be5b1d4667d4adeed82f0f806626038f7/bazel_v4_toolchain_builder_ubuntu2404_e0a4b30be5b1d4667d4adeed82f0f806626038f7_24_07_02_18_20_40.tar.gz",
+    },
 }

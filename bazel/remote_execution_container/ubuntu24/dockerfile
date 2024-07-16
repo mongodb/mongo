@@ -1,0 +1,8 @@
+# Image used by bazel remote execution hosts.
+
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y build-essential
+RUN apt-get install -y libxml2-dev
+
+CMD ["/bin/bash"]
