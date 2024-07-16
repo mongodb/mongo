@@ -311,7 +311,7 @@ protected:
         std::unique_ptr<query_shape::Shape> queryShape,
         boost::optional<BSONObj> hint,
         boost::optional<repl::ReadConcernArgs> readConcern,
-        bool maxTimeMS,
+        bool hasMaxTimeMS,
         query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
 
     /**

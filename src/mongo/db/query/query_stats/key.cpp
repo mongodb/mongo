@@ -210,7 +210,7 @@ Key::Key(OperationContext* opCtx,
          std::unique_ptr<query_shape::Shape> queryShape,
          boost::optional<BSONObj> hint,
          boost::optional<repl::ReadConcernArgs> readConcern,
-         bool maxTimeMS,
+         bool hasMaxTimeMS,
          query_shape::CollectionType collectionType)
     : _universalComponents(
           std::move(queryShape),
@@ -226,7 +226,7 @@ Key::Key(OperationContext* opCtx,
           readConcern ? boost::make_optional(readConcern->toBSONInner()) : boost::none,
           std::make_unique<APIParameters>(APIParameters::get(opCtx)),
           collectionType,
-          maxTimeMS) {}
+          hasMaxTimeMS) {}
 
 BSONObj Key::toBson(OperationContext* opCtx,
                     const SerializationOptions& opts,

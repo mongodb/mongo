@@ -358,9 +358,9 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parseFromCount(
         invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
     }
 
-    // Copy relevant count command fields to find command except skip and limit. The skip and limit
-    // fields are _not_ copied because the count stage in the PlanExecutor already applies the skip
-    // and limit, and thus copying the fields would involve erroneously skipping and limiting twice.
+    // Copy necessary count command fields to find command. Notably, the skip and limit fields are
+    // _not_ copied because the count stage in the PlanExecutor already applies the skip and limit,
+    // and thus copying the fields would involve erroneously skipping and limiting twice.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(countCommand.getQuery());
     findCommand->setCollation(countCommand.getCollation().value_or(BSONObj()));

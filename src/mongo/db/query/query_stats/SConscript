@@ -13,6 +13,7 @@ env.CppUnitTest(
     target="db_query_query_stats_test",
     source=[
         "agg_key_test.cpp",
+        "count_key_test.cpp",
         "distinct_key_test.cpp",
         "find_key_test.cpp",
         "key_test.cpp",
