@@ -248,7 +248,8 @@ public:
         return bb.obj();
     }
 };
-auto extraInfo = *ServerStatusSectionBuilder<ExtraInfo>("extra_info");
+// Register one instance of the section shared by both roles; this contains process-wide info.
+auto extraInfo = *ServerStatusSectionBuilder<ExtraInfo>("extra_info").forShard().forRouter();
 
 class Asserts : public ServerStatusSection {
 public:
@@ -308,7 +309,9 @@ public:
         return HttpClient::getServerStatus();
     }
 };
-auto httpClientServerStatus = *ServerStatusSectionBuilder<HttpClientServerStatus>("http_client");
+// Register one instance of the section shared by both roles; this contains process-wide info.
+auto httpClientServerStatus =
+    *ServerStatusSectionBuilder<HttpClientServerStatus>("http_client").forShard().forRouter();
 
 }  // namespace
 

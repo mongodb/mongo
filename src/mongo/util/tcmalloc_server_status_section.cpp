@@ -415,7 +415,8 @@ private:
 
     MyMetrics _metrics;
 };
+// Register one instance of the section shared by both roles; tcmalloc is a process-wide resource.
 auto& tcmallocServerStatusSection =
-    *ServerStatusSectionBuilder<TCMallocServerStatusSection>("tcmalloc");
+    *ServerStatusSectionBuilder<TCMallocServerStatusSection>("tcmalloc").forShard().forRouter();
 }  // namespace
 }  // namespace mongo

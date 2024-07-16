@@ -943,8 +943,11 @@ MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("de
 }
 #endif  // MONGO_CONFIG_TCMALLOC_GPERF
 
+// Register one instance of the section shared by both roles; this is a process-wide resource.
 auto& heapProfilerServerStatusSection =
-    *ServerStatusSectionBuilder<HeapProfilerServerStatusSection>("heapProfile");
+    *ServerStatusSectionBuilder<HeapProfilerServerStatusSection>("heapProfile")
+         .forShard()
+         .forRouter();
 
 }  // namespace
 }  // namespace mongo

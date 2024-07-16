@@ -164,7 +164,9 @@ public:
         }
     }
 };
-auto& advisoryHostFQDNs = *ServerStatusSectionBuilder<AdvisoryHostFQDNs>("advisoryHostFQDNs");
+// Register one instance of the section shared by both roles; the system has one set of FQDNs.
+auto& advisoryHostFQDNs =
+    *ServerStatusSectionBuilder<AdvisoryHostFQDNs>("advisoryHostFQDNs").forShard().forRouter();
 
 }  // namespace
 }  // namespace mongo
