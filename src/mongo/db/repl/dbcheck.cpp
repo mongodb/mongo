@@ -379,14 +379,16 @@ DbCheckHasher::DbCheckHasher(
     DataThrottle* dataThrottle,
     boost::optional<StringData> indexName,
     int64_t maxCount,
-    int64_t maxBytes)
+    int64_t maxBytes,
+    Date_t deadlineOnSecondary)
     : _opCtx(opCtx),
       _maxKey(end),
       _indexName(indexName),
       _maxCount(maxCount),
       _maxBytes(maxBytes),
       _secondaryIndexCheckParameters(secondaryIndexCheckParameters),
-      _dataThrottle(dataThrottle) {
+      _dataThrottle(dataThrottle),
+      _deadlineOnSecondary(deadlineOnSecondary) {
 
     // Get the MD5 hasher set up.
     md5_init_state(&_state);
@@ -543,6 +545,27 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                 break;
             }
         }
+
+        if (Date_t::now() > _deadlineOnSecondary) {
+            LOGV2_DEBUG(8889400,
+                        3,
+                        "Secondary ending batch early because it reached "
+                        "dbCheckSecondaryBatchMaxTimeMs limit",
+                        "dbCheckSecondaryBatchMaxTimeMs"_attr =
+                            repl::dbCheckSecondaryBatchMaxTimeMs.load(),
+                        "lastKeyStringSeen"_attr =
+                            key_string::rehydrateKey(indexDescriptor->keyPattern(), keyStringBson),
+                        logAttrs(collection->ns()),
+                        "uuid"_attr = collection->uuid(),
+                        "indexName"_attr = indexName);
+            std::string errorMsg =
+                "Secondary ending batch early because it reached dbCheckSecondaryBatchMaxTimeMs "
+                "limit: " +
+                std::to_string(repl::dbCheckSecondaryBatchMaxTimeMs.load()) +
+                ", lastKeyStringSeen: " +
+                key_string::rehydrateKey(indexDescriptor->keyPattern(), keyStringBson).toString();
+            return Status(ErrorCodes::DbCheckSecondaryBatchTimeout, errorMsg);
+        }
     }
 
     // If we got to the end of the index batch without seeing any keys, set the last key to MaxKey.
@@ -647,7 +670,7 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
 
 Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                                              const CollectionPtr& collPtr,
-                                             Date_t deadline) {
+                                             Date_t deadlineOnPrimary) {
     BSONObj currentObjId;
     RecordId currentRecordId;
     RecordData record;
@@ -772,8 +795,26 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
         md5_append(&_state, md5Cast(currentObjData), currentObjSize);
 
         _dataThrottle->awaitIfNeeded(opCtx, record.size());
-        if (Date_t::now() > deadline) {
+        if (Date_t::now() > deadlineOnPrimary) {
             break;
+        }
+        if (Date_t::now() > _deadlineOnSecondary) {
+            LOGV2_DEBUG(8889401,
+                        3,
+                        "Secondary ending batch early because it reached "
+                        "dbCheckSecondaryBatchMaxTimeMs limit",
+                        "dbCheckSecondaryBatchMaxTimeMs"_attr =
+                            repl::dbCheckSecondaryBatchMaxTimeMs.load(),
+                        "lastRecordIDSeen"_attr = currentRecordId.toString(),
+                        "lastObjIdSeen"_attr = rehydratedObjId,
+                        logAttrs(collPtr->ns()),
+                        "uuid"_attr = collPtr->uuid());
+            const std::string errorMsg =
+                "Secondary ending batch early because it reached dbCheckSecondaryBatchMaxTimeMs "
+                "limit: " +
+                std::to_string(repl::dbCheckSecondaryBatchMaxTimeMs.load()) +
+                ", lastRecordIdSeen: " + currentRecordId.toString();
+            return Status(ErrorCodes::DbCheckSecondaryBatchTimeout, errorMsg);
         }
     }
 
@@ -846,7 +887,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                const DbCheckOplogBatch& entry,
                                BSONObj batchStart,
                                BSONObj batchEnd) {
-    const auto msg = "replication consistency check";
+    auto msg = "replication consistency check";
 
     // Set up the hasher,
     boost::optional<DbCheckHasher> hasher;
@@ -899,7 +940,11 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                    batchEnd,
                                    entry.getSecondaryIndexCheckParameters(),
                                    &dataThrottle,
-                                   indexName);
+                                   indexName,
+                                   std::numeric_limits<int64_t>::max(), /*maxCount*/
+                                   std::numeric_limits<int64_t>::max(), /*maxBytes*/
+                                   Date_t::now() +
+                                       Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
 
                     indexDescriptor =
                         collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
@@ -937,7 +982,12 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                    batchStart,
                                    batchEnd,
                                    entry.getSecondaryIndexCheckParameters(),
-                                   &dataThrottle);
+                                   &dataThrottle,
+                                   boost::none,                         /*indexName*/
+                                   std::numeric_limits<int64_t>::max(), /*maxCount*/
+                                   std::numeric_limits<int64_t>::max(), /*maxBytes*/
+                                   Date_t::now() +
+                                       Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
                     uassertStatusOK(hasher->hashForCollectionCheck(opCtx, collection));
                     break;
                 }
@@ -949,7 +999,12 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                            batchStart,
                            batchEnd,
                            entry.getSecondaryIndexCheckParameters(),
-                           &dataThrottle);
+                           &dataThrottle,
+                           boost::none,                         /*indexName*/
+                           std::numeric_limits<int64_t>::max(), /*maxCount*/
+                           std::numeric_limits<int64_t>::max(), /*maxBytes*/
+                           Date_t::now() +
+                               Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
             const auto status = hasher->hashForCollectionCheck(opCtx, collection);
             if (!status.isOK() && status.code() == ErrorCodes::KeyNotFound) {
                 std::unique_ptr<HealthLogEntry> healthLogEntry =
@@ -1018,6 +1073,11 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         }
     } catch (const DBException& exception) {
         // In case of an error, report it to the health log,
+        if (exception.toStatus().code() == ErrorCodes::DbCheckSecondaryBatchTimeout) {
+            msg =
+                "Secondary ending batch early because it reached dbCheckSecondaryBatchMaxTimeMs "
+                "limit";
+        }
         auto logEntry = dbCheckErrorHealthLogEntry(entry.getSecondaryIndexCheckParameters(),
                                                    entry.getNss(),
                                                    boost::none,

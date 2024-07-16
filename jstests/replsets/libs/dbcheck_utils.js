@@ -82,6 +82,12 @@ export const logQueries = {
             "skipping applying dbcheck batch because the 'skipApplyingDbCheckBatchOnSecondary' parameter is on",
         "data.dbCheckParameters": {$exists: true}
     },
+    secondaryBatchTimeoutReachedQuery: {
+        severity: "error",
+        "data.dbCheckParameters": {$exists: true},
+        "msg":
+            "Secondary ending batch early because it reached dbCheckSecondaryBatchMaxTimeMs limit",
+    },
     tooManyDbChecksInQueue: {
         severity: "error",
         "msg": "too many dbcheck runs in queue",

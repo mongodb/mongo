@@ -220,13 +220,14 @@ void DbCheckTest::dropIndex(OperationContext* opCtx, const std::string& indexNam
     wuow.commit();
 }
 
-void DbCheckTest::runHashForCollectionCheck(
+Status DbCheckTest::runHashForCollectionCheck(
     OperationContext* opCtx,
     const BSONObj& start,
     const BSONObj& end,
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParams,
     int64_t maxCount,
-    int64_t maxBytes) {
+    int64_t maxBytes,
+    Date_t deadlineOnSecondary) {
     const DbCheckAcquisition acquisition(
         opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
     const auto& collection = acquisition.coll.getCollectionPtr();
@@ -240,8 +241,35 @@ void DbCheckTest::runHashForCollectionCheck(
                                 &dataThrottle,
                                 boost::none /* indexName */,
                                 maxCount,
-                                maxBytes);
-    ASSERT_OK(hasher.hashForCollectionCheck(opCtx, collection));
+                                maxBytes,
+                                deadlineOnSecondary);
+    return hasher.hashForCollectionCheck(opCtx, collection);
+}
+
+Status DbCheckTest::runHashForExtraIndexKeysCheck(
+    OperationContext* opCtx,
+    const BSONObj& start,
+    const BSONObj& end,
+    boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParams,
+    int64_t maxCount,
+    int64_t maxBytes,
+    Date_t deadlineOnSecondary) {
+    const DbCheckAcquisition acquisition(
+        opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
+    const auto& collection = acquisition.coll.getCollectionPtr();
+    // Disable throttling for testing.
+    DataThrottle dataThrottle(opCtx, []() { return 0; });
+    auto hasher = DbCheckHasher(opCtx,
+                                acquisition,
+                                start,
+                                end,
+                                secondaryIndexCheckParams,
+                                &dataThrottle,
+                                secondaryIndexCheckParams.get().getSecondaryIndex(),
+                                maxCount,
+                                maxBytes,
+                                deadlineOnSecondary);
+    return hasher.hashForExtraIndexKeysCheck(opCtx, collection.get(), start, end);
 }
 
 SecondaryIndexCheckParameters DbCheckTest::createSecondaryIndexCheckParams(

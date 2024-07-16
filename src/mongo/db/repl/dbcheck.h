@@ -190,6 +190,7 @@ public:
      * @param end The last key to hash (inclusive).
      * @param maxCount The maximum number of documents or index keys to hash.
      * @param maxBytes The maximum number of bytes to hash.
+     * @param deadlineOnSecondary The time deadline to finish this batch by on the secondary.
      */
     DbCheckHasher(OperationContext* opCtx,
                   const DbCheckAcquisition& acquisition,
@@ -199,7 +200,8 @@ public:
                   DataThrottle* dataThrottle,
                   boost::optional<StringData> indexName = boost::none,
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
-                  int64_t maxBytes = std::numeric_limits<int64_t>::max());
+                  int64_t maxBytes = std::numeric_limits<int64_t>::max(),
+                  Date_t deadlineOnSecondary = Date_t::max());
 
     ~DbCheckHasher() = default;
 
@@ -208,7 +210,7 @@ public:
      */
     Status hashForCollectionCheck(OperationContext* opCtx,
                                   const CollectionPtr& collPtr,
-                                  Date_t deadline = Date_t::max());
+                                  Date_t deadlineOnPrimary = Date_t::max());
 
     /**
      * Hash index keys between first and last inclusive.
@@ -284,6 +286,10 @@ private:
 
     boost::optional<SecondaryIndexCheckParameters> _secondaryIndexCheckParameters;
     DataThrottle* _dataThrottle;
+
+    // Max time that the hasher should spend on a batch. This should only be populated on the
+    // secondary since the primary has its own batch time limit.
+    Date_t _deadlineOnSecondary;
 };
 
 namespace repl {

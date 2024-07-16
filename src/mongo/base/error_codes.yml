@@ -841,6 +841,7 @@ error_codes:
       name: StreamProcessorCannotResumeFromSource,
       categories: [StreamProcessorUserError],
     }
+  - {code: 426, name: DbCheckSecondaryBatchTimeout}
 
   # Error codes 4000-8999 are reserved.
 

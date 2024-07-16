@@ -37,6 +37,48 @@
 
 namespace mongo {
 
+TEST_F(DbCheckTest, DbCheckHasherErrorsOnCollectionCheckTimeout) {
+    auto opCtx = operationContext();
+    std::vector<std::string> fieldNames = {"a"};
+
+    createIndex(opCtx, BSON("a" << 1));
+    insertDocs(opCtx, 0, 5000, fieldNames);
+
+    auto params = createSecondaryIndexCheckParams(
+        DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
+        "" /* secondaryIndex */);
+    ASSERT_EQ(ErrorCodes::DbCheckSecondaryBatchTimeout,
+              runHashForCollectionCheck(opCtx,
+                                        docMinKey,
+                                        docMaxKey,
+                                        params,
+                                        std::numeric_limits<int64_t>::max() /*maxCount*/,
+                                        std::numeric_limits<int64_t>::max() /*maxBytes*/,
+                                        Date_t::now() + Milliseconds(1) /*deadlineOnSecondary*/)
+                  .code());
+}
+
+TEST_F(DbCheckTest, DbCheckHasherErrorsOnExtraIndexKeysCheckTimeout) {
+    auto opCtx = operationContext();
+    std::vector<std::string> fieldNames = {"a"};
+
+    createIndex(opCtx, BSON("a" << 1));
+    insertDocs(opCtx, 0, 5000, fieldNames);
+
+    auto params = createSecondaryIndexCheckParams(
+        DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
+        "a_1" /* secondaryIndex */);
+    ASSERT_EQ(ErrorCodes::DbCheckSecondaryBatchTimeout,
+              runHashForExtraIndexKeysCheck(opCtx,
+                                            docMinKey,
+                                            docMaxKey,
+                                            params,
+                                            std::numeric_limits<int64_t>::max() /*maxCount*/,
+                                            std::numeric_limits<int64_t>::max() /*maxBytes*/,
+                                            Date_t::now() + Milliseconds(1) /*deadlineOnSecondary*/)
+                  .code());
+}
+
 TEST_F(DbCheckTest, DbCheckHasherNoMissingKeys) {
     auto opCtx = operationContext();
     std::vector<std::string> fieldNames = {"a"};
@@ -47,7 +89,7 @@ TEST_F(DbCheckTest, DbCheckHasherNoMissingKeys) {
     auto params = createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
         "" /* secondaryIndex */);
-    runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params);
+    ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
 
     // Shut down the health log writer so that the writes get flushed to the health log collection.
     auto service = getServiceContext();
@@ -71,7 +113,7 @@ TEST_F(DbCheckTest, DbCheckHasherMissingKeys) {
     auto params = createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
         "" /* secondaryIndex */);
-    runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params);
+    ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
 
     // Shut down the health log writer so that the writes get flushed to the health log collection.
     auto service = getServiceContext();
@@ -96,7 +138,7 @@ TEST_F(DbCheckTest, DbCheckDocumentWithDuplicateFieldNames) {
         "" /* secondaryIndex */,
         false /* skipLookupForExtraKeys */,
         BSONValidateModeEnum::kFull);
-    runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params);
+    ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
 
     // Shut down the health log writer so that the writes get flushed to the health log collection.
     auto service = getServiceContext();
@@ -121,7 +163,7 @@ TEST_F(DbCheckTest, DbCheckDocumentWithInvalidUuid) {
         "" /* secondaryIndex */,
         false /* skipLookupForExtraKeys */,
         BSONValidateModeEnum::kExtended);
-    runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params);
+    ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
 
     // Shut down the health log writer so that the writes get flushed to the health log collection.
     auto service = getServiceContext();

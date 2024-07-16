@@ -853,6 +853,19 @@ server_parameters:
         default: false
         redact: false
 
+    dbCheckSecondaryBatchMaxTimeMs:
+        description: >-
+            The maximum amount of time for a dbcheck batch to run on a secondary.
+            Once the time limit is hit the secondary will stop running the batch.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: dbCheckSecondaryBatchMaxTimeMs
+        default: 5000
+        validator:
+            gte: 10
+            lte: 50000
+        redact: false
+
     dbCheckMaxInternalRetries:
         description: >-
             The maximum number of internal retries that dbCheck will run on a batch.

@@ -112,13 +112,26 @@ public:
     /**
      * Runs hashing and the missing keys check for kNss.
      */
-    void runHashForCollectionCheck(
+    Status runHashForCollectionCheck(
         OperationContext* opCtx,
         const BSONObj& start,
         const BSONObj& end,
         boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParams,
         int64_t maxCount = std::numeric_limits<int64_t>::max(),
-        int64_t maxBytes = std::numeric_limits<int64_t>::max());
+        int64_t maxBytes = std::numeric_limits<int64_t>::max(),
+        Date_t deadlineOnSecondary = Date_t::max());
+
+    /**
+     * Runs hashing for the extra index keys check for kNss.
+     */
+    Status runHashForExtraIndexKeysCheck(
+        OperationContext* opCtx,
+        const BSONObj& start,
+        const BSONObj& end,
+        boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParams,
+        int64_t maxCount = std::numeric_limits<int64_t>::max(),
+        int64_t maxBytes = std::numeric_limits<int64_t>::max(),
+        Date_t deadlineOnSecondary = Date_t::max());
 
     /**
      *  Creates a secondary index check params struct to define the dbCheck operation.
