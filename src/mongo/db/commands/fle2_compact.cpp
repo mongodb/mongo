@@ -449,6 +449,8 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
     // Compact 4.e, Calculate pathLength := #Edges_SPH(lb, lb, uh, prc, theta)
     const auto pathLength = getEdgesLength(fieldType, fieldPath, queryTypeConfig);
     // Compact 4.f, Calculate numPads := ceil( gamma * (pathLength * uniqueLeaves - len(C_f)) )
+    // This assumes that (pathLength * uniqueLeaves) >= uniqueTokens
+    dassert((pathLength * uniqueLeaves) >= uniqueTokens);
     const size_t numPads =
         std::ceil(anchorPaddingFactor * ((pathLength * uniqueLeaves) - uniqueTokens));
     if (numPads <= 0) {
