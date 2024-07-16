@@ -9,7 +9,8 @@ const rst = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             // Disable the checkpoint thread.
-            syncdelay: 0
+            syncdelay: 0,
+            logComponentVerbosity: tojson({storage: {wt: {wtCheckpoint: 1}}})
         }
     }
 });
