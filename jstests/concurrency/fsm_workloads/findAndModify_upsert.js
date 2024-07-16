@@ -51,13 +51,15 @@ export const $config = (function() {
             var res = db.runCommand(cmdObj);
             assert.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
 
-            var doc = res.value;
-            assert(doc !== null, 'a document should have been inserted');
+            if (res.ok === 1) {
+                var doc = res.value;
+                assert(doc !== null, 'a document should have been inserted');
 
-            assert.eq(this.tid, doc.tid);
-            assert(Array.isArray(doc.values), 'expected values to be an array');
-            assert.eq(1, doc.values.length);
-            assert.eq(updatedValue, doc.values[0]);
+                assert.eq(this.tid, doc.tid);
+                assert(Array.isArray(doc.values), 'expected values to be an array');
+                assert.eq(1, doc.values.length);
+                assert.eq(updatedValue, doc.values[0]);
+            }
         }
 
         function update(db, collName) {
@@ -78,11 +80,11 @@ export const $config = (function() {
             var res = db.runCommand(cmdObj);
             assert.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
 
-            var doc = res.value;
-            assert(doc !== null,
-                   'query spec should have matched a document, returned ' + tojson(res));
+            if (res.ok === 1) {
+                var doc = res.value;
+                assert(doc !== null,
+                       'query spec should have matched a document, returned ' + tojson(res));
 
-            if (doc !== null) {
                 assert.eq(this.tid, doc.tid);
                 assert(Array.isArray(doc.values), 'expected values to be an array');
                 assert.gte(doc.values.length, 2);
