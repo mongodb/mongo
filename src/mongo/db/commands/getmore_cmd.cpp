@@ -179,6 +179,13 @@ void validateLSID(OperationContext* opCtx, int64_t cursorId, const ClientCursor*
  * authenticating, so that it is safe to report the txnNumber of 'cursor'.
  */
 void validateTxnNumber(OperationContext* opCtx, int64_t cursorId, const ClientCursor* cursor) {
+    // TODO SERVER-92480 The txnNumber is not unset from the opCtx when the session is yielded, so
+    // it's possible for the txnNumber to still exist despite not running in a txn. Once we unset
+    // txn info from the opCtx after yielding a session, this check can be removed.
+    if (!cursor->getTxnNumber() && !TransactionParticipant::get(opCtx)) {
+        return;
+    }
+
     uassert(50739,
             str::stream() << "Cannot run getMore on cursor " << cursorId
                           << ", which was not created in a transaction, in transaction "

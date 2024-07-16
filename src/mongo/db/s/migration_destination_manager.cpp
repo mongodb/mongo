@@ -1383,8 +1383,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             outerOpCtx->getServiceContext()->getFastClockSource()->now() +
             Milliseconds(drainOverlappingRangeDeletionsOnStartTimeoutMS.load());
 
-        while (rangedeletionutil::checkForConflictingDeletions(
-            outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
+        while (runWithoutSession(outerOpCtx, [&] {
+            return rangedeletionutil::checkForConflictingDeletions(
+                outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid);
+        })) {
             uassert(ErrorCodes::ResumableRangeDeleterDisabled,
                     "Failing migration because the disableResumableRangeDeleter server "
                     "parameter is set to true on the recipient shard, which contains range "
