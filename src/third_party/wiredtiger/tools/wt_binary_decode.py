@@ -329,30 +329,31 @@ def process_timestamps(p, cell: btree_format.Cell, pagestats: PageStats):
     if cell.prepared:
         p.rint_v(' prepared')
 
-    if cell.durable_start_ts is not None:
-        pagestats.d_start_ts_sz += cell.size_durable_start_ts
-        pagestats.num_d_start_ts += 1
-        p.rint_v(' durable start ts: ' + ts(cell.durable_start_ts))
-    if cell.durable_stop_ts is not None:
-        pagestats.d_stop_ts_sz += cell.size_durable_stop_ts
-        pagestats.num_d_stop_ts += 1
-        p.rint_v(' durable stop ts: ' + ts(cell.durable_stop_ts))
     if cell.start_ts is not None:
         pagestats.start_ts_sz += cell.size_start_ts
         pagestats.num_start_ts += 1
         p.rint_v(' start ts: ' + ts(cell.start_ts))
-    if cell.stop_ts is not None:
-        pagestats.stop_ts_sz += cell.size_stop_ts
-        pagestats.num_stop_ts += 1
-        p.rint_v(' stop ts: ' + ts(cell.stop_ts))
     if cell.start_txn is not None:
         pagestats.start_txn_sz += cell.size_start_txn
         pagestats.num_start_txn += 1
         p.rint_v(' start txn: ' + txn(cell.start_txn))
+    if cell.durable_start_ts is not None:
+        pagestats.d_start_ts_sz += cell.size_durable_start_ts
+        pagestats.num_d_start_ts += 1
+        p.rint_v(' durable start ts: ' + ts(cell.durable_start_ts))
+
+    if cell.stop_ts is not None:
+        pagestats.stop_ts_sz += cell.size_stop_ts
+        pagestats.num_stop_ts += 1
+        p.rint_v(' stop ts: ' + ts(cell.stop_ts))
     if cell.stop_txn is not None:
         pagestats.stop_txn_sz += cell.size_stop_txn
         pagestats.num_stop_txn += 1
         p.rint_v(' stop txn: ' + txn(cell.stop_txn))
+    if cell.durable_stop_ts is not None:
+        pagestats.d_stop_ts_sz += cell.size_durable_stop_ts
+        pagestats.num_d_stop_ts += 1
+        p.rint_v(' durable stop ts: ' + ts(cell.durable_stop_ts))
 
 def block_decode(p, b, opts):
     disk_pos = b.tell()

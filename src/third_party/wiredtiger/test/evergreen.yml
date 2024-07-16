@@ -64,6 +64,7 @@ functions:
               export TESTUTIL_MSAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ TSan ]]; then
               export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
+              export TESTUTIL_TSAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ UBSan ]]; then
               export UBSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_stacktrace=1"
               export TESTUTIL_UBSAN=1
@@ -429,7 +430,7 @@ functions:
           set -o errexit
           set -o verbose
           ${PREPARE_TEST_ENV}
-          ../../../tools/run_parallel.sh 'nice ./recovery-test.sh "${data_validation_stress_test_args} ${run_test_checkpoint_args}" WT_TEST.$t test_checkpoint' 120
+          ../../../tools/run_parallel.sh 'nice ./recovery-test.sh "${data_validation_stress_test_args} ${run_test_checkpoint_args}" WT_TEST.$t test_checkpoint' ${validation_stress_num_runs|120}
   "run tiered storage test":
     - command: shell.exec
       params:
@@ -468,7 +469,7 @@ functions:
           pip3 install google-cloud-storage
 
           # Run Python testing for all tiered tests.
-          python3 ../test/suite/run.py -j $(nproc) ${tiered_storage_test_name}
+          python3 ../test/suite/run.py ${ignore_stdout} -j $(nproc) ${tiered_storage_test_name}
   "compile wiredtiger docs":
     - command: shell.exec
       params:
@@ -784,9 +785,9 @@ functions:
           threads_command="-j ${num_jobs}"
         fi
         if [ ${check_coverage|false} = true ]; then
-            ${python_binary|python3} ../test/suite/run.py ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1 || echo "Ignoring failed test as we are checking test coverage"
+            ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1 || echo "Ignoring failed test as we are checking test coverage"
         else
-            ${python_binary|python3} ../test/suite/run.py ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1
+            ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1
         fi
 
   "code coverage analysis":
@@ -2104,6 +2105,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
+            ${PREPARE_TEST_ENV}
 
             ./test_timestamp_abort -PT -Po s3_store
 
@@ -2265,7 +2267,7 @@ tasks:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            ${python_binary|python3} ../test/suite/run.py ${unit_test_args|-v 2} --hook tiered=tier_storage_source='s3_store' -j ${num_jobs} 2>&1
+            ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} --hook tiered=tier_storage_source='s3_store' -j ${num_jobs} 2>&1
 
   - name: unit-test-hook-tiered-timestamp
     tags: ["python"]
@@ -2322,7 +2324,7 @@ tasks:
             do
               ((i=i+1))
               echo "Test count: $i"
-              ${python_binary|python3} ../test/suite/run.py -v 4 test_prepare_hs03.py --hook timestamp
+              ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} -v 4 test_prepare_hs03.py --hook timestamp
             done
 
   - name: csuite-long-running
@@ -2971,6 +2973,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
+            ${PREPARE_TEST_ENV}
             WT_BUILDDIR=$(pwd)/../../cmake_build LD_LIBRARY_PATH=$WT_BUILDDIR ${python_binary|python3} syscall.py --verbose --preserve
 
   - name: checkpoint-filetypes-test
@@ -5582,6 +5585,9 @@ buildvariants:
     ctest_extra_args: -E "wt12015_backup_corruption"
   tasks:
     - name: ".pull_request !.pull_request_compilers !.model_checking !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
+      vars:
+        # We want to keep pull request testing short. Disable tests that are slow under ASan
+        ctest_extra_args: -E "wt12015_backup_corruption" -LE sanitizer_long
     - name: examples-c-test
     - name: format-asan-smoke-test
 
@@ -5598,6 +5604,58 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: examples-c-tsan
+
+# FIXME-WT-13256
+# This variant runs all possible tasks under TSan but instructs TSan to not report any issues it
+# encounters. This allows us to check whether a TSan change may cause other unexpected failures
+# while also not having to fix every TSan issue discovered. At the conclusion of the TSan work this
+# variant will be deleted.
+- name: ubuntu2004-tsan-no-throw
+  display_name: "~ Ubuntu 20.04 TSAN (No throw)"
+  patch_only: true
+  run_on:
+  - ubuntu2004-large
+  expansions:
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=TSan
+    ENABLE_TCMALLOC: 0
+    data_validation_stress_test_args: -t r -m -W 3 -D -p -n 100000 -k 100000 -C cache_size=100MB
+    additional_env_vars: |
+      # We intentionally suppress all TSan warnings.
+      export TSAN_OPTIONS="detect_deadlocks=0:report_bugs=0:report_atomic_races=0:allocator_may_return_null=1"
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    # We don't run C++ memory sanitized testing as it creates false positives. TSan also significantly increases the runtime
+    # of some csuite tests, so disable the already long tests as well as tests heavily impacted by TSan.
+    ctest_extra_args: -LE "cppsuite|long_running|sanitizer_long"
+    # TSan slows down python testing enough that we start printing "operation took X seconds" warnings.
+    # These don't impact functionality, but the python tests fail on detection of any content in stdout so ignore it instead.
+    ignore_stdout: --ignore-stdout
+    # Reduce the number of test iterations in validation stressing as TSan increases runtime by a factor of roughly 10x
+    validation_stress_num_runs: 20
+  tasks:
+    # Skip the azure/gcp tests as they don't compile under clang
+    - name: ".pull_request !.tiered_unittest !azure-gcp-tiered-test-small !.pull_request_compilers !.model_checking !csuite-wt12015-backup-corruption-test"
+    - name: compile
+    - name: make-check-test
+    - name: configure-combinations
+    - name: syscall-linux
+    - name: checkpoint-filetypes-test
+    - name: unit-test-zstd
+    - name: unit-test-random-seed
+    - name: unit-test-hook-timestamp
+    - name: test-prepare-hs03-hook-timestamp
+    - name: spinlock-gcc-test
+    - name: spinlock-pthread-adaptive-test
+    - name: static-wt-build-test
+    - name: linux-directio
+      distros: ubuntu2004-build
+    - name: format-smoke-test
+    - name: ".data-validation-stress-test"
+    - name: catch2-unittest-test
+    - name: s3-tiered-storage-extensions-test
+    - name: bench-tiered-push-pull
+    - name: catch2-unittest-assertions
+    - name: bench-tiered-push-pull-s3
 
 # Very minimal set without any extensions
 - name: ubuntu2004-minimal

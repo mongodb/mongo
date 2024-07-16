@@ -162,6 +162,7 @@ create_configs()
     echo "checkpoints=1"  >> $file_name             # Force periodic writes
     echo "compression=snappy"  >> $file_name        # We only build with snappy, force the choice
     echo "data_source=table" >> $file_name
+    echo "debug.background_compact=0" >> $file_name # WT-13276 - Not supported by older releases
     echo "debug.cursor_reposition=0" >> $file_name  # WT-10594 - Not supported by older releases
     echo "debug.log_retention=0" >> $file_name      # WT-10434 - Not supported by older releases
     echo "debug.realloc_malloc=0" >> $file_name     # WT-10111 - Not supported by older releases

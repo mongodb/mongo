@@ -1795,6 +1795,10 @@ __session_truncate(
     SESSION_TXN_API_CALL(session, ret, truncate, config, cfg);
     WT_STAT_CONN_INCR(session, cursor_truncate);
 
+    if ((start != NULL && start->session != wt_session) ||
+      (stop != NULL && stop->session != wt_session))
+        WT_ERR_MSG(session, EINVAL, "bounding cursors must be owned by the truncating session");
+
     /*
      * If the URI is specified, we don't need a start/stop, if start/stop is specified, we don't
      * need a URI. One exception is the log URI which may remove log files for a backup cursor.

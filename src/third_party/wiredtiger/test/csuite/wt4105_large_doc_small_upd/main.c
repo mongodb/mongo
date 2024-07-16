@@ -154,7 +154,8 @@ main(int argc, char *argv[])
              * Ignore this alarm for some sanitizer builds due to the typical slowdown they
              * introduce.
              */
-            if (!(testutil_is_flag_set("TESTUTIL_MSAN") || testutil_is_flag_set("TESTUTIL_UBSAN")))
+            if (!(testutil_is_flag_set("TESTUTIL_MSAN") || testutil_is_flag_set("TESTUTIL_UBSAN") ||
+                  testutil_is_flag_set("TESTUTIL_TSAN")))
                 (void)alarm(15);
             testutil_check(c->modify(c, &modify_entry, 1));
             (void)alarm(0);

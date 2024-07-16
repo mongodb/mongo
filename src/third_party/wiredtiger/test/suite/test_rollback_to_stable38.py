@@ -26,6 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import os
+
 import wttest
 from helper import simulate_crash_restart
 from rollback_to_stable_util import verify_rts_logs
@@ -68,6 +70,11 @@ class test_rollback_to_stable38(wttest.WiredTigerTestCase):
         cursor.close()
 
     def test_rollback_to_stable38(self):
+        # TSan slows this test down enough to reliably produce "Cache stuck for too long"
+        # messages in stderr which fails the test.
+        if os.environ.get("TESTUTIL_TSAN") == "1":
+            self.skipTest("Not compatible with TSan")
+
         nrows = 1000000
 
         # Create a table.

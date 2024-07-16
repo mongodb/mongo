@@ -42,6 +42,7 @@ from wtscenario import make_scenarios
 class test_checkpoint(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all),timing_stress_for_test=[checkpoint_slow]'
     session_config = 'isolation=snapshot'
+    rollbacks_allowed = 10
 
     format_values = [
         ('column-fix', dict(key_format='r', value_format='8t',
