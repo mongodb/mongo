@@ -62,20 +62,13 @@ assert.eq(max, res.chunks[0][1]);
 // Split the existing chunks to create a large number of chunks (> 16MB).
 // This needs to be done twice since the BSONObj size limit also applies
 // to command objects for commands like splitChunk.
-
-// The chunk min and max need to be large, otherwise we need a lot more
-// chunks to reach the size limit.
-const splitPoint = {
-    x: 0,
-    y: "A".repeat(512)
-};
+const bigString = 'X'.repeat(1024 * 1024);  // 1MB
 
 // Run splitChunk on the shards directly since the split command for mongos doesn't have an option
 // to specify multiple split points or number of splits.
-
 let splitPoints = [];
-for (let i = 0; i < 10000; i++) {
-    splitPoints.push({x: i, y: splitPoint.y});
+for (let i = 0; i < 7; i++) {
+    splitPoints.push({x: i, y: bigString});
 }
 assert.commandWorked(st.rs0.getPrimary().getDB('admin').runCommand({
     splitChunk: ns,
@@ -89,8 +82,8 @@ assert.commandWorked(st.rs0.getPrimary().getDB('admin').runCommand({
 
 let prevMin = splitPoints[splitPoints.length - 1];
 splitPoints = [];
-for (let i = 10000; i < 20000; i++) {
-    splitPoints.push({x: i, y: splitPoint.y});
+for (let i = 7; i < 14; i++) {
+    splitPoints.push({x: i, y: bigString});
 }
 assert.commandWorked(st.rs0.getPrimary().getDB('admin').runCommand({
     splitChunk: ns,
@@ -112,7 +105,7 @@ assert.neq(null, st.s.getDB('config').databases.findOne());
 
 // Trigger a refresh on the mongos through a moveChunk command.
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: splitPoint, to: otherShard.shardName}));
+    st.s.adminCommand({moveChunk: ns, find: {x: 0, y: bigString}, to: otherShard.shardName}));
 
 // Chunks should not be included in the response because the chunk size exceeds the limit.
 res = st.s.adminCommand({getShardVersion: ns, fullMetadata: true});
