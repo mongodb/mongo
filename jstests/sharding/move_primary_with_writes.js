@@ -113,7 +113,9 @@ function createCollections() {
     assert.commandWorked(db.runCommand({createIndexes: 'shardedColl', indexes: shardedBarIndexes}));
 
     // We can only move collection under FCV v8.0
-    if (!TestData.mixedBinVersions) {
+    const isMultiversion = jsTest.options().shardMixedBinVersions ||
+        jsTest.options().useRandomBinVersionsWithinReplicaSet;
+    if (!isMultiversion) {
         assert.commandWorked(db.adminCommand(
             {moveCollection: dbName + '.unshardedTrackedColl', toShard: st.shard1.shardName}));
     }
@@ -250,7 +252,7 @@ function buildCommands(collName, isCollTracked) {
             errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
         },
         {
-            command: {convertToCapped: "unshardedFoo", size: 1000000},
+            command: {convertToCapped: "unshardedColl", size: 1000000},
             shouldFail: true,
             isAdminCommand: false,
             errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
