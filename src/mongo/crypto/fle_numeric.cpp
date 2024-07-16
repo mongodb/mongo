@@ -563,8 +563,9 @@ bool canUsePrecisionMode(Decimal128 min, Decimal128 max, uint32_t precision, uin
 
     const auto t_1 = scaled_max.subtract(scaled_min);
     const auto t_4 = int_128_max_decimal.subtract(t_1);
-    const auto t_5 =
-        t_4.logarithm(Decimal128(10)).round(Decimal128::RoundingMode::kRoundTowardZero);
+    const auto t_5 = t_4.logarithm(Decimal128(10))
+                         .round(Decimal128::RoundingMode::kRoundTowardZero)
+                         .subtract(Decimal128(1));
 
     uassert(9178812, "Invalid value for precision", t_5.isGreaterEqual(Decimal128(precision)));
 
