@@ -62,6 +62,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/tick_source.h"
 
@@ -69,6 +70,9 @@
 
 namespace mongo::sbe {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangMultiPlannerBeforeAggPipelineRebuild);
+
 /**
  * An element in this histogram is the number of plans in the candidate set of an invocation (of the
  * SBE multiplanner).
@@ -342,6 +346,11 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     if (!_cq.cqPipeline().empty()) {
         winner.root->close();
         _yieldPolicy->clearRegisteredPlans();
+        if (MONGO_unlikely(hangMultiPlannerBeforeAggPipelineRebuild.shouldFail())) {
+            LOGV2(9213101, "Hanging due to hangMultiPlannerBeforeAggPipelineRebuild fail point");
+            hangMultiPlannerBeforeAggPipelineRebuild.pauseWhileSet(_opCtx);
+        }
+        _indexExistenceChecker.check(_opCtx, _collections);
         auto solution = QueryPlanner::extendWithAggPipeline(
             _cq, std::move(winner.solution), _queryParams.secondaryCollectionsInfo);
         auto [rootStage, data] = stage_builder::buildSlotBasedExecutableTree(
@@ -373,6 +382,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
                 if (i == winnerIdx)
                     continue;  // have already done the winner
 
+                _indexExistenceChecker.check(_opCtx, _collections);
                 auto solution = QueryPlanner::extendWithAggPipeline(
                     _cq, std::move(candidates[i].solution), _queryParams.secondaryCollectionsInfo);
                 auto&& [rootStage, data] = stage_builder::buildSlotBasedExecutableTree(
