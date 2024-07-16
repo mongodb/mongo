@@ -144,6 +144,11 @@ OS_DOCKER_LOOKUP = {
                        "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
                        "file"
                    ]), "python3"),
+    'ubuntu2404': ('ubuntu:24.04', "apt",
+                   frozenset([
+                       "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
+                       "file"
+                   ]), "python3"),
     'windows': None,
     'windows_i686': None,
     'windows_x86_64': None,

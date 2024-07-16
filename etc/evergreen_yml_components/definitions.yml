@@ -42,11 +42,15 @@ variables:
   - enterprise-suse15-64
   - ubuntu2004-arm64
   - ubuntu2204-arm64
+  - ubuntu2404-arm64
   - ubuntu2004
   - ubuntu2204
+  - ubuntu2404
   - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu2204-arm64
+  - enterprise-ubuntu2404-arm64
   - enterprise-ubuntu2004-64
+  - enterprise-ubuntu2404
   - enterprise-windows
   - windows
 

@@ -305,6 +305,8 @@ class Distro(object):
                 return "focal"
             elif build_os == 'ubuntu2204':
                 return "jammy"
+            elif build_os == 'ubuntu2404':
+                return "noble"
             else:
                 raise Exception("unsupported build_os: %s" % build_os)
         elif self.dname == 'debian':
@@ -369,6 +371,7 @@ class Distro(object):
                 "ubuntu1804",
                 "ubuntu2004",
                 "ubuntu2204",
+                "ubuntu2404",
             ]
         elif self.dname == 'debian':
             return ["debian81", "debian92", "debian10", "debian11", "debian12"]

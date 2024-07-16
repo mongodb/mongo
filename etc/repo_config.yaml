@@ -311,6 +311,18 @@ repos:
     repos:
       - apt/ubuntu/dists/jammy/mongodb-org
 
+  - name: ubuntu2404
+    type: deb
+    code_name: "noble"
+    edition: org
+    bucket: repo.mongodb.org
+    component: multiverse
+    architectures:
+      - amd64
+      - arm64
+    repos:
+      - apt/ubuntu/dists/noble/mongodb-org
+
 ####################
 #
 # Enterprise Repos:
@@ -603,3 +615,15 @@ repos:
       - arm64
     repos:
       - apt/ubuntu/dists/jammy/mongodb-enterprise
+
+  - name: ubuntu2404
+    type: deb
+    code_name: "noble"
+    edition: enterprise
+    bucket: repo.mongodb.com
+    component: multiverse
+    architectures:
+      - amd64
+      - arm64
+    repos:
+      - apt/ubuntu/dists/noble/mongodb-enterprise
