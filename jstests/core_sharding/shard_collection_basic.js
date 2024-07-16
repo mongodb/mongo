@@ -2,8 +2,6 @@
  * Test shardCollection command behavior
  */
 
-import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
-
 var kDbName = db.getName();
 
 db.dropDatabase();

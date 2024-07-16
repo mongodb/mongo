@@ -131,7 +131,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid db name specified: " << dbName.toStringForErrorMsg(),
-            DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
+            DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Disallow));
 
     // Make sure to force update of any stale metadata
     ON_BLOCK_EXIT([&] { RoutingInformationCache::get(opCtx)->purgeDatabase(dbName); });
