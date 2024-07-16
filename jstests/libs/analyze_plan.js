@@ -39,6 +39,19 @@ export function getQueryPlanner(explain) {
 }
 
 /**
+ * Help function to extract shards from explain in sharded environment. Returns null for
+ * non-sharded plans.
+ */
+export function getShardsFromExplain(explain) {
+    if (explain.hasOwnProperty("queryPlanner") &&
+        explain.queryPlanner.hasOwnProperty("winningPlan")) {
+        return explain.queryPlanner.winningPlan.shards;
+    }
+
+    return null;
+}
+
+/**
  * Extracts and returns an array of explain outputs for every shard in a sharded cluster; returns
  * the original explain output in case of a single replica set.
  */
@@ -58,14 +71,8 @@ export function getAllNodeExplains(explain) {
 
     // NOTE: When shards explain is present in the 'queryPlanner.winningPlan' the shard explains are
     // placed in the array and therefore there is no need to call Object.values() on each element.
-    const shards = (function() {
-        if (explain.hasOwnProperty("queryPlanner") &&
-            explain.queryPlanner.hasOwnProperty("winningPlan")) {
-            return explain.queryPlanner.winningPlan.shards;
-        }
+    const shards = getShardsFromExplain(explain);
 
-        return null;
-    }());
     if (shards) {
         assert(Array.isArray(shards), shards);
         shardsExplain.push(...shards);
