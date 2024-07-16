@@ -193,6 +193,8 @@ last-continuous:
       ticket: SERVER-91522
     - test_file: jstests/core/query/project/projection_with_hashed_index.js
       ticket: SERVER-91757
+    - test_file: jstests/sharding/sharded_data_distribution.js
+      ticket: SERVER-88400
   suites: null
 last-lts:
   all:
@@ -396,4 +398,6 @@ last-lts:
       ticket: SERVER-91522
     - test_file: jstests/core/query/project/projection_with_hashed_index.js
       ticket: SERVER-91757
+    - test_file: jstests/sharding/sharded_data_distribution.js
+      ticket: SERVER-88400
   suites: null
