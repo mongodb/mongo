@@ -91,3 +91,23 @@ assert.eq(profileObj.command.ordered, false, tojson(profileObj));
 assert.eq(profileObj.command.writeConcern.w, 1, tojson(profileObj));
 assert.eq(profileObj.command.writeConcern.wtimeout, wtimeout, tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+
+//
+// Test that inserts over 'kMaxWriteBatchSize' have the correct 'ninserted'.
+//
+coll.drop();
+let docs = [];
+for (let i = 1; i <= 150000; i++) {
+    docs.push({number: i});
+}
+
+assert.commandWorked(coll.insertMany(docs));
+coll.aggregate([{$match: {number: {$lte: 100001}}}, {$out: "col2"}]);
+
+profileObj = getLatestProfilerEntry(testDB);
+expectedKeysInserted = collectionIsClustered ? 0 : 100001;
+
+assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
+assert.eq(profileObj.ninserted, 100001, tojson(profileObj));
+assert.eq(profileObj.keysInserted, expectedKeysInserted, tojson(profileObj));
+assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));

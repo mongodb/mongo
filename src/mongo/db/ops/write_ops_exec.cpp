@@ -1170,7 +1170,8 @@ WriteResult performInserts(OperationContext* opCtx,
         curOp.setNS_inlock(wholeOp.getNamespace());
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
         curOp.ensureStarted();
-        curOp.debug().additiveMetrics.ninserted = 0;
+        // Initialize 'ninserted' for the operation if is not yet.
+        curOp.debug().additiveMetrics.incrementNinserted(0);
     }
 
     // If we are performing inserts from tenant migrations, skip checking if the user is allowed to
@@ -3269,7 +3270,8 @@ write_ops::InsertCommandReply performTimeseriesWrites(
                                : requestNs);
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
         curOp.ensureStarted();
-        curOp.debug().additiveMetrics.ninserted = 0;
+        // Initialize 'ninserted' for the operation if is not yet.
+        curOp.debug().additiveMetrics.incrementNinserted(0);
     }
 
     return performTimeseriesWrites(opCtx, request, &curOp);
