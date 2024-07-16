@@ -2001,6 +2001,7 @@ void OpDebug::setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats) {
         *additiveMetrics.fromPlanCache && planSummaryStats.fromPlanCache;
 
     sortSpills = planSummaryStats.sortSpills;
+    sortSpillBytes = planSummaryStats.sortSpillBytes;
     sortTotalDataSizeBytes = planSummaryStats.sortTotalDataSizeBytes;
     keysSorted = planSummaryStats.keysSorted;
     collectionScans = planSummaryStats.collectionScans;

@@ -59,6 +59,7 @@ sorterBaseEnv.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/server_feature_flags",
+        "$BUILD_DIR/mongo/db/stats/counters",
         "sorter_stats",
     ],
     LIBDEPS_PRIVATE=[

@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo::sbe {
 
@@ -178,10 +179,12 @@ void WindowStage::spill() {
     };
 
     // Spill all in memory rows in batches.
+    int64_t spilledBytes = 0;
     for (size_t i = 0, id = getLastSpilledRowId() + 1; i < _rows.size(); ++i, ++id) {
         BufBuilder buf;
         _rows[i].serializeForSorter(buf);
         int bufferSize = buf.len();
+        spilledBytes += bufferSize;
         auto buffer = buf.release();
         auto recordId = RecordId(id);
         _recordBuffers.push_back(buffer);
@@ -196,7 +199,12 @@ void WindowStage::spill() {
     if (_records.size() > 0) {
         writeBatch();
     }
+
+    // Record spilling statistics.
+    _specificStats.spilledBytes += spilledBytes;
     _specificStats.spilledDataStorageSize = _recordStore->rs()->storageSize(_opCtx);
+    setWindowFieldsCounters.incrementSetWindowFieldsCountersPerSpilling(
+        1 /* spills */, spilledBytes, _rows.size());
 
     // Clear the in memory window buffer.
     _rows.clear();
@@ -818,6 +826,7 @@ std::unique_ptr<PlanStageStats> WindowStage::getStats(bool includeDebugInfo) con
         // Spilling stats.
         bob.appendBool("usedDisk", _specificStats.usedDisk);
         bob.appendNumber("spills", _specificStats.spills);
+        bob.appendNumber("spilledBytes", _specificStats.spilledBytes);
         bob.appendNumber("spilledRecords", _specificStats.spilledRecords);
         bob.appendNumber("spilledDataStorageSize", _specificStats.spilledDataStorageSize);
 

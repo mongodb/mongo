@@ -85,6 +85,7 @@
 #include "mongo/db/sorter/sorter_checksum_calculator.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
@@ -987,6 +988,7 @@ private:
         for (auto& data : _data) {
             writer.addAlreadySorted(data.first, data.second);
         }
+
         _data.clear();
         // _data may have grown very large. Even though it's clear()ed, we need to
         // free the excess memory.
@@ -1662,9 +1664,10 @@ void SortedFileWriter<Key, Value>::writeChunk() {
     }
 
     // Negative size means compressed.
-    size = shouldCompress ? -size : size;
-    _file->write(reinterpret_cast<const char*>(&size), sizeof(size));
-    _file->write(outBuffer, std::abs(size));
+    int32_t signedSize = shouldCompress ? -size : size;
+    _file->write(reinterpret_cast<const char*>(&signedSize), sizeof(signedSize));
+    _file->write(outBuffer, size);
+    sortCounters.incrementSortCountersPerSpilling(1 /* sortSpills */, sizeof(signedSize) + size);
 
     _buffer.reset();
 }

@@ -238,10 +238,6 @@ bool GroupProcessor::shouldSpillOnEveryDuplicateId(bool isNewGroup) {
 }
 
 void GroupProcessor::spill() {
-    _stats.spills++;
-    _stats.numBytesSpilledEstimate += _memoryTracker.currentMemoryBytes();
-    _stats.spilledRecords += _groups.size();
-
     std::vector<const GroupProcessorBase::GroupsMap::value_type*>
         ptrs;  // using pointers to speed sorting
     ptrs.reserve(_groups.size());
@@ -282,15 +278,22 @@ void GroupProcessor::spill() {
             }
             break;
     }
+    _sortedFiles.emplace_back(writer.done());
+
+    _stats.spills++;
+    _stats.numBytesSpilledEstimate += _memoryTracker.currentMemoryBytes();
+    _stats.spilledRecords += _groups.size();
+
+    int64_t spilledBytes = 0;
+    if (_spillStats) {
+        spilledBytes = _spillStats->bytesSpilled() - _stats.spilledDataStorageSize;
+        _stats.spilledDataStorageSize = _spillStats->bytesSpilled();
+    }
+    groupCounters.incrementGroupCountersPerSpilling(1 /* spills */, spilledBytes, _groups.size());
 
     // Zero out the current per-accumulation statement memory consumption, as the memory has been
     // freed by spilling.
     GroupProcessorBase::reset();
-
-    _sortedFiles.emplace_back(writer.done());
-    if (_spillStats) {
-        _stats.spilledDataStorageSize = _spillStats->bytesSpilled();
-    }
 }
 
 }  // namespace mongo

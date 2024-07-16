@@ -95,6 +95,9 @@ struct PlanSummaryStats {
     // The total number of spills to disk from sort stages
     long long sortSpills = 0;
 
+    // The total number of bytes spilled to disk from sort stages
+    long long sortSpillBytes = 0;
+
     // The amount of data we've sorted in bytes
     size_t sortTotalDataSizeBytes = 0;
 

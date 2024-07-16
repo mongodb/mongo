@@ -343,6 +343,7 @@ LookupPushdownCounters lookupPushdownCounters;
 SortCounters sortCounters;
 ValidatorCounters validatorCounters;
 GroupCounters groupCounters;
+SetWindowFieldsCounters setWindowFieldsCounters;
 PlanCacheCounters planCacheCounters;
 FastPathQueryCounters fastPathQueryCounters;
 

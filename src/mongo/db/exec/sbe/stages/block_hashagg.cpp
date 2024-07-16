@@ -138,12 +138,6 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
     }
 }
 
-BlockHashAggStage::~BlockHashAggStage() {
-    groupCounters.incrementGroupCounters(_specificStats.spills,
-                                         _specificStats.spilledDataStorageSize,
-                                         _specificStats.spilledRecords);
-}
-
 std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
     AggExprTupleVector blockRowAggs;
     for (const auto& [slot, aggTuple] : _aggs) {
@@ -760,6 +754,7 @@ void BlockHashAggStage::open(bool reOpen) {
         }
 
         _specificStats.spilledDataStorageSize = _recordStore->rs()->storageSize(_opCtx);
+        groupCounters.incrementGroupCountersPerQuery(_specificStats.spilledDataStorageSize);
 
         // Establish a cursor, positioned at the beginning of the record store.
         _rsCursor = _recordStore->getCursor(_opCtx);
@@ -974,6 +969,7 @@ std::unique_ptr<PlanStageStats> BlockHashAggStage::getStats(bool includeDebugInf
         // Spilling stats.
         bob.appendBool("usedDisk", _specificStats.usedDisk);
         bob.appendNumber("spills", _specificStats.spills);
+        bob.appendNumber("spilledBytes", _specificStats.spilledBytes);
         bob.appendNumber("spilledRecords", _specificStats.spilledRecords);
         bob.appendNumber("spilledDataStorageSize", _specificStats.spilledDataStorageSize);
 

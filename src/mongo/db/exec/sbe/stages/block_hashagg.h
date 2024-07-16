@@ -68,8 +68,6 @@ public:
                       bool participateInTrialRunTracking = true,
                       bool forceIncreasedSpilling = false);
 
-    ~BlockHashAggStage() override;
-
     std::unique_ptr<PlanStage> clone() const final;
 
     void prepare(CompileCtx& ctx) final;

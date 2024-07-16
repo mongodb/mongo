@@ -69,8 +69,7 @@ namespace mongo {
 
 DocumentSourceGroupBase::~DocumentSourceGroupBase() {
     const auto& stats = _groupProcessor.getStats();
-    groupCounters.incrementGroupCounters(
-        stats.spills, stats.spilledDataStorageSize, stats.spilledRecords);
+    groupCounters.incrementGroupCountersPerQuery(stats.spilledDataStorageSize);
 }
 
 Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const {

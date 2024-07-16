@@ -69,6 +69,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+namespace {
+MONGO_FAIL_POINT_DEFINE(hangCollScanDoWork);
+}  // namespace
 
 namespace mongo {
 
@@ -238,6 +241,10 @@ void CollectionScan::initCursor(OperationContext* opCtx,
 }
 
 PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
+    if (MONGO_unlikely(hangCollScanDoWork.shouldFail())) {
+        hangCollScanDoWork.pauseWhileSet();
+    }
+
     if (_commonStats.isEOF) {
         _priority.reset();
         return PlanStage::IS_EOF;
