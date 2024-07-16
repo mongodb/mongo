@@ -86,12 +86,28 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
         }
     }
 
-    /*
-     * Clear the history store flags for the stable update to indicate that this update should be
-     * written to the history store later. The next time when this update is moved into the history
-     * store, it will have a different stop time point.
-     */
     if (stable_upd != NULL) {
+        /*
+         * During recovery, there shouldn't be any updates in the update chain except when the
+         * updates are from a prepared transaction. Reset the transaction ID of the stable update
+         * that was restored as part of the unstable prepared tombstone. Ignore the history store as
+         * we cannot have a prepared transaction operating on it.
+         */
+        if (F_ISSET(S2C(session), WT_CONN_RECOVERING) && !WT_IS_HS(session->dhandle)) {
+            WT_ASSERT(session, first_upd->type == WT_UPDATE_TOMBSTONE);
+            WT_ASSERT(session, first_upd->prepare_state == WT_PREPARE_INPROGRESS);
+            WT_ASSERT(session, F_ISSET(first_upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS));
+            WT_ASSERT(session, !hs_update);
+            WT_ASSERT(session, stable_upd->next == NULL);
+            WT_ASSERT(session, F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DS));
+            stable_upd->txnid = WT_TXN_NONE;
+        }
+
+        /*
+         * Clear the history store flags for the stable update to indicate that this update should
+         * be written to the history store later. The next time when this update is moved into the
+         * history store, it will have a different stop time point.
+         */
         if (hs_update) {
             /*
              * If we have a stable tombstone at the end of the update chain, it may not have been
