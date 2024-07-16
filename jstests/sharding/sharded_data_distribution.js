@@ -95,7 +95,9 @@ assert.commandWorked(testDb.runCommand({create: "unsharded"}));
 assert.commandWorked(barDb.runCommand({create: "unsharded"}));
 
 // We can only move collection under FCV v8.0
-if (!TestData.mixedBinVersions) {
+const isMultiversion =
+    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
+if (!isMultiversion) {
     assert.commandWorked(
         barDb.adminCommand({moveCollection: "bar.unsharded", toShard: st.shard0.shardName}));
     assert.commandWorked(
