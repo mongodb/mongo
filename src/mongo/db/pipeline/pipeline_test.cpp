@@ -2023,6 +2023,20 @@ TEST(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfExistsPredicateOnID)
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfTypePredicateOnID) {
+    std::string inputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {_id : {$type: [1]}}}]";
+    std::string outputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {_id : {$type: [1]}}}]";
+    std::string serializedPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {_id : {$type: [1]}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfExistsPredicateOnID) {
     std::string inputPipe =
         "[{$group : {_id:'$x'}}, "
@@ -2033,6 +2047,20 @@ TEST(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfExistsPredic
     std::string serializedPipe =
         "[{$group : {_id:'$x'}}, "
         " {$match: {$or : [ {_id : {$exists: true}}, {_id : {$gt : 70}}]}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfTypePredicateOnID) {
+    std::string inputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {$or : [ {_id : {$type: [18]}}, {_id : {$gt : 70}}]}}]";
+    std::string outputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {$or : [ {_id : {$gt : 70}}, {_id : {$type: [18]}}]}}]";
+    std::string serializedPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {$or : [ {_id : {$type: [18]}}, {_id : {$gt : 70}}]}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }

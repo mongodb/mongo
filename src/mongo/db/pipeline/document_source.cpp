@@ -159,24 +159,32 @@ namespace {
 
 /**
  * Verifies whether or not a $group is able to swap with a succeeding $match stage. While ordinarily
- * $group can swap with a $match, it cannot if the following $match has an $exists predicate on _id,
- * and the $group has exactly one field as the $group key.  This is because every document will have
- * an _id field following such a $group stage, including those whose group key was missing before
- * the $group. As an example, the following optimization would be incorrect as the post-optimization
- * pipeline would handle documents that had nullish _id fields differently. Thus, given such a
- * $group and $match, this function would return false.
+ * $group can swap with a $match, it cannot if the following $match has exactly one field as the
+ * $group key and either:
+ *     (1) an $exists predicate on _id
+ *     (2) a $type predicate on _id
+ *
+ * For $exists, every document will have an _id field following such a $group stage, including those
+ * whose group key was missing before the $group. As an example, the following optimization would be
+ * incorrect as the post-optimization pipeline would handle documents that had nullish _id fields
+ * differently. Thus, given such a $group and $match, this function would return false.
  *   {$group: {_id: "$x"}}
  *   {$match: {_id: {$exists: true}}
  * ---->
  *   {$match: {x: {$exists: true}}
  *   {$group: {_id: "$x"}}
+
+ * For $type, the $type operator can distinguish between values that compare equal in the $group
+ * stage, meaning documents that are regarded unequally in the $match stage are equated in the
+ * $group stage. This leads to varied results depending on the order of the $match and $group.
  */
 bool groupMatchSwapVerified(const DocumentSourceMatch& nextMatch,
                             const DocumentSourceGroup& thisGroup) {
     if (thisGroup.getIdFields().size() != 1) {
         return true;
     }
-    return !expression::hasExistencePredicateOnPath(*(nextMatch.getMatchExpression()), "_id"_sd);
+    return !expression::hasExistenceOrTypePredicateOnPath(*(nextMatch.getMatchExpression()),
+                                                          "_id"_sd);
 }
 
 /**

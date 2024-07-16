@@ -678,13 +678,15 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
 
 namespace expression {
 
-bool hasExistencePredicateOnPath(const MatchExpression& expr, StringData path) {
+bool hasExistenceOrTypePredicateOnPath(const MatchExpression& expr, StringData path) {
     if (expr.getCategory() == MatchExpression::MatchCategory::kLeaf) {
-        return (expr.matchType() == MatchExpression::MatchType::EXISTS && expr.path() == path);
+        return ((expr.matchType() == MatchExpression::MatchType::EXISTS ||
+                 expr.matchType() == MatchExpression::MatchType::TYPE_OPERATOR) &&
+                expr.path() == path);
     }
     for (size_t i = 0; i < expr.numChildren(); i++) {
         MatchExpression* child = expr.getChild(i);
-        if (hasExistencePredicateOnPath(*child, path)) {
+        if (hasExistenceOrTypePredicateOnPath(*child, path)) {
             return true;
         }
     }
