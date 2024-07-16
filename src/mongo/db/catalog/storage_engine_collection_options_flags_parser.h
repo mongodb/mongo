@@ -52,11 +52,11 @@ std::map<StringData, boost::optional<bool>> getFlagsFromStorageEngineBson(
 boost::optional<bool> getFlagFromStorageEngineBson(const BSONObj& storageEngineOptions,
                                                    StringData flagName);
 
-BSONObj setFlagsToStorageEngineBson(const BSONObj& storageEngineOptions,
-                                    const std::map<StringData, boost::optional<bool>>& flags);
+[[nodiscard]] BSONObj setFlagsToStorageEngineBson(
+    const BSONObj& storageEngineOptions, const std::map<StringData, boost::optional<bool>>& flags);
 
-BSONObj setFlagToStorageEngineBson(const BSONObj& storageEngineOptions,
-                                   StringData flagName,
-                                   boost::optional<bool> flagValue);
+[[nodiscard]] BSONObj setFlagToStorageEngineBson(const BSONObj& storageEngineOptions,
+                                                 StringData flagName,
+                                                 boost::optional<bool> flagValue);
 
 }  // namespace mongo
