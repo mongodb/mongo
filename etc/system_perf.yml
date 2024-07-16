@@ -4,13 +4,13 @@ exec_timeout_secs: &exec_timeout_secs 21600
 timeout_secs: &timeout_secs 7200
 
 include:
-  - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
   - filename: etc/evergreen_yml_components/definitions.yml
   - filename: etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
   - filename: etc/evergreen_yml_components/tasks/compile_tasks.yml
   - filename: etc/evergreen_yml_components/tasks/misc_tasks.yml
-  - filename: etc/evergreen_yml_components/perf_tasks.yml
-  - filename: etc/evergreen_yml_components/variants/perf.yml
+  - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
+  - filename: etc/system_perf_yml_components/tasks.yml
+  - filename: etc/system_perf_yml_components/variants.yml
 
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
 parameters:
@@ -27,59 +27,11 @@ parameters:
     description: "Overrides the default timeout_secs defined at the top of this file for the f_dsi_run_workload task"
 
 variables:
-  ###
-  # Leave this section uncommented to enable compile.
-  _real_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
-    - name: compile
-      variant: compile-amazon-linux2-arm64
-  _real_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
-    - name: compile
-      variant: compile-amazon-linux2-arm64
-    - name: compile_mongocrypt_shlib
-      variant: compile-amazon-linux2-arm64-mongocrypt-shlib
-  _real_compile_amazon2_streams: &_compile_amazon2_streams
-    - name: compile
-      variant: compile-amazon2-streams
-  _real_compile_al2023_arm64: &_compile_al2023_arm64
-    - name: compile
-      variant: compile-al2023-arm64
-  _real_compile_al2023_arm64_with_mongocrypt_shlib: &_compile_al2023_arm64_with_mongocrypt_shlib
-    - name: compile
-      variant: compile-al2023-arm64
-    - name: compile_mongocrypt_shlib
-      variant: compile-al2023-arm64-mongocrypt-shlib
-  _real_compile_mixed_amazon_linux2_al2023_arm64: &_compile_mixed_amazon_linux2_al2023_arm64
-    - name: compile
-      variant: compile-amazon-linux2-arm64
-    - name: compile
-      variant: compile-al2023-arm64
-
-  _real_expansions: &_expansion_updates []
-  ###
-
-  ###
-  # **Or**: Leave this section uncommented to bypass/skip compile.
-  #  _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
-  #     []
-  #  _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
-  #     []
-  #  _skip_compile_amazon2_streams: &_compile_amazon2_streams
-  #     []
-  #  _skip_compile_al2023_arm64: &_compile_al2023_arm64
-  #     []
-  #  _skip_expansions: &_expansion_updates
-  #      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9
-  #      - key: mdb_binary_for_client
-  #        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
-  #      - key: mdb_binary_for_server
-  #        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
-  ###
 
   _src_dir: &src_dir src/mongo
   _modules: &modules
     - enterprise
     - dsi
-    # - mongo
     - genny
     - workloads
     - linkbench
@@ -105,12 +57,18 @@ variables:
       - name: schedule_global_auto_tasks
         variant: task_generation
 
+  _shared_compile_expansions: &shared_compile_expansions
+    platform: linux
+    project_dir: dsi
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
+
+###
+# Same in every DSI project. Ensure that this block is synchronized with
+# evergreen-dsitest.yml, and src/dsi/onboarding.py (search update-repos-here)
+# in the dsi repo, and etc/system_perf.yml in mongodb/mongo.
 modules:
-  ###
-  # Same in every DSI project. Ensure that this block is synchronized with
-  # evergreen-dsitest.yml, atlas/system_perf_atlas.yml, and src/dsi/onboarding.py
-  # (search update-repos-here) in this repo, and etc/system_perf.yml and
-  # etc/perf.yml in mongodb/mongo
   - name: dsi
     owner: 10gen
     repo: dsi
@@ -161,12 +119,6 @@ modules:
     repo: flamegraph
     prefix: ${workdir}/src
     branch: master
-  #  - name: mongo
-  #    owner: mongodb
-  #    repo: mongo
-  #    prefix: ${workdir}/src
-  #    branch: master
-  ###
   - name: enterprise
     owner: 10gen
     repo: mongo-enterprise-modules
@@ -177,6 +129,7 @@ modules:
     repo: PrivateWorkloads
     prefix: ${workdir}/src
     branch: production
+###
 
 ###
 # Same in every DSI project
@@ -196,9 +149,6 @@ functions:
   # Same in every DSI project
   f_dsi_pre_run:
     - command: manifest.load
-    - command: expansions.update
-      params:
-        updates: *_expansion_updates
   f_dsi_post_run:
     - command: shell.exec
       params:
@@ -672,9 +622,6 @@ buildvariants:
     display_name: Task Generation
     cron: "0 0 1 1 *" # Every year starting 1/1 at 00:00
     modules: *modules
-    expansions:
-      platform: linux
-      project_dir: &project_dir dsi
     run_on:
       - amazon2-build
     tasks:
@@ -683,18 +630,13 @@ buildvariants:
       - name: schedule_global_auto_tasks
 
 
-  ###
-  # New compiles
   - name: amazon2-x86-compile
-    display_name: Compile for Amazon Linux 2 x86 NEW
-    modules: *modules
+    display_name: "* Compile for Amazon Linux 2 x86"
+    modules:
+      - enterprise
     expansions:
-      platform: linux
-      project_dir: *project_dir
+      <<: *shared_compile_expansions
       compile_variant: amazon2-x86-compile
-      scons_cache_scope: shared
-      scons_cache_mode: all
-      has_packages: false
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=amazon2
@@ -711,15 +653,12 @@ buildvariants:
             variant: amazon2-x86-compile
 
   - name: amazon2-arm64-compile
-    display_name: Compile for Amazon Linux 2 arm64 NEW
-    modules: *modules
+    display_name: "* Compile for Amazon Linux 2 arm64"
+    modules:
+      - enterprise
     expansions:
-      platform: linux
-      project_dir: *project_dir
+      <<: *shared_compile_expansions
       compile_variant: amazon2-arm64-compile
-      scons_cache_scope: shared
-      scons_cache_mode: all
-      has_packages: false
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=amazon2
@@ -737,16 +676,13 @@ buildvariants:
 
   - name: amazon2-arm64-mongocrypt-shlib-compile
     display_name: Compile mongo_crypt_v1.so for Amazon Linux 2 arm64 NEW
-    modules: *modules
+    modules:
+      - enterprise
     cron: "0 0 * * 4" # 00:00 on Thursday
     expansions:
-      platform: linux
-      project_dir: *project_dir
-      use_scons_cache: true
+      <<: *shared_compile_expansions
       compile_variant: amazon2-arm64-compile
-      scons_cache_scope: shared
-      scons_cache_mode: all
-      has_packages: false
+      use_scons_cache: true
       compile_flags: >-
         --separate-debug
         MONGO_DISTMOD=amazon2
@@ -768,15 +704,12 @@ buildvariants:
       - name: compile_mongocrypt_shlib
 
   - name: amazon2-x86-streams-compile
-    display_name: Compile Streams for Amazon Linux 2 x86 NEW
-    modules: *modules
+    display_name: "* Compile Streams for Amazon Linux 2 x86"
+    modules:
+      - enterprise
     expansions:
-      platform: linux
-      project_dir: *project_dir
+      <<: *shared_compile_expansions
       compile_variant: amazon2-x86-streams-compile
-      scons_cache_scope: shared
-      scons_cache_mode: all
-      has_packages: false
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=amazon2
@@ -794,15 +727,12 @@ buildvariants:
             variant: amazon2-x86-streams-compile
 
   - name: al2023-arm64-compile
-    display_name: Compile for Al2023 arm64 NEW
-    modules: *modules
+    display_name: Compile for Al2023 arm64
+    modules:
+      - enterprise
     expansions:
-      platform: linux
-      project_dir: *project_dir
+      <<: *shared_compile_expansions
       compile_variant: al2023-arm64-compile
-      scons_cache_scope: shared
-      scons_cache_mode: all
-      has_packages: false
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=rhel82
@@ -817,4 +747,3 @@ buildvariants:
         depends_on:
           - name: archive_dist_test
             variant: al2023-arm64-compile
-  ###
