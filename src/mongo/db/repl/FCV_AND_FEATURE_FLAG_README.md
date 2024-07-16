@@ -636,17 +636,40 @@ A feature flag has the following properties:
 - Default Value: false
   - The default value for a new feature flag should always start with false.
   - When the feature is fully tested and ready for release, we can change the default to true.
-    At that time, a "version" must be specified.
+    At that time, a `version` must be specified.
 - Version: string - a string for the FCV version
-  - Required field if default is true, Must be a string acceptable to
-    FeatureCompatibilityVersionParser.
+  - Required field if `default` is true and `shouldBeFCVGated` is true
+  - Must be a string acceptable to FeatureCompatibilityVersionParser.
 - shouldBeFCVGated: boolean
-  - This should usually be true in order to gate the feature flag based on the FCV.
-  - However, some feature flags should not be FCV gated (for example, if the feature only exists
-    on mongos, which doesn't have an FCV, or if the feature doesn't have any upgrade downgrade
-    concerns and can be enabled as soon as the binary is upgraded/downgraded.
-  - When set to false, the feature flag won't require a version parameter, so it will only be
-    gated based on whether it is enabled by default on that binary version.
+  - When set to `true`, the feature flag will only be enabled once the FCV is reaches the version
+    set in the `version` field. For example, if a feature flag has `shouldBeFCVGated: true` and
+    `version: 8.0`, this means that in a mixed version replica set, where some nodes are on the
+    7.0 binary version while others are on 8.0 binary version, the feature flag will not be enabled.
+    It will only be enabled once all nodes are on the 8.0 binary version AND the FCV of the replica
+    set is upgraded to 8.0 through the setFeatureCompatibilityVersion command.
+  - When set to `false`, the feature flag won't require a `version` field, so it will only be
+    gated based on whether it is enabled by default on that binary version. For example, if a feature
+    flag has `shouldBeFCVGated: false`, this means that during upgrade/downgrade, in a mixed version
+    replica set, where some nodes are still on the 7.0 binary version while others are on 8.0 binary
+    version, the feature flag will already be enabled on the nodes on the 8.0 binary version, but not
+    on the nodes with the 7.0 binary version.
+  - A question one should ask when deciding something should be FCV gated is whether they would want
+    their feature to be disabled or enabled while in a cluster that includes nodes of a different
+    binary version (for example, during upgrade/downgrade of a mongodb cluster, where some nodes can
+    be on the 7.0 binary version while others are on 8.0 binary version)
+  - When a feature needs to be FCV gated:
+    - the feature changes the on-disk format of some data
+    - the feature changes the way nodes in a cluster communicate with each other, e.g. a new oplog
+      format. This is because if an old binary secondary replicates one of the oplog entries with a new
+      format, it won't know how to read them
+  - Examples of when a feature does not need to be FCV gated:
+    - the feature improves query performance. This does not affect any on-disk
+      format and does not affect inter-node communication, and it would be okay if some nodes on the
+      upgraded binary performed queries faster and other nodes on the downgraded binary performed
+      queries slower.
+    - the feature only exists on mongos, which does not have an FCV.
+  - If in doubt about whether your feature needs to be FCV gated, please reach out to the Replication
+    team in #server-featureflags and add the Replication team as a reviewer to your code review.
 
 To turn on a feature flag for testing when starting up a server, we would use the following command
 line (for the Toaster feature):
