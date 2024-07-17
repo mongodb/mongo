@@ -8,6 +8,7 @@
  *   requires_fcv_80,
  * ]
  */
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TestData.skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate = true;
 
@@ -19,12 +20,6 @@ assert.commandWorked(
     testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
 const coll = testDB[collName];
 const bucketsColl = testDB["system.buckets." + collName];
-
-const timeseriesBucketsMayHaveMixedSchemaData = function() {
-    return bucketsColl.aggregate([{$listCatalog: {}}])
-        .toArray()[0]
-        .md.timeseriesBucketsMayHaveMixedSchemaData;
-};
 
 const bucket = {
     _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
@@ -65,13 +60,13 @@ const update = function() {
 
 assert.commandWorked(bucketsColl.insert(bucket));
 assert.commandFailedWithCode(update(), ErrorCodes.CannotInsertTimeseriesBucketsWithMixedSchema);
-assert.eq(timeseriesBucketsMayHaveMixedSchemaData(), false);
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), false);
 assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
-assert.eq(timeseriesBucketsMayHaveMixedSchemaData(), true);
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), true);
 assert.commandWorked(update());
 assert.commandFailedWithCode(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: false}),
     ErrorCodes.InvalidOptions);
 assert.commandWorked(bucketsColl.deleteOne({_id: bucket._id}));
-assert.eq(timeseriesBucketsMayHaveMixedSchemaData(), true);
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), true);

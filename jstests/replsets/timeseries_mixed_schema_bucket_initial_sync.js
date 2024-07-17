@@ -2,6 +2,8 @@
  * Tests initial sync with a time-series collection that contains mixed-schema buckets.
  */
 
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
 TestData.skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate = true;
 
 const replTest = new ReplSetTest({nodes: 1});
@@ -56,15 +58,10 @@ replTest.reInitiate();
 replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
 replTest.awaitReplication();
 
-const timeseriesBucketsMayHaveMixedSchemaData = function(node) {
-    return node.getDB(db.getName())[bucketsColl.getName()]
-               .aggregate([{$listCatalog: {}}])
-               .toArray()[0]
-               .md.options.storageEngine.wiredTiger.configString ==
-        "app_metadata=(timeseriesBucketsMayHaveMixedSchemaData=true)";
-};
+const primaryColl = primary.getDB(db.getName())[bucketsColl.getName()];
+const secondaryColl = secondary.getDB(db.getName())[bucketsColl.getName()];
 
-assert(timeseriesBucketsMayHaveMixedSchemaData(primary));
-assert(timeseriesBucketsMayHaveMixedSchemaData(secondary));
+assert(TimeseriesTest.bucketsMayHaveMixedSchemaData(primaryColl));
+assert(TimeseriesTest.bucketsMayHaveMixedSchemaData(secondaryColl));
 
 replTest.stopSet();
