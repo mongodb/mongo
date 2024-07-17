@@ -249,8 +249,6 @@ buildvariants:
       large_distro_name: rhel8.8-medium
       core_analyzer_distro_name: rhel8.8-xlarge
       compile_variant: *linux_x86_dynamic_debug_compile_variant_name
-      build_mongot: true
-      download_mongot_release: true
     tasks:
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
@@ -443,6 +441,7 @@ buildvariants:
       #
       san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
       build_mongot: true
+      download_mongot_release: true
       compile_flags: >-
         --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
         --dbg=on
