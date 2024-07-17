@@ -75,4 +75,11 @@ assert.soon(function() {
 }, "Did not find count operation in current operation log");
 
 var exitCode = awaitShell({checkExitSuccess: false});
-assert.neq(0, exitCode, "Expected shell to exit abnormally due to JS execution being terminated");
+
+// Suites that remove shards in the background can trigger migrations during draining.
+// This can make killOp commands overlap with a concurrent placement version mismatch,
+// such that the given operation is getting retried and completed, instead of being terminated.
+if (!TestData.shardsAddedRemoved) {
+    assert.neq(
+        0, exitCode, "Expected shell to exit abnormally due to JS execution being terminated");
+}
