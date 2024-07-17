@@ -67,7 +67,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DocumentSourceChangeStreamSpec& spec);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
 private:
     /**

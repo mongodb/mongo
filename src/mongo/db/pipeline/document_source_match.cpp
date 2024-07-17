@@ -627,4 +627,22 @@ void DocumentSourceMatch::addVariableRefs(std::set<Variables::Id>* refs) const {
     match_expression::addVariableRefs(_matchProcessor->getExpression().get(), refs);
 }
 
+Value DocumentSourceInternalChangeStreamMatch::serialize(const SerializationOptions& opts) const {
+    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged || opts.transformIdentifiers) {
+        // Stages made internally by 'DocumentSourceChangeStream' should not be serialized for
+        // query stats. For query stats we will serialize only the user specified $changeStream
+        // stage.
+        return Value();
+    }
+    return doSerialize(opts);
+}
+
+intrusive_ptr<DocumentSourceInternalChangeStreamMatch>
+DocumentSourceInternalChangeStreamMatch::create(BSONObj filter,
+                                                const intrusive_ptr<ExpressionContext>& expCtx) {
+    intrusive_ptr<DocumentSourceInternalChangeStreamMatch> internalMatch(
+        new DocumentSourceInternalChangeStreamMatch(filter, expCtx));
+    return internalMatch;
+}
+
 }  // namespace mongo

@@ -58,7 +58,8 @@ namespace mongo {
  * Part of the change stream API machinery used to look up the post-image of a document. Uses the
  * "documentKey" field of the input to look up the new version of the document.
  */
-class DocumentSourceChangeStreamAddPostImage final : public DocumentSource {
+class DocumentSourceChangeStreamAddPostImage final
+    : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamAddPostImage"_sd;
     static constexpr StringData kFullDocumentFieldName =
@@ -136,7 +137,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     const char* getSourceName() const final {
         return kStageName.rawData();
@@ -145,7 +146,8 @@ public:
 private:
     DocumentSourceChangeStreamAddPostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const FullDocumentModeEnum fullDocumentMode)
-        : DocumentSource(kStageName, expCtx), _fullDocumentMode(fullDocumentMode) {
+        : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
+          _fullDocumentMode(fullDocumentMode) {
         tassert(5842300,
                 "the 'fullDocument' field cannot be 'default'",
                 _fullDocumentMode != FullDocumentModeEnum::kDefault);

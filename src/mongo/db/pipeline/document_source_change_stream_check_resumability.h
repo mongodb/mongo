@@ -74,7 +74,7 @@ namespace mongo {
  * - Otherwise we cannot resume, as we do not know if there were any events between the resume token
  *   and the first matching document in the oplog.
  */
-class DocumentSourceChangeStreamCheckResumability : public DocumentSource {
+class DocumentSourceChangeStreamCheckResumability : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckResumability"_sd;
 
@@ -105,7 +105,7 @@ public:
         return boost::none;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;
+    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const override;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 

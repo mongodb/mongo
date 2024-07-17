@@ -203,51 +203,41 @@ structs:
         strict: true
         description: A document used to specify the $_internalChangeStreamCheckInvalidate stage of
                      an aggregation pipeline.
-        query_shape_component: true
         fields:
             startAfterInvalidate:
                 type: resumeToken
                 optional: true
-                query_shape: custom
 
     DocumentSourceChangeStreamCheckResumabilitySpec:
         strict: true
         description: A document used to specify the $_internalChangeStreamCheckResumability stage of
                      an aggregation pipeline.
-        query_shape_component: true
         fields:
             resumeToken:
                 type: resumeToken
                 optional: false
-                query_shape: custom
 
     DocumentSourceChangeStreamAddPreImageSpec:
         strict: true
         description: A document used to specify the $_internalChangeStreamAddPreImage stage of
                      an aggregation pipeline.
-        query_shape_component: true
         fields:
             fullDocumentBeforeChange:
                 type: FullDocumentBeforeChangeMode
-                query_shape: parameter
 
     DocumentSourceChangeStreamAddPostImageSpec:
         strict: true
         description: A document used to specify the $_internalChangeStreamAddPostImage stage of
                      an aggregation pipeline.
-        query_shape_component: true
         fields:
             fullDocument:
                 type: FullDocumentMode
-                query_shape: parameter
 
     DocumentSourceChangeStreamHandleTopologyChangeSpec:
         strict: true
         description: A document used to specify the $_internalChangeStreamHandleTopologyChange stage of
                      an aggregation pipeline.
-        query_shape_component: true
         fields:
             originalAggregateCommand:
                 type: object
                 optional: true
-                query_shape: literal

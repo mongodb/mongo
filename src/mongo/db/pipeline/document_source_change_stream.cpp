@@ -374,7 +374,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
 
     // If 'showExpandedEvents' is NOT set, add a filter that returns only classic change events.
     if (!spec.getShowExpandedEvents()) {
-        stages.push_back(DocumentSourceMatch::create(
+        stages.push_back(DocumentSourceInternalChangeStreamMatch::create(
             change_stream_filter::getMatchFilterForClassicOperationTypes(), expCtx));
     }
     changeStreamsShowExpandedEvents.increment(spec.getShowExpandedEvents());
@@ -388,6 +388,12 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     uassert(40573,
             "The $changeStream stage is only supported on replica sets",
             expCtx->inMongos || (replCoord && replCoord->getSettings().isReplSet()));
+
+    // We will not validate user specified options when we are not expecting to execute queries,
+    // such as during $queryStats.
+    if (!expCtx->mongoProcessInterface->isExpectedToExecuteQueries()) {
+        return;
+    }
 
     // If 'allChangesForCluster' is true, the stream must be opened on the 'admin' database with
     // {aggregate: 1}.

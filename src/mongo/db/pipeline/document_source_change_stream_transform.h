@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-class DocumentSourceChangeStreamTransform : public DocumentSource {
+class DocumentSourceChangeStreamTransform : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamTransform"_sd;
 
@@ -74,6 +74,13 @@ public:
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+
+    /**
+     * This function should never be called, since this DocumentSource has its own serialize method.
+     */
+    Value doSerialize(const SerializationOptions& opts) const final {
+        MONGO_UNREACHABLE;
+    }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
