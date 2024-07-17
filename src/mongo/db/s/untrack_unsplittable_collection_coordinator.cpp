@@ -141,6 +141,23 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
     // start-up from a configTime that is inclusive of the metadata deletions that were committed
     // during the critical section.
     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+
+    // Remove unnecessary collection catalog entries potentially left behind by previous movePrimary
+    // operations.
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    // Remove primary shard from participants.
+    std::erase(participants, ShardingState::get(opCtx)->shardId());
+
+    sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+        opCtx,
+        nss(),
+        participants,
+        **executor,
+        getNewSession(opCtx),
+        true /* fromMigrate */,
+        false /* dropSystemCollections */);
+
+    LOGV2_DEBUG(9237001, 2, "Collection untracked", logAttrs(nss()));
 }
 
 void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(
