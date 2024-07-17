@@ -12,6 +12,10 @@
  * @tags: [uses_transactions, requires_replication]
  */
 
+import {
+    withTxnAndAutoRetry
+} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+
 export const $config = (function() {
     var states = (function() {
         function init(db, collName) {
@@ -37,38 +41,31 @@ export const $config = (function() {
                 expectedTxnErrorCodes.push(ErrorCodes.MigrationConflict);
             }
 
-            // Start the transaction and run an operation on 'startColl'.
-            session.startTransaction();
-
-            // Run the specified operation on 'ddlColl'. Another thread may have performed a DDL
-            // operation on 'ddlColl' since the transaction started. The operation may fail with one
-            // of the allowed error codes, but it must not crash the server.
             let success = false;
-            try {
-                assert.eq(1, startColl.find({_id: "startTxnDoc"}).itcount());
-                op(ddlColl);
-                success = true;
-            } catch (e) {
-                assert.contains(e.code, expectedTxnErrorCodes, () => tojson(e));
-            }
 
-            // Commit or abort the transaction.
-            if (success) {
-                let commitRes = session.commitTransaction_forTesting();
-                if (!commitRes.ok && commitRes.hasOwnProperty("code") &&
-                    commitRes["code"] == ErrorCodes.WriteConflict) {
+            try {
+                withTxnAndAutoRetry(session, () => {
+                    // Run the specified operation on 'ddlColl'. Another thread may have performed a
+                    // DDL operation on 'ddlColl' since the transaction started. The operation may
+                    // fail with one of the allowed error codes, but it must not crash the server.
+                    try {
+                        assert.eq(1, startColl.find({_id: "startTxnDoc"}).itcount());
+                        op(ddlColl);
+                        success = true;
+                    } catch (e) {
+                        assert.contains(e.code, expectedTxnErrorCodes, () => tojson(e));
+                        throw e;
+                    }
+                });
+            } catch (e) {
+                if (e.hasOwnProperty("code") && e.code == ErrorCodes.WriteConflict) {
                     // As of SERVER-45405, inserts that implicitly create collections inside of
                     // multi- document transactions can fail at commit time with WriteConflict
                     // errors, if a conflicting collection does not get created until commit time.
                     success = false;
                 } else {
-                    assert.commandWorked(commitRes);
+                    throw e;
                 }
-            } else {
-                // The failed operation already aborted the transaction. Run abortTransaction to
-                // update the transaction state in the shell.
-                assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                             ErrorCodes.NoSuchTransaction);
             }
 
             // Record whether the operation succeeded or failed.
