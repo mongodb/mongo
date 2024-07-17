@@ -227,8 +227,8 @@ BSONObj generateFFP(StringData path, int lb, int ub, int min, int max) {
 
     auto edges = minCoverInt32(lb, true, ub, true, min, max, 1, 0);
     FLE2RangeFindSpec spec(0, Fle2RangeOperator::kGt);
-    auto ffp =
-        FLEClientCrypto::serializeFindRangePayloadV2(indexKeyAndId, userKeyAndId, edges, 0, spec);
+    auto ffp = FLEClientCrypto::serializeFindRangePayloadV2(
+        indexKeyAndId, userKeyAndId, edges, 0, 1, spec);
 
     BSONObjBuilder builder;
     toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindRangePayloadV2, ffp, &builder);

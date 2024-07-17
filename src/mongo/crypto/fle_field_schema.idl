@@ -255,6 +255,34 @@ structs:
             type: array<EdgeTokenSetV2>
             cpp_name: edgeTokenSet
             optional: true
+          sp:
+            description: "Queryable Encryption range hypergraph sparsity factor"
+            type: long
+            cpp_name: sparsity
+            optional: true
+            validator: { gte: 1, lte: 4 }
+          pn:
+            cpp_name: precision
+            description: "Determines the number of digits after the decimal point for floating point values"
+            type: safeInt
+            optional: true
+            validator: { gte: 0 }
+          tf:
+            cpp_name: trimFactor
+            description: "Determines how many levels of the hypergraph to trim"
+            type: safeInt
+            optional: true
+            validator: { gte: 0 }
+          mn:
+            cpp_name: indexMin
+            description: "Minimum value for the encrypted index that this query is using."
+            type: encrypted_numeric_element
+            optional: true
+          mx:
+            cpp_name: indexMax
+            description: "Maximum value for the encrypted index that this query is using."
+            type: encrypted_numeric_element
+            optional: true
 
     FLE2FindEqualityPayloadV2:
         description: "Payload for an equality find. Version 2"
@@ -328,7 +356,35 @@ structs:
             description: "Second query operator for which this payload was generated. Only populated for two-sided ranges."
             type: Fle2RangeOperator
             optional: true
-
+          sp:
+            description: "Queryable Encryption range hypergraph sparsity factor"
+            type: long
+            cpp_name: sparsity
+            optional: true
+            validator: { gte: 1, lte: 4 }
+          pn:
+            cpp_name: precision
+            description: "Determines the number of digits after the decimal point for floating point values"
+            type: safeInt
+            optional: true
+            validator: { gte: 0 }
+          tf:
+            cpp_name: trimFactor
+            description: "Determines how many levels of the hypergraph to trim"
+            type: safeInt
+            optional: true
+            validator: { gte: 0 }
+          mn:
+            cpp_name: indexMin
+            description: "Minimum value for the encrypted index that this query is using."
+            type: encrypted_numeric_element
+            optional: true
+          mx:
+            cpp_name: indexMax
+            description: "Maximum value for the encrypted index that this query is using."
+            type: encrypted_numeric_element
+            optional: true
+            
     EncryptionInformation:
         description: "Implements Encryption Information which includes the schema for Queryable Encryption that is consumed by query_analysis, queries and write_ops"
         strict: true

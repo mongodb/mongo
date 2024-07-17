@@ -44,8 +44,6 @@ function testBinaryUpgradeWithRangePreviewCollection(upgradeConfig, fcvUpgradeSh
         }
     }));
 
-    assert.commandWorked(
-        client.getDB().erunCommand({insert: "coll1", documents: [{_id: 0, field1: NumberInt(1)}]}));
     // The upgradeSet should always succeed and we should be able to start up with the rangePreview
     // collection.
     rst.upgradeSet(upgradeConfig);

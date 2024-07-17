@@ -131,7 +131,7 @@ std::string payload(StringData path,
     spec.setSecondOperator(secondOp);
 
     auto ffp = FLEClientCrypto::serializeFindRangePayloadV2(
-        indexKeyAndId, userKeyAndId, std::vector<std::string>(), 0, spec);
+        indexKeyAndId, userKeyAndId, std::vector<std::string>(), 0, 1, spec);
 
     BSONObjBuilder builder;
     toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindRangePayloadV2, ffp, &builder);
