@@ -2677,3 +2677,13 @@ functions:
     - *get_engflow_key
     - *get_engflow_cert
     - *generate_evergreen_bazelrc
+
+  "activate task":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/run_python_script.sh"
+          - "evergreen/activate_task.py"
+          - "${task_to_activate}"

@@ -1227,10 +1227,11 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "do scons setup"
-      - func: "f_expansions_write"
-      - func: "scons compile"
+      - func: "activate task"
         vars:
+          task_to_activate: archive_jstestshell_debug
+      - func: "scons compile"
+        vars: &archive_jstestshell_vars
           targets: archive-jstestshell
           compiling_for_test: true
           separate_debug: on
@@ -1251,6 +1252,27 @@ tasks:
           permissions: public-read
           content_type: ${content_type|application/gzip}
           display_name: Jstestshell
+
+  - name: archive_jstestshell_debug
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: archive_jstestshell
+    commands:
+      - func: "f_expansions_write"
+      - func: "scons compile"
+        vars:
+          <<: *archive_jstestshell_vars
+          targets: archive-jstestshell-debug
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-jstestshell-debugsymbols.${ext|tgz}
+          remote_file: ${mongo_jstestshell_debugsymbols}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: ${content_type|application/gzip}
+          display_name: Jstestshell Debugsymbols
 
   - name: stitch_support_create_lib
     tags:
@@ -2636,6 +2658,12 @@ task_groups:
       - compile_dbtest
       - run_dbtest
       - archive_dbtest
+
+  - <<: *compile_task_group_template
+    name: compile_jstestshell_TG
+    tasks:
+      - archive_jstestshell
+      - archive_jstestshell_debug
 
   - <<: *compile_task_group_template
     name: compile_test_serial_future_git_tag_multiversion_TG
