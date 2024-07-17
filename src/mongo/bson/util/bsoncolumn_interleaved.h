@@ -1024,7 +1024,7 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
     // mode.
     BSONObj refObj{control + 1};
     control += refObj.objsize() + 1;
-    uassert(8625730, "Invalid BSON Column encoding", _control < _end);
+    uassert(8625730, "Invalid BSON Column encoding", control < _end && *control != EOO);
 
     /**
      * The code below uses std::make_heap(), etc such that the element at the top of the heap always

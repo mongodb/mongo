@@ -7578,9 +7578,15 @@ TEST_F(BSONColumnTest, InterleavedEmptySequence) {
                                        static_cast<size_t>(interleavedBinary.len())};
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<BSONElement> collection;
+    std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{
+        {TestPath{{"x"}}, collection}};
     ASSERT_THROWS_CODE(colBlockBased.decompress<BSONElementMaterializer>(collection, allocator),
                        DBException,
                        8625732);
+    ASSERT_THROWS_CODE(
+        colBlockBased.decompress<BSONElementMaterializer>(allocator, std::span(testPaths)),
+        DBException,
+        8625730);
 
     BSONColumn col(createBSONColumn(interleavedBinary.buf(), interleavedBinary.len()));
     ASSERT_THROWS_CODE(std::distance(col.begin(), col.end()), DBException, 9232700);
