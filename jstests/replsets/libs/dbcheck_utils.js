@@ -95,7 +95,7 @@ export const logQueries = {
     },
     primarySteppedDown: {
         severity: "warning",
-        "msg": "abandoning dbCheck batch due to stepdown.",
+        "msg": "abandoning dbCheck batch due to stepdown",
     }
 };
 
@@ -380,7 +380,8 @@ export const runDbCheckForDatabase = (replSet,
         // Might hit stale shardVersion response from shard config while racing with
         // 'dropCollection' command.
         ErrorCodes.StaleConfig,
-        // TODO (SERVER-79850): Internally handle this within dbCheck.
+        // This code internally retries within dbCheck, but it may still fail if retries are
+        // exhausted.
         ErrorCodes.ObjectIsBusy,
         // TODO (SERVER-93173): listIndexes on tests which drop and recreate using different casing
         // might fail due to attempting to create the database with only casing difference.
@@ -450,10 +451,7 @@ export const assertForDbCheckErrors =
         }
 
         const healthlog = node.getDB('local').system.healthlog;
-        // Regex matching strings that start without "SnapshotTooOld"
-        // const regexStringWithoutSnapTooOld = /^((?!^SnapshotTooOld).)*$/;
-        // TODO (SERVER-79850): Handle ObjectIsBusy within dbCheck and replace the regex with the
-        // commented-out above regex.
+        // Regex matching strings that start without "SnapshotTooOld" or "ObjectIsBusy".
         const regexString = /^((?!^(SnapshotTooOld|ObjectIsBusy)).)*$/;
 
         // healthlog is a capped collection, truncation during scan might cause cursor

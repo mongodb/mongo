@@ -114,7 +114,7 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
 /**
  * Get a HealthLogEntry for a dbCheck batch.
  */
-std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
+std::unique_ptr<HealthLogEntry> dbCheckBatchHealthLogEntry(
     const boost::optional<SecondaryIndexCheckParameters>& parameters,
     const boost::optional<UUID>& batchId,
     const NamespaceString& nss,

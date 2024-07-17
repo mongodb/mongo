@@ -15,7 +15,10 @@ import {
     runDbCheck
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
-const rst = new ReplSetTest({nodes: 2});
+const rst = new ReplSetTest({
+    nodes: 2,
+    nodeOptions: {setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+});
 rst.startSet();
 rst.initiate();
 
@@ -41,7 +44,7 @@ Random.setRandomSeed();
 
 const stepdownWarningQuery = {
     severity: "warning",
-    "msg": "abandoning dbCheck batch due to stepdown."
+    "msg": "abandoning dbCheck batch due to stepdown"
 };
 const dbCheckStartQuery = {
     severity: "info",
