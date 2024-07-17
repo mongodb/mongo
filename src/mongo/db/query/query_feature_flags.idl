@@ -145,3 +145,9 @@ feature_flags:
       cpp_varname: gFeatureFlagSearchExplainExecutionStats
       default: false
       shouldBeFCVGated: false
+
+    featureFlagShardFilteringDistinctScan:
+      description: "Feature flag to support shard filtering in distinct scan optimization"
+      cpp_varname: gFeatureFlagShardFilteringDistinctScan
+      default: false
+      shouldBeFCVGated: true
