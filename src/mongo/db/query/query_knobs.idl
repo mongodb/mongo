@@ -210,15 +210,6 @@ server_parameters:
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
 
-  internalQueryDeduplicateQuerySolutions:
-    description: "Deduplicates query solutions based on their hashes."
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryDeduplicateQuerySolutions"
-    cpp_vartype: AtomicWord<bool>
-    default: true
-    on_update: plan_cache_util::clearSbeCacheOnParameterChange
-    redact: false
-
   #
   # Plan cache
   #

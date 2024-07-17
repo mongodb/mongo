@@ -214,20 +214,6 @@ bool QuerySolutionNode::isEligibleForPlanCache() const {
     return true;
 }
 
-void QuerySolutionNode::hash(absl::HashState state, HashValuesOrParams hashValuesOrParams) const {
-    state = absl::HashState::combine(std::move(state), getType());
-    if (filter) {
-        state = absl::HashState::combine(
-            std::move(state),
-            MatchExpressionHasher{MatchExpressionHashParams{20 /*maxNumberOfInElementsToHash*/,
-                                                            hashValuesOrParams}}(filter.get()));
-    }
-    for (const auto& child : children) {
-        state = absl::HashState::combine(std::move(state),
-                                         QuerySolutionHashParams{*child.get(), hashValuesOrParams});
-    }
-}
-
 std::pair<const QuerySolutionNode*, size_t> QuerySolutionNode::getFirstNodeByType(
     StageType type) const {
     const QuerySolutionNode* result = nullptr;

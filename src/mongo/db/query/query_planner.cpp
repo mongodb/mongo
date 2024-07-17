@@ -1550,9 +1550,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         plan_enumerator::PlanEnumerator planEnumerator(enumParams);
         uassertStatusOKWithContext(planEnumerator.init(), "failed to initialize plan enumerator");
 
-        const bool deduplicateSolutions = internalQueryDeduplicateQuerySolutions.load();
-        stdx::unordered_set<size_t> solutionHashes;
-
         unique_ptr<MatchExpression> nextTaggedTree;
         while ((nextTaggedTree = planEnumerator.getNext()) &&
                (out.size() < params.maxIndexedSolutions)) {
@@ -1590,18 +1587,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
             auto soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
             if (soln) {
-                if (deduplicateSolutions) {
-                    const auto [_, unique] =
-                        solutionHashes.insert(soln->hash(HashValuesOrParams::kHashValues));
-                    if (!unique) {
-                        LOGV2_DEBUG(8911000,
-                                    5,
-                                    "Planner: detected a duplicate solution",
-                                    "solution"_attr = redact(soln->toString()));
-                        continue;
-                    }
-                }
-
                 soln->_enumeratorExplainInfo.merge(planEnumerator._explainInfo);
                 LOGV2_DEBUG(20978,
                             5,

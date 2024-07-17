@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
+#include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -321,14 +321,32 @@ struct QuerySolutionNode {
         return _nodeId;
     }
 
+    template <typename H>
+    friend H AbslHashValue(H state, const QuerySolutionNode& c) {
+        c.hash(absl::HashState::Create(&state));
+        return state;
+    }
+
     /**
-     * Hashes a QuerySolutionNode using parameter IDs or concrete values. Hashing parameter IDs
-     * allows us to determine whether different query solutions, when parameterized, correspond to
-     * the same solution (used for populating "isCached" in explain). Hashing concrete values allows
-     * us to detect duplicate query solutions, which helps us ensure we are only multiplanning
-     * unique plans.
+     * Hashes a QuerySolutionNode using parameter IDs rather than concrete values wherever
+     * parameters are present. This allows us to determine whether different query solutions, when
+     * parameterized, correspond to the same solution. Used for populating "isCached" in explain.
      */
-    virtual void hash(absl::HashState state, HashValuesOrParams hashValuesOrParams) const;
+    virtual void hash(absl::HashState state) const {
+        state = absl::HashState::combine(std::move(state), getType());
+        if (filter) {
+            // When hashing the filter, we need to use parameter IDs rather than the concrete values
+            // from the query.
+            state = absl::HashState::combine(
+                std::move(state),
+                MatchExpressionHasher{MatchExpressionHashParams{
+                    20 /*maxNumberOfInElementsToHash*/,
+                    HashValuesOrParams::kHashParamIds /* hashValuesOrParams*/}}(filter.get()));
+        }
+        for (const auto& child : children) {
+            state = absl::HashState::combine(std::move(state), *child.get());
+        }
+    }
 
     std::vector<std::unique_ptr<QuerySolutionNode>> children;
 
@@ -381,17 +399,6 @@ private:
 
     PlanNodeId _nodeId{0u};
 };
-
-struct QuerySolutionHashParams {
-    const QuerySolutionNode& node;
-    const HashValuesOrParams hashValuesOrParams;
-};
-
-template <typename H>
-H AbslHashValue(H state, const QuerySolutionHashParams& params) {
-    params.node.hash(absl::HashState::Create(&state), params.hashValuesOrParams);
-    return state;
-}
 
 struct QuerySolutionNodeWithSortSet : public QuerySolutionNode {
     QuerySolutionNodeWithSortSet() = default;
@@ -482,8 +489,8 @@ public:
      */
     std::vector<NamespaceStringOrUUID> getAllSecondaryNamespaces(const NamespaceString& mainNss);
 
-    size_t hash(HashValuesOrParams hashValuesOrParams = HashValuesOrParams::kHashParamIds) const {
-        return absl::Hash<QuerySolutionHashParams>()({*_root.get(), hashValuesOrParams});
+    size_t hash() const {
+        return absl::Hash<QuerySolutionNode>()(*_root);
     }
 
     /**
@@ -926,16 +933,14 @@ struct IndexScanNode : public QuerySolutionNodeWithSortSet {
     static std::set<StringData> getFieldsWithStringBounds(const IndexBounds& bounds,
                                                           const BSONObj& indexKeyPattern);
 
-    void hash(absl::HashState h, HashValuesOrParams hashValuesOrParams) const override {
+    void hash(absl::HashState h) const override {
         h = absl::HashState::combine(
             std::move(h), index.identifier.catalogName, index.identifier.disambiguator);
-        if (hashValuesOrParams == HashValuesOrParams::kHashValues || iets.empty()) {
+        if (iets.empty()) {
             h = absl::HashState::combine(std::move(h), bounds);
         }
-        if (hashValuesOrParams == HashValuesOrParams::kHashParamIds) {
-            h = absl::HashState::combine_contiguous(std::move(h), iets.data(), iets.size());
-        }
-        QuerySolutionNode::hash(std::move(h), hashValuesOrParams);
+        h = absl::HashState::combine_contiguous(std::move(h), iets.data(), iets.size());
+        QuerySolutionNode::hash(std::move(h));
     }
 
     IndexEntry index;

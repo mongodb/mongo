@@ -82,7 +82,6 @@ selector:
     - jstests/core/query/plan_cache/plan_cache_clear.js
     - jstests/core/query/plan_cache/plan_cache_list_plans.js
     - jstests/core/query/query_settings/*
-    - jstests/core/query/plan_deduplication.js
     - jstests/core/query/regex/regex.js
     - jstests/core/query/regex/regex3.js
     - jstests/core/query/regex/regex4.js
