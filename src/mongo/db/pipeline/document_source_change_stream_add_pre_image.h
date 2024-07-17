@@ -59,7 +59,7 @@ namespace mongo {
  * The identifier of pre-image is in "preImageId" field of the incoming document. The pre-image is
  * set to "fullDocumentBeforeChange" field of the returned document.
  */
-class DocumentSourceChangeStreamAddPreImage final : public DocumentSourceInternalChangeStreamStage {
+class DocumentSourceChangeStreamAddPreImage final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamAddPreImage"_sd;
     static constexpr StringData kFullDocumentBeforeChangeFieldName =
@@ -86,8 +86,7 @@ public:
 
     DocumentSourceChangeStreamAddPreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           FullDocumentBeforeChangeModeEnum mode)
-        : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
-          _fullDocumentBeforeChangeMode(mode) {
+        : DocumentSource(kStageName, expCtx), _fullDocumentBeforeChangeMode(mode) {
         // This stage should never be created with FullDocumentBeforeChangeMode::kOff.
         invariant(_fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kOff);
     }
@@ -129,7 +128,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     const char* getSourceName() const final {
         return kStageName.rawData();

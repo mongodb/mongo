@@ -153,7 +153,7 @@ DocumentSourceChangeStreamHandleTopologyChange::create(
 
 DocumentSourceChangeStreamHandleTopologyChange::DocumentSourceChangeStreamHandleTopologyChange(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceInternalChangeStreamStage(kStageName, expCtx) {}
+    : DocumentSource(kStageName, expCtx) {}
 
 StageConstraints DocumentSourceChangeStreamHandleTopologyChange::constraints(
     Pipeline::SplitState) const {
@@ -292,7 +292,7 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::replaceResumeTokenInComm
     return newCmd.freeze().toBson();
 }
 
-Value DocumentSourceChangeStreamHandleTopologyChange::doSerialize(
+Value DocumentSourceChangeStreamHandleTopologyChange::serialize(
     const SerializationOptions& opts) const {
     if (opts.verbosity) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
