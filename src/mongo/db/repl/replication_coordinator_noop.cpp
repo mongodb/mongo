@@ -662,5 +662,9 @@ bool ReplicationCoordinatorNoOp::isDataConsistent() const {
     MONGO_UNREACHABLE;
 }
 
+void ReplicationCoordinatorNoOp::clearSyncSource() {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

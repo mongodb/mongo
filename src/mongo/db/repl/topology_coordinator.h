@@ -296,6 +296,11 @@ public:
                                 const OpTime& lastOpTimeFetched,
                                 Date_t now) const;
 
+    /*
+     * Clear this node's sync source.
+     */
+    void clearSyncSource();
+
     /**
      * Determines if a new sync source should be chosen when an error occurs. In this case
      * we do not have current metadata from the sync source and so can only do a subset of
@@ -1014,10 +1019,6 @@ private:
                                                           int currentSourceIndex,
                                                           const OpTime& lastOpTimeFetched,
                                                           Date_t now) const;
-    /*
-     * Clear this node's sync source.
-     */
-    void _clearSyncSource();
 
     /**
      * Sets this node's sync source. It will also update whether the sync source was forced and add

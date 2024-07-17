@@ -925,5 +925,9 @@ bool ReplicationCoordinatorMock::isDataConsistent() const {
     return !getMemberState().startup2();
 }
 
+void ReplicationCoordinatorMock::clearSyncSource() {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

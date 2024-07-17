@@ -410,6 +410,7 @@ public:
     void setConsistentDataAvailable(OperationContext* opCtx,
                                     bool isDataMajorityCommitted) override {}
     bool isDataConsistent() const override;
+    void clearSyncSource() override;
 
 private:
     ServiceContext* const _service;

@@ -1293,6 +1293,11 @@ public:
      */
     virtual bool isDataConsistent() const = 0;
 
+    /*
+     * Clear this node's sync source.
+     */
+    virtual void clearSyncSource() = 0;
+
     /**
      * Returns true if the node undergoes initial sync or rollback.
      */

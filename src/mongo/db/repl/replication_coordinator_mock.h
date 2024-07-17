@@ -515,6 +515,7 @@ public:
 
     void setConsistentDataAvailable(OperationContext* opCtx, bool isDataMajorityCommitted) override;
     bool isDataConsistent() const override;
+    void clearSyncSource() override;
 
 private:
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
