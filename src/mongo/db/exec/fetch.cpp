@@ -39,6 +39,10 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/util/assert_util.h"
 
+namespace {
+MONGO_FAIL_POINT_DEFINE(hangFetchDoWork);
+}  // namespace
+
 namespace mongo {
 
 using std::unique_ptr;
@@ -70,6 +74,10 @@ bool FetchStage::isEOF() {
 }
 
 PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
+    if (MONGO_unlikely(hangFetchDoWork.shouldFail())) {
+        hangFetchDoWork.pauseWhileSet();
+    }
+
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }

@@ -60,6 +60,10 @@
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
 
+namespace {
+MONGO_FAIL_POINT_DEFINE(hangScanGetNext);
+}  // namespace
+
 namespace mongo {
 namespace sbe {
 /**
@@ -437,6 +441,10 @@ void ScanStage::open(bool reOpen) {
 }
 
 PlanState ScanStage::getNext() {
+    if (MONGO_unlikely(hangScanGetNext.shouldFail())) {
+        hangScanGetNext.pauseWhileSet();
+    }
+
     auto optTimer(getOptTimer(_opCtx));
 
     // A clustered collection scan may have an end bound we have already passed.

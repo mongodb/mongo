@@ -31,6 +31,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo::sbe {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -236,8 +237,6 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
 void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
                                                size_t bufferIdx,
                                                const value::MaterializedRow& val) {
-    CurOp::get(_opCtx)->debug().hashLookupSpillToDisk += 1;
-
     RecordId rid = getValueRecordId(bufferIdx);
 
     BufBuilder buf;
@@ -247,8 +246,14 @@ void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
 
     _hashLookupStats.spilledBuffRecords++;
     // Add size of record ID + size of buffer.
-    _hashLookupStats.spilledBuffBytesOverAllRecords += sizeof(size_t) + buf.len();
-    return;
+    int64_t spillToDiskBytes = sizeof(size_t) + buf.len();
+    _hashLookupStats.spilledBuffBytesOverAllRecords += spillToDiskBytes;
+
+    auto& opDebug = CurOp::get(_opCtx)->debug();
+    opDebug.hashLookupSpillToDisk += 1;
+    opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
+    lookupPushdownCounters.incrementLookupCountersPerSpilling(1 /* spillToDisk */,
+                                                              spillToDiskBytes);
 }
 
 size_t LookupHashTable::bufferValueOrSpill(value::MaterializedRow& value) {
@@ -265,11 +270,11 @@ size_t LookupHashTable::bufferValueOrSpill(value::MaterializedRow& value) {
     return _valueId++;
 }
 
-void LookupHashTable::writeIndicesToRecordStore(SpillingStore* rs,
-                                                value::TypeTags tagKey,
-                                                value::Value valKey,
-                                                const std::vector<size_t>& value,
-                                                bool update) {
+int64_t LookupHashTable::writeIndicesToRecordStore(SpillingStore* rs,
+                                                   value::TypeTags tagKey,
+                                                   value::Value valKey,
+                                                   const std::vector<size_t>& value,
+                                                   bool update) {
     BufBuilder buf;
     buf.appendNum(value.size());  // number of indices
     for (auto& idx : value) {
@@ -289,15 +294,15 @@ void LookupHashTable::writeIndicesToRecordStore(SpillingStore* rs,
             rid.memUsage() + typeBits.getSize() + sizeof(size_t);
     }
     // Add the size of indices vector used in the hash-table value to the accounting.
-    _hashLookupStats.spilledHtBytesOverAllRecords += value.size() * sizeof(size_t);
+    int64_t spilledBytes = value.size() * sizeof(size_t);
+    _hashLookupStats.spilledHtBytesOverAllRecords += spilledBytes;
+    return spilledBytes;
 }
 
 void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
                                                 value::TypeTags tagKey,
                                                 value::Value valKey,
                                                 const std::vector<size_t>& value) {
-    CurOp::get(_opCtx)->debug().hashLookupSpillToDisk += 1;
-
     auto [owned, tagKeyColl, valKeyColl] = normalizeStringIfCollator(tagKey, valKey);
     _htProbeKey.reset(0, owned, tagKeyColl, valKeyColl);
 
@@ -314,7 +319,14 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
         valFromRs = value;
     }
 
-    writeIndicesToRecordStore(rs, tagKeyColl, valKeyColl, *valFromRs, update);
+    auto spillToDiskBytes =
+        writeIndicesToRecordStore(rs, tagKeyColl, valKeyColl, *valFromRs, update);
+
+    auto& opDebug = CurOp::get(_opCtx)->debug();
+    opDebug.hashLookupSpillToDisk += 1;
+    opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
+    lookupPushdownCounters.incrementLookupCountersPerSpilling(1 /* spillToDisk */,
+                                                              spillToDiskBytes);
 }
 
 void LookupHashTable::makeTemporaryRecordStore() {

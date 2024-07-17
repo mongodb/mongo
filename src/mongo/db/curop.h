@@ -355,7 +355,9 @@ public:
     BSONObj mongotCountVal = BSONObj();
     BSONObj mongotSlowQueryLog = BSONObj();
 
-    long long sortSpills{0};           // The total number of spills to disk from sort stages
+    long long sortSpills{0};      // The total number of spills from sort stages
+    long long sortSpillBytes{0};  // The total number of bytes spilled from sort stages.
+    // The spilled storage size after compression might be different from the bytes spilled.
     size_t sortTotalDataSizeBytes{0};  // The amount of data we've sorted in bytes
     long long keysSorted{0};           // The number of keys that we've sorted.
     long long collectionScans{0};      // The number of collection scans during query execution.
@@ -439,6 +441,10 @@ public:
 
     // Tracks the amount of spills by hash lookup in a pushed down lookup stage.
     int hashLookupSpillToDisk{0};
+
+    // Tracks the number of spilled bytes by hash lookup in a pushed down lookup stage. The spilled
+    // storage size after compression might be different from the bytes spilled.
+    long long hashLookupSpillToDiskBytes{0};
 
     // Details of any error (whether from an exception or a command returning failure).
     Status errInfo = Status::OK();

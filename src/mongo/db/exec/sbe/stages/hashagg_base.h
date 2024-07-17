@@ -135,7 +135,7 @@ protected:
      * but are not necessary for comparison purposes. Therefore, we carry the type bits separately
      * from the record id, instead appending them to the end of the serialized 'val' buffer.
      */
-    void spillRowToDisk(const value::MaterializedRow& key, const value::MaterializedRow& val);
+    int64_t spillRowToDisk(const value::MaterializedRow& key, const value::MaterializedRow& val);
     void spill(MemoryCheckData& mcd);
     void checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd);
 

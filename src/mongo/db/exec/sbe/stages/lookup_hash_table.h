@@ -287,11 +287,11 @@ private:
                                    value::Value valKey,
                                    const std::vector<size_t>& value);
 
-    void writeIndicesToRecordStore(SpillingStore* rs,
-                                   value::TypeTags tagKey,
-                                   value::Value valKey,
-                                   const std::vector<size_t>& value,
-                                   bool update);
+    int64_t writeIndicesToRecordStore(SpillingStore* rs,
+                                      value::TypeTags tagKey,
+                                      value::Value valKey,
+                                      const std::vector<size_t>& value,
+                                      bool update);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // LookupHashTable data members
