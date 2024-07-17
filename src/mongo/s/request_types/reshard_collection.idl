@@ -140,6 +140,13 @@ commands:
         type: Provenance
         description: "The source operation that called this resharding operation."
         optional: true
+      recipientOplogBatchTaskCount:
+        type: long
+        description: >-
+          "The number of subtasks to divide a single oplog batch into, so that it may be applied
+          concurrently by multiple threads on the recipient."
+        optional: true
+
 
   moveCollection:
     description: "The public command on mongos that moves one unsharded collection from source to destination shard."
@@ -153,6 +160,15 @@ commands:
         type: shard_id
         description: "The id specification of the destination shard."
         optional: false
+      oplogBatchApplierTaskCount:
+        type: safeInt64
+        description: >-
+          "The number of subtasks to divide a single oplog batch into,
+          so that it may be applied concurrently by multiple threads on the recipient."
+        validator:
+            gte: 1
+            lte: 256
+        optional: true
 
   unshardCollection:
     description: "The public command on mongos to unshard a sharded collection."
@@ -165,4 +181,13 @@ commands:
       toShard:
         type: shard_id
         description: "The id specification of the destination shard. If empty, we will pick the emptiest shard."
+        optional: true
+      oplogBatchApplierTaskCount:
+        type: safeInt64
+        description: >-
+          "The number of subtasks to divide a single oplog batch into,
+          so that it may be applied concurrently by multiple threads on the recipient."
+        validator:
+            gte: 1
+            lte: 256
         optional: true

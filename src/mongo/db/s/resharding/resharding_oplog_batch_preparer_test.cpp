@@ -186,13 +186,9 @@ protected:
         return nonempty;
     }
 
-    ReshardingOplogBatchPreparer _batchPreparer{nullptr};
+    ReshardingOplogBatchPreparer _batchPreparer{kNumWriterVectors, nullptr};
 
     static constexpr size_t kNumWriterVectors = 2;
-
-private:
-    RAIIServerParameterControllerForTest controller{"reshardingOplogBatchTaskCount",
-                                                    int(kNumWriterVectors)};
 };
 
 TEST_F(ReshardingOplogBatchPreparerTest, AssignsCrudOpsToWriterVectorsById) {

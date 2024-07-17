@@ -59,11 +59,12 @@ public:
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             const auto& nss = ns();
-            auto moveCollectionRequest =
-                cluster::unsplittable::makeMoveCollectionRequest(request().getDbName(),
-                                                                 nss,
-                                                                 request().getToShard(),
-                                                                 ProvenanceEnum::kMoveCollection);
+            auto moveCollectionRequest = cluster::unsplittable::makeMoveCollectionRequest(
+                request().getDbName(),
+                nss,
+                request().getToShard(),
+                ProvenanceEnum::kMoveCollection,
+                request().getOplogBatchApplierTaskCount());
 
             LOGV2(7973800,
                   "Running a reshard collection command for the move collection request.",

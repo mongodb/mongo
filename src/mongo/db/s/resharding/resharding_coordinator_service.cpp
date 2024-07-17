@@ -384,6 +384,8 @@ TypeCollectionRecipientFields constructRecipientFields(
     resharding::emplaceCloneTimestampIfExists(recipientFields, coordinatorDoc.getCloneTimestamp());
     resharding::emplaceApproxBytesToCopyIfExists(
         recipientFields, coordinatorDoc.getReshardingApproxCopySizeStruct());
+    resharding::emplaceOplogBatchTaskCountIfExists(
+        recipientFields, coordinatorDoc.getRecipientOplogBatchTaskCount());
 
     return recipientFields;
 }

@@ -100,8 +100,12 @@ bool shouldUpdateTxnTable(const repl::OplogEntry& op) {
 using WriterVectors = ReshardingOplogBatchPreparer::WriterVectors;
 
 ReshardingOplogBatchPreparer::ReshardingOplogBatchPreparer(
-    std::unique_ptr<CollatorInterface> defaultCollator, bool isCapped)
-    : _defaultCollator(std::move(defaultCollator)), _isCapped(isCapped) {}
+    std::size_t oplogBatchTaskCount,
+    std::unique_ptr<CollatorInterface> defaultCollator,
+    bool isCapped)
+    : _oplogBatchTaskCount(oplogBatchTaskCount),
+      _defaultCollator(std::move(defaultCollator)),
+      _isCapped(isCapped) {}
 
 void ReshardingOplogBatchPreparer::throwIfUnsupportedCommandOp(const OplogEntry& op) {
     invariant(op.isCommand());
@@ -281,7 +285,7 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
 }
 
 WriterVectors ReshardingOplogBatchPreparer::_makeEmptyWriterVectors() const {
-    return WriterVectors(size_t(resharding::gReshardingOplogBatchTaskCount.load()));
+    return WriterVectors(_oplogBatchTaskCount);
 }
 
 void ReshardingOplogBatchPreparer::_appendCrudOpToWriterVector(const OplogEntry* op,

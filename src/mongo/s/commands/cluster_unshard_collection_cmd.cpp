@@ -60,7 +60,10 @@ public:
 
             const auto& nss = ns();
             auto unshardCollectionRequest = cluster::unsplittable::makeUnshardCollectionRequest(
-                request().getDbName(), nss, request().getToShard());
+                request().getDbName(),
+                nss,
+                request().getToShard(),
+                request().getOplogBatchApplierTaskCount());
 
             LOGV2(8018400,
                   "Running a reshard collection command for the unshard collection request.",

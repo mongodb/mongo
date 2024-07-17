@@ -80,6 +80,12 @@ structs:
                 description: "The namespace of the collection being resharded."
             minimumOperationDurationMillis:
                 type: long
+            oplogBatchTaskCount:
+                type: long
+                description: >-
+                    "The number of subtasks to divide a single oplog batch into,
+                    so that it may be applied concurrently by multiple threads."
+                optional: true
 
     TypeCollectionReshardingFields:
         description: "Resharding-related fields meant to be stored in a config.collections

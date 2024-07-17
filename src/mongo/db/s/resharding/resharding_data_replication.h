@@ -158,6 +158,7 @@ public:
         OperationContext* opCtx,
         ReshardingMetrics* metrics,
         ReshardingApplierMetricsMap* applierMetricsMap,
+        std::size_t oplogBatchTaskCount,
         CommonReshardingMetadata metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
         Timestamp cloneTimestamp,
@@ -234,6 +235,7 @@ private:
     static std::vector<std::unique_ptr<ReshardingOplogApplier>> _makeOplogAppliers(
         OperationContext* opCtx,
         ReshardingApplierMetricsMap* applierMetricsMap,
+        std::size_t oplogBatchTaskCount,
         const CommonReshardingMetadata& metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
         Timestamp cloneTimestamp,
