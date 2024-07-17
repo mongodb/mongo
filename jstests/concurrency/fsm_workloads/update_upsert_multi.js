@@ -26,16 +26,26 @@ export const $config = (function() {
         },
 
         update: function update(db, collName) {
-            var res = db[collName].update(
-                // This query will match an existing document, since the 'insert' state
-                // always runs first.
-                {tid: this.tid},
-                {$inc: {n: 1}},
-                {multi: true, upsert: true});
+            // moveChunk can kill the multiupdate command and return QueryPlanKilled, so retry in
+            // that case.
+            retryOnRetryableError(() => {
+                const res = db[collName].update(
+                    // This query will match an existing document, since the 'insert' state
+                    // always runs first.
+                    {tid: this.tid},
+                    {$inc: {n: 1}},
+                    {multi: true, upsert: true});
 
-            assert.eq(0, res.nUpserted, tojson(res));
-            assert.lte(1, res.nMatched, tojson(res));
-            assert.eq(res.nMatched, res.nModified, tojson(res));
+                if (res instanceof WriteResult && res.hasWriteError()) {
+                    throw _getErrorWithCode(res, "Update failed: " + tojson(res));
+                } else if (!res.ok) {
+                    assert.commandWorked(res);
+                }
+
+                assert.eq(0, res.nUpserted, tojson(res));
+                assert.lte(1, res.nMatched, tojson(res));
+                assert.eq(res.nMatched, res.nModified, tojson(res));
+            }, 100, undefined, TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : []);
         },
 
         assertConsistency: function assertConsistency(db, collName) {
