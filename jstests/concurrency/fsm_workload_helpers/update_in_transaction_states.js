@@ -2,8 +2,8 @@
 /*
  * update_in_transaction_states.js
  *
- * States to perform updates in transactions without the shard key for the given database and
- * collection. This includes multi=true updates and multi=false updates with exact _id queries.
+ * States to perform updates in transactions for the given database and collection. This includes
+ * multi=true updates and multi=false updates with exact _id queries.
  */
 
 import {
@@ -63,9 +63,12 @@ export function verifyDocuments(db, collName, tid) {
  */
 export function initUpdateInTransactionStates(db, collName, tid) {
     expectedCounters[collName] = expectedCounters[collName] || {};
+    const session = db.getMongo().startSession({retryWrites: true});
+    const collection = session.getDatabase(db.getName()).getCollection(collName);
     // Assign a default counter value to each document owned by this thread.
     db[collName].find({tid: tid}).forEach(doc => {
         expectedCounters[collName][doc._id] = 0;
-        assert.commandWorked(db[collName].update({_id: doc._id}, {$set: {counter: 0}}));
+        assert.commandWorked(collection.update({_id: doc._id}, {$set: {counter: 0}}));
     });
+    session.endSession();
 }
