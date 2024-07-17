@@ -620,3 +620,24 @@ export function getExplainPipelineFromAggregationResult(result, {
         }
     }
 }
+
+/**
+ * Returns a string that represents the provided array of documents / Objects.
+ * Typically used in debugging or assertion messages.
+ */
+export function stringifyArray(ar, arName = null) {
+    let str = "";
+    if (arName != null) {
+        assert(typeof arName == "string", "provided arName is not a string");
+        str += "'" + arName + "' array: ";
+    }
+    str += "[";
+    if (ar.length != 0) {
+        str += "\n";
+        ar.forEach((element) => {
+            str += "    " + tojson(element) + "\n";
+        });
+    }
+    str += "]\n";
+    return str;
+}
