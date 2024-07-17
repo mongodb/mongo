@@ -4,6 +4,9 @@
  *   uses_transactions,
  * ]
  */
+
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+
 const tsTestColl = db.timeseries_txn_ts_coll;
 tsTestColl.drop();
 
@@ -32,29 +35,27 @@ const sessionDB = session.getDatabase(db.getName());
 const sessionTsColl = sessionDB.getCollection(tsTestColl.getName());
 
 // Test a simple find over a time-series collection.
-session.startTransaction();
-
-assert.eq(3, sessionTsColl.find().itcount());
-let doc = sessionTsColl.findOne({_id: 1, x: 1});
-assert.neq(null, doc);
-assert.docEq(doc1, doc);
-
-session.commitTransaction();
+withTxnAndAutoRetryOnMongos(session, () => {
+    assert.eq(3, sessionTsColl.find().itcount());
+    let doc = sessionTsColl.findOne({_id: 1, x: 1});
+    assert.neq(null, doc);
+    assert.docEq(doc1, doc);
+});
 
 // Test a read from a time-series collection then a subsequent insert into a regular collection. All
 // writes to time-series collections are banned within transactions.
 const sessionRegularColl = sessionDB.getCollection(regularColl.getName());
-session.startTransaction();
+let doc4 = {};
 
-let doc4 = sessionTsColl.findOne({_id: 1, x: 1});
-assert.commandWorked(sessionRegularColl.insert(doc4));
+withTxnAndAutoRetryOnMongos(session, () => {
+    doc4 = sessionTsColl.findOne({_id: 1, x: 1});
+    assert.commandWorked(sessionRegularColl.insert(doc4));
 
-// The last insert should be visible in this session.
-doc4 = sessionRegularColl.findOne({_id: 1, x: 1});
-assert.neq(null, doc4);
-assert.docEq(doc1, doc4);
-
-session.commitTransaction();
+    // The last insert should be visible in this session.
+    doc4 = sessionRegularColl.findOne({_id: 1, x: 1});
+    assert.neq(null, doc4);
+    assert.docEq(doc1, doc4);
+});
 
 // Verify that after a commit the update persists.
 let doc5 = regularColl.findOne({_id: 1, x: 1});
