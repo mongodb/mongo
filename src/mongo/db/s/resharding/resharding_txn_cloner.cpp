@@ -192,7 +192,8 @@ boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::doOneRecord(
                                                        TransactionParticipant::kDeadEndSentinel,
                                                        {kIncompleteHistoryStmtId},
                                                        boost::none /* preImageOpTime */,
-                                                       boost::none /* postImageOpTime */);
+                                                       boost::none /* postImageOpTime */,
+                                                       {});
         });
 }
 

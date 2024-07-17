@@ -108,6 +108,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
     invariant(op.getTxnNumber());
     invariant(op.get_id());
 
+    auto sourceNss = op.getNss();
     auto lsid = *op.getSessionId();
     if (isInternalSessionForNonRetryableWrite(lsid)) {
         // Skip internal sessions for non-retryable writes since they only support transactions
@@ -157,7 +158,8 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
                                                        std::move(o2Field),
                                                        std::move(stmtIds),
                                                        std::move(preImageOpTime),
-                                                       std::move(postImageOpTime));
+                                                       std::move(postImageOpTime),
+                                                       std::move(sourceNss));
         });
 }
 
