@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
@@ -348,6 +349,10 @@ private:
     // is read on the critical path after each write operation, that's why it is cached.
     AtomicWord<unsigned long long> _maxChunkSizeBytes;
     AtomicWord<bool> _shouldAutoMerge;
+
+    // Mutex used to serialize the balancer configuration refreshes. It should be taken in exclusive
+    // mode to prevent having more than one refresh happening at the same time.
+    Lock::ResourceMutex _settingsRefreshMutex{"BalancerConfiguration::_settingsRefreshMutex"};
 };
 
 }  // namespace mongo
