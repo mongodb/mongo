@@ -2,7 +2,7 @@
  * Tests for the $percentile expression syntax.
  * @tags: [
  *   requires_fcv_81,
- *   # TO DO SERVER-91582
+ *   # TODO SERVER-91582: Support sharding
  *   assumes_against_mongod_not_mongos,
  * ]
  */

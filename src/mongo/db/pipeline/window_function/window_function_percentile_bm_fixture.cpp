@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/percentile_algo.h"
 #include <boost/random/normal_distribution.hpp>
 #include <cmath>
 #include <cstddef>
@@ -64,14 +65,14 @@ vector<double> generateNormalData(size_t n) {
 // function. Then for each following window, the element before the current element will be removed
 // and the percentile will be recalculated.
 void WindowFunctionPercentileBenchmarkFixture::removable_unbounded_percentile(
-    benchmark::State& state, std::vector<double> ps) {
+    benchmark::State& state, PercentileMethod method, std::vector<double> ps) {
     // Generate the data.
     const vector<double> inputs = generateNormalData(dataSizeLarge);
     auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     // Run the test.
     for (auto keepRunning : state) {
-        auto w = WindowFunctionPercentile::create(expCtx.get(), ps);
+        auto w = WindowFunctionPercentile::create(expCtx.get(), method, ps);
 
         // Calculate the percentile for a [0, unbounded] window for each input.
         for (size_t i = 0; i < dataSizeLarge; i++) {
@@ -99,14 +100,14 @@ void WindowFunctionPercentileBenchmarkFixture::removable_unbounded_percentile(
 // Then the percentile will be recalculated. We will not add any elements if the index is out of
 // bounds, resulting in smaller windows towards the end of 'inputs'.
 void WindowFunctionPercentileBenchmarkFixture::removable_bounded_percentile(
-    benchmark::State& state, std::vector<double> ps) {
+    benchmark::State& state, PercentileMethod method, std::vector<double> ps) {
     // Generate the data.
     const vector<double> inputs = generateNormalData(dataSizeLarge);
     auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     // Run the test.
     for (auto keepRunning : state) {
-        auto w = WindowFunctionPercentile::create(expCtx.get(), ps);
+        auto w = WindowFunctionPercentile::create(expCtx.get(), method, ps);
 
         // Calculate the percentile for a ["current", 100] window for each input.
         for (size_t i = 0; i < dataSizeLarge; i++) {

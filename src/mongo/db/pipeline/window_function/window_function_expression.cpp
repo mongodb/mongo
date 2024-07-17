@@ -451,9 +451,9 @@ Value ExpressionQuantile<AccumulatorTType>::serialize(const SerializationOptions
 template <typename AccumulatorTType>
 std::unique_ptr<WindowFunctionState> ExpressionQuantile<AccumulatorTType>::buildRemovable() const {
     if (AccumulatorTType::kName == AccumulatorMedian::kName) {
-        return WindowFunctionMedian::create(_expCtx);
+        return WindowFunctionMedian::create(_expCtx, _method);
     } else {
-        return WindowFunctionPercentile::create(_expCtx, _ps);
+        return WindowFunctionPercentile::create(_expCtx, _method, _ps);
     }
 }
 

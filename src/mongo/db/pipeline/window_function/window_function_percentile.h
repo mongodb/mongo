@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/percentile_algo_continuous.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 
 namespace mongo {
@@ -68,18 +69,21 @@ public:
     }
 
 protected:
-    explicit WindowFunctionPercentileCommon(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx), _values(boost::container::flat_multiset<double>()) {}
+    explicit WindowFunctionPercentileCommon(ExpressionContext* const expCtx,
+                                            PercentileMethod method)
+        : WindowFunctionState(expCtx),
+          _values(boost::container::flat_multiset<double>()),
+          _method(method) {}
 
     Value computePercentile(double p) const {
         // Calculate the rank.
         const double n = _values.size();
-        const double rank = DiscretePercentile::computeTrueRank(n, p);
 
         // boost::container::flat_multiset stores the values in ascending order, so we don't need to
         // sort them before finding the value at index 'rank'.
         // boost::container::flat_multiset has random-access iterators, so std::advance has an
         // expected runtime of O(1).
+        const double rank = DiscretePercentile::computeTrueRank(n, p);
         auto it = _values.begin();
         std::advance(it, rank);
         return Value(*it);
@@ -91,18 +95,21 @@ protected:
     // as a binary search tree. Thus, using a boost::container::flat_multiset significantly improved
     // performance.
     boost::container::flat_multiset<double> _values;
+    PercentileMethod _method;
 };
 
 class WindowFunctionPercentile : public WindowFunctionPercentileCommon {
 public:
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx,
+                                                       PercentileMethod method,
                                                        const std::vector<double>& ps) {
-        return std::make_unique<WindowFunctionPercentile>(expCtx, ps);
+        return std::make_unique<WindowFunctionPercentile>(expCtx, method, ps);
     }
 
     explicit WindowFunctionPercentile(ExpressionContext* const expCtx,
+                                      PercentileMethod method,
                                       const std::vector<double>& ps)
-        : WindowFunctionPercentileCommon(expCtx), _ps(ps) {
+        : WindowFunctionPercentileCommon(expCtx, method), _ps(ps) {
         _memUsageTracker.set(sizeof(*this) + _ps.capacity() * sizeof(double));
     }
 
@@ -133,12 +140,13 @@ private:
 
 class WindowFunctionMedian : public WindowFunctionPercentileCommon {
 public:
-    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
-        return std::make_unique<WindowFunctionMedian>(expCtx);
+    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx,
+                                                       PercentileMethod method) {
+        return std::make_unique<WindowFunctionMedian>(expCtx, method);
     }
 
-    explicit WindowFunctionMedian(ExpressionContext* const expCtx)
-        : WindowFunctionPercentileCommon(expCtx) {
+    explicit WindowFunctionMedian(ExpressionContext* const expCtx, PercentileMethod method)
+        : WindowFunctionPercentileCommon(expCtx, method) {
         _memUsageTracker.set(sizeof(*this));
     }
 

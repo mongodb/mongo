@@ -2,9 +2,9 @@
  * Tests for the discrete percentile accumulator semantics.
  * @tags: [
  *   requires_fcv_81,
- *   # TO DO SERVER-91581
+ *   # TODO SERVER-91581: Support spilling
  *   incompatible_aubsan,
- *   # TO DO SERVER-91582
+ *   # TODO SERVER-91582: Support sharding
  *   assumes_against_mongod_not_mongos,
  * ]
  */
@@ -145,7 +145,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
     testLargeUniformDataset_WithInfinities(
         coll, samples, sortedSamples, p, accuracyError, "discrete");
 
-    // TODO SERVER-91956 improve precision so that this test succeeds.
+    // TODO SERVER-91956: Improve precision so that this test succeeds.
     // // Same dataset but using Decimal128 type.
     // // testLargeUniformDataset_Decimal(coll, samples, sortedSamples, p, accuracyError,
     // "discrete")
