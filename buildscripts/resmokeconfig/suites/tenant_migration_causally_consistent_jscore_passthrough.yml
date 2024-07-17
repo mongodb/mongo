@@ -30,6 +30,11 @@ selector:
     - jstests/core/**/crud_api.js
     - jstests/core/**/batch_write_command_w0.js
 
+    # Skip time-series tests which need special handling to not fail validate.
+    # Currently, the validate hook is run before migration reaches the recipient kConsistent stage
+    # which is fine for regular collections, but will show as corruption for system.buckets collections.
+    - jstests/core/timeseries/*.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     # These tests run getMore commands which are not supported in the tenant migration passthrough.
@@ -68,11 +73,6 @@ selector:
     - uses_parallel_shell
     # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
     - simulate_atlas_proxy_incompatible
-
-    # Skip time-series tests which need special handling to not fail validate.
-    # Currently, the validate hook is run before migration reaches the recipient kConsistent stage
-    # which is fine for regular collections, but will show as corruption for system.buckets collections.
-    - jstests/core/timeseries/*.js
 
 executor:
   archive:

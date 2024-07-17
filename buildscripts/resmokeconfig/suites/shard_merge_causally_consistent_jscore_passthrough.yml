@@ -36,6 +36,9 @@ selector:
     - jstests/core/timeseries/timeseries_insert_mixed_schema_bucket.js
     - jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
 
+    # Tenant migration retry may cause bulk delete to return the wrong count
+    - jstests/core/timeseries/*delete*.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     # These tests run getMore commands which are not supported in the tenant migration passthrough.
