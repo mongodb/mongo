@@ -287,6 +287,13 @@ let expectedChanges = [
     {"operationType": "drop", "ns": {"db": dbName, "coll": bucketsCollName}}
 ];
 
+if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TSBucketingParametersUnchanged")) {
+    expectedChanges[9].stateBeforeChange.collectionOptions.storageEngine = {
+        "wiredTiger":
+            {"configString": "app_metadata=(timeseriesBucketingParametersHaveChanged=true)"}
+    };
+}
+
 if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
     // Check for compressed bucket changes when using always compressed buckets.
     expectedChanges[4] = {

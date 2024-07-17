@@ -643,6 +643,10 @@ last-continuous:
     ticket: SERVER-37164
   - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
     ticket: SERVER-91784
+  - test_file: jstests/replsets/backwards_compatible_timeseries_catalog_options.js
+    ticket: SERVER-91195
+  - test_file: jstests/change_streams/timeseries.js
+    ticket: SERVER-91195
   suites: null
 last-lts:
   all:
@@ -1340,4 +1344,8 @@ last-lts:
     ticket: SERVER-37164
   - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
     ticket: SERVER-91784
+  - test_file: jstests/replsets/backwards_compatible_timeseries_catalog_options.js
+    ticket: SERVER-91195
+  - test_file: jstests/change_streams/timeseries.js
+    ticket: SERVER-91195
   suites: null
