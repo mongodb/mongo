@@ -552,7 +552,8 @@ error_codes:
 
     - {code: 414, name: AddOrRemoveShardInProgress}
 
-    - {code: 426, name: DbCheckSecondaryBatchTimeout}
+    - {code: 426, name: IndexIsEmpty}
+    - {code: 427, name: DbCheckSecondaryBatchTimeout}
 
     # Error codes 4000-8999 are reserved.
 

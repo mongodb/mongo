@@ -5,6 +5,8 @@
  * After dbcheck command succeeds, If the collection is not present or if there exists a view with
  * an identical name, the 'dbcheck healthLog' must issue a 'NamespaceNotFound' warning and not an
  * inconsistency error.
+ *
+ * @tags: [featureFlagSecondaryIndexChecksInDbCheck]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -67,7 +69,8 @@ const runTest = (failpoint, mode) => {
         assert.eq(warnings.length, 1);
         assert.eq(warnings[0]["severity"], "warning");
         assert.eq(warnings[0]["namespace"], testDB[collName].getFullName());
-        assert.includes(warnings[0]["data"]["error"], "Collection under dbCheck no longer exists");
+        assert.includes(warnings[0]["msg"],
+                        "abandoning dbCheck batch because collection no longer exists");
         if (mode == "createView" &&
             (failpoint == "hangBeforeProcessingDbCheckRun" ||
              FeatureFlagUtil.isPresentAndEnabled(
@@ -75,8 +78,7 @@ const runTest = (failpoint, mode) => {
                  "SecondaryIndexChecksInDbCheck",
                  ))) {
             // 'acquireCollectionMaybeLockFree' should have failed with 'CommandNotSupportedOnView'.
-            assert.includes(warnings[0]["data"]["error"],
-                            "but there is a view with the identical name");
+            assert.includes(warnings[0]["data"]["error"], "is a view, not a collection");
         }
     }
 };
