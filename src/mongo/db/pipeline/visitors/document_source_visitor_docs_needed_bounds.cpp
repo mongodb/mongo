@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/document_source_tee_consumer.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
@@ -48,6 +49,21 @@
 namespace mongo {
 using NeedAll = docs_needed_bounds::NeedAll;
 using Unknown = docs_needed_bounds::Unknown;
+
+namespace {
+void extractDocsNeededBoundsHelper(const Pipeline& pipeline, DocsNeededBoundsContext* ctx) {
+    ServiceContext* serviceCtx = pipeline.getContext()->opCtx->getServiceContext();
+    auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);
+    DocumentSourceWalker walker(reg, ctx);
+
+    walker.reverseWalk(pipeline);
+
+    tassert(8673200,
+            "If one of min/max docs needed bounds is NeedAll, they must both be NeedAll.",
+            std::holds_alternative<NeedAll>(ctx->minBounds) ==
+                std::holds_alternative<NeedAll>(ctx->maxBounds));
+}
+}  // namespace
 
 void DocsNeededBoundsContext::applyPossibleDecreaseStage() {
     // If we have existing discrete maxBounds, this stage may reduce the number of documents in the
@@ -242,12 +258,44 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalDensify& so
     ctx->applyPossibleIncreaseStage();
 }
 
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceTeeConsumer& source) {
+    // DocumentSourceTeeConsumer is an internal proxy stage between a pipeline within a $facet stage
+    // and the buffer of incoming documents. Because a DocumentSourceTeeConsumer stage is uniquely
+    // positioned after each $facet subpipeline, we should do nothing. Otherwise, the visit will not
+    // recognize the document source and override the $facet bounds by applying unknown bounds.
+}
+
 void visit(DocsNeededBoundsContext* ctx, const DocumentSourceFacet& source) {
-    // $facet is completely unknown since the subpipelines are treated as blackboxes. We have no
-    // idea if the pipelines all have a limit that could be applied, or if one may require all
-    // documents.
-    // TODO SERVER-88371 Scrutinize the subpipelines to infer min/max constraints of $facet.
-    ctx->applyUnknownStage();
+    // Computes the DocsNeededBounds of each $facet subpipeline applied to the constraints of the
+    // pipeline seen so far, and compares the constraints of each subpipeline to find the most
+    // restrictive constraints of all the pipelines. After traversing all subpipelines, applies the
+    // most restrictive constraints.
+
+    auto& subpipelines = source.getFacetPipelines();
+    if (subpipelines.empty()) {
+        return;
+    }
+
+    // Initialize min/max bounds that are guaranteed to be overriden by the first subpipeline.
+    // They're different values because of the different semantics of min vs max constraints for
+    // determining constrait strength.
+    DocsNeededConstraint mostRestrictiveMinBounds = Unknown();
+    DocsNeededConstraint mostRestrictiveMaxBounds = 0;
+
+    for (const auto& facetPipeline : subpipelines) {
+        // Compute this subpipeline's constraints applied to the constraints-so-far.
+        DocsNeededBoundsContext subpipelineCtx(ctx->minBounds, ctx->maxBounds);
+        extractDocsNeededBoundsHelper(*facetPipeline.pipeline.get(), &subpipelineCtx);
+
+        mostRestrictiveMinBounds = docs_needed_bounds::chooseStrongerMinConstraint(
+            mostRestrictiveMinBounds, subpipelineCtx.minBounds);
+        mostRestrictiveMaxBounds = docs_needed_bounds::chooseStrongerMaxConstraint(
+            mostRestrictiveMaxBounds, subpipelineCtx.maxBounds);
+    }
+
+    // Apply the most restrictive bounds.
+    ctx->minBounds = mostRestrictiveMinBounds;
+    ctx->maxBounds = mostRestrictiveMaxBounds;
 }
 
 void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSearch& source) {
@@ -316,18 +364,7 @@ const ServiceContext::ConstructorActionRegisterer docsNeededBoundsRegisterer{
 
 DocsNeededBounds extractDocsNeededBounds(const Pipeline& pipeline) {
     DocsNeededBoundsContext ctx;
-
-    ServiceContext* serviceCtx = pipeline.getContext()->opCtx->getServiceContext();
-    auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);
-    DocumentSourceWalker walker(reg, &ctx);
-
-    walker.reverseWalk(pipeline);
-
-    tassert(8673200,
-            "If one of min/max docs needed bounds is NeedAll, they must both be NeedAll.",
-            std::holds_alternative<NeedAll>(ctx.minBounds) ==
-                std::holds_alternative<NeedAll>(ctx.maxBounds));
-
+    extractDocsNeededBoundsHelper(pipeline, &ctx);
     return DocsNeededBounds(ctx.minBounds, ctx.maxBounds);
 }
 }  // namespace mongo

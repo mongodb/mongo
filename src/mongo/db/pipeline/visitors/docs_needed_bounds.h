@@ -54,4 +54,20 @@ DocsNeededConstraint parseDocsNeededConstraintFromBSON(const BSONElement& elem);
 void serializeDocsNeededConstraint(const DocsNeededConstraint& bounds,
                                    StringData fieldName,
                                    BSONObjBuilder* builder);
+
+/**
+ * Given two DocsNeededConstraints, returns the one that is the stronger constraint, to denote
+ * either a minimum or maximum constraint.
+ *
+ * The strength of a constraint is different for min and max constraints. For example, if you're
+ * trying to determine the most restrictive constraints from two pipelines on the same collection,
+ * one that produces min and max constraints Unknown and one that produces min and max constraints
+ * 100, we can infer that we will need at least 100 (min = 100) but the upper limit is unclear (max
+ * = Unknown).
+ */
+DocsNeededConstraint chooseStrongerMinConstraint(DocsNeededConstraint constraintA,
+                                                 DocsNeededConstraint constraintB);
+DocsNeededConstraint chooseStrongerMaxConstraint(DocsNeededConstraint constraintA,
+                                                 DocsNeededConstraint constraintB);
+
 }  // namespace mongo::docs_needed_bounds

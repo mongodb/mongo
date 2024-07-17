@@ -61,5 +61,37 @@ void serializeDocsNeededConstraint(const DocsNeededConstraint& constraint,
           },
           constraint);
 }
+
+DocsNeededConstraint chooseStrongerMinConstraint(DocsNeededConstraint constraintA,
+                                                 DocsNeededConstraint constraintB) {
+    return visit(
+        OverloadedVisitor{
+            [](long long a, long long b) -> DocsNeededConstraint { return std::max(a, b); },
+            // For minimum constraints, a discrete value is stronger than Unknown.
+            [](Unknown a, long long b) -> DocsNeededConstraint { return b; },
+            [](long long a, Unknown b) -> DocsNeededConstraint { return a; },
+            [](Unknown a, Unknown b) -> DocsNeededConstraint { return Unknown(); },
+            // If we've reached this case, one of the constraints is NeedAll.
+            [](auto a, auto b) -> DocsNeededConstraint { return NeedAll(); },
+        },
+        constraintA,
+        constraintB);
+}
+
+DocsNeededConstraint chooseStrongerMaxConstraint(DocsNeededConstraint constraintA,
+                                                 DocsNeededConstraint constraintB) {
+    return visit(
+        OverloadedVisitor{
+            [](long long a, long long b) -> DocsNeededConstraint { return std::max(a, b); },
+            // For maximum constraints, Unknown is stronger than a discrete value.
+            [](Unknown a, long long b) -> DocsNeededConstraint { return Unknown(); },
+            [](long long a, Unknown b) -> DocsNeededConstraint { return Unknown(); },
+            [](Unknown a, Unknown b) -> DocsNeededConstraint { return Unknown(); },
+            // If we've reached this case, one of the constraints is NeedAll.
+            [](auto a, auto b) -> DocsNeededConstraint { return NeedAll(); },
+        },
+        constraintA,
+        constraintB);
+}
 }  // namespace docs_needed_bounds
 }  // namespace mongo

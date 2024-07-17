@@ -44,6 +44,10 @@ using DocsNeededConstraint = docs_needed_bounds::DocsNeededConstraint;
  * result cardinality of a stage doesn't matter if it requires all documents as input.
  */
 struct DocsNeededBoundsContext : public DocumentSourceVisitorContextBase {
+    DocsNeededBoundsContext(DocsNeededConstraint startingMinBounds = docs_needed_bounds::Unknown(),
+                            DocsNeededConstraint startingMaxBounds = docs_needed_bounds::Unknown())
+        : minBounds(startingMinBounds), maxBounds(startingMaxBounds) {}
+
     void applyPossibleDecreaseStage();
     void applyPossibleIncreaseStage();
     void applySkip(long long newSkip);
@@ -51,8 +55,8 @@ struct DocsNeededBoundsContext : public DocumentSourceVisitorContextBase {
     void applyBlockingStage();
     void applyUnknownStage();
 
-    DocsNeededConstraint minBounds = docs_needed_bounds::Unknown();
-    DocsNeededConstraint maxBounds = docs_needed_bounds::Unknown();
+    DocsNeededConstraint minBounds;
+    DocsNeededConstraint maxBounds;
 };
 
 /**
