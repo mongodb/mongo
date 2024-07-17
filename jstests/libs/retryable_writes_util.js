@@ -108,6 +108,28 @@ export var RetryableWritesUtil = (function() {
         return false;
     }
 
+    function retryOnRetryableCode(fn, prefix) {
+        let ret;
+        assert.soon(() => {
+            try {
+                ret = fn();
+                return true;
+            } catch (e) {
+                if (RetryableWritesUtil.isRetryableCode(e.code)) {
+                    print(prefix + ", err: " + tojson(e));
+                    return false;
+                }
+                throw e;
+            }
+        });
+        return ret;
+    }
+
+    function runCommandWithRetries(conn, cmd) {
+        return retryOnRetryableCode(() => conn.runCommand(cmd),
+                                    "Retry interrupt: runCommand(" + tojson(cmd) + ")");
+    }
+
     return {
         isRetryableCode,
         errmsgContainsRetryableCodeName,
@@ -116,5 +138,7 @@ export var RetryableWritesUtil = (function() {
         assertSameRecordOnBothConnections,
         runRetryableWrite,
         isFailedToSatisfyPrimaryReadPreferenceError,
+        retryOnRetryableCode,
+        runCommandWithRetries
     };
 })();

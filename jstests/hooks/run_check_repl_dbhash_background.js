@@ -36,7 +36,9 @@ const buildInfo = assert.commandWorked(db.runCommand({"buildInfo": 1}));
 const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
 
-function checkReplDbhashBackgroundThread(hosts) {
+async function checkReplDbhashBackgroundThread(hosts) {
+    const {RetryableWritesUtil} = await import("jstests/libs/retryable_writes_util.js");
+
     let debugInfo = [];
 
     // Calls 'func' with the print() function overridden to be a no-op.
@@ -74,7 +76,6 @@ function checkReplDbhashBackgroundThread(hosts) {
     ].map(conn => conn.startSession({causalConsistency: false}));
 
     const resetFns = [];
-    const kForeverSeconds = 1e9;
     const dbs = new Map();
 
     // We enable the "WTPreserveSnapshotHistoryIndefinitely" failpoint to ensure that the same
@@ -113,7 +114,8 @@ function checkReplDbhashBackgroundThread(hosts) {
         const dbNoSession = session.getClient().getDB('admin');
 
         const cmdObj = multitenancy ? {listDatabasesForAllTenants: 1} : {listDatabases: 1};
-        const res = assert.commandWorked(dbNoSession.runCommand(cmdObj));
+        const res =
+            assert.commandWorked(RetryableWritesUtil.runCommandWithRetries(dbNoSession, cmdObj));
         for (let dbInfo of res.databases) {
             const key = `${dbInfo.tenantId}_${dbInfo.name}`;
             const obj = {name: dbInfo.name, tenant: dbInfo.tenantId};
@@ -446,7 +448,7 @@ function checkReplDbhashBackgroundThread(hosts) {
 }
 
 if (topology.type === Topology.kReplicaSet) {
-    let res = checkReplDbhashBackgroundThread(topology.nodes);
+    let res = await checkReplDbhashBackgroundThread(topology.nodes);
     assert.commandWorked(res, () => 'data consistency checks failed: ' + tojson(res));
 } else if (topology.type === Topology.kShardedCluster) {
     const threads = [];
