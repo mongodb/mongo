@@ -402,6 +402,21 @@ function _isUndefinedBehaviorSanitizerActive() {
     return __sanitizeMatch("undefined");
 }
 
+// Enabling a custom JS_GC_ZEAL value for spidermonkey is a two step process:
+// 1) JS_GC_ZEAL preprocessor directive needs to be defined at compilation (spider-monkey-dbg=on).
+// 2) A valid JS_GC_ZEAL value needs to be provided as an environment variable at runtime.
+// In order to detect whether we are running with JS_GC_ZEAL enabled, ideally we'd like to check for
+// the CPPDEFINE for JS_GC_ZEAL. Unfortunately, this CPPDEFINE only applies to libmozjs, and is not
+// exposed in the BuildInfo response. Instead, we rely on detecting a non-empty environment variable
+// for JS_GC_ZEAL. We could have restricted the RegExp to match a valid input for JS_GC_ZEAL
+// For example: RegExp(/^\w+(;\w+)*(,\d+)?$/), but SpiderMonkey performs the validation for us.
+// As long as a non-whitespace JS_GC_ZEAL value has been detected, we report it as being enabled.
+function _isSpiderMonkeyDebugEnabled() {
+    const jsGcZeal = _getEnv("JS_GC_ZEAL");
+    let regex = RegExp(/^\S+$/);
+    return regex.test(jsGcZeal);
+}
+
 jsTestName = function() {
     if (TestData) {
         // If we are using the jsTestName as a database name and performing tenant prefixing

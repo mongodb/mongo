@@ -31,6 +31,60 @@ variables:
     scons_cache_mode: all
     has_packages: false
 
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_x86_dynamic_compile_variant_dependency
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: linux-x86-dynamic-compile
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_x86_generic_expansions
+    multiversion_platform: rhel8
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    large_distro_name: rhel8.8-medium
+    core_analyzer_distro_name: rhel8.8-xlarge
+    num_scons_link_jobs_available: 0.99
+    compile_variant: *linux_x86_dynamic_compile_variant_name
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &enterprise-rhel-8-64-bit-dynamic-expansions
+    <<: *linux_x86_generic_expansions
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 5
+    idle_timeout_factor: 1.5
+    exec_timeout_factor: 1.5
+    large_distro_name: rhel8.8-medium
+
   # THIS HAS COPIES IN
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
@@ -526,3 +580,35 @@ buildvariants:
       - name: .serverless
       - name: unittest_shell_hang_analyzer_gen
       - name: .watchdog
+
+  - name: &enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
+    display_name: "~ Shared Library Enterprise RHEL 8 SpiderMonkey Debug"
+    tags: []
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - rhel8.8-small
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+      # JS_GC_ZEAL modes can be found at https://github.com/mongodb/mongo/blob/r8.0.0-rc9/src/third_party/mozjs/extract/js/src/gc/GC.cpp#L563-L612.
+      # These modes correspond to collecting the nursery (GenerationalGC) every 50 allocations.
+      mozjs_options: JS_GC_ZEAL='7,50'
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel88
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --link-model=dynamic
+        --use-diagnostic-latches=on
+        --spider-monkey-dbg=on
+      compile_variant: enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
+      exec_timeout_secs: 32400 # 9 hour timeout
+      timeout_secs: 18000 # 5 hour idle timeout
+    depends_on: []
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+        distros:
+          - rhel8.8-xlarge
+      - name: aggregation
+      - name: aggregation_mongos_passthrough
+      - name: concurrency_simultaneous_gen
+      - name: jsCore

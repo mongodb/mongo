@@ -65,6 +65,7 @@ struct BaseInfo {
     static const JSFunctionSpec* freeFunctions;
     static const JSFunctionSpec* methods;
     static const unsigned classFlags = 0;
+    static constexpr uint32_t finalizeFlag = JSCLASS_FOREGROUND_FINALIZE;
     static void addProperty(JSContext* cx,
                             JS::HandleObject obj,
                             JS::HandleId id,

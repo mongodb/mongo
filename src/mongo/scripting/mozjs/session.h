@@ -67,7 +67,8 @@ struct SessionInfo : public BaseInfo {
     static const JSFunctionSpec methods[8];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(SessionInfoSlotCount);
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(SessionInfoSlotCount) | BaseInfo::finalizeFlag;
     static const InstallType installType = InstallType::Private;
 
     static void make(JSContext* cx,

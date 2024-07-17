@@ -62,7 +62,8 @@ struct NativeFunctionInfo : public BaseInfo {
 
     static const char* const inheritFrom;
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(NativeFunctionInfoSlotCount);
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(NativeFunctionInfoSlotCount) | BaseInfo::finalizeFlag;
     static const InstallType installType = InstallType::Private;
 
     struct Functions {

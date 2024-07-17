@@ -60,8 +60,8 @@ struct OIDInfo : public BaseInfo {
 
     static const JSFunctionSpec methods[3];
 
-    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(OIDInfoSlotCount);
-
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(OIDInfoSlotCount) | BaseInfo::finalizeFlag;
     static const char* const className;
 
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);

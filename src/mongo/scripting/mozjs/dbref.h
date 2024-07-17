@@ -56,7 +56,8 @@ struct DBRefInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(DBRefInfoSlotCount);
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(DBRefInfoSlotCount) | BaseInfo::finalizeFlag;
 
     static void delProperty(JSContext* cx,
                             JS::HandleObject obj,

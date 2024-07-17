@@ -61,7 +61,8 @@ struct NumberIntInfo : public BaseInfo {
     static const JSFunctionSpec methods[5];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(NumberIntInfoSlotCount);
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(NumberIntInfoSlotCount) | BaseInfo::finalizeFlag;
 
     static int ToNumberInt(JSContext* cx, JS::HandleObject object);
     static int ToNumberInt(JSContext* cx, JS::HandleValue value);
