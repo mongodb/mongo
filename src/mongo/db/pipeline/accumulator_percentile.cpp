@@ -61,10 +61,7 @@ REGISTER_STABLE_EXPRESSION(median, AccumulatorMedian::parseExpression);
 Status AccumulatorPercentile::validatePercentileMethod(StringData method) {
     if (feature_flags::gFeatureFlagAccuratePercentiles.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        if (method == kContinuous) {
-            return {ErrorCodes::InternalErrorNotSupported, "Not implemented."};
-        }
-        if (method != kApproximate && method != kDiscrete) {
+        if (method != kApproximate && method != kDiscrete && method != kContinuous) {
             return {ErrorCodes::BadValue,
                     "Currently only 'approximate', 'discrete', and 'continuous' "
                     "can be used as percentile 'method'."};
@@ -87,7 +84,9 @@ PercentileMethod methodNameToEnum(StringData method) {
     if (method == AccumulatorPercentile::kDiscrete) {
         return PercentileMethod::Discrete;
     }
-
+    if (method == AccumulatorPercentile::kContinuous) {
+        return PercentileMethod::Continuous;
+    }
     // The idl should have validated the input string (see 'validatePercentileMethod()').
     uasserted(7766600, "Currently only approximate percentiles are supported");
 }
@@ -230,13 +229,15 @@ std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(PercentileMethod 
     switch (method) {
         case PercentileMethod::Approximate:
             return createTDigestDistributedClassic();
-        case PercentileMethod::Discrete: {
+        case PercentileMethod::Discrete:
             return createDiscretePercentile();
-        }
+        case PercentileMethod::Continuous:
+            return createContinuousPercentile();
         default:
-            uasserted(7435800,
-                      str::stream()
-                          << "Currently only approximate and discrete percentiles are supported");
+            uasserted(
+                7435800,
+                str::stream()
+                    << "Only approximate, discrete, and continuous percentiles are supported");
     }
     return nullptr;
 }

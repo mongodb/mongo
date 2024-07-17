@@ -47,7 +47,7 @@ testWithSingleGroup({
     docs: [{x: 10}, {x: 5}, {x: 27}],
     percentileSpec: {$percentile: {p: [0], input: "$x", method: "approximate"}},
     expectedResult: [5],
-    msg: "Minimun percentile"
+    msg: "Minimum percentile"
 });
 
 testWithSingleGroup({
@@ -105,6 +105,9 @@ testWithSingleGroup({
     msg: "Multiple percentiles using expression as input"
 });
 
+/**
+ * Tests for correctness with grouping on $k and computing the percentile on $x.
+ */
 testWithMultipleGroups({
     coll: coll,
     docs: [{k: 0, x: 0}, {k: 0, x: 1}, {k: 1, x: 2}, {k: 2}, {k: 0, x: "str"}, {k: 1, x: 0}],

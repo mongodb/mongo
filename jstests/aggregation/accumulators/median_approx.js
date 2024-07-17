@@ -34,6 +34,9 @@ testWithSingleGroupMedian({
     msg: "Median of completely non-numeric data."
 });
 
+/**
+ * Tests for correctness with grouping on $k and computing the percentile on $x.
+ */
 testWithMultipleGroupsMedian({
     coll: coll,
     docs: [{k: 0, x: 2}, {k: 0, x: 1}, {k: 1, x: 2}, {k: 2}, {k: 0, x: "str"}, {k: 1, x: 0}],

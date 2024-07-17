@@ -130,10 +130,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
         msg: "Should work with discrete 'method'"
     });
 
-    assertInvalidSyntax({
+    assertValidSyntax({
         pSpec: {$percentile: {p: [0.5, 0.7], input: "$x", method: "continuous"}},
         errorCode: ErrorCodes.InternalErrorNotSupported,
-        msg: "$percentile should fail because continuous 'method' isn't implemented yet"
+        msg: "Should work with continuous 'method'"
     });
 
 } else {
@@ -182,10 +182,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
         msg: "Should work with discrete 'method'"
     });
 
-    assertInvalidSyntax({
+    assertValidSyntax({
         pSpec: {$median: {input: "$x", method: "continuous"}},
         errorCode: ErrorCodes.InternalErrorNotSupported,
-        msg: "$median should fail because continuous 'method' isn't implemented yet"
+        msg: "Should work with continuous 'method'"
     });
 
 } else {

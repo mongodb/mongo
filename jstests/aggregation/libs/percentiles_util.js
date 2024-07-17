@@ -71,6 +71,8 @@ export function testWithMultipleGroupsMedian({coll, docs, medianSpec, expectedRe
     }
 }
 
+// findRank returns index of the first value in sorted greater than or equal to the algorithm's
+// computed percentile. Be cautious with repeat values.
 function findRank(sorted, value) {
     for (let i = 0; i < sorted.length; i++) {
         if (sorted[i] >= value) {
@@ -82,22 +84,43 @@ function findRank(sorted, value) {
 
 // 'sorted' is expected to contain a sorted array of all _numeric_ samples that are used to
 // compute the percentile(s). 'error' should be specified as a percentage point.
-function testWithAccuracyError({coll, docs, percentileSpec, sorted, error, msg, accuracyError}) {
+function testWithAccuracyError({coll, docs, percentileSpec, sorted, error, msg}) {
     coll.drop();
     coll.insertMany(docs);
     const res = coll.aggregate([{$group: {_id: null, p: percentileSpec}}]).toArray();
 
     for (let i = 0; i < res[0].p.length; i++) {
         const p = percentileSpec.$percentile.p[i];
-        const computedRank = findRank(sorted, res[0].p[i]);
-        const trueRank = Math.max(0, Math.ceil(p * sorted.length) - 1);
-        if (res[0].p[i] != sorted[trueRank]) {
-            assert.lte(Math.abs(trueRank - computedRank),
-                       error * sorted.length,
-                       msg +
-                           `; Error is too high for p: ${p}. Computed: ${res[0].p[i]} with rank ${
-                               computedRank} but the true value ${sorted[trueRank]} has rank ${
-                               trueRank} in ${tojson(res)}`);
+        if (percentileSpec.$percentile.method != "continuous") {
+            const computedRank = findRank(sorted, res[0].p[i]);
+            const trueRank = Math.max(0, Math.ceil(p * sorted.length) - 1);
+            if (res[0].p[i] != sorted[trueRank]) {
+                assert.lte(Math.abs(trueRank - computedRank),
+                           error * sorted.length,
+                           msg +
+                               `; Error is too high for p: ${p}. Computed: ${
+                                   res[0].p[i]} with rank ${computedRank} but the true value ${
+                                   sorted[trueRank]} has rank ${trueRank} in ${tojson(res)}`);
+            }
+        } else {
+            const computedRank = findRank(sorted, res[0].p[i]);
+            const trueRank = p * (sorted.length - 1);
+            const cr = Math.ceil(trueRank);
+            const fr = Math.floor(trueRank);
+            if (cr == trueRank && trueRank == fr) {
+                assert.eq(res[0].p[i],
+                          sorted[trueRank],
+                          msg +
+                              `; Computed: ${res[0].p[i]} but the true value is ${
+                                  sorted[trueRank]} in ${tojson(res)}`);
+            } else {
+                const truePercentile = (cr - trueRank) * sorted[fr] + (trueRank - fr) * sorted[cr];
+                assert.close(res[0].p[i],
+                             truePercentile,
+                             msg +
+                                 `; Computed: ${res[0].p[i]} but the true value is ${
+                                     truePercentile} in ${tojson(res)}`);
+            }
         }
     }
 }

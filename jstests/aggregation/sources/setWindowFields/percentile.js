@@ -215,12 +215,7 @@ testError({$median: "not an object"}, 7436100);
 
 testError({$percentile: {p: [0.1, 0.6], input: "$str", method: false}}, ErrorCodes.TypeMismatch);
 testError({$median: {input: "$str", method: false}}, ErrorCodes.TypeMismatch);
-if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
-    testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "continuous"}},
-              ErrorCodes.InternalErrorNotSupported);
-    testError({$median: {input: "$str", method: "continuous"}},
-              ErrorCodes.InternalErrorNotSupported);
-} else {
+if (!FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
     testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "discrete"}},
               ErrorCodes.BadValue);
     testError({$median: {input: "$str", method: "discrete"}}, ErrorCodes.BadValue);

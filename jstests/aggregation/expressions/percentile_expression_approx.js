@@ -28,7 +28,7 @@ testWithProject({
     doc: {x: [10, 5, 27], x1: 5},
     percentileSpec: {$percentile: {p: [0], input: "$x", method: "approximate"}},
     expectedResult: [5],
-    msg: "Minimun percentile"
+    msg: "Minimum percentile"
 });
 
 testWithProject({
@@ -66,6 +66,22 @@ testWithProject({
         {$percentile: {p: [0.5, 0.9], input: ["$x", "$x1", "$x2"], method: "approximate"}},
     expectedResult: [null, null],
     msg: "Multiple percentiles of completely non-numeric data in input field passed as an array"
+});
+
+testWithProject({
+    coll: coll,
+    doc: {x: [-Infinity, Infinity, Infinity, Infinity]},
+    percentileSpec: {$percentile: {p: [0.1, 0.5], input: "$x", method: "approximate"}},
+    expectedResult: [-Infinity, Infinity],
+    msg: "Percentile of all infinities"
+});
+
+testWithProject({
+    coll: coll,
+    doc: {x: [0, "non-numeric", 1, 2, 3, Infinity]},
+    percentileSpec: {$percentile: {p: [0.5], input: "$x", method: "approximate"}},
+    expectedResult: [2],
+    msg: "Rank not that of infinity returns numeric, counts infinity as number"
 });
 
 testWithProject({
