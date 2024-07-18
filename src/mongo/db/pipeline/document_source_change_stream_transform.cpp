@@ -84,7 +84,8 @@ DocumentSourceChangeStreamTransform::createFromBson(
 
 DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceChangeStreamSpec spec)
-    : DocumentSource(DocumentSourceChangeStreamTransform::kStageName, expCtx),
+    : DocumentSourceInternalChangeStreamStage(DocumentSourceChangeStreamTransform::kStageName,
+                                              expCtx),
       _changeStreamSpec(std::move(spec)),
       _transformer(expCtx, _changeStreamSpec),
       _isIndependentOfAnyCollection(expCtx->ns.isCollectionlessAggregateNS()) {
@@ -215,8 +216,14 @@ Value DocumentSourceChangeStreamTransform::serialize(const SerializationOptions&
                                         {"options"_sd, _changeStreamSpec.toBSON(opts)}}}});
     }
 
-    return Value(Document{
-        {DocumentSourceChangeStreamTransform::kStageName, _changeStreamSpec.toBSON(opts)}});
+    // Internal change stream stages are not serialized for query stats. Query stats uses this stage
+    // to serialize the user specified stage, and therefore if serializing for query stats, we
+    // should use the '$changeStream' stage name.
+    auto stageName =
+        (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged || opts.transformIdentifiers)
+        ? DocumentSourceChangeStream::kStageName
+        : DocumentSourceChangeStreamTransform::kStageName;
+    return Value(Document{{stageName, _changeStreamSpec.toBSON(opts)}});
 }
 
 DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTracker* deps) const {

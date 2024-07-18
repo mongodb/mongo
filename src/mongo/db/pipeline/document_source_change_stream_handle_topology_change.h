@@ -64,7 +64,8 @@ namespace mongo {
  * the first time. When this event is detected, this stage will establish a new cursor on that
  * shard and add it to the cursors being merged.
  */
-class DocumentSourceChangeStreamHandleTopologyChange final : public DocumentSource {
+class DocumentSourceChangeStreamHandleTopologyChange final
+    : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName =
         change_stream_constants::stage_names::kHandleTopologyChange;
@@ -82,7 +83,7 @@ public:
         return kStageName.rawData();
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     StageConstraints constraints(Pipeline::SplitState) const final;
 
