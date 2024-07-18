@@ -16,9 +16,15 @@
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/sbe_util.js";
 
 (function() {
 "use strict";
+
+if (checkSbeCompletelyDisabled(db)) {
+    jsTestLog("Skipping test because SBE is disabled");
+    quit();
+}
 
 const collName = jsTestName() + "_coll";
 const coll = assertDropAndRecreateCollection(db, collName);
