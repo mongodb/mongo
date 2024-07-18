@@ -1027,12 +1027,10 @@ def _bind_expression(expr, allow_literal_string=True):
         node.expr = expr.literal
         return node
 
-    # int32_t
+    # integer
     try:
-        intval = int(expr.literal)
-        if intval >= -0x80000000 and intval <= 0x7FFFFFFF:  # pylint: disable=chained-comparison
-            node.expr = repr(intval)
-            return node
+        node.expr = repr(int(expr.literal))
+        return node
     except ValueError:
         pass
 

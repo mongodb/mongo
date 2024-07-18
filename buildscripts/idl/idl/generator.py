@@ -2177,10 +2177,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _compare_and_return_status(self, op, limit, field, optional_param):
         # type: (str, ast.Expression, ast.Field, str) -> None
         """Throw an error on comparison failure."""
-        with self._block('if (!(value %s %s)) {' % (op, _get_expression(limit)), '}'):
-            self._writer.write_line(
-                'throwComparisonError<%s>(%s"%s", "%s"_sd, value, %s);' %
-                (field.type.cpp_type, optional_param, field.name, op, _get_expression(limit)))
+        cpp_type_info = cpp_types.get_cpp_type_without_optional(field)
+        param_type = cpp_type_info.get_storage_type()
+
+        with self._block("{", "}"):
+            self._writer.write_line(f"static const {param_type} rhs{{{_get_expression(limit)}}};")
+            with self._block("if (!(value %s rhs)) {" % (op), "}"):
+                self._writer.write_line('throwComparisonError<%s>(%s"%s", "%s"_sd, value, rhs);' %
+                                        (field.type.cpp_type, optional_param, field.name, op))
 
     def _gen_field_validator(self, struct, field, optional_params):
         # type: (ast.Struct, ast.Field, Tuple[str, str]) -> None
