@@ -161,7 +161,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
             if (doUpsert) {
                 assert.neq(res.upsertedId, null, res);
-                assert.eq(db[collName].find({"_id": res.upsertedId}).itcount(), 1);
+                assert.eq(db[collName].countDocuments({"_id": res.upsertedId}), 1);
 
                 // Clean up, remove upserted document.
                 assert.commandWorked(db[collName].deleteOne({"_id": res.upsertedId}));
@@ -398,7 +398,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 assert.eq(res.lastErrorObject.n, 1, res);
                 assert.eq(res.lastErrorObject.updatedExisting, false, res);
                 assert.neq(res.lastErrorObject.upserted, null, res);
-                assert.eq(db[collName].find({"_id": res.lastErrorObject.upserted}).itcount(), 1);
+                assert.eq(db[collName].countDocuments({"_id": res.lastErrorObject.upserted}), 1);
 
                 // Clean up, remove upserted document.
                 assert.commandWorked(db[collName].deleteOne({"_id": res.lastErrorObject.upserted}));
@@ -407,7 +407,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 assert.eq(res.lastErrorObject.updatedExisting, false, res);
             }
         } else { /* Remove */
-            const numMatchedDocsBefore = db[collName].find(query).itcount();
+            const numMatchedDocsBefore = db[collName].countDocuments(query);
             const cmdObj = {
                 findAndModify: collName,
                 query: query,
@@ -424,7 +424,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
             res = assert.commandWorked(db.runCommand(cmdObj));
 
-            const numMatchedDocsAfter = db[collName].find(query).itcount();
+            const numMatchedDocsAfter = db[collName].countDocuments(query);
 
             if (numMatchedDocsBefore > 0) {
                 assert.eq(res.lastErrorObject.n, 1, res);
@@ -471,7 +471,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // Used for validation after running the write operation.
         const containsMatchedDocs = db[collName].findOne(query) != null;
-        const numMatchedDocsBefore = db[collName].find(query).itcount();
+        const numMatchedDocsBefore = db[collName].countDocuments(query);
 
         jsTestLog("deleteOne state running with query: " + tojson(query) + "\n" +
                   "containsMatchedDocs: " + containsMatchedDocs + "\n" +
@@ -479,7 +479,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         let res = assert.commandWorked(db[collName].deleteOne(query));
 
-        const numMatchedDocsAfter = db[collName].find(query).itcount();
+        const numMatchedDocsAfter = db[collName].countDocuments(query);
 
         if (containsMatchedDocs) {
             assert.eq(res.deletedCount, 1, res);
@@ -508,7 +508,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // Used for validation after running the write operation.
         const containsMatchedDocs = db[collName].findOne(query) != null;
-        const numMatchedDocsBefore = db[collName].find(query).itcount();
+        const numMatchedDocsBefore = db[collName].countDocuments(query);
 
         jsTestLog("deleteOneWithId state running with query: " + tojson(query) + "\n" +
                   "containsMatchedDocs: " + containsMatchedDocs + "\n" +
@@ -516,7 +516,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         let res = assert.commandWorked(db[collName].deleteOne(query));
 
-        const numMatchedDocsAfter = db[collName].find(query).itcount();
+        const numMatchedDocsAfter = db[collName].countDocuments(query);
 
         if (containsMatchedDocs) {
             assert.eq(res.deletedCount, 1, res);
