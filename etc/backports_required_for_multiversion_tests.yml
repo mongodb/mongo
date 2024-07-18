@@ -195,6 +195,8 @@ last-continuous:
       ticket: SERVER-91757
     - test_file: jstests/sharding/sharded_data_distribution.js
       ticket: SERVER-88400
+    - test_file: jstests/sharding/sharded_data_distribution.js
+      ticket: SERVER-92190
   suites: null
 last-lts:
   all:
@@ -402,4 +404,6 @@ last-lts:
       ticket: SERVER-88400
     - test_file: jstests/replsets/sync_source_clears_post_failure.js
       ticket: SERVER-91960
+    - test_file: jstests/sharding/sharded_data_distribution.js
+      ticket: SERVER-92190
   suites: null

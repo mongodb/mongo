@@ -160,13 +160,16 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         elem.embeddedObject());
     auto nss = NamespaceStringUtil::deserialize(spec.getDb().value_or(DatabaseName()),
                                                 spec.getColl().value_or(""));
+    // In the cases nss == config.collections and nss == config.chunks we can proceed with the
+    // lookup as the merge will be done on the config server
+    bool isConfigSvrSupportedCollection = nss == NamespaceString::kConfigsvrCollectionsNamespace ||
+        nss == NamespaceString::kConfigsvrChunksNamespace;
     uassert(
         ErrorCodes::FailedToParse,
         str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
                       << nss.dbName().toStringForErrorMsg() << " and coll: " << nss.coll(),
         nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace ||
-            nss == NamespaceString::kTenantMigrationOplogView ||
-            nss == NamespaceString::kConfigsvrCollectionsNamespace);
+            nss == NamespaceString::kTenantMigrationOplogView || isConfigSvrSupportedCollection);
     return nss;
 }
 

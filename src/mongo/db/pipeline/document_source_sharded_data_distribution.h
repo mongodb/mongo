@@ -72,7 +72,8 @@ public:
                                  ActionType::shardedDataDistribution)}) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-        return {NamespaceString::kConfigsvrCollectionsNamespace};
+        return {NamespaceString::kConfigsvrCollectionsNamespace,
+                NamespaceString::kConfigsvrChunksNamespace};
     }
 
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
