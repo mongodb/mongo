@@ -167,6 +167,11 @@ using ScopeBindingMap =
 
 // Common interface for a cache holding the mapping of Scope to a hash table
 // which mirror the binding mapping stored in the scope.
+// MONGODB MODIFICATION: Only enable for GCC.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
+#endif
 class ScopeBindingCache {
  public:
   using CacheGeneration = size_t;
@@ -274,7 +279,10 @@ class RuntimeScopeBindingCache final : public ScopeBindingCache {
     scopeMap.clearAndCompact();
   }
 };
-
+// MONGODB MODIFICATION: Only enable for GCC.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 }  // namespace frontend
 }  // namespace js
 

@@ -2643,7 +2643,11 @@ base::uc32 RegExpParserImpl<CharT>::ParseClassSetCharacter() {
 }
 
 namespace {
-
+// MONGODB MODIFICATION: Only enable for GCC.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreturn-type"
+#endif
 bool MayContainStrings(ClassSetOperandType type, RegExpTree* operand) {
   switch (type) {
     case ClassSetOperandType::kClassSetCharacter:
@@ -2657,7 +2661,10 @@ bool MayContainStrings(ClassSetOperandType type, RegExpTree* operand) {
       return operand->AsClassSetExpression()->may_contain_strings();
   }
 }
-
+//MONGODB MODIFICATION: Only enable for GCC.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 }  // namespace
 
 // TODO(v8:11935): Change permalink once proposal is in stage 4.
