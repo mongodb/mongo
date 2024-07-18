@@ -95,6 +95,7 @@ public:
     };
 
     ReshardingOplogApplier(std::unique_ptr<Env> env,
+                           std::size_t oplogBatchTaskCount,
                            ReshardingSourceId sourceId,
                            NamespaceString oplogBufferNss,
                            NamespaceString outputNss,

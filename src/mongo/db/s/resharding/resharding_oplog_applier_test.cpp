@@ -460,7 +460,8 @@ protected:
         }());
     }
 
-    static constexpr int kWriterPoolSize = 4;
+    static constexpr size_t kWriterPoolSize = 4;
+    static constexpr size_t kApplierBatchTaskCount = kWriterPoolSize;
 
     const NamespaceString kOplogNs =
         NamespaceString::createNamespaceString_forTest("config.localReshardingOplogBuffer.xxx.yyy");
@@ -498,6 +499,7 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
     boost::optional<ReshardingOplogApplier> applier;
 
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -536,6 +538,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -582,6 +585,7 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
     boost::optional<ReshardingOplogApplier> applier;
 
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -614,6 +618,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 3 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -656,6 +661,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 4 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -700,6 +706,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -742,6 +749,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplog) {
 
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -779,6 +787,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatch) {
 
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -822,6 +831,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatch) {
 
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -862,6 +872,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDown) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 4 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -905,6 +916,7 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldError) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -942,6 +954,7 @@ TEST_F(ReshardingOplogApplierTest, DropSourceCollectionCmdShouldError) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
                     sourceId(),
                     oplogBufferNs(),
                     appliedToNs(),
@@ -980,6 +993,7 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
             easyOp(9, OpT::kInsert, BSON("_id" << 3))},
         2);
     ReshardingOplogApplier applier(makeApplierEnv(),
+                                   4,
                                    sourceId(),
                                    oplogBufferNs(),
                                    appliedToNs(),

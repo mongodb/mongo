@@ -96,6 +96,22 @@ void emplaceCloneTimestampIfExists(ClassWithCloneTimestamp& c,
     c.setCloneTimestamp(*cloneTimestamp);
 }
 
+template <typename ClassWithOplogBatchTaskCount>
+void emplaceOplogBatchTaskCountIfExists(ClassWithOplogBatchTaskCount& c,
+                                        boost::optional<std::int64_t> oplogBatchTaskCount) {
+    if (!oplogBatchTaskCount) {
+        return;
+    }
+
+    if (auto alreadyExistingOplogBatchTaskCount = c.getOplogBatchTaskCount()) {
+        uassert(ErrorCodes::BadValue,
+                "Existing and new values for oplogBatchTaskCount are expected to be equal.",
+                oplogBatchTaskCount == alreadyExistingOplogBatchTaskCount);
+    }
+
+    c.setOplogBatchTaskCount(*oplogBatchTaskCount);
+}
+
 template <class ReshardingDocumentWithApproxCopySize>
 void emplaceApproxBytesToCopyIfExists(ReshardingDocumentWithApproxCopySize& document,
                                       boost::optional<ReshardingApproxCopySize> approxCopySize) {

@@ -362,6 +362,8 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
 
     recipientDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
+    recipientDoc.setOplogBatchTaskCount(recipientFields->getOplogBatchTaskCount());
+
     return recipientDoc;
 }
 

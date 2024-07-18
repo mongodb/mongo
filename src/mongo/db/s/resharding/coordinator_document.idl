@@ -161,3 +161,9 @@ structs:
                 type: date
                 description: "When to release the instance following its completion."
                 optional: true
+            recipientOplogBatchTaskCount:
+                type: long
+                description: >-
+                    "The number of subtasks to divide a single oplog batch into, so that it may be applied
+                    concurrently by multiple threads on the recipient."
+                optional: true

@@ -305,6 +305,8 @@ public:
                 coordinatorDoc.setForceRedistribution(request().getForceRedistribution());
                 coordinatorDoc.setUnique(request().getUnique());
                 coordinatorDoc.setCollation(request().getCollation());
+                coordinatorDoc.setRecipientOplogBatchTaskCount(
+                    request().getRecipientOplogBatchTaskCount());
 
                 auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
                 instance->getCoordinatorDocWrittenFuture().get(opCtx);

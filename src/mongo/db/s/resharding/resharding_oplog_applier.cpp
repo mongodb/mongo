@@ -81,6 +81,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingApplyOplogBatchTwice);
 
 ReshardingOplogApplier::ReshardingOplogApplier(
     std::unique_ptr<Env> env,
+    std::size_t oplogBatchTaskCount,
     ReshardingSourceId sourceId,
     NamespaceString oplogBufferNss,
     NamespaceString outputNss,
@@ -91,7 +92,8 @@ ReshardingOplogApplier::ReshardingOplogApplier(
     bool isCapped)
     : _env(std::move(env)),
       _sourceId(std::move(sourceId)),
-      _batchPreparer{CollatorInterface::cloneCollator(sourceChunkMgr.getDefaultCollator()),
+      _batchPreparer{oplogBatchTaskCount,
+                     CollatorInterface::cloneCollator(sourceChunkMgr.getDefaultCollator()),
                      isCapped},
       _crudApplication{std::move(outputNss),
                        std::move(allStashNss),

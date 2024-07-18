@@ -302,6 +302,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _metrics{ReshardingMetrics::initializeFrom(recipientDoc, _serviceContext)},
       _metadata{recipientDoc.getCommonReshardingMetadata()},
       _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
+      _oplogBatchTaskCount{recipientDoc.getOplogBatchTaskCount()},
       _recipientCtx{recipientDoc.getMutableState()},
       _donorShards{recipientDoc.getDonorShards()},
       _cloneTimestamp{recipientDoc.getCloneTimestamp()},
@@ -835,9 +836,13 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
                                 << " != donor shards count: " << _donorShards.size());
     }
 
+    auto oplogBatchTaskCount = _oplogBatchTaskCount.value_or(
+        static_cast<std::size_t>(resharding::gReshardingOplogBatchTaskCount.load()));
+
     return _dataReplicationFactory(opCtx,
                                    _metrics.get(),
                                    &_applierMetricsMap,
+                                   oplogBatchTaskCount,
                                    _metadata,
                                    _donorShards,
                                    *_cloneTimestamp,

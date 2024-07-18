@@ -148,6 +148,8 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             configsvrReshardCollection.set_presetReshardedChunks(_doc.get_presetReshardedChunks());
             configsvrReshardCollection.setZones(_doc.getZones());
             configsvrReshardCollection.setNumInitialChunks(_doc.getNumInitialChunks());
+            configsvrReshardCollection.setRecipientOplogBatchTaskCount(
+                _doc.getRecipientOplogBatchTaskCount());
 
             if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {

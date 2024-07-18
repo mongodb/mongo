@@ -69,15 +69,18 @@ const auto kUnsplittableCollectionShardKey = BSON("_id" << 1);
 const auto kUnsplittableCollectionMinKey = BSON("_id" << MINKEY);
 const auto kUnsplittableCollectionMaxKey = BSON("_id" << MAXKEY);
 
-ShardsvrReshardCollection makeMoveCollectionRequest(const DatabaseName& dbName,
-                                                    const NamespaceString& nss,
-                                                    const ShardId& destinationShard,
-                                                    ProvenanceEnum provenance);
+ShardsvrReshardCollection makeMoveCollectionRequest(
+    const DatabaseName& dbName,
+    const NamespaceString& nss,
+    const ShardId& destinationShard,
+    ProvenanceEnum provenance,
+    const boost::optional<std::int64_t>& oplogBatchApplierTaskCount = boost::none);
 
 ShardsvrReshardCollection makeUnshardCollectionRequest(
     const DatabaseName& dbName,
     const NamespaceString& nss,
-    const boost::optional<ShardId>& destinationShard);
+    const boost::optional<ShardId>& destinationShard,
+    const boost::optional<std::int64_t>& oplogBatchApplierTaskCount = boost::none);
 }  // namespace cluster::unsplittable
 
 struct RawResponsesResult {

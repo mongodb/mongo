@@ -413,6 +413,15 @@ structs:
                 type: Provenance
                 description: "The source operation that called this resharding operation."
                 optional: true
+            recipientOplogBatchTaskCount:
+                type: safeInt64
+                description: >-
+                    "The number of subtasks to divide a single oplog batch into, so that it may be applied
+                    concurrently by multiple threads on the recipient."
+                validator:
+                    gte: 1
+                    lte: 256
+                optional: true
 
     SetAllowMigrationsRequest:
         description: "Parameters sent for the set allow migrations command"
