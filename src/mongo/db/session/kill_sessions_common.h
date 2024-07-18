@@ -66,9 +66,7 @@ SessionKiller::Result killSessionsLocalKillOps(OperationContext* opCtx,
 /**
  * Helper for executing a pattern set from a kill sessions style command.
  */
-Status killSessionsCmdHelper(OperationContext* opCtx,
-                             BSONObjBuilder& result,
-                             const KillAllSessionsByPatternSet& patterns);
+Status killSessionsCmdHelper(OperationContext* opCtx, const KillAllSessionsByPatternSet& patterns);
 
 /**
  * Helper for logging kill sessions command.

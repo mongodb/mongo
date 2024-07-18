@@ -84,22 +84,17 @@ SessionKiller::Result killSessionsLocalKillOps(OperationContext* opCtx,
     return {std::vector<HostAndPort>{}};
 }
 
-Status killSessionsCmdHelper(OperationContext* opCtx,
-                             BSONObjBuilder& result,
-                             const KillAllSessionsByPatternSet& patterns) {
+Status killSessionsCmdHelper(OperationContext* opCtx, const KillAllSessionsByPatternSet& patterns) {
     auto killResult = SessionKiller::get(opCtx)->kill(opCtx, patterns);
-
     if (!killResult->isOK()) {
         return killResult->getStatus();
     }
 
     if (!killResult->getValue().empty()) {
-        BSONArrayBuilder bab(result.subarrayStart("failedHosts"));
-        for (const auto& host : killResult->getValue()) {
-            bab.append(host.toString());
-        }
-
-        return Status(ErrorCodes::HostUnreachable, "Failed to kill on some hosts");
+        LOGV2_ERROR(8963000,
+                    "Failed to kill sessions on some hosts",
+                    "failedHosts"_attr = killResult->getValue());
+        return Status(ErrorCodes::HostUnreachable, "Failed to kill sessions on some hosts");
     }
 
     return Status::OK();
