@@ -125,7 +125,6 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     const BSONObj& cmdObj,
     const ExtensionsCallback& extensionsCallback,
     const CollatorInterface* defaultCollator,
-    const bool isExplain,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto vts = auth::ValidatedTenancyScope::get(opCtx);
     const auto serializationContext = vts != boost::none
@@ -154,9 +153,10 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
                                        extensionsCallback,
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
 
+    // We do not collect queryStats on explain for distinct.
     if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        !isExplain) {
+        !verbosity.has_value()) {
         query_stats::registerRequest(opCtx, nss, [&]() {
             return std::make_unique<query_stats::DistinctKey>(
                 expCtx, *parsedDistinct, collOrViewAcquisition.getCollectionType());
@@ -353,7 +353,6 @@ public:
                                                cmdObj,
                                                ExtensionsCallbackReal(opCtx, &nss),
                                                defaultCollator,
-                                               true, /* isExplain */
                                                verbosity);
 
         if (collectionOrView->isView()) {
@@ -451,7 +450,6 @@ public:
                                                cmdObj,
                                                ExtensionsCallbackReal(opCtx, &nss),
                                                defaultCollation,
-                                               false, /* isExplain */
                                                {});
         const CanonicalDistinct& canonicalDistinct = *canonicalQuery->getDistinct();
 

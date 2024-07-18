@@ -72,6 +72,8 @@
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_stats/distinct_key.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -90,6 +92,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
@@ -134,6 +137,15 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
                                        std::move(distinctCommand),
                                        extensionsCallback,
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    // We do not collect queryStats on explain for distinct.
+    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !verbosity.has_value()) {
+        query_stats::registerRequest(opCtx, nss, [&]() {
+            return std::make_unique<query_stats::DistinctKey>(expCtx, *parsedDistinct);
+        });
+    }
 
     expCtx->setQuerySettingsIfNotPresent(
         query_settings::lookupQuerySettingsForDistinct(expCtx, *parsedDistinct, nss));
@@ -280,9 +292,11 @@ public:
 
         auto swCri = getCollectionRoutingInfoForTxnCmd(opCtx, nss);
         if (swCri == ErrorCodes::NamespaceNotFound) {
-            // If the database doesn't exist, we successfully return an empty result set without
-            // creating a cursor.
+            // If the database doesn't exist, we successfully return an empty result set.
             result.appendArray("values", BSONObj());
+            CurOp::get(opCtx)->setEndOfOpMetrics(0);
+            collectQueryStatsMongos(opCtx,
+                                    std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
             return true;
         }
 
@@ -361,6 +375,10 @@ public:
             result.append("atClusterTime"_sd,
                           repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()->asTimestamp());
         }
+
+        CurOp::get(opCtx)->setEndOfOpMetrics(n);
+        collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+
         return true;
     }
 

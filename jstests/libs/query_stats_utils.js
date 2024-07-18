@@ -417,9 +417,8 @@ export function getValueAtPath(object, dottedPath) {
  * once with a mongos.
  * @param {String} collName - The desired collection name to use. The db will be "test".
  * @param {Function} callbackFn - The function to make the assertion on each connection.
- * @param {Boolean} runShardingTest - Whether or not to run a sharding test on mongos
  */
-export function withQueryStatsEnabled(collName, callbackFn, runShardingTest = true) {
+export function withQueryStatsEnabled(collName, callbackFn) {
     const options = {
         setParameter: {internalQueryStatsRateLimit: -1},
     };
@@ -433,10 +432,6 @@ export function withQueryStatsEnabled(collName, callbackFn, runShardingTest = tr
         callbackFn(coll);
         MongoRunner.stopMongod(conn);
     }
-
-    // TODO SERVER-90650: add testing support for distinct queryStats on mongos
-    if (!runShardingTest)
-        return;
 
     {
         const st = new ShardingTest({shards: 2, mongosOptions: options});

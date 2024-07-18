@@ -72,4 +72,4 @@ withQueryStatsEnabled(collName, (coll) => {
         shapeFields: queryShapeDistinctFieldsComplex,
         keyFields: distinctKeyFieldsComplex
     });
-}, false);
+});
