@@ -370,6 +370,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
         if (_params.tailable) {
             _cursor.reset();
         } else {
+            _lastSeenId = RecordId();
             _commonStats.isEOF = true;
         }
 
