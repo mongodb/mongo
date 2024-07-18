@@ -6,7 +6,7 @@ To run aggregation pipelines containing $search or $vectorSearch stages, you wil
 
 In order to acquire a release or latest mongot binary, from your ~/mongo directory you will need to:
 
-1. Make sure your db-contrib-tool is up-to-date. In order to do this, you will need to run:
+1. Make sure your [db-contrib-tool](https://github.com/10gen/db-contrib-tool/tree/main) is up-to-date. In order to do this, you will need to run:
 
 ######
 
@@ -124,3 +124,37 @@ This order is required to ensure correctness. This is due to the nature of data 
 
 <!-- TODO SERVER-90679 add instructions for downloading mongot binary from evergreen artifact/object. If packaged in mongod_binaries tarball that is pushed to s3, should be able to just use
 db-contrib-tool setup-repro-env <evergreen-object-identifier> -->
+
+## Downloading a mongot binary from an evergreen artifact
+
+You can download the mongot binary that a specific evergreen patch or version utilized, which can be useful for trying to replicate errors.
+
+You can download the mongot binary from any build variant that compiles mongot--i.e., variants which include the expansion `build_mongot: true` ([example](https://github.com/10gen/mongo/blob/848b5264be2d0f93d21ffe2e4058e810f8ea18f2/etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml#L194)). More specifically, that includes:
+
+- Compile variants that are depended upon by variants which run the search end to end tests, such as the variant `amazon-linux2-arm64-dynamic-compile` _(! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis)_, which is depended upon by _! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags)_
+- Variants that compile mongot **and** run the search end to end tests, such as: `amazon-linux2-arm64-mongot-integration-patchable` _(AL2 arm64 mongot integration tasks)_
+  - Note that this will be true of any of the build variants that include `mongot` in the name, such as _Enterprise RHEL 8.0 Mongot Integration_
+
+If you're confused about evergreen build variants, check out [Intro to Evergreen Concepts](https://docs.google.com/document/d/1kHi0YuzuRcMs1sRgXRRwy5-cSF4vasAT8lQjkg2hXCU/edit?usp=sharing).
+
+The general format of the command is:
+
+######
+
+    db-contrib-tool setup-repro-env --variant <evergreen variant name> <evergreen patch id OR associated git commit hash>
+
+Specifically, to download from the `AL2023 x86 mongot integration tasks cron only` build variant, you could run:
+
+######
+
+    db-contrib-tool setup-repro-env --variant amazon-linux-2023-x86-mongot-integration-cron-only 23b790a2a81767b8edbbc266043a205029867b74
+
+By default, the download will be placed in `build/multiversion_bin/<githash_patchid OR githash>/dist_test/`, but you can also specify a location via the `--installDir` option. For example:
+
+######
+
+    db-contrib-tool setup-repro-env --variant amazon-linux2-arm64-dynamic-compile 23b790a2a81767b8edbbc266043a205029867b74 --installDir=build/multiversion_bin/my_variant
+
+Will place the mongot binary in `build/multiversion_bin/my_variant/23b790a2a81767b8edbbc266043a205029867b74/dist_test/bin/mongot-localdev`
+
+General information about the `setup-repro-env` command can be found in its [README](https://github.com/10gen/db-contrib-tool/blob/main/src/db_contrib_tool/setup_repro_env/README.md#setting-up-a-specific-mongodb-version). Note that if you want to download the mongot binary, you'll have to pass in an appropriate `--variant`: if you don't specify, a variant that makes sense for your machine's architecture will be automatically chosen for you, and will very likely will not be one of the variants that compiles mongot.
