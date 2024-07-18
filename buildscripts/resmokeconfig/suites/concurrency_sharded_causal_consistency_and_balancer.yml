@@ -45,6 +45,10 @@ selector:
     # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
     - jstests/concurrency/fsm_workloads/update_where.js
 
+    # This test runs a large number of inserts, which can cause moveCollection to take a long time
+    # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
+    - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
+
   exclude_with_any_tags:
     - does_not_support_causal_consistency
     # This suite uses secondary read preference, which isn't currently compatible with transactions.

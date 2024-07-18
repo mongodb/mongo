@@ -102,6 +102,10 @@ selector:
     # TODO SERVER-92349: Re-enable this test once completed.
     - jstests/concurrency/fsm_workloads/indexed_insert_ttl.js
 
+    # This test runs a large number of inserts, which can cause moveCollection to take a long time
+    # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
+    - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
