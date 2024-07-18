@@ -79,8 +79,7 @@ feature_flags:
       description: "Feature flag to enable the search batchsize and limit optimization."
       cpp_varname: gFeatureFlagSearchBatchSizeLimit
       default: true
-      version: 7.1
-      shouldBeFCVGated: true
+      shouldBeFCVGated: false
 
     featureFlagAggOutTimeseries:
       description: "Feature flag for enabling support for $out to write to time-series collections"
@@ -138,13 +137,13 @@ feature_flags:
       description: "Feature flag to enable batchSize tuning for search queries."
       cpp_varname: gFeatureFlagSearchBatchSizeTuning
       default: false
-      shouldBeFCVGated: true
+      shouldBeFCVGated: false
 
     featureFlagSearchHybridScoring:
-      description: "Feature flag to introduce MQL syntax to allow customizable scoring 
+      description: "Feature flag to introduce MQL syntax to allow customizable scoring
                     of multiple ranked pipelines."
       cpp_varname: gFeatureFlagSearchHybridScoring
-      default: false 
+      default: false
       shouldBeFCVGated: true
 
     featureFlagSearchExplainExecutionStats:
