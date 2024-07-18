@@ -34,6 +34,7 @@ global:
 
 imports:
     - "mongo/crypto/fle_field_schema.idl"
+    - "mongo/db/auth/access_checks.idl"
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/pipeline/legacy_runtime_constants.idl"
@@ -426,8 +427,12 @@ commands:
         namespace: concatenate_with_db
         api_version: "1"
         access_check:
-            simple:
-                privilege:
+            complex:
+                # Updates with $where clause may read into system.js collection and issue getMore commands
+                # that require cursor checks.
+                - check: check_cursor_session_privilege
+                - check: is_coauthorized_with
+                - privilege:
                     resource_pattern: exact_namespace
                     action_type: [bypassDocumentValidation, insert, update]
         reply_type: UpdateCommandReply

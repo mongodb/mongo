@@ -398,6 +398,11 @@ ALLOWED_NEW_COMPLEX_ACCESS_CHECKS = dict(
     complexChecksSupersetSomeAllowed={"checkTwo"},
 )
 
+CHANGED_ACCESS_CHECKS_TYPE = dict(
+    # Changed access checks of update command from 'simple' to 'complex' in 8.1.
+    update=["simple", "complex"]
+)
+
 
 @dataclass
 class AllowedNewPrivilege:
@@ -2043,7 +2048,9 @@ def check_security_access_checks(
     if old_access_checks is not None and new_access_checks is not None:
         old_access_check_type = old_access_checks.get_access_check_type()
         new_access_check_type = new_access_checks.get_access_check_type()
-        if old_access_check_type != new_access_check_type:
+        if old_access_check_type != new_access_check_type and CHANGED_ACCESS_CHECKS_TYPE.get(
+            cmd_name, None
+        ) != [old_access_check_type, new_access_check_type]:
             ctxt.add_access_check_type_not_equal_error(
                 cmd_name, old_access_check_type, new_access_check_type, new_idl_file_path
             )
