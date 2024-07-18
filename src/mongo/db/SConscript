@@ -2873,6 +2873,7 @@ if wiredtiger:
             'read_write_concern_defaults_test.cpp',
             'read_write_concern_provenance_test.cpp',
             'record_id_test.cpp',
+            'resource_yielder_test.cpp',
             'server_options_test.cpp',
             'service_liaison_mock.cpp',
             'session/internal_session_pool_test.cpp',

@@ -129,18 +129,19 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
         // _configsvrCreateDatabase command here will also need to run inside that session. Yield
         // the session here. Otherwise, if this router is also the configsvr primary, the
         // _configsvrCreateDatabase command would not be able to check out the session.
-        auto txnRouterResourceYielder = std::make_unique<TransactionRouterResourceYielder>();
-        txnRouterResourceYielder->yield(opCtx);
+        auto txnRouterResourceYielder = TransactionRouterResourceYielder::makeForRemoteCommand();
+        auto sendCommand = [&] {
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                DatabaseName::kAdmin,
+                CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
+                Shard::RetryPolicy::kIdempotent));
+            return response;
+        };
+        auto response = runWithYielding(opCtx, txnRouterResourceYielder.get(), sendCommand);
 
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            DatabaseName::kAdmin,
-            CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
-            Shard::RetryPolicy::kIdempotent));
-
-        uassertStatusOK(txnRouterResourceYielder->unyieldNoThrow(opCtx));
         uassertStatusOK(response.writeConcernStatus);
         uassertStatusOKWithContext(response.commandStatus,
                                    str::stream() << "Database " << dbName.toStringForErrorMsg()
