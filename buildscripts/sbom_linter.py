@@ -123,6 +123,7 @@ def main() -> int:
     third_party_libs = set(os.listdir(THIRD_PARTY_DIR))
     # the only files in this dir that are not third party libs
     third_party_libs.remove("SConscript")
+    third_party_libs.remove("README.md")
     third_party_libs.remove("scripts")
     # wiredtiger will not be included in the sbom since it is considered part of the server
     third_party_libs.remove("wiredtiger")
