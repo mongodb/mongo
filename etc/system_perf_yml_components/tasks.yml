@@ -308,6 +308,13 @@ tasks:
         vars:
           test_control: "ycsb_non_retryable_writes_rolling_restarts.2023-09"
 
+  - name: ycsb-update_force_stepdowns.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-update_force_stepdowns.2023-09"
+
   # See DSI configurations/test_control/defaults.*.yml for an explanation of the available parameters.
   # Definitions of terms:
   #   OutOfCache: the data set is larger than the WiredTiger Cache. For these tests the record count
