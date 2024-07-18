@@ -1009,6 +1009,7 @@ void CurOp::reportState(BSONObjBuilder* builder,
         queueMetricsBuilder.append("admissions", admCtx->getAdmissions());
         queueMetricsBuilder.append("totalTimeQueuedMicros",
                                    durationCount<Microseconds>(totalTimeQueuedMicros));
+        queueMetricsBuilder.append("isHoldingTicket", admCtx->isHoldingTicket());
         queueMetricsBuilder.done();
     }
     queuesBuilder.done();

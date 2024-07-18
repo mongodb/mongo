@@ -78,8 +78,8 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
                                          TickSourceMock<Microseconds>* tickSource) {
     Stats stats(holder.get());
 
-    MockAdmissionContext admCtx{};
-    auto ticket = holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds{500});
+    std::array<MockAdmissionContext, 6> admCtxs;
+    auto ticket = holder->waitForTicketUntil(opCtx, &admCtxs[0], Date_t::now() + Milliseconds{500});
 
     ASSERT_EQ(holder->used(), 1);
     ASSERT_EQ(holder->available(), 0);
@@ -118,22 +118,23 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
     ASSERT_TRUE(holder->resize(opCtx, 6));
     std::array<boost::optional<Ticket>, 5> tickets;
     {
-        auto ticket = holder->waitForTicket(opCtx, &admCtx);
+        auto ticket = holder->waitForTicket(opCtx, &admCtxs[0]);
         ASSERT_EQ(holder->used(), 1);
         ASSERT_EQ(holder->outof(), 6);
 
         for (int i = 0; i < 5; ++i) {
-            tickets[i] = holder->waitForTicket(opCtx, &admCtx);
+            tickets[i] = holder->waitForTicket(opCtx, &admCtxs[i + 1]);
             ASSERT_EQ(holder->used(), 2 + i);
             ASSERT_EQ(holder->outof(), 6);
         }
-        ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1)));
+        ASSERT_FALSE(
+            holder->waitForTicketUntil(opCtx, &admCtxs[0], Date_t::now() + Milliseconds(1)));
     }
 
     ASSERT_TRUE(holder->resize(opCtx, 5));
     ASSERT_EQ(holder->used(), 5);
     ASSERT_EQ(holder->outof(), 5);
-    ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1)));
+    ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtxs[0], Date_t::now() + Milliseconds(1)));
 
     ASSERT_FALSE(holder->resize(opCtx, 4, Date_t::now() + Milliseconds(1)));
 }

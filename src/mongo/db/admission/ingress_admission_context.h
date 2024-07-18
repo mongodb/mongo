@@ -45,14 +45,6 @@ public:
      * Retrieve the IngressAdmissionContext decoration the provided OperationContext
      */
     static IngressAdmissionContext& get(OperationContext* opCtx);
-
-    /**
-     * Returns true if the operation is already holding a ticket.
-     */
-    bool isHoldingTicket() const {
-        // TODO(SERVER-91502): Move to AdmissionContext and replace with a general implementation.
-        return getAdmissions() > 0;
-    }
 };
 
 }  // namespace mongo

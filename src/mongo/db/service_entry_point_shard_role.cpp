@@ -1802,6 +1802,10 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (gIngressAdmissionControlEnabled.load()) {
+        // The way ingress admission works, one ticket should cover all the work for the operation.
+        // Therefore, if the operation has already been admitted by IngressAdmissionController, all
+        // of the subsequent admissions of the same operation (e.g. via DBDirectClient) should be
+        // exempt from ingress admission control.
         boost::optional<ScopedAdmissionPriority<IngressAdmissionContext>> admissionPriority;
         if (!_invocation->isSubjectToIngressAdmissionControl() ||
             IngressAdmissionContext::get(opCtx).isHoldingTicket()) {

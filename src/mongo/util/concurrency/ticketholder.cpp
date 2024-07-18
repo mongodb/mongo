@@ -114,6 +114,8 @@ void TicketHolder::_releaseToTicketPool(Ticket& ticket) noexcept {
         return;
     }
 
+    ticket._admissionContext->markTicketReleased();
+
     auto& queueStats = _getQueueStatsToUse(ticket._priority);
     _updateQueueStatsOnRelease(queueStats, ticket);
     _releaseToTicketPoolImpl(ticket._admissionContext);

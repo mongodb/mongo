@@ -88,9 +88,9 @@ function testCurrentOp(conn, db, collName) {
 
         const notCurrentlyQueued = op.currentQueue == null;
         if (notCurrentlyQueued) {
-            // while here, validate that the operation was admitted and `currentQueue` is null
+            // while here, validate that the operation was admitted and is holding a ticket
             assert.gte(op.queues.ingress.admissions, 1);
-            assert(op.currentQueue == null, 'expected no current queue');
+            assert(op.queues.ingress.isHoldingTicket);
         }
 
         return notCurrentlyQueued;

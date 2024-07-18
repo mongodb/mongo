@@ -65,18 +65,6 @@ IngressAdmissionController& IngressAdmissionController::get(OperationContext* op
 Ticket IngressAdmissionController::admitOperation(OperationContext* opCtx) {
     auto& admCtx = IngressAdmissionContext::get(opCtx);
 
-    // The way ingress admission works, one ticket should cover _all_ the work for the operation.
-    // Therefore, if the operation has already been admitted by IngressAdmissionController, all of
-    // the subsequent admissions of the same operation (e.g. via DBDirectClient) should perform work
-    // under the same ticket.
-    // NOTE: This tassert is currently somewhat superfluous, since we already ensure we this
-    // condition holds inside ExecCommandDatabase::_initiateCommand(), but we're leaving it in to
-    // make sure future changes don't violate this condition.
-    tassert(9143000,
-            "Operation may not hold more than one ingress admission ticket at a time",
-            !admCtx.isHoldingTicket() ||
-                admCtx.getPriority() == AdmissionContext::Priority::kExempt);
-
     // Try to get the ticket without waiting
     if (auto ticket = _ticketHolder->tryAcquire(&admCtx)) {
         return std::move(*ticket);

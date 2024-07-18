@@ -212,6 +212,9 @@ protected:
      */
     void _appendCommonQueueImplStats(BSONObjBuilder& b, const QueueStats& stats) const;
 
+    /**
+     * Creates a ticket for a non-exempt admission.
+     */
     Ticket _makeTicket(AdmissionContext* admCtx);
 
     AtomicWord<int32_t> _outof;
@@ -332,6 +335,7 @@ private:
      * Discards the ticket without releasing it back to the ticketholder.
      */
     void discard() {
+        _admissionContext->markTicketReleased();
         _ticketholder = nullptr;
         _admissionContext = nullptr;
     }
@@ -343,6 +347,8 @@ private:
 };
 
 inline Ticket TicketHolder::_makeTicket(AdmissionContext* admCtx) {
+    // TODO(SERVER-92647): Move this to the Ticket constructor so it also applies to exempt tickets
+    admCtx->markTicketHeld();
     return Ticket{this, admCtx};
 }
 

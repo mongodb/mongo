@@ -157,14 +157,14 @@ TEST_F(SemaphoreTicketHolderTest, QueuedWaiterGetsTicketWhenMadeAvailable) {
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
     // acquire all 3 tickets
-    MockAdmissionContext admCtx{};
+    std::array<MockAdmissionContext, 6> admCtxs;
     std::vector<Ticket> tickets;
     for (int i = 0; i < initialNumTickets; ++i) {
-        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtxs[i + 1]));
     }
 
     // try (and fail) to acquire a ticket - none are availabe.
-    ASSERT_FALSE(holder->tryAcquire(&admCtx));
+    ASSERT_FALSE(holder->tryAcquire(&admCtxs[0]));
 
     // start a thread and make it wait on a ticket
     MockAdmission releaseWaiterAdmission{getServiceContext(), AdmissionContext::Priority::kNormal};
@@ -216,10 +216,10 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownTicketsStillAvailable
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
     // acquire 5 tickets
-    MockAdmissionContext admCtx{};
+    std::array<MockAdmissionContext, 6> admCtxs;
     std::vector<Ticket> tickets;
     for (int i = 0; i < 5; ++i) {
-        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtxs[i + 1]));
     }
 
     // ensure 5 are now in-use and 5 are left available
@@ -235,18 +235,18 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownTicketsStillAvailable
     ASSERT_EQ(holder->outof(), 8);
 
     // We can get a ticket as some are still available
-    ASSERT_TRUE(holder->tryAcquire(&admCtx));
+    ASSERT_TRUE(holder->tryAcquire(&admCtxs[0]));
 }
 
-TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownSoNoTicketsAvailalbe) {
+TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownSoNoTicketsAvailable) {
     constexpr int initialNumTickets = 10;
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
     // acquire 5 tickets
-    MockAdmissionContext admCtx{};
+    std::array<MockAdmissionContext, 6> admCtxs;
     std::vector<Ticket> tickets;
     for (int i = 0; i < 5; ++i) {
-        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtxs[i + 1]));
     }
 
     // ensure 5 are now in-use and 5 are left available
@@ -255,7 +255,7 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownSoNoTicketsAvailalbe)
     ASSERT_EQ(holder->outof(), 10);
 
     // We can get a ticket when one is available
-    ASSERT_TRUE(holder->tryAcquire(&admCtx));
+    ASSERT_TRUE(holder->tryAcquire(&admCtxs[0]));
 
     // shrink the pool to 3 tickets
     // available should now be negative because more are in use (5) than the total capacity (3)
@@ -265,7 +265,7 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownSoNoTicketsAvailalbe)
     ASSERT_EQ(holder->outof(), 3);
 
     // When < 0 tickets are availabe, we shouldn't be able to acquire one.
-    ASSERT_FALSE(holder->tryAcquire(&admCtx));
+    ASSERT_FALSE(holder->tryAcquire(&admCtxs[0]));
 }
 
 TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeUpMakesTicketsAvailableToWaiters) {
@@ -273,14 +273,14 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeUpMakesTicketsAvailableTo
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
     // acquire all 3 tickets
-    MockAdmissionContext admCtx{};
+    std::array<MockAdmissionContext, 6> admCtxs;
     std::vector<Ticket> tickets;
     for (int i = 0; i < initialNumTickets; ++i) {
-        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtxs[i]));
     }
 
     // try (and fail) to acquire a ticket - none are availabe.
-    ASSERT_FALSE(holder->tryAcquire(&admCtx));
+    ASSERT_FALSE(holder->tryAcquire(&admCtxs[0]));
 
     // start a thread and make it wait on a ticket
     MockAdmission releaseWaiterAdmission{getServiceContext(), AdmissionContext::Priority::kNormal};
@@ -311,10 +311,10 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest,
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
     // acquire 5 tickets
-    MockAdmissionContext admCtx{};
+    std::array<MockAdmissionContext, 5> admCtxs;
     std::vector<Ticket> tickets;
     for (int i = 0; i < 5; ++i) {
-        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtxs[i]));
     }
 
     // ensure 5 are now in-use and 5 are left available
@@ -364,10 +364,10 @@ TEST_F(SemaphoreTicketHolderTest, ReleaseToPoolWakesWaiters) {
     // waiting thread waits for the initial waiters to queue before enqueueing itself. Back on the
     // main thread, wait for all three queued waiters before returning two tickets to the pool
     // immediately.
-    MockAdmissionContext admCtx{};
+    std::array<MockAdmissionContext, 5> admCtxs;
     std::vector<Ticket> tickets;
     for (int i = 0; i < initialNumTickets; ++i) {
-        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtx));
+        tickets.push_back(holder->waitForTicket(_opCtx.get(), &admCtxs[i]));
     }
 
     std::vector<Future<Ticket>> ticketFutures;
