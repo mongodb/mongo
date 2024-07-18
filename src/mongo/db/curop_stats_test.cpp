@@ -356,5 +356,61 @@ TEST_F(CurOpStatsTest, MultipleUnstashingAndStashingTransaction) {
     ASSERT_EQ(curop1->debug().workingTimeMillis, Milliseconds(4880));
 }
 
+TEST_F(CurOpStatsTest, SubOperationStats) {
+    auto opCtx = makeOperationContext();
+    auto* admCtx = &ExecutionAdmissionContext::get(opCtx.get());
+    auto locker = shard_role_details::getLocker(opCtx.get());
+    auto curop1 = CurOp::get(*opCtx);
+
+    Milliseconds executionTime = Milliseconds(512);
+    Milliseconds waitForTickets = Milliseconds(2);
+    Milliseconds waitForFlowControlTicket = Milliseconds(4);
+
+    auto tickSourceMock = std::make_unique<TickSourceMock<Microseconds>>();
+    // The tick source is initialized to a non-zero value as CurOp equates a value of 0 with a
+    // not-started timer.
+    tickSourceMock->advance(Milliseconds{100});
+    curop1->setTickSource_forTest(tickSourceMock.get());
+
+    // Advance execution time.
+    curop1->ensureStarted();
+    tickSourceMock->advance(executionTime);
+    curop1->done();
+    ASSERT_EQ(duration_cast<Milliseconds>(curop1->elapsedTimeExcludingPauses()), executionTime);
+
+    // Add blocked time to curop1.
+    addTicketQueueTime(admCtx, tickSourceMock.get(), executionTime, waitForTickets);
+    locker->addFlowControlTicketQueueTime(waitForFlowControlTicket);
+    Milliseconds waitForLocks = duration_cast<Milliseconds>(
+        Microseconds(addWaitForLock(opCtx.get(), getServiceContext(), locker, Milliseconds(8))));
+    curop1->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+    ASSERT_EQ(curop1->debug().workingTimeMillis,
+              executionTime - waitForTickets - waitForFlowControlTicket - waitForLocks);
+
+    // Add new curop to top of curop stack using the same opCtx.
+    CurOp curop2;
+    curop2.push(opCtx.get());
+    curop2.setTickSource_forTest(tickSourceMock.get());
+    curop2.ensureStarted();
+
+    // Check that curop2 only reports execution time that elapsed after it started without deducting
+    // any blocked time from preceding operations in the stack.
+    Milliseconds executionTime2 = Milliseconds(1024);
+    tickSourceMock->advance(executionTime2);
+    curop2.completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+    ASSERT_EQ(curop2.debug().workingTimeMillis, executionTime2);
+
+    // Add blocked time to curop2 and verify blocked time from curop1 is still not reported.
+    Milliseconds waitForTickets2 = Milliseconds(16);
+    Milliseconds waitForFlowControlTicket2 = Milliseconds(32);
+    addTicketQueueTime(admCtx, tickSourceMock.get(), executionTime2, waitForTickets2);
+    locker->addFlowControlTicketQueueTime(waitForFlowControlTicket2);
+    auto waitForLocks2 = duration_cast<Milliseconds>(
+        Microseconds(addWaitForLock(opCtx.get(), getServiceContext(), locker, Milliseconds(64))));
+    curop2.completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+    ASSERT_EQ(curop2.debug().workingTimeMillis,
+              executionTime2 - waitForTickets2 - waitForFlowControlTicket2 - waitForLocks2);
+}
+
 }  // namespace
 }  // namespace mongo
