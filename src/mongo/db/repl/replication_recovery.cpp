@@ -52,6 +52,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
@@ -116,12 +117,40 @@ const auto kRecoveryBatchLogLevel = logv2::LogSeverity::Debug(2);
 const auto kRecoveryOperationLogLevel = logv2::LogSeverity::Debug(3);
 
 /**
+ * ServerStatus section for oplog recovery.
+ */
+class RecoveryOplogApplierSSS : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
+
+    bool includeByDefault() const final {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
+        BSONObjBuilder recoveryOplogApplier;
+
+        recoveryOplogApplier.append("numBatches", (int)numBatches.loadRelaxed());
+        recoveryOplogApplier.append("numOpsApplied", (int)numOpsApplied.loadRelaxed());
+
+        return recoveryOplogApplier.obj();
+    }
+
+    AtomicWord<size_t> numBatches{0};
+    AtomicWord<size_t> numOpsApplied{0};
+};
+
+auto& recoveryOplogApplierSection =
+    *ServerStatusSectionBuilder<RecoveryOplogApplierSSS>("recoveryOplogApplier").forShard();
+
+/**
  * Tracks and logs operations applied during recovery.
  */
 class RecoveryOplogApplierStats : public OplogApplier::Observer {
 public:
     void onBatchBegin(const std::vector<OplogEntry>& batch) final {
         _numBatches++;
+        recoveryOplogApplierSection.numBatches.fetchAndAdd(1);
         LOGV2_FOR_RECOVERY(24098,
                            kRecoveryBatchLogLevel.toInt(),
                            "Applying operations in batch",
@@ -132,6 +161,7 @@ public:
                            "numOpsApplied"_attr = _numOpsApplied);
 
         _numOpsApplied += batch.size();
+        recoveryOplogApplierSection.numOpsApplied.fetchAndAdd(batch.size());
         if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kRecoveryOperationLogLevel)) {
             std::size_t i = 0;
             for (const auto& entry : batch) {
