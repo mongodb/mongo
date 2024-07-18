@@ -439,6 +439,70 @@ buildvariants:
       - name: tpcc_majority_small
         cron: *high-value-workload-cron
 
+  - <<: *amazon_linux2_arm64_openssl111_compile_variant_dependency
+    name: perf-3-node-replSet-default-sharding.arm.aws.2024-05
+    display_name: Default Sharding 3-Node ReplSet ARM AWS 2024-05
+    cron: *linux-3-node-cron
+    modules: *perf_modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-default-sharding.2024-05
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: replica.2024-05
+      workload_setup: 2024-05
+      platform: linux
+      project_dir: *perf_project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: amazon2-arm64-openssl111-compile
+    run_on:
+      - "rhel94-perf-replset"
+    tasks:
+      - *schedule_patch_auto_tasks_task
+      - *schedule_variant_auto_tasks_task
+      - name: linkbench2.2024-05
+        cron: *high-value-workload-cron
+      - name: smoke_test
+      - name: top_ten_queries
+      - name: tsbs_load.2024-05
+        cron: *high-value-workload-cron
+      - name: tsbs_query
+        cron: *high-value-workload-cron
+      - name: tsbs_query_finance
+      # This variant is targeted at AWS instances with 30GB of RAM. As such, a database size of ~30GB is larger
+      # than the WiredTigerCache and Linux FS Cache (assuming incompressible data).
+      # 100 Read tests
+      - name: ycsb.100read.2024-05
+        cron: *high-value-workload-cron
+      - name: ycsb_30GB.100read.2024-05
+        cron: *high-value-workload-cron
+      - name: ycsb_30GB.100read.rate_limited.2024-05
+        cron: *high-value-workload-cron
+      # 95Read5Update tests
+      - name: ycsb.95read5update.2024-05
+        cron: *high-value-workload-cron
+      - name: ycsb_30GB.95read5update.2024-05
+        cron: *high-value-workload-cron
+      - name: ycsb_30GB.95read5update.rate_limited.2024-05
+        cron: *high-value-workload-cron
+      # TODO: PERF-5540 Consider making the following high value once the noise levels are low enough.
+      # 50Read50Update tests
+      - name: ycsb.50read50update.2024-05
+        activate: false
+      - name: ycsb_30GB.50read50update.2024-05
+        activate: false
+      - name: ycsb_30GB.50read50update.rate_limited.2024-05
+        activate: false
+      # 100Update tests
+      - name: ycsb.100update.2024-05
+        activate: false
+      - name: ycsb_30GB.100update.2024-05
+        activate: false
+      - name: ycsb_30GB.100update.rate_limited.2024-05
+        activate: false
+      - name: tpcc_majority_small
+        cron: *high-value-workload-cron
+
   # On PERF-730 we changed the initial sync tests to use two nodes instead of three. To avoid
   # losing history, the name remains unchanged, but the display_name reflects the change to 2-Node.
   - <<: *amazon_linux2_arm64_compile_variant_dependency
