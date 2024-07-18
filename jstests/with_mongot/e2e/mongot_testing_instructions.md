@@ -122,9 +122,6 @@ To note, until SERVER-86616 is completed, your test will have to follow a partic
 
 This order is required to ensure correctness. This is due to the nature of data replication between mongot and mongod. Mongot replicates data from mongod via a $changeStream and is thus eventually consistent with mongod collection data. Currently, the testing infrastructure ensures correctness by expecting engineers do not make document changes after index creation (as dictated by above order) + by having the createSearchIndex shell helper wait until mongot confirms the requested mongot index is queryable before returning. More specifically, createSearchIndex uses the status of the search index (READY) generated from $listSearchIndexes to know that the collection data has been fully replicated and indexed. If we update documents or add documents after index creation, the status of $listSearchIndexes doesn't guarantee anything about the status of data replication and queries could return incorrect results.
 
-<!-- TODO SERVER-90679 add instructions for downloading mongot binary from evergreen artifact/object. If packaged in mongod_binaries tarball that is pushed to s3, should be able to just use
-db-contrib-tool setup-repro-env <evergreen-object-identifier> -->
-
 ## Downloading a mongot binary from an evergreen artifact
 
 You can download the mongot binary that a specific evergreen patch or version utilized, which can be useful for trying to replicate errors.
