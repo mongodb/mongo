@@ -34,6 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/platform/decimal128.h"
 
 namespace mongo::query_stats {
 
@@ -50,7 +51,7 @@ struct AggregatedMetric {
         sum += val;
         max = std::max(val, max);
         min = std::min(val, min);
-        sumOfSquares += val * val;
+        sumOfSquares = sumOfSquares.add(Decimal128(val).multiply(Decimal128(val)));
     }
 
     void appendTo(BSONObjBuilder& builder, const StringData& fieldName) const {
@@ -58,7 +59,7 @@ struct AggregatedMetric {
         metricsBuilder.append("sum", (long long)sum);
         metricsBuilder.append("max", (long long)max);
         metricsBuilder.append("min", (long long)min);
-        metricsBuilder.append("sumOfSquares", (long long)sumOfSquares);
+        metricsBuilder.append("sumOfSquares", sumOfSquares);
         metricsBuilder.done();
     }
 
@@ -72,7 +73,7 @@ struct AggregatedMetric {
      * The sum of squares along with (an externally stored) count will allow us to compute the
      * variance/stddev.
      */
-    uint64_t sumOfSquares = 0;
+    Decimal128 sumOfSquares{};
 };
 
 }  // namespace mongo::query_stats

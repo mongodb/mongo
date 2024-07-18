@@ -39,6 +39,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/unittest/inline_auto_update.h"
 #include "mongo/unittest/unittest.h"
 
@@ -1410,5 +1411,26 @@ TEST_F(QueryStatsStoreTest,
             ]
         })",
         shapified);
+}
+
+BSONObj toBSON(AggregatedMetric& am) {
+    BSONObjBuilder builder;
+    am.appendTo(builder, "m");
+    return builder.obj();
+}
+
+TEST_F(QueryStatsStoreTest, SumOfSquaresOverflowTest) {
+    // Ensure sumOfSquares is initialized correctly.
+    AggregatedMetric aggMetric;
+    auto res = toBSON(aggMetric).getObjectField("m").getField("sumOfSquares").Decimal();
+
+    ASSERT_EQ(res, Decimal128());
+
+    // Aggregating with the maximum int value does not overflow the sumOfSquares field.
+    auto maxVal = std::numeric_limits<uint64_t>::max();
+    aggMetric.aggregate(maxVal);
+    res = toBSON(aggMetric).getObjectField("m").getField("sumOfSquares").Decimal();
+
+    ASSERT_EQ(res, Decimal128(maxVal).power(Decimal128(2.0)));
 }
 }  // namespace mongo::query_stats
