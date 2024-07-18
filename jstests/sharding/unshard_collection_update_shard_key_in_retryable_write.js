@@ -88,6 +88,7 @@ function runTest(reshardInPlace) {
         ErrorCodes.LockTimeout,
         ErrorCodes.IncompleteTransactionHistory,
         ErrorCodes.WriteConflict,
+        ErrorCodes.NoProgressMade,
     ]);
 
     function runCommandRetryOnTransientErrors(db, cmdObj) {

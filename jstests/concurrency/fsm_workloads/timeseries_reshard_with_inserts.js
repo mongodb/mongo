@@ -68,7 +68,18 @@ export const $config = (function() {
                 });
             }
 
-            TimeseriesTest.assertInsertWorked(db[collName].insert(docs));
+            assert.soon(() => {
+                const res = db[collName].insert(docs);
+
+                if (res.code == ErrorCodes.NoProgressMade) {
+                    print(`No progress made while inserting documents. Retrying.`);
+                    return false;
+                }
+
+                TimeseriesTest.assertInsertWorked(res);
+                return true;
+            });
+
             print(`Finished Inserting documents.`);
         },
         reshardTimeseries: function reshardTimeseries(db, collName) {
