@@ -3,6 +3,8 @@
 //   # Test doesn't start enough mongods to have num_mongos routers
 //   temp_disabled_embedded_router_num_routers,
 // ]
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 var st = new ShardingTest({name: "mongos_no_detect_sharding", shards: 1, mongos: 2});
 
 var mongos = st.s;
@@ -19,7 +21,7 @@ print("Sharding collection...");
 
 var admin = mongos.getDB("admin");
 
-assert.eq(coll.getShardVersion().ok, 0);
+assert(!FixtureHelpers.isSharded(coll));
 
 admin.runCommand({enableSharding: "test"});
 admin.runCommand({shardCollection: "test.foo", key: {_id: 1}});
@@ -36,7 +38,7 @@ assert.commandWorked(bulk.execute());
 
 st.printShardingStatus(true);
 
-assert.eq(coll.getShardVersion().ok, 1);
+assert(FixtureHelpers.isSharded(coll));
 assert.eq(101, coll.find().itcount());
 
 st.stop();
