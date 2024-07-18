@@ -43,8 +43,6 @@ const auto getMongotMockStateDecoration = ServiceContext::declareDecoration<Mong
  * name needs to be ignored, include the full path and all intermediate paths such as
  * "parent.childA.childB", "childA.childB" and "childB".
  **/
-// TODO SERVER-91092 remove 'batchSize' and 'docsRequested' and "cursorOptions.x" from ignored
-// fields.
 const std::set<std::string> ignoredFields = {"lsid",
                                              "uid",
                                              "$db",
