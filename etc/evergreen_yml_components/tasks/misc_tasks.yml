@@ -1101,6 +1101,22 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "configure evergreen api credentials"
+      - command: s3.get
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${project}/monitor_build_status/${branch_name}/build_status_latest_file.txt
+          bucket: mciuploads
+          local_file: src/input_build_status_file.txt
+          optional: true
+      - command: s3.get
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${project}/monitor_build_status_testing/${branch_name}/build_status_latest_file_testing.txt
+          bucket: mciuploads
+          local_file: src/input_build_status_file_testing.txt
+          optional: true
       - command: subprocess.exec
         params:
           binary: bash
@@ -1111,6 +1127,28 @@ tasks:
             JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
             JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
             JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/output_build_status_file.txt
+          remote_file: ${project}/monitor_build_status/${branch_name}/build_status_latest_file.txt
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/plain
+          display_name: Build Status Latest
+          patchable: false
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/output_build_status_file_testing.txt
+          remote_file: ${project}/monitor_build_status_testing/${branch_name}/build_status_latest_file_testing.txt
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/plain
+          display_name: Build Status Latest Testing
+          patch_only: true
 
   - name: monitor_mongo_fork_10gen
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]

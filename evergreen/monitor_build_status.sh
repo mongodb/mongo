@@ -8,7 +8,10 @@ cd src
 activate_venv
 
 command_invocation="$python buildscripts/monitor_build_status/cli.py"
-if [ "${is_patch}" != "true" ]; then
+if [ "${is_patch}" = "true" ]; then
+  command_invocation="$command_invocation --input-status-file input_build_status_file_testing.txt"
+  command_invocation="$command_invocation --output-status-file output_build_status_file_testing.txt"
+else
   command_invocation="$command_invocation --notify"
 fi
 

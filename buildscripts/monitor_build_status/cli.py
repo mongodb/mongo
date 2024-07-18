@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 from statistics import median
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import structlog
 import typer
@@ -32,18 +33,24 @@ from buildscripts.util.cmdutils import enable_logging
 
 LOGGER = structlog.get_logger(__name__)
 
+BLOCK_ON_RED_PLAYBOOK_URL = "http://go/blockonred"
+
 JIRA_SERVER = "https://jira.mongodb.org"
 DEFAULT_REPO = "10gen/mongo"
 DEFAULT_BRANCH = "master"
 SLACK_CHANNEL = "#10gen-mongo-code-lockdown"
+FRIDAY_INDEX = 4  # datetime.weekday() returns Monday as 0 and Sunday as 6
 EVERGREEN_LOOKBACK_DAYS = 14
 
-OVERALL_HOT_BF_COUNT_THRESHOLD = 30
-OVERALL_COLD_BF_COUNT_THRESHOLD = 100
-OVERALL_PERF_BF_COUNT_THRESHOLD = 30
-PER_TEAM_HOT_BF_COUNT_THRESHOLD = 7
-PER_TEAM_COLD_BF_COUNT_THRESHOLD = 20
-PER_TEAM_PERF_BF_COUNT_THRESHOLD = 10
+OVERALL_HOT_BF_COUNT_THRESHOLD = 15
+OVERALL_COLD_BF_COUNT_THRESHOLD = 50
+OVERALL_PERF_BF_COUNT_THRESHOLD = 15
+PER_TEAM_HOT_BF_COUNT_THRESHOLD = 3
+PER_TEAM_COLD_BF_COUNT_THRESHOLD = 10
+PER_TEAM_PERF_BF_COUNT_THRESHOLD = 5
+
+GREEN_THRESHOLD_PERCENTS = 100
+RED_THRESHOLD_PERCENTS = 200
 
 
 def iterable_to_jql(entries: Iterable[str]) -> str:
@@ -60,6 +67,56 @@ ACTIVE_BFS_QUERY = (
 )
 
 
+class BuildStatus(Enum):
+    RED = "RED"
+    YELLOW = "YELLOW"
+    GREEN = "GREEN"
+    UNKNOWN = "UNKNOWN"
+
+    @classmethod
+    def from_str(cls, status: Optional[str]) -> BuildStatus:
+        try:
+            return cls[status]
+        except KeyError:
+            return cls.UNKNOWN
+
+    @classmethod
+    def from_threshold_percentages(cls, threshold_percentages: List[float]) -> BuildStatus:
+        if any(percentage > RED_THRESHOLD_PERCENTS for percentage in threshold_percentages):
+            return cls.RED
+        if all(percentage < GREEN_THRESHOLD_PERCENTS for percentage in threshold_percentages):
+            return cls.GREEN
+        return cls.YELLOW
+
+
+class SummaryMsg(Enum):
+    TITLE = "`[SUMMARY]`"
+
+    BELOW_THRESHOLDS = f"All metrics are within {GREEN_THRESHOLD_PERCENTS}% of their thresholds."
+    THRESHOLD_EXCEEDED = (
+        f"At least one metric exceeds {GREEN_THRESHOLD_PERCENTS}% of its threshold."
+    )
+    THRESHOLD_EXCEEDED_X2 = (
+        f"At least one metric exceeds {RED_THRESHOLD_PERCENTS}% of its threshold."
+    )
+
+    STATUS_CHANGED = "<!here> Build status has changed to `{status}`."
+    STATUS_IS = "Build status is `{status}`."
+
+    ENTER_RED = "We are entering the code block state."
+    STILL_RED = "We are still in the code block state."
+    EXIT_RED = "We are exiting the code block state."
+
+    ACTION_ON_RED = "Approve only changes that fix BFs, Bugs, and Performance Regressions."
+    ACTION_ON_YELLOW = (
+        "Warning: all merges are still allowed, but now is a good time to get BFs, Bugs, and"
+        " Performance Regressions under control to avoid a blocking state."
+    )
+    ACTION_ON_GREEN = "All merges are allowed."
+
+    PLAYBOOK_REFERENCE = f"Refer to our playbook at <{BLOCK_ON_RED_PLAYBOOK_URL}> for details."
+
+
 class MonitorBuildStatusOrchestrator:
     def __init__(
         self,
@@ -69,7 +126,9 @@ class MonitorBuildStatusOrchestrator:
         self.jira_service = jira_service
         self.evg_service = evg_service
 
-    def evaluate_build_redness(self, repo: str, branch: str, notify: bool) -> None:
+    def evaluate_build_redness(
+        self, repo: str, branch: str, notify: bool, input_status_file: str, output_status_file: str
+    ) -> None:
         status_message = f"\n`[STATUS]` '{repo}' repo '{branch}' branch"
         threshold_percentages = []
 
@@ -98,24 +157,23 @@ class MonitorBuildStatusOrchestrator:
         )
         status_message = f"{status_message}\n{waterfall_failure_rate_status_msg}\n"
 
-        if any(percentage > 100 for percentage in threshold_percentages):
-            status_message = (
-                f"{status_message}\n"
-                f"`[ACTION]` RED: At least one metric exceeds 100% of its threshold."
-                f" Lock the branch if it is not already.\n"
-            )
-        elif all(percentage < 50 for percentage in threshold_percentages):
-            status_message = (
-                f"{status_message}\n"
-                f"`[ACTION]` GREEN: All metrics are within 50% of their thresholds."
-                f" The branch should be unlocked if it is not already.\n"
-            )
+        previous_build_status = BuildStatus.UNKNOWN
+        if os.path.exists(input_status_file):
+            with open(input_status_file, "r") as input_file:
+                input_file_content = input_file.read().strip()
+                LOGGER.info(
+                    "Input status file content",
+                    file=input_status_file,
+                    content=input_file_content,
+                )
+                previous_build_status = BuildStatus.from_str(input_file_content)
         else:
-            status_message = (
-                f"{status_message}\n"
-                f"`[ACTION]` YELLOW: At least one metric exceeds 50% of its threshold,"
-                f" but none exceed 100%. No action is required.\n"
-            )
+            LOGGER.warning("Input status file is absent", file=input_status_file)
+        current_build_status = BuildStatus.from_threshold_percentages(threshold_percentages)
+        resulting_build_status, summary = self._summarize(
+            previous_build_status, current_build_status, self._today_is_friday()
+        )
+        status_message = f"{status_message}\n{summary}"
 
         for line in status_message.split("\n"):
             LOGGER.info(line)
@@ -126,6 +184,9 @@ class MonitorBuildStatusOrchestrator:
                 target=SLACK_CHANNEL,
                 msg=status_message.strip(),
             )
+
+        with open(output_status_file, "w") as output_file:
+            output_file.write(resulting_build_status.value)
 
     def _make_bfs_report(self, evg_projects_info: EvgProjectsInfo) -> BFsReport:
         query = (
@@ -288,6 +349,66 @@ class MonitorBuildStatusOrchestrator:
 
         return status_message
 
+    @staticmethod
+    def _summarize(
+        previous_status: BuildStatus, current_status: BuildStatus, today_is_friday: bool
+    ) -> Tuple[BuildStatus, str]:
+        resulting_status = previous_status
+        if current_status == BuildStatus.RED and previous_status != BuildStatus.RED:
+            if today_is_friday:
+                resulting_status = BuildStatus.RED
+            else:
+                resulting_status = BuildStatus.YELLOW
+        if current_status == BuildStatus.YELLOW and previous_status != BuildStatus.RED:
+            resulting_status = BuildStatus.YELLOW
+        if current_status == BuildStatus.GREEN:
+            resulting_status = BuildStatus.GREEN
+
+        summary = SummaryMsg.TITLE.value
+
+        if resulting_status != previous_status:
+            status_msg = SummaryMsg.STATUS_CHANGED.value.format(status=resulting_status.value)
+        else:
+            status_msg = SummaryMsg.STATUS_IS.value.format(status=resulting_status.value)
+        summary = f"{summary}\n{status_msg}"
+
+        if current_status == BuildStatus.RED:
+            summary = f"{summary}\n{SummaryMsg.THRESHOLD_EXCEEDED_X2.value}"
+        if current_status == BuildStatus.YELLOW:
+            summary = f"{summary}\n{SummaryMsg.THRESHOLD_EXCEEDED.value}"
+        if current_status == BuildStatus.GREEN:
+            summary = f"{summary}\n{SummaryMsg.BELOW_THRESHOLDS.value}"
+
+        if previous_status != BuildStatus.RED and resulting_status == BuildStatus.RED:
+            summary = f"{summary}\n{SummaryMsg.ENTER_RED.value}"
+        if previous_status == BuildStatus.RED and resulting_status == BuildStatus.RED:
+            summary = f"{summary}\n{SummaryMsg.STILL_RED.value}"
+        if previous_status == BuildStatus.RED and resulting_status != BuildStatus.RED:
+            summary = f"{summary}\n{SummaryMsg.EXIT_RED.value}"
+
+        if resulting_status == BuildStatus.RED:
+            summary = f"{summary}\n{SummaryMsg.ACTION_ON_RED.value}"
+        if resulting_status == BuildStatus.YELLOW:
+            summary = f"{summary}\n{SummaryMsg.ACTION_ON_YELLOW.value}"
+        if resulting_status == BuildStatus.GREEN:
+            summary = f"{summary}\n{SummaryMsg.ACTION_ON_GREEN.value}"
+
+        summary = f"{summary}\n\n{SummaryMsg.PLAYBOOK_REFERENCE.value}\n"
+
+        LOGGER.info(
+            "Got build statuses",
+            previous_build_status=previous_status.value,
+            current_build_status=current_status.value,
+            resulting_build_status=resulting_status.value,
+            today_is_friday=today_is_friday,
+        )
+
+        return resulting_status, summary
+
+    @staticmethod
+    def _today_is_friday() -> bool:
+        return datetime.utcnow().weekday() == FRIDAY_INDEX
+
 
 def main(
     github_repo: Annotated[
@@ -299,6 +420,12 @@ def main(
     notify: Annotated[
         bool, typer.Option(help="Whether to send slack notification with the results")
     ] = False,  # default to the more "quiet" setting
+    input_status_file: Annotated[
+        str, typer.Option(help="The file that contains a previous build status")
+    ] = "input_build_status_file.txt",
+    output_status_file: Annotated[
+        str, typer.Option(help="The file that contains the current build status")
+    ] = "output_build_status_file.txt",
 ) -> None:
     """
     Analyze Jira BFs count and Evergreen redness data.
@@ -328,7 +455,9 @@ def main(
         jira_service=jira_service, evg_service=evg_service
     )
 
-    orchestrator.evaluate_build_redness(github_repo, branch, notify)
+    orchestrator.evaluate_build_redness(
+        github_repo, branch, notify, input_status_file, output_status_file
+    )
 
 
 if __name__ == "__main__":
