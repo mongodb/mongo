@@ -163,7 +163,11 @@ export const $config = (function() {
                     // Due to a stepdown of the donor during the cloning phase, the movePrimary
                     // operation failed. It is not automatically recovered, but any orphaned data on
                     // the recipient has been deleted.
-                    7120202
+                    7120202,
+                    // In the FSM tests, there is a chance that there are still some User
+                    // collections left to clone. This occurs when a MovePrimary joins an already
+                    // existing MovePrimary command that has purposefully triggered a failpoint.
+                    9046501,
                 ]);
         },
         checkDatabaseMetadataConsistency: function(db, collName, connCache) {

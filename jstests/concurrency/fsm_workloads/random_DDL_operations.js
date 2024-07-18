@@ -34,7 +34,11 @@ export const $config = (function() {
             ErrorCodes.ConflictingOperationInProgress,
             // The cloning phase has failed (e.g. as a result of a stepdown). When a failure
             // occurs at this phase, the movePrimary operation does not recover.
-            7120202
+            7120202,
+            // In the FSM tests, there is a chance that there are still some User collections
+            // left to clone. This occurs when a MovePrimary joins an already existing MovePrimary
+            // command that has purposefully triggered a failpoint.
+            9046501,
         ]
     };
 
