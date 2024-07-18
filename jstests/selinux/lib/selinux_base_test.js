@@ -27,7 +27,8 @@ export class SelinuxBaseTest {
                 "timeZoneInfo": "/usr/share/zoneinfo"
             },
             "net": {"port": 27017, "bindIp": "127.0.0.1"},
-            "storage": {"dbPath": "/var/lib/mongo"}
+            "storage": {"dbPath": "/var/lib/mongo"},
+            "setParameter": {"enableTestCommands": 1}
         };
     }
 

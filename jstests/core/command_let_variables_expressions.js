@@ -8,7 +8,7 @@
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
-const coll = db.getCollection('command_let_variables_expressions');
+const coll = db.getCollection(jsTestName());
 
 function setupColl() {
     coll.drop();
