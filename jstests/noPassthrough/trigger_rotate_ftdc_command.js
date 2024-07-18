@@ -1,14 +1,14 @@
 function rotate(conn, path, rotateCount) {
     sleep(2000);
-    for (let i = 0; i < rotateCount; ++i) {
+    for (let i = 1; i <= rotateCount; ++i) {
         assert.commandWorked(conn.adminCommand({rotateFTDC: true}));
-        jsTestLog("Rotating file " + i + " of " + rotateCount);
-        sleep(2000);
+        assert.soon(() => {
+            return ls(path).length == i + 1;
+        }, "Timeout awaiting file rotate", 30000, 2000);
+        jsTestLog("Rotation count " + i + " of " + rotateCount);
     }
 
-    const files = ls(path);
-    jsTestLog("Found " + files.length + " files in " + path);
-    assert.eq(files.length, rotateCount + 1);
+    jsTestLog("Found " + ls(path).length + " files in " + path);
 }
 
 {
