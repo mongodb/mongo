@@ -287,16 +287,12 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
                  });
 }
 
-BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCtx,
-                                                          const NamespaceString& nss) {
-    if (nss.isNamespaceAlwaysUntracked()) {
-        return getCollectionOptionsLocally(opCtx, nss);
-    }
-
+BSONObj ShardServerProcessInterface::_runListCollectionsCommand(OperationContext* opCtx,
+                                                                const NamespaceString& nss) {
     sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
     return router.route(
         opCtx,
-        "ShardServerProcessInterface::getCollectionOptions",
+        "ShardServerProcessInterface::runListCollectionsCommand",
         [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
             const BSONObj filterObj = BSON("name" << nss.coll());
             const BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filterObj);
@@ -319,28 +315,15 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
             if (resultCollections.docs.empty()) {
                 return BSONObj{};
             }
-
             for (const BSONObj& bsonObj : resultCollections.docs) {
-                // Return first element which matches on name and has options.
+                // Return the entire 'listCollections' response for the first element which matches
+                // on name.
                 const BSONElement nameElement = bsonObj["name"];
                 if (!nameElement || nameElement.valueStringDataSafe() != nss.coll()) {
                     continue;
                 }
 
-                const BSONElement optionsElement = bsonObj["options"];
-                if (optionsElement) {
-                    auto optionObj = optionsElement.Obj();
-
-                    // If the BSON object has field 'info' and the BSON element 'info' has field
-                    // 'uuid', then extract the uuid and add to the BSON object to be return. This
-                    // will ensure that the BSON object is complaint with the BSON object returned
-                    // for non-sharded namespace.
-                    if (auto infoElement = bsonObj["info"]; infoElement && infoElement["uuid"]) {
-                        return optionObj.addField(infoElement["uuid"]);
-                    }
-
-                    return optionObj.getOwned();
-                }
+                return bsonObj.getOwned();
 
                 tassert(5983900,
                         str::stream()
@@ -348,8 +331,61 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
                             << nss.toStringForErrorMsg() << ": " << resultCollections.docs.size(),
                         resultCollections.docs.size() <= 1);
             }
+
             return BSONObj{};
         });
+};
+
+BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCtx,
+                                                          const NamespaceString& nss) {
+    if (nss.isNamespaceAlwaysUntracked()) {
+        return getCollectionOptionsLocally(opCtx, nss);
+    };
+
+    BSONObj listCollectionsResult = _runListCollectionsCommand(opCtx, nss);
+    const BSONElement optionsElement = listCollectionsResult["options"];
+    if (optionsElement) {
+        auto optionObj = optionsElement.Obj();
+
+        // If the BSON object has field 'info' and the BSON element 'info' has field
+        // 'uuid', then extract the uuid and add to the BSON object to be returned.
+        // This will ensure that the BSON object is complaint with the BSON object
+        // returned for non-sharded namespace.
+        if (auto infoElement = listCollectionsResult["info"]; infoElement && infoElement["uuid"]) {
+            return optionObj.addField(infoElement["uuid"]);
+        }
+        return optionObj.getOwned();
+    }
+    return BSONObj{};
+}
+
+query_shape::CollectionType ShardServerProcessInterface::getCollectionType(
+    OperationContext* opCtx, const NamespaceString& nss) {
+
+    if (nss.isNamespaceAlwaysUntracked()) {
+        return getCollectionTypeLocally(opCtx, nss);
+    };
+
+    BSONObj listCollectionsResult = _runListCollectionsCommand(opCtx, nss);
+    if (listCollectionsResult.isEmpty()) {
+        return query_shape::CollectionType::kNonExistent;
+    }
+
+    const StringData typeString = listCollectionsResult["type"].valueStringDataSafe();
+    tassert(9072002,
+            "All collections returned by listCollections must have a type element",
+            !typeString.empty());
+
+    if (typeString == "collection") {
+        return query_shape::CollectionType::kCollection;
+    }
+    if (typeString == "timeseries") {
+        return query_shape::CollectionType::kTimeseries;
+    }
+    if (typeString == "view") {
+        return query_shape::CollectionType::kView;
+    }
+    MONGO_UNREACHABLE_TASSERT(9072003);
 }
 
 std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
@@ -496,11 +532,11 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
                 uassertStatusOKWithContext(getStatusFromCommandResult(result),
                                            str::stream() << "command was sent but failed " << cmdObj
                                                          << " on shard " << response.shardId);
-                uassertStatusOKWithContext(
-                    getWriteConcernStatusFromCommandResult(result),
-                    str::stream()
-                        << "command was sent and succeeded, but failed waiting for write concern "
-                        << cmdObj << " on shard " << response.shardId);
+                uassertStatusOKWithContext(getWriteConcernStatusFromCommandResult(result),
+                                           str::stream()
+                                               << "command was sent and succeeded, but failed "
+                                                  "waiting for write concern "
+                                               << cmdObj << " on shard " << response.shardId);
             }
         });
 }

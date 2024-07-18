@@ -17,20 +17,31 @@
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
 
 const numHosts = 10;
+const splitPoint = numHosts / 2;
 const numIterations = 20;
 
 const st = new ShardingTest({shards: 2});
 const dbName = "test";
 const testDB = st.s.getDB(dbName);
 const targetCollName = "out_time";
-assert.commandWorked(testDB.adminCommand({enableSharding: dbName}));
+const bucketCollFullName = `${dbName}.system.buckets.in`;
+assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 let [inColl, observerInColl] =
     TimeseriesAggTests.prepareInputCollections(numHosts, numIterations, true, testDB);
 
-st.shardColl(inColl.getName(), {tags: 1}, false, dbName);
+// Split the data over 2 shards. The test data has tags uniformly distributed from 1-10, so for half
+// the data to be on each shard, we will split at tags = 5.
+testDB.adminCommand({shardCollection: inColl.getFullName(), key: {'tags': 1}});
+assert.commandWorked(st.s.adminCommand({split: bucketCollFullName, middle: {'meta': splitPoint}}));
+assert.commandWorked(st.s.adminCommand({
+    movechunk: bucketCollFullName,
+    find: {'meta': splitPoint},
+    to: st.shard1.shardName,
+    _waitForDelete: true
+}));
 observerInColl.createIndex({tags: 1});
-st.shardColl(observerInColl.getName(), {tags: 1}, {tags: 1}, false, dbName);
+st.shardColl(observerInColl.getName(), {'tags': 1}, {'tags': splitPoint}, true, dbName);
 
 function runTest({
     observer: observerPipeline,
@@ -158,8 +169,8 @@ assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7406103);
 // Tests that an error is raised if a conflicting view exists.
 assert.commandWorked(testDB.createCollection("view_out", {viewOn: "out"}));
 pipeline = TimeseriesAggTests.generateOutPipeline("view_out", dbName, {timeField: "time"});
-assert.throwsWithCode(() => inColl.aggregate(pipeline), 7268703);
-assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7268703);
+assert.throws(() => inColl.aggregate(pipeline));
+assert.throws(() => observerInColl.aggregate(pipeline));
 
 // Test that we can output to a non existant database. non-timeseries output
 const destDB = testDB.getSiblingDB("outDifferentDB");

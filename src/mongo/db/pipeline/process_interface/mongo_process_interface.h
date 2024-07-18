@@ -54,6 +54,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/collection_index_usage_tracker.h"
+#include "mongo/db/collection_type.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -329,11 +330,19 @@ public:
                                         BSONObjBuilder* builder) const = 0;
 
     /**
-     * Gets the collection options for the collection given by 'nss'. Throws
-     * ErrorCodes::CommandNotSupportedOnView if 'nss' describes a view. Future callers may want to
+     * Gets the collection options for the collection given by 'nss'. If the nss represents a view,
+     * we will return the user spec that was used to create the view. Future callers may want to
      * parameterize this behavior.
      */
     virtual BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) = 0;
+
+    /**
+     * Returns the query shape collection type in the namespace given by 'nss'. This function holds
+     * an acquisition that is freed right after execution, and can't guarantee if the collection or
+     * view exists in the future.
+     */
+    virtual query_shape::CollectionType getCollectionType(OperationContext* opCtx,
+                                                          const NamespaceString& nss) = 0;
 
     /**
      * Performs the given rename command if the collection given by 'targetNs' has the same options
