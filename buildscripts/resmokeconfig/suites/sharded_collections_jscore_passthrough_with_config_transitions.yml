@@ -3,8 +3,8 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/**/*.js
-  # TODO: SERVER-86059 Support tracking unsharded collections with FLE in the sharding catalog
-  # - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
   # These tests are run in sharded_jscore_txns.
   - jstests/core/txns/**/*.js
