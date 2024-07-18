@@ -30,9 +30,11 @@ function assertPushdownQueryExecMode(pipeline, expectedExplainVersion) {
 }
 
 assert.commandWorked(coll.insertMany([
-    {_id: 0, a: 1, b: ISODate("2021-04-28T00:00:00Z")},
-    {_id: 1, a: 2, b: ISODate("2021-04-28T10:00:00Z")},
-    {_id: 2, a: 3, b: ISODate("2021-04-28T20:00:00Z")},
+    {_id: 0, a: 1, b: ISODate("2021-04-28T00:00:00Z"), c: "category1"},
+    {_id: 1, a: 2, b: ISODate("2021-04-28T10:00:00Z"), c: "category2"},
+    {_id: 2, a: 3, b: ISODate("2021-04-28T20:00:00Z"), c: "category1"},
+    {_id: 3, a: 4, b: ISODate("2021-04-29T00:00:00Z"), c: "category3"},
+    {_id: 4, a: 5, b: ISODate("2021-04-29T10:00:00Z"), c: "category2"}
 ]));
 
 // Test query with no supported expressions is executed with the classic engine.
@@ -56,4 +58,12 @@ assertPushdownQueryExecMode([{$match: {a: 2}}, {$project: {_id: 0, c: {kUnsuppor
 // Test query with fully supported expressions are executed with SBE when pushed down.
 assertPushdownQueryExecMode(
     [{$match: {$expr: {$eq: ["$b", {$dateFromParts: {year: 2021, month: 4, day: 28}}]}}}], "2");
+
+// Test query with unsupported SBE operator '$arrayToObject' is executed in the classic engine.
+assertPushdownQueryExecMode(
+    [
+        {$group: {_id: "$c", items: {$push: {k: "$a", v: "$b"}}}},
+        {$group: {_id: null, data: {$push: {k: "$_id", v: {$arrayToObject: "$items"}}}}}
+    ],
+    "1");
 }());
