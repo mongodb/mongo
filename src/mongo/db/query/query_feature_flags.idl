@@ -146,3 +146,9 @@ feature_flags:
       cpp_varname: gFeatureFlagSearchHybridScoring
       default: false 
       shouldBeFCVGated: true
+
+    featureFlagSearchExplainExecutionStats:
+      description: "Feature flag to enable executing search queries for explain."
+      cpp_varname: gFeatureFlagSearchExplainExecutionStats
+      default: false
+      shouldBeFCVGated: false

@@ -190,6 +190,12 @@ bool DocumentSourceInternalSearchMongotRemote::shouldReturnEOF() {
         return true;
     }
 
+    if (pExpCtx->explain &&
+        !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return true;
+    }
+
     return false;
 }
 
