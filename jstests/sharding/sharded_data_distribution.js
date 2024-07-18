@@ -76,6 +76,7 @@ const ns1 = "test.foo";
 const ns2 = "bar.baz";
 const ns3 = "test.unsharded";
 const ns4 = "bar.unsharded";
+const ns7 = "test.timeseriesColl";
 
 const adminDb = mongos.getDB("admin");
 const testDb = mongos.getDB("test");
@@ -84,11 +85,19 @@ const fooColl = testDb.getCollection("foo");
 const bazColl = barDb.getCollection("baz");
 const unshardedColl1 = testDb.getCollection("unsharded");
 const unshardedColl2 = barDb.getCollection("unsharded");
+const timeseriesColl = testDb.getCollection("timeseriesColl");
 
 st.adminCommand({enablesharding: testDb.getName(), primaryShard: st.shard1.shardName});
 st.adminCommand({shardcollection: ns1, key: {skey: 1}});
+st.adminCommand({shardcollection: ns7, timeseries: {timeField: "ts"}, key: {ts: 1}});
 st.adminCommand({enablesharding: barDb.getName(), primaryShard: st.shard1.shardName});
 st.adminCommand({shardcollection: ns2, key: {skey: 1}});
+
+assert.commandWorked(timeseriesColl.insertOne({
+    "metadata": {"sensorId": 5578, "type": "temperature"},
+    "ts": ISODate("2021-05-18T00:00:00.000Z"),
+    "temp": 12
+}));
 
 // We create and move the unsharded collections to make sure they are tracked
 assert.commandWorked(testDb.runCommand({create: "unsharded"}));
@@ -188,6 +197,23 @@ assert.eq(0,
           adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: {$in: [ns3, ns4]}}}])
               .itcount());
 
+// Test that verifies that the fields returned for timeseries collections are correct.
+assert.eq(1,
+          adminDb
+              .aggregate([
+                  {$shardedDataDistribution: {}},
+                  {$match: {ns: "test.system.buckets.timeseriesColl"}},
+                  {
+                      $match: {
+                          $and: [
+                              {"shards.numOwnedDocuments": {$eq: 1}},
+                              {"shards.ownedSizeBytes": {$eq: 435}},
+                              {"shards.orphanedSizeBytes": {$eq: 0}}
+                          ]
+                      }
+                  }
+              ])
+              .itcount());
 st.stop();
 
 // Test that verifies the behavior in unsharded deployments
@@ -203,5 +229,4 @@ const response2 = assert.commandFailedWithCode(
     6789101);
 assert.neq(
     -1, response2.errmsg.indexOf("The $shardedDataDistribution stage can only be run on mongoS"));
-
 rsTest.stopSet();
