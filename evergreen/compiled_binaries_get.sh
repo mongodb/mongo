@@ -19,6 +19,10 @@ architecture="${multiversion_architecture}"
 version=${project#mongodb-mongo-}
 version=${version#v}
 
+if [ ! -z "${multiversion_platform_50_or_later}" ]; then
+  platform="${multiversion_platform_50_or_later}"
+fi
+
 # This is primarily for tests for infrastructure which don't always need the latest
 # binaries.
 db-contrib-tool setup-repro-env \

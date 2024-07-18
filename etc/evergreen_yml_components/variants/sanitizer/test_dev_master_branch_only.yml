@@ -61,7 +61,8 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    multiversion_platform: rhel8
+    multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
@@ -121,7 +122,8 @@ variables:
     num_scons_link_jobs_available: 0.99
     large_distro_name: rhel8.8-large
     xlarge_distro_name: rhel8.8-xxlarge
-    multiversion_platform: rhel8
+    multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
@@ -407,7 +409,8 @@ buildvariants:
         --excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible
         --runAllFeatureFlagTests
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-      multiversion_platform: rhel8
+      multiversion_platform: rhel80
+      multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under UBSAN build.
       scons_cache_scope: shared

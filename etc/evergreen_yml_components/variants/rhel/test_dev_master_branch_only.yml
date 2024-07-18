@@ -84,7 +84,8 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    multiversion_platform: rhel8
+    multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
@@ -135,7 +136,8 @@ variables:
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
       test_flags: --excludeWithAnyTags=requires_ldap_pool
-      multiversion_platform: rhel8
+      multiversion_platform: rhel80
+      multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise
       has_packages: true
       packager_script: packager_enterprise.py
@@ -592,7 +594,8 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
         --use-diagnostic-latches=on
-      multiversion_platform: rhel8
+      multiversion_platform: rhel80
+      multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise
       test_flags: >-
         --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\""
@@ -639,7 +642,8 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
         --use-diagnostic-latches=on
-      multiversion_platform: rhel8
+      multiversion_platform: rhel80
+      multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise
       test_flags: >-
         --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\""
@@ -726,7 +730,8 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
         --use-diagnostic-latches=on
-      multiversion_platform: rhel8
+      multiversion_platform: rhel80
+      multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise
       test_flags: >-
         --mongosSetParameters="joinIngressSessionsOnShutdown: \"true\""

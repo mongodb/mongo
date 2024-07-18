@@ -32,7 +32,8 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    multiversion_platform: rhel8
+    multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
@@ -60,7 +61,8 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --use-diagnostic-latches=on
-      multiversion_platform: rhel8
+      multiversion_platform: rhel80
+      multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise
       scons_cache_scope: shared
       large_distro_name: rhel8.8-large
