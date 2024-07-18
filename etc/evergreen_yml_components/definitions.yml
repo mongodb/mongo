@@ -16,8 +16,6 @@ variables:
       - enterprise-linux-64-amazon-ami
       - amazon2023
       - amazon2023-arm64
-      - enterprise-amazon2-openssl111
-      - enterprise-amazon2-arm64-openssl111
       - enterprise-amazon2023
       - enterprise-amazon2023-arm64
       - debian12

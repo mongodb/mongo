@@ -21,11 +21,6 @@ variables:
       - name: package_new_compile
         variant: amazon2-arm64-compile
 
-  - &amazon_linux2_arm64_openssl111_compile_variant_dependency
-    depends_on:
-      - name: package_new_compile
-        variant: amazon2-arm64-openssl111-compile
-
   - &amazon_linux2_arm64_mongocrypt_compile_variant_dependency
     depends_on:
       - name: package_new_compile
@@ -375,7 +370,7 @@ buildvariants:
       - "rhel94-perf-replset"
     tasks: *3node-intel-tasks
 
-  - <<: *amazon_linux2_arm64_openssl111_compile_variant_dependency
+  - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-node-replSet.arm.aws.2024-05
     display_name: 3-Node ReplSet ARM AWS 2024-05
     cron: *linux-3-node-cron
@@ -390,7 +385,7 @@ buildvariants:
       project_dir: *perf_project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      compile_variant: amazon2-arm64-openssl111-compile
+      compile_variant: amazon2-arm64-compile
     run_on:
       - "rhel94-perf-replset"
     tasks:
@@ -439,7 +434,7 @@ buildvariants:
       - name: tpcc_majority_small
         cron: *high-value-workload-cron
 
-  - <<: *amazon_linux2_arm64_openssl111_compile_variant_dependency
+  - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-node-replSet-default-sharding.arm.aws.2024-05
     display_name: Default Sharding 3-Node ReplSet ARM AWS 2024-05
     cron: *linux-3-node-cron
@@ -454,7 +449,7 @@ buildvariants:
       project_dir: *perf_project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      compile_variant: amazon2-arm64-openssl111-compile
+      compile_variant: amazon2-arm64-compile
     run_on:
       - "rhel94-perf-replset"
     tasks:
