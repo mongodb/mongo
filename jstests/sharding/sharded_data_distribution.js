@@ -83,6 +83,7 @@ const ns4 = "bar.unsharded";
 const ns5 = "test.coll1";
 const ns6 = "bar.coll2";
 const ns7 = "test.timeseriesColl";
+const ns8 = "test.emptyColl";
 
 const adminDb = mongos.getDB("admin");
 const testDb = mongos.getDB("test");
@@ -93,21 +94,17 @@ const unshardedColl1 = testDb.getCollection("unsharded");
 const unshardedColl2 = barDb.getCollection("unsharded");
 const barColl2 = barDb.getCollection("coll2");
 const timeseriesColl = testDb.getCollection("timeseriesColl");
+const emptyColl = testDb.getCollection("emptyColl");
 
 st.adminCommand({enablesharding: testDb.getName(), primaryShard: st.shard1.shardName});
-st.adminCommand({shardcollection: ns1, key: {skey: 1}});
-st.adminCommand({shardcollection: ns7, timeseries: {timeField: "ts"}, key: {ts: 1}});
 st.adminCommand({enablesharding: barDb.getName(), primaryShard: st.shard1.shardName});
-st.adminCommand({shardcollection: ns2, key: {skey: 1}});
 
+st.adminCommand({shardcollection: ns1, key: {skey: 1}});
+st.adminCommand({shardcollection: ns2, key: {skey: 1}});
 st.adminCommand({shardcollection: ns5, key: {skey: 1}});
 st.adminCommand({shardcollection: ns6, key: {skey: 1}});
-
-assert.commandWorked(timeseriesColl.insertOne({
-    "metadata": {"sensorId": 5578, "type": "temperature"},
-    "ts": ISODate("2021-05-18T00:00:00.000Z"),
-    "temp": 12
-}));
+st.adminCommand({shardcollection: ns7, timeseries: {timeField: "ts"}, key: {ts: 1}});
+st.adminCommand({shardcollection: ns8, key: {skey: 1}});
 
 // We create and move the unsharded collections to make sure they are tracked
 assert.commandWorked(testDb.runCommand({create: "unsharded"}));
@@ -124,6 +121,12 @@ for (let i = 0; i < 6; i++) {
     assert.commandWorked(bazColl.insert({skey: (i + 5)}));
     assert.commandWorked(barColl2.insert({skey: i}));
 }
+
+assert.commandWorked(timeseriesColl.insertOne({
+    "metadata": {"sensorId": 5578, "type": "temperature"},
+    "ts": ISODate("2021-05-18T00:00:00.000Z"),
+    "temp": 12
+}));
 
 // Test before chunk migration
 testShardedDataAggregationStage();
@@ -263,6 +266,27 @@ assert.eq(1,
                   }
               ])
               .itcount());
+
+// Verify that the corresponding fields returned by $shardedDataDistribution are properly set to 0
+// on an empty collection
+assert.eq(1,
+          adminDb
+              .aggregate([
+                  {$shardedDataDistribution: {}},
+                  {$match: {ns: ns8}},
+                  {
+                      $match: {
+                          $and: [
+                              {"shards.numOrphanedDocs": {$eq: 0}},
+                              {"shards.numOwnedDocuments": {$eq: 0}},
+                              {"shards.ownedSizeBytes": {$eq: 0}},
+                              {"shards.orphanedSizeBytes": {$eq: 0}}
+                          ]
+                      }
+                  }
+              ])
+              .itcount());
+
 st.stop();
 
 // Test that verifies the behavior in unsharded deployments
