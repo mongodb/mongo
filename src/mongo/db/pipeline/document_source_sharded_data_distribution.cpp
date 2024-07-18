@@ -152,7 +152,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
             }
         }
     })");
-    static const BSONObj kLookupObj = fromjson(R"({
+    static const BSONObj kConfigCollectionsLookupObj = fromjson(R"({
          $lookup: {
             from: {
                 db: "config",
@@ -173,20 +173,63 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
             }]
             }
     })");
+    // Adding a new field matchingShards that contains the shards that have a chunk
+    static const BSONObj kConfigChunksLookupObj = fromjson(R"({
+        "$lookup": {
+            "from": {
+                "db": "config",
+                "coll": "chunks"
+            },
+            "localField": "matchingShardedCollection.uuid",
+            "foreignField": "uuid",
+            "pipeline" : [
+                { "$project": { "shard": 1 } },
+                {
+                    "$group": {
+                        "_id": null,
+                        "shards": {
+                            "$addToSet": "$shard"
+                        }
+                    }
+                }
+            ],
+            "as": "matchingShards"
+        }    
+    })");
+
+    // We get rid of the db primary shards that do not contain a chunk and don't have any orphaned
+    // docs
     static const BSONObj kFinalProjectObj = fromjson(R"({
         $project: {
             _id: 0,
             ns: "$_id",
-            shards: "$shards"
+            shards: {
+                $filter: {
+                    input: "$shards",
+                    as: "shard",
+                    cond: {
+                        $or: [
+                            {
+                                $in: ["$$shard.shardName", {$first: "$matchingShards.shards"}]
+                            },
+                            {
+                                $ne: ["$$shard.numOrphanedDocs", 0]
+                            }
+                        ]
+
+                    }
+                }
+            }
         }
     })");
-
-    return {DocumentSourceInternalAllCollectionStats::createFromBsonInternal(
-                kAllCollStatsObj.firstElement(), expCtx),
-            DocumentSourceProject::createFromBson(kProjectObj.firstElement(), expCtx),
-            DocumentSourceGroup::createFromBson(kGroupObj.firstElement(), expCtx),
-            DocumentSourceLookUp::createFromBson(kLookupObj.firstElement(), expCtx),
-            DocumentSourceMatch::createFromBson(kMatchObj.firstElement(), expCtx),
-            DocumentSourceProject::createFromBson(kFinalProjectObj.firstElement(), expCtx)};
+    return {
+        DocumentSourceInternalAllCollectionStats::createFromBsonInternal(
+            kAllCollStatsObj.firstElement(), expCtx),
+        DocumentSourceProject::createFromBson(kProjectObj.firstElement(), expCtx),
+        DocumentSourceGroup::createFromBson(kGroupObj.firstElement(), expCtx),
+        DocumentSourceLookUp::createFromBson(kConfigCollectionsLookupObj.firstElement(), expCtx),
+        DocumentSourceMatch::createFromBson(kMatchObj.firstElement(), expCtx),
+        DocumentSourceLookUp::createFromBson(kConfigChunksLookupObj.firstElement(), expCtx),
+        DocumentSourceProject::createFromBson(kFinalProjectObj.firstElement(), expCtx)};
 }
 }  // namespace mongo

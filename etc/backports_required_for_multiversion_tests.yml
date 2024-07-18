@@ -1514,4 +1514,6 @@ last-lts:
     ticket: SERVER-91757
   - test_file: jstests/sharding/sharded_data_distribution.js
     ticket: SERVER-88400
+  - test_file: jstests/sharding/sharded_data_distribution.js
+    ticket: SERVER-92190
   suites: null

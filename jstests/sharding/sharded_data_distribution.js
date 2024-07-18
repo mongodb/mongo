@@ -68,14 +68,20 @@ function testShardedDataAggregationStage() {
     }
 }
 
+// Skip orphans check because the range deleter is disabled in this test
+TestData.skipCheckOrphans = true;
+
 // Configure initial sharding cluster
-const st = new ShardingTest({shards: 2});
+// Disable the range deleter to be able to test `numOrphanDocs`
+const st = new ShardingTest({shards: 3, rs: {setParameter: {disableResumableRangeDeleter: true}}});
 const mongos = st.s;
 
 const ns1 = "test.foo";
 const ns2 = "bar.baz";
 const ns3 = "test.unsharded";
 const ns4 = "bar.unsharded";
+const ns5 = "test.coll1";
+const ns6 = "bar.coll2";
 const ns7 = "test.timeseriesColl";
 
 const adminDb = mongos.getDB("admin");
@@ -85,6 +91,7 @@ const fooColl = testDb.getCollection("foo");
 const bazColl = barDb.getCollection("baz");
 const unshardedColl1 = testDb.getCollection("unsharded");
 const unshardedColl2 = barDb.getCollection("unsharded");
+const barColl2 = barDb.getCollection("coll2");
 const timeseriesColl = testDb.getCollection("timeseriesColl");
 
 st.adminCommand({enablesharding: testDb.getName(), primaryShard: st.shard1.shardName});
@@ -92,6 +99,9 @@ st.adminCommand({shardcollection: ns1, key: {skey: 1}});
 st.adminCommand({shardcollection: ns7, timeseries: {timeField: "ts"}, key: {ts: 1}});
 st.adminCommand({enablesharding: barDb.getName(), primaryShard: st.shard1.shardName});
 st.adminCommand({shardcollection: ns2, key: {skey: 1}});
+
+st.adminCommand({shardcollection: ns5, key: {skey: 1}});
+st.adminCommand({shardcollection: ns6, key: {skey: 1}});
 
 assert.commandWorked(timeseriesColl.insertOne({
     "metadata": {"sensorId": 5578, "type": "temperature"},
@@ -117,6 +127,7 @@ if (!isMultiversion) {
 for (let i = 0; i < 6; i++) {
     assert.commandWorked(fooColl.insert({skey: i}));
     assert.commandWorked(bazColl.insert({skey: (i + 5)}));
+    assert.commandWorked(barColl2.insert({skey: i}));
 }
 
 // Test before chunk migration
@@ -126,6 +137,13 @@ st.adminCommand({split: ns1, middle: {skey: 2}});
 st.adminCommand({moveChunk: ns1, find: {skey: 2}, to: st.shard0.name, _waitForDelete: true});
 st.adminCommand({split: ns2, middle: {skey: 7}});
 st.adminCommand({moveChunk: ns2, find: {skey: 7}, to: st.shard0.name, _waitForDelete: true});
+
+// Moving all the chunks outside the db primary shard for both collections.
+assert.commandWorked(st.s.adminCommand({moveChunk: ns5, find: {skey: 1}, to: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns6, find: {skey: 1}, to: st.shard0.shardName}));
+// Moving the chunk to another shard that is not the db primary to verify that shards that own
+// orphans but are not the primary are also shown
+assert.commandWorked(st.s.adminCommand({moveChunk: ns6, find: {skey: 1}, to: st.shard2.shardName}));
 
 // Test after chunk migration
 testShardedDataAggregationStage();
@@ -196,6 +214,42 @@ assert.neq(
 assert.eq(0,
           adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: {$in: [ns3, ns4]}}}])
               .itcount());
+
+// Test that verifies $shardedDataDistribution returns no information about a shard that does not
+// own any chunks or orphans.
+assert.eq(
+    1,
+    adminDb
+        .aggregate(
+            [{$shardedDataDistribution: {}}, {$match: {ns: ns5}}, {$unwind: {path: "$shards"}}])
+        .itcount());
+
+// Test that verifies $shardedDataDistribution still returns information about the a shard that
+// owned a chunk in the past and now only owns orphans.
+assert.eq(
+    3,
+    adminDb
+        .aggregate(
+            [{$shardedDataDistribution: {}}, {$match: {ns: ns6}}, {$unwind: {path: "$shards"}}])
+        .itcount());
+
+// Test that verifies $shardedDataDistribution returns no information about a shard that does not
+// own any chunks or orphans.
+assert.eq(
+    1,
+    adminDb
+        .aggregate(
+            [{$shardedDataDistribution: {}}, {$match: {ns: ns5}}, {$unwind: {path: "$shards"}}])
+        .itcount());
+
+// Test that verifies $shardedDataDistribution still returns information about the a shard that
+// owned a chunk in the past and now only owns orphans.
+assert.eq(
+    3,
+    adminDb
+        .aggregate(
+            [{$shardedDataDistribution: {}}, {$match: {ns: ns6}}, {$unwind: {path: "$shards"}}])
+        .itcount());
 
 // Test that verifies that the fields returned for timeseries collections are correct.
 assert.eq(1,
