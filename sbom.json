@@ -12,7 +12,7 @@
     ],
     "component": {
       "name": "mongodb/mongo",
-      "version": "master",
+      "version": "v7.0",
       "type": "application",
       "bom-ref": "2b272c5d-6c5e-401d-95c4-6449c06377c4"
     }
