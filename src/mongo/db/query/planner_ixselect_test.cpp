@@ -1433,6 +1433,46 @@ TEST(QueryPlannerIXSelectTest, CanUseIndexWithSimpleCollatorForNonPrefixRegexFil
     std::set<size_t> expectedIndices = {0};
     testRateIndices("{a: { $regex: \"John\"}}", "", kSimpleCollator, indices, "a", expectedIndices);
 }
+
+TEST(QueryPlannerIXSelectTest, GeoPredicateCanOnlyUse2dsphereIndex) {
+    std::vector<IndexEntry> indices;
+    auto btreeEntry = buildSimpleIndexEntry(BSON("loc" << 1));
+    auto twodSphereEntry = buildSimpleIndexEntry(BSON("loc"
+                                                      << "2dsphere"));
+    indices.push_back(btreeEntry);
+    indices.push_back(twodSphereEntry);
+    std::set<size_t> expectedIndices = {1};
+    testRateIndices(R"({loc: {$geoWithin: {$geometry: {type: 'Polygon',
+                      coordinates: [[[0,0],[0,1],[1,0],[0,0]]]}}}})",
+                    "",
+                    kSimpleCollator,
+                    indices,
+                    "loc",
+                    expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, GeoPredicateWithNotCanOnlyUse2dsphereIndex) {
+    std::vector<IndexEntry> indices;
+    auto btreeEntry = buildSimpleIndexEntry(BSON("loc" << 1));
+    auto twodSphereEntry = buildSimpleIndexEntry(BSON("loc"
+                                                      << "2dsphere"));
+    indices.push_back(btreeEntry);
+    indices.push_back(twodSphereEntry);
+    // This query gets parsed to {$not: {$and: {$geoWithin: <>}}} and then tags
+    // the 2dsphere index as relevant. If the $and is optimized away ({$not: {$geoWithin: <>}}),
+    // that tagging is skipped.
+    // TODO SERVER-92427: The tagging behavior should be made consistent so that this query has no
+    // expectedIndices.
+    std::set<size_t> expectedIndices = {1};
+    testRateIndices(R"({loc: {$not: {$geoWithin: {$geometry: {type: 'Polygon',
+                      coordinates: [[[0,0],[0,1],[1,0],[0,0]]]}}}}})",
+                    "",
+                    kSimpleCollator,
+                    indices,
+                    "loc",
+                    expectedIndices);
+}
+
 /*
  * Will compare 'keyPatterns' with 'entries'. As part of comparing, it will sort both of them.
  */
