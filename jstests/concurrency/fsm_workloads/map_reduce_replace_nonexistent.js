@@ -16,6 +16,7 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/map_reduce_inline.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use the workload name as a prefix for the collection name,
@@ -28,7 +29,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.states.mapReduce = function mapReduce(db, collName) {
         var outCollName = uniqueCollectionName(this.prefix, this.tid);
-        db[outCollName].drop();
+        // Dropping the targeted collection in case it contains garbage from previous runs and
+        // creating it again to support concurrent mapReduce targeting the same collection.
+        assertDropAndRecreateCollection(db, outCollName);
 
         var options = {
             finalize: this.finalizer,
