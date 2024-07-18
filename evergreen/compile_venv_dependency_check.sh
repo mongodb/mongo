@@ -8,5 +8,6 @@ source ./compile_venv/bin/activate
 
 # Try printing scons.py help message
 cd src
+export PIP_CACHE_DIR=${workdir}/pip_cache
 python -m pip install -r etc/pip/compile-requirements.txt
 buildscripts/scons.py --help

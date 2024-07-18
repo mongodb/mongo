@@ -20,6 +20,7 @@ if [[ -f "$HOME/.zshrc" ]]; then
   rc_file="$HOME/.zshrc"
 fi
 
+export PIP_CACHE_DIR=${workdir}/pip_cache
 if ! command -v db-contrib-tool &> /dev/null; then
   if ! python3 -c "import sys; sys.exit(sys.version_info < (3, 7))" &> /dev/null; then
     actual_version=$(python3 -c 'import sys; print(sys.version)')
