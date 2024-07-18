@@ -536,7 +536,7 @@ bool KeyStringIndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* 
     const uint64_t totalMemoryNeededBytes =
         std::accumulate(_indexKeyBuckets.begin(),
                         _indexKeyBuckets.end(),
-                        0,
+                        0ull,
                         [](uint64_t bytes, const IndexKeyBucket& bucket) {
                             return bucket.indexKeyCount ? bytes + bucket.bucketSizeBytes : bytes;
                         });
