@@ -73,14 +73,16 @@ class DoNotRecoverPolicy final : public express::ExceptionRecoveryPolicy {
 public:
     express::PlanProgress recoverIfPossible(
         ExceptionFor<ErrorCodes::WriteConflict>& exception) const override {
-        exception.addContext("Internal retry explicitly disabled for query"_sd);
-        throw exception;
+        throwWriteConflictException(
+            "Write conflict during plan execution and "
+            "yielding is disabled.");
     }
 
     express::PlanProgress recoverIfPossible(
         ExceptionFor<ErrorCodes::TemporarilyUnavailable>& exception) const override {
-        exception.addContext("Internal retry explicitly disabled for query"_sd);
-        throw exception;
+        throwTemporarilyUnavailableException(
+            "got TemporarilyUnavailable exception on a plan that "
+            "cannot auto-yield");
     }
 
     express::PlanProgress recoverIfPossible(
