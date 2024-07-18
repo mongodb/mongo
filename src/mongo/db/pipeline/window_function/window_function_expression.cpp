@@ -269,12 +269,7 @@ boost::intrusive_ptr<Expression> ExpressionFirstLast::parse(
 template <typename WindowFunctionN, typename AccumulatorNType>
 Value ExpressionN<WindowFunctionN, AccumulatorNType>::serialize(
     const SerializationOptions& opts) const {
-    // For query stats, create but don't initialize the accumulator for serialization. This is
-    // because initialization evaluates and validates the 'n' expression, which is unnecessary for
-    // this case and can cause false positive errors.
-    auto acc = opts.literalPolicy == LiteralSerializationPolicy::kUnchanged
-        ? buildAccumulatorOnly()
-        : createAccumulatorWithoutInitializing();
+    auto acc = buildAccumulatorOnly();
     MutableDocument result(acc->serialize(nExpr, _input, opts));
 
     MutableDocument windowField;
@@ -285,29 +280,24 @@ Value ExpressionN<WindowFunctionN, AccumulatorNType>::serialize(
 
 template <typename WindowFunctionN, typename AccumulatorNType>
 boost::intrusive_ptr<AccumulatorState>
-ExpressionN<WindowFunctionN, AccumulatorNType>::createAccumulatorWithoutInitializing() const {
+ExpressionN<WindowFunctionN, AccumulatorNType>::buildAccumulatorOnly() const {
     static_assert(isWindowFunctionN<WindowFunctionN>::value,
                   "tried to use ExpressionN with an unsupported window function");
+    boost::intrusive_ptr<AccumulatorState> acc;
     if constexpr (!needsSortBy<WindowFunctionN>::value) {
         tassert(5788606,
                 str::stream() << AccumulatorNType::getName()
                               << " should not have received a 'sortBy' but did!",
                 !sortPattern);
 
-        return AccumulatorNType::create(_expCtx);
+        acc = AccumulatorNType::create(_expCtx);
     } else {
         tassert(5788601,
                 str::stream() << AccumulatorNType::getName()
                               << " should have received a 'sortBy' but did not!",
                 sortPattern);
-        return AccumulatorNType::create(_expCtx, *sortPattern);
+        acc = AccumulatorNType::create(_expCtx, *sortPattern);
     }
-}
-
-template <typename WindowFunctionN, typename AccumulatorNType>
-boost::intrusive_ptr<AccumulatorState>
-ExpressionN<WindowFunctionN, AccumulatorNType>::buildAccumulatorOnly() const {
-    boost::intrusive_ptr<AccumulatorState> acc = createAccumulatorWithoutInitializing();
 
     // Initialize 'n' for our accumulator. At this point we don't have any user defined variables
     // so you physically can't reference the partition key in 'n'. It will evaluate to MISSING and
