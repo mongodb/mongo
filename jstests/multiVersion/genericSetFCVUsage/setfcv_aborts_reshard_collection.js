@@ -132,6 +132,9 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
                 // building index, it is possible that the index build gets aborted first and
                 // resharding fails on IndexBuildAborted.
                 ErrorCodes.IndexBuildAborted,
+                // The use of $_requestResumeToken can fail after downgrade because resharding
+                // improvements are not enabled, which produces this specific error code.
+                90675,
             ]
         });
 
