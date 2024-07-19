@@ -21,6 +21,10 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/core/query/query_settings/query_settings_strictness.js
+    ticket: SERVER-92665
+  - test_file: jstests/core/query/query_settings/query_settings_cmds_validation.js
+    ticket: SERVER-92665
   - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
     ticket: SERVER-88885
   - test_file: jstests/core/write/update/upsert_nor.js
@@ -736,6 +740,10 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/core/query/query_settings/query_settings_strictness.js
+    ticket: SERVER-92665
+  - test_file: jstests/core/query/query_settings/query_settings_cmds_validation.js
+    ticket: SERVER-92665
   - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
     ticket: SERVER-88885
   - test_file: jstests/core/write/update/upsert_nor.js

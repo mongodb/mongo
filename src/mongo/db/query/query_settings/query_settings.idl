@@ -62,6 +62,7 @@ structs:
   IndexHintSpec:
     description: "Struct representing the index hint spec."
     generate_comparison_operators : true
+    strict: false
     fields:
       ns:
         type: NamespaceSpec
@@ -74,6 +75,7 @@ structs:
     description: >-
       Struct representing possible settings that may be applied to a given query.
     generate_comparison_operators : true
+    strict: false
     fields:
       indexHints:
         type: IndexHintSpecs
@@ -92,6 +94,7 @@ structs:
       Struct representing configuration for a particular query shape of the
       'representativeQuery'. Configuration consists of query settings that will
       be applied to all query instances of the query shape.
+    strict: false
     fields:
       queryShapeHash: QueryShapeHash
       settings: QuerySettings
