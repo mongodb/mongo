@@ -643,6 +643,8 @@ last-continuous:
     ticket: SERVER-37164
   - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
     ticket: SERVER-91784
+  - test_file: jstests/sharding/query/find_initialize_runtime_variables.js
+    ticket: SERVER-88647
   - test_file: jstests/core/query/plan_cache/match_or_duplicate_predicate_plan_cache.js
     ticket: SERVER-92603
   - test_file: jstests/replsets/backwards_compatible_timeseries_catalog_options.js
@@ -1346,6 +1348,8 @@ last-lts:
     ticket: SERVER-37164
   - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
     ticket: SERVER-91784
+  - test_file: jstests/sharding/query/find_initialize_runtime_variables.js
+    ticket: SERVER-88647
   - test_file: jstests/core/query/plan_cache/match_or_duplicate_predicate_plan_cache.js
     ticket: SERVER-92603
   - test_file: jstests/replsets/backwards_compatible_timeseries_catalog_options.js

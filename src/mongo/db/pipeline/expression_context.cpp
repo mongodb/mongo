@@ -412,6 +412,21 @@ void ExpressionContext::stopExpressionCounters() {
     _expressionCounters.reset();
 }
 
+void ExpressionContext::initializeReferencedSystemVariables() {
+    if (_varsReferencedInQuery.contains(Variables::kNowId) &&
+        !variables.hasValue(Variables::kNowId)) {
+        variables.defineLocalNow();
+    }
+    if (_varsReferencedInQuery.contains(Variables::kClusterTimeId) &&
+        !variables.hasValue(Variables::kClusterTimeId)) {
+        variables.defineClusterTime(opCtx);
+    }
+    if (_varsReferencedInQuery.contains(Variables::kUserRolesId) &&
+        !variables.hasValue(Variables::kUserRolesId) && enableAccessToUserRoles.load()) {
+        variables.defineUserRoles(opCtx);
+    }
+}
+
 void ExpressionContext::setUserRoles() {
     // Only set the value of $$USER_ROLES if it is referenced in the query.
     if (isSystemVarReferencedInQuery(Variables::kUserRolesId) && enableAccessToUserRoles.load()) {

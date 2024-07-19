@@ -502,6 +502,14 @@ public:
     void setUserRoles();
 
     /**
+     * Initializes the value of system variables that are referenced by the query. This allows for
+     * lazy initialization of resources which may be expensive to construct (e.g. constructing
+     * cluster timestamp invokes taking a mutex). This function should be invoked after the parsing
+     * of all aggregation expressions in the query.
+     */
+    void initializeReferencedSystemVariables();
+
+    /**
      * Record that we have seen the given system variable in the query.
      */
     void setSystemVarReferencedInQuery(Variables::Id var) {

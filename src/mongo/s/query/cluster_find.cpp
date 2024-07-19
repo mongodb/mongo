@@ -225,6 +225,8 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
         findCommand->setReadConcern(readConcernArgs.toBSONInner());
     }
 
+    query.getExpCtx()->initializeReferencedSystemVariables();
+
     // Replace the 'letParams' expressions with their values.
     if (auto letParams = findCommand->getLet()) {
         const auto& vars = query.getExpCtx()->variables;
