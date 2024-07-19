@@ -37,22 +37,11 @@ export var FeatureFlagUtil = (function() {
             }
 
             // For sharded cluster get a connection to the first replicaset through a Mongo
-            // object; its construction may fail when the contacted primary is shutting down, so
-            // that related errors are tolerated in case this method is being called within the
-            // context of a kill/terminate primary suite.
-            const timeoutMsecs = 5 * 60 * 1000;
-            const firstReplicaSet = FixtureHelpers.getAllReplicas(db)[0];
-            assert.soon(function() {
-                try {
-                    conn = new Mongo(firstReplicaSet.getURL());
-                    return true;
-                } catch (e) {
-                    if (ErrorCodes.isRetriableError(e.code)) {
-                        return false;
-                    }
-                    throw e;
-                }
-            }, `Unable to establish a connection with ${firstReplicaSet.name}`, timeoutMsecs);
+            // object. We may fail to connect if we are in a stepdown/terminate passthrough
+            // suite. However, ReplSetTest will retry on network errors when making its initial
+            // connection to the cluster, and all subsequent operations on the connection should
+            // use runCommand, which should be overriden to retry on network errors in such suites.
+            conn = FixtureHelpers.getAllReplicas(db)[0].getPrimary();
         };
         try {
             setConn(db);
