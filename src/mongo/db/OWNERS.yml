@@ -1,8 +1,17 @@
 version: 1.0.0
 filters:
+  - "fts":
+    approvers:
+      - 10gen/query-integration
+  - "geo":
+    approvers:
+      - 10gen/query-integration
   - "*index_build*":
     approvers:
       - 10gen/server-storage-execution
+  - "profile_*":
+    approvers:
+      - 10gen/query-integration
   - "record_id*":
     approvers:
       - 10gen/server-storage-execution

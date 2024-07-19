@@ -12,3 +12,7 @@ filters:
   - "*.bazel":
     approvers:
       - 10gen/devprod-build
+  - "mozjs":
+    approvers:
+      - 10gen/query-integration
+      - 10gen/server-security

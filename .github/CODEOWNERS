@@ -129,7 +129,10 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/client/**/scram_client_cache* @10gen/server-security
 
 # The following patterns are parsed from ./src/mongo/db/OWNERS.yml
+/src/mongo/db/**/fts @10gen/query-integration
+/src/mongo/db/**/geo @10gen/query-integration
 /src/mongo/db/**/*index_build* @10gen/server-storage-execution
+/src/mongo/db/**/profile_* @10gen/query-integration
 /src/mongo/db/**/record_id* @10gen/server-storage-execution
 /src/mongo/db/**/repair* @10gen/server-rss-sydney @10gen/server-storage-execution
 /src/mongo/db/**/ttl* @10gen/server-storage-execution
@@ -151,11 +154,22 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/commands/OWNERS.yml
 /src/mongo/db/commands/**/create_indexes* @10gen/server-storage-execution
 /src/mongo/db/commands/**/fsync* @10gen/server-storage-execution
+/src/mongo/db/commands/**/profile* @10gen/query-integration
+/src/mongo/db/commands/**/search_* @10gen/query-integration
 /src/mongo/db/commands/**/validate.cpp @10gen/server-rss-sydney @10gen/server-storage-execution
 /src/mongo/db/commands/**/vote*index_build* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./src/mongo/db/concurrency/OWNERS.yml
 /src/mongo/db/concurrency/**/exception_util* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/db/exec/OWNERS.yml
+/src/mongo/db/exec/**/*timeseries* @10gen/query-integration
+/src/mongo/db/exec/**/text_* @10gen/query-integration
+/src/mongo/db/exec/**/geo_* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/db/exec/sbe/OWNERS.yml
+/src/mongo/db/exec/sbe/**/*columnar* @10gen/query-integration
+/src/mongo/db/exec/sbe/**/*column_store* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/ftdc/OWNERS.yml
 /src/mongo/db/ftdc/**/* @10gen/server-service-architecture @markbenvenuto
@@ -166,6 +180,9 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/docs/testing/OWNERS.yml
 /src/mongo/db/modules/enterprise/docs/testing/**/* @10gen/devprod-correctness
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/fle/OWNERS.yml
+/src/mongo/db/modules/enterprise/src/fle/**/query_analysis @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/hot_backups/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/hot_backups/**/* @10gen/server-rss-sydney
@@ -179,8 +196,19 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/queryable/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/queryable/**/* @10gen/server-rss-sydney
 
+# The following patterns are parsed from ./src/mongo/db/pipeline/OWNERS.yml
+/src/mongo/db/pipeline/**/document_source_internal_unpack_bucket* @10gen/query-integration
+/src/mongo/db/pipeline/**/document_source_query_stats* @10gen/query-integration
+/src/mongo/db/pipeline/**/search @10gen/query-integration
+/src/mongo/db/pipeline/**/window_function @10gen/query-integration
+
 # The following patterns are parsed from ./src/mongo/db/process_health/OWNERS.yml
 /src/mongo/db/process_health/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/db/query/OWNERS.yml
+/src/mongo/db/query/**/query_stats @10gen/query-integration
+/src/mongo/db/query/**/query_shape @10gen/query-integration
+/src/mongo/db/query/**/timeseries @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/sorter/OWNERS.yml
 /src/mongo/db/sorter/**/* @10gen/server-storage-execution
@@ -190,6 +218,11 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/storage/OWNERS.yml
 /src/mongo/db/storage/**/* @10gen/server-rss-sydney @10gen/server-storage-execution
+/src/mongo/db/storage/**/*named_pipe* @10gen/query-integration
+/src/mongo/db/storage/**/*column_store* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/db/storage/wiredtiger/OWNERS.yml
+/src/mongo/db/storage/wiredtiger/**/*column_store* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/timeseries/OWNERS.yml
 /src/mongo/db/timeseries/**/* @10gen/server-storage-execution
@@ -228,6 +261,7 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/scripting/OWNERS.yml
 /src/mongo/scripting/**/dbdirectclient_factory.* @10gen/server-service-architecture
 /src/mongo/scripting/**/deadline_monitor* @10gen/server-service-architecture
+/src/mongo/scripting/**/mozjs @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/stdx/OWNERS.yml
 /src/mongo/stdx/**/* @10gen/server-service-architecture
@@ -266,6 +300,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/third_party/**/* @10gen/server-security
 /src/third_party/**/SConscript @10gen/devprod-build
 /src/third_party/**/*.bazel @10gen/devprod-build
+/src/third_party/**/mozjs @10gen/query-integration @10gen/server-security
 
 # The following patterns are parsed from ./src/third_party/wiredtiger/OWNERS.yml
 /src/third_party/wiredtiger/**/*

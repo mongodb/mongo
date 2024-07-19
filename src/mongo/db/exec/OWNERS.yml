@@ -1,12 +1,11 @@
 version: 1.0.0
 filters:
-  - "*":
-    approvers:
-      - 10gen/server-storage-execution
-      - 10gen/server-rss-sydney
-  - "*named_pipe*":
+  - "*timeseries*":
     approvers:
       - 10gen/query-integration
-  - "*column_store*":
+  - "text_*":
+    approvers:
+      - 10gen/query-integration
+  - "geo_*":
     approvers:
       - 10gen/query-integration

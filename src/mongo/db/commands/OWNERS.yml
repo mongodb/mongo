@@ -6,6 +6,12 @@ filters:
   - "fsync*":
     approvers:
       - 10gen/server-storage-execution
+  - "profile*":
+    approvers:
+      - 10gen/query-integration
+  - "search_*":
+    approvers:
+      - 10gen/query-integration
   - "validate.cpp":
     approvers:
       - 10gen/server-storage-execution

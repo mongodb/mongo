@@ -1,0 +1,14 @@
+version: 1.0.0
+filters:
+  - "document_source_internal_unpack_bucket*":
+    approvers:
+      - 10gen/query-integration
+  - "document_source_query_stats*":
+    approvers:
+      - 10gen/query-integration
+  - "search":
+    approvers:
+      - 10gen/query-integration
+  - "window_function":
+    approvers:
+      - 10gen/query-integration

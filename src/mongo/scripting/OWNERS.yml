@@ -6,3 +6,6 @@ filters:
   - "deadline_monitor*": # note this wants to match _test.cpp and .idl files too
     approvers:
       - 10gen/server-service-architecture
+  - "mozjs":
+    approvers:
+      - 10gen/query-integration
