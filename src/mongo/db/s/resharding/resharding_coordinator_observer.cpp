@@ -154,6 +154,13 @@ ReshardingCoordinatorObserver::ReshardingCoordinatorObserver() = default;
 
 ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() {
     stdx::lock_guard<Latch> lg(_mutex);
+
+    // Rarely, when there is a short period of time between stepdown and stepup, the
+    // ReshardingCoordinator::run() method is not called causing the invariants below
+    // to fire. If this method hasn't been called, we skip the checks.
+    if (!_reshardingCoordinatorRunCalled) {
+        return;
+    }
     invariant(_allDonorsReportedMinFetchTimestamp.getFuture().isReady());
     invariant(_allRecipientsFinishedCloning.getFuture().isReady());
     invariant(_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady());

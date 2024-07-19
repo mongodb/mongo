@@ -1839,6 +1839,7 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
 
 SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                             const CancellationToken& stepdownToken) noexcept {
+    getObserver()->reshardingCoordinatorRunCalled();
     pauseBeforeCTHolderInitialization.pauseWhileSet();
 
     auto abortCalled = [&] {
