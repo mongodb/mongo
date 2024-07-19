@@ -133,12 +133,14 @@ public:
             std::unique_ptr<MatchExpression> filter = list_databases::getFilter(cmd, opCtx, ns());
 
             std::vector<DatabaseName> dbNames;
-            StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
             {
-                Lock::GlobalLock lk(opCtx, MODE_IS);
+                // Read lock free through a consistent in-memory catalog and storage snapshot.
+                AutoReadLockFree lockFreeReadBlock(opCtx);
+                auto catalog = CollectionCatalog::get(opCtx);
+
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
-                dbNames = storageEngine->listDatabases(tenantId);
+                dbNames = catalog->getAllConsistentDbNamesForTenant(opCtx, tenantId);
             }
             std::vector<ListDatabasesReplyItem> items;
             SerializationContext scReply =
@@ -148,15 +150,16 @@ public:
                 // a non-multitenant node (with prefix and without token) during initial sync.
                 scReply.setPrefixState(true);
             }
-            int64_t totalSize = list_databases::setReplyItems(opCtx,
-                                                              dbNames,
-                                                              items,
-                                                              storageEngine,
-                                                              nameOnly,
-                                                              filter,
-                                                              false /* setTenantId */,
-                                                              authorizedDatabases,
-                                                              scReply);
+            int64_t totalSize =
+                list_databases::setReplyItems(opCtx,
+                                              dbNames,
+                                              items,
+                                              getGlobalServiceContext()->getStorageEngine(),
+                                              nameOnly,
+                                              filter,
+                                              false /* setTenantId */,
+                                              authorizedDatabases,
+                                              scReply);
 
             // We need to copy the serialization context from the request to the reply object
             ListDatabasesReply reply(std::move(items), scReply);

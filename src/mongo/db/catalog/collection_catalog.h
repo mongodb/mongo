@@ -547,6 +547,29 @@ public:
     std::set<TenantId> getAllTenants() const;
 
     /**
+     * This function gets all the database names. The result is sorted in alphabetical ascending
+     * order. The returned list is consistent with the storage snapshot.
+     *
+     * Callers of this method must hold an active storage snapshot. This method takes a global lock
+     * in MODE_IS.
+     *
+     * Unlike DatabaseHolder::getNames(), this does not return databases that are empty.
+     */
+    std::vector<DatabaseName> getAllConsistentDbNames(OperationContext* opCtx) const;
+
+    /**
+     * This function gets all the database names associated with tenantId. The result is sorted in
+     * alphabetical ascending order. The returned list is consistent with the storage snapshot.
+     *
+     * Callers of this method must hold an active storage snapshot. This method takes a global lock
+     * in MODE_IS.
+     *
+     * Unlike DatabaseHolder::getNames(), this does not return databases that are empty.
+     */
+    std::vector<DatabaseName> getAllConsistentDbNamesForTenant(
+        OperationContext* opCtx, boost::optional<TenantId> tenantId) const;
+
+    /**
      * Updates the profile filter on all databases with non-default settings.
      */
     void setAllDatabaseProfileFilters(std::shared_ptr<ProfileFilter> filter);
