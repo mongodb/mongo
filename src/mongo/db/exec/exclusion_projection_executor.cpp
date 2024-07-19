@@ -80,9 +80,8 @@ std::pair<BSONObj, bool> ExclusionNode::extractProjectOnFieldAndRename(const Str
 ExclusionProjectionExecutor::ExclusionProjectionExecutor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     ProjectionPolicies policies,
-    bool allowFastPath,
-    boost::optional<projection_ast::ProjectionPathASTNode> proj)
-    : ProjectionExecutor(expCtx, policies, proj),
+    bool allowFastPath)
+    : ProjectionExecutor(expCtx, policies),
       _root((allowFastPath && !internalQueryDisableExclusionProjectionFastPath)
                 ? std::make_unique<FastPathEligibleExclusionNode>(policies)
                 : std::make_unique<ExclusionNode>(policies)) {}

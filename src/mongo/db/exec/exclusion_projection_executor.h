@@ -172,11 +172,9 @@ private:
  */
 class ExclusionProjectionExecutor : public ProjectionExecutor {
 public:
-    ExclusionProjectionExecutor(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        ProjectionPolicies policies,
-        bool allowFastPath = false,
-        boost::optional<projection_ast::ProjectionPathASTNode> proj = boost::none);
+    ExclusionProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                ProjectionPolicies policies,
+                                bool allowFastPath = false);
 
     TransformerType getType() const final {
         return TransformerType::kExclusionProjection;
