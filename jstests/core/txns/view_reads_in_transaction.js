@@ -24,6 +24,12 @@ assert.commandWorked(view.runCommand(
 // Run a dummy find to start the transaction.
 jsTestLog("Starting transaction.");
 withTxnAndAutoRetryOnMongos(session, () => {
+    // Make sure the starting state is clean even on retry.
+    jsTestLog("Remove not_visible_in_transaction documents");
+    assert.commandWorked(db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).remove({
+        _id: "not_visible_in_transaction",
+    }));
+
     // Refresh the router's and shard's database versions so the distinct run below can succeed.
     // This is necessary because shards always abort their local transaction on stale version
     // errors and mongos is not allowed to retry on these errors in a transaction if the stale
