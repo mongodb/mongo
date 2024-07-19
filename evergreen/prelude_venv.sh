@@ -25,6 +25,7 @@ function activate_venv {
   else
     export PYTHONPATH="$PYTHONPATH:${workdir}/src"
   fi
+  export PIP_CACHE_DIR=${workdir}/pip_cache
 
   echo "python set to $(which $python)"
 }
