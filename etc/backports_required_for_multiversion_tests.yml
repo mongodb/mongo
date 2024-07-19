@@ -1532,4 +1532,6 @@ last-lts:
     ticket: SERVER-92190
   - test_file: jstests/core/index/geo/negated_geo_queries.js
     ticket: SERVER-92193
+  - test_file: jstests/sharding/sharded_data_distribution.js
+    ticket: SERVER-92419
   suites: null

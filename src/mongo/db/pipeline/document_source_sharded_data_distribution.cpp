@@ -69,13 +69,16 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
 
     static const BSONObj kAllCollStatsObj =
         fromjson("{$_internalAllCollectionStats: {stats: {storageStats: {}}}}}");
+
+    // TODO (SERVER-92596): Remove `"storageStats.numOrphanDocs": 1` once the bug is fixed.
     static const BSONObj kProjectObj = fromjson(R"({
          $project: {
              "ns": 1,
              "shard": 1,
-             "storageStats.count": 1, 
-             "storageStats.numOrphanDocs": 1, 
-             "storageStats.avgObjSize": 1, 
+             "storageStats.numOrphanDocs": 1,
+             "count": {$ifNull: ["$storageStats.count", 0]}, 
+             "avgObjSize": {$ifNull: ["$storageStats.avgObjSize", 0]}, 
+             "numOrphanDocs": {$ifNull: ["$storageStats.numOrphanDocs", 0]}, 
              "timeseries": {$ifNull: ["$storageStats.timeseries", null]}
          }
      })");
@@ -94,25 +97,25 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
                                 vars: {
                                     nOwnedDocs: {
                                         $subtract: [
-                                            "$storageStats.count",
-                                            "$storageStats.numOrphanDocs"
+                                            "$count",
+                                            "$numOrphanDocs"
                                         ]
                                     }
                                 },
                                 in: {
                                     shardName: "$shard",
-                                    numOrphanedDocs: "$storageStats.numOrphanDocs",
+                                    numOrphanedDocs: "$numOrphanDocs",
                                     numOwnedDocuments: "$$nOwnedDocs",
                                     ownedSizeBytes: {
                                         $multiply: [
-                                            "$storageStats.avgObjSize",
+                                            "$avgObjSize",
                                             "$$nOwnedDocs"
                                         ]
                                     },
                                     orphanedSizeBytes: {
                                         $multiply: [
-                                            "$storageStats.avgObjSize",
-                                            "$storageStats.numOrphanDocs"
+                                            "$avgObjSize",
+                                            "$numOrphanDocs"
                                         ]
                                     }
                                 }
@@ -124,13 +127,13 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
                                     nOwnedDocs: {
                                         $subtract: [
                                             "$timeseries.bucketCount",
-                                            "$storageStats.numOrphanDocs"
+                                            "$numOrphanDocs"
                                         ]
                                     }
                                 },
                                 in: {
                                     shardName: "$shard",
-                                    numOrphanedDocs: "$storageStats.numOrphanDocs",
+                                    numOrphanedDocs: "$numOrphanDocs",
                                     numOwnedDocuments: "$$nOwnedDocs",
                                     ownedSizeBytes: {
                                         $multiply: [
@@ -141,7 +144,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
                                     orphanedSizeBytes: {
                                         $multiply: [
                                             "$timeseries.avgBucketSize",
-                                            "$storageStats.numOrphanDocs"
+                                            "$numOrphanDocs"
                                         ]
                                     }
                                 }
