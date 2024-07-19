@@ -75,73 +75,48 @@ OplogCapMaintainerThread* OplogCapMaintainerThread::get(ServiceContext* serviceC
 }
 
 bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
-    if (!opCtx->getServiceContext()->getStorageEngine()) {
-        LOGV2_DEBUG(22240, 2, "OplogCapMaintainerThread: no global storage engine yet");
-        return false;
-    }
-
     // Maintaining the Oplog cap is crucial to the stability of the server so that we don't let the
     // oplog grow unbounded. We mark the operation as having immediate priority to skip ticket
     // acquisition and flow control.
     ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
         opCtx, AdmissionContext::Priority::kExempt);
 
-    try {
-        // A Global IX lock should be good enough to protect the oplog truncation from
-        // interruptions such as replication rollback. Database lock or collection lock is not
-        // needed. This improves concurrency if oplog truncation takes long time.
-        std::shared_ptr<CollectionTruncateMarkers> oplogTruncateMarkers;
-        {
-            Lock::GlobalLock globalLk(opCtx, MODE_IX);
-            auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-            if (!rs) {
-                LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
-                return false;
-            }
 
-            // Create another reference to the oplog truncate markers while holding a lock on
-            // the collection to prevent it from being destructed.
-            oplogTruncateMarkers = rs->getCollectionTruncateMarkers();
-            invariant(oplogTruncateMarkers);
-        }
-
-        if (!oplogTruncateMarkers->awaitHasExcessMarkersOrDead(opCtx)) {
-            // Oplog went away or we timed out waiting for oplog space to reclaim.
+    // A Global IX lock should be good enough to protect the oplog truncation from
+    // interruptions such as replication rollback. Database lock or collection lock is not
+    // needed. This improves concurrency if oplog truncation takes long time.
+    std::shared_ptr<CollectionTruncateMarkers> oplogTruncateMarkers;
+    {
+        Lock::GlobalLock globalLk(opCtx, MODE_IX);
+        auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+        if (!rs) {
+            LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
             return false;
         }
 
-        {
-            // Oplog state could have changed while yielding. Reacquire global lock
-            // and refresh oplog state to ensure we have a valid pointer.
-            Lock::GlobalLock globalLk(opCtx, MODE_IX);
-            auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-            if (!rs) {
-                LOGV2_DEBUG(9064300, 2, "oplog collection does not exist");
-                return false;
-            }
-            rs->reclaimOplog(opCtx);
-        }
-    } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& e) {
-        LOGV2_DEBUG(5929700,
-                    1,
-                    "Caught an InterruptedDueToStorageChange exception, "
-                    "but this thread can safely continue",
-                    "error"_attr = e.toStatus());
-    } catch (const DBException& ex) {
-        if (!opCtx->checkForInterruptNoAssert().isOK()) {
-            LOGV2_DEBUG(9064301,
-                        1,
-                        "Oplog cap maintainer thread was interrupted, but can safely continue",
-                        "error"_attr = ex);
-            return false;
-        }
-
-        LOGV2_FATAL_NOTRACE(6761100, "Error in OplogCapMaintainerThread", "error"_attr = ex);
-    } catch (const std::exception& e) {
-        LOGV2_FATAL_NOTRACE(22243, "Error in OplogCapMaintainerThread", "error"_attr = e.what());
-    } catch (...) {
-        LOGV2_FATAL_NOTRACE(5184100, "Unknown error in OplogCapMaintainerThread");
+        // Create another reference to the oplog truncate markers while holding a lock on
+        // the collection to prevent it from being destructed.
+        oplogTruncateMarkers = rs->getCollectionTruncateMarkers();
+        invariant(oplogTruncateMarkers);
     }
+
+    if (!oplogTruncateMarkers->awaitHasExcessMarkersOrDead(opCtx)) {
+        // Oplog went away or we timed out waiting for oplog space to reclaim.
+        return false;
+    }
+
+    {
+        // Oplog state could have changed while yielding. Reacquire global lock
+        // and refresh oplog state to ensure we have a valid pointer.
+        Lock::GlobalLock globalLk(opCtx, MODE_IX);
+        auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+        if (!rs) {
+            LOGV2_DEBUG(9064300, 2, "oplog collection does not exist");
+            return false;
+        }
+        rs->reclaimOplog(opCtx);
+    }
+
     return true;
 }
 
@@ -154,32 +129,55 @@ void OplogCapMaintainerThread::run() {
         tc.get()->setSystemOperationUnkillableByStepdown(lk);
     }
 
-    while (!globalInShutdownDeprecated()) {
-        auto opCtx = tc->makeOperationContext();
+    ServiceContext::UniqueOperationContext opCtx;
+    while (true) {
+        // It's illegal to create a new opCtx while a thread already has one, so we reset the opCtx.
+        // Otherwise, it could lead to deadlocks in the production setup.
+        //
+        // For example, FCBIS requires switching storage engines. Before switching storage engines,
+        // we block the system from creating new opCtxs, kill all existing opCtxs, and wait for
+        // their destruction. If makeOperationContext() was called during this process, it could be
+        // blocked, which would in turn block the destruction of previous killed opCtx and block the
+        // FCBIS.
+        ON_BLOCK_EXIT([&] { opCtx.reset(); });
+        try {
+            opCtx = tc->makeOperationContext();
 
-        if (MONGO_unlikely(hangOplogCapMaintainerThread.shouldFail())) {
-            LOGV2(5095500, "Hanging the oplog cap maintainer thread due to fail point");
-            try {
+            if (MONGO_unlikely(hangOplogCapMaintainerThread.shouldFail())) {
+                LOGV2(5095500, "Hanging the oplog cap maintainer thread due to fail point");
                 hangOplogCapMaintainerThread.pauseWhileSet(opCtx.get());
-            } catch (DBException& ex) {
-                auto interruptStatus = opCtx->checkForInterruptNoAssert();
-                if (!interruptStatus.isOK()) {
-                    LOGV2(9064302,
-                          "Stop hanging the oplog cap maintainer thread due to interrupted fail "
-                          "point wait",
-                          "ex"_attr = ex,
-                          "interruptStatus"_attr = interruptStatus,
-                          "shutdown"_attr = globalInShutdownDeprecated());
-                    continue;
-                }
-                throw;
             }
-        }
 
-        if (!_deleteExcessDocuments(opCtx.get()) && !globalInShutdownDeprecated()) {
-            sleepmillis(1000);  // Back off in case there were problems deleting.
+            if (_deleteExcessDocuments(opCtx.get())) {
+                continue;
+            }
+
+            opCtx->sleepFor(Seconds(1));  // Back off in case there were problems deleting.
+        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+            LOGV2_DEBUG(9259900,
+                        1,
+                        "Interrupted due to shutdown. OplogCapMaintainerThread Exiting",
+                        "error"_attr = e);
+            return;
+        } catch (...) {
+            const auto& err = mongo::exceptionToStatus();
+            if (opCtx->checkForInterruptNoAssert().isOK()) {
+                LOGV2_FATAL_NOTRACE(
+                    6761100, "Error in OplogCapMaintainerThread", "error"_attr = err);
+            }
+            // Since we set setSystemOperationUnkillableByStepdown(), the opCtx can't be interrupted
+            // by repl state transitions - stepdown, stepup, and rollback.
+            // It can only be interrupted by shutdown, killOp, or storage change
+            // (causes ErrorCodes::InterruptedDueToStorageChange) due to FCBIS. The shutdown case is
+            // handled above. We reach here for the last two cases, and it's safe to continue.
+            LOGV2_DEBUG(9064301,
+                        1,
+                        "Oplog cap maintainer thread was interrupted, but can safely continue",
+                        "error"_attr = err);
         }
     }
+
+    MONGO_UNREACHABLE;
 }
 
 void OplogCapMaintainerThread::waitForFinish() {
