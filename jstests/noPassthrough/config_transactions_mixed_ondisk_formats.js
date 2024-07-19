@@ -113,6 +113,7 @@ function testRestartSecondaryWithDifferentExpectedConfigTxnsFormat() {
             startClean: false,
             setParameter: {featureFlagClusteredConfigTransactions: !primarySetting}
         });
+        replSet.awaitSecondaryNodes();
         replSet.reInitiate();
         replSet.awaitSecondaryNodes();
 
