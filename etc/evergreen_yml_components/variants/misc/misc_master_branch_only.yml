@@ -106,7 +106,7 @@ buildvariants:
   - rhel80-small
   expansions:
     multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     compile_variant: *stm-daily-cron
   stepback: false

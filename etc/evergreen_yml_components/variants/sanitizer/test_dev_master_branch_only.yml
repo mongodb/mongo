@@ -43,7 +43,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+  multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium
@@ -104,7 +104,7 @@ multiversion_platform_50_or_later: rhel8
   num_scons_link_jobs_available: 0.99
   large_distro_name: rhel80-build
   multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+  multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
@@ -487,7 +487,7 @@ buildvariants:
       --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,all_feature_flags_incompatible
       --runAllFeatureFlagTests
     multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
@@ -646,7 +646,7 @@ multiversion_platform_50_or_later: rhel8
     large_distro_name: rhel80-medium
     core_analyzer_distro_name: rhel80-xlarge
     multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --excludeWithAnyTags=tsan_incompatible

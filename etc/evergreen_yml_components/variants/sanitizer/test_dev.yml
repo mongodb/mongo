@@ -107,7 +107,7 @@ variables:
   num_scons_link_jobs_available: 0.99
   large_distro_name: rhel80-build
   multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+  multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
@@ -230,7 +230,7 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
@@ -274,7 +274,7 @@ multiversion_platform_50_or_later: rhel8
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
       --benchmarkRepetitions=1
     multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
@@ -367,7 +367,7 @@ multiversion_platform_50_or_later: rhel8
       --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
       --benchmarkRepetitions=1
     multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared

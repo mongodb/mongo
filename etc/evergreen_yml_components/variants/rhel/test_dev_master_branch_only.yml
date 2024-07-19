@@ -79,7 +79,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+  multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium
@@ -440,7 +440,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
@@ -799,7 +799,7 @@ multiversion_platform_50_or_later: rhel8
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\""
@@ -848,7 +848,7 @@ multiversion_platform_50_or_later: rhel8
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\""
@@ -895,7 +895,7 @@ multiversion_platform_50_or_later: rhel8
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
-multiversion_platform_50_or_later: rhel8
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
         --mongosSetParameters="joinIngressSessionsOnShutdown: \"true\""
