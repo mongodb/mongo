@@ -636,7 +636,8 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
     }
 
     if (auto mixedSchema = cmr.getTimeseriesBucketsMayHaveMixedSchemaData()) {
-        if (!gCollModTimeseriesBucketsMayHaveMixedSchemaData.isEnabled(
+        if (opCtx->isEnforcingConstraints() &&
+            !gCollModTimeseriesBucketsMayHaveMixedSchemaData.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             return {ErrorCodes::InvalidOptions,
                     "The timeseriesBucketsMayHaveMixedSchemaData parameter is not enabled"};
