@@ -14,11 +14,6 @@ variables:
   - name: package_new_compile
     variant: amazon2-x86-compile
 
-- &amazon2_x86_openssl111_compile_variant_dependency
-  depends_on:
-  - name: package_new_compile
-    variant: amazon2-x86-openssl111-compile
-
 - &amazon_linux2_arm64_compile_variant_dependency
   depends_on:
   - name: package_new_compile
@@ -430,7 +425,7 @@ buildvariants:
     # - name: genny_query_TenMDocCollection_IntId_IdentityView
     # - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
-- <<: *amazon2_x86_openssl111_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: atlas-like-replica-intel-openSSL-111.2023-09
   display_name: M60-like-replica.2023-09 Intel OpenSSL 1.1.1 3-Node ReplSet
   cron: *atlas-like-repl-cron
@@ -445,7 +440,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon2-x86-openssl111-compile
+    compile_variant: amazon2-x86-compile
   run_on:
     - "rhel94-perf-M60-like"
   tasks:
