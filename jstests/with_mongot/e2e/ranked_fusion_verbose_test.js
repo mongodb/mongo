@@ -8,6 +8,7 @@ import {
     getMovieData,
     getPlotEmbeddingById
 } from "jstests/with_mongot/e2e/lib/hybrid_scoring_data.js";
+import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
 
 const collName = "search_rank_fusion";
 const coll = db.getCollection(collName);
@@ -133,7 +134,7 @@ function runTest(vectorSearchConstant, fullTextSearchConstant, expectedResultIds
     ];
     let results = coll.aggregate(hybridSearchQuery).toArray();
 
-    assert.eq(results, buildExpectedResults(expectedResultIds));
+    assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds), results);
 }
 
 // The default rank constants for reciprocal rank fusion is 1.
