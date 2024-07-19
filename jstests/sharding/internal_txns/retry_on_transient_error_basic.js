@@ -147,7 +147,7 @@ function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilt
 
     // Preload the collection metadata to avoid repeating the insert command if it fails due to
     // StaleConfig error.
-    assert.soon(() => db.adminCommand({_flushRoutingTableCacheUpdates: kNs}));
+    assert.commandWorked(db.adminCommand({_flushRoutingTableCacheUpdates: kNs}));
 
     const insertCmdObj = {
         insert: kCollName,
