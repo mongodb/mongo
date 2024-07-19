@@ -63,7 +63,7 @@ buildvariants:
 - name: enterprise-rhel-8-64-bit
   display_name: "! Enterprise RHEL 8"
   expansions:
-    multiversion_platform: rhel8
+    multiversion_platform: rhel80
     burn_in_tag_buildvariants: enterprise-rhel-8-64-bit-majority-read-concern-off enterprise-rhel-8-64-bit-inmem
   tasks:
   - name: compile_all_run_unittests_TG
@@ -77,7 +77,7 @@ buildvariants:
 - name: buildvariant-without-burn-in-tag-buildvariants
   display_name: "Buildvariant without burn in tag buildvariants expansion"
   expansions:
-    multiversion_platform: rhel8
+    multiversion_platform: rhel80
   tasks:
   - name: burn_in_tags_gen
 - name: enterprise-rhel-8-64-bit-majority-read-concern-off
@@ -106,7 +106,7 @@ buildvariants:
       --release
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
       MONGO_DISTMOD=rhel80
-    multiversion_platform: rhel8
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
@@ -121,7 +121,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     large_distro_name: rhel80-large
     multiversion_edition: enterprise
-    multiversion_platform: rhel8
+    multiversion_platform: rhel80
     scons_cache_scope: shared
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
   run_on:
