@@ -237,22 +237,21 @@ export function randomUpdateDelete($config, $super) {
     };
 
     $config.data.verifyUpdateResult = function verifyUpdateResult(expected, actual) {
-        if (this.expectPartialMultiWrites) {
-            assert.lte(actual.n, expected.n);
-            assert.lte(actual.nModified, expected.nModified);
+        if (!this.expectPartialMultiWrites && !this.expectExtraMultiWrites) {
+            // We don't expect partial nor extra updates, so the result must match exactly the
+            // expected.
+            assert.eq(actual.n, expected.n);
+            assert.eq(actual.nModified, expected.nModified);
             return;
         }
+
         // When we expect extra multi updates, we can at least assert that at most two times the
         // number of actual documents were modified. This happens when a multi-update router with
         // ShardVersion::IGNORED completely executes on one shard before resharding commits, and on
         // the other after it commits.
-        if (this.expectExtraMultiWrites) {
-            assert.lte(actual.n, 2 * expected.n);
-            assert.lte(actual.nModified, 2 * expected.nModified);
-            return;
-        }
-        assert.eq(actual.n, expected.n);
-        assert.eq(actual.nModified, expected.nModified);
+        const multiplier = this.expectExtraMultiWrites ? 2 : 1;
+        assert.lte(actual.n, multiplier * expected.n);
+        assert.lte(actual.nModified, multiplier * expected.nModified);
     };
 
     $config.data.verifyDeleteResult = function verifyDeleteResult(expected, actual) {
