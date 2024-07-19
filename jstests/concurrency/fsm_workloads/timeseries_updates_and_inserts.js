@@ -27,10 +27,15 @@ export const $config = (function() {
         },
         updateMany: function updateMany(db, collName) {
             const readingNo = Random.randInt(this.nTotalReadings);
+            let additionalCodesToRetry = [ErrorCodes.NoProgressMade];
+            if (TestData.runningWithBalancer) {
+                additionalCodesToRetry.push(ErrorCodes.QueryPlanKilled);
+            }
+
             retryOnRetryableError(() => {
                 assert.commandWorked(
                     db[collName].updateMany({readingNo: readingNo}, {$inc: {updated: 1}}));
-            }, 100, undefined, TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : []);
+            }, 100, undefined, additionalCodesToRetry);
         },
         updateOne: function updateOne(db, collName) {
             const sensorId = Random.randInt(this.nSensors);
