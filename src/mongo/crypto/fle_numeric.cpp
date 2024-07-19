@@ -247,10 +247,6 @@ OSTType_Double getTypeInfoDouble(double value,
     bool use_precision_mode = false;
     uint32_t bits_range;
     if (precision.has_value()) {
-
-        // Subnormal representations can support up to 5x10^-324 as a number
-        uassert(6966801, "Precision must be between 0 and 324 inclusive", precision.get() <= 324);
-
         uassert(6966803,
                 "Must specify both a lower bound, upper bound and precision",
                 min.has_value() == max.has_value() && max.has_value() == precision.has_value());
@@ -397,8 +393,6 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
                 "Must specify both a lower bound, upper bound and precision",
                 min.has_value() == max.has_value() && max.has_value() == precision.has_value());
 
-        uassert(6966802, "Precision must be between 0 and 6142 inclusive", precision.get() <= 6142);
-
         use_precision_mode =
             canUsePrecisionMode(min.get(), max.get(), precision.get(), &bits_range);
     }
@@ -535,6 +529,16 @@ bool canUsePrecisionMode(Decimal128 min, Decimal128 max, uint32_t precision, uin
             "than max.",
             min < max);
 
+    // Ensure the precision can be converted to signed int without overflow
+    // since Decimal128::scale implicitly converts uint32_t to int
+    uassert(9125501,
+            str::stream() << "Precision cannot be greater than "
+                          << std::numeric_limits<int32_t>::max(),
+            precision <= static_cast<uint32_t>(std::numeric_limits<int32_t>::max()));
+    uassert(9125502,
+            "Precision is too large and cannot be used to calculate the scaled range bounds",
+            Decimal128(1).scale(precision).isFinite());
+
     const auto scaled_min = min.scale(precision);
     const auto scaled_max = max.scale(precision);
 
@@ -603,7 +607,17 @@ bool canUsePrecisionMode(double min, double max, uint32_t precision, uint32_t* m
         "Invalid upper and lower bounds for double precision. Min must be strictly less than max.",
         min < max);
 
+    // Ensure the precision can be converted to signed int without overflow
+    // since exp10Double implicitly converts uint32_t to int
+    uassert(9125503,
+            str::stream() << "Precision cannot be greater than "
+                          << std::numeric_limits<int32_t>::max(),
+            precision <= static_cast<uint32_t>(std::numeric_limits<int32_t>::max()));
+
     const auto scaled_prc = exp10Double(precision);
+    uassert(9125504,
+            "Precision is too large and cannot be used to calculate the scaled range bounds",
+            !std::isinf(scaled_prc));
 
     auto scaled_max = max * scaled_prc;
     auto scaled_min = min * scaled_prc;

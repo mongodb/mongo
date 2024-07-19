@@ -3316,8 +3316,7 @@ TEST(RangeTest, Double_Bounds_Precision_Errors) {
     ASSERT_THROWS_CODE(
         getTypeInfoDouble(1, boost::none, boost::none, 1), AssertionException, 6966803);
 
-    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 1, 2, -1), AssertionException, 6966801);
-    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 1, 2, 325), AssertionException, 6966801);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 1, 2, -1), AssertionException, 9125503);
 }
 
 TEST(RangeTest, Double_Errors) {
@@ -3669,11 +3668,7 @@ TEST(RangeTest, Decimal128_Bounds_Precision_Errors) {
 
     ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), Decimal128(1), Decimal128(2), -1),
                        AssertionException,
-                       6966802);
-
-    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), Decimal128(1), Decimal128(2), 6143),
-                       AssertionException,
-                       6966802);
+                       9125501);
 }
 
 void roundTripDecimal128_Int128(std::string dec_str) {
@@ -5428,7 +5423,16 @@ TEST_F(EdgeTestFixture, canUsePrecisionMode) {
 
     CAN_USE_PRECISION_MODE(2.718281, 314.159265, 6, true, 29);
 
-    CAN_USE_PRECISION_MODE(-1000000000, 9223372036844775424, 0, false, 0);
+    // precision too large
+    CAN_USE_PRECISION_MODE_ERRORS(
+        Decimal128("1"), Decimal128("2"), std::numeric_limits<uint32_t>::max(), 9125501);
+    CAN_USE_PRECISION_MODE_ERRORS(1, 2, std::numeric_limits<uint32_t>::max(), 9125503);
+    // 10^prc results in infinity above 308 for doubles, since the largest double value is
+    // 1.7976931348623157x10^308
+    CAN_USE_PRECISION_MODE_ERRORS(0, 1, 309, 9125504);
+    // 10^prc results in infinity above 6144 for decimal, since the largest decimal128 value
+    // is 9.99999...x10^6144
+    CAN_USE_PRECISION_MODE_ERRORS(Decimal128("0"), Decimal128("1"), 6145, 9125502);
 
     CAN_USE_PRECISION_MODE_ERRORS(2.710000, 314.150000, 2, 9178801);
     CAN_USE_PRECISION_MODE_ERRORS(314.150000, 350, 2, 9178802);
