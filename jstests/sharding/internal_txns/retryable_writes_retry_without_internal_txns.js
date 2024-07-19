@@ -163,7 +163,7 @@ let currentParentTxnNumber = NumberLong(35);
         setUpTestMode(testMode);
 
         const childLsid2 = {id: parentLsid.id, txnNumber: parentTxnNumber, txnUUID: UUID()};
-        const childTxnNumber2 = NumberLong(0);
+        let childTxnNumber2 = NumberLong(0);
         jsTest.log(`Retrying the update in a retryable internal transaction with lsid ${
             tojson(childLsid2)}`);
 
@@ -185,6 +185,7 @@ let currentParentTxnNumber = NumberLong(35);
             } catch (e) {
                 assert(ErrorCodes.isRetriableError(e.code) || isNetworkError(e));
                 assert(TransactionsUtil.isTransientTransactionError(e));
+                childTxnNumber2 += 1;
             }
             return false;
         });
@@ -230,7 +231,7 @@ let currentParentTxnNumber = NumberLong(35);
         setUpTestMode(testMode);
 
         const childLsid1 = {id: parentLsid.id, txnNumber: parentTxnNumber, txnUUID: UUID()};
-        const childTxnNumber1 = NumberLong(0);
+        let childTxnNumber1 = NumberLong(0);
         jsTest.log(`Retrying one of the updates in a retryable internal transaction with lsid ${
             tojson(childLsid1)}`);
 
@@ -252,6 +253,7 @@ let currentParentTxnNumber = NumberLong(35);
             } catch (e) {
                 assert(ErrorCodes.isRetriableError(e.code) || isNetworkError(e));
                 assert(TransactionsUtil.isTransientTransactionError(e));
+                childTxnNumber1 += 1;
             }
             return false;
         });
