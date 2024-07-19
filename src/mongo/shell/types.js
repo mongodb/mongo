@@ -292,6 +292,36 @@ Object.merge = function(dst, src, deep) {
     return Object.extend(clone, src, deep);
 };
 
+// If there is a conflict in values of a key for two objects being merged, the second value will
+// override the first one in the merged object
+Object.deepMerge = function(...objects) {
+    const isObject = obj => obj && typeof obj === 'object';
+
+    // Create new object prev to hold combination of all object fields.
+    return objects.reduce((prev, obj) => {
+        if (obj === undefined) {
+            obj = {};
+        }
+        Object.keys(obj).forEach(key => {
+            const pVal = prev[key];  // Get the values for key from the two objects being merged.
+            const oVal = obj[key];
+
+            if (Array.isArray(pVal) &&
+                Array.isArray(oVal)) {  // If both are arrays then concatenate them into a new
+                                        // array and add it to prev.
+                prev[key] = pVal.concat(...oVal);
+            } else if (isObject(pVal) &&
+                       isObject(oVal)) {  // If both are objects then recursively merge again.
+                prev[key] = Object.deepMerge(pVal, oVal);
+            } else {  // In all other cases set prev[key] to obj[key].
+                prev[key] = oVal;
+            }
+        });
+
+        return prev;
+    }, {});
+};
+
 Object.keySet = function(o) {
     var ret = new Array();
     for (var i in o) {
