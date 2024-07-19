@@ -6,6 +6,7 @@
  * @tags: [requires_fcv_70]
  */
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 const testCases = [];
@@ -109,7 +110,7 @@ function testDiffs(rst, testCase, expectSampling) {
     // If running on the config server, use "config" as the database name since it is illegal to
     // create a user database on the config server.
     const dbName = rst.isConfigRS ? "config" : "testDb";
-    const collName = "testColl-" + QuerySamplingUtil.generateRandomString();
+    const collName = "testColl-" + extractUUIDFromObject(UUID());
     const ns = dbName + "." + collName;
 
     const primary = rst.getPrimary();
