@@ -54,14 +54,6 @@ withQueryStatsEnabled(collName, (coll) => {
             fromMultiPlanner: false,
             fromPlanCache: false
         });
-        assertExpectedResults(firstEntry,
-                              firstEntry.key,
-                              /* expectedExecCount */ 1,
-                              /* expectedDocsReturnedSum */ 3,
-                              /* expectedDocsReturnedMax */ 3,
-                              /* expectedDocsReturnedMin */ 3,
-                              /* expectedDocsReturnedSumOfSq */ 9,
-                              /* getMores */ false);
     } else {
         assertAggregatedMetricsSingleExec(firstEntry, {
             keysExamined: 0,
@@ -71,14 +63,13 @@ withQueryStatsEnabled(collName, (coll) => {
             fromMultiPlanner: false,
             fromPlanCache: false
         });
-        // TODO SERVER-92502: docsReturned should be the same as the mongos results above.
-        assertExpectedResults(firstEntry,
-                              firstEntry.key,
-                              /* expectedExecCount */ 1,
-                              /* expectedDocsReturnedSum */ 5,
-                              /* expectedDocsReturnedMax */ 5,
-                              /* expectedDocsReturnedMin */ 5,
-                              /* expectedDocsReturnedSumOfSq */ 25,
-                              /* getMores */ false);
     }
+    assertExpectedResults(firstEntry,
+                          firstEntry.key,
+                          /* expectedExecCount */ 1,
+                          /* expectedDocsReturnedSum */ 3,
+                          /* expectedDocsReturnedMax */ 3,
+                          /* expectedDocsReturnedMin */ 3,
+                          /* expectedDocsReturnedSumOfSq */ 9,
+                          /* getMores */ false);
 });
