@@ -928,7 +928,7 @@ tasks:
   - func: "run selinux tests"
     vars:
       user: root
-      distro: rhel76-selinux
+      distro: rhel79-selinux
       test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
 
 - name: selinux_rhel7_org
@@ -947,7 +947,7 @@ tasks:
   - func: "run selinux tests"
     vars:
       user: root
-      distro: rhel76-selinux
+      distro: rhel79-selinux
       test_list: jstests/selinux/*.js
 
 - name: selinux_rhel8_enterprise
