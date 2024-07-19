@@ -91,10 +91,14 @@ function runExplainAndCursorTest(currentVerbosity) {
 }
 
 runExplainTest("queryPlanner");
-// TODO SERVER-91594: Testing "executionStats" and "allPlansExecution" for runExplainTest() is not
-// necessary when mongot will not return that.
-runExplainTest("executionStats");
-runExplainTest("allPlansExecution");
+// TODO SERVER-85637 Remove the gated tests when the feature flag is removed, as they will fail.
+// They are tested with the feature flag enabled in search_explain_execution_stats.js.
+if (!FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchExplainExecutionStats')) {
+    // TODO SERVER-91594: Testing "executionStats" and "allPlansExecution" for runExplainTest() is
+    // not necessary after mongot will always return a cursor for execution stats verbosties.
+    runExplainTest("executionStats");
+    runExplainTest("allPlansExecution");
+}
 
 runExplainAndCursorTest("executionStats");
 runExplainAndCursorTest("allPlansExecution");

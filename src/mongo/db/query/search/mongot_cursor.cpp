@@ -172,32 +172,39 @@ std::unique_ptr<executor::TaskExecutorCursor> makeTaskExecutorCursorForExplain(
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     std::unique_ptr<executor::TaskExecutorCursorGetMoreStrategy> getMoreStrategy,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
-    auto response =
-        runSearchCommandWithRetries(expCtx, command.cmdObj, makeRetryOnNetworkErrorPolicy());
-    auto responseData = response.data;
-    // We may query a version of mongot that only returns the explain object. Since creating a
-    // TaskExecutorCursor (TEC) with no cursor will error, we manually create a dummy cursor to
-    // create the TEC here.
-    if (responseData[CursorInitialReply::kCursorFieldName].type() != BSONType::Object) {
+    // We may potentially query an older version of mongot that doesn't return a cursor object. This
+    // causes an error within makeTaskExecutorCursor() as it expects a cursor. We catch that error
+    // here and then create a dummy TEC to continue execution.
+    try {
+        return makeTaskExecutorCursor(expCtx->opCtx,
+                                      taskExecutor,
+                                      command,
+                                      {std::move(getMoreStrategy), std::move(yieldPolicy)},
+                                      makeRetryOnNetworkErrorPolicy());
+    } catch (ExceptionFor<ErrorCodes::IDLFailedToParse>&) {
         auto nss = expCtx->ns;
-        auto cursorBSON =
-            BSON(AnyCursor::kCursorIdFieldName
-                 << CursorId(0) << AnyCursor::kNsFieldName
-                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
-                 << AnyCursor::kFirstBatchFieldName << BSONArray());
-        BSONObjBuilder cursorBuilder(std::move(responseData));
-        cursorBuilder << CursorInitialReply::kCursorFieldName << cursorBSON;
-        responseData = cursorBuilder.obj();
+        BSONObjBuilder createdResponse;
+        createdResponse.append("ok", 1);
+
+        // Note that we do not query mongot here to obtain the explain object for the created cursor
+        // response. This is because the command could include the protocolVersion, and if we happen
+        // to query a version of mongot that does return cursors, we would not be able to easily
+        // obtain the explain object from the response. As there is no explain object on this
+        // created cursor response, the explain object will be obtained during
+        // serializeWithoutMergePipeline() of DocumentSourceInternalSearchMongotRemote.
+        BSONObjBuilder cursor =
+            BSONObjBuilder(createdResponse.subobjStart(CursorInitialReply::kCursorFieldName));
+        cursor.append(AnyCursor::kCursorIdFieldName, CursorId(0));
+        cursor.append(AnyCursor::kNsFieldName,
+                      NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+        cursor.append(AnyCursor::kFirstBatchFieldName, BSONArray());
+        cursor.doneFast();
+        auto cursorResponse = CursorResponse::parseFromBSON(std::move(createdResponse.obj()));
+
+        return std::make_unique<executor::TaskExecutorCursor>(
+            taskExecutor, nullptr, uassertStatusOK(std::move(cursorResponse)), command);
     }
-    auto cursorResponse = CursorResponse::parseFromBSON(std::move(responseData));
-    executor::TaskExecutorCursorOptions options = {std::move(getMoreStrategy),
-                                                   std::move(yieldPolicy)};
-    return std::make_unique<executor::TaskExecutorCursor>(
-        taskExecutor,
-        nullptr,
-        uassertStatusOK(std::move(cursorResponse)),
-        command,
-        std::move(options));
+    MONGO_UNREACHABLE;
 }
 
 std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
