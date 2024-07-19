@@ -9,5 +9,5 @@ function setup_db_contrib_tool {
   # We force reinstall here because when we download the previous venv the shebang
   # in pipx still points to the old machines python location.
   python -m pip --disable-pip-version-check install --force-reinstall --no-deps "pipx==1.2.0" || exit 1
-  pipx install "db-contrib-tool==0.7.0" --pip-args="--no-cache-dir" || exit 1
+  pipx install "db-contrib-tool==0.8.3" --pip-args="--no-cache-dir" || exit 1
 }

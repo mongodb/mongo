@@ -54,6 +54,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium
@@ -66,7 +67,7 @@ variables:
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &enterprise-rhel-80-64-bit-dynamic-expansions
+- &enterprise-rhel-8-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions
   scons_cache_scope: shared
   scons_cache_mode: all
@@ -123,6 +124,7 @@ variables:
   num_scons_link_jobs_available: 0.99
   large_distro_name: rhel80-build
   multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
@@ -149,17 +151,17 @@ buildvariants:
       distros:
       - rhel80-large
 
-- &enterprise-rhel-80-64-bit-dynamic-template
+- &enterprise-rhel-8-64-bit-dynamic-template
   <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel-80-64-bit-dynamic enterprise-rhel-80-64-bit-dynamic
-  display_name: "! Shared Library Enterprise RHEL 8.0"
+  name: &enterprise-rhel-8-64-bit-dynamic enterprise-rhel-8-64-bit-dynamic
+  display_name: "! Shared Library Enterprise RHEL 8"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
   - rhel80-small
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+    <<: *enterprise-rhel-8-64-bit-dynamic-expansions
   depends_on:
   - name: archive_dist_test_debug
     variant: *linux_x86_dynamic_compile_variant_name
@@ -266,18 +268,18 @@ buildvariants:
 # # TODO (SERVER-86211): Re-enable this variant once all the tests work.
 # # TODO (SERVER-75884): Remove this variant once we switch to config shard as the default.
 # # This build variant is used to test suites that use sharded cluster fixture with config shard mode.
-# - &enterprise-rhel-80-64-bit-dynamic-config-shard
+# - &enterprise-rhel-8-64-bit-dynamic-config-shard
 #   <<: *linux_x86_dynamic_compile_variant_dependency
-#   name: enterprise-rhel-80-64-bit-dynamic-config-shard
-#   display_name: "* Shared Library Enterprise RHEL 8.0 (Config Shard)"
+#   name: enterprise-rhel-8-64-bit-dynamic-config-shard
+#   display_name: "* Shared Library Enterprise RHEL 8 (Config Shard)"
 #   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
 #   modules:
 #   - enterprise
 #   run_on:
 #   - rhel80-small
 #   stepback: false
-#   expansions: &enterprise-rhel-80-64-bit-dynamic-config-shard-expansions
-#     <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+#   expansions: &enterprise-rhel-8-64-bit-dynamic-config-shard-expansions
+#     <<: *enterprise-rhel-8-64-bit-dynamic-expansions
 #     test_flags: >-
 #       --configShard=any
 #       --excludeWithAnyTags=config_shard_incompatible
@@ -316,10 +318,10 @@ buildvariants:
 #     - rhel80-medium
 #   - name: .multi_shard
 
-- &enterprise-rhel-80-64-bit-dynamic-classic-engine
+- &enterprise-rhel-8-64-bit-dynamic-classic-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
-  name: enterprise-rhel-80-64-bit-dynamic-classic-engine
-  display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
+  name: enterprise-rhel-8-64-bit-dynamic-classic-engine
+  display_name: "Shared Library Enterprise RHEL 8 (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -327,7 +329,7 @@ buildvariants:
   - rhel80-small
   stepback: false
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+    <<: *enterprise-rhel-8-64-bit-dynamic-expansions
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
@@ -445,8 +447,8 @@ buildvariants:
 ###########################################
 
 - <<: *linux_debug_aubsan_compile_variant_dependency
-  name: &rhel80-debug-aubsan-classic-engine rhel80-debug-aubsan-classic-engine
-  display_name: "* {A,UB}SAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
+  name: &rhel8-debugaubsan-classic-engine rhel8-debugaubsan-classic-engine
+  display_name: "* {A,UB}SAN Enterprise RHEL 8 DEBUG (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise

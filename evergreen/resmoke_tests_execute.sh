@@ -27,7 +27,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
       # Use the RHEL 8 all feature flags variant for the classic engine variant. The original
       # classic engine variant is not a required builder and therefore not captured in patch
       # test failure history.
-      tags_build_variant="enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required"
+      tags_build_variant="enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required"
     fi
 
     $python buildscripts/testmatrix/getdisplaytaskname.py "${task_name}" "${build_variant}" > display_task_name.txt
@@ -105,7 +105,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
   set -o errexit
 
   # Reduce the JSHeapLimit for the serial_run task task on Code Coverage builder variant.
-  if [[ "${build_variant}" = "enterprise-rhel-80-64-bit-coverage" && "${task_name}" = "serial_run" ]]; then
+  if [[ "${build_variant}" = "enterprise-rhel-8-64-bit-coverage" && "${task_name}" = "serial_run" ]]; then
     extra_args="$extra_args --mongodSetParameter \"{'jsHeapLimitMB':10}\""
   fi
 

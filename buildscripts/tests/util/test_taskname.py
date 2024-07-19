@@ -28,7 +28,7 @@ class TestRemoveGenSuffix(unittest.TestCase):
 
 class TestDetermineTaskBaseName(unittest.TestCase):
     def test_task_name_with_build_variant_should_strip_bv_and_sub_task_index(self):
-        bv = "enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required"
+        bv = "enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required"
         task_name = f"auth_23_{bv}"
 
         base_task_name = under_test.determine_task_base_name(task_name, bv)
@@ -36,7 +36,7 @@ class TestDetermineTaskBaseName(unittest.TestCase):
         self.assertEqual("auth", base_task_name)
 
     def test_task_name_without_build_variant_should_strip_sub_task_index(self):
-        bv = "enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required"
+        bv = "enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required"
         task_name = "auth_314"
 
         base_task_name = under_test.determine_task_base_name(task_name, bv)
@@ -44,7 +44,7 @@ class TestDetermineTaskBaseName(unittest.TestCase):
         self.assertEqual("auth", base_task_name)
 
     def test_task_name_without_build_variant_or_subtask_index_should_self(self):
-        bv = "enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required"
+        bv = "enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required"
         task_name = "auth"
 
         base_task_name = under_test.determine_task_base_name(task_name, bv)

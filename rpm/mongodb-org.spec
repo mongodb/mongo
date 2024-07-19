@@ -227,7 +227,7 @@ MongoDB features:
 
 This package provides the MongoDB static library and header files needed to develop MongoDB client software.
 
-#Release builds have no debug symbols, and this prevents packaging errors on RHEL 8.0
+#Release builds have no debug symbols, and this prevents packaging errors on RHEL 8
 %global debug_package %{nil}
 
 %prep

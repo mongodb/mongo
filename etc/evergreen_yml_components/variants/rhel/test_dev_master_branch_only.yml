@@ -79,6 +79,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium
@@ -91,7 +92,7 @@ variables:
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &enterprise-rhel-80-64-bit-dynamic-expansions
+- &enterprise-rhel-8-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions
   scons_cache_scope: shared
   scons_cache_mode: all
@@ -264,18 +265,18 @@ buildvariants:
       distros:
       - rhel80-xxlarge
 
-- &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
+- &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
   <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags enterprise-rhel-80-64-bit-dynamic-all-feature-flags
-  display_name: "* Shared Library Enterprise RHEL 8.0 (all feature flags)"
+  name: &enterprise-rhel-8-64-bit-dynamic-all-feature-flags enterprise-rhel-8-64-bit-dynamic-all-feature-flags
+  display_name: "* Shared Library Enterprise RHEL 8 (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
   - rhel80-small
   stepback: false
-  expansions: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
-    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+  expansions: &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-expansions
+    <<: *enterprise-rhel-8-64-bit-dynamic-expansions
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
@@ -421,8 +422,8 @@ buildvariants:
   - name: query_stats_mongos_passthrough
   - name: query_stats_passthrough
 
-- name: &enterprise-rhel-80-64-bit-suggested enterprise-rhel-80-64-bit-suggested
-  display_name: "* Enterprise RHEL 8.0"
+- name: &enterprise-rhel-8-64-bit-suggested enterprise-rhel-8-64-bit-suggested
+  display_name: "* Enterprise RHEL 8"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
   modules:
   - enterprise
@@ -439,6 +440,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
@@ -448,7 +450,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel80-large
     core_analyzer_distro_name: rhel80-xlarge
-    compile_variant: *enterprise-rhel-80-64-bit-suggested
+    compile_variant: *enterprise-rhel-8-64-bit-suggested
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -487,8 +489,8 @@ buildvariants:
   - name: selinux_rhel8_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: &enterprise-rhel-80-benchmarks enterprise-rhel-80-benchmarks
-  display_name: "* Enterprise RHEL 8.0 (Benchmarks)"
+- name: &enterprise-rhel-8-benchmarks enterprise-rhel-8-benchmarks
+  display_name: "* Enterprise RHEL 8 (Benchmarks)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -503,7 +505,7 @@ buildvariants:
       --use-diagnostic-latches=on
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.5
-    compile_variant: *enterprise-rhel-80-benchmarks
+    compile_variant: *enterprise-rhel-8-benchmarks
   tasks:
   - name: compile_upload_benchmarks_TG
     distros:
@@ -511,8 +513,8 @@ buildvariants:
   - name: .benchmarks
 
 - <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel-80-64-bit-large-txns-format enterprise-rhel-80-64-bit-large-txns-format
-  display_name: "Enterprise RHEL 8.0 (large transactions format)"
+  name: &enterprise-rhel-8-64-bit-large-txns-format enterprise-rhel-8-64-bit-large-txns-format
+  display_name: "Enterprise RHEL 8 (large transactions format)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   modules:
   - enterprise
@@ -575,8 +577,8 @@ buildvariants:
 # currently only run on our daily builders.
 - &linux-x86-multiversion-template
   <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel-80-64-bit-multiversion enterprise-rhel-80-64-bit-multiversion
-  display_name: "Enterprise RHEL 8.0 (implicit multiversion)"
+  name: &enterprise-rhel-8-64-bit-multiversion enterprise-rhel-8-64-bit-multiversion
+  display_name: "Enterprise RHEL 8 (implicit multiversion)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -591,8 +593,8 @@ buildvariants:
   - name: .random_multiversion_ds
 
 - <<: *linux-x86-multiversion-template
-  name: &enterprise-rhel-80-64-bit-multiversion-all-feature-flags enterprise-rhel-80-64-bit-multiversion-all-feature-flags
-  display_name: "Enterprise RHEL 8.0 (implicit multiversion & all feature flags)"
+  name: &enterprise-rhel-8-64-bit-multiversion-all-feature-flags enterprise-rhel-8-64-bit-multiversion-all-feature-flags
+  display_name: "Enterprise RHEL 8 (implicit multiversion & all feature flags)"
   expansions:
     <<: *linux-x86-multiversion-expansions-template
     # No feature flag tests since they aren't compatible with the older binaries.
@@ -602,10 +604,10 @@ buildvariants:
 # This variant exists becuase this is the only way to test future multiversion tags
 # version_expansions_gen will pretend we are upgrading to "bv_future_git_tag"
 # which is like simulating a branching task
-- &enterprise-rhel-80-64-bit-future-git-tag-multiversion-template
+- &enterprise-rhel-8-64-bit-future-git-tag-multiversion-template
   <<: *linux-x86-multiversion-template
-  name: &enterprise-rhel-80-64-bit-future-git-tag-multiversion enterprise-rhel-80-64-bit-future-git-tag-multiversion
-  display_name: "Enterprise RHEL 8.0 (future git tag multiversion)"
+  name: &enterprise-rhel-8-64-bit-future-git-tag-multiversion enterprise-rhel-8-64-bit-future-git-tag-multiversion
+  display_name: "Enterprise RHEL 8 (future git tag multiversion)"
   expansions:
     <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
@@ -662,8 +664,8 @@ buildvariants:
   - name: noPassthroughHotBackups_gen
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: &enterprise-rhel80-no-latch-64-bit enterprise-rhel80-no-latch-64-bit
-  display_name: "~ Enterprise RHEL 8.0 (without Diagnostic Latches)"
+- name: &enterprise-rhel8-no-latch-64-bit enterprise-rhel8-no-latch-64-bit
+  display_name: "~ Enterprise RHEL 8 (without Diagnostic Latches)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -676,7 +678,7 @@ buildvariants:
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
-    compile_variant: *enterprise-rhel80-no-latch-64-bit
+    compile_variant: *enterprise-rhel8-no-latch-64-bit
   tasks:
   - name: compile_test_parallel_core_stream_TG
     distros:
@@ -691,8 +693,8 @@ buildvariants:
     distros:
     - rhel80-build
 
-- name: &enterprise-rhel80-sdam-replica-set-monitor-64-bit enterprise-rhel80-sdam-replica-set-monitor-64-bit
-  display_name: "~ Enterprise RHEL 8.0 (with SdamReplicaSetMonitor)"
+- name: &enterprise-rhel8-sdam-replica-set-monitor-64-bit enterprise-rhel8-sdam-replica-set-monitor-64-bit
+  display_name: "~ Enterprise RHEL 8 (with SdamReplicaSetMonitor)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -711,7 +713,7 @@ buildvariants:
       --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
       --excludeWithAnyTags=requires_streamable_rsm
     large_distro_name: rhel80-build
-    compile_variant: *enterprise-rhel80-sdam-replica-set-monitor-64-bit
+    compile_variant: *enterprise-rhel8-sdam-replica-set-monitor-64-bit
   tasks:
   - name: compile_test_parallel_core_stream_TG
     distros:
@@ -735,8 +737,8 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
-  display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
+- name: &enterprise-rhel8-sharding-task-executor-pool-rsm-matchPrimary-64-bit enterprise-rhel8-sharding-task-executor-pool-rsm-matchPrimary-64-bit
+  display_name: "~ Enterprise RHEL 8 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -754,7 +756,7 @@ buildvariants:
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
     large_distro_name: rhel80-build
-    compile_variant: *enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
+    compile_variant: *enterprise-rhel8-sharding-task-executor-pool-rsm-matchPrimary-64-bit
   tasks:
   - name: compile_test_parallel_core_stream_TG
     distros:
@@ -778,8 +780,8 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
-  display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
+- name: &enterprise-rhel8-sharding-task-executor-pool-rsm-matchBusiest-64-bit enterprise-rhel8-sharding-task-executor-pool-rsm-matchBusiest-64-bit
+  display_name: "~ Enterprise RHEL 8 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
@@ -797,12 +799,13 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
     large_distro_name: rhel80-build
-    compile_variant: *enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
+    compile_variant: *enterprise-rhel8-sharding-task-executor-pool-rsm-matchBusiest-64-bit
   tasks:
   - name: compile_test_parallel_core_stream_TG
     distros:
@@ -826,8 +829,8 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: &enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
-  display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
+- name: &enterprise-rhel8-sharding-task-executor-pool-rsm-disabled-64-bit enterprise-rhel8-sharding-task-executor-pool-rsm-disabled-64-bit
+  display_name: "~ Enterprise RHEL 8 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
@@ -845,12 +848,13 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
     large_distro_name: rhel80-build
-    compile_variant: *enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
+    compile_variant: *enterprise-rhel8-sharding-task-executor-pool-rsm-disabled-64-bit
   tasks:
   - name: compile_test_parallel_core_stream_TG
     distros:
@@ -874,8 +878,8 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: &enterprise-rhel80-join-ingress-sessions-on-shutdown enterprise-rhel80-join-ingress-sessions-on-shutdown
-  display_name: "~ Enterprise RHEL 8.0 (with {joinIngressSessionsOnShutdown: \"true\"})"
+- name: &enterprise-rhel8-join-ingress-sessions-on-shutdown enterprise-rhel8-join-ingress-sessions-on-shutdown
+  display_name: "~ Enterprise RHEL 8 (with {joinIngressSessionsOnShutdown: \"true\"})"
   activate: false
   run_on:
     - rhel80-small
@@ -891,12 +895,13 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
         --mongosSetParameters="joinIngressSessionsOnShutdown: \"true\""
         --mongodSetParameters="joinIngressSessionsOnShutdown: \"true\""
     large_distro_name: rhel80-build
-    compile_variant: *enterprise-rhel80-join-ingress-sessions-on-shutdown
+    compile_variant: *enterprise-rhel8-join-ingress-sessions-on-shutdown
   tasks:
   - name: compile_test_serial_TG
     distros:
@@ -935,13 +940,13 @@ buildvariants:
 # Classic Engine variant above.
 # TODO SERVER-71163: Replace this variant with a dedicated variant for stage builders once the CQF
 # feature flag is not always-disabled.
-- &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled-template
-  <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
-  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled
-  display_name: "Shared Library Enterprise RHEL 8.0 Query (all feature flags and CQF enabled)"
+- &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled-template
+  <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
+  name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled
+  display_name: "Shared Library Enterprise RHEL 8 Query (all feature flags and CQF enabled)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
+    <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-expansions
     test_flags: >-
       --runAllFeatureFlagTests
       --excludeWithAnyTags=cqf_incompatible
@@ -1053,17 +1058,17 @@ buildvariants:
 
 # TODO SERVER-71163: Replace this variant with a dedicated variant for stage builders once the CQF
 # feature flag is not always-disabled.
-- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled-template
-  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-and-cqf-enabled-fuzzers
-  display_name: "*| Shared Library Enterprise RHEL 8.0 Query (all feature flags and CQF enabled) Fuzzers"
+- <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled-template
+  name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags-and-cqf-enabled-fuzzers
+  display_name: "*| Shared Library Enterprise RHEL 8 Query (all feature flags and CQF enabled) Fuzzers"
   tasks:
   - name: .aggfuzzer .cqf_only
   - name: .query_fuzzer .cqf_only
 
 ### QO & QE Patch-Specific Build Variants ###
 
-- name: &enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only
-  display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (Classic Engine)"
+- name: &enterprise-rhel-8-64-bit-dynamic-classic-engine-query-patch-only enterprise-rhel-8-64-bit-dynamic-classic-engine-query-patch-only
+  display_name: "~ Shared Library Enterprise RHEL 8 Query Patch Only (Classic Engine)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   modules:
   - enterprise
@@ -1071,7 +1076,7 @@ buildvariants:
   - rhel80-small
   stepback: false
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+    <<: *enterprise-rhel-8-64-bit-dynamic-expansions
     jstestfuzz_num_generated_files: 20
     jstestfuzz_concurrent_num_files: 5
     target_resmoke_time: 30
@@ -1183,13 +1188,13 @@ buildvariants:
   - name: vector_search_auth
   - name: vector_search_ssl
 
-- &enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only-template
-  <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
-  name: enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only
-  display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (Classic Engine all feature flags)"
+- &enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only-template
+  <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
+  name: enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only
+  display_name: "~ Shared Library Enterprise RHEL 8 Query Patch Only (Classic Engine all feature flags)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
+    <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-expansions
     jstestfuzz_num_generated_files: 20
     jstestfuzz_concurrent_num_files: 5
     target_resmoke_time: 30
@@ -1306,21 +1311,21 @@ buildvariants:
   - name: query_stats_mongos_passthrough
   - name: query_stats_passthrough
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only-template
-  name: enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
-  display_name: "*| Shared Library Enterprise RHEL 8.0 (Classic Engine all feature flags) Fuzzers"
+- <<: *enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only-template
+  name: enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
+  display_name: "*| Shared Library Enterprise RHEL 8 (Classic Engine all feature flags) Fuzzers"
   tasks:
   - name: .aggfuzzer !.cqf_only
   - name: .change_stream_fuzzer
   - name: .query_fuzzer !.cqf_only
   - name: .updatefuzzer
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
-  name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
-  display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (all feature flags)"
+- <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
+  name: &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-patch-only enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-patch-only
+  display_name: "~ Shared Library Enterprise RHEL 8 Query Patch Only (all feature flags)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
+    <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-expansions
     jstestfuzz_num_generated_files: 20
     jstestfuzz_concurrent_num_files: 5
     target_resmoke_time: 30
@@ -1330,12 +1335,12 @@ buildvariants:
       --excludeWithAnyTags=resource_intensive
 
 ### Security Patch-Specific Build Variants ###
-- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
-  name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only
-  display_name: "~ Shared Library Enterprise RHEL 8.0 Security Patch Only (all feature flags)"
+- <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
+  name: &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-security-patch-only enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-security-patch-only
+  display_name: "~ Shared Library Enterprise RHEL 8 Security Patch Only (all feature flags)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
+    <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-expansions
     target_resmoke_time: 15
     max_sub_suites: 15
   tasks:

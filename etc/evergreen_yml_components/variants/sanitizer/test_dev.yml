@@ -107,6 +107,7 @@ variables:
   num_scons_link_jobs_available: 0.99
   large_distro_name: rhel80-build
   multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
@@ -193,10 +194,10 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
 
-- &rhel80-debug-aubsan-lite-template
+- &rhel8-debugaubsan-lite-template
   <<: *linux_debug_aubsan_compile_variant_dependency
-  name: &rhel80-debug-aubsan-lite rhel80-debug-aubsan-lite
-  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
+  name: &rhel8-debugaubsan-lite rhel8-debugaubsan-lite
+  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
@@ -209,8 +210,8 @@ buildvariants:
   - name: jsCore
   - name: jsCore_txns
 
-- name: rhel80-asan
-  display_name: ~ ASAN RHEL 8.0
+- name: rhel8-asan
+  display_name: ~ ASAN RHEL 8
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
     - rhel80-build
@@ -229,13 +230,14 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,corrupts_data
     separate_debug: off
-    compile_variant: rhel80-asan
+    compile_variant: rhel8-asan
   tasks:
     - name: compile_test_serial_TG
     - name: compile_test_parallel_unittest_stream_TG
@@ -243,8 +245,8 @@ buildvariants:
     - name: .jstestfuzz !.initsync
     - name: generate_buildid_to_debug_symbols_mapping
 
-- name: rhel80-debug-asan
-  display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG
+- name: rhel8-debugasan
+  display_name: ~ ASAN Enterprise RHEL 8 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -272,6 +274,7 @@ buildvariants:
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
       --benchmarkRepetitions=1
     multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
@@ -279,7 +282,7 @@ buildvariants:
     exec_timeout_secs: 14400 # 3 hour timeout
     separate_debug: off
     large_distro_name: rhel80-build
-    compile_variant: rhel80-debug-asan
+    compile_variant: rhel8-debugasan
   tasks:
   - name: compile_test_benchmark_serial_TG
     distros:
@@ -336,8 +339,8 @@ buildvariants:
   - name: server_selection_json_test_TG
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: rhel80-debug-ubsan
-  display_name: ~ UBSAN Enterprise RHEL 8.0 DEBUG
+- name: rhel8-debugubsan
+  display_name: ~ UBSAN Enterprise RHEL 8 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -364,12 +367,13 @@ buildvariants:
       --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
       --benchmarkRepetitions=1
     multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
     separate_debug: off
     large_distro_name: rhel80-build
-    compile_variant: rhel80-debug-ubsan
+    compile_variant: rhel8-debugubsan
   tasks:
   - name: compile_test_benchmark_serial_TG
     distros:
@@ -422,9 +426,9 @@ buildvariants:
   - name: server_selection_json_test_TG
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &rhel80-debug-aubsan-lite_fuzzer-template
-  name: &rhel80-debug-aubsan-lite_fuzzer rhel80-debug-aubsan-lite_fuzzer
-  display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
+- &rhel8-debugaubsan-lite_fuzzer-template
+  name: &rhel8-debugaubsan-lite_fuzzer rhel8-debugaubsan-lite_fuzzer
+  display_name: "{A,UB}SAN Enterprise RHEL 8 FUZZER"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -457,7 +461,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     separate_debug: off
-    compile_variant: *rhel80-debug-aubsan-lite_fuzzer
+    compile_variant: *rhel8-debugaubsan-lite_fuzzer
   display_tasks:
   - name: libfuzzertests!
     execution_tasks:

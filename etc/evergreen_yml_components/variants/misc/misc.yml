@@ -170,8 +170,8 @@ buildvariants:
     distros:
     - ubuntu1804-xlarge
 
-- name: enterprise-rhel-80-64-bit-dynamic-ninja
-  display_name: "Ninja Build: Enterprise RHEL 8.0"
+- name: enterprise-rhel-8-64-bit-dynamic-ninja
+  display_name: "Ninja Build: Enterprise RHEL 8"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise

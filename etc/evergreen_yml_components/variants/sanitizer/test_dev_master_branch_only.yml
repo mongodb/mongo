@@ -43,6 +43,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium
@@ -55,7 +56,7 @@ variables:
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &enterprise-rhel-80-64-bit-dynamic-expansions
+- &enterprise-rhel-8-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions
   scons_cache_scope: shared
   scons_cache_mode: all
@@ -103,6 +104,7 @@ variables:
   num_scons_link_jobs_available: 0.99
   large_distro_name: rhel80-build
   multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
@@ -113,8 +115,8 @@ buildvariants:
 #          Redhat buildvariants           #
 ###########################################
 
-- name: &enterprise-rhel-80-64-bit-dynamic-debug-mode enterprise-rhel-80-64-bit-dynamic-debug-mode
-  display_name: "Shared Library Enterprise RHEL 8.0 Debug Mode"
+- name: &enterprise-rhel-8-64-bit-dynamic-debug-mode enterprise-rhel-8-64-bit-dynamic-debug-mode
+  display_name: "Shared Library Enterprise RHEL 8 Debug Mode"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   modules:
   - enterprise
@@ -122,8 +124,8 @@ buildvariants:
   - rhel80-small
   stepback: false
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
-    compile_variant: *enterprise-rhel-80-64-bit-dynamic-debug-mode
+    <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+    compile_variant: *enterprise-rhel-8-64-bit-dynamic-debug-mode
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel80
@@ -453,9 +455,9 @@ buildvariants:
 #     Experimental buildvariants          #
 ###########################################
 
-- &rhel80-debug-ubsan-all-feature-flags-template
-  name: &rhel80-debug-ubsan-all-feature-flags rhel80-debug-ubsan-all-feature-flags
-  display_name: "* Shared Library UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
+- &rhel8-debugubsan-all-feature-flags-template
+  name: &rhel8-debugubsan-all-feature-flags rhel8-debugubsan-all-feature-flags
+  display_name: "* Shared Library UBSAN Enterprise RHEL 8 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -478,13 +480,14 @@ buildvariants:
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --use-diagnostic-latches=on
-    compile_variant: *rhel80-debug-ubsan-all-feature-flags
+    compile_variant: *rhel8-debugubsan-all-feature-flags
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,all_feature_flags_incompatible
       --runAllFeatureFlagTests
     multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
@@ -496,10 +499,10 @@ buildvariants:
   - name: disk_wiredtiger
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &rhel80-debug-aubsan-lite-all-feature-flags-required-template
+- &rhel8-debugaubsan-lite-all-feature-flags-required-template
   <<: *linux_debug_aubsan_compile_variant_dependency
-  name: &rhel80-debug-aubsan-lite-all-feature-flags-required rhel80-debug-aubsan-lite-all-feature-flags-required
-  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
+  name: &rhel8-debugaubsan-lite-all-feature-flags-required rhel8-debugaubsan-lite-all-feature-flags-required
+  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
@@ -518,9 +521,9 @@ buildvariants:
   - name: jsCore_column_store_indexes
   - name: jsCore_wildcard_indexes
 
-- <<: *rhel80-debug-aubsan-lite-all-feature-flags-required-template
-  name: &rhel80-debug-aubsan-all-feature-flags rhel80-debug-aubsan-all-feature-flags
-  display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
+- <<: *rhel8-debugaubsan-lite-all-feature-flags-required-template
+  name: &rhel8-debugaubsan-all-feature-flags rhel8-debugaubsan-all-feature-flags
+  display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
   expansions:
     <<: *aubsan-lite-required-expansions
@@ -597,22 +600,22 @@ buildvariants:
   - name: .updatefuzzer
   - name: .watchdog
 
-- &enterprise-rhel80-debug-tsan-template
-  name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
-  display_name: "* TSAN Enterprise RHEL 8.0 DEBUG"
+- &enterprise-rhel8-debug-tsan-template
+  name: &enterprise-rhel8-debug-tsan enterprise-rhel8-debug-tsan
+  display_name: "* TSAN Enterprise RHEL 8 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
   - rhel80-large
   stepback: false
-  expansions: &enterprise-rhel80-debug-tsan-expansions-template
+  expansions: &enterprise-rhel8-debug-tsan-expansions-template
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
     toolchain_version: stable
-    compile_variant: *enterprise-rhel80-debug-tsan
+    compile_variant: *enterprise-rhel8-debug-tsan
     # If you add anything to san_options, make sure the appropriate
     # changes are also made to SConstruct.
     #
@@ -643,6 +646,7 @@ buildvariants:
     large_distro_name: rhel80-medium
     core_analyzer_distro_name: rhel80-xlarge
     multiversion_platform: rhel80
+multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --excludeWithAnyTags=tsan_incompatible
@@ -758,9 +762,9 @@ buildvariants:
   - name: vector_search_ssl
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &enterprise-rhel80-debug-complete-tsan-template
-  name: &enterprise-rhel80-debug-complete-tsan enterprise-rhel80-debug-complete-tsan
-  display_name: "~ TSAN Enterprise RHEL 8.0 COMPLETE DEBUG"
+- &enterprise-rhel8-debug-complete-tsan-template
+  name: &enterprise-rhel8-debug-complete-tsan enterprise-rhel8-debug-complete-tsan
+  display_name: "~ TSAN Enterprise RHEL 8 COMPLETE DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   activate: false
   modules:
@@ -769,10 +773,10 @@ buildvariants:
   - rhel80-large
   stepback: false
   expansions:
-    <<: *enterprise-rhel80-debug-tsan-expansions-template
+    <<: *enterprise-rhel8-debug-tsan-expansions-template
     large_distro_name: rhel80-xlarge
     core_analyzer_distro_name: rhel80-xlarge
-    compile_variant: *enterprise-rhel80-debug-complete-tsan
+    compile_variant: *enterprise-rhel8-debug-complete-tsan
   tasks:
   - name: compile_test_serial_TG
   - name: compile_test_parallel_unittest_stream_TG
@@ -795,8 +799,8 @@ buildvariants:
     - rhel80-xlarge
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: &enterprise-rhel80-unoptimized-64-bit enterprise-rhel80-unoptimized-64-bit
-  display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"
+- name: &enterprise-rhel8-unoptimized-64-bit enterprise-rhel8-unoptimized-64-bit
+  display_name: "~ Enterprise RHEL 8 DEBUG (Unoptimized)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -813,7 +817,7 @@ buildvariants:
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
-    compile_variant: *enterprise-rhel80-unoptimized-64-bit
+    compile_variant: *enterprise-rhel8-unoptimized-64-bit
   tasks:
   - name: compile_test_parallel_core_stream_TG
     distros:

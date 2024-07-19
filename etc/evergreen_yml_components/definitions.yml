@@ -158,13 +158,13 @@ variables:
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-81-ppc64le
   - ubi8
-  - rhel80
-  - rhel-82-arm64
+  - rhel8
+  - rhel8-arm64
   - rhel90
   - rhel90-arm64
-  - enterprise-rhel-80-64-bit
-  - enterprise-rhel-80-64-bit-suggested  # For testing selinux.
-  - enterprise-rhel-82-arm64
+  - enterprise-rhel-8-64-bit
+  - enterprise-rhel-8-64-bit-suggested  # For testing selinux.
+  - enterprise-rhel8-arm64
   - enterprise-rhel-83-s390x
   - enterprise-rhel-90-64-bit
   - enterprise-rhel-90-arm64

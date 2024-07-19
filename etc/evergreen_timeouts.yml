@@ -26,7 +26,7 @@ overrides:
     exec_timeout: 150  # 2.5 hours
 
   # TODO: Delete me once all tests have been migrated over from complete-tsan
-  enterprise-rhel80-debug-complete-tsan:
+  enterprise-rhel8-debug-complete-tsan:
   - task: shard_merge_jscore_passthrough
     exec_timeout: 240  # 4 hours
   - task: shard_merge_causally_consistent_jscore_passthrough
@@ -44,7 +44,7 @@ overrides:
   - task: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm
     exec_timeout: 180  # 3 hours
 
-  enterprise-rhel80-debug-tsan:
+  enterprise-rhel8-debug-tsan:
   - task: aggregation_expression_multiversion_fuzzer
     exec_timeout: 600  # 10 hours
   - task: aggregation_multiversion_fuzzer
@@ -82,7 +82,7 @@ overrides:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
-  rhel80-asan:
+  rhel8-asan:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 360  # 6 hours
   - task: aggregation_wildcard_fuzzer
@@ -92,19 +92,19 @@ overrides:
   - task: aggregation_multiversion_fuzzer_last_lts
     exec_timeout: 300  # 5 hours
 
-  rhel80-debug-ubsan:
+  rhel8-debugubsan:
   - task: update_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
-  rhel80-debug-ubsan-classic-engine:
+  rhel8-debugubsan-classic-engine:
   - task: update_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
-  rhel80-debug-aubsan-all-feature-flags:
+  rhel8-debugaubsan-all-feature-flags:
   - task: update_timeseries_fuzzer
     exec_timeout: 180  # 3 hours
 
-  rhel80-debug-aubsan-classic-engine:
+  rhel8-debugaubsan-classic-engine:
   - task: update_timeseries_fuzzer
     exec_timeout: 180  # 3 hours
 

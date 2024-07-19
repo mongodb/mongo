@@ -579,7 +579,7 @@ class TestBurnInTestsOutput(unittest.TestCase):
     def test_valid_yaml(self):
         process = subprocess.run([
             sys.executable, "buildscripts/burn_in_tests.py", "run", "--build-variant",
-            "enterprise-rhel-80-64-bit-dynamic-classic-engine", "--yaml", "--evg-project-file",
+            "enterprise-rhel-8-64-bit-dynamic-classic-engine", "--yaml", "--evg-project-file",
             "etc/evergreen.yml"
         ], text=True, capture_output=True)
         output = process.stdout
