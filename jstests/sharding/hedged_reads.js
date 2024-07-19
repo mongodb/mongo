@@ -1,6 +1,10 @@
 /**
  * Tests hedging metrics in the serverStatus output.
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *    requires_fcv_70,
+ *    # Disable windows testing as this feature is deprecated in v8.0.
+ *    incompatible_with_windows_tls,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
