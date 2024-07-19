@@ -52,6 +52,13 @@ OAuthAuthorizationServerMetadata OAuthDiscoveryFactory::acquire(StringData issue
     // '.well-known/oauth-authorization-server'. However, that endpoint uses a different URL
     // construction scheme which doesn't seem to work with any of the authorization servers we've
     // tested.
+
+    // Some issuers URL will end with '/', we should remove it since we add it when forming the
+    // configuration endpoint.
+    if (issuer.ends_with('/')) {
+        issuer.remove_suffix(1);
+    }
+
     auto openIDConfiguationEndpoint = "{}/.well-known/openid-configuration"_format(issuer);
 
     DataBuilder results = _client->get(openIDConfiguationEndpoint);

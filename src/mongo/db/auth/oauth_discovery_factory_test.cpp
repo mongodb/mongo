@@ -154,6 +154,20 @@ TEST_F(OAuthDiscoveryFactoryFixture, LookupsMustBeSecure) {
     ASSERT_THROWS(factory.acquire("http://idp.example"), DBException);
 }
 
+TEST_F(OAuthDiscoveryFactoryFixture, DiscoveryIssuerWithFwdSlash) {
+    auto defaultMetadata = makeDefaultMetadata();
+
+    std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
+    client->expect(
+        {HttpClient::HttpMethod::kGET, "https://idp.example/.well-known/openid-configuration"},
+        {200, {}, defaultMetadata.toBSON().jsonString()});
+
+    OAuthDiscoveryFactory factory(std::move(client));
+    OAuthAuthorizationServerMetadata metadata = factory.acquire("https://idp.example/");
+
+    ASSERT_EQ(defaultMetadata, metadata);
+}
+
 TEST_F(OAuthDiscoveryFactoryFixture, IssuerAndJWKSUriMustBeSecure) {
     auto defaultMetadata = makeDefaultMetadata();
 
