@@ -21,6 +21,10 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/core/query/query_settings/query_settings_strictness.js
+      ticket: SERVER-92665
+    - test_file: jstests/core/query/query_settings/query_settings_cmds_validation.js
+      ticket: SERVER-92665
     - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
       ticket: SERVER-86253
     - test_file: jstests/sharding/retryable_update_one_by_id_chunk_migration.js
@@ -204,6 +208,10 @@ last-continuous:
   suites: null
 last-lts:
   all:
+    - test_file: jstests/core/query/query_settings/query_settings_strictness.js
+      ticket: SERVER-92665
+    - test_file: jstests/core/query/query_settings/query_settings_cmds_validation.js
+      ticket: SERVER-92665
     - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
       ticket: SERVER-86253
     - test_file: jstests/sharding/retryable_update_one_by_id_chunk_migration.js

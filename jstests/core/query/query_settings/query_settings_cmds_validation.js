@@ -25,10 +25,6 @@ const nonExistentQueryShapeHash = "0".repeat(64);
     assert.commandFailedWithCode(
         db.adminCommand({setQuerySettings: {notAValid: "query"}, settings: querySettingsA}),
         7746402);
-    assert.commandFailedWithCode(
-        db.adminCommand(
-            {setQuerySettings: qsutils.makeFindQueryInstance(), settings: {notAValid: "settings"}}),
-        ErrorCodes.IDLUnknownField);
     assert.commandFailedWithCode(db.adminCommand({
         setQuerySettings: qsutils.makeFindQueryInstance(),
         settings: {indexHints: {allowedIndexes: ["a_1"]}}
