@@ -6,6 +6,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const collPrefix = "validate_timeseries_minmax";
 const bucketPrefix = "system.buckets.validate_timeseries_minmax";
@@ -218,8 +219,19 @@ assert.commandWorked(
     bucket.update({}, {"$set": {"control.min.timestamp": ISODate("2021-05-19T13:00:00.000Z")}}));
 res = assert.commandWorked(coll.validate());
 // TODO SERVER-87065: Validation should error on the incorrect min temperature.
-assert(res.valid, tojson(res));
-assert(res.errors.length == 0, tojson(res));
+
+if (FeatureFlagUtil.isPresentAndEnabled(db, "TSBucketingParametersUnchanged")) {
+    // Errors due to SERVER-91754 because min is > then some of the record timestamps rounded
+    // down with granularity.
+    assert(!res.valid, tojson(res));
+    assert(res.errors.length == 1, tojson(res));
+    assert.contains(
+        "A time series bucketing parameter was changed in this collection but timeseriesBucketingParametersChanged is not true. For more info, see logs with log id 9175400.",
+        res.errors);
+} else {
+    assert(res.valid, tojson(res));
+    assert(res.errors.length == 0, tojson(res));
+}
 assert(res.nNonCompliantDocuments == 0, tojson(res));
 
 // Adds an extra field to the 'control' min object.
