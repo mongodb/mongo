@@ -41,6 +41,7 @@ function activate_venv {
     fi
     python -c "import sys; print(sys.path)"
   fi
+  export PIP_CACHE_DIR=${workdir}/pip_cache
 
   echo "python set to $(which $python)"
 }
