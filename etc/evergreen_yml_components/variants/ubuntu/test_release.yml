@@ -176,8 +176,8 @@ buildvariants:
   depends_on:
     - name: archive_dist_test_debug
       variant: *ubuntu2404
-      tasks:
-        - name: .powercycle
+  tasks:
+    - name: .powercycle
 
 
 - &enterprise-ubuntu2004-64-template
