@@ -622,6 +622,9 @@ TEST_F(NetworkInterfaceTest, TimeoutWaitingToAcquireConnection) {
 }
 
 TEST_F(NetworkInterfaceTest, TimeoutGeneralNetworkInterface) {
+    // Run a command to populate the connection pool.
+    assertCommandOK(DatabaseName::kAdmin, BSON("ping" << 1));
+
     // If a general network timeout occurs in the NetworkInterface,
     // NetworkInterfaceExceededTimeLimit should be returned.
     FailPointEnableBlock fpb("triggerSendRequestNetworkTimeout",
@@ -633,7 +636,7 @@ TEST_F(NetworkInterfaceTest, TimeoutGeneralNetworkInterface) {
     auto result = deferred.get();
 
     ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
-    assertNumOps(0u, 1u, 0u, 0u);
+    assertNumOps(0u, 1u, 0u, 1u);
 }
 
 /**
