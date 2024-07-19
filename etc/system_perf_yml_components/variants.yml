@@ -727,6 +727,59 @@ buildvariants:
       - name: tsbs-query-genny
       - name: tsbs-query-optimizations
 
+  - <<: *amazon2_x86_compile_variant_dependency
+    name: perf-3-node-replSet.intel.aws.2024-05
+    display_name: 3-Node ReplSet Intel AWS 2024-05
+    cron: *linux-3-node-cron
+    modules: *perf_modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica.2024-05
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: replica-intel.2024-05
+      workload_setup: 2024-05
+      platform: linux
+      project_dir: *perf_project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: amazon2-x86-compile
+    run_on:
+      - "rhel94-perf-replset"
+    tasks:
+      - *schedule_patch_auto_tasks_task
+      - *schedule_variant_auto_tasks_task
+      - name: linkbench2.2024-05
+      - name: smoke_test
+      - name: top_ten_queries
+      - name: tsbs_load.2024-05
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      # This variant is targeted at AWS instances with 30GB of RAM. As such, a database size of ~30GB is larger
+      # than the WiredTigerCache and Linux FS Cache (assuming incompressible data).
+      # 100 Read tests
+      - name: ycsb.100read.2024-05
+      - name: ycsb_30GB.100read.2024-05
+      - name: ycsb_30GB.100read.rate_limited.2024-05
+      # 95Read5Update tests
+      - name: ycsb.95read5update.2024-05
+      - name: ycsb_30GB.95read5update.2024-05
+      - name: ycsb_30GB.95read5update.rate_limited.2024-05
+      # 50Read50Update tests
+      - name: ycsb.50read50update.2024-05
+        activate: false
+      - name: ycsb_30GB.50read50update.2024-05
+        activate: false
+      - name: ycsb_30GB.50read50update.rate_limited.2024-05
+        activate: false
+      # 100Update tests
+      - name: ycsb.100update.2024-05
+        activate: false
+      - name: ycsb_30GB.100update.2024-05
+        activate: false
+      - name: ycsb_30GB.100update.rate_limited.2024-05
+        activate: false
+      - name: tpcc_majority_small
+
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-node-replSet-all-feature-flags.arm.aws.2023-11
     display_name: all feature flags 3-Node ReplSet ARM AWS 2023-11
