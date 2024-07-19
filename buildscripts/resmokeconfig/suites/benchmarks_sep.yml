@@ -12,3 +12,4 @@ executor:
   config: {}
   hooks:
     - class: GenerateAndCheckPerfResults
+      check_result: True

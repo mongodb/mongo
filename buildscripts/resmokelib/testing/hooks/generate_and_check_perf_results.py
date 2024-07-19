@@ -60,7 +60,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
     IS_BACKGROUND = False
 
-    def __init__(self, hook_logger, fixture):
+    def __init__(self, hook_logger, fixture, check_result=False):
         """Initialize GenerateAndCheckPerfResults."""
         interface.Hook.__init__(self, hook_logger, fixture, GenerateAndCheckPerfResults.DESCRIPTION)
         self.cedar_report_file = _config.CEDAR_REPORT_FILE
@@ -70,6 +70,9 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
         self.create_time = None
         self.end_time = None
+        self.check_result = check_result
+        # Flag to see if we have checked any results against thresholds. Initialize to false here.
+        self.has_checked_results = False
 
     @staticmethod
     def _strftime(time):
@@ -104,6 +107,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 "No variant information was given to resmoke. Please set the --variantName flag to let resmoke know what thresholds to use when checking."
             )
             return
+
         for test_name in benchmark_reports.keys():
             variant_thresholds = self.performance_thresholds.get(test_name, None)
             if variant_thresholds is None:
@@ -146,6 +150,8 @@ class GenerateAndCheckPerfResults(interface.Hook):
                         )
                     else:
                         transformed_metrics[reported_metric] = individual_metric
+            if len(metrics_to_check) > 0:
+                self.has_checked_results = True
             # Add a dynamic resmoke test to make sure that the pass/fail results are reported correctly.
             hook_test_case = CheckPerfResultTestCase.create_after_test(
                 self.logger, test, self, metrics_to_check, transformed_metrics
@@ -178,6 +184,18 @@ class GenerateAndCheckPerfResults(interface.Hook):
             dict_formatted_results = [result.as_dict() for result in self.cedar_reports]
             with open(self.cedar_report_file, "w") as fh:
                 json.dump(dict_formatted_results, fh)
+        if self.has_checked_results and not self.check_result:
+            raise ServerFailure(
+                "Running generate_and_check_perf_results."
+                " Results were checked against thresholds, but configuration"
+                " indicated there shouldn't be."
+            )
+        if not self.has_checked_results and self.check_result:
+            raise ServerFailure(
+                "Running generate_and_check_perf_results."
+                " No results checked against thresholds, but configuration"
+                " indicated there should be."
+            )
 
     def _generate_cedar_report(
         self, benchmark_reports: Dict[str, "_BenchmarkThreadsReport"]
