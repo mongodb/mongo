@@ -12,7 +12,8 @@ import {
 import {numNodesPerRS} from "jstests/sharding/analyze_shard_key/libs/monotonicity_common.js";
 import {
     numDocsRange,
-    rangeShardingCompoundTestCases
+    rangeShardingCompoundTestCases,
+    testProbability
 } from "jstests/sharding/analyze_shard_key/libs/monotonicity_range_sharding_compound_common.js";
 
 if (!jsTestOptions().useAutoBootstrapProcedure) {
@@ -21,7 +22,8 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {
     rst.initiate();
     const primary = rst.getPrimary();
 
-    testAnalyzeShardKeysUnshardedCollection(primary, rangeShardingCompoundTestCases, numDocsRange);
+    testAnalyzeShardKeysUnshardedCollection(
+        primary, rangeShardingCompoundTestCases, testProbability, numDocsRange);
 
     rst.stopSet();
 }
