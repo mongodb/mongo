@@ -937,7 +937,7 @@ class _AddRemoveShardThread(threading.Thread):
                         + str(err)
                     )
                     continue
-                if err.code in set(self._INTERRUPTED):
+                if err.code in set([self._INTERRUPTED]):
                     # Some workloads kill sessions which may interrupt the transition.
                     self.logger.info(
                         "Received 'Interrupted' error when running post removal checks, will retry. err: "
