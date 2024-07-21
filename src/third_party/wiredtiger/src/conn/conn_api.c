@@ -1983,6 +1983,24 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __wt_heuristic_controls_config --
+ *     Set heuristic_controls configuration.
+ */
+int
+__wt_heuristic_controls_config(WT_SESSION_IMPL *session, const char *cfg[])
+{
+    WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+
+    WT_RET(__wt_config_gets(session, cfg, "heuristic_controls.obsolete_tw_pages_dirty", &cval));
+    conn->heuristic_controls.obsolete_tw_pages_dirty = (uint32_t)cval.val;
+
+    return (0);
+}
+
+/*
  * __wt_verbose_config --
  *     Set verbose configuration.
  */
@@ -2833,6 +2851,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      * is set up.
      */
     WT_ERR(__wt_debug_mode_config(session, cfg));
+
+    /* Parse the heuristic_controls configuration. */
+    WT_ERR(__wt_heuristic_controls_config(session, cfg));
 
     /*
      * Load the extensions after initialization completes; extensions expect everything else to be

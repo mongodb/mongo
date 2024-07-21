@@ -162,3 +162,7 @@
         if ((source)->prepare != 0)                                                           \
             (dest)->prepare = 1;                                                              \
     } while (0)
+
+/* Check if the stop time aggregate is set. */
+#define WT_TIME_AGGREGATE_HAS_STOP(ta) \
+    ((ta)->newest_stop_txn != WT_TXN_MAX || (ta)->newest_stop_ts != WT_TS_MAX)

@@ -64,6 +64,14 @@ struct __wt_bucket_storage {
     } while (0)
 
 /*
+ * WT_HEURISTIC_CONTROLS --
+ *  Heuristic controls configuration.
+ */
+struct __wt_heuristic_controls {
+    uint32_t obsolete_tw_pages_dirty;
+};
+
+/*
  * WT_KEYED_ENCRYPTOR --
  *	A list entry for an encryptor with a unique (name, keyid).
  */
@@ -265,6 +273,8 @@ struct __wt_connection_impl {
 
     /* Configuration */
     const WT_CONFIG_ENTRY **config_entries;
+
+    WT_HEURISTIC_CONTROLS heuristic_controls; /* Heuristic controls configuration */
 
     uint64_t operation_timeout_us; /* Maximum operation period before rollback */
 
