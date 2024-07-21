@@ -833,6 +833,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     cache->evict_max_page_size = 0;
     cache->evict_max_ms = 0;
     cache->reentry_hs_eviction_ms = 0;
+    conn->heuristic_controls.obsolete_tw_btree_count = 0;
     conn->rec_maximum_hs_wrapup_milliseconds = 0;
     conn->rec_maximum_image_build_milliseconds = 0;
     conn->rec_maximum_milliseconds = 0;

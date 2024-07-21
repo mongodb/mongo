@@ -68,7 +68,19 @@ struct __wt_bucket_storage {
  *  Heuristic controls configuration.
  */
 struct __wt_heuristic_controls {
-    uint32_t obsolete_tw_pages_dirty;
+    /*
+     * The controls below deal with the cleanup of obsolete time window information. This process
+     * can be configured on two levels:
+     *   - The maximum number of btrees to process in a single checkpoint,
+     *   - The maximum number of pages per btree to process in a single checkpoint.
+     */
+
+    /* Number of btrees processed in the current checkpoint. */
+    uint32_t obsolete_tw_btree_count;
+    /* Maximum number of btrees that can be processed per checkpoint. */
+    uint32_t obsolete_tw_btree_max;
+    /* Maximum number of pages that can be processed per btree. */
+    uint32_t obsolete_tw_pages_dirty_max;
 };
 
 /*

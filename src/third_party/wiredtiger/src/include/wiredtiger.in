@@ -2175,9 +2175,11 @@ struct __wt_connection {
 	 * providing a mechanism for quickly reverting to prior behavior in the field., a set of
 	 * related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * obsolete_tw_pages_dirty, eviction to mark the number of obsolete time window pages that
-	 * are marked as dirty per btree in a single checkpoint., an integer between 0 and 100000;
-	 * default \c 100.}
+	 * obsolete_tw_btree_max, maximum number of btrees that can be checked for obsolete time
+	 * window cleanup in a single checkpoint., an integer between 0 and 500000; default \c 100.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;obsolete_tw_pages_dirty_max, maximum number of pages that
+	 * can be marked dirty because of obsolete time window information per btree in a single
+	 * checkpoint., an integer between 0 and 100000; default \c 100.}
 	 * @config{ ),,}
 	 * @config{history_store = (, history store configuration options., a set of related
 	 * configuration options defined below.}
@@ -2906,9 +2908,12 @@ struct __wt_connection {
  * used as a mechanism for rolling out changes to internal heuristics while providing a mechanism
  * for quickly reverting to prior behavior in the field., a set of related configuration options
  * defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;obsolete_tw_pages_dirty, eviction to mark the
- * number of obsolete time window pages that are marked as dirty per btree in a single checkpoint.,
- * an integer between 0 and 100000; default \c 100.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;obsolete_tw_btree_max, maximum number of btrees
+ * that can be checked for obsolete time window cleanup in a single checkpoint., an integer between
+ * 0 and 500000; default \c 100.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;obsolete_tw_pages_dirty_max,
+ * maximum number of pages that can be marked dirty because of obsolete time window information per
+ * btree in a single checkpoint., an integer between 0 and 100000; default \c 100.}
  * @config{ ),,}
  * @config{history_store = (, history store configuration options., a set of related configuration
  * options defined below.}
