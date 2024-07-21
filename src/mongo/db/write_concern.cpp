@@ -288,6 +288,14 @@ Status waitForWriteConcern(OperationContext* opCtx,
                            const OpTime& replOpTime,
                            const WriteConcernOptions& writeConcern,
                            WriteConcernResult* result) {
+    // If we are in a direct client that's holding a global lock, then this means it is illegal to
+    // wait for write concern. This is fine, since the outer operation should have handled waiting
+    // for write concern.
+    if (opCtx->getClient()->isInDirectClient() &&
+        shard_role_details::getLocker(opCtx)->isLocked()) {
+        return Status::OK();
+    }
+
     LOGV2_DEBUG(22549,
                 2,
                 "Waiting for write concern. OpTime: {replOpTime}, write concern: {writeConcern}",

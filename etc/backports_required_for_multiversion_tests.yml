@@ -207,6 +207,8 @@ last-continuous:
       ticket: SERVER-92419
     - test_file: jstests/core/index/geo/negated_geo_queries.js
       ticket: SERVER-92193
+    - test_file: jstests/replsets/write_concern_update_where.js
+      ticket: SERVER-87126
   suites: null
 last-lts:
   all:
@@ -426,4 +428,6 @@ last-lts:
       ticket: SERVER-92419
     - test_file: jstests/core/index/geo/negated_geo_queries.js
       ticket: SERVER-92193
+    - test_file: jstests/replsets/write_concern_update_where.js
+      ticket: SERVER-87126
   suites: null
