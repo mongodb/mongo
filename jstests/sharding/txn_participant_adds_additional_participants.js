@@ -15,7 +15,8 @@ const verifyMidpointTransactionMetrics = function(initialTxnMetrics, expectedPar
         initialTxnMetrics.totalContactedParticipants + expectedParticipants;
     let midpointTxnMetrics =
         assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
-    assert.eq(midpointTxnMetrics.totalContactedParticipants, expectedMongosTargetedShards);
+    // More transactions can be running in the background. Check we observe the minimum.
+    assert.gte(midpointTxnMetrics.totalContactedParticipants, expectedMongosTargetedShards);
 };
 
 const verifyFinalTransactionMetrics = function(
@@ -285,7 +286,7 @@ lookupPipeline = [
         let: {localVar: "$_id"},
         pipeline: [
             {$match : {"_id": {$gte: -5}}},
-        ], 
+        ],
             as: "result"}},
     {$sort: {"_id": 1}}
 ];
