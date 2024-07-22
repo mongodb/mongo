@@ -47,6 +47,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/parsed_delete.h"
@@ -96,16 +97,6 @@ namespace {
 Date_t getDeadline(OperationContext* opCtx) {
     return opCtx->getServiceContext()->getPreciseClockSource()->now() +
         Milliseconds(resharding::gReshardingOplogApplierMaxLockRequestTimeoutMillis.load());
-}
-
-void runWithTransaction(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const boost::optional<ShardingIndexesCatalogCache>& sii,
-                        unique_function<void(OperationContext*)> func) {
-    AlternativeSessionRegion asr(opCtx);
-    TxnNumber txnNumber = 0;
-    asr.opCtx()->setTxnNumber(txnNumber);
-    resharding::data_copy::runWithTransactionFromOpCtx(asr.opCtx(), nss, sii, std::move(func));
 }
 
 CollectionAcquisition acquireCollectionAndAssertExists(OperationContext* opCtx,
@@ -501,7 +492,8 @@ void ReshardingOplogApplicationRules::_applyDelete(
     // We must run 'findByIdAndNoopUpdate' in the same storage transaction as the ops run in the
     // single replica set transaction that is executed if we apply rule #4, so we therefore must run
     // 'findByIdAndNoopUpdate' as a part of the single replica set transaction.
-    runWithTransaction(opCtx, _outputNss, sii, [this, idQuery](OperationContext* opCtx) {
+    {
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
         const auto outputColl = acquireCollectionAndAssertExists(opCtx, _outputNss);
 
         // Query the output collection for a doc with _id == [op _id].
@@ -590,7 +582,12 @@ void ReshardingOplogApplicationRules::_applyDelete(
         if (!doc.isEmpty()) {
             uassertStatusOK(Helpers::insert(opCtx, outputColl, doc));
         }
-    });
+
+        // Because we called findByIdAndNoopUpdate in this wuow, we have to ensure that this wuow
+        // contains some replicated writes.
+        invariant(!BatchedWriteContext::get(opCtx).getBatchedOperations(opCtx)->isEmpty());
+        wuow.commit();
+    }
 }
 
 BSONObj ReshardingOplogApplicationRules::_queryStashCollById(OperationContext* opCtx,
