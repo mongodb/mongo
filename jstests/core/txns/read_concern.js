@@ -8,6 +8,7 @@
 //   uses_transactions,
 //   requires_majority_read_concern
 // ]
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "read_concern";
@@ -28,25 +29,32 @@ function testReadConcernMaintainsSnapshotIsolationInTransaction(readConcern) {
     jsTest.log(
         "Test that the following multi-document transaction has snapshot isolation with readConcern: " +
         tojson(readConcern));
-    assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
 
-    // Start a new transaction with the given readConcern.
-    session.startTransaction();
-    let command = {find: collName};
-    if (readConcern) {
-        Object.extend(command, {readConcern: readConcern});
-    }
-    assert.commandWorked(sessionDb.runCommand(command));
+    withRetryOnTransientTxnError(
+        () => {
+            assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
 
-    // Insert a document outside of the transaction.
-    assert.commandWorked(testColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
+            // Start a new transaction with the given readConcern.
+            session.startTransaction();
+            let command = {find: collName};
+            if (readConcern) {
+                Object.extend(command, {readConcern: readConcern});
+            }
+            assert.commandWorked(sessionDb.runCommand(command));
 
-    // Test that the transaction does not see the new document (it has snapshot isolation).
-    let res = assert.commandWorked(sessionDb.runCommand({find: collName}));
-    assert.eq(res.cursor.firstBatch.length, 0, tojson(res));
+            // Insert a document outside of the transaction.
+            assert.commandWorked(testColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
-    // Commit the transaction.
-    assert.commandWorked(session.commitTransaction_forTesting());
+            // Test that the transaction does not see the new document (it has snapshot isolation).
+            let res = assert.commandWorked(sessionDb.runCommand({find: collName}));
+            assert.eq(res.cursor.firstBatch.length, 0, tojson(res));
+
+            // Commit the transaction.
+            assert.commandWorked(session.commitTransaction_forTesting());
+        },
+        () => {
+            session.abortTransaction_forTesting();
+        });
 }
 
 testReadConcernMaintainsSnapshotIsolationInTransaction(null);
@@ -60,58 +68,85 @@ function testReadConcernNotSupportedInTransaction(readConcern) {
         "Test that the following readConcern is not supported in a multi-document transaction: " +
         readConcern);
 
-    // Start a new transaction with the given readConcern.
-    session.startTransaction();
-    assert.commandFailedWithCode(sessionDb.runCommand({find: collName, readConcern: readConcern}),
-                                 ErrorCodes.InvalidOptions);
+    withRetryOnTransientTxnError(
+        () => {
+            // Start a new transaction with the given readConcern.
+            session.startTransaction();
+            assert.commandFailedWithCode(
+                sessionDb.runCommand({find: collName, readConcern: readConcern}),
+                ErrorCodes.InvalidOptions);
 
-    // No more operations are allowed in the transaction.
-    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
-                                 ErrorCodes.NoSuchTransaction);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+            // No more operations are allowed in the transaction.
+            assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
+                                         ErrorCodes.NoSuchTransaction);
+            assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                         ErrorCodes.NoSuchTransaction);
+        },
+        () => {
+            session.abortTransaction_forTesting();
+        });
 }
 
 testReadConcernNotSupportedInTransaction({level: "available"});
 testReadConcernNotSupportedInTransaction({level: "linearizable"});
 
 jsTest.log("Test starting a transaction with an invalid readConcern");
+withRetryOnTransientTxnError(
+    () => {
+        // Start a new transaction with the given readConcern.
+        session.startTransaction();
+        assert.commandFailedWithCode(
+            sessionDb.runCommand({find: collName, readConcern: {level: "bad"}}),
+            [ErrorCodes.FailedToParse, ErrorCodes.BadValue]);
 
-// Start a new transaction with the given readConcern.
-session.startTransaction();
-assert.commandFailedWithCode(sessionDb.runCommand({find: collName, readConcern: {level: "bad"}}),
-                             [ErrorCodes.FailedToParse, ErrorCodes.BadValue]);
-
-// No more operations are allowed in the transaction.
-assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.NoSuchTransaction);
-assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+        // No more operations are allowed in the transaction.
+        assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
+                                     ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
 
 jsTest.log("Test specifying readConcern on the second statement in a transaction");
+withRetryOnTransientTxnError(
+    () => {
+        // Start a new transaction with snapshot readConcern.
+        session.startTransaction();
+        assert.commandWorked(
+            sessionDb.runCommand({find: collName, readConcern: {level: "snapshot"}}));
 
-// Start a new transaction with snapshot readConcern.
-session.startTransaction();
-assert.commandWorked(sessionDb.runCommand({find: collName, readConcern: {level: "snapshot"}}));
+        // The second statement cannot specify a readConcern.
+        assert.commandFailedWithCode(
+            sessionDb.runCommand({find: collName, readConcern: {level: "snapshot"}}),
+            ErrorCodes.InvalidOptions);
 
-// The second statement cannot specify a readConcern.
-assert.commandFailedWithCode(
-    sessionDb.runCommand({find: collName, readConcern: {level: "snapshot"}}),
-    ErrorCodes.InvalidOptions);
-
-// The transaction is still active and can be committed.
-assert.commandWorked(session.commitTransaction_forTesting());
+        // The transaction is still active and can be committed.
+        assert.commandWorked(session.commitTransaction_forTesting());
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
 
 jsTest.log("Test specifying non-snapshot readConcern on the second statement in a transaction");
+withRetryOnTransientTxnError(
+    () => {
+        // Start a new transaction with majority readConcern.
+        session.startTransaction();
+        assert.commandWorked(
+            sessionDb.runCommand({find: collName, readConcern: {level: "majority"}}));
 
-// Start a new transaction with majority readConcern.
-session.startTransaction();
-assert.commandWorked(sessionDb.runCommand({find: collName, readConcern: {level: "majority"}}));
+        // The second statement cannot specify a readConcern.
+        assert.commandFailedWithCode(
+            sessionDb.runCommand({find: collName, readConcern: {level: "majority"}}),
+            ErrorCodes.InvalidOptions);
 
-// The second statement cannot specify a readConcern.
-assert.commandFailedWithCode(
-    sessionDb.runCommand({find: collName, readConcern: {level: "majority"}}),
-    ErrorCodes.InvalidOptions);
+        // The transaction is still active and can be committed.
+        assert.commandWorked(session.commitTransaction_forTesting());
 
-// The transaction is still active and can be committed.
-assert.commandWorked(session.commitTransaction_forTesting());
-
-session.endSession();
+        session.endSession();
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
