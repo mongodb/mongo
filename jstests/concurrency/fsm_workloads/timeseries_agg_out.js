@@ -20,7 +20,6 @@ import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from 'jstests/concurrency/fsm_workloads/agg_out.js';
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     const timeFieldName = 'time';
@@ -65,6 +64,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ErrorCodes.MovePrimaryInProgress,
             // TODO SERVER-87422 potentially remove this error since there are no concurrent drops
             ErrorCodes.NamespaceNotFound,
+            // This error is returned if output collection doesn't exist when $out first fetches
+            // collection options, but then created by another thread before $out finished
+            // timeseries options validation.
+            7268700
         ];
 
         // TODO (SERVER-88275) a moveCollection can cause the original collection to be dropped and
