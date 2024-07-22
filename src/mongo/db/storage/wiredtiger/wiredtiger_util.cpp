@@ -970,11 +970,10 @@ void WiredTigerUtil::validateTableLogging(WiredTigerRecoveryUnit& ru,
                                           bool& valid,
                                           std::vector<std::string>& errors,
                                           std::vector<std::string>& warnings) {
-    // This skips validation of table log settings only during selective restore.
-    if (storageGlobalParams.restore && gWiredTigerSkipTableLoggingChecksOnStartup) {
+    if (gWiredTigerSkipTableLoggingChecksDuringValidation) {
         LOGV2(9264500,
               "Skipping validation of table log settings due to usage of "
-              "'wiredTigerSkipTableLoggingChecksOnStartup' and 'restore'",
+              "'wiredTigerSkipTableLoggingChecksDuringValidation'",
               "ident"_attr = uri);
         return;
     }
