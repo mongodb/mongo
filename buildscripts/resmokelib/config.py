@@ -69,6 +69,7 @@ DEFAULTS = {
     "flow_control_tickets": None,
     "force_excluded_tests": False,
     "fuzz_mongod_configs": None,
+    "fuzz_mongod_runtime_params": None,
     "fuzz_mongos_configs": None,
     "config_fuzz_seed": None,
     "genny_executable": None,
@@ -405,10 +406,13 @@ EXCLUDED_TAG = "__TEMPORARILY_DISABLED__"
 # If true, then a test failure or error will cause resmoke.py to exit and not run any more tests.
 FAIL_FAST = None
 
-# Defines how to fuzz mongod parameters
+# Defines how to fuzz mongod parameters on startup
 FUZZ_MONGOD_CONFIGS = None
 
-# Defines how to fuzz mongos parameters
+# Defines how to fuzz mongod parameters at test run-time
+FUZZ_MONGOD_RUNTIME_PARAMS = None
+
+# Defines how to fuzz mongos parameters on startup
 FUZZ_MONGOS_CONFIGS = None
 
 # This seeds the random number generator used to fuzz mongod and mongos parameters
