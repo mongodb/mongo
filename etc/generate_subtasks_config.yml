@@ -7,9 +7,7 @@ build_variant_large_distro_exceptions:
   - debian11
   - debian92
   - enterprise-amazon2
-  - enterprise-amazon2-openssl111
   - enterprise-amazon2-arm64
-  - enterprise-amazon2-arm64-openssl111
   - enterprise-amazon2023
   - enterprise-amazon2023-arm64
   - enterprise-debian10-64
