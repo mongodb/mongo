@@ -40,14 +40,34 @@ local_args="--edition $edition \
   --fallbackToMaster \
   --resmokeCmd \"python buildscripts/resmoke.py\" \
   --debug \
-  ${last_lts_arg} \
-  ${last_continuous_arg} 4.2 4.4 5.0 6.0"
+  4.2 4.4"
 
 remote_invocation="${base_command} ${evergreen_args} ${local_args}"
 eval "${remote_invocation}"
 echo "Verbatim db-contrib-tool invocation: ${remote_invocation}"
 
 local_invocation="${base_command} ${local_args}"
+
+if [ ! -z "${multiversion_platform_50_or_later}" ]; then
+  platform="${multiversion_platform_50_or_later}"
+fi
+
+evergreen_args="--installDir /data/install \
+  --linkDir /data/multiversion \
+  --platform $platform \
+  --architecture $architecture \
+  --evgVersionsFile multiversion-downloads.json"
+local_args="--edition $edition \
+  --resmokeCmd \"python buildscripts/resmoke.py\" \
+  --debug \
+  ${last_lts_arg} \
+  ${last_continuous_arg} 5.0 6.0"
+
+remote_invocation="${base_command} ${evergreen_args} ${local_args}"
+eval "${remote_invocation}"
+echo "Verbatim db-contrib-tool invocation: ${remote_invocation}"
+
+local_invocation="${local_invocation} && ${base_command} ${local_args}"
 echo "Local db-contrib-tool invocation: ${local_invocation}"
 
 echo "${local_invocation}" > local-db-contrib-tool-invocation.txt
