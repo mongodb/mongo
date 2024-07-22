@@ -16,6 +16,7 @@ variables:
 # THIS WAS COPIED FROM EVERGREEN.YML - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
+  multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium

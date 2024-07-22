@@ -1123,6 +1123,7 @@ buildvariants:
       --modules=
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer --enableEnterpriseTests=off
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: targeted
     has_packages: true
     packager_script: packager.py
@@ -1188,6 +1189,7 @@ buildvariants:
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py

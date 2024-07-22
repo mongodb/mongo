@@ -19,6 +19,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: rhel80-large

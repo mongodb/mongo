@@ -13,6 +13,7 @@ variables:
 
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
+  multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium
@@ -177,6 +178,7 @@ buildvariants:
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
@@ -258,6 +260,7 @@ buildvariants:
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
