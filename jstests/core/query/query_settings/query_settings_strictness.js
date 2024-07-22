@@ -16,6 +16,10 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
+
+// Ensure that there are no query settings present at the start of the test.
+qsutils.removeAllQuerySettings();
+
 const query = qsutils.makeFindQueryInstance({filter: {a: 15}});
 const validSettings = {
     queryFramework: "classic",

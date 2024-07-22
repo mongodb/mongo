@@ -36,7 +36,6 @@ const qsutils = new QuerySettingsUtils(db, collName);
 const queryA = qsutils.makeFindQueryInstance({filter: {a: 1}});
 const queryAInstance2 = qsutils.makeFindQueryInstance({filter: {a: 2}});
 const queryB = qsutils.makeFindQueryInstance({filter: {b: "string"}});
-const queryC = qsutils.makeFindQueryInstance({filter: {c: 1}});
 const querySettingsA = {
     indexHints: {ns, allowedIndexes: ["a_1", {$natural: 1}]}
 };
@@ -217,3 +216,5 @@ runQuerySettingsCommandsConcurrently({
     commandToPass: qsutils.makeRemoveQuerySettingsCommand(queryAInstance2),
     finalConfiguration: [qsutils.makeQueryShapeConfiguration(querySettingsB, queryB)]
 });
+
+qsutils.removeAllQuerySettings();
