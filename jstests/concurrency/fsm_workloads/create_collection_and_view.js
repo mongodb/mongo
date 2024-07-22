@@ -4,8 +4,13 @@
  *
  * @tags: [catches_command_failures, antithesis_incompatible]
  */
+
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+
 export const $config = (function() {
     const prefix = "create_collection_and_view";
+
+    const allowedErrorCodes = [ErrorCodes.NamespaceExists];
 
     // We'll use a single unique collection for all operations executed by this test. The
     // convention is that each FSM workload is given a unique 'collName' as input to increase
@@ -29,22 +34,28 @@ export const $config = (function() {
     };
 
     const states = {
-        init: (db, collName) => {},
+        init: (db, collName) => {
+            if (isMongos(db)) {
+                // In a sharded collection, we may sometimes get a NamespaceNotFound error, as we
+                // attempt to to do some additional validation on the creation options after we get
+                // back the NamespaceExists error, and the namespace may have been dropped in the
+                // meantime.
+                allowedErrorCodes.push(ErrorCodes.NamespaceNotFound);
+                // In rare cases, it's possible the max number of retries is hit and eventually the
+                // router returns a StaleConfig error.
+                allowedErrorCodes.push(ErrorCodes.StaleConfig);
+            }
+        },
         createView: (db, collName) => {
-            // In a sharded collection, we may sometimes get a NamespaceNotFound error, as we
-            // attempt to to do some additional validation on the creation options after we get back
-            // the NamespaceExists error, and the namespace may have been dropped in the meantime.
             assert.commandWorkedOrFailedWithCode(
                 db.createCollection(
                     getCollectionName(collName),
                     {viewOn: getBaseCollectionName(collName), pipeline: [{$match: {}}]}),
-                [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound]);
+                allowedErrorCodes);
         },
         createCollection: (db, collName) => {
-            // In a sharded collection, we may sometimes get a NamespaceNotFound error. See above.
-            assert.commandWorkedOrFailedWithCode(
-                db.createCollection(getCollectionName(collName)),
-                [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound]);
+            assert.commandWorkedOrFailedWithCode(db.createCollection(getCollectionName(collName)),
+                                                 allowedErrorCodes);
         },
         verifyNoDuplicates: (db, collName) => {
             // Check how many collections/views match our namespace.
