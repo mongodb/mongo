@@ -56,9 +56,7 @@ void DbCheckTest::setUp() {
     CatalogTestFixture::setUp();
 
     // Create collection kNss for unit tests to use. It will possess a default _id index.
-    const CollectionOptions defaultCollectionOptions;
-    ASSERT_OK(
-        storageInterface()->createCollection(operationContext(), kNss, defaultCollectionOptions));
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), kNss, _collectionOptions));
 
     auto service = getServiceContext();
 

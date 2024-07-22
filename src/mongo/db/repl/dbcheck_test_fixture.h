@@ -33,6 +33,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/commands/dbcheck_command.h"
 #include "mongo/db/repl/dbcheck.h"
@@ -52,7 +53,9 @@ const int64_t kDefaultMaxBatchTimeMillis = 1000;
 
 class DbCheckTest : public CatalogTestFixture {
 public:
-    DbCheckTest(Options options = {}) : CatalogTestFixture(std::move(options)) {}
+    DbCheckTest(Options options = {}, CollectionOptions collectionOptions = {})
+        : CatalogTestFixture(std::move(options)),
+          _collectionOptions(std::move(collectionOptions)) {}
 
     void setUp() override;
 
@@ -154,8 +157,17 @@ public:
      * Fetches the number of entries in the health log that match the given query.
      */
     int getNumDocsFoundInHealthLog(OperationContext* opCtx, const BSONObj& query);
+
+protected:
+    CollectionOptions _collectionOptions;
 };
 
+class DbCheckClusteredCollectionTest : public DbCheckTest {
+public:
+    DbCheckClusteredCollectionTest(Options options = {}) : DbCheckTest(std::move(options)) {
+        _collectionOptions.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+    }
+};
 
 const auto docMinKey = BSON("_id" << MINKEY);
 const auto docMaxKey = BSON("_id" << MAXKEY);
@@ -166,6 +178,10 @@ const auto errQuery = BSON(HealthLogEntry::kSeverityFieldName << "error");
 const auto missingKeyQuery =
     BSON(HealthLogEntry::kSeverityFieldName << "error" << HealthLogEntry::kMsgFieldName
                                             << "Document has missing index keys");
+const auto idRecordIdMismatchQuery =
+    BSON(HealthLogEntry::kSeverityFieldName
+         << "error" << HealthLogEntry::kMsgFieldName
+         << "Document's _id mismatches its RecordId in clustered collection");
 const auto warningQuery = BSON(HealthLogEntry::kSeverityFieldName << "warning");
 const auto BSONWarningQuery =
     BSON(HealthLogEntry::kSeverityFieldName << "warning" << HealthLogEntry::kMsgFieldName

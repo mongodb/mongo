@@ -174,4 +174,37 @@ TEST_F(DbCheckTest, DbCheckDocumentWithInvalidUuid) {
     ASSERT_EQ(numWarningDocs, getNumDocsFoundInHealthLog(opCtx, warningQuery));
     ASSERT_EQ(0, getNumDocsFoundInHealthLog(opCtx, errQuery));
 }
+
+TEST_F(DbCheckClusteredCollectionTest, DbCheckIdRecordIdMismatch) {
+    auto opCtx = operationContext();
+    const AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    // The test fixture setUp() will make the collection a clustered collection.
+    const auto& collection = coll.getCollection();
+    ASSERT_TRUE(collection->isClustered());
+    auto doc = BSON("_id" << 1 << "a" << 1);
+    auto docToGenerateWrongRecordId = BSON("_id" << 2);
+    auto mismatchedRecordId =
+        uassertStatusOK(record_id_helpers::keyForDoc(docToGenerateWrongRecordId,
+                                                     collection->getClusteredInfo()->getIndexSpec(),
+                                                     collection->getDefaultCollator()));
+    auto ts = Timestamp();
+    WriteUnitOfWork wuow(opCtx);
+    auto recordIdStatus = collection->getRecordStore()->insertRecord(
+        opCtx, mismatchedRecordId, doc.objdata(), doc.objsize(), ts);
+    wuow.commit();
+    ASSERT_OK(recordIdStatus);
+
+    auto params = createSecondaryIndexCheckParams(
+        DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
+        "" /* secondaryIndex */,
+        false /* skipLookupForExtraKeys */,
+        BSONValidateModeEnum::kExtended);
+    runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params);
+    // Shut down the health log writer so that the writes get flushed to the health log collection.
+    auto service = getServiceContext();
+    HealthLogInterface::get(service)->shutdown();
+    ASSERT_EQ(1, getNumDocsFoundInHealthLog(opCtx, idRecordIdMismatchQuery));
+    ASSERT_EQ(1, getNumDocsFoundInHealthLog(opCtx, errQuery));
+}
+
 }  // namespace mongo

@@ -774,6 +774,25 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                           "Document with record ID " + currentRecordId.toString() + " missing _id");
         }
 
+        if (collPtr->isClustered() &&
+            !_isIdSameAsRecordId(currentRecordId,
+                                 currentObj,
+                                 collPtr->getClusteredInfo()->getIndexSpec(),
+                                 collPtr->getDefaultCollator())) {
+            const auto msg = "Document's _id mismatches its RecordId in clustered collection";
+            const auto status = Status(ErrorCodes::BadValue, msg);
+            const auto logEntry = dbCheckErrorHealthLogEntry(
+                _secondaryIndexCheckParameters,
+                collPtr->ns(),
+                collPtr->uuid(),
+                msg,
+                ScopeEnum::Document,
+                OplogEntriesEnum::Batch,
+                status,
+                BSON("recordID" << currentRecordId.toString() << "objId" << rehydratedObjId));
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+        }
+
         // If this would put us over a limit, stop here.
         if (!_canHashForCollectionCheck(currentObj)) {
             return Status::OK();
@@ -890,6 +909,16 @@ bool DbCheckHasher::_canHashForCollectionCheck(const BSONObj& obj) {
     }
 
     return true;
+}
+
+bool DbCheckHasher::_isIdSameAsRecordId(const RecordId& rid,
+                                        const BSONObj& doc,
+                                        const ClusteredIndexSpec& indexSpec,
+                                        const CollatorInterface* collator) {
+    const auto ridFromDoc = uassertStatusOK(record_id_helpers::keyForDoc(doc, indexSpec, collator));
+    const auto ksFromBSON = key_string::Builder(key_string::Version::kLatestVersion, ridFromDoc);
+    const auto ksFromRid = key_string::Builder(key_string::Version::kLatestVersion, rid);
+    return ksFromRid == ksFromBSON;
 }
 
 namespace {
