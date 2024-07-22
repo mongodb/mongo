@@ -67,6 +67,6 @@ server_parameters:
     cpp_varname: internalSearchOptions
     cpp_vartype: InternalSearchOptions
     condition:
-      feature_flag: feature_flags::gFeatureFlagSearchBatchSizeTuning
+      min_fcv: 8.1
     redact: false
     omit_in_ftdc: false
