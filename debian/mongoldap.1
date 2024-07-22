@@ -178,16 +178,17 @@ configuration files are valid, the output might be as follows:
 .EE
 .SH BEHAVIOR
 .PP
-Starting in MonogoDB 5.1, \fBmongoldap\f1 supports prefixing LDAP
+Starting in MongoDB 5.1, \fBmongoldap\f1 supports prefixing LDAP
 server with \fBsrv:\f1 and \fBsrv_raw:\f1\&.
 .PP
 If your connection string specifies \fB"srv:<DNS_NAME>"\f1, \fBmongoldap\f1
 verifies that \fB"_ldap._tcp.gc._msdcs.<DNS_NAME>"\f1 exists for SRV to
-support Active Directory. If not found, it verifies
+support Active Directory. If not found, \fBmongoldap\f1 verifies that
 \fB"_ldap._tcp.<DNS_NAME>"\f1 exists for SRV. If an SRV record cannot be
 found, \fBmongoldap\f1 warns you to use \fB"srv_raw:<DNS_NAME>"\f1 instead.
-\fBmongoldap\f1 does the reverse check for \fB"srv_raw:<DNS_NAME>"\f1 by
-checking for \fB"_ldap._tcp.<DNS NAME>"\f1\&.
+.PP
+If your connection string specifies \fB"srv_raw:<DNS_NAME>"\f1,
+\fBmongoldap\f1 performs an SRV record lookup for \fB"<DNS NAME>"\f1\&.
 .SH OPTIONS
 .PP
 \fBmongoldap \-\-config\f1, \fBmongoldap \-f\f1
@@ -281,11 +282,10 @@ If not set, \fBmongoldap\f1\f1 does not attempt to bind to the LDAP server.
 You can configure this setting on a running \fBmongoldap\f1\f1 using
 \fBsetParameter\f1\f1\&.
 .PP
-Starting in MongoDB 4.4, the \fBldapQueryPassword\f1
-\fBsetParameter\f1\f1 command accepts either a string or
-an array of strings. If \fBldapQueryPassword\f1 is set to an array, MongoDB tries
-each password in order until one succeeds. Use a password array to roll over the
-LDAP account password without downtime.
+The \fBldapQueryPassword\f1\fBsetParameter\f1\f1 command accepts either a
+string or an array of strings. If \fBldapQueryPassword\f1 is set to an array,
+MongoDB tries each password in order until one succeeds. Use a password array
+to roll over the LDAP account password without downtime.
 .PP
 Windows MongoDB deployments can use \fB\-\-ldapBindWithOSDefaults\f1\f1
 instead of \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&.
@@ -589,11 +589,10 @@ to find additional matches. If no matches are found in any document,
 or the transformation the document describes fails,
 \fBmongoldap\f1\f1 returns an error.
 .PP
-Starting in MongoDB 4.4, \fBmongoldap\f1\f1 also returns an error
-if one of the transformations cannot be evaluated due to networking
-or authentication failures to the LDAP server. \fBmongoldap\f1\f1
-rejects the connection request and does not check the remaining
-documents in the array.
+\fBmongoldap\f1\f1 also returns an error if one of the transformations
+cannot be evaluated due to networking or authentication failures to the
+LDAP server. \fBmongoldap\f1\f1 rejects the connection request and does
+not check the remaining documents in the array.
 .PP
 Starting in MongoDB 5.0, \fB\-\-ldapUserToDNMapping\f1\f1
 accepts an empty string \fB""\f1 or empty array \fB[ ]\f1 in place of a

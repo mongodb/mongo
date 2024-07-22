@@ -1,32 +1,34 @@
 .TH mongos 1
 .SH MONGOS
 .SH SYNOPSIS
-For a \fBsharded cluster\f1, the \fBmongos\f1\f1
+For a \fBsharded cluster\f1, the \fBmongos\f1
 instances provide the interface between the client applications and the
-sharded cluster. The \fBmongos\f1\f1 instances route queries and
+sharded cluster. The \fBmongos\f1 instances route queries and
 write operations to the shards. From the perspective of the
-application, a \fBmongos\f1\f1 instance behaves identically to
+application, a \fBmongos\f1 instance behaves identically to
 any other MongoDB instance.
 .SH CONSIDERATIONS
 .RS
 .IP \(bu 2
-Never change the name of the \fBmongos\f1\f1 binary.
-.IP \(bu 2
-Starting in version 4.4, \fBmongos\f1\f1
-can support \fBhedged reads\f1 to minimize
-latencies.
+Never change the name of the \fBmongos\f1 binary.
 .IP \(bu 2
 MongoDB disables support for TLS 1.0
-encryption on systems where TLS 1.1+ is available. For
-more details, see \fBDisable TLS 1.0\f1\&.
+encryption on systems where TLS 1.1+ is available.
 .IP \(bu 2
 The \fBmongos\f1\f1 binary cannot connect to \fBmongod\f1\f1
 instances whose \fBfeature compatibility version (fCV)\f1 is greater
 than that of the \fBmongos\f1\f1\&. For example, you cannot connect
-a MongoDB 5.0 version \fBmongos\f1\f1 to a 6.0
-sharded cluster with \fBfCV\f1 set to 6.0\&. You
+a MongoDB 5.0 version \fBmongos\f1\f1 to a 7.0
+sharded cluster with \fBfCV\f1 set to 7.0\&. You
 can, however, connect a MongoDB 5.0 version
-\fBmongos\f1\f1 to a 6.0 sharded cluster with \fBfCV\f1 set to 5.0\&.
+\fBmongos\f1\f1 to a 7.0 sharded cluster with \fBfCV\f1 set to 5.0\&.
+.IP \(bu 2
+\fBmongod\f1\f1 includes a \fBFull Time Diagnostic Data Capture\f1 mechanism to assist MongoDB engineers with troubleshooting
+deployments. If this thread fails, it terminates the originating process.
+To avoid the most common failures, confirm that the user running the
+process has permissions to create the FTDC \fBdiagnostic.data\f1
+directory. For \fBmongod\f1 the directory is within
+\fBstorage.dbPath\f1\f1\&. For \fBmongos\f1 it is parallel to \fBsystemLog.path\f1\f1\&.
 .RE
 .SH OPTIONS
 .PP
@@ -49,13 +51,13 @@ corresponding \fBnet.serviceExecutor\f1 configuration option.
 \fBmongos \-\-help\f1, \fBmongos \-h\f1
 .RS
 .PP
-Returns information on the options and use of \fBmongos\f1\f1\&.
+Returns information on the options and use of \fBmongos\f1\&.
 .RE
 .PP
 \fBmongos \-\-version\f1
 .RS
 .PP
-Returns the \fBmongos\f1\f1 release number.
+Returns the \fBmongos\f1 release number.
 .RE
 .PP
 \fBmongos \-\-config\f1, \fBmongos \-f\f1
@@ -63,11 +65,11 @@ Returns the \fBmongos\f1\f1 release number.
 .PP
 Specifies a configuration file for runtime configuration options. The
 configuration file is the preferred method for runtime configuration of
-\fBmongos\f1\f1\&. The options are equivalent to the command\-line
+\fBmongos\f1\&. The options are equivalent to the command\-line
 configuration options. See \fBConfiguration File Options\f1 for
 more information.
 .PP
-Ensure the configuration file uses ASCII encoding. The \fBmongos\f1\f1
+Ensure the configuration file uses ASCII encoding. The \fBmongos\f1
 instance does not support configuration files with non\-ASCII encoding,
 including UTF\-8.
 .RE
@@ -95,8 +97,8 @@ Description
 .IP \(bu 4
 \fBnone\f1
 .IP \(bu 4
-Default. \fBmongos\f1\f1 does not expand expansion directives.
-\fBmongos\f1\f1 fails to start if any configuration file settings
+Default. \fBmongos\f1 does not expand expansion directives.
+\fBmongos\f1 fails to start if any configuration file settings
 use expansion directives.
 .RE
 .IP \(bu 2
@@ -104,7 +106,7 @@ use expansion directives.
 .IP \(bu 4
 \fBrest\f1
 .IP \(bu 4
-\fBmongos\f1\f1 expands \fB__rest\f1 expansion directives when
+\fBmongos\f1 expands \fB__rest\f1 expansion directives when
 parsing the configuration file.
 .RE
 .IP \(bu 2
@@ -112,14 +114,14 @@ parsing the configuration file.
 .IP \(bu 4
 \fBexec\f1
 .IP \(bu 4
-\fBmongos\f1\f1 expands \fB__exec\f1 expansion directives when
+\fBmongos\f1 expands \fB__exec\f1 expansion directives when
 parsing the configuration file.
 .RE
 .RE
 .PP
 You can specify multiple expansion directives as a comma\-separated
-list, e.g. \fBrest, exec\f1\&. If the configuration file contains
-expansion directives not specified to \fB\-\-configExpand\f1\f1, the \fBmongos\f1\f1
+list, for example: \fBrest, exec\f1\&. If the configuration file contains
+expansion directives not specified to \fB\-\-configExpand\f1\f1, the \fBmongos\f1
 returns an error and terminates.
 .PP
 See \fBExternally Sourced Configuration File Values\f1 for configuration files
@@ -131,13 +133,13 @@ for more information on expansion directives.
 .PP
 Increases the amount of internal reporting returned on standard output
 or in log files. Increase the verbosity with the \fB\-v\f1 form by
-including the option multiple times, (e.g. \fB\-vvvvv\f1\&.)
+including the option multiple times, for example: \fB\-vvvvv\f1\&.
 .RE
 .PP
 \fBmongos \-\-quiet\f1
 .RS
 .PP
-Runs \fBmongos\f1\f1 in a quiet mode that attempts to limit the amount
+Runs \fBmongos\f1 in a quiet mode that attempts to limit the amount
 of output.
 .PP
 This option suppresses:
@@ -158,8 +160,12 @@ connection closed events
 .PP
 \fIDefault\f1: 27017
 .PP
-The TCP port on which the \fBmongos\f1\f1 instance listens for
+The TCP port on which the \fBmongos\f1 instance listens for
 client connections.
+.PP
+The \fB\-\-port\f1 option accepts a range of values between \fB0\f1 and \fB65535\f1\&.
+Setting the port to \fB0\f1 configures \fBmongos\f1 to use an arbitrary port
+assigned by the operating system.
 .RE
 .PP
 \fBmongos \-\-bind_ip\f1
@@ -168,15 +174,15 @@ client connections.
 \fIDefault\f1: localhost
 .PP
 The hostnames and/or IP addresses and/or full Unix domain socket
-paths on which \fBmongos\f1\f1 should listen for client connections. You
-may attach \fBmongos\f1\f1 to any interface. To bind to multiple
+paths on which \fBmongos\f1 should listen for client connections. You
+may attach \fBmongos\f1 to any interface. To bind to multiple
 addresses, enter a list of comma\-separated values.
 .PP
 You can specify both IPv4 and IPv6 addresses, or hostnames that
 resolve to an IPv4 or IPv6 address.
 .PP
 If specifying an IPv6 address \fIor\f1 a hostname that resolves to an
-IPv6 address to \fB\-\-bind_ip\f1\f1, you must start \fBmongos\f1\f1 with
+IPv6 address to \fB\-\-bind_ip\f1\f1, you must start \fBmongos\f1 with
 \fB\-\-ipv6\f1\f1 to enable IPv6 support. Specifying an IPv6 address
 to \fB\-\-bind_ip\f1\f1 does not enable IPv6 support.
 .PP
@@ -193,8 +199,7 @@ set members or sharded cluster members.
 .PP
 Use hostnames instead of IP addresses to configure clusters across a
 split network horizon. Starting in MongoDB 5.0, nodes that are only
-configured with an IP address will fail startup validation and will
-not start.
+configured with an IP address fail startup validation and do not start.
 .PP
 Before you bind your instance to a publicly\-accessible IP address,
 you must secure your cluster from unauthorized access. For a complete
@@ -209,13 +214,12 @@ For more information about IP Binding, refer to the
 To bind to all IPv4 addresses, enter \fB0.0.0.0\f1\&.
 .PP
 To bind to all IPv4 and IPv6 addresses, enter \fB::,0.0.0.0\f1 or
-starting in MongoDB 4.2, an asterisk \fB"*"\f1 (enclose the asterisk in
-quotes to avoid filename pattern expansion). Alternatively, use the
-\fBnet.bindIpAll\f1\f1 setting.
+an asterisk \fB"*"\f1 (enclose the asterisk in quotes to avoid filename pattern
+expansion). Alternatively, use the \fBnet.bindIpAll\f1\f1 setting.
 .RS
 .IP \(bu 2
 \fB\-\-bind_ip\f1 and \fB\-\-bind_ip_all\f1 are mutually exclusive.
-Specifying both options causes \fBmongos\f1\f1 to throw an error and
+Specifying both options causes \fBmongos\f1 to throw an error and
 terminate.
 .IP \(bu 2
 The command\-line option \fB\-\-bind\f1 overrides the configuration
@@ -226,12 +230,12 @@ file setting \fBnet.bindIp\f1\f1\&.
 \fBmongos \-\-bind_ip_all\f1
 .RS
 .PP
-If specified, the \fBmongos\f1\f1 instance binds to all IPv4
-addresses (i.e. \fB0.0.0.0\f1). If \fBmongos\f1\f1 starts with
+If specified, the \fBmongos\f1 instance binds to all IPv4
+addresses (i.e. \fB0.0.0.0\f1). If \fBmongos\f1 starts with
 \fB\-\-ipv6\f1\f1, \fB\-\-bind_ip_all\f1\f1 also binds to all IPv6 addresses
 (i.e. \fB::\f1).
 .PP
-\fBmongos\f1\f1 only supports IPv6 if started with \fB\-\-ipv6\f1\f1\&. Specifying
+\fBmongos\f1 only supports IPv6 if started with \fB\-\-ipv6\f1\f1\&. Specifying
 \fB\-\-bind_ip_all\f1\f1 alone does not enable IPv6 support.
 .PP
 Before you bind your instance to a publicly\-accessible IP address,
@@ -245,8 +249,8 @@ For more information about IP Binding, refer to the
 \fBIP Binding\f1 documentation.
 .PP
 Alternatively, you can set the \fB\-\-bind_ip\f1 option to \fB::,0.0.0.0\f1
-or, starting in MongoDB 4.2, to an asterisk \fB"*"\f1 (enclose the
-asterisk in quotes to avoid filename pattern expansion).
+or to an asterisk \fB"*"\f1 (enclose the asterisk in quotes to avoid filename
+pattern expansion).
 .PP
 \fB\-\-bind_ip\f1 and \fB\-\-bind_ip_all\f1 are mutually exclusive. That
 is, you can specify one or the other, but not both.
@@ -296,9 +300,9 @@ of connections which are forced into a backoff state.
 \fBmongos \-\-maxConns\f1
 .RS
 .PP
-The maximum number of simultaneous connections that \fBmongos\f1\f1 will
-accept. This setting has no effect if it is higher than your operating
-system\(aqs configured maximum connection tracking threshold.
+The maximum number of simultaneous connections that \fBmongos\f1
+accepts. This setting has no effect if it is higher than your
+operating system\(aqs configured maximum connection tracking threshold.
 .PP
 Do not assign too low of a value to this option, or you will
 encounter errors during normal application operation.
@@ -341,7 +345,8 @@ for log entries, especially when the system is under heavy load. We
 recommend using the \fB\-\-logpath\f1\f1 option for production systems to
 ensure accurate timestamps.
 .PP
-Starting in version 4.2, MongoDB includes the \fBcomponent\f1 in its log messages to \fBsyslog\f1\&.
+MongoDB includes the \fBcomponent\f1 in its log
+messages to \fBsyslog\f1\&.
 .PP
 .EX
   ...  ACCESS   [repl writer worker 5] Unsupported modification to roles collection ...
@@ -362,7 +367,7 @@ must  enable the \fB\-\-syslog\f1\f1 option.
 \fBmongos \-\-logappend\f1
 .RS
 .PP
-Appends new entries to the end of the existing log file when the \fBmongos\f1\f1
+Appends new entries to the end of the existing log file when the \fBmongos\f1
 instance restarts. Without this option, \fBmongod\f1\f1 will back up the
 existing log and create a new file.
 .RE
@@ -392,8 +397,8 @@ If you specify \fBreopen\f1, you must also use \fB\-\-logappend\f1\f1\&.
 .PP
 \fIAvailable in MongoDB Enterprise only.\f1
 .PP
-A \fBmongos\f1\f1 running with \fB\-\-redactClientLogData\f1\f1 redacts any message accompanying a given
-log event before logging. This prevents the \fBmongos\f1\f1 from writing
+A \fBmongos\f1 running with \fB\-\-redactClientLogData\f1\f1 redacts any message accompanying a given
+log event before logging. This prevents the \fBmongos\f1 from writing
 potentially sensitive data stored on the database to the diagnostic log.
 Metadata such as error or operation codes, line numbers, and source file
 names are still visible in the logs.
@@ -404,19 +409,19 @@ Use \fB\-\-redactClientLogData\f1\f1 in conjunction with
 regulatory requirements.
 .PP
 For example, a MongoDB deployment might store Personally Identifiable
-Information (PII) in one or more collections. The \fBmongos\f1\f1 logs events
+Information (PII) in one or more collections. The \fBmongos\f1 logs events
 such as those related to CRUD operations, sharding metadata, etc. It is
-possible that the \fBmongos\f1\f1 may expose PII as a part of these logging
-operations. A \fBmongos\f1\f1 running with \fB\-\-redactClientLogData\f1\f1 removes any message
+possible that the \fBmongos\f1 may expose PII as a part of these logging
+operations. A \fBmongos\f1 running with \fB\-\-redactClientLogData\f1\f1 removes any message
 accompanying these events before being output to the log, effectively
 removing the PII.
 .PP
-Diagnostics on a \fBmongos\f1\f1 running with \fB\-\-redactClientLogData\f1\f1 may be more difficult
+Diagnostics on a \fBmongos\f1 running with \fB\-\-redactClientLogData\f1\f1 may be more difficult
 due to the lack of data related to a log event. See the
 \fBprocess logging\f1 manual page for an
 example of the effect of \fB\-\-redactClientLogData\f1\f1 on log output.
 .PP
-On a running \fBmongos\f1\f1, use \fBsetParameter\f1\f1 with the
+On a running \fBmongos\f1, use \fBsetParameter\f1\f1 with the
 \fBredactClientLogData\f1\f1 parameter to configure this setting.
 .RE
 .PP
@@ -455,15 +460,14 @@ format. For example, for New York at the start of the Epoch:
 .RE
 .RE
 .PP
-Starting in MongoDB 4.4, \fB\-\-timeStampFormat\f1\f1 no longer supports \fBctime\f1\&.
-An example of \fBctime\f1 formatted date is: \fBWed Dec 31
-18:17:54.811\f1\&.
+\fB\-\-timeStampFormat\f1\f1 no longer supports \fBctime\f1\&. An example of \fBctime\f1
+formatted date is: \fBWed Dec 31 18:17:54.811\f1\&.
 .RE
 .PP
 \fBmongos \-\-pidfilepath\f1
 .RS
 .PP
-Specifies a file location to store the process ID (PID) of the \fBmongos\f1\f1
+Specifies a file location to store the process ID (PID) of the \fBmongos\f1
 process. The user running the \fBmongod\f1 or \fBmongos\f1
 process must be able to write to this path. If the \fB\-\-pidfilepath\f1\f1 option is not
 specified, the process does not create a PID file. This option is generally
@@ -491,9 +495,8 @@ that MongoDB instances use to authenticate to each other in a
 \fBclient authorization\f1\&. See \fBInternal/Membership Authentication\f1 for more
 information.
 .PP
-Starting in MongoDB 4.2, \fBkeyfiles for internal membership
-authentication\f1 use YAML format to allow for
-multiple keys in a keyfile. The YAML format accepts either:
+\fBKeyfiles for internal membership authentication\f1 use YAML format to allow for multiple keys in a
+keyfile. The YAML format accepts either:
 .RS
 .IP \(bu 2
 A single key string (same as in earlier versions)
@@ -530,7 +533,7 @@ If you do not use these operations, disable server\-side scripting.
 Disables listening on the UNIX domain socket. \fB\-\-nounixsocket\f1\f1 applies only
 to Unix\-based systems.
 .PP
-The \fBmongos\f1\f1 process
+The \fBmongos\f1 process
 always listens on the UNIX socket unless one of the following is true:
 .RS
 .IP \(bu 2
@@ -541,7 +544,7 @@ always listens on the UNIX socket unless one of the following is true:
 \fBnet.bindIp\f1\f1 does not specify \fBlocalhost\f1 or its associated IP address
 .RE
 .PP
-\fBmongos\f1\f1 installed from official \fB\&.deb\f1 and \fB\&.rpm\f1 packages
+\fBmongos\f1 installed from official \fB\&.deb\f1 and \fB\&.rpm\f1 packages
 have the \fBbind_ip\f1 configuration set to \fB127.0.0.1\f1 by
 default.
 .RE
@@ -555,7 +558,7 @@ The path for the UNIX socket. \fB\-\-unixSocketPrefix\f1\f1 applies only
 to Unix\-based systems.
 .PP
 If this option has no value, the
-\fBmongos\f1\f1 process creates a socket with \fB/tmp\f1 as a prefix. MongoDB
+\fBmongos\f1 process creates a socket with \fB/tmp\f1 as a prefix. MongoDB
 creates and listens on a UNIX socket unless one of the following is true:
 .RS
 .IP \(bu 2
@@ -582,49 +585,48 @@ Sets the permission for the UNIX domain socket file.
 \fBmongos \-\-fork\f1
 .RS
 .PP
-Enables a \fBdaemon\f1 mode that runs the \fBmongos\f1\f1 process in the
-background. By default \fBmongos\f1\f1 does not run as a daemon:
-typically you will run \fBmongos\f1\f1 as a daemon, either by using
-\fB\-\-fork\f1\f1 or by using a controlling process that handles the
-daemonization process (e.g. as with \fBupstart\f1 and \fBsystemd\f1).
+Enables a \fBdaemon\f1 mode that runs the \fBmongos\f1 process in the
+background. The \fB\-\-fork\f1\f1 option is not supported on Windows.
+.PP
+By default \fBmongos\f1 does not run as a daemon. You run \fBmongos\f1 as
+a daemon by using either \fB\-\-fork\f1\f1 or a controlling process
+that handles daemonization, such as \fBupstart\f1 or \fBsystemd\f1\&.
 .PP
 Using the \fB\-\-fork\f1\f1 option requires that you configure log
-output for the \fBmongos\f1\f1 with one of the following:
+output for the \fBmongos\f1 with one of the following:
 .RS
 .IP \(bu 2
 \fB\-\-logpath\f1\f1
 .IP \(bu 2
 \fB\-\-syslog\f1\f1
 .RE
-.PP
-The \fB\-\-fork\f1\f1 option is not supported on Windows.
 .RE
 .PP
 \fBmongos \-\-transitionToAuth\f1
 .RS
 .PP
-Allows the \fBmongos\f1\f1 to accept and create authenticated and
+Allows the \fBmongos\f1 to accept and create authenticated and
 non\-authenticated connections to and from other \fBmongod\f1\f1
-and \fBmongos\f1\f1 instances in the deployment. Used for
+and \fBmongos\f1 instances in the deployment. Used for
 performing rolling transition of replica sets or sharded clusters
 from a no\-auth configuration to \fBinternal authentication\f1\&. Requires specifying a \fBinternal
 authentication\f1 mechanism such as
 \fB\-\-keyFile\f1\f1\&.
 .PP
 For example, if using \fBkeyfiles\f1 for
-\fBinternal authentication\f1, the \fBmongos\f1\f1 creates
-an authenticated connection with any \fBmongod\f1\f1 or \fBmongos\f1\f1
+\fBinternal authentication\f1, the \fBmongos\f1 creates
+an authenticated connection with any \fBmongod\f1\f1 or \fBmongos\f1
 in the deployment using a matching keyfile. If the security mechanisms do
-not match, the \fBmongos\f1\f1 utilizes a non\-authenticated connection instead.
+not match, the \fBmongos\f1 utilizes a non\-authenticated connection instead.
 .PP
-A \fBmongos\f1\f1 running with \fB\-\-transitionToAuth\f1\f1 does not enforce \fBuser access
+A \fBmongos\f1 running with \fB\-\-transitionToAuth\f1\f1 does not enforce \fBuser access
 controls\f1\&. Users may connect to your deployment without any
 access control checks and perform read, write, and administrative operations.
 .PP
-A \fBmongos\f1\f1 running with \fBinternal authentication\f1 and \fIwithout\f1 \fB\-\-transitionToAuth\f1\f1 requires clients to connect
+A \fBmongos\f1 running with \fBinternal authentication\f1 and \fIwithout\f1 \fB\-\-transitionToAuth\f1\f1 requires clients to connect
 using \fBuser access controls\f1\&. Update clients to
-connect to the \fBmongos\f1\f1 using the appropriate \fBuser\f1
-prior to restarting \fBmongos\f1\f1 without \fB\-\-transitionToAuth\f1\f1\&.
+connect to the \fBmongos\f1 using the appropriate \fBuser\f1
+prior to restarting \fBmongos\f1 without \fB\-\-transitionToAuth\f1\f1\&.
 .RE
 .PP
 \fBmongos \-\-networkMessageCompressors\f1
@@ -633,7 +635,7 @@ prior to restarting \fBmongos\f1\f1 without \fB\-\-transitionToAuth\f1\f1\&.
 \fIDefault\f1: snappy,zstd,zlib
 .PP
 Specifies the default compressor(s) to use for
-communication between this \fBmongos\f1\f1 instance and:
+communication between this \fBmongos\f1 instance and:
 .RS
 .IP \(bu 2
 other members of the sharded cluster
@@ -653,7 +655,7 @@ MongoDB supports the following compressors:
 \fBzstd\f1
 .RE
 .PP
-Both \fBmongod\f1\f1 and \fBmongos\f1\f1 instances
+Both \fBmongod\f1\f1 and \fBmongos\f1 instances
 default to \fBsnappy,zstd,zlib\f1 compressors, in that order.
 .PP
 To disable network compression, set the value to \fBdisabled\f1\&.
@@ -681,7 +683,7 @@ compressed.
 .RS
 .PP
 The full path from which to load the time zone database. If this option
-is not provided, then MongoDB will use its built\-in time zone database.
+is not provided, then MongoDB uses its built\-in time zone database.
 .PP
 The configuration file included with Linux and macOS packages sets the
 time zone database path to \fB/usr/share/zoneinfo\f1 by default.
@@ -704,16 +706,15 @@ could create inaccurate time zone conversions in older versions of
 MongoDB.
 .PP
 To explicitly link to the time zone database in versions of MongoDB
-prior to 5.0, 4.4.7, and 4.2.14, download the time zone
-database (https://downloads.mongodb.org/olson_tz_db/timezonedb\-latest.zip)\&.
+prior to 5.0, download the time zone database (https://downloads.mongodb.org/olson_tz_db/timezonedb\-latest.zip)\&.
 and use the \fBtimeZoneInfo\f1\f1 parameter.
 .RE
 .PP
 \fBmongos \-\-outputConfig\f1
 .RS
 .PP
-Outputs the \fBmongos\f1\f1 instance\(aqs configuration options, formatted
-in YAML, to \fBstdout\f1 and exits the \fBmongos\f1\f1 instance. For
+Outputs the \fBmongos\f1 instance\(aqs configuration options, formatted
+in YAML, to \fBstdout\f1 and exits the \fBmongos\f1 instance. For
 configuration options that uses \fBExternally Sourced Configuration File Values\f1,
 \fB\-\-outputConfig\f1\f1 returns the resolved value for those options.
 .PP
@@ -748,7 +749,7 @@ at least one of the members of the config server replica set.
     configDB: <configReplSetName>/cfg1.example.net:27019, cfg2.example.net:27019,...
 .EE
 .PP
-The \fBmongos\f1\f1 instances for the sharded cluster must specify
+The \fBmongos\f1 instances for the sharded cluster must specify
 the same config server replica set name but can specify hostname and
 port of different members of the replica set.
 .RE
@@ -758,31 +759,31 @@ port of different members of the replica set.
 .PP
 \fIDefault\f1: 15
 .PP
-Specifies the ping time, in milliseconds, that \fBmongos\f1\f1 uses
+Specifies the ping time, in milliseconds, that \fBmongos\f1 uses
 to determine which secondary replica set members to pass read
 operations from clients. The default value of \fB15\f1 corresponds to
 the default value in all of the client drivers (https://www.mongodb.com/docs/drivers/)\&.
 .PP
-When \fBmongos\f1\f1 receives a request that permits reads to
-\fBsecondary\f1 members, the \fBmongos\f1\f1 will:
+When \fBmongos\f1 receives a request that permits reads to
+\fBsecondary\f1 members, it:
 .RS
 .IP \(bu 2
-Find the member of the set with the lowest ping time.
+Finds the member of the set with the lowest ping time.
 .IP \(bu 2
-Construct a list of replica set members that is within a ping time of
+Constructs a list of replica set members that is within a ping time of
 15 milliseconds of the nearest suitable member of the set.
 .IP
-If you specify a value for the \fB\-\-localThreshold\f1\f1 option, \fBmongos\f1\f1 will
-construct the list of replica members that are within the latency
-allowed by this value.
+If you specify a value for the \fB\-\-localThreshold\f1\f1 option,
+\fBmongos\f1 constructs the list of replica members that are within
+the latency allowed by this value.
 .IP \(bu 2
-Select a member to read from at random from this list.
+Selects a member to read from at random from this list.
 .RE
 .PP
 The ping time used for a member compared by the \fB\-\-localThreshold\f1\f1 setting is a
 moving average of recent ping times, calculated at most every 10
 seconds. As a result, some queries may reach members above the threshold
-until the \fBmongos\f1\f1 recalculates the average.
+until the \fBmongos\f1 recalculates the average.
 .PP
 See the \fBRead Preference for Replica Sets\f1
 section of the \fBread preference\f1
@@ -839,9 +840,9 @@ The server uses and accepts only TLS encrypted connections.
 .RE
 .PP
 If \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1 is not
-specified and you are not using x.509 authentication, the
-system\-wide CA certificate store will be used when connecting to an
-TLS\-enabled server.
+specified and you are not using x.509 authentication, you must set the
+\fBtlsUseSystemCA\f1\f1 parameter to \fBtrue\f1\&. This makes MongoDB use
+the system\-wide CA certificate store when connecting to a TLS\-enabled server.
 .PP
 If using x.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
@@ -878,12 +879,12 @@ For more information about TLS and MongoDB, see
 .PP
 Specifies the password to decrypt the certificate\-key file (i.e.
 \fB\-\-tlsCertificateKeyFile\f1\f1). Use the \fB\-\-tlsCertificateKeyFilePassword\f1\f1 option only if the
-certificate\-key file is encrypted. In all cases, the \fBmongos\f1\f1 will
-redact the password from all logging and reporting output.
+certificate\-key file is encrypted. In all cases, the \fBmongos\f1
+redacts the password from all logging and reporting output.
 .RS
 .IP \(bu 2
 On Linux/BSD, if the private key in the PEM file is encrypted and
-you do not specify the \fB\-\-tlsCertificateKeyFilePassword\f1\f1 option, MongoDB will prompt for a
+you do not specify the \fB\-\-tlsCertificateKeyFilePassword\f1\f1 option, MongoDB prompts for a
 passphrase. See \fBTLS/SSL Certificate Passphrase\f1\&.
 .IP \(bu 2
 On macOS or Windows, if the private key in the PEM file is
@@ -951,9 +952,9 @@ accept only x.509 certificates.
 .RE
 .PP
 If \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1 is not
-specified and you are not using x.509 authentication, the
-system\-wide CA certificate store will be used when connecting to an
-TLS\-enabled server.
+specified and you are not using x.509 authentication, you must set the
+\fBtlsUseSystemCA\f1\f1 parameter to \fBtrue\f1\&. This makes MongoDB use
+the system\-wide CA certificate store when connecting to a TLS\-enabled server.
 .PP
 If using x.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
@@ -999,12 +1000,12 @@ For more information about TLS and MongoDB, see
 .PP
 Specifies the password to decrypt the x.509 certificate\-key file
 specified with \fB\-\-tlsClusterFile\f1\&. Use the \fB\-\-tlsClusterPassword\f1\f1 option only
-if the certificate\-key file is encrypted. In all cases, the \fBmongos\f1\f1
-will redact the password from all logging and reporting output.
+if the certificate\-key file is encrypted. In all cases, the \fBmongos\f1
+redacts the password from all logging and reporting output.
 .RS
 .IP \(bu 2
 On Linux/BSD, if the private key in the x.509 file is encrypted and
-you do not specify the \fB\-\-tlsClusterPassword\f1\f1 option, MongoDB will prompt for a
+you do not specify the \fB\-\-tlsClusterPassword\f1\f1 option, MongoDB prompts for a
 passphrase. See \fBTLS/SSL Certificate Passphrase\f1\&.
 .IP \(bu 2
 On macOS or Windows, if the private key in the x.509 file is
@@ -1188,11 +1189,11 @@ absolute paths.
 You cannot specify a CRL file on
 macOS. Instead, you can use the system SSL certificate store,
 which uses OCSP (Online Certificate Status Protocol) to
-validate the revocation status of certificates. See
-\fB\-\-tlsCertificateSelector\f1\f1 in MongoDB 4.2+ to use the
-system SSL certificate store.
+validate the revocation status of certificates. To use the
+system SSL certificate store, see
+\fB\-\-tlsCertificateSelector\f1\f1\&.
 .IP \(bu 2
-Starting in version 4.4, to check for certificate revocation,
+To check for certificate revocation,
 MongoDB \fBenables\f1\f1 the use of OCSP
 (Online Certificate Status Protocol) by default as an
 alternative to specifying a CRL file or using the system SSL
@@ -1207,16 +1208,24 @@ For more information about TLS and MongoDB, see
 \fBmongos \-\-tlsAllowConnectionsWithoutCertificates\f1
 .RS
 .PP
+By default, the server bypasses client certificate validation unless
+the server is configured to use a CA file. If a CA file is provided, the
+following rules apply:
+.RS
+.IP \(bu 2
 For clients that don\(aqt provide certificates, \fBmongod\f1\f1 or
 \fBmongos\f1\f1 encrypts the TLS/SSL connection, assuming the
 connection is successfully made.
-.PP
-For clients that present a certificate, however, \fBmongos\f1\f1 performs
+.IP \(bu 2
+For clients that present a certificate, \fBmongos\f1 performs
 certificate validation using the root certificate chain specified by
-\fB\-\-tlsCAFile\f1 and reject clients with invalid certificates.
+\fB\-\-tlsCAFile\f1\f1  and reject clients with invalid
+certificates.
+.RE
 .PP
-Use the \fB\-\-tlsAllowConnectionsWithoutCertificates\f1\f1 option if you have a mixed deployment that includes
-clients that do not or cannot present certificates to the \fBmongos\f1\f1\&.
+Use the \fB\-\-tlsAllowConnectionsWithoutCertificates\f1\f1 option if you have
+a mixed deployment that includes clients that do not or cannot present
+certificates to the \fBmongos\f1\&.
 .PP
 For more information about TLS and MongoDB, see
 \fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
@@ -1250,7 +1259,7 @@ For more information about TLS and MongoDB, see
 .PP
 Disables the validation of the hostnames in TLS certificates,
 when connecting to other members of the replica set or sharded cluster
-for inter\-process authentication. This allows \fBmongos\f1\f1 to connect
+for inter\-process authentication. This allows \fBmongos\f1 to connect
 to other members if the hostnames in their certificates do not match
 their configured hostname.
 .PP
@@ -1277,7 +1286,7 @@ two, for example, \fBTLS1_0,TLS1_1\f1\&.
 To list multiple protocols, specify as a comma separated list of
 protocols. For example \fBTLS1_0,TLS1_1\f1\&.
 .IP \(bu 2
-Specifying an unrecognized protocol will prevent the server from
+Specifying an unrecognized protocol prevents the server from
 starting.
 .IP \(bu 2
 The specified disabled protocols overrides any default disabled
@@ -1286,7 +1295,7 @@ protocols.
 .PP
 MongoDB disables the use of TLS 1.0 if TLS
 1.1+ is available on the system. To enable the disabled TLS 1.0,
-specify \fBnone\f1 to \fB\-\-tlsDisabledProtocols\f1\f1\&. See \fBDisable TLS 1.0\f1\&.
+specify \fBnone\f1 to \fB\-\-tlsDisabledProtocols\f1\f1\&.
 .PP
 Members of replica sets and sharded clusters must speak at least one
 protocol in common.
@@ -1297,505 +1306,9 @@ protocol in common.
 \fBmongos \-\-tlsFIPSMode\f1
 .RS
 .PP
-Directs the \fBmongos\f1\f1 to use the FIPS mode of the  TLS
+Directs the \fBmongos\f1 to use the FIPS mode of the  TLS
 library. Your system must have a FIPS
 compliant library to use the \fB\-\-tlsFIPSMode\f1\f1 option.
-.PP
-FIPS\-compatible TLS/SSL is
-available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&. See
-\fBConfigure MongoDB for FIPS\f1 for more information.
-.RE
-.SS SSL OPTIONS (DEPRECATED)
-.PP
-All SSL options are deprecated since 4.2. Use the TLS counterparts
-instead, as they have identical functionality to the SSL options.  The SSL
-protocol is deprecated and MongoDB supports TLS 1.0 and later.
-.PP
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 for full
-documentation of MongoDB\(aqs support.
-.PP
-\fBmongos \-\-sslOnNormalPorts\f1
-.RS
-.PP
-Use \fB\-\-tlsMode requireTLS\f1\f1 instead.
-.PP
-Enables TLS/SSL for \fBmongos\f1\f1\&.
-.PP
-With \fB\-\-sslOnNormalPorts\f1\f1, a \fBmongos\f1\f1 requires TLS/SSL encryption for all
-connections on the default MongoDB port, or the port specified by
-\fB\-\-port\f1\f1\&. By default, \fB\-\-sslOnNormalPorts\f1\f1 is
-disabled.
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslMode\f1
-.RS
-.PP
-Use \fB\-\-tlsMode\f1\f1 instead.
-.PP
-Enables TLS/SSL or mixed TLS/SSL used for all network connections. The
-argument to the \fB\-\-sslMode\f1\f1 option can be one of the following:
-.RS
-.IP \(bu 2
-.RS
-.IP \(bu 4
-Value
-.IP \(bu 4
-Description
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBdisabled\f1
-.IP \(bu 4
-The server does not use TLS/SSL.
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBallowSSL\f1
-.IP \(bu 4
-Connections between servers do not use TLS/SSL. For incoming
-connections, the server accepts both TLS/SSL and non\-TLS/non\-SSL.
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBpreferSSL\f1
-.IP \(bu 4
-Connections between servers use TLS/SSL. For incoming
-connections, the server accepts both TLS/SSL and non\-TLS/non\-SSL.
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBrequireSSL\f1
-.IP \(bu 4
-The server uses and accepts only TLS/SSL encrypted connections.
-.RE
-.RE
-.PP
-If \fB\-\-tlsCAFile\f1/\fBnet.tls.CAFile\f1 (or
-their aliases \fB\-\-sslCAFile\f1/\fBnet.ssl.CAFile\f1) is not specified
-and you are not using x.509 authentication, the system\-wide CA
-certificate store will be used when connecting to an TLS/SSL\-enabled
-server.
-.PP
-To use x.509 authentication, \fB\-\-tlsCAFile\f1 or \fBnet.tls.CAFile\f1
-must be specified unless you are using \fB\-\-tlsCertificateSelector\f1
-or \fB\-\-net.tls.certificateSelector\f1\&.
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslPEMKeyFile\f1
-.RS
-.PP
-Use \fB\-\-tlsPEMKeyFile\f1\f1
-instead.
-.PP
-On macOS or Windows, you can use a certificate from
-the operating system\(aqs secure store instead of a PEM file. See
-\fB\-\-sslCertificateSelector\f1\f1\&.
-.PP
-Specifies the \&.pem file that contains both the TLS/SSL certificate
-and key.
-.RS
-.IP \(bu 2
-On Linux/BSD, you must specify \fB\-\-sslPEMKeyFile\f1\f1 when TLS/SSL is enabled.
-.IP \(bu 2
-On Windows or macOS, you must specify either \fB\-\-sslPEMKeyFile\f1\f1 or
-\fB\-\-sslCertificateSelector\f1\f1 when TLS/SSL is enabled.
-.RE
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslPEMKeyPassword\f1
-.RS
-.PP
-Use \fB\-\-tlsPEMKeyPassword\f1\f1 instead.
-.PP
-Specifies the password to decrypt the certificate\-key file (i.e.
-\fB\-\-sslPEMKeyFile\f1\f1). Use the \fB\-\-sslPEMKeyPassword\f1\f1 option only if the
-certificate\-key file is encrypted. In all cases, the \fBmongos\f1\f1 will
-redact the password from all logging and reporting output.
-.RS
-.IP \(bu 2
-On Linux/BSD, if the private key in the PEM file is encrypted and
-you do not specify the \fB\-\-sslPEMKeyPassword\f1\f1 option, MongoDB will prompt for a
-passphrase. See \fBTLS/SSL Certificate Passphrase\f1\&.
-.IP \(bu 2
-On macOS or Windows, if the private key in the PEM file is
-encrypted, you must explicitly specify the \fB\-\-sslPEMKeyPassword\f1\f1 option.
-Alternatively, you can use a certificate from the secure system
-store (see \fB\-\-sslCertificateSelector\f1\f1) instead of a PEM key file or use an
-unencrypted PEM file.
-.RE
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslClusterFile\f1
-.RS
-.PP
-Use \fB\-\-tlsClusterFile\f1\f1 instead.
-.PP
-On macOS or Windows, you can use a certificate
-from the operating system\(aqs secure store instead of a PEM key
-file. See \fB\-\-sslClusterCertificateSelector\f1\f1\&.
-.PP
-Specifies the \&.pem file that contains the x.509 certificate\-key
-file for \fBmembership authentication\f1
-for the cluster or replica set.
-.PP
-If \fB\-\-sslClusterFile\f1\f1 does not specify the \fB\&.pem\f1 file for internal cluster
-authentication or the alternative
-\fB\-\-sslClusterCertificateSelector\f1\f1, the cluster uses the
-\fB\&.pem\f1 file specified in the \fB\-\-sslPEMKeyFile\f1\f1 option or
-the certificate returned by the \fB\-\-sslCertificateSelector\f1\f1\&.
-.PP
-To use x.509 authentication, \fB\-\-tlsCAFile\f1 or \fBnet.tls.CAFile\f1
-must be specified unless you are using \fB\-\-tlsCertificateSelector\f1
-or \fB\-\-net.tls.certificateSelector\f1\&.
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslClusterPassword\f1
-.RS
-.PP
-Use \fB\-\-tlsClusterPassword\f1\f1 instead.
-.PP
-Specifies the password to decrypt the x.509 certificate\-key file
-specified with \fB\-\-sslClusterFile\f1\&. Use the \fB\-\-sslClusterPassword\f1\f1 option only
-if the certificate\-key file is encrypted. In all cases, the \fBmongos\f1\f1
-will redact the password from all logging and reporting output.
-.RS
-.IP \(bu 2
-On Linux/BSD, if the private key in the x.509 file is encrypted and
-you do not specify the \fB\-\-sslClusterPassword\f1\f1 option, MongoDB will prompt for a
-passphrase. See \fBTLS/SSL Certificate Passphrase\f1\&.
-.IP \(bu 2
-On macOS or Windows, if the private key in the x.509 file is
-encrypted, you must explicitly specify the \fB\-\-sslClusterPassword\f1\f1 option.
-Alternatively, you can either use a certificate from the secure
-system store (see \fB\-\-sslClusterCertificateSelector\f1\f1) instead of a cluster PEM file or
-use an unencrypted PEM file.
-.RE
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslCAFile\f1
-.RS
-.PP
-Use \fB\-\-tlsCAFile\f1\f1 instead.
-.PP
-Specifies the \&.pem file that contains the root certificate chain
-from the Certificate Authority. Specify the file name of the
-\&.pem file using relative or absolute paths.
-.PP
-On macOS or Windows, you can use a certificate from
-the operating system\(aqs secure store instead of a PEM key file. See
-\fB\-\-sslCertificateSelector\f1\f1\&. When using the secure store, you
-do not need to, but can, also specify the \fB\-\-sslCAFile\f1\f1\&.
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslClusterCAFile\f1
-.RS
-.PP
-Use \fB\-\-tlsClusterCAFile\f1\f1
-instead.
-.PP
-Specifies the \&.pem file that contains the root certificate chain
-from the Certificate Authority used to validate the certificate
-presented by a client establishing a connection. Specify the file
-name of the \&.pem file using relative or absolute paths.
-.PP
-If \fB\-\-sslClusterCAFile\f1\f1 does not specify the \&.pem file for validating the
-certificate from a client establishing a connection, the cluster uses
-the \&.pem file specified in the \fB\-\-sslCAFile\f1\f1 option.
-.PP
-\fB\-\-sslClusterCAFile\f1\f1 lets you use separate Certificate Authorities to verify the
-client to server and server to client portions of the TLS handshake.
-.PP
-On macOS or Windows, you can use a certificate from
-the operating system\(aqs secure store instead of a PEM key file. See
-\fB\-\-sslClusterCertificateSelector\f1\f1\&. When using the secure store, you
-do not need to, but can, also specify the \fB\-\-sslClusterCAFile\f1\f1\&.
-.PP
-Requires that \fB\-\-sslCAFile\f1\f1 is set.
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslCertificateSelector\f1
-.RS
-.PP
-Use \fB\-\-tlsCertificateSelector\f1\f1 instead.
-.PP
-Available on Windows and macOS as an alternative to
-\fB\-\-tlsCertificateKeyFile\f1\f1\&.
-.PP
-\fB\-\-tlsCertificateKeyFile\f1\f1 and \fB\-\-sslCertificateSelector\f1\f1
-options are mutually exclusive. You can only specify one.
-.PP
-Specifies a certificate property in order to select a matching
-certificate from the operating system\(aqs certificate store.
-.PP
-\fB\-\-sslCertificateSelector\f1\f1 accepts an argument of the format \fB<property>=<value>\f1
-where the property can be one of the following:
-.RS
-.IP \(bu 2
-.RS
-.IP \(bu 4
-Property
-.IP \(bu 4
-Value type
-.IP \(bu 4
-Description
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBsubject\f1
-.IP \(bu 4
-ASCII string
-.IP \(bu 4
-Subject name or common name on certificate
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBthumbprint\f1
-.IP \(bu 4
-hex string
-.IP \(bu 4
-A sequence of bytes, expressed as hexadecimal, used to
-identify a public key by its SHA\-1 digest.
-.IP
-The \fBthumbprint\f1 is sometimes referred to as a
-\fBfingerprint\f1\&.
-.RE
-.RE
-.PP
-When using the system SSL certificate store, OCSP (Online
-Certificate Status Protocol) is used to validate the revocation
-status of certificates.
-.RE
-.PP
-\fBmongos \-\-sslClusterCertificateSelector\f1
-.RS
-.PP
-Use \fB\-\-tlsClusterCertificateSelector\f1\f1 instead.
-.PP
-Available on Windows and macOS as an alternative to
-\fB\-\-sslClusterFile\f1\f1\&.
-.PP
-\fB\-\-sslClusterFile\f1\f1 and \fB\-\-sslClusterCertificateSelector\f1\f1
-options are mutually exclusive. You can only specify one.
-.PP
-Specifies a certificate property in order to select a matching
-certificate from the operating system\(aqs certificate store to use for
-internal authentication.
-.PP
-\fB\-\-sslClusterCertificateSelector\f1\f1 accepts an argument of the format \fB<property>=<value>\f1
-where the property can be one of the following:
-.RS
-.IP \(bu 2
-.RS
-.IP \(bu 4
-Property
-.IP \(bu 4
-Value type
-.IP \(bu 4
-Description
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBsubject\f1
-.IP \(bu 4
-ASCII string
-.IP \(bu 4
-Subject name or common name on certificate
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBthumbprint\f1
-.IP \(bu 4
-hex string
-.IP \(bu 4
-A sequence of bytes, expressed as hexadecimal, used to
-identify a public key by its SHA\-1 digest.
-.IP
-The \fBthumbprint\f1 is sometimes referred to as a
-\fBfingerprint\f1\&.
-.RE
-.RE
-.RE
-.PP
-\fBmongos \-\-sslCRLFile\f1
-.RS
-.PP
-Use \fB\-\-tlsCRLFile\f1\f1 instead.
-.PP
-Specifies the \&.pem file that contains the Certificate Revocation
-List. Specify the file name of the \&.pem file using relative or
-absolute paths.
-.RS
-.IP \(bu 2
-You cannot specify a CRL file on
-macOS. Instead, you can use the system SSL certificate store,
-which uses OCSP (Online Certificate Status Protocol) to
-validate the revocation status of certificates. See
-\fB\-\-tlsCertificateSelector\f1\f1 in MongoDB 4.2+ to use the
-system SSL certificate store.
-.IP \(bu 2
-Starting in version 4.4, to check for certificate revocation,
-MongoDB \fBenables\f1\f1 the use of OCSP
-(Online Certificate Status Protocol) by default as an
-alternative to specifying a CRL file or using the system SSL
-certificate store.
-.RE
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslAllowConnectionsWithoutCertificates\f1
-.RS
-.PP
-Use \fB\-\-tlsAllowConnectionsWithoutCertificates\f1\f1 instead.
-.PP
-For clients that don\(aqt provide certificates, \fBmongod\f1\f1 or
-\fBmongos\f1\f1 encrypts the TLS/SSL connection, assuming the
-connection is successfully made.
-.PP
-For clients that present a certificate, however, \fBmongos\f1\f1 performs
-certificate validation using the root certificate chain specified by
-\fB\-\-sslCAFile\f1 and reject clients with invalid certificates.
-.PP
-Use the \fB\-\-sslAllowConnectionsWithoutCertificates\f1\f1 option if you have a mixed deployment that includes
-clients that do not or cannot present certificates to the \fBmongos\f1\f1\&.
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslAllowInvalidCertificates\f1
-.RS
-.PP
-Use \fB\-\-tlsAllowInvalidCertificates\f1\f1 instead.
-.PP
-Bypasses the validation checks for TLS/SSL certificates on other
-servers in the cluster and allows the use of invalid certificates to
-connect.
-.PP
-Starting in MongoDB 4.0, if you specify any of the following x.509
-authentication options, an invalid certificate is
-sufficient only to establish a TLS connection but it is
-\fIinsufficient\f1 for authentication:
-.RS
-.IP \(bu 2
-\fB\-\-sslAllowInvalidCertificates\f1 or \fBnet.ssl.allowInvalidCertificates: true\f1 for MongoDB 4.0 and later
-.IP \(bu 2
-\fB\-\-tlsAllowInvalidCertificates\f1 or \fBnet.tls.allowInvalidCertificates: true\f1 for MongoDB 4.2 and later
-.RE
-.PP
-When using
-the \fB\-\-sslAllowInvalidCertificates\f1\f1 setting, MongoDB
-logs a warning regarding the use of the invalid certificate.
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslAllowInvalidHostnames\f1
-.RS
-.PP
-Use \fB\-\-tlsAllowInvalidHostnames\f1\f1 instead.
-.PP
-Disables the validation of the hostnames in TLS/SSL certificates,
-when connecting to other members of the replica set or sharded cluster
-for inter\-process authentication. This allows \fBmongos\f1\f1 to connect
-to other members if the hostnames in their certificates do not match
-their configured hostname.
-.PP
-For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
-\fBTLS/SSL Configuration for Clients\f1 .
-.RE
-.PP
-\fBmongos \-\-sslDisabledProtocols\f1
-.RS
-.PP
-Use \fB\-\-tlsDisabledProtocols\f1\f1 instead.
-.PP
-Prevents a MongoDB server running with TLS/SSL from accepting
-incoming connections that use a specific protocol or protocols. To
-specify multiple protocols, use a comma separated list of protocols.
-.PP
-\fB\-\-sslDisabledProtocols\f1\f1 recognizes the following protocols: \fBTLS1_0\f1, \fBTLS1_1\f1,
-\fBTLS1_2\f1, and \fBTLS1_3\f1\&.
-.RS
-.IP \(bu 2
-On macOS, you cannot disable \fBTLS1_1\f1 and leave both \fBTLS1_0\f1 and
-\fBTLS1_2\f1 enabled. You must disable at least one of the other
-two, for example, \fBTLS1_0,TLS1_1\f1\&.
-.IP \(bu 2
-To list multiple protocols, specify as a comma separated list of
-protocols. For example \fBTLS1_0,TLS1_1\f1\&.
-.IP \(bu 2
-Specifying an unrecognized protocol will prevent the server from
-starting.
-.IP \(bu 2
-The specified disabled protocols overrides any default disabled
-protocols.
-.RE
-.PP
-MongoDB disables the use of TLS 1.0 if TLS
-1.1+ is available on the system. To enable the disabled TLS 1.0,
-specify \fBnone\f1 to \fB\-\-sslDisabledProtocols\f1\f1\&. See \fBDisable TLS 1.0\f1\&.
-.PP
-Members of replica sets and sharded clusters must speak at least one
-protocol in common.
-.PP
-\fBDisallow Protocols\f1
-.RE
-.PP
-\fBmongos \-\-sslFIPSMode\f1
-.RS
-.PP
-Use \fB\-\-tlsFIPSMode\f1\f1 instead.
-.PP
-Directs the \fBmongos\f1\f1 to use the FIPS mode of the  TLS/SSL
-library. Your system must have a FIPS
-compliant library to use the \fB\-\-sslFIPSMode\f1\f1 option.
 .PP
 FIPS\-compatible TLS/SSL is
 available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&. See
@@ -1844,7 +1357,7 @@ requirements.
 .RS
 .PP
 Enables \fBauditing\f1 and specifies where
-\fBmongos\f1\f1 sends all audit events.
+\fBmongos\f1 sends all audit events.
 .PP
 \fB\-\-auditDestination\f1\f1 can have one of the following values:
 .RS
@@ -1865,8 +1378,8 @@ Windows. Audit messages have a syslog severity level of \fBinfo\f1
 and a facility level of \fBuser\f1\&.
 .IP
 The syslog message limit can result in the truncation of
-audit messages. The auditing system will neither detect the
-truncation nor error upon its occurrence.
+audit messages. The auditing system neither detects the
+truncation nor errors upon its occurrence.
 .RE
 .IP \(bu 2
 .RS
@@ -1996,6 +1509,46 @@ the configuration file.
 Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
+.PP
+\fBmongos \-\-auditSchema\f1
+.RS
+.PP
+\fIType\f1: string
+.PP
+\fIDefault\f1: \fBmongo\f1
+.PP
+Specifies the format used for audit logs. You can specify one of the
+following values for \fB\-\-auditSchema\f1:
+.RS
+.IP \(bu 2
+.RS
+.IP \(bu 4
+Value
+.IP \(bu 4
+Description
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fBmongo\f1
+.IP \(bu 4
+Logs are written in a format designed by MongoDB.
+.IP
+For example log messages, see \fBmongo Schema Audit Messages\f1\&.
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fBOCSF\f1
+.IP \(bu 4
+Logs are written in OCSF (Open Cybersecurity Schema
+Framework) format. This option provides logs in a standardized
+format compatible with log processors.
+.IP
+For example log messages, see \fBOCSF Schema Audit Messages\f1\&.
+.RE
+.RE
+.RE
 .SS PROFILER OPTIONS
 .PP
 \fBmongos \-\-slowms\f1
@@ -2013,9 +1566,9 @@ operations to the diagnostic log at a rate determined by
 At higher \fBlogLevel\f1\f1 settings, all operations appear
 in the diagnostic log regardless of their latency.
 .PP
-For \fBmongos\f1\f1 instances,  affects the diagnostic
+For \fBmongos\f1 instances,  affects the diagnostic
 log only and not the profiler since profiling is not available on
-\fBmongos\f1\f1\&.
+\fBmongos\f1\&.
 .RE
 .PP
 \fBmongos \-\-slowOpSampleRate\f1
@@ -2026,9 +1579,9 @@ log only and not the profiler since profiling is not available on
 The fraction of \fIslow\f1 operations that should be logged.
 \fB\-\-slowOpSampleRate\f1\f1 accepts values between 0 and 1, inclusive.
 .PP
-For \fBmongos\f1\f1 instances, \fB\-\-slowOpSampleRate\f1\f1 affects the diagnostic log
+For \fBmongos\f1 instances, \fB\-\-slowOpSampleRate\f1\f1 affects the diagnostic log
 only and not the profiler since profiling is not available on
-\fBmongos\f1\f1\&.
+\fBmongos\f1\&.
 .RE
 .SS LDAP AUTHENTICATION AND AUTHORIZATION OPTIONS
 .PP
@@ -2037,7 +1590,7 @@ only and not the profiler since profiling is not available on
 .PP
 \fIAvailable in MongoDB Enterprise only.\f1
 .PP
-The LDAP server against which the \fBmongos\f1\f1 authenticates users or
+The LDAP server against which the \fBmongos\f1 authenticates users or
 determines what actions a user is authorized to perform on a given
 database. If the LDAP server specified has any replicated instances,
 you may specify the host and port of each replicated server in a
@@ -2049,10 +1602,10 @@ servers, specify \fIone\f1 LDAP server or any of its replicated instances to
 4.1.10 (https://www.rfc\-editor.org/rfc/rfc4511.txt)\&. Do not use \fB\-\-ldapServers\f1\f1
 for listing every LDAP server in your infrastructure.
 .PP
-This setting can be configured on a running \fBmongos\f1\f1 using
+This setting can be configured on a running \fBmongos\f1 using
 \fBsetParameter\f1\f1\&.
 .PP
-If unset, \fBmongos\f1\f1 cannot use \fBLDAP authentication or authorization\f1\&.
+If unset, \fBmongos\f1 cannot use \fBLDAP authentication or authorization\f1\&.
 .RE
 .PP
 \fBmongos \-\-ldapValidateLDAPServerConfig\f1
@@ -2060,15 +1613,15 @@ If unset, \fBmongos\f1\f1 cannot use \fBLDAP authentication or authorization\f1\
 .PP
 \fIAvailable in MongoDB Enterprise\f1
 .PP
-A flag that determines if the \fBmongos\f1\f1 instance checks
+A flag that determines if the \fBmongos\f1 instance checks
 the availability of the \fBLDAP server(s)\f1\f1 as part of its startup:
 .RS
 .IP \(bu 2
-If \fBtrue\f1, the \fBmongos\f1\f1 instance performs the
+If \fBtrue\f1, the \fBmongos\f1 instance performs the
 availability check and only continues to start up if the LDAP
 server is available.
 .IP \(bu 2
-If \fBfalse\f1, the \fBmongos\f1\f1 instance skips the
+If \fBfalse\f1, the \fBmongos\f1 instance skips the
 availability check; i.e. the instance starts up even if the LDAP
 server is unavailable.
 .RE
@@ -2079,7 +1632,7 @@ server is unavailable.
 .PP
 \fIAvailable in MongoDB Enterprise only.\f1
 .PP
-The identity with which \fBmongos\f1\f1 binds as, when connecting to or
+The identity with which \fBmongos\f1 binds as, when connecting to or
 performing queries on an LDAP server.
 .PP
 Only required if any of the following are true:
@@ -2094,9 +1647,9 @@ The LDAP server disallows anonymous binds
 .PP
 You must use \fB\-\-ldapQueryUser\f1\f1 with \fB\-\-ldapQueryPassword\f1\f1\&.
 .PP
-If unset, \fBmongos\f1\f1 will not attempt to bind to the LDAP server.
+If unset, \fBmongos\f1 doesn\(aqt attempt to bind to the LDAP server.
 .PP
-This setting can be configured on a running \fBmongos\f1\f1 using
+This setting can be configured on a running \fBmongos\f1 using
 \fBsetParameter\f1\f1\&.
 .PP
 Windows MongoDB deployments can use \fB\-\-ldapBindWithOSDefaults\f1\f1
@@ -2113,9 +1666,9 @@ The password used to bind to an LDAP server when using
 \fB\-\-ldapQueryUser\f1\f1\&. You must use \fB\-\-ldapQueryPassword\f1\f1 with
 \fB\-\-ldapQueryUser\f1\f1\&.
 .PP
-If unset, \fBmongos\f1\f1 will not attempt to bind to the LDAP server.
+If unset, \fBmongos\f1 doesn\(aqt attempt to bind to the LDAP server.
 .PP
-This setting can be configured on a running \fBmongos\f1\f1 using
+This setting can be configured on a running \fBmongos\f1 using
 \fBsetParameter\f1\f1\&.
 .PP
 Windows MongoDB deployments can use \fB\-\-ldapBindWithOSDefaults\f1\f1
@@ -2130,7 +1683,7 @@ both \fB\-\-ldapQueryPassword\f1\f1 and \fB\-\-ldapBindWithOSDefaults\f1\f1 at t
 .PP
 Available in MongoDB Enterprise for the Windows platform only.
 .PP
-Allows \fBmongos\f1\f1 to authenticate, or bind, using your Windows login
+Allows \fBmongos\f1 to authenticate, or bind, using your Windows login
 credentials when connecting to the LDAP server.
 .PP
 Only required if:
@@ -2154,20 +1707,20 @@ Use \fB\-\-ldapBindWithOSDefaults\f1\f1 to replace \fB\-\-ldapQueryUser\f1\f1 an
 .PP
 \fIAvailable in MongoDB Enterprise only.\f1
 .PP
-The method \fBmongos\f1\f1 uses to authenticate to an LDAP server.
+The method \fBmongos\f1 uses to authenticate to an LDAP server.
 Use with \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1 to
 connect to the LDAP server.
 .PP
 \fB\-\-ldapBindMethod\f1\f1 supports the following values:
 .RS
 .IP \(bu 2
-\fBsimple\f1 \- \fBmongos\f1\f1 uses simple authentication.
+\fBsimple\f1 \- \fBmongos\f1 uses simple authentication.
 .IP \(bu 2
-\fBsasl\f1 \- \fBmongos\f1\f1 uses SASL protocol for authentication
+\fBsasl\f1 \- \fBmongos\f1 uses SASL protocol for authentication
 .RE
 .PP
 If you specify \fBsasl\f1, you can configure the available SASL mechanisms
-using \fB\-\-ldapBindSaslMechanisms\f1\f1\&. \fBmongos\f1\f1 defaults to
+using \fB\-\-ldapBindSaslMechanisms\f1\f1\&. \fBmongos\f1 defaults to
 using \fBDIGEST\-MD5\f1 mechanism.
 .RE
 .PP
@@ -2178,21 +1731,21 @@ using \fBDIGEST\-MD5\f1 mechanism.
 .PP
 \fIAvailable in MongoDB Enterprise only.\f1
 .PP
-A comma\-separated list of SASL mechanisms \fBmongos\f1\f1 can
-use when authenticating to the LDAP server. The \fBmongos\f1\f1 and the
-LDAP server must agree on at least one mechanism. The \fBmongos\f1\f1
+A comma\-separated list of SASL mechanisms \fBmongos\f1 can
+use when authenticating to the LDAP server. The \fBmongos\f1 and the
+LDAP server must agree on at least one mechanism. The \fBmongos\f1
 dynamically loads any SASL mechanism libraries installed on the host
 machine at runtime.
 .PP
 Install and configure the appropriate libraries for the selected
-SASL mechanism(s) on both the \fBmongos\f1\f1 host and the remote
+SASL mechanism(s) on both the \fBmongos\f1 host and the remote
 LDAP server host. Your operating system may include certain SASL
 libraries by default. Defer to the documentation associated with each
 SASL mechanism for guidance on installation and configuration.
 .PP
 If using the \fBGSSAPI\f1 SASL mechanism for use with
 \fBKerberos Authentication\f1, verify the following for the
-\fBmongos\f1\f1 host machine:
+\fBmongos\f1 host machine:
 .PP
 \fBLinux\f1\f1
 .RS
@@ -2205,7 +1758,7 @@ variables, please defer to the
 Kerberos documentation (https://web.mit.edu/kerberos/krb5\-1.13/doc/admin/env_variables.html)\&.
 .IP \(bu 2
 The client keytab includes a
-\fBUser Principal\f1 for the \fBmongos\f1\f1 to use when
+\fBUser Principal\f1 for the \fBmongos\f1 to use when
 connecting to the LDAP server and execute LDAP queries.
 .RE
 .RE
@@ -2217,7 +1770,7 @@ If connecting to an Active Directory server, the Windows
 Kerberos configuration automatically generates a
 Ticket\-Granting\-Ticket (https://msdn.microsoft.com/en\-us/library/windows/desktop/aa380510(v=vs.85).aspx)
 when the user logs onto the system. Set \fB\-\-ldapBindWithOSDefaults\f1\f1 to
-\fBtrue\f1 to allow \fBmongos\f1\f1 to use the generated credentials when
+\fBtrue\f1 to allow \fBmongos\f1 to use the generated credentials when
 connecting to the Active Directory server and execute queries.
 .RE
 .PP
@@ -2251,7 +1804,7 @@ For Windows, please see the Windows SASL documentation (https://msdn.microsoft.c
 .PP
 \fIAvailable in MongoDB Enterprise only.\f1
 .PP
-By default, \fBmongos\f1\f1 creates a TLS/SSL secured connection to the LDAP
+By default, \fBmongos\f1 creates a TLS/SSL secured connection to the LDAP
 server.
 .PP
 For Linux deployments, you must configure the appropriate TLS Options in
@@ -2267,11 +1820,11 @@ tool may vary depending on operating system version. Please see the
 documentation for your version of Windows for more information on
 certificate management.
 .PP
-Set \fB\-\-ldapTransportSecurity\f1\f1 to \fBnone\f1 to disable TLS/SSL between \fBmongos\f1\f1 and the LDAP
+Set \fB\-\-ldapTransportSecurity\f1\f1 to \fBnone\f1 to disable TLS/SSL between \fBmongos\f1 and the LDAP
 server.
 .PP
 Setting \fB\-\-ldapTransportSecurity\f1\f1 to \fBnone\f1 transmits plaintext information and possibly
-credentials between \fBmongos\f1\f1 and the LDAP server.
+credentials between \fBmongos\f1 and the LDAP server.
 .RE
 .PP
 \fBmongos \-\-ldapTimeoutMS\f1
@@ -2281,7 +1834,7 @@ credentials between \fBmongos\f1\f1 and the LDAP server.
 .PP
 \fIAvailable in MongoDB Enterprise only.\f1
 .PP
-The amount of time in milliseconds \fBmongos\f1\f1 should wait for an LDAP server
+The amount of time in milliseconds \fBmongos\f1 should wait for an LDAP server
 to respond to a request.
 .PP
 Increasing the value of \fB\-\-ldapTimeoutMS\f1\f1 may prevent connection failure between the
@@ -2289,7 +1842,7 @@ MongoDB server and the LDAP server, if the source of the failure is a
 connection timeout. Decreasing the value of \fB\-\-ldapTimeoutMS\f1\f1 reduces the time
 MongoDB waits for a response from the LDAP server.
 .PP
-This setting can be configured on a running \fBmongos\f1\f1 using
+This setting can be configured on a running \fBmongos\f1 using
 \fBsetParameter\f1\f1\&.
 .RE
 .PP
@@ -2309,7 +1862,7 @@ network error.
 .PP
 \fIAvailable in MongoDB Enterprise only.\f1
 .PP
-Maps the username provided to \fBmongos\f1\f1 for authentication to a LDAP
+Maps the username provided to \fBmongos\f1 for authentication to a LDAP
 Distinguished Name (DN). You may need to use \fB\-\-ldapUserToDNMapping\f1\f1 to transform a
 username into an LDAP DN in the following scenarios:
 .RS
@@ -2319,9 +1872,9 @@ authenticate to MongoDB with usernames that are not full LDAP DNs.
 .IP \(bu 2
 Using an \fBLDAP authorization query template\f1\f1 that requires a DN.
 .IP \(bu 2
-Transforming the usernames of clients authenticating to Mongo DB using
-different authentication mechanisms (e.g. x.509, kerberos) to a full LDAP
-DN for authorization.
+Transforming the usernames of clients authenticating to Mongo DB
+using different authentication mechanisms, such as x.509 or
+kerberos, to a full LDAP DN for authorization.
 .RE
 .PP
 \fB\-\-ldapUserToDNMapping\f1\f1 expects a quote\-enclosed JSON\-string representing an ordered array
@@ -2385,10 +1938,10 @@ name matched by the \fBmatch\f1 regex into an LDAP query URI encoded
 respecting RFC4515 and RFC4516. Each curly bracket\-enclosed numeric
 value is replaced by the corresponding regex capture group (http://www.regular\-expressions.info/refcapture.html) extracted
 from the authentication username via the \fBmatch\f1 expression.
-\fBmongos\f1\f1 executes the query against the LDAP server to retrieve
-the LDAP DN for the authenticated user. \fBmongos\f1\f1 requires
+\fBmongos\f1 executes the query against the LDAP server to retrieve
+the LDAP DN for the authenticated user. \fBmongos\f1 requires
 exactly one returned result for the transformation to be
-successful, or \fBmongos\f1\f1 skips this transformation.
+successful, or \fBmongos\f1 skips this transformation.
 .IP \(bu 4
 \fB"ou=engineering,dc=example,
 dc=com??one?(user={0})"\f1
@@ -2404,29 +1957,28 @@ use your preferred LDAP resource.
 For each document in the array, you must use either \fBsubstitution\f1 or
 \fBldapQuery\f1\&. You \fIcannot\f1 specify both in the same document.
 .PP
-When performing authentication or authorization, \fBmongos\f1\f1 steps through
+When performing authentication or authorization, \fBmongos\f1 steps through
 each document in the array in the given order, checking the authentication
 username against the \fBmatch\f1 filter.  If a match is found,
-\fBmongos\f1\f1 applies the transformation and uses the output for
-authenticating the user. \fBmongos\f1\f1 does not check the remaining documents
+\fBmongos\f1 applies the transformation and uses the output for
+authenticating the user. \fBmongos\f1 does not check the remaining documents
 in the array.
 .PP
 If the given document does not match the provided authentication
-name, \fBmongos\f1\f1 continues through the list of documents
+name, \fBmongos\f1 continues through the list of documents
 to find additional matches. If no matches are found in any document,
 or the transformation the document describes fails,
-\fBmongos\f1\f1 returns an error.
+\fBmongos\f1 returns an error.
 .PP
-Starting in MongoDB 4.4, \fBmongos\f1\f1 also returns an error
-if one of the transformations cannot be evaluated due to networking
-or authentication failures to the LDAP server. \fBmongos\f1\f1
-rejects the connection request and does not check the remaining
+\fBmongos\f1 also returns an error if one of the transformations cannot be
+evaluated due to networking or authentication failures to the LDAP server.
+\fBmongos\f1 rejects the connection request and does not check the remaining
 documents in the array.
 .PP
 Starting in MongoDB 5.0, \fB\-\-ldapUserToDNMapping\f1\f1
 accepts an empty string \fB""\f1 or empty array \fB[ ]\f1 in place of a
 mapping documnent. If providing an empty string or empty array to
-\fB\-\-ldapUserToDNMapping\f1\f1, MongoDB will map the
+\fB\-\-ldapUserToDNMapping\f1\f1, MongoDB maps the
 authenticated username as the LDAP DN. Previously, providing an
 empty mapping document would cause mapping to fail.
 .PP
@@ -2459,14 +2011,14 @@ document. The regex capture group \fB{0}\f1 corresponds to the string
 A user with username \fBbob@DBA.EXAMPLE.COM\f1 matches the second document.
 The regex capture group \fB{0}\f1 corresponds to the string \fBbob\f1\&.  The
 resulting output is the LDAP query
-\fB"ou=dba,dc=example,dc=com??one?(user=bob)"\f1\&. \fBmongos\f1\f1 executes this
+\fB"ou=dba,dc=example,dc=com??one?(user=bob)"\f1\&. \fBmongos\f1 executes this
 query against the LDAP server, returning the result
 \fB"cn=bob,ou=dba,dc=example,dc=com"\f1\&.
 .PP
-If \fB\-\-ldapUserToDNMapping\f1\f1 is unset, \fBmongos\f1\f1 applies no transformations to the username
+If \fB\-\-ldapUserToDNMapping\f1\f1 is unset, \fBmongos\f1 applies no transformations to the username
 when attempting to authenticate or authorize a user against the LDAP server.
 .PP
-This setting can be configured on a running \fBmongos\f1\f1 using the
+This setting can be configured on a running \fBmongos\f1 using the
 \fBsetParameter\f1\f1 database command.
 .RE
 .SS ADDITIONAL OPTIONS
@@ -2474,10 +2026,10 @@ This setting can be configured on a running \fBmongos\f1\f1 using the
 \fBmongos \-\-ipv6\f1
 .RS
 .PP
-Enables IPv6 support. \fBmongos\f1\f1 disables IPv6 support by default.
+Enables IPv6 support. \fBmongos\f1 disables IPv6 support by default.
 .PP
-Setting \fB\-\-ipv6\f1\f1 does \fInot\f1 direct the \fBmongos\f1\f1 to listen on any
-local IPv6 addresses or interfaces. To configure the \fBmongos\f1\f1 to
+Setting \fB\-\-ipv6\f1\f1 does \fInot\f1 direct the \fBmongos\f1 to listen on any
+local IPv6 addresses or interfaces. To configure the \fBmongos\f1 to
 listen on an IPv6 interface, you must either:
 .RS
 .IP \(bu 2
