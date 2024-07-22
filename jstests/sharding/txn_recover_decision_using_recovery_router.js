@@ -194,8 +194,19 @@ const waitForCommitTransactionToComplete = function(coordinatorRs, lsid, txnNumb
     });
 };
 
-let st =
-    new ShardingTest({shards: 2, rs: {nodes: 2}, mongos: 2, other: {mongosOptions: {verbose: 3}}});
+let st = new ShardingTest({
+    shards: 2,
+    rs: {nodes: 2},
+    rsOptions: {
+        setParameter: {
+            // Set this to match the value of transactionLifetimeLimitSeconds to avoid transition
+            // failure due to not being able to acquire the lock quickly enough.
+            maxTransactionLockRequestTimeoutMillis: TestData.transactionLifetimeLimitSeconds * 1000
+        }
+    },
+    mongos: 2,
+    other: {mongosOptions: {verbose: 3}}
+});
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(st.s.adminCommand(
