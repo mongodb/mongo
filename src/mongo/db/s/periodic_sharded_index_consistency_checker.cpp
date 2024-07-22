@@ -276,7 +276,13 @@ void PeriodicShardedIndexConsistencyChecker::_launchOrResumeShardedTimeseriesSha
                 return;
             }
 
-            uassertStatusOK(ShardingCatalogManager::get(opCtx)->checkTimeseriesShardKeys(opCtx));
+            try {
+                uassertStatusOK(
+                    ShardingCatalogManager::get(opCtx)->checkTimeseriesShardKeys(opCtx));
+            } catch (const ExceptionForCat<ErrorCategory::CancellationError>&) {
+                // The job is shutting down.
+                return;
+            }
         },
         Milliseconds(shardedTimeseriesShardkeyCheckIntervalMS),
         false);
@@ -318,6 +324,8 @@ void PeriodicShardedIndexConsistencyChecker::onStepDown() {
 void PeriodicShardedIndexConsistencyChecker::onShutDown() {
     if (_shardedIndexConsistencyChecker.isValid()) {
         _shardedIndexConsistencyChecker.stop();
+    }
+    if (_shardedTimeseriesShardkeyChecker.isValid()) {
         _shardedTimeseriesShardkeyChecker.stop();
     }
 }
