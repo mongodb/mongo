@@ -58,6 +58,7 @@
 namespace mongo {
 
 // Forward declarations.
+class ClusteredIndexSpec;
 class Collection;
 class CollectionPtr;
 class OperationContext;
@@ -259,6 +260,11 @@ private:
      * Checks if we can hash `obj` without going over our limits for collection check.
      */
     bool _canHashForCollectionCheck(const BSONObj& obj);
+
+    bool _isIdSameAsRecordId(const RecordId& rid,
+                             const BSONObj& doc,
+                             const ClusteredIndexSpec& indexSpec,
+                             const CollatorInterface* collator);
 
     OperationContext* _opCtx;
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
