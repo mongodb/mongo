@@ -5529,7 +5529,7 @@ buildvariants:
     - name: format-linux-no-ftruncate
 
 - name: rhel80
-  display_name: RHEL 8
+  display_name: RHEL 8.0
   run_on:
   - rhel80-test
   expansions:
