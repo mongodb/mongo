@@ -457,8 +457,6 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
         case TypeTags::keyString:
             return getKeyString(val)->hash();
         case TypeTags::Array:
-        case TypeTags::ArraySet:
-        case TypeTags::ArrayMultiSet:
         case TypeTags::bsonArray: {
             auto arr = ArrayEnumerator{tag, val};
             auto res = hashInit();
@@ -471,6 +469,21 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
             }
 
             return res;
+        }
+        case TypeTags::ArraySet:
+        case TypeTags::ArrayMultiSet: {
+            size_t size = tag == TypeTags::ArraySet ? getArraySetView(val)->size()
+                                                    : getArrayMultiSetView(val)->size();
+            std::vector<size_t> valueHashes;
+            valueHashes.reserve(size);
+            for (ArrayEnumerator arr{tag, val}; !arr.atEnd(); arr.advance()) {
+                auto [elemTag, elemVal] = arr.getViewOfValue();
+                valueHashes.push_back(hashValue(elemTag, elemVal));
+            }
+            // TODO SERVER-92666 Implement a more efficient hashing algorithm
+            std::sort(valueHashes.begin(), valueHashes.end());
+            return std::accumulate(
+                valueHashes.begin(), valueHashes.end(), hashInit(), &hashCombine);
         }
         case TypeTags::Object:
         case TypeTags::bsonObject: {
