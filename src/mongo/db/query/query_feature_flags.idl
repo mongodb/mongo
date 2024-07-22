@@ -146,6 +146,14 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
+    featureFlagSearchHybridScoringPrerequisites:
+      description: "Feature flag to introduce $sigmoid and $minMaxScaler helpers, as well as permit
+                    $vectorSearch within $union and $lookup stages. (M1 and M2 of Vector search
+                    Hybrid Scoring)"
+      cpp_varname: gFeatureFlagSearchHybridScoringPrerequisites
+      default: false
+      shouldBeFCVGated: true
+
     featureFlagSearchExplainExecutionStats:
       description: "Feature flag to enable executing search queries for explain."
       cpp_varname: gFeatureFlagSearchExplainExecutionStats
