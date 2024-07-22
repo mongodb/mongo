@@ -157,7 +157,10 @@ public:
      * To be used within a Failpoint. When used in the `executeIf` we parse a BSONObj which should
      * contain a field for the namespace string (such as `ns` or `namespace` etc..).
      */
-    static NamespaceString parseFailPointData(const BSONObj& data, StringData nsFieldName);
+    static NamespaceString parseFailPointData(
+        const BSONObj& data,
+        StringData nsFieldName,
+        const boost::optional<TenantId>& tenantId = boost::none);
 
     /**
      * To be used only for deserializing a NamespaceString object from a ns string in error

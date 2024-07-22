@@ -286,9 +286,10 @@ NamespaceString NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancy
 }
 
 NamespaceString NamespaceStringUtil::parseFailPointData(const BSONObj& data,
-                                                        StringData nsFieldName) {
+                                                        StringData nsFieldName,
+                                                        const boost::optional<TenantId>& tenantId) {
     const auto ns = data.getStringField(nsFieldName);
-    return NamespaceStringUtil::deserialize(boost::none, ns, SerializationContext::stateDefault());
+    return NamespaceStringUtil::deserialize(tenantId, ns, SerializationContext::stateDefault());
 }
 
 NamespaceString NamespaceStringUtil::deserializeForErrorMsg(StringData nsInErrMsg) {
