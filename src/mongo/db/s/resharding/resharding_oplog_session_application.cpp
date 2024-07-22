@@ -106,7 +106,7 @@ boost::optional<repl::OpTime> ReshardingOplogSessionApplication::_logPrePostImag
         "ReshardingOplogSessionApplication::_logPrePostImage",
         NamespaceString::kRsOplogNamespace,
         [&] {
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+            AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
 
             WriteUnitOfWork wuow(opCtx);
             const auto& opTime = repl::logOp(opCtx, &noopEntry);

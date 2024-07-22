@@ -56,9 +56,9 @@ public:
     LocalOplogInfo& operator=(const LocalOplogInfo&) = delete;
     LocalOplogInfo() = default;
 
-    const Collection* getCollection() const;
-    void setCollection(const Collection* oplog);
-    void resetCollection();
+    RecordStore* getRecordStore() const;
+    void setRecordStore(RecordStore* rs);
+    void resetRecordStore();
 
     /**
      * Sets the global Timestamp to be 'newTime'.
@@ -72,13 +72,10 @@ public:
     std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count);
 
 private:
-    // Name of the oplog collection.
-    NamespaceString _oplogName;
-
-    // The "oplog" pointer is always valid (or null) because an operation must take the global
-    // exclusive lock to set the pointer to null when the Collection instance is destroyed. See
-    // "oplogCheckCloseDatabase".
-    const Collection* _oplog = nullptr;
+    // The "oplog" record store pointer is always valid (or null) because an operation must take
+    // the global exclusive lock to set the pointer to null when the RecordStore instance is
+    // destroyed. See "oplogCheckCloseDatabase".
+    RecordStore* _rs = nullptr;
 
     // Synchronizes the section where a new Timestamp is generated and when it is registered in the
     // storage engine.

@@ -364,7 +364,7 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
                                   std::vector<InsertStatement>::const_iterator begin,
                                   std::vector<InsertStatement>::const_iterator end) {
     boost::optional<AutoGetCollection> autoColl;
-    boost::optional<AutoGetOplog> autoOplog;
+    boost::optional<AutoGetOplogFastPath> autoOplog;
     const CollectionPtr* collection;
 
     if (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isOplog()) {
@@ -456,7 +456,7 @@ Status StorageInterfaceImpl::createOplog(OperationContext* opCtx, const Namespac
 }
 
 StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* opCtx) {
-    AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
     const auto& oplog = oplogRead.getCollection();
     if (!oplog) {
         return {ErrorCodes::NamespaceNotFound, "Your oplog doesn't exist."};
@@ -1303,7 +1303,7 @@ StorageInterfaceImpl::findOplogOpTimeLessThanOrEqualToTimestampRetryOnWCE(
 
 Timestamp StorageInterfaceImpl::getEarliestOplogTimestamp(OperationContext* opCtx) {
     auto statusWithTimestamp = [&]() {
-        AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+        AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
         return oplogRead.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
     }();
 
@@ -1341,7 +1341,7 @@ Timestamp StorageInterfaceImpl::getEarliestOplogTimestamp(OperationContext* opCt
 
 Timestamp StorageInterfaceImpl::getLatestOplogTimestamp(OperationContext* opCtx) {
     auto statusWithTimestamp = [&]() {
-        AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+        AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
         return oplogRead.getCollection()->getRecordStore()->getLatestOplogTimestamp(opCtx);
     }();
 
@@ -1524,7 +1524,7 @@ void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationCont
     ScopedAdmissionPriority<ExecutionAdmissionContext> setTicketAquisition(
         opCtx, AdmissionContext::Priority::kExempt);
 
-    AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
     if (primaryOnly &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
                                                                               DatabaseName::kAdmin))
@@ -1542,7 +1542,7 @@ void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
     ScopedAdmissionPriority<ExecutionAdmissionContext> setTicketAquisition(
         opCtx, AdmissionContext::Priority::kExempt);
 
-    AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
     fassert(28557,
             oplogRead.getCollection()->getRecordStore()->oplogDiskLocRegister(
                 opCtx, ts, orderedCommit));

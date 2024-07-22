@@ -207,12 +207,12 @@ RecordId Helpers::findById(OperationContext* opCtx,
 }
 
 // Acquires necessary locks to read the collection with the given namespace. If this is an oplog
-// read, use AutoGetOplog for simplified locking.
+// read, use AutoGetOplogFastPath for simplified locking.
 const CollectionPtr& getCollectionForRead(
     OperationContext* opCtx,
     const NamespaceString& ns,
     boost::optional<AutoGetCollectionForReadCommand>& autoColl,
-    boost::optional<AutoGetOplog>& autoOplog) {
+    boost::optional<AutoGetOplogFastPath>& autoOplog) {
     if (ns.isOplog()) {
         // Simplify locking rules for oplog collection.
         autoOplog.emplace(opCtx, OplogAccessMode::kRead);
@@ -225,7 +225,7 @@ const CollectionPtr& getCollectionForRead(
 
 bool Helpers::getSingleton(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result) {
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
-    boost::optional<AutoGetOplog> autoOplog;
+    boost::optional<AutoGetOplogFastPath> autoOplog;
     const auto& collection = getCollectionForRead(opCtx, nss, autoColl, autoOplog);
     if (!collection) {
         return false;
@@ -250,7 +250,7 @@ bool Helpers::getSingleton(OperationContext* opCtx, const NamespaceString& nss, 
 
 bool Helpers::getLast(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result) {
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
-    boost::optional<AutoGetOplog> autoOplog;
+    boost::optional<AutoGetOplogFastPath> autoOplog;
     const auto& collection = getCollectionForRead(opCtx, nss, autoColl, autoOplog);
     if (!collection) {
         return false;

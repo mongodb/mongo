@@ -144,7 +144,7 @@ Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceStri
             AutoGetDb db(opCtx, sourceNss.dbName(), MODE_IX);
             Lock::CollectionLock collLock(opCtx, sourceNss, MODE_S);
 
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+            AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
 
             const std::string msg = str::stream()
                 << "All future oplog entries on the namespace " << sourceNss.toStringForErrorMsg()
@@ -707,7 +707,7 @@ void ReshardingDonorService::DonorStateMachine::
         auto oplog = generateOplogEntry();
         writeConflictRetry(
             rawOpCtx, "ReshardingBeginOplog", NamespaceString::kRsOplogNamespace, [&] {
-                AutoGetOplog oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
+                AutoGetOplogFastPath oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
                 WriteUnitOfWork wunit(rawOpCtx);
                 const auto& oplogOpTime = repl::logOp(rawOpCtx, &oplog);
                 uassert(5052101,
@@ -836,7 +836,7 @@ void ReshardingDonorService::DonorStateMachine::
                     "ReshardingBlockWritesOplog",
                     NamespaceString::kRsOplogNamespace,
                     [&] {
-                        AutoGetOplog oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
+                        AutoGetOplogFastPath oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
                         WriteUnitOfWork wunit(rawOpCtx);
                         const auto& oplogOpTime = repl::logOp(rawOpCtx, &oplog);
                         uassert(5279507,

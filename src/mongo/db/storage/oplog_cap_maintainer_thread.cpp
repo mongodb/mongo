@@ -92,13 +92,12 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
         // needed. This improves concurrency if oplog truncation takes long time.
         std::shared_ptr<CollectionTruncateMarkers> oplogTruncateMarkers;
         {
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-            const auto& oplog = oplogWrite.getCollection();
-            if (!oplog) {
+            Lock::GlobalLock globalLk(opCtx, MODE_IX);
+            auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+            if (!rs) {
                 LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
                 return false;
             }
-            auto rs = oplog->getRecordStore();
 
             // Create another reference to the oplog truncate markers while holding a lock on
             // the collection to prevent it from being destructed.
@@ -114,13 +113,12 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
         {
             // Oplog state could have changed while yielding. Reacquire global lock
             // and refresh oplog state to ensure we have a valid pointer.
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-            const auto& oplog = oplogWrite.getCollection();
-            if (!oplog) {
+            Lock::GlobalLock globalLk(opCtx, MODE_IX);
+            auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+            if (!rs) {
                 LOGV2_DEBUG(9064300, 2, "oplog collection does not exist");
                 return false;
             }
-            auto rs = oplog->getRecordStore();
             rs->reclaimOplog(opCtx);
         }
     } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& e) {

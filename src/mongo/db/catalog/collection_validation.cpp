@@ -301,7 +301,7 @@ void _logOplogEntriesForInvalidResults(OperationContext* opCtx, ValidateResults*
 
     // Set up read on oplog collection.
     try {
-        AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+        AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
         const auto& oplogCollection = oplogRead.getCollection();
 
         if (!oplogCollection) {

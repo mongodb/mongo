@@ -486,37 +486,45 @@ private:
 };
 
 /**
- * RAII-style class to acquire proper locks using special oplog locking rules for oplog accesses.
+ * RAII-style class to acquire the oplog with weaker consistency rules.
+ *
+ * IMPORTANT: this acquisition is optimized for fast-path access and is suitable for efficiently
+ * reading from or writing to the oplog table. This acquisition can return a stale view of the
+ * oplog metadata if interleaving with a DDL operation like an oplog resize. For consistent
+ * lookups and support for yield and restore, use a conventional acquisition API like
+ * mongo::acquireCollection.
  *
  * Only the global lock is acquired:
  * | OplogAccessMode | Global Lock |
  * +-----------------+-------------|
  * | kRead           | MODE_IS     |
  * | kWrite          | MODE_IX     |
+ * | kLogOp          | -           |
  *
  * kLogOp is a special mode for replication operation logging and it behaves similar to kWrite. The
  * difference between kWrite and kLogOp is that kLogOp invariants that global IX lock is already
  * held. It is the caller's responsibility to ensure the global lock already held is still valid
  * within the lifetime of this object.
  *
- * Any acquired locks may be released when this object goes out of scope, therefore the oplog
+ * The catalog resources are released when this object goes out of scope, therefore the oplog
  * collection reference returned by this class should not be retained.
  */
 enum class OplogAccessMode { kRead, kWrite, kLogOp };
 
-struct AutoGetOplogOptions {
+struct AutoGetOplogFastPathOptions {
     bool skipRSTLLock = false;
 };
 
-class AutoGetOplog {
-    AutoGetOplog(const AutoGetOplog&) = delete;
-    AutoGetOplog& operator=(const AutoGetOplog&) = delete;
+class AutoGetOplogFastPath {
+    AutoGetOplogFastPath(const AutoGetOplogFastPath&) = delete;
+    AutoGetOplogFastPath& operator=(const AutoGetOplogFastPath&) = delete;
 
 public:
-    AutoGetOplog(OperationContext* opCtx,
-                 OplogAccessMode mode,
-                 Date_t deadline = Date_t::max(),
-                 const AutoGetOplogOptions& options = AutoGetOplogOptions());
+    AutoGetOplogFastPath(
+        OperationContext* opCtx,
+        OplogAccessMode mode,
+        Date_t deadline = Date_t::max(),
+        const AutoGetOplogFastPathOptions& options = AutoGetOplogFastPathOptions());
 
     /**
      * Return a pointer to the per-service-context LocalOplogInfo.
@@ -536,6 +544,10 @@ private:
     boost::optional<Lock::GlobalLock> _globalLock;
     LocalOplogInfo* _oplogInfo;
     CollectionPtr _oplog;
+
+    // Retain the CollectionCatalog snapshot since this fast-path acquisition skips acquiring the
+    // oplog collection lock.
+    std::shared_ptr<const CollectionCatalog> _stashedCatalog;
 };
 
 /**

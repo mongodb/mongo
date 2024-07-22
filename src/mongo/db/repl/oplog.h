@@ -187,7 +187,7 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx);
  * Called by catalog::openCatalog() to re-establish the oplog collection pointer while holding onto
  * the global lock in exclusive mode.
  */
-void establishOplogCollectionForLogging(OperationContext* opCtx, const Collection* oplog);
+void establishOplogRecordStoreForLogging(OperationContext* opCtx, RecordStore* oplog);
 
 using IncrementOpsAppliedStatsFn = std::function<void()>;
 

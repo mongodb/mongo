@@ -132,7 +132,7 @@ repl::OpTime _logOp(OperationContext* opCtx,
     oplogEntry.setTid(nss.tenantId() ? nss.tenantId() : tenantIdForStartStop);
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(obj);
-    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
     return writeConflictRetry(
         opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace, [&] {
             auto const clockSource = opCtx->getServiceContext()->getFastClockSource();

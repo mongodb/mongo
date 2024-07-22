@@ -64,7 +64,7 @@ void insertOplogEntry(OperationContext* opCtx,
                       repl::MutableOplogEntry&& oplogEntry,
                       StringData opStr) {
     writeConflictRetry(opCtx, opStr, NamespaceString::kRsOplogNamespace, [&] {
-        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork wunit(opCtx);
         const auto& oplogOpTime = repl::logOp(opCtx, &oplogEntry);
         uassert(8423339,

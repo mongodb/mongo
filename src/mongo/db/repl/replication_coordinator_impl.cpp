@@ -2818,11 +2818,11 @@ StatusWith<OpTime> ReplicationCoordinatorImpl::getLatestWriteOpTime(
     if (!canAcceptNonLocalWrites()) {
         return {ErrorCodes::NotWritablePrimary, "Not primary so can't get latest write optime"};
     }
-    const auto& oplog = LocalOplogInfo::get(opCtx)->getCollection();
+    const auto& oplog = LocalOplogInfo::get(opCtx)->getRecordStore();
     if (!oplog) {
         return {ErrorCodes::NamespaceNotFound, "oplog collection does not exist"};
     }
-    auto latestOplogTimestampSW = oplog->getRecordStore()->getLatestOplogTimestamp(opCtx);
+    auto latestOplogTimestampSW = oplog->getLatestOplogTimestamp(opCtx);
     if (!latestOplogTimestampSW.isOK()) {
         return latestOplogTimestampSW.getStatus();
     }

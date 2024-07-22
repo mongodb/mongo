@@ -77,16 +77,16 @@ LocalOplogInfo* LocalOplogInfo::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-const Collection* LocalOplogInfo::getCollection() const {
-    return _oplog;
+RecordStore* LocalOplogInfo::getRecordStore() const {
+    return _rs;
 }
 
-void LocalOplogInfo::setCollection(const Collection* oplog) {
-    _oplog = oplog;
+void LocalOplogInfo::setRecordStore(RecordStore* rs) {
+    _rs = rs;
 }
 
-void LocalOplogInfo::resetCollection() {
-    _oplog = nullptr;
+void LocalOplogInfo::resetRecordStore() {
+    _rs = nullptr;
 }
 
 void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
@@ -120,11 +120,11 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
         ts = VectorClockMutable::get(opCtx)->tickClusterTime(count).asTimestamp();
         const bool orderedCommit = false;
 
-        // The local oplog collection pointer must already be established by this point.
+        // The local oplog record store pointer must already be established by this point.
         // We can't establish it here because that would require locking the local database, which
         // would be a lock order violation.
-        invariant(_oplog);
-        fassert(28560, _oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
+        invariant(_rs);
+        fassert(28560, _rs->oplogDiskLocRegister(opCtx, ts, orderedCommit));
     }
 
     Timer oplogSlotDurationTimer;

@@ -1716,9 +1716,6 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
     if (!coll)
         return nullptr;
 
-    if (coll->ns().isOplog())
-        return coll.get();
-
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(coll->ns(), MODE_X));
 
     // Skip cloning and return directly if allowed.
@@ -1808,11 +1805,6 @@ std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByNamespace(
 
 Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     OperationContext* opCtx, const NamespaceString& nss) const {
-    // Oplog is special and can only be modified in a few contexts. It is modified inplace and care
-    // need to be taken for concurrency.
-    if (nss.isOplog()) {
-        return const_cast<Collection*>(lookupCollectionByNamespace(opCtx, nss));
-    }
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     auto [found, uncommittedPtr, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);

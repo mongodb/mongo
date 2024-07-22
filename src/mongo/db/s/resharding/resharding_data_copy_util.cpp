@@ -581,7 +581,7 @@ void updateSessionRecord(OperationContext* opCtx,
         "resharding::data_copy::updateSessionRecord",
         NamespaceString::kSessionTransactionsTableNamespace,
         [&] {
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+            AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
 
             WriteUnitOfWork wuow(opCtx);
             repl::OpTime opTime = repl::logOp(opCtx, &oplogEntry);
