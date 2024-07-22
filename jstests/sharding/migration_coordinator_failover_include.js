@@ -56,8 +56,11 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
                     db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
                     expectAbortDecisionWithCode);
             } else {
-                assert.commandWorked(
-                    db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
+                assert.soonRetryOnAcceptableErrors(() => {
+                    assert.commandWorked(
+                        db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
+                    return true;
+                }, ErrorCodes.FailedToSatisfyReadPreference);
             }
         }, ns, st.shard1.shardName, expectAbortDecisionWithCode), st.s.port);
     failpointHandle.wait();
