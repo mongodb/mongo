@@ -316,6 +316,11 @@ __wt_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
         }
     }
 
+    /*
+     * The data is written to the disk so we can mark the page clean after re-instantiating prepared
+     * updates to avoid reconciling the page every time.
+     */
+    __wt_page_modify_clear(session, page);
     __wt_cache_page_inmem_incr(session, page, total_size);
 
     if (0) {
