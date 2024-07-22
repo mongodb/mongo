@@ -218,6 +218,9 @@ private:
      */
     void _cleanupOnError() noexcept;
 
+    // Mutex to protect concurrent reads and writes to internal attributes
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationSourceManager::_mutex");
+
     // This is the opCtx of the moveChunk request that constructed the MigrationSourceManager.
     // The caller must guarantee it outlives the MigrationSourceManager.
     OperationContext* const _opCtx;
