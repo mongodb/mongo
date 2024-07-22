@@ -685,14 +685,12 @@ tasks:
   ## initial sync generational fuzzer ##
   - <<: *jstestfuzz_template
     name: initial_sync_fuzzer_gen
-    # TODO (SERVER-89735): capped:true + recordIdsReplicated:true crashes initial sync.
     tags:
       [
         "assigned_to_jira_team_server_repl",
         "default",
         "require_npm",
         "random_name",
-        "exclude_when_record_ids_replicated",
       ]
     commands:
       - func: "generate resmoke tasks"

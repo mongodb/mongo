@@ -37,6 +37,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 #include <memory>
 #include <string>
 #include <utility>
@@ -800,6 +801,11 @@ Collection* DatabaseImpl::_createCollection(
                     "oldValue"_attr = optionsWithUUID.recordIdsReplicated);
         optionsWithUUID.recordIdsReplicated = true;
     }
+
+    uassert(ErrorCodes::CommandNotSupported,
+            fmt::format("Capped collection '{}' can't use recordIdsReplicated:true",
+                        nss.toStringForErrorMsg()),
+            !(optionsWithUUID.recordIdsReplicated && optionsWithUUID.capped));
 
     hangAndFailAfterCreateCollectionReservesOpTime.executeIf(
         [&](const BSONObj&) {

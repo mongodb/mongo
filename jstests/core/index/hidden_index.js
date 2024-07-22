@@ -13,6 +13,7 @@
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   not_allowed_with_signed_security_token,
+ *   requires_capped,
  * ]
  */
 

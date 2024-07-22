@@ -51,6 +51,7 @@ selector:
     # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
     # is bootstrapped as a sharded cluster.
     - jstests/core/collation.js
+    - jstests/core/replicate_record_ids/disallow_capped.js
     # Test expects changes in metrics (rejected command count), but these are
     # per-ClusterRole. This suite changes which role's metrics are updated.
     - jstests/core/query/query_settings/query_settings_reject_application.js
