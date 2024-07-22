@@ -154,7 +154,7 @@ class Suite(object):
             raise ex
         evergreen_filtered_tests = result["tests"]
         evergreen_excluded_tests = set(evergreen_filtered_tests).symmetric_difference(set(tests))
-        print(f"Evergreen excluded the following tests: {evergreen_filtered_tests}")
+        print(f"Evergreen excluded the following tests: {evergreen_excluded_tests}")
         excluded.extend(evergreen_excluded_tests)
         tests = _selector.group_tests(test_kind, selector_config, evergreen_filtered_tests)
         return tests, excluded
