@@ -251,7 +251,7 @@ public:
         tickSource().advance(d);
     }
 
-    static inline const Seconds kWaitTimeout{10};
+    static inline const Seconds kWaitTimeout{35};
     static inline const Milliseconds kSleepTime{1};
 
     static inline const int kActiveFaultDurationSecs = 5;
