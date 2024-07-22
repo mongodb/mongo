@@ -7636,6 +7636,28 @@ protected:
         });
     }
 
+    void runRouterTransactionAndYieldLeaveOpen(LogicalSessionId lsid,
+                                               TxnNumber txnNumber,
+                                               unittest::Barrier* started,
+                                               unittest::Barrier* canFinish) {
+        runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(lsid);
+            opCtx->setTxnNumber(txnNumber);
+            opCtx->setInMultiDocumentTransaction();
+            auto opCtxSession = std::make_unique<RouterOperationContextSession>(opCtx);
+
+            auto txnRouter = TransactionRouter::get(opCtx);
+            txnRouter.beginOrContinueTxn(
+                opCtx, *opCtx->getTxnNumber(), TransactionRouter::TransactionActions::kStart);
+
+            started->countDownAndWait();
+            RouterOperationContextSession::checkIn(opCtx,
+                                                   OperationContextSession::CheckInReason::kYield);
+            canFinish->countDownAndWait();
+            RouterOperationContextSession::checkOut(opCtx);
+        });
+    }
+
     void runParticipantTransactionLeaveOpen(LogicalSessionId lsid, TxnNumber txnNumber) {
         runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
             opCtx->setLogicalSessionId(lsid);
@@ -7730,6 +7752,62 @@ TEST_F(TxnParticipantAndTxnRouterTest, SkipEagerReapingSessionUsedByParticipantF
     ASSERT(doesExistInCatalog(parentLsid2, sessionCatalog));
     ASSERT_FALSE(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
     ASSERT_FALSE(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+}
+
+TEST_F(TxnParticipantAndTxnRouterTest, CannotEagerReapSessionWithYieldedTxnRouter) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with two retryable children. Make one child yield its session with an
+    // open TransactionRouter.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runRouterTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+
+    unittest::Barrier startedYielding(2);
+    unittest::Barrier finishYielding(2);
+    auto yieldedThreadFuture = stdx::async(stdx::launch::async, [&] {
+        runRouterTransactionAndYieldLeaveOpen(
+            retryableChildLsid, 0, &startedYielding, &finishYielding);
+    });
+    startedYielding.countDownAndWait();
+
+    auto retryableChildLsidReapable =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runRouterTransactionLeaveOpen(retryableChildLsidReapable, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsidReapable, sessionCatalog));
+
+    // Start a higher txnNumber client transaction in the router role and verify the child with a
+    // yielded TransactionRouter was not erased but the other one was.
+
+    parentTxnNumber++;
+    runRouterTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsidReapable, sessionCatalog));
+
+    // Finish yielding and verify the previously yielded session can now be eager reaped.
+
+    finishYielding.countDownAndWait();
+    yieldedThreadFuture.get();
+
+    parentTxnNumber++;
+    runRouterTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsidReapable, sessionCatalog));
 }
 
 }  // namespace

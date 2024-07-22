@@ -198,6 +198,7 @@ MongoDSessionCatalogTransactionInterfaceImpl::makeSessionWorkerFnForEagerReap(
     return [clientTxnNumberStarted, provenance](ObservableSession& osession) {
         const auto& transactionSessionId = osession.getSessionId();
         const auto txnParticipant = TransactionParticipant::get(osession);
+        const auto txnRouter = TransactionRouter::get(osession);
 
         // If a retryable session has been used for a TransactionParticipant, it may be in the
         // retryable participant catalog. A participant triggers eager reaping after clearing its
@@ -207,7 +208,13 @@ MongoDSessionCatalogTransactionInterfaceImpl::makeSessionWorkerFnForEagerReap(
             txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber() ==
                 kUninitializedTxnNumber) {
             if (isInternalSessionForRetryableWrite(transactionSessionId) &&
-                *transactionSessionId.getTxnNumber() < clientTxnNumberStarted) {
+                *transactionSessionId.getTxnNumber() < clientTxnNumberStarted &&
+                txnRouter.canBeReaped()) {
+                // Participants should only trigger eager reaping after aborting superseded child
+                // transactions, which should guarantee they can be reaped.
+                tassert(9260700,
+                        "Attempted to eager reap a participant that was not reapable",
+                        txnParticipant.canBeReaped());
                 osession.markForReap(ObservableSession::ReapMode::kExclusive);
             }
         }
