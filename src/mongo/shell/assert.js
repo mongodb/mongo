@@ -1120,5 +1120,26 @@ assert = (function() {
                "API parameters are not allowed in this context");
     };
 
+    assert.soonRetryOnAcceptableErrors = function(
+        func, acceptableErrors, msg, timeout, interval, {runHangAnalyzer = true} = {}) {
+        if (!Array.isArray(acceptableErrors)) {
+            acceptableErrors = [acceptableErrors];
+        }
+
+        const funcWithRetries = () => {
+            try {
+                return func();
+            } catch (e) {
+                if (acceptableErrors.some((err) => e.code === err)) {
+                    print("assert.soonRetryOnAcceptableErrors() retrying on err: " + tojson(e));
+                    return false;
+                }
+                throw e;
+            }
+        };
+
+        assert.soon(funcWithRetries, msg, timeout, interval, {runHangAnalyzer});
+    };
+
     return assert;
 })();
