@@ -2261,11 +2261,16 @@ __wti_heuristic_controls_config(WT_SESSION_IMPL *session, const char *cfg[])
 
     conn = S2C(session);
 
+    WT_RET(__wt_config_gets(
+      session, cfg, "heuristic_controls.checkpoint_cleanup_obsolete_tw_pages_dirty_max", &cval));
+    conn->heuristic_controls.checkpoint_cleanup_obsolete_tw_pages_dirty_max = (uint32_t)cval.val;
+
+    WT_RET(__wt_config_gets(
+      session, cfg, "heuristic_controls.eviction_obsolete_tw_pages_dirty_max", &cval));
+    conn->heuristic_controls.eviction_obsolete_tw_pages_dirty_max = (uint32_t)cval.val;
+
     WT_RET(__wt_config_gets(session, cfg, "heuristic_controls.obsolete_tw_btree_max", &cval));
     conn->heuristic_controls.obsolete_tw_btree_max = (uint32_t)cval.val;
-
-    WT_RET(__wt_config_gets(session, cfg, "heuristic_controls.obsolete_tw_pages_dirty_max", &cval));
-    conn->heuristic_controls.obsolete_tw_pages_dirty_max = (uint32_t)cval.val;
 
     return (0);
 }

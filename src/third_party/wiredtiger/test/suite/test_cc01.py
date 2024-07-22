@@ -38,6 +38,12 @@ from wiredtiger import stat
 # Shared base class used by cc tests.
 class test_cc_base(wttest.WiredTigerTestCase):
 
+    def get_stat(self, stat, uri = ""):
+        stat_cursor = self.session.open_cursor(f'statistics:{uri}')
+        val = stat_cursor[stat][2]
+        stat_cursor.close()
+        return val
+
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records.
         session = self.session
@@ -71,19 +77,26 @@ class test_cc_base(wttest.WiredTigerTestCase):
         session.rollback_transaction()
         self.assertEqual(count, nrows)
 
-    def wait_for_cc_to_run(self):
-        c = self.session.open_cursor( 'statistics:')
+    # Trigger checkpoint cleanup. The function waits for checkpoint cleanup to make progress before
+    # exiting.
+    def wait_for_cc_to_run(self, ckpt_name = ""):
+        c = self.session.open_cursor('statistics:')
         cc_success = prev_cc_success = c[stat.conn.checkpoint_cleanup_success][2]
         c.close()
+        ckpt_config = "debug=(checkpoint_cleanup=true)"
+        if ckpt_name:
+            ckpt_config += f",name={ckpt_name}"
+        self.session.checkpoint(ckpt_config)
         while cc_success - prev_cc_success == 0:
             time.sleep(0.1)
-            c = self.session.open_cursor( 'statistics:')
+            c = self.session.open_cursor('statistics:')
             cc_success = c[stat.conn.checkpoint_cleanup_success][2]
             c.close()
 
-    def check_cc_stats(self):
-        self.wait_for_cc_to_run()
-        c = self.session.open_cursor( 'statistics:')
+    # Trigger checkpoint clean up and check it has visited and removed pages.
+    def check_cc_stats(self, ckpt_name = ""):
+        self.wait_for_cc_to_run(ckpt_name=ckpt_name)
+        c = self.session.open_cursor('statistics:')
         self.assertGreaterEqual(c[stat.conn.checkpoint_cleanup_pages_visited][2], 0)
         self.assertGreaterEqual(c[stat.conn.checkpoint_cleanup_pages_removed][2], 0)
         c.close()
@@ -125,8 +138,7 @@ class test_cc01(test_cc_base):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(100) +
             ',stable_timestamp=' + self.timestamp_str(100))
 
-        # Checkpoint to ensure that the history store is cleaned.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        # Trigger checkpoint cleanup and wait until it is done. This should clean the history store.
         self.check_cc_stats()
 
         # Check that the new updates are only seen after the update timestamp.
@@ -158,8 +170,7 @@ class test_cc01(test_cc_base):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(200) +
             ',stable_timestamp=' + self.timestamp_str(200))
 
-        # Checkpoint to ensure that the history store is cleaned.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        # Trigger checkpoint cleanup and wait until it is done. This should clean the history store.
         self.check_cc_stats()
 
         # Check that the new updates are only seen after the update timestamp.
@@ -191,8 +202,7 @@ class test_cc01(test_cc_base):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(300) +
             ',stable_timestamp=' + self.timestamp_str(300))
 
-        # Checkpoint to ensure that the history store is cleaned.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        # Trigger checkpoint cleanup and wait until it is done. This should clean the history store.
         self.check_cc_stats()
 
         # Check that the new updates are only seen after the update timestamp.

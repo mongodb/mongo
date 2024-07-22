@@ -13,9 +13,9 @@ def all_files():
     excluded_dirs = {"../.git"}
 
     # The build folder can be identified by the presence of CMakeFiles
-    build_file = glob.glob('../**/CMakeFiles')
-    if len(build_file) != 0:
-        excluded_dirs.add(os.path.dirname(build_file[0]))
+    build_files = glob.glob('../**/CMakeFiles')
+    for file in build_files:
+        excluded_dirs.add(os.path.dirname(file))
 
     search_function = 'find .. -type f '
     for excluded_dir in excluded_dirs:

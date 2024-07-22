@@ -62,8 +62,8 @@ class test_cc02(test_cc_base):
         # Check that old updates are seen.
         self.check(bigvalue, uri, nrows, 10)
 
-        # Checkpoint to ensure that the history store is checkpointed and not cleaned.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        # Trigger checkpoint cleanup and ensure that the history store is checkpointed but not
+        # cleaned.
         self.wait_for_cc_to_run()
         c = self.session.open_cursor('statistics:')
         self.assertEqual(c[stat.conn.checkpoint_cleanup_pages_evict][2], 0)
@@ -113,8 +113,7 @@ class test_cc02(test_cc_base):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(200) +
             ',stable_timestamp=' + self.timestamp_str(200))
 
-        # Checkpoint to ensure that the history store is cleaned.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        # Trigger checkpoint cleanup and wait until it is done. This should clean the history store.
         self.check_cc_stats()
 
         # Check that the new updates are only seen after the update timestamp.

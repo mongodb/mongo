@@ -594,18 +594,21 @@ __rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *first_upd
                 continue;
             } else {
                 /*
-                 * For prepared updates written to the date store in salvage, we write the same
-                 * prepared value to the data store. If there is still content for that key left in
-                 * the history store, rollback to stable will bring it back to the data store.
-                 * Otherwise, it removes the key.
+                 * If we are not in eviction, we must be in salvage to reach here. Since salvage
+                 * only works on data on-disk, the prepared update must be restored from the disk.
+                 * No need for us to rollback the prepared update in salvage here. If there is still
+                 * content for that key left in the history store, rollback to stable will bring it
+                 * back to the data store later. Otherwise, it removes the key.
                  */
                 WT_ASSERT_ALWAYS(session,
                   F_ISSET(r, WT_REC_EVICT) ||
                     (F_ISSET(r, WT_REC_VISIBILITY_ERR) &&
                       F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS)),
-                  "rec_upd_select found an in-progress prepared update");
+                  "Should never salvage a prepared update not from disk.");
+                /* Prepared updates cannot be resolved concurrently to eviction and salvage. */
                 WT_ASSERT_ALWAYS(session, upd->prepare_state == WT_PREPARE_INPROGRESS,
-                  "rec_upd_select found an in-progress prepared update");
+                  "Should never concurrently resolve a prepared update during reconciliation if we "
+                  "are not in a checkpoint.");
             }
         }
 

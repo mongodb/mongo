@@ -39,10 +39,10 @@ class test_eviction02(eviction_util):
     # checkpoint.
     conn_config_values = [
         ('no_btrees', dict(expected_cleanup=False, obsolete_tw_max=0, conn_config=f'{conn_config_common},heuristic_controls=[obsolete_tw_btree_max=0]')),
-        ('no_pages', dict(expected_cleanup=False, obsolete_tw_max=0, conn_config=f'{conn_config_common},heuristic_controls=[obsolete_tw_pages_dirty_max=0]')),
-        ('50_pages', dict(expected_cleanup=True, obsolete_tw_max=50, conn_config=f'{conn_config_common},heuristic_controls=[obsolete_tw_pages_dirty_max=50]')),
-        ('100_pages', dict(expected_cleanup=True, obsolete_tw_max=100, conn_config=f'{conn_config_common},heuristic_controls=[obsolete_tw_pages_dirty_max=100]')),
-        ('500_pages', dict(expected_cleanup=True, obsolete_tw_max=500, conn_config=f'{conn_config_common},heuristic_controls=[obsolete_tw_pages_dirty_max=500]')),
+        ('no_pages', dict(expected_cleanup=False, obsolete_tw_max=0, conn_config=f'{conn_config_common},heuristic_controls=[eviction_obsolete_tw_pages_dirty_max=0]')),
+        ('50_pages', dict(expected_cleanup=True, obsolete_tw_max=50, conn_config=f'{conn_config_common},heuristic_controls=[eviction_obsolete_tw_pages_dirty_max=50]')),
+        ('100_pages', dict(expected_cleanup=True, obsolete_tw_max=100, conn_config=f'{conn_config_common},heuristic_controls=[eviction_obsolete_tw_pages_dirty_max=100]')),
+        ('500_pages', dict(expected_cleanup=True, obsolete_tw_max=500, conn_config=f'{conn_config_common},heuristic_controls=[eviction_obsolete_tw_pages_dirty_max=500]')),
     ]
 
     scenarios = make_scenarios(conn_config_values)

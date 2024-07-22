@@ -32,8 +32,7 @@ __rts_btree_walk_page_skip(
 {
     WT_PAGE_DELETED *page_del;
     wt_timestamp_t rollback_timestamp;
-    char time_string[WT_TIME_STRING_SIZE];
-    bool reconciled;
+    char time_string[3][WT_TIME_STRING_SIZE];
 
     rollback_timestamp = *(wt_timestamp_t *)context;
     WT_UNUSED(visible_all);
@@ -71,7 +70,7 @@ __rts_btree_walk_page_skip(
                   WT_RTS_VERB_TAG_SKIP_DEL "ref=%p: deleted page walk skipped page_del %s",
                   (void *)ref,
                   __wt_time_point_to_string(page_del->timestamp, page_del->durable_timestamp,
-                    page_del->txnid, time_string));
+                    page_del->txnid, time_string[0]));
             }
             WT_STAT_CONN_INCR(session, txn_rts_tree_walk_skip_pages);
             *skipp = true;
@@ -83,9 +82,9 @@ __rts_btree_walk_page_skip(
               WT_RTS_VERB_TAG_PAGE_DELETE
               "deleted page with commit_timestamp=%s, durable_timestamp=%s > "
               "rollback_timestamp=%s, txnid=%" PRIu64,
-              __wt_timestamp_to_string(page_del->timestamp, time_string),
-              __wt_timestamp_to_string(page_del->durable_timestamp, time_string),
-              __wt_timestamp_to_string(rollback_timestamp, time_string), page_del->txnid);
+              __wt_timestamp_to_string(page_del->timestamp, time_string[0]),
+              __wt_timestamp_to_string(page_del->durable_timestamp, time_string[1]),
+              __wt_timestamp_to_string(rollback_timestamp, time_string[2]), page_del->txnid);
         return (0);
     }
 
@@ -104,13 +103,10 @@ __rts_btree_walk_page_skip(
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_STABLE_PG_WALK_SKIP "ref=%p: stable page walk skipped", (void *)ref);
         WT_STAT_CONN_INCR(session, txn_rts_tree_walk_skip_pages);
-    }
+    } else
+        __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_3,
+          WT_RTS_VERB_TAG_PAGE_UNSKIPPED "ref=%p page not skipped", (void *)ref);
 
-    reconciled = ref->page && ref->page->modify ? true : false;
-
-    __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_3,
-      WT_RTS_VERB_TAG_PAGE_UNSKIPPED "ref=%p page not skipped, reconciled info=%d", (void *)ref,
-      reconciled ? ref->page->modify->rec_result : 0);
     return (0);
 }
 

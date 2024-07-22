@@ -104,6 +104,10 @@ arch_doc_pages = [
     ArchDocPage('arch-metadata',
         [],
         ['src/include/meta.h', 'src/meta/']),
+    ArchDocPage('arch-prefetch',
+        ['WT_PREFETCH', 'WT_PREFETCH_QUEUE_ENTRY', 'WT_REF'],
+        ['src/btree/bt_prefetch.c', 'src/conn/conn_prefetch.c',
+         'src/session/session_prefetch.c']),
     ArchDocPage('arch-python',
         [],
         ['lang/python/']),
@@ -133,4 +137,7 @@ arch_doc_pages = [
     ArchDocPage('arch-transaction',
         ['WT_TXN', 'WT_TXN_GLOBAL', 'WT_TXN_OP', 'WT_TXN_SHARED'],
         ['src/include/txn.h', 'src/include/txn_inline.h', 'src/txn/']),
+    ArchDocPage('arch-usage-patterns',
+        [],
+        []),
 ]

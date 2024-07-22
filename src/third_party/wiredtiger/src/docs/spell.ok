@@ -77,6 +77,7 @@ Gimpel
 GitHub
 Google
 Google's
+Growable
 HyperDex
 HyperLevelDB
 IAA
@@ -124,9 +125,11 @@ NoSQL
 OPTYPE
 PMU
 PPC
+PREFETCH
 PRELOAD
 PROFDATA
 Powershell
+Pseudocode
 README
 REFs
 RLE
@@ -175,6 +178,7 @@ WiredTigerRollbackException
 WiredTigerStat
 WiredTigerTestCase
 WiredTigerTmplog
+WwS
 XChaCha
 XRay
 Yann
@@ -234,6 +238,7 @@ cachesize
 calc
 callbk
 callgraph
+cas
 ccache
 cd
 cdb
@@ -335,6 +340,7 @@ dup
 dups
 ebusy
 ejnprx
+emptively
 encrypt
 encryptor
 encryptor's
@@ -411,6 +417,7 @@ gid
 github
 gnuplot
 graphviz
+growable
 hashtable
 hb
 hotbackup
@@ -574,6 +581,7 @@ pareto
 pcoll
 pdf
 perf
+performant
 petabyte
 pget
 php
@@ -584,6 +592,7 @@ posix
 ppc
 pre
 prealloc
+prefetch
 prepended
 prepends
 presumptively
@@ -596,6 +605,7 @@ priv
 proc
 profdata
 profraw
+pseudocode
 pthread
 pthreads
 putKey
@@ -743,6 +753,7 @@ unicode
 uninstall
 unittest
 unpositioned
+unsets
 untyped
 uri
 usec

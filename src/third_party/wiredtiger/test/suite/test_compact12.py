@@ -28,6 +28,7 @@
 
 import time, wttest
 from compact_util import compact_util
+from test_cc01 import test_cc_base
 from wiredtiger import stat
 
 kilobyte = 1024
@@ -41,7 +42,7 @@ kilobyte = 1024
 # It checks that:
 #
 # - Compaction correctly rewrites pages in WT_REF_DELETED state but are still on disk.
-class test_compact12(compact_util):
+class test_compact12(compact_util, test_cc_base):
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB,leaf_value_max=16MB'
     conn_config = 'cache_size=100MB,statistics=(all),verbose=[compact:4]'
     uri_prefix = 'table:test_compact12'
@@ -67,16 +68,6 @@ class test_compact12(compact_util):
             c[k] = ('%07d' % k) + '_' + 'b' * self.value_size
             self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(2)}')
         c.close()
-
-    def wait_for_cc_to_run(self):
-        c = self.session.open_cursor( 'statistics:')
-        cc_success = prev_cc_success = c[stat.conn.checkpoint_cleanup_success][2]
-        c.close()
-        while cc_success - prev_cc_success == 0:
-            time.sleep(0.1)
-            c = self.session.open_cursor( 'statistics:')
-            cc_success = c[stat.conn.checkpoint_cleanup_success][2]
-            c.close()
 
     def test_compact12_truncate(self):
         # FIXME-WT-11399
@@ -114,11 +105,8 @@ class test_compact12(compact_util):
         self.truncate(uri, self.table_numkv // 10 * 9, self.table_numkv)
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(5)}')
 
-        # Perform two checkpoints and also trigger checkpoint cleanup to remove
-        # the obsolete content.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        # Trigger checkpoint cleanup twice to remove the obsolete content.
         self.wait_for_cc_to_run()
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
         self.wait_for_cc_to_run()
 
         self.assertGreater(self.get_fast_truncated_pages(), 0)

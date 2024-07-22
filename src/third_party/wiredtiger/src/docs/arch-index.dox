@@ -166,11 +166,13 @@ of the documentation.
 - @subpage arch-toc-int-wt-dev
     - @ref arch-concurrency
     - @ref arch-locking-hierarchy
+    - @ref arch-usage-patterns
 
 - @subpage arch-toc-mem-disk
     - @ref arch-block
     - @ref arch-data-file
     - @ref arch-cloud-storage-extension
+    - @ref arch-prefetch
     - @ref arch-tiered-storage
 
 - @subpage arch-toc-on-disk
@@ -284,6 +286,7 @@ writing it to disk if it is dirty.
 
 @subpage arch-concurrency
 @subpage arch-locking-hierarchy
+@subpage arch-usage-patterns
 
 */
 
@@ -300,6 +303,11 @@ The format of the data file is given by structures in \c block.h .
 @subpage arch-cloud-storage-extension
 
 The cloud storage source extension which manage the flushing of the data files to and reading from different cloud object stores.
+
+@subpage arch-prefetch
+
+Pre-fetch is a performance optimization that aims to reduce I/O latency by reading pages from disk
+into memory before they are required by the application.
 
 @subpage arch-tiered-storage
 

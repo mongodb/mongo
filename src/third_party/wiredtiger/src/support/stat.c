@@ -126,7 +126,7 @@ static const char *const __stats_dsrc_desc[] = {
   "cache: overflow pages read into cache",
   "cache: page split during eviction deepened the tree",
   "cache: page written requiring history store records",
-  "cache: pages dirtied due to obsolete time window",
+  "cache: pages dirtied due to obsolete time window by eviction",
   "cache: pages read into cache",
   "cache: pages read into cache after truncate",
   "cache: pages read into cache after truncate in prepare state",
@@ -169,6 +169,7 @@ static const char *const __stats_dsrc_desc[] = {
   "cache_walk: Total number of pages currently in cache",
   "checkpoint: checkpoint has acquired a snapshot for its transaction",
   "checkpoint: pages added for eviction during checkpoint cleanup",
+  "checkpoint: pages dirtied due to obsolete time window by checkpoint cleanup",
   "checkpoint: pages removed during checkpoint cleanup",
   "checkpoint: pages skipped during checkpoint cleanup tree walk",
   "checkpoint: pages visited during checkpoint cleanup",
@@ -519,6 +520,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     /* not clearing cache_state_pages */
     stats->checkpoint_snapshot_acquired = 0;
     stats->checkpoint_cleanup_pages_evict = 0;
+    stats->checkpoint_cleanup_pages_obsolete_tw = 0;
     stats->checkpoint_cleanup_pages_removed = 0;
     stats->checkpoint_cleanup_pages_walk_skipped = 0;
     stats->checkpoint_cleanup_pages_visited = 0;
@@ -857,6 +859,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cache_state_pages += from->cache_state_pages;
     to->checkpoint_snapshot_acquired += from->checkpoint_snapshot_acquired;
     to->checkpoint_cleanup_pages_evict += from->checkpoint_cleanup_pages_evict;
+    to->checkpoint_cleanup_pages_obsolete_tw += from->checkpoint_cleanup_pages_obsolete_tw;
     to->checkpoint_cleanup_pages_removed += from->checkpoint_cleanup_pages_removed;
     to->checkpoint_cleanup_pages_walk_skipped += from->checkpoint_cleanup_pages_walk_skipped;
     to->checkpoint_cleanup_pages_visited += from->checkpoint_cleanup_pages_visited;
@@ -1210,6 +1213,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cache_state_pages += WT_STAT_DSRC_READ(from, cache_state_pages);
     to->checkpoint_snapshot_acquired += WT_STAT_DSRC_READ(from, checkpoint_snapshot_acquired);
     to->checkpoint_cleanup_pages_evict += WT_STAT_DSRC_READ(from, checkpoint_cleanup_pages_evict);
+    to->checkpoint_cleanup_pages_obsolete_tw +=
+      WT_STAT_DSRC_READ(from, checkpoint_cleanup_pages_obsolete_tw);
     to->checkpoint_cleanup_pages_removed +=
       WT_STAT_DSRC_READ(from, checkpoint_cleanup_pages_removed);
     to->checkpoint_cleanup_pages_walk_skipped +=
@@ -1604,7 +1609,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: page written requiring history store records",
   "cache: pages considered for eviction that were brought in by pre-fetch",
   "cache: pages currently held in the cache",
-  "cache: pages dirtied due to obsolete time window",
+  "cache: pages dirtied due to obsolete time window by eviction",
   "cache: pages evicted in parallel with checkpoint",
   "cache: pages queued for eviction",
   "cache: pages queued for eviction post lru sorting",
@@ -1688,6 +1693,7 @@ static const char *const __stats_connection_desc[] = {
   "checkpoint: number of leaf pages visited",
   "checkpoint: number of pages caused to be reconciled",
   "checkpoint: pages added for eviction during checkpoint cleanup",
+  "checkpoint: pages dirtied due to obsolete time window by checkpoint cleanup",
   "checkpoint: pages removed during checkpoint cleanup",
   "checkpoint: pages skipped during checkpoint cleanup tree walk",
   "checkpoint: pages visited during checkpoint cleanup",
@@ -2447,6 +2453,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->checkpoint_pages_visited_leaf = 0;
     stats->checkpoint_pages_reconciled = 0;
     stats->checkpoint_cleanup_pages_evict = 0;
+    stats->checkpoint_cleanup_pages_obsolete_tw = 0;
     stats->checkpoint_cleanup_pages_removed = 0;
     stats->checkpoint_cleanup_pages_walk_skipped = 0;
     stats->checkpoint_cleanup_pages_visited = 0;
@@ -3248,6 +3255,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->checkpoint_pages_visited_leaf += WT_STAT_CONN_READ(from, checkpoint_pages_visited_leaf);
     to->checkpoint_pages_reconciled += WT_STAT_CONN_READ(from, checkpoint_pages_reconciled);
     to->checkpoint_cleanup_pages_evict += WT_STAT_CONN_READ(from, checkpoint_cleanup_pages_evict);
+    to->checkpoint_cleanup_pages_obsolete_tw +=
+      WT_STAT_CONN_READ(from, checkpoint_cleanup_pages_obsolete_tw);
     to->checkpoint_cleanup_pages_removed +=
       WT_STAT_CONN_READ(from, checkpoint_cleanup_pages_removed);
     to->checkpoint_cleanup_pages_walk_skipped +=

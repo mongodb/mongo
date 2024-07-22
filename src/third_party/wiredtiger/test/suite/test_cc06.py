@@ -45,12 +45,6 @@ class test_cc06(test_cc_base):
     ]
     scenarios = make_scenarios(format_values)
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_cc(self):
         uri = "table:cc06"
 
@@ -65,11 +59,11 @@ class test_cc06(test_cc_base):
 
         self.session.checkpoint("debug=(checkpoint_cleanup=true)")
         # Check statistics.
-        self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_visited), 0)
+        self.assertEqual(self.get_stat(stat.dsrc.checkpoint_cleanup_pages_visited, uri), 0)
 
         # Reopen the database.
         self.reopen_conn()
 
         self.session.checkpoint("debug=(checkpoint_cleanup=true)")
         # Check statistics.
-        self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_visited), 0)
+        self.assertEqual(self.get_stat(stat.dsrc.checkpoint_cleanup_pages_visited, uri), 0)

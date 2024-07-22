@@ -100,7 +100,7 @@ class test_eviction03(eviction_util, suite_subprocess):
 
         # The new connection is configured in a way to maximise the number of pages that can be
         # cleaned up.
-        self.reopen_conn(config="heuristic_controls=[obsolete_tw_pages_dirty_max=10000]")
+        self.reopen_conn(config="heuristic_controls=[eviction_obsolete_tw_pages_dirty_max=10000]")
 
         # Update the oldest timestamp to make all the time window information obsolete.
         self.conn.set_timestamp(f'oldest_timestamp={self.timestamp_str(nrows + 1)}')

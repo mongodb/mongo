@@ -5,6 +5,7 @@ This program provides an CLI interface to check and generate Evergreen configura
 """
 
 import argparse
+import glob
 import os
 import re
 import subprocess
@@ -129,15 +130,15 @@ def get_make_check_dirs():
     # Make sure we are under the repo top level directory
     os.chdir(run('git rev-parse --show-toplevel'))
 
-    # Find the build folder. It can be identified by the presence of the `CMakeFiles` file.
-    p = subprocess.Popen("find . -maxdepth 2 -name CMakeFiles", stdout=subprocess.PIPE, shell=True,
-        universal_newlines=True)
-    build_folder = os.path.dirname(p.stdout.read().strip())
+    # Find all build folders. They can be identified by the presence of the `CMakeFiles` file.
+    ignore_build_folders = ""
+    for cmake_file in glob.glob('./**/CMakeFiles'):
+        ignore_build_folders += f" -not -path '{os.path.dirname(cmake_file)}/*'"
 
     # Search keyword in CMakeLists.txt to identify directories that involve test configuration.
     # Need to use subprocess 'shell=True' to get the expected shell command output.
     # `{{}}`` is used here to print `{}` when using python f-strings.
-    cmd = f"find . -not -path './releases/*' -not -path '{build_folder}/*' -name CMakeLists.txt -exec grep -H -e '\\(add_test\\|define_c_test|define_test_variants\\)' {{}} \\; | cut -d: -f1 | cut -c3- | uniq"
+    cmd = f"find . -not -path './releases/*' {ignore_build_folders} -name CMakeLists.txt -exec grep -H -e '\\(add_test\\|define_c_test|define_test_variants\\)' {{}} \\; | cut -d: -f1 | cut -c3- | uniq"
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
     mkfiles_with_tests = p.stdout.readlines()
 

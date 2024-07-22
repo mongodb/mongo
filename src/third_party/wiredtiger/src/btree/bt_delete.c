@@ -619,7 +619,7 @@ err:
 
 /*
  * __wti_delete_page_instantiate --
- *     Instantiate an entirely deleted row-store leaf page.
+ *     Instantiate an entirely deleted leaf page. Note that FLCS is not supported.
  */
 int
 __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)

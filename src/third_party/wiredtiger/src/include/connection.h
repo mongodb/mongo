@@ -151,19 +151,29 @@ struct __wt_bucket_storage {
  *  Heuristic controls configuration.
  */
 struct __wt_heuristic_controls {
-    /*
-     * The controls below deal with the cleanup of obsolete time window information. This process
-     * can be configured on two levels:
-     *   - The maximum number of btrees to process in a single checkpoint,
-     *   - The maximum number of pages per btree to process in a single checkpoint.
-     */
-
     /* Number of btrees processed in the current checkpoint. */
     wt_shared uint32_t obsolete_tw_btree_count;
+
+    /*
+     * The controls below deal with the cleanup of obsolete time window information. This process
+     * can be configured based on two configuration items, one that is shared among the subsystems
+     * which is the number of btrees and another one which is unique to each subsystem that is
+     * the number of pages.
+     *   - The maximum number of pages per btree to process in a single checkpoint by checkpoint
+     * cleanup.
+     *   - The maximum number of pages per btree to process in a single checkpoint by eviction
+     * threads.
+     *   - The maximum number of btrees to process in a single checkpoint.
+     */
+
+    /* Maximum number of pages that can be processed per btree by checkpoint cleanup. */
+    uint32_t checkpoint_cleanup_obsolete_tw_pages_dirty_max;
+
+    /* Maximum number of pages that can be processed per btree by eviction. */
+    uint32_t eviction_obsolete_tw_pages_dirty_max;
+
     /* Maximum number of btrees that can be processed per checkpoint. */
     uint32_t obsolete_tw_btree_max;
-    /* Maximum number of pages that can be processed per btree. */
-    uint32_t obsolete_tw_pages_dirty_max;
 };
 
 /*
@@ -347,8 +357,8 @@ extern const WT_NAME_FLAG __wt_stress_types[];
 
 /*
  * Access the array of all sessions. This field uses the Slotted Array pattern to managed shared
- * accesses, if you are looking to walk all sessions please consider using the existing session walk
- * logic. FIXME-WT-10946 - Add link to Slotted Array docs.
+ * accesses, if you need to walk all sessions please call __wt_session_array_walk. For more details
+ * on this usage pattern see the architecture guide.
  */
 #define WT_CONN_SESSIONS_GET(conn) ((conn)->session_array.__array)
 

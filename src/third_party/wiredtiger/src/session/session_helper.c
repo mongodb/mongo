@@ -34,8 +34,8 @@ __wt_session_array_walk(WT_SESSION_IMPL *session,
     /*
      * Ensure we read the session count only once. We want to iterate over all sessions that were
      * active at this point in time. Sessions in the array may open, close, or be have their
-     * contents change during traversal. We expect the calling code to handle this. See the slotted
-     * sessions docs for further details. FIXME-WT-10946 Add link to docs once they're added.
+     * contents change during traversal. We expect the calling code to handle this. See the Slotted
+     * array usage pattern in the architecture guide for more details.
      */
     WT_READ_ONCE(session_cnt, conn->session_array.cnt);
 
