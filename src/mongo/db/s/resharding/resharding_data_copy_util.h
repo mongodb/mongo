@@ -144,7 +144,8 @@ void updateSessionRecord(OperationContext* opCtx,
                          BSONObj o2Field,
                          std::vector<StmtId> stmtIds,
                          boost::optional<repl::OpTime> preImageOpTime,
-                         boost::optional<repl::OpTime> postImageOpTime);
+                         boost::optional<repl::OpTime> postImageOpTime,
+                         NamespaceString sourceNss);
 
 /**
  * Calls and returns the value from the supplied lambda function.

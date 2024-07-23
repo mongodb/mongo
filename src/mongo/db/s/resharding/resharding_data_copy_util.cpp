@@ -282,7 +282,8 @@ void updateSessionRecord(OperationContext* opCtx,
                          BSONObj o2Field,
                          std::vector<StmtId> stmtIds,
                          boost::optional<repl::OpTime> preImageOpTime,
-                         boost::optional<repl::OpTime> postImageOpTime) {
+                         boost::optional<repl::OpTime> postImageOpTime,
+                         NamespaceString sourceNss) {
     invariant(opCtx->getLogicalSessionId());
     invariant(opCtx->getTxnNumber());
 
@@ -296,7 +297,7 @@ void updateSessionRecord(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setObject(SessionCatalogMigration::kSessionOplogTag);
     oplogEntry.setObject2(std::move(o2Field));
-    oplogEntry.setNss({});
+    oplogEntry.setNss(std::move(sourceNss));
     oplogEntry.setSessionId(sessionId);
     oplogEntry.setTxnNumber(txnNumber);
     oplogEntry.setStatementIds(stmtIds);
