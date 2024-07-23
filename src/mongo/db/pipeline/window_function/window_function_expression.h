@@ -1000,6 +1000,13 @@ public:
     // TODO SERVER-59327 make these members private
     boost::intrusive_ptr<::mongo::Expression> nExpr;
     boost::optional<SortPattern> sortPattern;
+
+private:
+    /**
+     * Create the accumulator object without initializing it for execution (e.g., evaluating and
+     * setting 'n').
+     */
+    boost::intrusive_ptr<AccumulatorState> createAccumulatorWithoutInitializing() const;
 };
 
 template <typename AccumulatorTType>
