@@ -202,8 +202,10 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
         mock_compile_task.display_name = "compile"
         mock_compile_task.artifacts = [mock_artifact]
         mock_compile_task.status = "success"
+        mock_compile_task.get_execution_or_self.return_value = mock_compile_task
         mock_push_task.display_name = "push"
         mock_push_task.status = "success"
+        mock_push_task.get_execution_or_self.return_value = mock_push_task
         mock_build.get_tasks.return_value = [mock_compile_task, mock_push_task]
 
         urls = evergreen_conn.get_compile_artifact_urls(mock_evg_api, mock_version, "test")
@@ -244,12 +246,15 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
         mock_compile_task.display_name = "compile"
         mock_compile_task.artifacts = [mock_compile_artifact]
         mock_compile_task.status = "success"
+        mock_compile_task.get_execution_or_self.return_value = mock_compile_task
         mock_push_task.display_name = "push"
         mock_push_task.status = "success"
         mock_push_task.depends_on = [{"id": "fake id"}]
+        mock_push_task.get_execution_or_self.return_value = mock_push_task
         mock_child_task.display_name = "archive_dist_test_debug"
         mock_child_task.artifacts = [mock_child_task_artifact]
         mock_child_task.status = "success"
+        mock_child_task.get_execution_or_self.return_value = mock_child_task
 
         mock_build.get_tasks.return_value = [mock_compile_task, mock_push_task]
 
@@ -267,8 +272,10 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
         mock_evg_api.build_by_id.return_value = mock_build
         mock_compile_task.display_name = "compile"
         mock_compile_task.status = "success"
+        mock_compile_task.get_execution_or_self.return_value = mock_compile_task
         mock_push_task.display_name = "push"
         mock_push_task.status = "failed"
+        mock_push_task.get_execution_or_self.return_value = mock_push_task
         mock_build.get_tasks.return_value = [mock_compile_task, mock_push_task]
 
         urls = evergreen_conn.get_compile_artifact_urls(mock_evg_api, mock_version, "test")
