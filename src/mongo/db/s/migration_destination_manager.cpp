@@ -1168,8 +1168,8 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
             }
         }
 
-        // Before taking the exclusive database lock for cloning the remaining indexes, wait for
-        // index builds to finish if it is the first migration.
+        // Before acquiring the exclusive collection lock for cloning the remaining indexes, wait
+        // for index builds to finish if it is the first migration.
         if (waitForInProgressIndexBuildCompletion) {
             if (MONGO_unlikely(
                     hangMigrationRecipientBeforeWaitingNoIndexBuildInProgress.shouldFail())) {
@@ -1181,13 +1181,13 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
                 opCtx, collectionOptionsAndIndexes.uuid);
         }
 
-        // Take the exclusive database lock if the collection does not exist or indexes are missing
-        // (needs auto-heal).
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
+        // Acquire the exclusive collection lock to eventually create the collection and clone the
+        // remaining indexes.
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
 
         auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-        auto fromMigrate = true;
         if (collection) {
             checkUUIDsMatch(collection);
         } else {
@@ -1203,19 +1203,19 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
 
             // We do not have a collection by this name. Create it with the donor's options.
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx, /* forceCSRAsUnknownAfterCollectionCreation */ true);
+                unsafeCreateCollection(opCtx, true /* forceCSRAsUnknownAfterCollectionCreation */);
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions collectionOptions = uassertStatusOK(
                 CollectionOptions::parse(collectionOptionsAndIndexes.options,
                                          CollectionOptions::ParseKind::parseForStorage));
-            const bool createDefaultIndexes = true;
             uassertStatusOK(db->userCreateNS(opCtx,
                                              nss,
                                              collectionOptions,
-                                             createDefaultIndexes,
+                                             true /* createDefaultIndexes */,
                                              collectionOptionsAndIndexes.idIndexSpec,
-                                             fromMigrate));
+                                             true /* fromMigrate */));
             wuow.commit();
+
             collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         }
 
@@ -1224,7 +1224,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
             WriteUnitOfWork wunit(opCtx);
             CollectionWriter collWriter(opCtx, collection->uuid());
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collWriter, indexSpecs, fromMigrate);
+                opCtx, collWriter, indexSpecs, true /* fromMigrate */);
             wunit.commit();
         }
     }

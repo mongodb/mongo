@@ -4,7 +4,7 @@
  * @tags: [
  *   uses_transactions,
  *   requires_db_locking,
- *   # TODO SERVER-86727 Can probably enable for sharded collections.
+ *   # Creating sharded collections is not supported in multi-document transactions.
  *   assumes_unsharded_collection,
  * ]
  */
