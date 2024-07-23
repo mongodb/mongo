@@ -276,10 +276,10 @@ TEST(ArrayHistograms, LargeNumberOfScalarValuesBucketRanges) {
     auto ah = createArrayEstimator(values, ScalarHistogram::kMaxBuckets);
 
     ASSERT_EQ(1'000'000, ah->getScalar().getCardinality());
-    // Assert that each bucket except the first has more than one entry.
-    std::for_each(++ah->getScalar().getBuckets().begin(),
+    // Assert that each bucket has at least one entry.
+    std::for_each(ah->getScalar().getBuckets().begin(),
                   ah->getScalar().getBuckets().end(),
-                  [](auto&& bucket) { ASSERT_GT(bucket._rangeFreq, 1); });
+                  [](auto&& bucket) { ASSERT_GTE(bucket._equalFreq + bucket._rangeFreq, 1); });
 }
 
 TEST(ArrayHistograms, LargeArraysHistogram) {
@@ -401,7 +401,7 @@ TEST(ArrayHistograms, Golden) {
             return arr;
         }()),
     };
-    auto ah = createArrayEstimator(values, 8);
+    auto ah = createArrayEstimator(values, 8, stats::SortArg::kArea);
     auto expected = fromjson(R"(
     {
         trueCount: 0.0,
@@ -449,6 +449,55 @@ TEST(ArrayHistograms, Golden) {
         }
     })");
     ASSERT_BSONOBJ_EQ(expected, ah->serialize());
+
+    auto ahAreaDiff = createArrayEstimator(values, 8);
+    auto expectedAreaDiff = fromjson(R"(
+    {
+        trueCount: 0.0,
+        falseCount: 0.0,
+        nanCount: 0.0,
+        emptyArrayCount: 0.0,
+        typeCount: [
+            { typeName: "NumberInt64", count: 4.0 },
+            { typeName: "Date", count: 3.0 },
+            { typeName: "StringSmall", count: 2.0 },
+            { typeName: "StringBig", count: 2.0 },
+            { typeName: "Array", count: 1.0 }
+        ],
+        scalarHistogram: {
+            buckets: [
+                { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 1.0, cumulativeDistincts: 1.0 },
+                { boundaryCount: 2.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 3.0, cumulativeDistincts: 2.0 },
+                { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 4.0, cumulativeDistincts: 3.0 },
+                { boundaryCount: 2.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 6.0, cumulativeDistincts: 4.0 },
+                { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 7.0, cumulativeDistincts: 5.0 },
+                { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 8.0, cumulativeDistincts: 6.0 },
+                { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 9.0, cumulativeDistincts: 7.0 },
+                { boundaryCount: 1.0, rangeCount: 1.0, rangeDistincts: 1.0, cumulativeCount: 11.0, cumulativeDistincts: 9.0 }
+            ],
+            bounds: [ 3, 4, 6, "delorean", "marty", "mcfly", new Date(499165200000), new Date(1445412480000) ]
+        },
+        arrayStatistics: {
+            minHistogram: {
+                buckets: [ { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 1.0, cumulativeDistincts: 1.0 } ],
+                bounds: [ 8 ]
+            },
+            maxHistogram: {
+                buckets: [ { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 1.0, cumulativeDistincts: 1.0 } ],
+                bounds: [ 10 ]
+            },
+            uniqueHistogram: {
+                buckets: [
+                    { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 1.0, cumulativeDistincts: 1.0 },
+                    { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 2.0, cumulativeDistincts: 2.0 },
+                    { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 3.0, cumulativeDistincts: 3.0 }
+                ],
+                bounds: [ 8, 9, 10 ]
+            },
+            typeCount: [ { typeName: "NumberInt64", count: 1.0 } ]
+        }
+    })");
+    ASSERT_BSONOBJ_EQ(expectedAreaDiff, ahAreaDiff->serialize());
 }
 
 }  // namespace mongo::stats

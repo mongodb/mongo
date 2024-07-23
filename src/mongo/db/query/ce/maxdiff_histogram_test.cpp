@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/stats/rand_utils_new.h"
 #include <cstddef>
 #include <iostream>
 #include <memory>
@@ -46,8 +47,11 @@
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::optimizer::ce {
 namespace {
@@ -56,7 +60,6 @@ namespace value = sbe::value;
 using stats::DataDistribution;
 using stats::genFixedValueArray;
 using stats::getDataDistribution;
-using stats::makeHistogram;
 using stats::makeInt64Value;
 using stats::ScalarHistogram;
 
@@ -102,6 +105,78 @@ TEST_F(HistogramTest, CreateFixed) {
     ASSERT_APPROX_EQUAL(50.0, estimateCard(hist, 50 * 10, EstimationType::kLess), kTolerance);
 }
 
+TEST_F(HistogramTest, MaxDiffBoundariesInt) {
+    constexpr size_t nElems = 100;
+    constexpr size_t nBuckets = 10;
+
+    auto data = genFixedValueArray(nElems, 1.0, 0.0);
+    auto opCtx = makeOperationContext();
+    const size_t actualCard = getActualCard(opCtx.get(), data, "[{$match: {a: {$lt: 3}}}]");
+    ASSERT_EQ(8, actualCard);
+
+    sortValueVector(data);
+    const DataDistribution& dataDistrib = getDataDistribution(data);
+
+    auto result = generateTopKBuckets(dataDistrib, nBuckets);
+    std::vector<int> expectedBounds = {0, 1, 3, 4, 5, 6, 7, 8, 9, 24};
+    for (size_t i = 0; i < expectedBounds.size(); i++) {
+        ASSERT_EQ(result[i]._idx, expectedBounds[i]);
+    }
+}
+
+TEST_F(HistogramTest, MaxDiffBoundariesString) {
+    constexpr size_t nElems = 100;
+    constexpr size_t nBuckets = 10;
+
+    auto data = genFixedValueArray(nElems, 0.0, 1.0);
+    auto opCtx = makeOperationContext();
+    const size_t actualCard =
+        getActualCard(opCtx.get(), data, "[{$match: {a: {$lt: '91YgOvBB'}}}]");
+    ASSERT_EQ(15, actualCard);
+
+    sortValueVector(data);
+    const DataDistribution& dataDistrib = getDataDistribution(data);
+
+    auto result = generateTopKBuckets(dataDistrib, nBuckets);
+    std::vector<int> expectedBounds = {0, 3, 7, 8, 12, 13, 14, 15, 16, 19};
+    for (size_t i = 0; i < expectedBounds.size(); i++) {
+        ASSERT_EQ(result[i]._idx, expectedBounds[i]);
+    }
+}
+
+TEST_F(HistogramTest, MaxDiffTestSkewedInt) {
+    constexpr size_t nElems = 24;
+    constexpr size_t nBuckets = 5;
+
+    std::vector<stats::SBEValue> data;
+    auto rawData =
+        std::vector<int>{0, 1, 1, 1, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7};
+    for (size_t i = 0; i < nElems; i++) {
+        const auto [tag, val] = makeInt64Value(rawData[i]);
+        data.emplace_back(tag, val);
+    }
+    auto opCtx = makeOperationContext();
+    const size_t actualCard = getActualCard(opCtx.get(), data, "[{$match: {a: {$lt: 4}}}]");
+
+    ASSERT_EQ(8, actualCard);
+
+    sortValueVector(data);
+
+    const DataDistribution& dataDistrib = getDataDistribution(data);
+
+    auto result = generateTopKBuckets(dataDistrib, nBuckets, stats::SortArg::kArea);
+    std::vector<int> expectedBounds = {0, 4, 5, 6, 7};
+    for (size_t i = 0; i < expectedBounds.size(); i++) {
+        ASSERT_EQ(result[i]._idx, expectedBounds[i]);
+    }
+
+    auto resultAreaDiff = generateTopKBuckets(dataDistrib, nBuckets);
+    std::vector<int> expectedBoundsAreaDiff = {0, 1, 2, 3, 7};
+    for (size_t i = 0; i < expectedBoundsAreaDiff.size(); i++) {
+        ASSERT_EQ(resultAreaDiff[i]._idx, expectedBoundsAreaDiff[i]);
+    }
+}
+
 TEST_F(HistogramTest, MaxDiffTestInt) {
     constexpr size_t nElems = 100;
     constexpr size_t nBuckets = 10;
@@ -109,14 +184,51 @@ TEST_F(HistogramTest, MaxDiffTestInt) {
     auto data = genFixedValueArray(nElems, 1.0, 0.0);
     auto opCtx = makeOperationContext();
     const size_t actualCard = getActualCard(opCtx.get(), data, "[{$match: {a: {$lt: 10}}}]");
-
-    const ScalarHistogram& hist = makeHistogram(data, nBuckets);
-    std::cout << hist.toString();
-
-    ASSERT_LTE(hist.getBuckets().size(), nBuckets);
-    const double estimatedCard = estimateCard(hist, 11, EstimationType::kLess);
     ASSERT_EQ(36, actualCard);
-    ASSERT_APPROX_EQUAL(43.7333, estimatedCard, kTolerance);
+
+    sortValueVector(data);
+    const DataDistribution& dataDistrib = getDataDistribution(data);
+
+    const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets, stats::SortArg::kArea);
+    LOGV2(8674801, "Generated histogram", "histogram"_attr = hist.toString());
+    ASSERT_LTE(hist.getBuckets().size(), nBuckets);
+    const double estimatedCard = estimateCard(hist, 10, EstimationType::kLess);
+    ASSERT_APPROX_EQUAL(36, estimatedCard, kTolerance);
+
+    const ScalarHistogram& histAreaDiff = genMaxDiffHistogram(dataDistrib, nBuckets);
+    LOGV2(8674802, "Generated histogram", "histogram"_attr = histAreaDiff.toString());
+    ASSERT_LTE(histAreaDiff.getBuckets().size(), nBuckets);
+    const double estimatedCardAreaDiff = estimateCard(histAreaDiff, 10, EstimationType::kLess);
+    ASSERT_APPROX_EQUAL(36, estimatedCardAreaDiff, kTolerance);
+}
+
+TEST_F(HistogramTest, MaxDiffTestIntMixedDistribution) {
+    constexpr size_t nElems = 1'000'000;
+    constexpr size_t nBuckets = 100;
+
+    std::mt19937_64 seed(42);
+    stats::MixedDistributionDescriptor mixed{{stats::DistrType::kUniform, 0.2},
+                                             {stats::DistrType::kNormal, 0.8}};
+    stats::TypeDistrVector td;
+    td.push_back(std::make_unique<stats::IntDistribution>(mixed, 1.0, 2000, 0, 10'000));
+    stats::DatasetDescriptorNew desc{std::move(td), seed};
+    std::vector<stats::SBEValue> data = desc.genRandomDataset(nElems);
+
+    auto opCtx = makeOperationContext();
+    const size_t actualCard = getActualCard(opCtx.get(), data, "[{$match: {a: {$lt: 3500}}}]");
+
+    sortValueVector(data);
+    const DataDistribution& dataDistrib = getDataDistribution(data);
+
+    const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets, stats::SortArg::kArea);
+    const ScalarHistogram& histAreaDiff = genMaxDiffHistogram(dataDistrib, nBuckets);
+    ASSERT_LTE(hist.getBuckets().size(), nBuckets);
+    ASSERT_LTE(histAreaDiff.getBuckets().size(), nBuckets);
+    const double estimatedCard = estimateCard(hist, 3500, EstimationType::kLess);
+    const double estimatedCardAreaDiff = estimateCard(histAreaDiff, 3500, EstimationType::kLess);
+
+    ASSERT_APPROX_EQUAL(actualCard, estimatedCard, actualCard * 0.1);
+    ASSERT_APPROX_EQUAL(actualCard, estimatedCardAreaDiff, actualCard * 0.1);
 }
 
 TEST_F(HistogramTest, MaxDiffTestString) {
@@ -124,27 +236,66 @@ TEST_F(HistogramTest, MaxDiffTestString) {
     constexpr size_t nBuckets = 10;
 
     auto randData = genFixedValueArray(nElems, 0.0, 1.0);
-    std::cout << "Generated " << nElems << " random values:\n"
-              << printValueArray(randData) << "\n"
-              << std::flush;
-
+    LOGV2(8674803,
+          "Generated random values",
+          "nElems"_attr = nElems,
+          "randData"_attr = printValueArray(randData));
     auto opCtx = makeOperationContext();
     const size_t actualCard =
         getActualCard(opCtx.get(), randData, "[{$match: {a: {$lt: '91YgOvBB'}}}]");
+    ASSERT_EQ(15, actualCard);
 
     sortValueVector(randData);
     const DataDistribution& dataDistrib = getDataDistribution(randData);
-
-    const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets);
-    std::cout << hist.toString();
-    ASSERT_LTE(hist.getBuckets().size(), nBuckets);
-
     const auto [tag, val] = value::makeNewString("91YgOvBB"_sd);
     value::ValueGuard vg(tag, val);
-    const double estimatedCard = estimate(hist, tag, val, EstimationType::kLess).card;
 
-    ASSERT_EQ(15, actualCard);
+    const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets, stats::SortArg::kArea);
+    LOGV2(8674804, "Generated histogram", "histogram"_attr = hist.toString());
+    ASSERT_LTE(hist.getBuckets().size(), nBuckets);
+    const double estimatedCard = estimate(hist, tag, val, EstimationType::kLess).card;
     ASSERT_APPROX_EQUAL(15.9443, estimatedCard, kTolerance);
+
+    const ScalarHistogram& histAreaDiff = genMaxDiffHistogram(dataDistrib, nBuckets);
+    LOGV2(8674805, "Generated histogram", "histogram"_attr = histAreaDiff.toString());
+    ASSERT_LTE(histAreaDiff.getBuckets().size(), nBuckets);
+    const double estimatedCardAreaDiff =
+        estimate(histAreaDiff, tag, val, EstimationType::kLess).card;
+    ASSERT_APPROX_EQUAL(9.59627, estimatedCardAreaDiff, kTolerance);
+}
+
+// Converts the string values from MaxDiffTestString into integers using the ASCII values of the
+// first two chars of each string to check the correctness of boundaries
+TEST_F(HistogramTest, MaxDiffTestStringToInt) {
+    constexpr size_t nElems = 100;
+    constexpr size_t nBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    auto rawData = std::vector<int>{
+        5071,  5071,  5071,  5071,  5071,  5155,  5155,  5155,  5155,  5155,  5573,  5573,  5573,
+        5573,  5573,  6582,  6582,  6582,  6582,  6582,  6597,  6597,  6597,  6597,  6597,  7088,
+        7088,  7088,  7088,  7088,  7399,  7399,  7399,  7399,  7399,  7408,  7408,  7408,  7408,
+        7408,  8215,  8215,  8215,  8215,  8215,  8220,  8220,  8220,  8220,  8220,  8454,  8454,
+        8454,  8454,  8454,  8956,  8956,  8956,  8956,  8956,  9872,  9872,  9872,  9872,  9872,
+        9881,  9881,  9881,  9881,  9881,  10683, 10683, 10683, 10683, 10683, 10698, 10698, 10698,
+        10698, 10698, 11505, 11505, 11505, 11505, 11505, 11510, 11510, 11510, 11510, 11510, 11919,
+        11919, 11919, 11919, 11919, 12250, 12250, 12250, 12250, 12250};
+    for (size_t i = 0; i < nElems; i++) {
+        const auto [tag, val] = makeInt64Value(rawData[i]);
+        data.emplace_back(tag, val);
+    }
+    auto opCtx = makeOperationContext();
+    const size_t actualCard = getActualCard(opCtx.get(), data, "[{$match: {a: {$lt: 5749}}}]");
+    ASSERT_EQ(15, actualCard);
+
+    sortValueVector(data);
+    const DataDistribution& dataDistrib = getDataDistribution(data);
+
+    auto result = generateTopKBuckets(dataDistrib, nBuckets);
+    std::vector<int> expectedBounds = {0, 3, 7, 8, 12, 13, 14, 15, 16, 19};
+    for (size_t i = 0; i < expectedBounds.size(); i++) {
+        ASSERT_EQ(result[i]._idx, expectedBounds[i]);
+    }
 }
 
 TEST_F(HistogramTest, MaxDiffTestMixedTypes) {
@@ -152,23 +303,29 @@ TEST_F(HistogramTest, MaxDiffTestMixedTypes) {
     constexpr size_t nBuckets = 10;
 
     auto randData = genFixedValueArray(nElems, 0.5, 0.5);
-    std::cout << "Generated " << nElems << " random values:\n"
-              << printValueArray(randData) << "\n"
-              << std::flush;
+    LOGV2(8674806,
+          "Generated random values",
+          "nElems"_attr = nElems,
+          "randData"_attr = printValueArray(randData));
 
     auto opCtx = makeOperationContext();
     const size_t actualCard = getActualCard(opCtx.get(), randData, "[{$match: {a: {$lt: 10}}}]");
+    ASSERT_EQ(18, actualCard);
 
     sortValueVector(randData);
     const DataDistribution& dataDistrib = getDataDistribution(randData);
 
-    const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets);
-    std::cout << hist.toString();
+    const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets, stats::SortArg::kArea);
+    LOGV2(8674807, "Generated histogram", "histogram"_attr = hist.toString());
     ASSERT_LTE(hist.getBuckets().size(), nBuckets);
     const double estimatedCard = estimateCard(hist, 10, EstimationType::kLess);
-
-    ASSERT_EQ(18, actualCard);
     ASSERT_APPROX_EQUAL(18.0, estimatedCard, kTolerance);
+
+    const ScalarHistogram& histAreaDiff = genMaxDiffHistogram(dataDistrib, nBuckets);
+    LOGV2(8674808, "Generated histogram", "histogram"_attr = histAreaDiff.toString());
+    ASSERT_LTE(histAreaDiff.getBuckets().size(), nBuckets);
+    const double estimatedCardAreaDiff = estimateCard(histAreaDiff, 10, EstimationType::kLess);
+    ASSERT_APPROX_EQUAL(17.3043, estimatedCardAreaDiff, kTolerance);
 }
 
 TEST_F(HistogramTest, MaxDiffIntArrays) {
@@ -178,9 +335,11 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
     auto rawData = genFixedValueArray(nElems, 1.0, 0.0);
     auto arrayData = nestArrays(rawData, 0 /* No empty arrays */);
 
-    auto estimator = createArrayEstimator(arrayData, nBuckets);
+    auto estimator = createArrayEstimator(arrayData, nBuckets, stats::SortArg::kArea);
+    auto estimatorAreaDiff = createArrayEstimator(arrayData, nBuckets);
 
     auto opCtx = makeOperationContext();
+
     {
         const size_t actualCard =
             getActualCard(opCtx.get(), arrayData, "[{$match: {a: {$eq: 2}}}]");
@@ -188,9 +347,11 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const auto [tag, val] = makeInt64Value(2);
         value::ValueGuard vg(tag, val);
         const CEType estimatedCard = estimateCardEq(*estimator, tag, val, true /*includeScalar*/);
+        const CEType estimatedCardAreaDiff = estimateCardEq(*estimatorAreaDiff, tag, val, true);
 
-        ASSERT_CE_APPROX_EQUAL(4.0, estimatedCard, kTolerance);
         ASSERT_EQ(4, actualCard);
+        ASSERT_CE_APPROX_EQUAL(4.0, estimatedCard, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(4.0, estimatedCardAreaDiff, kTolerance);
     }
 
     {
@@ -207,8 +368,18 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
                                                        tag,
                                                        val,
                                                        true /* includeScalar */);
+        const CEType estimatedCardAreaDiff = estimateCardRange(*estimatorAreaDiff,
+                                                               false /*lowInclusive*/,
+                                                               value::TypeTags::MinKey,
+                                                               0,
+                                                               false /*highInclusive*/,
+                                                               tag,
+                                                               val,
+                                                               true /* includeScalar */);
+
         ASSERT_EQ(6, actualCard);
         ASSERT_CE_APPROX_EQUAL(6.0, estimatedCard, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(7.0, estimatedCardAreaDiff, kTolerance);
     }
 
     {
@@ -228,9 +399,18 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
                                                        highTag,
                                                        highVal,
                                                        false /* includeScalar */);
+        const CEType estimatedCardAreaDiff = estimateCardRange(*estimatorAreaDiff,
+                                                               false /*lowInclusive*/,
+                                                               lowTag,
+                                                               lowVal,
+                                                               false /*highInclusive*/,
+                                                               highTag,
+                                                               highVal,
+                                                               false /* includeScalar */);
 
         ASSERT_EQ(2, actualCard);
         ASSERT_CE_APPROX_EQUAL(3.15479, estimatedCard, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(2.52383, estimatedCardAreaDiff, kTolerance);
     }
 }
 
@@ -241,12 +421,19 @@ TEST_F(HistogramTest, MaxDiffEmptyArrays) {
 
     auto rawData = genFixedValueArray(nElems, 1.0, 0.0);
     auto arrayData = nestArrays(rawData, emptyArrayCount);
-    std::cout << "Generated " << nElems << " arrayData:\n"
-              << printValueArray(arrayData) << "\n"
-              << std::flush;
+    LOGV2(8674809,
+          "Generated arrayData",
+          "nElems"_attr = nElems,
+          "arrayData"_attr = printValueArray(arrayData));
 
-    const auto arrayHist = createArrayEstimator(arrayData, nBuckets);
-    ASSERT_EQ(arrayHist->getEmptyArrayCount(), emptyArrayCount);
+    const auto arrayHist = createArrayEstimator(arrayData, nBuckets, stats::SortArg::kAreaDiff);
+    const auto arrayHistAreaDiff = createArrayEstimator(arrayData, nBuckets);
+
+    const auto histograms = {arrayHist, arrayHistAreaDiff};
+
+    std::for_each(histograms.begin(), histograms.end(), [emptyArrayCount](auto&& histogram) {
+        ASSERT_EQ(histogram->getEmptyArrayCount(), emptyArrayCount);
+    });
 }
 
 }  // namespace

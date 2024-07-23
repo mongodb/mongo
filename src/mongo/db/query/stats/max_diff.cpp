@@ -44,8 +44,11 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::stats {
 namespace {
@@ -68,42 +71,10 @@ double valueSpread(value::TypeTags tag1,
     double doubleVal2 = valueToDouble(tag2, val2);
     uassert(
         6660502,
-        "Data distribution values must be monotonically increasing, however enocuntered {} before {}"_format(
+        "Data distribution values must be monotonically increasing, however encountered {} before {}"_format(
             doubleVal1, doubleVal2),
         doubleVal2 >= doubleVal1);
     return doubleVal2 - doubleVal1;
-}
-
-// TODO: This doesn't seem right -- it looks like we're sorting on the frequency,
-//       not the difference between buckets
-std::vector<ValFreq> generateTopKBuckets(const DataDistribution& dataDistrib, size_t numBuckets) {
-    struct AreaComparator {
-        bool operator()(const ValFreq& a, const ValFreq& b) const {
-            return a._normArea > b._normArea;
-        }
-    };
-    std::priority_queue<ValFreq, std::vector<ValFreq>, AreaComparator> pq;
-
-    for (const auto& valFreq : dataDistrib._freq) {
-        if (pq.size() < numBuckets) {
-            pq.emplace(valFreq);
-        } else if (AreaComparator()(valFreq, pq.top())) {
-            pq.pop();
-            pq.emplace(valFreq);
-        }
-    }
-
-    std::vector<ValFreq> result;
-    while (!pq.empty()) {
-        result.push_back(pq.top());
-        pq.pop();
-    }
-
-    std::sort(result.begin(), result.end(), [](const ValFreq& a, const ValFreq& b) {
-        return a._idx < b._idx;
-    });
-
-    return result;
 }
 
 /**
@@ -172,7 +143,82 @@ double boundedCalculateArea(SBEValue v1, SBEValue v2, size_t freq) {
     return area;
 }
 
+/*
+ * Helper for constructing a priority queue with values either compared based on calculated area or
+ * area difference.
+ */
+template <typename P>
+std::vector<ValFreq> fillAndReturnPriorityQueueResult(const DataDistribution& dataDistrib,
+                                                      size_t numBuckets,
+                                                      P& pq) {
+    // Populate priority queue with values in data distribution using a specific comparator for a
+    // given sorting algorithm.
+    for (const auto& valFreq : dataDistrib._freq) {
+        if (pq.size() < numBuckets) {
+            pq.emplace(valFreq);
+        } else if (typename P::value_compare{}(valFreq, pq.top())) {
+            pq.pop();
+            pq.emplace(valFreq);
+        }
+    }
+
+    // Transfer values from priority queue into a vector.
+    std::vector<ValFreq> result;
+    while (!pq.empty()) {
+        result.push_back(pq.top());
+        pq.pop();
+    }
+
+    // Sort the values by value _idx.
+    std::sort(result.begin(), result.end(), [](const ValFreq& a, const ValFreq& b) {
+        return a._idx < b._idx;
+    });
+
+    return result;
+}
+
+struct AreaComparator {
+    bool operator()(const ValFreq& a, const ValFreq& b) const {
+        // TODO: the alternatives below allow to experiment with original vs normalized areas
+        // return a._area         > b._area;
+        return a._normArea > b._normArea;
+    }
+};
+
+struct AreaDiffComparator {
+    bool operator()(const ValFreq& a, const ValFreq& b) const {
+        // TODO: the alternatives below allow to experiment with original vs normalized areas
+        // return a._areaDiff > b._areaDiff;
+        return a._normAreaDiff > b._normAreaDiff;
+    }
+};
+
+inline bool isValidValFreq(std::vector<ValFreq>& valFreqVec) {
+    return std::any_of(valFreqVec.begin(), valFreqVec.end(), [](ValFreq valFreq) {
+        return valFreq._area >= 0.0 && valFreq._areaDiff >= 0.0 && valFreq._normArea >= 0.0 &&
+            valFreq._normAreaDiff >= 0.0;
+    });
+}
+
 }  // namespace
+
+std::vector<ValFreq> generateTopKBuckets(const DataDistribution& dataDistrib,
+                                         size_t numBuckets,
+                                         SortArg sortArg) {
+    // find the top "numBucket" number of values from the data distribution according to the
+    // provided sorting algorithm.
+    if (sortArg == SortArg::kAreaDiff) {
+        std::priority_queue<ValFreq, std::vector<ValFreq>, AreaDiffComparator> pq;
+        // Call the helper function with pq and the given comparator (determined based on the
+        // sorting algorithm) to find "numBucket" number of largest normalized area difference
+        // values
+        return fillAndReturnPriorityQueueResult(dataDistrib, numBuckets, pq);
+    } else if (sortArg == SortArg::kArea) {
+        std::priority_queue<ValFreq, std::vector<ValFreq>, AreaComparator> pq;
+        return fillAndReturnPriorityQueueResult(dataDistrib, numBuckets, pq);
+    }
+    MONGO_UNREACHABLE_TASSERT(8674814);
+}
 
 DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput) {
     if (sortedInput.empty()) {
@@ -207,7 +253,9 @@ DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput) {
 
     // Calculate the area for all values in the data distribution.
     // The current minimum and maximum areas of the values of a type class.
-    double maxArea = 0.0;
+    constexpr double kInvalidArea = -1.0;
+    double maxArea = kInvalidArea;
+    double maxAreaDiff = kInvalidArea;
 
     for (size_t i = 0; i + 1 < result._freq.size(); ++i) {
         const auto v1 = result._bounds[i];
@@ -217,60 +265,87 @@ DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput) {
         if (newTypeBracket) {
             // If maxArea is 0.0, this is because this value is the only value of its type bracket.
             // Because we want to force it to be a bucket, set maxArea to inifinte.
-            const auto res = result.typeClassBounds.emplace(
-                i, maxArea == 0.0 ? std::numeric_limits<double>::infinity() : maxArea);
+            std::pair<double, double> valPair;
+            valPair.first = {maxArea == 0.0 ? std::numeric_limits<double>::infinity() : maxArea};
+            valPair.second = {maxAreaDiff == 0.0 ? std::numeric_limits<double>::infinity()
+                                                 : maxAreaDiff};
+            const auto res = result.typeClassBounds.emplace(i, valPair);
             uassert(6660551, "There can't be duplicate type class bounds.", res.second);
             maxArea = 0.0;
+            maxAreaDiff = 0.0;
         } else if (i == 0) {
             maxArea = boundedCalculateArea(v1, v2, result._freq[i]._freq);
+            maxAreaDiff = 0.0;
         }
 
         if (i == 0 || newTypeBracket) {
             // Make sure we insert bucket boundaries between different types, and also make sure
             // first value is picked for a boundary.
             result._freq[i]._area = std::numeric_limits<double>::infinity();
+            result._freq[i]._areaDiff = std::numeric_limits<double>::infinity();
         } else {
             result._freq[i]._area = boundedCalculateArea(v1, v2, result._freq[i]._freq);
             maxArea = std::max(maxArea, result._freq[i]._area);
+            result._freq[i]._areaDiff =
+                (i == 1 || result._freq[i - 1]._area == std::numeric_limits<double>::infinity())
+                ? result._freq[i]._area
+                : std::abs(result._freq[i]._area - result._freq[i - 1]._area);
+            maxAreaDiff = std::max(maxAreaDiff, result._freq[i]._areaDiff);
         }
     }
+
+    // Check that maxArea and maxAreaDiff have valid values.
+    uassert(8674811,
+            "maxArea cannot be a negative value.",
+            (result._freq.size() <= 1 || maxArea >= 0.0));
+    uassert(8674812,
+            "maxAreaDiff cannot be a negative value.",
+            (result._freq.size() <= 1 || maxAreaDiff >= 0.0));
 
     // Make sure last value is picked as a histogram bucket boundary.
     result._freq.back()._area = std::numeric_limits<double>::infinity();
-    // If maxArea is 0.0, it is because the last value is the only value in a type class. We need to
-    // give it an infinite area so we allocate a bucket for it.
-    const auto res = result.typeClassBounds.emplace(
-        result._freq.size() - 1,
-        maxArea == 0.0 ? std::numeric_limits<double>::infinity() : maxArea);
-    uassert(6660503, "There can't be duplicate type class bounds.", res.second);
+    result._freq.back()._areaDiff = std::numeric_limits<double>::infinity();
+
+    std::pair<double, double> valPair;
+    valPair.first = {maxArea == 0.0 ? std::numeric_limits<double>::infinity() : maxArea};
+    valPair.second = {maxAreaDiff == 0.0 ? std::numeric_limits<double>::infinity() : maxAreaDiff};
+    const auto res = result.typeClassBounds.emplace(result._freq.size(), valPair);
+
+    uassert(8674800, "There can't be duplicate type class bounds.", res.second);
 
     // Compute normalized areas.
-    size_t i = 0;
-    for (const auto& [endIdx, area] : result.typeClassBounds) {
-        // We ensure above that the area for the current type bracket is never 0.
-        tassert(7299703, str::stream() << "maximum area for type bracket is zero", area != 0.0);
-        // Iterate over all values in the current type bracket.
-        // Note: 'endIdx' is an inclusive index into result._freq.
-        for (; i <= endIdx; ++i) {
+    size_t beginIdx = 0;
+    for (const auto& [endIdx, areaInfo] : result.typeClassBounds) {
+        tassert(7299703,
+                str::stream() << "maximum area for type bracket is zero",
+                areaInfo.first != 0.0);
+        for (size_t i = beginIdx; i < endIdx; ++i) {
             if (std::isinf(result._freq[i]._area)) {
-                // We want to set type boundaries to have infinite normalized area to force them to
-                // be picked as buckets. We want them to be picked before the entry with the highest
-                // area for a type which has normalized area 1.0.
                 result._freq[i]._normArea = std::numeric_limits<double>::infinity();
             } else {
-                result._freq[i]._normArea = result._freq[i]._area / area;
+                result._freq[i]._normArea = result._freq[i]._area / areaInfo.first;
+            }
+            if (std::isinf(result._freq[i]._areaDiff)) {
+                result._freq[i]._normAreaDiff = std::numeric_limits<double>::infinity();
+            } else {
+                result._freq[i]._normAreaDiff = result._freq[i]._areaDiff / areaInfo.second;
             }
         }
+        beginIdx = endIdx;  // Normalize values of the next type.
     }
 
-    // std::cout << "Distribution sorted by value:\n"
-    //           << printDistribution(result, result._freq.size()) << "\n"
-    //           << std::flush;
+    uassert(8674813, "ValFreq contains invalid values", isValidValFreq(result._freq));
+
+    LOGV2(8674810,
+          "Distribution sorted by value",
+          "distribution"_attr = printDistribution(result, result._freq.size()));
 
     return result;
 }
 
-ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t numBuckets) {
+ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib,
+                                    size_t numBuckets,
+                                    SortArg sortArg) {
     if (dataDistrib._freq.empty()) {
         return ScalarHistogram::make();
     }
@@ -285,7 +360,7 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t 
                 numBuckets, numTypes),
             numBuckets >= numTypes);
 
-    std::vector<ValFreq> topKBuckets = generateTopKBuckets(dataDistrib, numBuckets);
+    std::vector<ValFreq> topKBuckets = generateTopKBuckets(dataDistrib, numBuckets, sortArg);
     uassert(6660504,
             "Must have bucket boundary on first value",
             topKBuckets[0]._idx == dataDistrib._freq[0]._idx);
@@ -326,7 +401,8 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t 
 }
 
 std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBEValue>& arrayData,
-                                                           size_t nBuckets) {
+                                                           size_t nBuckets,
+                                                           SortArg sortArg) {
     uassert(7120500, "A histogram must have at least one bucket.", nBuckets > 0);
 
     // Values that will be used as inputs to histogram generation code.
@@ -437,9 +513,9 @@ std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBE
     }
 
     // Lambda helper to construct histogram from an unsorted value vector.
-    const auto makeHistogram = [&nBuckets](std::vector<SBEValue>& values) {
+    const auto makeHistogram = [&nBuckets, sortArg](std::vector<SBEValue>& values) {
         sortValueVector(values);
-        return genMaxDiffHistogram(getDataDistribution(values), nBuckets);
+        return genMaxDiffHistogram(getDataDistribution(values), nBuckets, sortArg);
     };
 
     if (isScalar) {

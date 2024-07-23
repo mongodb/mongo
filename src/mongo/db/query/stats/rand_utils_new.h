@@ -96,26 +96,27 @@ public:
           _max((double)max) {}
 
     size_t operator()(std::mt19937_64& gen) override {
-        size_t result = std::round(_distr(gen));
+        double randNum = _distr(gen);
         size_t trials = 0;
         // If the result is outside the range (an event with low probability), try 10 more times to
         // get a number in the range.
-        while (!(result >= _min && result <= _max) && trials < 10) {
-            double randNum = _distr(gen);
+        while (!(randNum >= _min && randNum <= _max) && trials < 10) {
+            randNum = _distr(gen);
             if (randNum < _min) {
-                result = std::ceil(randNum);
+                randNum = std::ceil(randNum);
             } else if (randNum > _max) {
-                result = std::floor(randNum);
+                randNum = std::floor(randNum);
             } else {
-                result = std::round(randNum);
+                randNum = std::round(randNum);
             }
             ++trials;
         }
-        if (result < _min && result > _max) {
+        if (randNum < _min || randNum > _max) {
             // We couldn't generate a number in [min,max] within 10 attempts. Generate a uniform
             // number.
-            result = _backup(gen);
+            randNum = _backup(gen);
         }
+        size_t result = std::round(randNum);
         uassert(6660541, "Random index out of range", result >= _min && result <= _max);
         return result;
     }
