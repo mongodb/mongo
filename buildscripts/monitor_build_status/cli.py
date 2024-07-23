@@ -67,6 +67,11 @@ ACTIVE_BFS_QUERY = (
 )
 
 
+class ExitCode(Enum):
+    SUCCESS = 0
+    PREVIOUS_BUILD_STATUS_UNKNOWN = 1
+
+
 class BuildStatus(Enum):
     RED = "RED"
     YELLOW = "YELLOW"
@@ -128,7 +133,9 @@ class MonitorBuildStatusOrchestrator:
 
     def evaluate_build_redness(
         self, repo: str, branch: str, notify: bool, input_status_file: str, output_status_file: str
-    ) -> None:
+    ) -> ExitCode:
+        exit_code = ExitCode.SUCCESS
+
         status_message = f"\n`[STATUS]` '{repo}' repo '{branch}' branch"
         threshold_percentages = []
 
@@ -167,8 +174,34 @@ class MonitorBuildStatusOrchestrator:
                     content=input_file_content,
                 )
                 previous_build_status = BuildStatus.from_str(input_file_content)
+                if previous_build_status == BuildStatus.UNKNOWN:
+                    LOGGER.error(
+                        "Could not parse previous build status from the input build status file,"
+                        " the file was corrupted or contained unexpected string"
+                    )
         else:
             LOGGER.warning("Input status file is absent", file=input_status_file)
+            LOGGER.warning(
+                "The absence of input build status file is expected if the task is running for"
+                " the first time or for the first time after the file storage location is changed"
+            )
+
+        if previous_build_status == BuildStatus.UNKNOWN:
+            LOGGER.warning(
+                "We were not able to get the previous build status, which could lead to build status"
+                " being changed from RED to YELLOW, which should not happen, and/or summary messages"
+                " could be somewhat off"
+            )
+            LOGGER.warning(
+                "If we are in a YELLOW condition, there's different behavior to communicate if that"
+                " was previously GREEN (things are worse, but not RED yet), YELLOW (no change), or"
+                " RED (still RED but improving)"
+            )
+            LOGGER.warning(
+                "The state will still be reported, but may lose accuracy on specific actions to take"
+            )
+            exit_code = ExitCode.PREVIOUS_BUILD_STATUS_UNKNOWN
+
         current_build_status = BuildStatus.from_threshold_percentages(threshold_percentages)
         resulting_build_status, summary = self._summarize(
             previous_build_status, current_build_status, self._today_is_friday()
@@ -187,6 +220,8 @@ class MonitorBuildStatusOrchestrator:
 
         with open(output_status_file, "w") as output_file:
             output_file.write(resulting_build_status.value)
+
+        return exit_code
 
     def _make_bfs_report(self, evg_projects_info: EvgProjectsInfo) -> BFsReport:
         query = (
@@ -455,9 +490,10 @@ def main(
         jira_service=jira_service, evg_service=evg_service
     )
 
-    orchestrator.evaluate_build_redness(
+    exit_code = orchestrator.evaluate_build_redness(
         github_repo, branch, notify, input_status_file, output_status_file
     )
+    sys.exit(exit_code.value)
 
 
 if __name__ == "__main__":

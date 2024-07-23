@@ -1102,6 +1102,9 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "configure evergreen api credentials"
+      # Attempting to download build status file that was uploaded by previous run of this task
+      # `remote_file` location should match uploading file location in steps below
+      # `optional: true` is to pass this step when this task is running for the first time
       - command: s3.get
         params:
           aws_key: ${aws_key}
@@ -1110,6 +1113,7 @@ tasks:
           bucket: mciuploads
           local_file: src/input_build_status_file.txt
           optional: true
+      # The same as above but for patches for testing purposes
       - command: s3.get
         params:
           aws_key: ${aws_key}
@@ -1119,15 +1123,18 @@ tasks:
           local_file: src/input_build_status_file_testing.txt
           optional: true
       - command: subprocess.exec
+        type: test
         params:
           binary: bash
           args:
-            - "src/evergreen/monitor_build_status.sh"
+            - "src/evergreen/monitor_build_status_run.sh"
           env:
             JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
             JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
             JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
             JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
+      # Uploading build status file after each run of this task to be consumed by the next run
+      # `remote_file` location should match downloading file location in steps above
       - command: s3.put
         params:
           aws_key: ${aws_key}
@@ -1139,6 +1146,11 @@ tasks:
           content_type: text/plain
           display_name: Build Status Latest
           patchable: false
+      # The same as above but for patches for testing purposes to avoid overriding the file
+      # that is used on the waterfall runs
+      # However `remote_file` location could be changed here to intentionally override the file
+      # that is used on the waterfall from the patch in case of emergency, e.g. build status was
+      # evaluated incorrectly on the waterfall and incorrect status was uploaded on S3
       - command: s3.put
         params:
           aws_key: ${aws_key}
@@ -1148,8 +1160,14 @@ tasks:
           bucket: mciuploads
           permissions: public-read
           content_type: text/plain
-          display_name: Build Status Latest Testing
+          display_name: Build Status Latest Patch Testing
           patch_only: true
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/monitor_build_status_exit.sh"
 
   - name: monitor_mongo_fork_10gen
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]

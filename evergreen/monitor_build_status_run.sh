@@ -16,4 +16,7 @@ else
 fi
 
 echo "Verbatim monitor_build_status invocation: ${command_invocation}"
+set +o errexit
 eval "${command_invocation}"
+echo "$?" > monitor_build_status_command_exit_code.txt
+set -o errexit
