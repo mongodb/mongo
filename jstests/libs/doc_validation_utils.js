@@ -27,3 +27,11 @@ export function assertDocumentValidationFailure(res, coll) {
 export function assertDocumentValidationFailureCheckLogs(db) {
     checkLog.contains(db, '"codeName":"DocumentValidationFailure"');
 }
+
+/**
+ * Verifies that validation failed.
+ */
+export function assertFailsValidation(res) {
+    assert.writeError(res);
+    assert.eq(res.getWriteError().code, ErrorCodes.DocumentValidationFailure);
+}

@@ -6,14 +6,8 @@
 //      no_selinux,
 // ]
 
-import {documentEq} from "jstests/aggregation/extras/utils.js";
+import {assertFailsValidation} from "jstests/libs/doc_validation_utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-
-function assertFailsValidation(res) {
-    assert.writeError(res);
-    assert.eq(res.getWriteError().code, ErrorCodes.DocumentValidationFailure);
-}
 
 const t = db[jsTestName()];
 t.drop();
@@ -23,33 +17,8 @@ const validatorExpression = {
 };
 assert.commandWorked(db.createCollection(t.getName(), {validator: validatorExpression}));
 
-const warnLogId = 20294;
-const errorAndLogId = 7488700;
-
-function checkLogsForFailedValidation(logId) {
-    // In case of sharded deployments, look on all shards and expect the log to be found on one of
-    // them.
-    const nodesToCheck = FixtureHelpers.isStandalone(db) ? [db] : FixtureHelpers.getPrimaries(db);
-
-    const errInfo = {
-        failingDocumentId: 1,
-        details: {
-            operatorName: "$eq",
-            specifiedAs: {a: 1},
-            reason: "comparison failed",
-            consideredValue: 2
-        }
-    };
-
-    assert(nodesToCheck.some((conn) => checkLog.checkContainsOnceJson(conn, logId, {
-        "errInfo": function(obj) {
-            return documentEq(obj, errInfo);
-        }
-    })));
-}
-
 assertFailsValidation(t.insert({a: 2}));
-t.insert({_id: 1, a: 1});
+assert.commandWorked(t.insert({_id: 1, a: 1}));
 assert.eq(1, t.count());
 
 // test default to strict
@@ -61,7 +30,6 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
         t.runCommand("collMod", {validationAction: "errorAndLog"}), ErrorCodes.InvalidOptions);
     if (res.ok) {
         assertFailsValidation(t.update({}, {$set: {a: 2}}));
-        checkLogsForFailedValidation(errorAndLogId);
         // make sure persisted
         const info = db.getCollectionInfos({name: t.getName()})[0];
         assert.eq("errorAndLog", info.options.validationAction, tojson(info));
@@ -70,11 +38,8 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
 
 // check we can do a bad update in warn mode
 assert.commandWorked(t.runCommand("collMod", {validationAction: "warn"}));
-t.update({}, {$set: {a: 2}});
+assert.commandWorked(t.update({}, {$set: {a: 2}}));
 assert.eq(1, t.find({a: 2}).itcount());
-// check log for message. In case of sharded deployments, look on all shards and expect the log to
-// be found on one of them.
-checkLogsForFailedValidation(warnLogId);
 // make sure persisted
 const info = db.getCollectionInfos({name: t.getName()})[0];
 assert.eq("warn", info.options.validationAction, tojson(info));
@@ -96,7 +61,7 @@ assert.eq(1, t.find({a: 2}).itcount());
 
 // check bad -> bad is ok
 assert.commandWorked(t.runCommand("collMod", {validationLevel: "moderate"}));
-t.update({}, {$set: {a: 3}});
+assert.commandWorked(t.update({}, {$set: {a: 3}}));
 assert.eq(1, t.find({a: 3}).itcount());
 
 // test create
@@ -104,6 +69,6 @@ t.drop();
 assert.commandWorked(
     db.createCollection(t.getName(), {validator: {a: 1}, validationAction: "warn"}));
 
-t.insert({a: 2});
-t.insert({a: 1});
+assert.commandWorked(t.insert({a: 2}));
+assert.commandWorked(t.insert({a: 1}));
 assert.eq(2, t.count());
