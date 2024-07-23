@@ -105,6 +105,8 @@ assertNumEntries({
 // Force the logical session cache to reap, and verify that the config.transactions entry for
 // the internal transaction does not get reaped.
 assert.commandWorked(sessionsColl.remove({"_id.id": parentLsid.id}));
+// Wait for the delete to replicate to guarantee the reap below will see its effect.
+st.awaitReplicationOnShards();
 assert.commandWorked(shard0Primary.adminCommand({reapLogicalSessionCacheNow: 1}));
 assertNumEntries({
     sessionUUID: parentLsid.id,
