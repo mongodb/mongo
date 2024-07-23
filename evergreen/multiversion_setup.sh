@@ -63,11 +63,11 @@ if [ ! -z "${multiversion_architecture_44_or_later}" ]; then
 fi
 
 last_lts_arg="--installLastLTS"
+last_continuous_arg="--installLastContinuous"
+
 if [[ -n "${last_lts_evg_version_id}" ]]; then
   last_lts_arg="${last_lts_evg_version_id}"
 fi
-
-last_continuous_arg="--installLastContinuous"
 
 if [[ -n "${last_continuous_evg_version_id}" ]]; then
   last_continuous_arg="${last_continuous_evg_version_id}"
@@ -79,20 +79,8 @@ db-contrib-tool setup-repro-env \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --debug \
-  $last_continuous_arg 4.4
-
-if [ ! -z "${multiversion_platform_50_or_later}" ]; then
-  platform="${multiversion_platform_50_or_later}"
-fi
-
-db-contrib-tool setup-repro-env \
-  --installDir /data/install \
-  --linkDir /data/multiversion \
-  --edition $edition \
-  --platform $platform \
-  --architecture $architecture \
   --fallbackToMaster \
   --resmokeCmd "python buildscripts/resmoke.py" \
   --debug \
-  $last_lts_arg 5.0
+  $last_lts_arg \
+  $last_continuous_arg 4.4 5.0

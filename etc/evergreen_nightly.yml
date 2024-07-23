@@ -73,7 +73,6 @@ variables:
 
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
-  multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium
@@ -341,7 +340,6 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     large_distro_name: rhel80-build
     multiversion_platform: rhel80
-    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
   tasks:
