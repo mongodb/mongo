@@ -728,6 +728,14 @@ var $config = extendWorkload($config, function($config, $super) {
             // Inaccurate fast count is only expected when there is unclean shutdown.
             return TestData.runningWithShardStepdowns;
         }
+        // TODO SERVER-91030: Remove special handling of error code 7826507.
+        if (err.code == 7826507) {
+            print(
+                `Failed to analyze the shard key because the number of sampled documents is zero. ${
+                    tojsononeline(err)}`);
+            // This may be due to chunk migrations.
+            return true;
+        }
         if (err.code == ErrorCodes.IllegalOperation && err.errmsg &&
             err.errmsg.includes("monotonicity") && err.errmsg.includes("empty collection")) {
             print(`Failed to analyze the shard key because the fast count during the ` +
