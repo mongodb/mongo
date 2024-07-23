@@ -206,6 +206,15 @@ components:
     team_owner: "Query Optimization"
     # Note: This is a test-only library and not compiled into the server.
 
+  libbsoncxx:
+    homepage_url: https://github.com/mongodb/mongo-cxx-driver
+    open_hub_url: https://www.openhub.net/p/mongo-cxx-driver
+    release_monitoring_id: 6167
+    local_directory_path: enterprise/src/streams/third_party/mongocxx/dist/bsoncxx
+    team_owner: "Atlas Streams"
+    upgrade_suppression: TODO SERVER-90035
+    # Note: Not included in release builds of MongoDB, only used for Atlas Stream Processing.
+
   libmongocrypt:
     homepage_url: https://github.com/mongodb/libmongocrypt
     open_hub_url: N/A
@@ -221,6 +230,7 @@ components:
     local_directory_path: src/third_party/librdkafka
     team_owner: "Atlas Streams"
     upgrade_suppression: TODO SERVER-79507
+    # Note: Not included in release builds of MongoDB, only used for Atlas Stream Processing.
 
   linenoise:
     homepage_url: https://github.com/antirez/linenoise
@@ -252,6 +262,7 @@ components:
     release_monitoring_id: 10712
     local_directory_path: src/third_party/libbson
     team_owner: "Server Security"
+    # Note: Not included in release builds of MongoDB, only used for Atlas Stream Processing.
 
   mongo-cxx-driver:
     homepage_url: https://github.com/mongodb/mongo-cxx-driver
@@ -260,6 +271,7 @@ components:
     local_directory_path: enterprise/src/streams/third_party/mongocxx
     team_owner: "Atlas Streams"
     upgrade_suppression: TODO SERVER-90035
+    # Note: Not included in release builds of MongoDB, only used for Atlas Stream Processing.
 
   "Mozilla Firefox":
     homepage_url: https://www.mozilla.org/en-US/firefox/organizations/
