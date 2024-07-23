@@ -199,7 +199,7 @@ TEST_F(DbCheckClusteredCollectionTest, DbCheckIdRecordIdMismatch) {
         "" /* secondaryIndex */,
         false /* skipLookupForExtraKeys */,
         BSONValidateModeEnum::kExtended);
-    runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params);
+    ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
     // Shut down the health log writer so that the writes get flushed to the health log collection.
     auto service = getServiceContext();
     HealthLogInterface::get(service)->shutdown();

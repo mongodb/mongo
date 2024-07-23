@@ -96,6 +96,11 @@ export const logQueries = {
     primarySteppedDown: {
         severity: "warning",
         "msg": "abandoning dbCheck batch due to stepdown",
+    },
+    missingIdIndex: {
+        severity: "error",
+        operation: "dbCheckBatch",
+        "data.error": "IndexNotFound: dbCheck needs _id index",
     }
 };
 

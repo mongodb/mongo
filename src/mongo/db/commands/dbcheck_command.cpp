@@ -1727,6 +1727,7 @@ bool DbChecker::_shouldRetryDataConsistencyCheck(OperationContext* opCtx,
             "view with the identical name";
     } else if (code == ErrorCodes::IndexNotFound) {
         msg = "skipping dbCheck on collection because it is missing an _id index";
+        logError = true;
     } else if (code == ErrorCodes::ObjectIsBusy) {
         // This is a retryable error.
         isRetryableError = true;
