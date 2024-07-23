@@ -757,6 +757,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/serverless/shard_split_donor_service",
         "$BUILD_DIR/mongo/db/set_change_stream_state_coordinator",
         "$BUILD_DIR/mongo/db/stats/top",
+        "$BUILD_DIR/mongo/db/storage/durable_catalog",
         "$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util",
         "$BUILD_DIR/mongo/db/transaction/transaction_api",
         "$BUILD_DIR/mongo/executor/inline_executor",

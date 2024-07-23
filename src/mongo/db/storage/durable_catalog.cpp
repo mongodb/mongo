@@ -66,6 +66,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
@@ -73,6 +74,10 @@
 
 namespace mongo {
 namespace {
+
+// TODO SERVER-92655: Remove in 9.1
+MONGO_FAIL_POINT_DEFINE(createFeatureDoc);
+
 // Does not escape letters, digits, '.', or '_'.
 // Otherwise escapes to a '.' followed by a zero-filled 2- or 3-digit decimal number.
 // Note that this escape table does not produce a 1:1 mapping to and from dbname, and
@@ -202,11 +207,14 @@ std::string DurableCatalog::generateUniqueIdent(NamespaceString nss, const char*
 void DurableCatalog::init(OperationContext* opCtx) {
     // No locking needed since called single threaded.
     auto cursor = _rs->getCursor(opCtx);
+
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
 
         // For backwards compatibility where older version have a written feature document
         if (isFeatureDocument(obj)) {
+            // Cache the record ID for future removal.
+            _featureDocId = record->id;
             continue;
         }
 
@@ -338,6 +346,12 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_addEntry(
     StatusWith<RecordId> res = _rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp());
     if (!res.isOK())
         return res.getStatus();
+
+    // A test only failpoint that mimics creating and inserting a feature doc to test removal logic.
+    if (MONGO_unlikely(createFeatureDoc.shouldFail())) {
+        auto doc = BSON("isFeatureDoc" << true);
+        invariantStatusOK(_rs->insertRecord(opCtx, doc.objdata(), doc.objsize(), Timestamp()));
+    }
 
     stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
     invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
@@ -500,6 +514,14 @@ Status DurableCatalog::_removeEntry(OperationContext* opCtx, const RecordId& cat
     _catalogIdToEntryMap.erase(it);
 
     return Status::OK();
+}
+
+void DurableCatalog::removeFeatureDoc(OperationContext* opCtx) {
+    if (!_featureDocId) {
+        return;
+    }
+    _rs->deleteRecord(opCtx, *_featureDocId);
+    LOGV2_DEBUG(8583700, 1, "Removed feature document");
 }
 
 std::vector<std::string> DurableCatalog::getAllIdents(OperationContext* opCtx) const {

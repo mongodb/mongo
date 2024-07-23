@@ -297,6 +297,11 @@ public:
     Status dropCollection(OperationContext* opCtx, const RecordId& catalogId);
 
     /**
+     * Deletes the obsolete feature document (if present) identified by the cached '_featureDocId'.
+     */
+    void removeFeatureDoc(OperationContext* opCtx);
+
+    /**
      * Drops the provided ident and recreates it as empty for use in resuming an index build.
      */
     Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
@@ -372,6 +377,11 @@ private:
     RecordStore* _rs;  // not owned
     const bool _directoryPerDb;
     const bool _directoryForIndexes;
+
+    // Stores the feature document RecordId if present. This field gets set during startup recovery
+    // when iterating over the durable catalog. It remains boost::none if the feature document
+    // doesn't exist at startup.
+    boost::optional<RecordId> _featureDocId;
 
     // Protects '_rand' and '_next'.
     mutable Mutex _randLock = MONGO_MAKE_LATCH("DurableCatalogImpl::_rand");

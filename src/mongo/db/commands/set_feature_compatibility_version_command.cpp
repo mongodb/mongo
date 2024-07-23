@@ -114,6 +114,7 @@
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern.h"
@@ -1810,6 +1811,14 @@ private:
         if (role && role->has(ClusterRole::ConfigServer)) {
             ShardingCatalogManager::get(opCtx)->deleteMaxSizeMbFromShardEntries(opCtx);
         }
+
+        // TODO SERVER-92655: Remove in 9.1
+        WriteUnitOfWork wuow(opCtx);
+        // An untimestamped write here is safe as the feature document is completely unused. No
+        // readers read the key, so we don't care about the history of the document.
+        shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
+        DurableCatalog::get(opCtx)->removeFeatureDoc(opCtx);
+        wuow.commit();
     }
 };
 MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCommand).forShard();
