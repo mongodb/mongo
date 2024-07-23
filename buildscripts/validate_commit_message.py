@@ -70,10 +70,13 @@ def is_valid_commit(commit: Commit) -> bool:
         )
         return False
 
+    # Remove all whitespace from comparisons. GitHub line-wraps commit messages, which adds
+    # newline characters that otherwise would not match verbatim such banned strings.
+    stripped_message = "".join(commit.message.split())
     for banned_string in BANNED_STRINGS:
-        if banned_string in commit.message:
+        if "".join(banned_string.split()) in stripped_message:
             LOGGER.error(
-                "Commit contains banned string",
+                "Commit contains banned string (ignoring whitespace)",
                 banned_string=banned_string,
                 commit_hexsha=commit.hexsha,
                 commit_message=commit.message,

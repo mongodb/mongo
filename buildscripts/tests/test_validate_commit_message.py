@@ -59,6 +59,11 @@ class ValidateCommitMessageTest(unittest.TestCase):
                 binsha=b"deadbeefdeadbeefdead",
                 message="SERVER-123 asdf\nAnything in this description will be included in the commit message. Replace or delete this text before merging. Add links to testing in the comments of the PR.",
             ),  # Contains some banned strings
+            Commit(
+                repo=fake_repo,
+                binsha=b"deadbeefdeadbeefdead",
+                message="SERVER-123 asdf\nAnything\n\n in this description will be included in the commit message.\nReplace or delete this text before merging. Add links to testing in the\ncomments of the PR.",
+            ),  # Contains some banned strings with extra newlines
         ]
 
         self.assertTrue(all(is_valid_commit(message) == False for message in messages))
