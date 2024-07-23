@@ -14,6 +14,7 @@
  *   does_not_support_multiplanning_single_solutions,
  *   # Transactions do not support writes on capped collections
  *   does_not_support_transactions,
+ *   requires_capped,
  * ]
  */
 

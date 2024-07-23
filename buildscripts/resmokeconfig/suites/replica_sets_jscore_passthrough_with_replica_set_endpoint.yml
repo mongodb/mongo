@@ -88,6 +88,7 @@ selector:
     # is bootstrapped as a sharded cluster.
     - jstests/core/collation.js
     - jstests/core/ddl/capped_convertToCapped1.js
+    - jstests/core/replicate_record_ids/disallow_capped.js
     # TODO (SERVER-84243): Separate Shard-Role Catalog Cache and Loader.
     - jstests/core/txns/speculative_snapshot_includes_all_writes.js
     # TODO (SERVER-84329): renameCollection command against a collection with invalid views fails on
