@@ -5870,5 +5870,166 @@ TEST_F(TransactionRouterTest, TxnLevelShouldBePreservedWithNoCmdReadConcern) {
     ASSERT_EQ(Timestamp(20, 1), finalReadConcern.getArgsAfterClusterTime()->asTimestamp());
 }
 
+class TransactionRouterSnapshotReadConcern : public TransactionRouterTestWithDefaultSession {
+protected:
+    void runTest(boost::optional<Timestamp> atClusterTime) {
+        TxnNumber txnNum{3};
+        operationContext()->setTxnNumber(txnNum);
+        auto txnRouter = TransactionRouter::get(operationContext());
+
+        auto initializeReadConcern = [&](BSONObj cmdObj) {
+            repl::ReadConcernArgs readConcernArgs;
+            ASSERT_OK(readConcernArgs.initialize(cmdObj));
+            repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+        };
+
+        // Make the first command in the transaction specify "snapshot" readConcern with an
+        // "atClusterTime" if it is provided, and make it target shard1.
+        BSONObj firstCmdReadConcernObj;
+        BSONObj txnReadConcernObj;
+        if (atClusterTime) {
+            firstCmdReadConcernObj = BSON(
+                repl::ReadConcernArgs::kLevelFieldName
+                << "snapshot" << repl::ReadConcernArgs::kAtClusterTimeFieldName << *atClusterTime);
+            txnReadConcernObj = firstCmdReadConcernObj;
+        } else {
+            firstCmdReadConcernObj = BSON(repl::ReadConcernArgs::kLevelFieldName << "snapshot");
+            txnReadConcernObj =
+                firstCmdReadConcernObj.addFields(BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                                      << kInMemoryLogicalTime.asTimestamp()));
+        }
+        {
+            auto cmdObj = BSON("insert"
+                               << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                               << firstCmdReadConcernObj);
+            initializeReadConcern(cmdObj);
+            txnRouter.beginOrContinueTxn(
+                operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+
+            txnRouter.setDefaultAtClusterTime(operationContext());
+            auto actualCmdObj =
+                txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, cmdObj);
+            BSONObj expectedCmdObj =
+                BSON("insert"
+                     << "test"
+                     << "readConcern" << txnReadConcernObj
+                     << OperationSessionInfoFromClient::kStartTransactionFieldName << true
+                     << "coordinator" << true << "autocommit" << false << "txnNumber" << txnNum);
+            ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
+        }
+
+        // Make the second command in the transaction not specify a readConcern and make it target
+        // shard2.
+        {
+            auto cmdObj = BSON("update"
+                               << "test");
+            initializeReadConcern(cmdObj);
+            txnRouter.beginOrContinueTxn(
+                operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
+            txnRouter.setDefaultAtClusterTime(operationContext());
+            auto actualCmdObj =
+                txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, cmdObj);
+            BSONObj expectedCmdObj =
+                BSON("update"
+                     << "test"
+                     << "readConcern" << txnReadConcernObj
+                     << OperationSessionInfoFromClient::kStartTransactionFieldName << true
+                     << "autocommit" << false << "txnNumber" << txnNum);
+            ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
+        }
+
+        // Make the third command in the transaction specify "local" readConcern. It is expected to
+        // fail with InvalidOptions since only the first command in a transaction can specify a
+        // readConcern.
+        {
+            auto cmdObj = BSON("delete"
+                               << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                               << BSON(repl::ReadConcernArgs::kLevelFieldName << "local"));
+            initializeReadConcern(cmdObj);
+            ASSERT_THROWS_CODE(
+                txnRouter.beginOrContinueTxn(
+                    operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue),
+                DBException,
+                ErrorCodes::InvalidOptions);
+        }
+
+        // Make the fourth command in the transaction specify "snapshot" readConcern with the same
+        // "atClusterTime" as the first command. It is also expected to fail with InvalidOptions
+        // since only the first command in a transaction can specify a readConcern.
+        {
+            auto cmdObj = BSON("delete"
+                               << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                               << txnReadConcernObj);
+            initializeReadConcern(cmdObj);
+            ASSERT_THROWS_CODE(
+                txnRouter.beginOrContinueTxn(
+                    operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue),
+                DBException,
+                ErrorCodes::InvalidOptions);
+        }
+
+        // Make the fifth command in the transaction not specify a readConcern and make it target
+        // shard3.
+        {
+            auto cmdObj = BSON("delete"
+                               << "test");
+            initializeReadConcern(cmdObj);
+            txnRouter.beginOrContinueTxn(
+                operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
+            txnRouter.setDefaultAtClusterTime(operationContext());
+            auto actualCmdObj =
+                txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, cmdObj);
+            BSONObj expectedCmdObj =
+                BSON("delete"
+                     << "test"
+                     << "readConcern" << txnReadConcernObj
+                     << OperationSessionInfoFromClient::kStartTransactionFieldName << true
+                     << "autocommit" << false << "txnNumber" << txnNum);
+            ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
+        }
+
+        // Make the sixth command in the transaction not specify a readConcern and make it target
+        // shard1. It should not have "readConcern" or "startTransaction" attached.
+        {
+            auto cmdObj = BSON("delete"
+                               << "test");
+            initializeReadConcern(cmdObj);
+            txnRouter.beginOrContinueTxn(
+                operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
+            txnRouter.setDefaultAtClusterTime(operationContext());
+            auto actualCmdObj =
+                txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, cmdObj);
+            BSONObj expectedCmdObj = BSON("delete"
+                                          << "test"
+                                          << "autocommit" << false << "txnNumber" << txnNum);
+            ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
+        }
+    }
+};
+
+TEST_F(TransactionRouterSnapshotReadConcern,
+       SnapshotReadConcernWithAtClusterTimeGreaterThanVectorClockTime) {
+    auto atClusterTime = Timestamp(4, 1);
+    ASSERT_GREATER_THAN(atClusterTime, kInMemoryLogicalTime.asTimestamp());
+    runTest(atClusterTime);
+}
+
+TEST_F(TransactionRouterSnapshotReadConcern,
+       SnapshotReadConcernWithAtClusterTimeEqualToVectorClockTime) {
+    auto atClusterTime = kInMemoryLogicalTime.asTimestamp();
+    runTest(atClusterTime);
+}
+
+TEST_F(TransactionRouterSnapshotReadConcern,
+       SnapshotReadConcernWithAtClusterTimeLessThanVectorClockTime) {
+    auto atClusterTime = Timestamp(2, 1);
+    ASSERT_LESS_THAN(atClusterTime, kInMemoryLogicalTime.asTimestamp());
+    runTest(atClusterTime);
+}
+
+
+TEST_F(TransactionRouterSnapshotReadConcern, SnapshotReadConcernWithoutAtClusterTime) {
+    runTest(boost::none /* atClusterTime */);
+}
 }  // unnamed namespace
 }  // namespace mongo
