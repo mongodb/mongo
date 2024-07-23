@@ -265,8 +265,10 @@ buildvariants:
       # This builder excludes tests tagged with:
       # 1) exclude_when_record_ids_replicated: indicates that the test is particular about recordIdsReplicated:false
       # 2) disables_test_commands: this builder uses failpoints, and setting disables_test_commands means that the builder can't use failpoints.
-      # 3) serverless: Retryable writes on the serverless cause problems with recordIdsReplicated:true
+      # TODO (SERVER-89735): Possibly remove requires_capped.
+      # 3) requires_capped: capped collections don't interact well with recordIdsReplicated:true
+      # 4) serverless: Retryable writes on the serverless cause problems with recordIdsReplicated:true
       test_flags: >-
         --runAllFeatureFlagTests
-        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,exclude_when_record_ids_replicated,disables_test_commands,incompatible_with_atlas_environment,requires_ldap_pool
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,exclude_when_record_ids_replicated,disables_test_commands,requires_capped,incompatible_with_atlas_environment,requires_ldap_pool
         --mongodSetParameters="{'failpoint.overrideRecordIdsReplicatedDefault': {mode: 'alwaysOn'}, 'failpoint.automaticallyCollmodToRecordIdsReplicatedFalse': {mode: 'alwaysOn'}}"

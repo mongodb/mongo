@@ -4,4 +4,3 @@ eval:
 
 excludes:
   - "recordids_replicated.excluded_files"
-  - "recordids_replicated.excluded_tags"

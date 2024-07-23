@@ -181,8 +181,6 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         options.cappedSize = size;
         if (temp)
             options.temp = true;
-        // Capped collections cannot use recordIdsReplicated:true.
-        options.recordIdsReplicated = false;
 
         uassertStatusOK(createCollection(opCtx, toNss, options, BSONObj()));
     }

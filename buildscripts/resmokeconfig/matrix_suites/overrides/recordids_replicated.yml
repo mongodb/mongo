@@ -54,10 +54,3 @@
       - jstests/core/query/query_settings/query_settings_lost_update.js
       # The below test is incompatible with the set_recordids_replicated.js overrides.
       - jstests/core/**/create_indexes.js
-
-- name: excluded_tags
-  value:
-    exclude_with_any_tags:
-      # For capped collections the override ends up sending {capped: true, recordIdsReplicated:true}, which
-      # is invalid.
-      - requires_capped
