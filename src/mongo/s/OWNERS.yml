@@ -1,0 +1,26 @@
+version: 1.0.0
+filters:
+  - "*analyze_shard_key*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*move*collection*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*move*primary*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*move*range*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*refine_collection_shard_key*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*reshard*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*transaction*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*unshard*collection*":
+    approvers:
+      - 10gen/server-cluster-scalability

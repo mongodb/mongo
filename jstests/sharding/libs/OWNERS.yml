@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  - "chunk_bounds_util.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "update_shard_key_helpers.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "zone_changes_util.js":
+    approvers:
+      - 10gen/server-cluster-scalability

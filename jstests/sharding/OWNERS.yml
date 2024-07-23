@@ -1,0 +1,32 @@
+version: 1.0.0
+filters:
+  - "*fsync_lock*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*chunk_migration*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*migration_coordinator*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*range*deleter*":
+    approvers:
+      - "10gen/server-cluster-scalability"
+  - "*range*deletion*":
+    approvers:
+      - "10gen/server-cluster-scalability"
+  - "*retryable_write*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*transaction*":
+    approvers:
+      - "10gen/server-cluster-scalability"
+  - "*txn*":
+    approvers:
+      - "10gen/server-cluster-scalability"
+  - "*_with_id_without_shard_key*":
+    approvers:
+      - "10gen/server-cluster-scalability"
+  - "*zone*":
+    approvers:
+      - "10gen/server-cluster-scalability"

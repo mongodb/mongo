@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  - "coordinate_multi_update*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "pause_migrations_during_multi_update*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "write_without_shard_key*":
+    approvers:
+      - 10gen/server-cluster-scalability

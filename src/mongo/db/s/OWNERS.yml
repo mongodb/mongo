@@ -1,0 +1,41 @@
+version: 1.0.0
+filters:
+  - "*active_migrations_registry*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*analyze_shard_key*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_*cmd_d*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "migration*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*move_primary*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*move_range*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*range*deleter*":
+    approvers:
+      - "10gen/server-cluster-scalability"
+  - "*range*deletion*":
+    approvers:
+      - "10gen/server-cluster-scalability"
+  - "*refine_collection_shard_key*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*reshard*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "session_catalog_migration*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*transaction*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*txn*":
+    approvers:
+      - 10gen/server-cluster-scalability

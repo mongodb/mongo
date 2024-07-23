@@ -1,8 +1,20 @@
 version: 1.0.0
 filters:
+  - "*global*index*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "server_status.js":
     approvers:
       - 10gen/server-service-architecture
   - "server_status_with_time_out_cursors.js":
     approvers:
       - 10gen/server-service-architecture
+  - "*transaction*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*txn*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*write_without_shard_key*":
+    approvers:
+      - 10gen/server-cluster-scalability

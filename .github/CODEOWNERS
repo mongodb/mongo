@@ -57,6 +57,7 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/hooks/OWNERS.yml
 /buildscripts/resmokelib/testing/hooks/**/*
+/buildscripts/resmokelib/testing/hooks/**/analyze_shard_key.py @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./buildscripts/tracing_profiler/OWNERS.yml
 /buildscripts/tracing_profiler/**/* @10gen/query
@@ -76,9 +77,28 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./etc/evergreen_yml_components/variants/mongot/OWNERS.yml
 /etc/evergreen_yml_components/variants/mongot/**/* @TedTuckman @madelinezec
 
+# The following patterns are parsed from ./jstests/OWNERS.yml
+/jstests/**/*analyze_shard_key* @10gen/server-cluster-scalability
+/jstests/**/*move*chunk* @10gen/server-cluster-scalability
+/jstests/**/*moveChunk* @10gen/server-cluster-scalability
+/jstests/**/*move*collection* @10gen/server-cluster-scalability
+/jstests/**/*move*primary* @10gen/server-cluster-scalability
+/jstests/**/*movePrimary* @10gen/server-cluster-scalability
+/jstests/**/*move*range* @10gen/server-cluster-scalability
+/jstests/**/*refine_collection_shard_key* @10gen/server-cluster-scalability
+/jstests/**/*reshard* @10gen/server-cluster-scalability
+/jstests/**/*unshard*collection* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_libs/OWNERS.yml
+/jstests/concurrency/fsm_libs/**/reshard_collection_util.js @10gen/server-cluster-scalability
+
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/OWNERS.yml
+/jstests/concurrency/fsm_workloads/**/*global*index* @10gen/server-cluster-scalability
 /jstests/concurrency/fsm_workloads/**/server_status.js @10gen/server-service-architecture
 /jstests/concurrency/fsm_workloads/**/server_status_with_time_out_cursors.js @10gen/server-service-architecture
+/jstests/concurrency/fsm_workloads/**/*transaction* @10gen/server-cluster-scalability
+/jstests/concurrency/fsm_workloads/**/*txn* @10gen/server-cluster-scalability
+/jstests/concurrency/fsm_workloads/**/*write_without_shard_key* @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./jstests/core/OWNERS.yml
 /jstests/core/**/connection_string_validation.js @10gen/server-service-architecture
@@ -91,8 +111,18 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./jstests/fail_point/OWNERS.yml
 /jstests/fail_point/**/* @10gen/server-service-architecture
 
+# The following patterns are parsed from ./jstests/hooks/OWNERS.yml
+/jstests/hooks/**/run_analyze_shard_key_background.js @10gen/server-cluster-scalability
+
 # The following patterns are parsed from ./jstests/httpinterface/OWNERS.yml
 /jstests/httpinterface/**/network_options.js @10gen/server-service-architecture
+
+# The following patterns are parsed from ./jstests/multiVersion/OWNERS.yml
+/jstests/multiVersion/**/migration* @10gen/server-cluster-scalability
+/jstests/multiVersion/**/rs_endpoint* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./jstests/noPassthrough/rs_endpoint/OWNERS.yml
+/jstests/noPassthrough/rs_endpoint/**/* @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./jstests/noPassthroughWithMongod/OWNERS.yml
 /jstests/noPassthroughWithMongod/**/connections_opened.js @10gen/server-service-architecture
@@ -104,8 +134,40 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/noPassthroughWithMongod/**/ftdc_params.js @10gen/server-service-architecture
 /jstests/noPassthroughWithMongod/**/log_component_helpers.js @10gen/server-service-architecture
 
+# The following patterns are parsed from ./jstests/sharding/OWNERS.yml
+/jstests/sharding/**/*fsync_lock* @10gen/server-cluster-scalability
+/jstests/sharding/**/*chunk_migration* @10gen/server-cluster-scalability
+/jstests/sharding/**/*migration_coordinator* @10gen/server-cluster-scalability
+/jstests/sharding/**/*range*deleter* @10gen/server-cluster-scalability
+/jstests/sharding/**/*range*deletion* @10gen/server-cluster-scalability
+/jstests/sharding/**/*retryable_write* @10gen/server-cluster-scalability
+/jstests/sharding/**/*transaction* @10gen/server-cluster-scalability
+/jstests/sharding/**/*txn* @10gen/server-cluster-scalability
+/jstests/sharding/**/*_with_id_without_shard_key* @10gen/server-cluster-scalability
+/jstests/sharding/**/*zone* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./jstests/sharding/analyze_shard_key/OWNERS.yml
+/jstests/sharding/analyze_shard_key/**/* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./jstests/sharding/internal_txns/OWNERS.yml
+/jstests/sharding/internal_txns/**/* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./jstests/sharding/libs/OWNERS.yml
+/jstests/sharding/libs/**/chunk_bounds_util.js @10gen/server-cluster-scalability
+/jstests/sharding/libs/**/update_shard_key_helpers.js @10gen/server-cluster-scalability
+/jstests/sharding/libs/**/zone_changes_util.js @10gen/server-cluster-scalability
+
 # The following patterns are parsed from ./jstests/sharding/load_balancer_support/OWNERS.yml
 /jstests/sharding/load_balancer_support/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./jstests/sharding/migration_blocking_operation/OWNERS.yml
+/jstests/sharding/migration_blocking_operation/**/* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./jstests/sharding/resharding_timeseries/OWNERS.yml
+/jstests/sharding/resharding_timeseries/**/* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./jstests/sharding/updateOne_without_shard_key/OWNERS.yml
+/jstests/sharding/updateOne_without_shard_key/**/* @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./jstests/watchdog/OWNERS.yml
 /jstests/watchdog/**/* @10gen/server-service-architecture
@@ -131,10 +193,15 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/OWNERS.yml
 /src/mongo/db/**/fts @10gen/query-integration
 /src/mongo/db/**/geo @10gen/query-integration
+/src/mongo/db/**/*global_index* @10gen/server-cluster-scalability
 /src/mongo/db/**/*index_build* @10gen/server-storage-execution
+/src/mongo/db/**/keys_collection* @10gen/server-cluster-scalability
 /src/mongo/db/**/profile_* @10gen/query-integration
 /src/mongo/db/**/record_id* @10gen/server-storage-execution
+/src/mongo/db/**/replica_set_endpoint* @10gen/server-cluster-scalability
 /src/mongo/db/**/repair* @10gen/server-rss-sydney @10gen/server-storage-execution
+/src/mongo/db/**/*transaction* @10gen/server-cluster-scalability
+/src/mongo/db/**/*txn* @10gen/server-cluster-scalability
 /src/mongo/db/**/ttl* @10gen/server-storage-execution
 /src/mongo/db/**/service_entry_point_shard_role* @10gen/server-service-architecture
 
@@ -210,6 +277,38 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/query/**/query_shape @10gen/query-integration
 /src/mongo/db/query/**/timeseries @10gen/query-integration
 
+# The following patterns are parsed from ./src/mongo/db/s/OWNERS.yml
+/src/mongo/db/s/**/*active_migrations_registry* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*analyze_shard_key* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/cluster_*cmd_d* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/migration* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*move_primary* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*move_range* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*range*deleter* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*range*deletion* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*refine_collection_shard_key* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*reshard* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/session_catalog_migration* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*transaction* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*txn* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./src/mongo/db/s/config/OWNERS.yml
+/src/mongo/db/s/config/**/*chunk_migration_command* @10gen/server-cluster-scalability
+/src/mongo/db/s/config/**/*transition_from_dedicated* @10gen/server-cluster-scalability
+/src/mongo/db/s/config/**/*transition_to_dedicated* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./src/mongo/db/s/global_index/OWNERS.yml
+/src/mongo/db/s/global_index/**/* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./src/mongo/db/s/metrics/OWNERS.yml
+/src/mongo/db/s/metrics/**/* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./src/mongo/db/s/migration_blocking_operation/OWNERS.yml
+/src/mongo/db/s/migration_blocking_operation/**/* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./src/mongo/db/s/resharding/OWNERS.yml
+/src/mongo/db/s/resharding/**/* @10gen/server-cluster-scalability
+
 # The following patterns are parsed from ./src/mongo/db/sorter/OWNERS.yml
 /src/mongo/db/sorter/**/* @10gen/server-storage-execution
 
@@ -257,6 +356,36 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/rpc/OWNERS.yml
 /src/mongo/rpc/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/s/OWNERS.yml
+/src/mongo/s/**/*analyze_shard_key* @10gen/server-cluster-scalability
+/src/mongo/s/**/*move*collection* @10gen/server-cluster-scalability
+/src/mongo/s/**/*move*primary* @10gen/server-cluster-scalability
+/src/mongo/s/**/*move*range* @10gen/server-cluster-scalability
+/src/mongo/s/**/*refine_collection_shard_key* @10gen/server-cluster-scalability
+/src/mongo/s/**/*reshard* @10gen/server-cluster-scalability
+/src/mongo/s/**/*transaction* @10gen/server-cluster-scalability
+/src/mongo/s/**/*unshard*collection* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./src/mongo/s/commands/OWNERS.yml
+/src/mongo/s/commands/**/document_shard_key* @10gen/server-cluster-scalability
+/src/mongo/s/commands/**/*fsync_unlock* @10gen/server-cluster-scalability
+/src/mongo/s/commands/**/*transition_from_dedicated* @10gen/server-cluster-scalability
+/src/mongo/s/commands/**/*transition_to_dedicated* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./src/mongo/s/migration_blocking_operation/OWNERS.yml
+/src/mongo/s/migration_blocking_operation/**/* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./src/mongo/s/request_types/OWNERS.yml
+/src/mongo/s/request_types/**/coordinate_multi_update.idl @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./src/mongo/s/resharding/OWNERS.yml
+/src/mongo/s/resharding/**/* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./src/mongo/s/write_ops/OWNERS.yml
+/src/mongo/s/write_ops/**/coordinate_multi_update* @10gen/server-cluster-scalability
+/src/mongo/s/write_ops/**/pause_migrations_during_multi_update* @10gen/server-cluster-scalability
+/src/mongo/s/write_ops/**/write_without_shard_key* @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./src/mongo/scripting/OWNERS.yml
 /src/mongo/scripting/**/dbdirectclient_factory.* @10gen/server-service-architecture

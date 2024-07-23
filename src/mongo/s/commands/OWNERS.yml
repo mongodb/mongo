@@ -1,0 +1,14 @@
+version: 1.0.0
+filters:
+  - "document_shard_key*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*fsync_unlock*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*transition_from_dedicated*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*transition_to_dedicated*":
+    approvers:
+      - 10gen/server-cluster-scalability

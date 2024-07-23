@@ -6,19 +6,34 @@ filters:
   - "geo":
     approvers:
       - 10gen/query-integration
+  - "*global_index*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "*index_build*":
     approvers:
       - 10gen/server-storage-execution
+  - "keys_collection*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "profile_*":
     approvers:
       - 10gen/query-integration
   - "record_id*":
     approvers:
       - 10gen/server-storage-execution
+  - "replica_set_endpoint*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "repair*":
     approvers:
       - 10gen/server-storage-execution
       - 10gen/server-rss-sydney
+  - "*transaction*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*txn*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "ttl*":
     approvers:
       - 10gen/server-storage-execution
