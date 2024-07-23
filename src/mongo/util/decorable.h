@@ -395,8 +395,9 @@ private:
     }
 
     OwningPointer _makeData() {
-        auto alignment = _reg().bufferAlignment();
-        auto sz = _reg().bufferSize();
+        auto& reg = _reg();
+        auto alignment = reg.bufferAlignment();
+        auto sz = reg.bufferSize();
         auto rawBuffer =
             static_cast<unsigned char*>(::operator new(sz, std::align_val_t(alignment)));
         std::memset(rawBuffer, 0, sz);
