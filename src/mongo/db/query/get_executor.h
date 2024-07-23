@@ -136,8 +136,8 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
                                   bool strictDistinctOnly);
 
 /**
- * Attempts to get an executor that uses a DISTINCT_SCAN, intended for either a "distinct" command
- * or an aggregation pipeline that uses a $group stage with distinct-like semantics. If a
+ * Attempts to get a query solution that uses a DISTINCT_SCAN, intended for either a "distinct"
+ * command or an aggregation pipeline that uses a $group stage with distinct-like semantics. If a
  * DISTINCT_SCAN cannot be created for the given arguments, returns
  * ErrorCodes::NoQueryExecutionPlans.
  *
@@ -157,11 +157,20 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * documents for the original [10, 11] and 12 values. Thus, the latter would use the
  * STRICT_DISTINCT_ONLY option to preserve the arrays.
  */
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorDistinct(
+StatusWith<std::unique_ptr<QuerySolution>> tryGetQuerySolutionForDistinct(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
-    CanonicalDistinct& canonicalDistinct,
+    const CanonicalQuery& canonicalQuery,
     bool flipDistinctScanDirection = false);
+
+/**
+ * Get a PlanExecutor for a query solution that includes a DISTINCT_SCAN.
+ */
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
+    const MultipleCollectionAccessor& collections,
+    size_t plannerOptions,
+    std::unique_ptr<CanonicalQuery> canonicalQuery,
+    std::unique_ptr<QuerySolution> soln);
 
 /*
  * Get a PlanExecutor for a query executing as part of a count command.

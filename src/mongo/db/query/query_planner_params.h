@@ -194,7 +194,7 @@ struct QueryPlannerParams {
      */
     struct ArgsForDistinct {
         OperationContext* opCtx;
-        const CanonicalDistinct& canonicalDistinct;
+        const CanonicalQuery& canonicalQuery;
         const MultipleCollectionAccessor& collections;
         size_t plannerOptions;
         bool flipDistinctScanDirection;

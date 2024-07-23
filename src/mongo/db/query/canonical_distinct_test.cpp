@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/canonical_distinct.h"
+#include "mongo/db/query/parsed_distinct_command.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/rpc/op_msg.h"
@@ -98,9 +99,10 @@ std::unique_ptr<ParsedDistinctCommand> bsonToParsedDistinct(
 TEST_F(CanonicalDistinctTest, ConvertToAggregationNoQuery) {
     auto rawCmd = fromjson("{distinct: 'testcoll', key: 'x', $db: 'testdb'}");
     auto pdc = bsonToParsedDistinct(expCtx, rawCmd);
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
+    auto canonicalQuery =
+        parsed_distinct_command::parseCanonicalQuery(expCtx, std::move(pdc), nullptr);
 
-    auto agg = cd.asAggregationCommand();
+    auto agg = parsed_distinct_command::asAggregation(*canonicalQuery);
     ASSERT_OK(agg);
 
     auto cmdObj = OpMsgRequestBuilder::create(
@@ -138,9 +140,10 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationNoQuery) {
 TEST_F(CanonicalDistinctTest, ConvertToAggregationDottedPathNoQuery) {
     auto rawCmd = fromjson("{distinct: 'testcoll', key: 'x.y.z', $db: 'testdb'}");
     auto pdc = bsonToParsedDistinct(expCtx, rawCmd);
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
+    auto canonicalQuery =
+        parsed_distinct_command::parseCanonicalQuery(expCtx, std::move(pdc), nullptr);
 
-    auto agg = cd.asAggregationCommand();
+    auto agg = parsed_distinct_command::asAggregation(*canonicalQuery);
     ASSERT_OK(agg);
 
     auto cmdObj = OpMsgRequestBuilder::create(
@@ -192,8 +195,9 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithAllOptions) {
                        << "maxTimeMS" << 100 << "$db"
                        << "testdb");
     auto pdc = bsonToParsedDistinct(expCtx, rawCmd);
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
-    auto agg = cd.asAggregationCommand();
+    auto canonicalQuery =
+        parsed_distinct_command::parseCanonicalQuery(expCtx, std::move(pdc), nullptr);
+    auto agg = parsed_distinct_command::asAggregation(*canonicalQuery);
     ASSERT_OK(agg);
 
     auto cmdObj = OpMsgRequestBuilder::create(
@@ -239,9 +243,10 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithAllOptions) {
 TEST_F(CanonicalDistinctTest, ConvertToAggregationWithQuery) {
     auto rawCmd = fromjson("{distinct: 'testcoll', key: 'y', query: {z: 7}, $db: 'testdb'}");
     auto pdc = bsonToParsedDistinct(expCtx, rawCmd);
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
+    auto canonicalQuery =
+        parsed_distinct_command::parseCanonicalQuery(expCtx, std::move(pdc), nullptr);
 
-    auto agg = cd.asAggregationCommand();
+    auto agg = parsed_distinct_command::asAggregation(*canonicalQuery);
     ASSERT_OK(agg);
 
     auto cmdObj = OpMsgRequestBuilder::create(
@@ -280,9 +285,10 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithQuery) {
 TEST_F(CanonicalDistinctTest, ExplainNotIncludedWhenConvertingToAggregationCommand) {
     auto rawCmd = fromjson("{distinct: 'testcoll', key: 'x', $db: 'testdb'}");
     auto pdc = bsonToParsedDistinct(expCtx, rawCmd);
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
+    auto canonicalQuery =
+        parsed_distinct_command::parseCanonicalQuery(expCtx, std::move(pdc), nullptr);
 
-    auto agg = cd.asAggregationCommand();
+    auto agg = parsed_distinct_command::asAggregation(*canonicalQuery);
     ASSERT_OK(agg);
 
     ASSERT_FALSE(agg.getValue().hasField("explain"));

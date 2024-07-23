@@ -510,6 +510,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/window_function:window_function_integral.h",
         "//src/mongo/db/pipeline/window_function:window_function_statement.h",
         "//src/mongo/db/pipeline/window_function:window_function_sum.h",
+        "//src/mongo/db/query:canonical_distinct.h",
         "//src/mongo/db/query:canonical_query.h",
         "//src/mongo/db/query:canonical_query_encoder.h",
         "//src/mongo/db/query:cursor_response_gen",

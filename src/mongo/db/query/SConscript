@@ -59,6 +59,7 @@ env.Library(
         "$BUILD_DIR/mongo/crypto/encrypted_field_config",
         "$BUILD_DIR/mongo/db/cst/cst",
         "$BUILD_DIR/mongo/db/query_expressions",
+        "canonical_distinct",
         "collation/collator_factory_interface",
         "collation/collator_interface",
         "projection_ast",
@@ -151,6 +152,20 @@ env.Library(
 )
 
 env.Library(
+    target="canonical_distinct",
+    source=[
+        "canonical_distinct.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query_expressions",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/server_base",
+    ],
+)
+
+env.Library(
     target="bucket_predicate_generator",
     source=[
         "timeseries/bucket_spec.cpp",
@@ -170,7 +185,6 @@ env.Library(
 env.Library(
     target="query_common",
     source=[
-        "canonical_distinct.cpp",
         "explain_common.cpp",
         "find_common.cpp",
     ],

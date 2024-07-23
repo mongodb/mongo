@@ -105,12 +105,13 @@
 namespace mongo {
 namespace {
 
-CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const BSONObj& cmdObj,
-                                   const ExtensionsCallback& extensionsCallback,
-                                   const CollatorInterface* defaultCollator,
-                                   boost::optional<ExplainOptions::Verbosity> verbosity) {
+std::unique_ptr<CanonicalQuery> parseDistinctCmd(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const ExtensionsCallback& extensionsCallback,
+    const CollatorInterface* defaultCollator,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto vts = auth::ValidatedTenancyScope::get(opCtx);
     const auto serializationContext = vts.has_value()
         ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
@@ -138,7 +139,8 @@ CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,
     expCtx->setQuerySettingsIfNotPresent(
         query_settings::lookupQuerySettingsForDistinct(expCtx, *parsedDistinct, nss));
 
-    return CanonicalDistinct::parse(std::move(expCtx), std::move(parsedDistinct));
+    return parsed_distinct_command::parseCanonicalQuery(std::move(expCtx),
+                                                        std::move(parsedDistinct));
 }
 
 BSONObj prepareDistinctForPassthrough(const BSONObj& cmd, const query_settings::QuerySettings& qs) {
@@ -213,9 +215,8 @@ public:
                    rpc::ReplyBuilderInterface* result) const override {
         const BSONObj& cmdObj = opMsgRequest.body;
         const NamespaceString nss(parseNs(opMsgRequest.parseDbName(), cmdObj));
-        auto canonicalDistinct = parseDistinctCmd(
+        auto canonicalQuery = parseDistinctCmd(
             opCtx, nss, cmdObj, ExtensionsCallbackNoop(), nullptr /* defaultCollator */, verbosity);
-        auto canonicalQuery = canonicalDistinct.getQuery();
         auto targetingQuery = canonicalQuery->getQueryObj();
         auto targetingCollation = canonicalQuery->getFindCommandRequest().getCollation();
 
@@ -241,8 +242,11 @@ public:
                 boost::none /*letParameters*/,
                 boost::none /*runtimeConstants*/);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-            runDistinctOnView(
-                opCtx, canonicalDistinct, *ex.extraInfo<ResolvedView>(), verbosity, bodyBuilder);
+            runDistinctOnView(opCtx,
+                              std::move(canonicalQuery),
+                              *ex.extraInfo<ResolvedView>(),
+                              verbosity,
+                              bodyBuilder);
             return Status::OK();
         }
 
@@ -266,13 +270,12 @@ public:
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         const NamespaceString nss(parseNs(dbName, cmdObj));
-        auto canonicalDistinct = parseDistinctCmd(opCtx,
-                                                  nss,
-                                                  cmdObj,
-                                                  ExtensionsCallbackNoop(),
-                                                  nullptr /* defaultCollator */,
-                                                  boost::none /* verbosity */);
-        auto canonicalQuery = canonicalDistinct.getQuery();
+        auto canonicalQuery = parseDistinctCmd(opCtx,
+                                               nss,
+                                               cmdObj,
+                                               ExtensionsCallbackNoop(),
+                                               nullptr /* defaultCollator */,
+                                               boost::none /* verbosity */);
         auto query = canonicalQuery->getQueryObj();
         auto collation = canonicalQuery->getFindCommandRequest().getCollation();
 
@@ -306,7 +309,7 @@ public:
                 true /* eligibleForSampling */);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             runDistinctOnView(opCtx,
-                              canonicalDistinct,
+                              std::move(canonicalQuery),
                               *ex.extraInfo<ResolvedView>(),
                               boost::none /* verbosity */,
                               result);
@@ -363,25 +366,27 @@ public:
     }
 
     void runDistinctOnView(OperationContext* opCtx,
-                           const CanonicalDistinct& canonicalDistinct,
+                           std::unique_ptr<CanonicalQuery> canonicalQuery,
                            const ResolvedView& resolvedView,
                            boost::optional<ExplainOptions::Verbosity> verbosity,
                            BSONObjBuilder& bob) const {
-        const auto& nss = canonicalDistinct.getQuery()->nss();
+        const auto& nss = canonicalQuery->nss();
         const auto& dbName = nss.dbName();
         const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
         const auto viewAggCmd =
             OpMsgRequestBuilder::create(
-                vts, dbName, uassertStatusOK(canonicalDistinct.asAggregationCommand()))
+                vts,
+                dbName,
+                uassertStatusOK(parsed_distinct_command::asAggregation(*canonicalQuery)))
                 .body;
         auto viewAggRequest = aggregation_request_helper::parseFromBSON(
             viewAggCmd,
             vts,
             verbosity,
-            canonicalDistinct.getQuery()->getFindCommandRequest().getSerializationContext());
+            canonicalQuery->getFindCommandRequest().getSerializationContext());
 
         // Propagate the query settings with the request to the shards if present.
-        const auto& querySettings = canonicalDistinct.getQuery()->getExpCtx()->getQuerySettings();
+        const auto& querySettings = canonicalQuery->getExpCtx()->getQuerySettings();
         if (!query_settings::utils::isDefault(querySettings)) {
             viewAggRequest.setQuerySettings(querySettings);
         }

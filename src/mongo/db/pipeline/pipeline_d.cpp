@@ -1124,11 +1124,13 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         return {swCq.getStatus()};
     }
 
+    auto cq = std::move(swCq.getValue());
+
     // If the pipeline is not eligible for distinct executor, returns the CanonicalQuery so that we
     // can create a non-distinct executor. We don't want to lose the work done inside
     // createCanonicalQuery()
     if (!rewrittenGroupStage) {
-        return StatusWith{std::move(swCq.getValue())};
+        return StatusWith{std::move(cq)};
     }
 
     std::size_t plannerOpts = QueryPlannerParams::DEFAULT;
@@ -1136,7 +1138,7 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
 
-    CanonicalDistinct canonicalDistinct(std::move(swCq.getValue()), rewrittenGroupStage->groupId());
+    cq->setDistinct(CanonicalDistinct(rewrittenGroupStage->groupId()));
 
     // If the GroupFromFirst transformation was generated for the $last or $bottom case, we will
     // need to flip the direction of any generated DISTINCT_SCAN to preserve the semantics of
@@ -1152,13 +1154,22 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
     // 2) Non-strict parameter would allow use of multikey indexes for DISTINCT_SCAN, which
     //    means that for {a: [1, 2]} two distinct values would be returned, but for group keys
     //    arrays shouldn't be traversed.
-    StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> swExecutorGrouped =
-        tryGetExecutorDistinct(collections,
-                               plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
-                               canonicalDistinct,
-                               flipDistinctScanDirection);
+    auto swQuerySolution =
+        tryGetQuerySolutionForDistinct(collections,
+                                       plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                                       *cq,
+                                       flipDistinctScanDirection);
+    if (swQuerySolution.isOK()) {
+        auto swExecutorGrouped =
+            getExecutorDistinct(collections,
+                                plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                                std::move(cq),
+                                std::move(swQuerySolution.getValue()));
+        if (!swExecutorGrouped.isOK()) {
+            return swExecutorGrouped.getStatus().withContext(
+                "Failed to determine whether query system can provide a DISTINCT_SCAN grouping");
+        }
 
-    if (swExecutorGrouped.isOK()) {
         pipeline->popFrontWithName(rewrittenGroupStage->originalStageName());
 
         boost::intrusive_ptr<DocumentSource> groupTransform(
@@ -1171,16 +1182,16 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         return StatusWith{std::move(swExecutorGrouped.getValue())};
     }
 
-    if (swExecutorGrouped != ErrorCodes::NoQueryExecutionPlans) {
-        return swExecutorGrouped.getStatus().withContext(
+    if (swQuerySolution != ErrorCodes::NoQueryExecutionPlans) {
+        return swQuerySolution.getStatus().withContext(
             "Failed to determine whether query system can provide a DISTINCT_SCAN grouping");
     }
 
     // Couldn't find a viable distinct executor for the query. This is not a final failure because
-    // it's possible to generate a non-distinct executor and so, returns Status::OK() with the
+    // it's possible to generate a non-distinct executor and so we return Status::OK() with the
     // CanonicalQuery. We return the CanonicalQuery since we don't want to lose the work done inside
     // createCanonicalQuery().
-    auto cq = canonicalDistinct.releaseQuery();
+
     // Non-empty sortPattern can be returned only from the case of $group with $top or $bottom, when
     // the 'sortPattern' is artificially added to leverage the DISTINCT_SCAN inside
     // createCanonicalQuery() though there is no $sort stage. Now given that we can't generate a

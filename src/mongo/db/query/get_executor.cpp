@@ -2170,11 +2170,10 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
 
 namespace {
 
-std::unique_ptr<QuerySolution> createDistinctScanSolution(
-    const CanonicalDistinct& canonicalDistinct,
-    const QueryPlannerParams& plannerParams,
-    bool flipDistinctScanDirection) {
-    const auto& canonicalQuery = *canonicalDistinct.getQuery();
+std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& canonicalQuery,
+                                                          const QueryPlannerParams& plannerParams,
+                                                          bool flipDistinctScanDirection) {
+    const CanonicalDistinct& canonicalDistinct = *canonicalQuery.getDistinct();
     if (canonicalQuery.getFindCommandRequest().getFilter().isEmpty() &&
         !canonicalQuery.getSortPattern()) {
         // If a query has neither a filter nor a sort, the query planner won't attempt to use an
@@ -2243,25 +2242,26 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(
 }
 }  // namespace
 
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorDistinct(
+StatusWith<std::unique_ptr<QuerySolution>> tryGetQuerySolutionForDistinct(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
-    CanonicalDistinct& canonicalDistinct,
+    const CanonicalQuery& canonicalQuery,
     bool flipDistinctScanDirection) {
+    tassert(9245500, "Expected distinct property on CanonicalQuery", canonicalQuery.getDistinct());
+
     const auto& collectionPtr = collections.getMainCollection();
     if (!collectionPtr) {
         // The caller should create EOF plan for the appropriate engine.
         return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
     }
 
-    const auto& canonicalQuery = *canonicalDistinct.getQuery();
     auto* opCtx = canonicalQuery.getExpCtx()->opCtx;
 
     auto getQuerySolution = [&](size_t options) -> std::unique_ptr<QuerySolution> {
         auto plannerParams =
             std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForDistinct{
                 opCtx,
-                canonicalDistinct,
+                canonicalQuery,
                 collections,
                 options,
                 flipDistinctScanDirection,
@@ -2272,7 +2272,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
             return nullptr;
         }
         return createDistinctScanSolution(
-            canonicalDistinct, *plannerParams, flipDistinctScanDirection);
+            canonicalQuery, *plannerParams, flipDistinctScanDirection);
     };
     auto soln = getQuerySolution(plannerOptions);
     if (!soln) {
@@ -2283,19 +2283,30 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
         return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
     }
 
-    // Convert the solution into an executable tree.
+    return {std::move(soln)};
+}
+
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
+    const MultipleCollectionAccessor& collections,
+    size_t plannerOptions,
+    std::unique_ptr<CanonicalQuery> canonicalQuery,
+    std::unique_ptr<QuerySolution> soln) {
+    tassert(9245501, "Expected distinct property on CanonicalQuery", canonicalQuery->getDistinct());
+
+    const auto& collectionPtr = collections.getMainCollection();
+    auto* opCtx = canonicalQuery->getExpCtx()->opCtx;
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     auto collPtrOrAcq = collections.getMainCollectionPtrOrAcquisition();
     auto&& root = stage_builder::buildClassicExecutableTree(
-        opCtx, collPtrOrAcq, canonicalQuery, *soln, ws.get());
+        opCtx, collPtrOrAcq, *canonicalQuery, *soln, ws.get());
 
-    auto cq = canonicalDistinct.releaseQuery();
-    LOGV2_DEBUG(20932, 2, "Using fast distinct", "query"_attr = redact(cq->toStringShort()));
+    LOGV2_DEBUG(
+        20932, 2, "Using fast distinct", "query"_attr = redact(canonicalQuery->toStringShort()));
 
     // Stop the query planning timer once we have an execution plan.
     CurOp::get(opCtx)->stopQueryPlanningTimer();
 
-    return plan_executor_factory::make(std::move(cq),
+    return plan_executor_factory::make(std::move(canonicalQuery),
                                        std::move(ws),
                                        std::move(root),
                                        collPtrOrAcq,

@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/distinct_command_gen.h"
 
@@ -73,6 +74,19 @@ std::unique_ptr<ParsedDistinctCommand> parse(
     std::unique_ptr<DistinctCommandRequest> distinctCommand,
     const ExtensionsCallback& extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures);
+
+/**
+ * Convert the canonical query with a distinct field into an aggregation command.
+ */
+StatusWith<BSONObj> asAggregation(const CanonicalQuery& query);
+
+/**
+ * Convert the parsed distinct command into a canonical query with a distinct field.
+ */
+std::unique_ptr<CanonicalQuery> parseCanonicalQuery(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::unique_ptr<ParsedDistinctCommand> parsedDistinct,
+    const CollatorInterface* defaultCollator = nullptr);
 
 }  // namespace parsed_distinct_command
 }  // namespace mongo

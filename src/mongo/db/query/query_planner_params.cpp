@@ -566,9 +566,9 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
     std::vector<IndexEntry> indices;
 
     auto* opCtx = distinctArgs.opCtx;
-    const auto& canonicalQuery = *distinctArgs.canonicalDistinct.getQuery();
+    const auto& canonicalQuery = distinctArgs.canonicalQuery;
     const auto& query = canonicalQuery.getFindCommandRequest().getFilter();
-    const auto& key = distinctArgs.canonicalDistinct.getKey();
+    const auto& key = canonicalQuery.getDistinct()->getKey();
     const auto& collectionPtr = distinctArgs.collections.getMainCollection();
 
     // If the caller did not request a "strict" distinct scan then we may choose a plan which
@@ -648,7 +648,7 @@ QueryPlannerParams::QueryPlannerParams(QueryPlannerParams::ArgsForDistinct&& dis
     }
 
     mainCollectionInfo.indexes = getIndexEntriesForDistinct(distinctArgs);
-    const auto& canonicalQuery = *distinctArgs.canonicalDistinct.getQuery();
+    const auto& canonicalQuery = distinctArgs.canonicalQuery;
     applyQuerySettingsOrIndexFiltersForMainCollection(canonicalQuery, distinctArgs.collections);
 
     // If there exists an index filter, we ignore all hints. Else, we only keep the index specified

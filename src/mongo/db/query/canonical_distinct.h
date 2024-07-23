@@ -41,9 +41,7 @@
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/parsed_distinct_command.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/uuid.h"
@@ -67,26 +65,10 @@ public:
     static const char kUnwoundArrayFieldForViewUnwind[];
     static const char kHintField[];
 
-    CanonicalDistinct(std::unique_ptr<CanonicalQuery> query,
-                      const std::string key,
+    CanonicalDistinct(const std::string key,
                       const bool mirrored = false,
                       const boost::optional<UUID> sampleId = boost::none)
-        : _query(std::move(query)),
-          _key(std::move(key)),
-          _mirrored(std::move(mirrored)),
-          _sampleId(std::move(sampleId)) {}
-
-    const CanonicalQuery* getQuery() const {
-        return _query.get();
-    }
-
-    /**
-     * Releases ownership of the canonical query to the caller.
-     */
-    std::unique_ptr<CanonicalQuery> releaseQuery() {
-        invariant(_query.get());
-        return std::move(_query);
-    }
+        : _key(std::move(key)), _mirrored(std::move(mirrored)), _sampleId(std::move(sampleId)) {}
 
     const std::string& getKey() const {
         return _key;
@@ -100,17 +82,6 @@ public:
         return _mirrored;
     }
 
-    /**
-     * Convert this CanonicalDistinct into an aggregation command object.
-     */
-    StatusWith<BSONObj> asAggregationCommand() const;
-
-
-    static CanonicalDistinct parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   std::unique_ptr<ParsedDistinctCommand> parsedDistinct,
-                                   const CollatorInterface* defaultCollator = nullptr);
-
-
     static boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         OperationContext* opCtx,
         const NamespaceString& nss,
@@ -119,8 +90,6 @@ public:
         boost::optional<ExplainOptions::Verbosity> verbosity = boost::none);
 
 private:
-    std::unique_ptr<CanonicalQuery> _query;
-
     // The field for which we are getting distinct values.
     const std::string _key;
 
