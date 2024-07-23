@@ -211,28 +211,3 @@ tasks:
     vars:
       exec_timeout_secs: 3600
       use_large_distro: "true"
-
-- <<: *benchmark_template
-  name: benchmarks_streams
-  tags: ["assigned_to_jira_team_streams", "experimental", "benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run benchmark tests"
-    vars:
-      suites: benchmarks_streams
-      exec_timeout_secs: 18000  # 5 hour timeout.
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: streams
-  tags: ["assigned_to_jira_team_streams", "default"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: streams_kafka
-  tags: ["assigned_to_jira_team_streams", "experimental"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"

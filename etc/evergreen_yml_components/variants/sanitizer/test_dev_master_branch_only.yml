@@ -254,8 +254,6 @@ buildvariants:
   - name: server_selection_json_test
     distros:
     - rhel8.8-xlarge
-  - name: streams
-  - name: streams_kafka
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl

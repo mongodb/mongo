@@ -1000,8 +1000,6 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
-  - name: streams
-  - name: streams_kafka
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl

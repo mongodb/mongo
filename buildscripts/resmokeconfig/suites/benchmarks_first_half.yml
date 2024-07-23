@@ -58,9 +58,6 @@ selector:
   - build/install/bin/sbe_expression_bm*
   # These benchmarks are being run as part of the benchmarks_abt.yml test suite.
   - build/install/bin/abt_translation_bm*
-  # These benchmarks are being run as part of the benchmarks_streams.yml test suite.
-  - build/install/bin/streams_operator_dag_bm*
-  - build/install/bin/streams_window_operator_bm*
   # These benchmarks are only run when modifying or upgrading the immutable library.
   - build/install/bin/immutable_absl_comparison_bm*
   - build/install/bin/immutable_std_comparison_bm*
