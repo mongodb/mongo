@@ -6,7 +6,7 @@ include:
 variables:
 # Template for perf-tasks
 - &perf-tasks-template
-  batchtime: 360 # 6 hours
+  batchtime: 1440 # 1 day
   expansions: &ubuntu2004-perf-tests-expansions-template
     additional_env_vars: export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_BUILDDIR/test/utility/"
     ENABLE_TCMALLOC: 1
@@ -84,14 +84,17 @@ buildvariants:
   expansions:
     ENABLE_TCMALLOC: 0
     database: WTCodeStatisticsDB
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
-    - name: coverage-report
+    - name: coverage-report-python
+      distros: ubuntu2004-arm64-large
+    - name: coverage-report-other
       distros: ubuntu2004-arm64-large
     - name: coverage-report-per-test
       distros: ubuntu2004-arm64-large
       activate: false # Launch only manually for now
     - name: coverage-report-catch2
+    - name: generate-coverage-report
     - name: cyclomatic-complexity
     - name: code-change-report
 

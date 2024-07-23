@@ -18,8 +18,7 @@ test/evergreen/find_cmake.sh
 echo "Disk usage and free space for the current drive (pre-test):"
 df -h .
 
-# Create directories for 8 builds and the output data
-mkdir build_0 build_1 build_2 build_3 build_4 build_5 build_6 build_7
+# Create the output data directory.
 mkdir -p coverage_data
 mkdir -p coverage_report
 
@@ -61,7 +60,7 @@ if [ "${is_patch}" = true ]; then
   ls -l coverage_report
   echo "cat coverage_report/diff.txt"
   cat coverage_report/diff.txt
-  python3 test/evergreen/code_change_report/per_test_code_coverage_report.py -v -c coverage_data -d coverage_report/diff.txt -m coverage_report/metrixpp.csv
+  python3 test/evergreen/code_change_report/per_test_code_coverage_report.py -c coverage_data -d coverage_report/diff.txt -m coverage_report/metrixpp.csv
 fi
 
 tar -czf coverage_report/coverage_data.tar.gz coverage_data

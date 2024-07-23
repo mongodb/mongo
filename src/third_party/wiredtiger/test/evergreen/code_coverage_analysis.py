@@ -102,7 +102,7 @@ def main():
     parser.add_argument('-o', '--outfile', help='Path of the file to write test output to')
     parser.add_argument('-c', '--coverage_type',
                         help='Type of the coverage report to generate, component_coverage to generate component level coverage(by default the coverage type is overall)')
-    parser.add_argument('-t', '--time', required=True, help='Path to the timing data file')
+    parser.add_argument('-t', '--time', help='Path to the timing data file')
     parser.add_argument('-v', '--verbose', action="store_true", help='be verbose')
     args = parser.parse_args()
 
@@ -128,12 +128,13 @@ def main():
 
     print("Branch coverage = {}%".format(branch_coverage))
 
-    delta_secs = read_timing_data(args.time)
-    delta_mins = delta_secs / 60.0
-    code_coverage_per_min = branch_coverage / delta_mins
-    print("Time taken: {} seconds".format(delta_secs))
+    if (args.time):
+        delta_secs = read_timing_data(args.time)
+        delta_mins = delta_secs / 60.0
+        code_coverage_per_min = branch_coverage / delta_mins
+        print("Time taken: {} seconds".format(delta_secs))
 
-    print("Code coverage rate = {:.2f}%/min".format(code_coverage_per_min))
+        print("Code coverage rate = {:.2f}%/min".format(code_coverage_per_min))
 
 
 if __name__ == '__main__':

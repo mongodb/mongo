@@ -18,7 +18,7 @@
   ],
   "setup_actions" : [
     "cmake -DHAVE_UNITTEST=1 -DHAVE_DIAGNOSTIC=0 -DCODE_COVERAGE_MEASUREMENT=1 -DINLINE_FUNCTIONS_INSTEAD_OF_MACROS=1 -DCMAKE_BUILD_TYPE=Coverage -G Ninja ../.",
-    "ninja -j 2",
+    "ninja -j 16",
     "mkdir WT_HOME_COVERAGE",
     "examples/c/ex_hello/ex_hello",
     "./wt -h WT_HOME_COVERAGE load -j -f ../test/evergreen/code_coverage/test_table.json"
