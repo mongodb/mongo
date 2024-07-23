@@ -3,12 +3,8 @@ import json
 import os
 import sys
 import jsonschema
-import retry
-import urllib.request
 
-CYCLONEDX_VERSION = 1.5
-# json schema for CycloneDX sbom files
-SCHEMA_URL = f"https://cyclonedx.org/schema/bom-{CYCLONEDX_VERSION}.schema.json"
+SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
 # directory to scan for third party libraries
 THIRD_PARTY_DIR = os.path.join("src", "third_party")
 # platform independent prefix of third party libraries
@@ -25,9 +21,8 @@ MISSING_EVIDENCE_ERROR = "component must include an 'evidence.occurrences' field
 MISSING_TEAM_ERROR = "component must include a 'internal:team_responsible' property."
 
 
-@retry.retry(tries=3, delay=5)
 def get_schema():
-    with urllib.request.urlopen(SCHEMA_URL) as schema_data:
+    with open(SCHEMA_LOCATION, "r") as schema_data:
         return json.load(schema_data)
 
 
@@ -47,7 +42,7 @@ def lint_sbom(input_file: str, output_file: str, third_party_libs: set,
     try:
         jsonschema.validate(sbom, get_schema())
     except jsonschema.ValidationError as error:
-        errors.append(f"sbom.json file did not match the CycloneDX schema from {SCHEMA_URL}")
+        errors.append(f"{input_file} file did not match the CycloneDX schema")
         errors.append(error.message)
         return errors
 

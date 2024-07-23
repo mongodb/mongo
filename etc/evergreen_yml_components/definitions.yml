@@ -3328,27 +3328,26 @@ tasks:
       targets: lint-pylinters
 
 ## lint ##
-# TODO: DEVPROD-9047 Enable after the issue with getting third party file is resolved
-# - name: lint_sbom
-#   tags: ["lint"]
-#   commands:
-#   - command: timeout.update
-#     params:
-#       # 40 minutes
-#       exec_timeout_secs: 2400
-#   - *f_expansions_write
-#   - command: manifest.load
-#   - func: "git get project and add git tag"
-#   - *f_expansions_write
-#   - *kill_processes
-#   - *cleanup_environment
-#   - func: "set up venv"
-#   - command: subprocess.exec
-#     params:
-#       binary: bash
-#       args:
-#       - "src/evergreen/run_python_script.sh"
-#       - "buildscripts/sbom_linter.py"
+- name: lint_sbom
+  tags: ["lint"]
+  commands:
+  - command: timeout.update
+    params:
+      # 40 minutes
+      exec_timeout_secs: 2400
+  - *f_expansions_write
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - func: "set up venv"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/sbom_linter.py"
 
 - name: lint_sconslinters
   tags: ["lint"]
