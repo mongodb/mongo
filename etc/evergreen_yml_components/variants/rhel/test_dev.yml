@@ -239,6 +239,7 @@ buildvariants:
       - name: .multi_shard
       - name: .query_fuzzer
       - name: query_golden_classic
+      - name: query_golden_sharding
       - name: .random_multiversion_ds
       - name: .read_only
       - name: .read_write_concern !.large

@@ -113,6 +113,7 @@ buildvariants:
       - name: jsCore_txns_large_txns_format
       - name: json_schema
       - name: query_golden_classic
+      - name: query_golden_sharding
       - name: libunwind_tests
       - name: .multi_shard
       - name: multi_stmt_txn_jscore_passthrough_with_migration_gen

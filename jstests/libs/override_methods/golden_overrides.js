@@ -22,3 +22,7 @@ globalThis.print = (() => {
         return original(...args);
     };
 })();
+
+// Initialize `printGolden` to have the same behavior as `print`. This is needed to utilize markdown
+// support (i.e. pretty_md.js) in this golden test suite.
+globalThis.printGolden = globalThis.print;

@@ -16,7 +16,7 @@ executor:
       crashOnInvalidBSONError: ""
       objcheck: ""
       eval: |
-        // Keep in sync with query_golden_cqf.yml.
+        // Keep in sync with query_golden_*.yml.
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
         await import("jstests/libs/override_methods/golden_overrides.js");
         import {beginGoldenTest} from "jstests/libs/begin_golden_test.js";
