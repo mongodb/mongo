@@ -147,7 +147,11 @@ function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilt
 
     // Preload the collection metadata to avoid repeating the insert command if it fails due to
     // StaleConfig error.
-    assert.commandWorked(db.adminCommand({_flushRoutingTableCacheUpdates: kNs}));
+    // TODO SERVER-78909: Remove soonRetryOnAcceptableErrors when backported.
+    assert.soonRetryOnAcceptableErrors(() => {
+        assert.commandWorked(db.adminCommand({_flushRoutingTableCacheUpdates: kNs}));
+        return true;
+    }, ErrorCodes.InvalidOptions);
 
     const insertCmdObj = {
         insert: kCollName,
