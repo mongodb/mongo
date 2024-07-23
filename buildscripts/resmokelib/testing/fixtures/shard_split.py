@@ -143,6 +143,8 @@ class ShardSplitFixture(interface.MultiClusterFixture):
         # the donor to initiate which may take a long time.
         for fixture in self.fixtures:
             fixture.await_ready()
+            if _is_replica_set_fixture(fixture):
+                fixture.await_cluster_time_signing_keys()
 
     def _do_teardown(self, mode=None):
         """Shut down the replica sets."""

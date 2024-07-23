@@ -92,6 +92,7 @@ class MultiReplicaSetFixture(interface.MultiClusterFixture):
         # Wait for each of the replica sets
         for replica_set in self.replica_sets:
             replica_set.await_ready()
+            replica_set.await_cluster_time_signing_keys()
         if self.persist_connection_strings:
             docs = [
                 {"_id": i, "connectionString": replica_set.get_driver_connection_url()}
