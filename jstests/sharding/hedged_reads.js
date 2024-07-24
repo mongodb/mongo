@@ -1,5 +1,10 @@
 /**
  * Tests hedging metrics in the serverStatus output.
+ * @tags: [
+ *    # This test is known to be racey due to implementation of hedged reads (SERVER-65329).
+ *    # Disable windows testing as this feature is deprecated in v8.0.
+ *    incompatible_with_windows_tls,
+ * ]
  */
 (function() {
 "use strict";
