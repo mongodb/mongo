@@ -272,12 +272,13 @@ def _filter_successful_tasks(evg_api: RetryingEvergreenApi,
 
         # Only set the compile task if there isn't one already, otherwise
         # newer tasks like "archive_dist_test_debug" take precedence.
+        # Use `get_execution_or_self` to prevent grabbing an unfinished restarted executed task.
         if evg_task.display_name in ("compile", "archive_dist_test") and compile_task is None:
-            compile_task = evg_task
+            compile_task = evg_task.get_execution_or_self(0)
         elif evg_task.display_name == "push":
-            push_task = evg_task
+            push_task = evg_task.get_execution_or_self(0)
         elif evg_task.display_name == "archive_dist_test_debug":
-            archive_symbols_task = evg_task
+            archive_symbols_task = evg_task.get_execution_or_self(0)
         if compile_task and push_task and archive_symbols_task:
             break
 
