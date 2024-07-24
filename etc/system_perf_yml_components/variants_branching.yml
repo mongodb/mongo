@@ -30,7 +30,7 @@ variables:
     depends_on:
       - name: package_new_compile
         variant: amazon2-arm64-compile
-      - name: compile_mongocrypt_shlib
+      - name: crypt_create_lib
         variant: amazon2-arm64-mongocrypt-shlib-compile
 
   - &al2023_arm64_compile_variant_dependency
@@ -320,7 +320,8 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
-      requires_mongocrypt_shlib: true
+      shlib_compile_variant: amazon2-arm64-mongocrypt-shlib-compile
+      mongocrypt_shlib_required: true
     run_on:
       - "rhel94-perf-shard-lite"
     tasks:

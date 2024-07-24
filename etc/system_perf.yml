@@ -131,6 +131,8 @@ modules:
 pre:
   - func: "f_other_pre_ops"
   - func: "f_dsi_pre_run"
+  - func: "get version expansions"
+  - func: "apply version expansions"
 post:
   - func: "f_dsi_post_run"
   - func: "f_other_post_ops"
@@ -620,48 +622,6 @@ functions:
         display_name: mongodb${compile_variant|}.tar.gz
   ###
 
-  ###
-  # Compile mongo_crypt_v1 shared library
-  compile mongocrypt shlib:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          source "${workdir}/compile_venv/bin/activate"
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} $extra_args SPLIT_DWARF=0 archive-mongo-crypt-dev MONGO_VERSION=${version} DESTDIR=$(pwd)/crypt-lib-${version} PKGDIR=$(pwd) ${patch_compile_flags|}
-            # Put all matching mongo .debug from the build directory in an archive in the same location
-            # as the library archive (i.e. lib).
-            tar czvf mongo-crypt-dev-debugsymbols.tar.gz $(find ./build/cached -name mongo\*.debug -type f) --xform 's:^.*/:lib/:'
-          else
-            python buildscripts/download_sys_perf_binaries.py -v ${reuse_compile_from} -b ${build_variant} -u ${evergreen_api_user} -k ${evergreen_api_key}
-            mv binary.tar.gz mongo-crypt-dev.tgz
-          fi
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mongo-crypt-dev.tgz
-        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongo_crypt_shared_v1-${compile_variant|}-${version_id}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        display_name: mongo_crypt_shared_v1-${version|}-${compile_variant|}.tgz
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mongo-crypt-dev-debugsymbols.tar.gz
-        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongo_crypt_shared_v1-${compile_variant|}-${version_id}-debugsymbols.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        optional: true
-        display_name: mongo_crypt_shared_v1-debugsymbols.tgz
-  ###
-
 tasks:
   - name: package_new_compile
     commands:
@@ -678,16 +638,6 @@ tasks:
       - func: "download jstests"
       - func: "package binary"
       - func: "upload binary"
-
-  - name: compile_mongocrypt_shlib
-    commands:
-      - command: manifest.load
-      - command: git.get_project
-        params:
-          directory: src
-      - func: "compile prep"
-      - func: "get engflow creds perf"
-      - func: "compile mongocrypt shlib"
 
 buildvariants:
   - name: task_generation
@@ -768,7 +718,7 @@ buildvariants:
     run_on:
       - amazon2-arm64-xlarge
     tasks:
-      - name: compile_mongocrypt_shlib
+      - name: .crypt
 
   - name: amazon2-x86-streams-compile
     display_name: "* Compile Streams for Amazon Linux 2 x86"

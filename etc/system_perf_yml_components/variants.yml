@@ -28,7 +28,7 @@ variables:
   depends_on:
   - name: package_new_compile
     variant: amazon2-arm64-compile
-  - name: compile_mongocrypt_shlib
+  - name: crypt_create_lib
     variant: amazon2-arm64-mongocrypt-shlib-compile
 
 - &al2023_arm64_compile_variant_dependency
