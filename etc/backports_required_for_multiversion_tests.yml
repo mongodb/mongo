@@ -367,6 +367,8 @@ last-continuous:
     ticket: SERVER-90485
   - test_file: jstests/aggregation/group_by_objectid.js
     ticket: SERVER-90173
+  - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
+    ticket: SERVER-86674
   suites: null
 last-lts:
   all:
@@ -782,4 +784,6 @@ last-lts:
     ticket: SERVER-90485
   - test_file: jstests/aggregation/group_by_objectid.js
     ticket: SERVER-90173
+  - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
+    ticket: SERVER-86674
   suites: null
