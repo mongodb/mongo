@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/aggregation/bugs/lookup_using_hashed_index.js
+    ticket: SERVER-92668
   - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
     ticket: SERVER-88885
   - test_file: jstests/replsets/dbcheck_fails_on_write_concern_error.js
@@ -542,6 +544,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/aggregation/bugs/lookup_using_hashed_index.js
+    ticket: SERVER-92668
   - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
     ticket: SERVER-88885
   - test_file: jstests/replsets/dbcheck_fails_on_write_concern_error.js

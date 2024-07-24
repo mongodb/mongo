@@ -123,6 +123,10 @@ struct CoreIndexInfo {
         std::string disambiguator;
     } identifier;
 
+    // Describes the keys of this index. Each BSONElement in 'keyPattern' describes one key part.
+    // Its name is the path to the field indexed by this part, and its value is the type of indexing
+    // done on that field, e.g. double 1.0/-1.0 for ascending/descending or string "hashed" for
+    // hashing.
     BSONObj keyPattern;
 
     const MatchExpression* filterExpr;
