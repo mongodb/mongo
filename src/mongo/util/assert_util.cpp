@@ -55,7 +55,11 @@ void logScopedDebugInfo() {
     auto diagStack = scopedDebugInfoStack().getAll();
     if (diagStack.empty())
         return;
-    LOGV2_FATAL_CONTINUE(4106400, "ScopedDebugInfo", "scopedDebugInfo"_attr = diagStack);
+    LOGV2_FATAL_OPTIONS(
+        4106400,
+        logv2::LogOptions(logv2::FatalMode::kContinue, logv2::LogTruncation::Disabled),
+        "ScopedDebugInfo",
+        "scopedDebugInfo"_attr = diagStack);
 }
 
 /**
