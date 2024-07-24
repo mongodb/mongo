@@ -49,6 +49,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/update/storage_validation.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -93,6 +94,13 @@ public:
                     << query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName,
                 !request().getCommandParameter()
                      [query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName]);
+
+            {
+                bool ignore;
+                mutablebson::Document mutableUpdate(request().getCommandParameter());
+                storage_validation::scanDocument(mutableUpdate, false, true, &ignore);
+            }
+
             static auto impl = getSetClusterParameterImpl(service);
             impl(opCtx,
                  request(),

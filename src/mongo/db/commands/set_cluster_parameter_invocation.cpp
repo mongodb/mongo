@@ -49,6 +49,7 @@
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/update/storage_validation.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -154,6 +155,15 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     }
 
     BSONObj update = updateBuilder.obj();
+
+    // Validate that serialized update is validate replacement update document by calling the same
+    // document validation function as the update stage.
+    {
+        bool ignore;
+        mutablebson::Document mutableUpdate(update);
+        storage_validation::scanDocument(mutableUpdate, false, true, &ignore);
+    }
+
     BSONObj query = queryBuilder.obj();
 
     if (!skipValidation) {
