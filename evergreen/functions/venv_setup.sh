@@ -38,6 +38,7 @@ mkdir -p $poetry_dir
 export POETRY_CONFIG_DIR="$poetry_dir/config"
 export POETRY_DATA_DIR="$poetry_dir/data"
 export POETRY_CACHE_DIR="$poetry_dir/cache"
+export PIP_CACHE_DIR="$poetry_dir/pip_cache"
 for i in {1..5}; do
   $POETRY_VENV_PYTHON -m pip install -vvv "poetry==1.5.1" ${EXTRA_IBM_ARGS} && RET=0 && break || RET=$? && sleep 1
   echo "Python failed to install poetry, retrying..."
@@ -130,6 +131,21 @@ done
 if [ $RET -ne 0 ]; then
   echo "Poetry install error for full venv"
   exit $RET
+fi
+
+# poetry will install cryptography in an isolated build environment
+# to conform to pep517, however this doesn't work for the old cryptography
+# version on these platforms, and ends up not building required shared libraries.
+# Here we go behing poetry's back and install with pip
+if uname -a | grep -q 's390x\|ppc64le'; then
+  for i in {1..5}; do
+    python -m pip uninstall -y cryptography==2.3 || true
+    python -m pip install cryptography==2.3 && RET=0 && break || RET=$? && sleep 1
+  done
+  if [ $RET -ne 0 ]; then
+    echo "cryptography install error for full venv"
+    exit $RET
+  fi
 fi
 
 cd ..
