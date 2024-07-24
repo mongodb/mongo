@@ -1208,6 +1208,28 @@ TEST_F(IngressAsioNetworkingBatonTest, RunUntilProperlyTimesout) {
     ASSERT(state == Waitable::TimeoutState::Timeout);
 }
 
+TEST_F(IngressAsioNetworkingBatonTest, CancelTimerAfterDetach) {
+    bool continuationRan = false;
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton()->networking();
+
+    auto timer = makeDummyTimer();
+    baton->waitUntil(*timer, Date_t::max())
+        .getAsync([baton, timer = std::move(timer), &continuationRan](Status status) {
+            ASSERT_THAT(
+                status,
+                unittest::match::StatusIs(unittest::match::Eq(ErrorCodes::ShutdownInProgress),
+                                          unittest::match::Any()));
+            ASSERT_FALSE(baton->cancelTimer(*timer));
+            continuationRan = true;
+        });
+
+    // opCtx destruction will detach the baton, which will forcibly cancel the timer and run its
+    // continuation inline.
+    opCtx = {};
+    ASSERT(continuationRan);
+}
+
 TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveTimerWhileInPoll) {
     auto opCtx = client().makeOperationContext();
     Notification<bool> cancelTimerResult;
