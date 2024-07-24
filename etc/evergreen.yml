@@ -8736,7 +8736,7 @@ buildvariants:
 - name: macos
   display_name: macOS
   run_on:
-  - macos-1014
+  - macos-1014-aws
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer --enableEnterpriseTests=off
     push_path: osx
@@ -8768,7 +8768,7 @@ buildvariants:
   display_name: "* Shared Library macOS DEBUG"
   batchtime: *batchtime_one_week
   run_on:
-  - macos-1014
+  - macos-1014-aws
   expansions: &macos-debug-expansions
     test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
     resmoke_jobs_max: 6
@@ -8792,7 +8792,7 @@ buildvariants:
 - name: enterprise-macos
   display_name: Enterprise macOS
   run_on:
-  - macos-1014
+  - macos-1014-aws
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
@@ -8825,7 +8825,7 @@ buildvariants:
 - name: embedded-sdk-macos
   display_name: "Embedded SDK - macOS"
   run_on:
-  - macos-1014
+  - macos-1014-aws
   batchtime: *batchtime_one_week
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos --enableEnterpriseTests=off
