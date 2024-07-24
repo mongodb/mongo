@@ -81,12 +81,6 @@ race:mongo::AuthorizationManager::get
 race:mongo::repl::FileCopyBasedInitialSyncer::_extendBackupCursor
 race:mongo::repl::FileCopyBasedInitialSyncer::_getInitialSyncProgress
 
-# TODO SERVER-91873 inversion between _keystoreMetadataMutex and encrypedCustomizeMutex
-# rotateMasterKey -> makeKeystore -> WTDataStore -> customize
-# WTFactory::create->_openWiredTiger->customize->getKey->initLocalKeystore
-deadlock:mongo::EncryptionKeyManager::_initLocalKeystore
-deadlock:mongo::(anonymous namespace)::customize
-
 # TODO SERVER-91877 inversion b/w SSL manager and some crypto mutex
 deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
 
