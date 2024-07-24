@@ -4,7 +4,8 @@ WiredTiger operations return a value of 0 on success and a non-zero
 value on error.  Error codes may be either positive or negative:
 positive error codes are standard error codes as described for
 POSIX-like systems (for example, \c EINVAL or \c EBUSY), negative error
-codes are WiredTiger-specific (for example, \c WT_ROLLBACK).
+codes are WiredTiger-specific (for example, \c WT_ROLLBACK). WiredTiger
+makes no guarantees about which error codes can be returned its APIs.
 
 @section error_ebusy EBUSY errors
 

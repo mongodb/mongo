@@ -2308,7 +2308,22 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 #endif
 
     if (cursor != NULL) {
-        WT_TRET(cursor->close(cursor));
+        /*
+         * Technically the WiredTiger API allows closing a cursor to return rollback. This is a
+         * strange error to get in the rollback path so we swallow that error here. Analysis made at
+         * the time suggests that it is impossible for resetting a cursor to return rollback, which
+         * is called from cursor close, but we cannot guarantee it.
+         *
+         * Because swallowing an error that you believe cannot happen doesn't make a lot of sense we
+         * assert the error is not generated in diagnostic mode.
+         */
+#ifdef HAVE_DIAGNOSTIC
+        int ret2 = cursor->close(cursor);
+        WT_ASSERT(session, ret2 != WT_ROLLBACK);
+        WT_TRET(ret2);
+#else
+        WT_TRET_ERROR_OK(cursor->close(cursor), WT_ROLLBACK);
+#endif
         cursor = NULL;
     }
 
