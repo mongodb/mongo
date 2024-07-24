@@ -475,14 +475,17 @@ export class MagicRestoreUtils {
     /**
      * Retrieves all oplog entries that occurred after the checkpoint timestamp on the source node.
      * Returns an object with the timestamp of the last oplog entry, as well as the oplog
-     * entry array
+     * entry array. If there are no entries after the checkpoint timestamp, the returned timestamp
+     * is the checkpoint timestamp of the backup cursor.
      */
     getEntriesAfterBackup(sourceNode) {
         let oplog = sourceNode.getDB("local").getCollection('oplog.rs');
         const entriesAfterBackup =
             oplog.find({ts: {$gt: this.checkpointTimestamp}}).sort({ts: 1}).toArray();
         return {
-            lastOplogEntryTs: entriesAfterBackup[entriesAfterBackup.length - 1].ts,
+            lastOplogEntryTs: (entriesAfterBackup.length != 0
+                                   ? entriesAfterBackup[entriesAfterBackup.length - 1].ts
+                                   : this.checkpointTimestamp),
             entriesAfterBackup
         };
     }
@@ -554,7 +557,6 @@ export class MagicRestoreUtils {
     writeObjsAndRunMagicRestore(restoreConfiguration, entriesAfterBackup, options) {
         this.pointInTimeTimestamp = restoreConfiguration.pointInTimeTimestamp;
         if (this.pointInTimeTimestamp) {
-            assert(entriesAfterBackup.length > 0);
             this.isPit = true;
         }
         MagicRestoreUtils.writeObjsToMagicRestorePipe(
