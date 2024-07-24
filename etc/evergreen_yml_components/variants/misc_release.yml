@@ -782,7 +782,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: x86_64-rhel80
+    push_arch: x86_64-rhel8
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     multiversion_platform: rhel80
@@ -834,7 +834,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
-    push_arch: x86_64-enterprise-rhel80
+    push_arch: x86_64-enterprise-rhel8
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
@@ -954,7 +954,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: aarch64-rhel82
+    push_arch: aarch64-rhel8
     compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     has_packages: true
     packager_script: packager.py
@@ -1002,7 +1002,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
-    push_arch: aarch64-enterprise-rhel82
+    push_arch: aarch64-enterprise-rhel8
     compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     has_packages: true
