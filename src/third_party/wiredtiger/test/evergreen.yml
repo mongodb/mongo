@@ -5645,14 +5645,10 @@ buildvariants:
     additional_env_vars: |
       export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
-    # Exclude this test for ASan builds, as it results in a false positives owing
-    # to deliberate killing of processes to invoke corruption.
+    # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
     ctest_extra_args: -E "wt12015_backup_corruption"
   tasks:
     - name: ".pull_request !.pull_request_compilers !.model_checking !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
-      vars:
-        # We want to keep pull request testing short. Disable tests that are slow under ASan
-        ctest_extra_args: -E "wt12015_backup_corruption" -LE sanitizer_long
     - name: examples-c-test
     - name: format-asan-smoke-test
 
@@ -5691,7 +5687,7 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     # We don't run C++ memory sanitized testing as it creates false positives. TSan also significantly increases the runtime
     # of some csuite tests, so disable the already long tests as well as tests heavily impacted by TSan.
-    ctest_extra_args: -LE "cppsuite|long_running|sanitizer_long"
+    ctest_extra_args: -LE "cppsuite|long_running"
     # TSan slows down python testing enough that we start printing "operation took X seconds" warnings.
     # These don't impact functionality, but the python tests fail on detection of any content in stdout so ignore it instead.
     ignore_stdout: --ignore-stdout
