@@ -38,6 +38,7 @@ function test() {
 
 clearOCSPCache();
 
+jsTest.log("Test a ShardingTest without MockOCSPServer.");
 test();
 
 let mock_ocsp = new MockOCSPServer("", 10000);
@@ -45,6 +46,7 @@ mock_ocsp.start();
 
 clearOCSPCache();
 
+jsTest.log("Test a ShardingTest with MockOCSPServer and expect to have valid OCSP response.");
 test();
 
 // We don't want to invoke the hang analyzer because we
@@ -54,6 +56,7 @@ MongoRunner.runHangAnalyzer.disable();
 clearOCSPCache();
 
 // Leave the OCSP responder on so that the other nodes all have valid responses.
+jsTest.log("Test another ShardingTest with MockOCSPServer and expect to have valid OCSP response.");
 var st = new ShardingTest(sharding_config);
 
 mock_ocsp.stop();
@@ -63,6 +66,7 @@ mock_ocsp.start();
 clearOCSPCache();
 sleep(2000);
 
+jsTest.log("Restart the mongos with MockOCSPServer and expect to have REVOKED response.");
 const err = assert.throws(() => {
     st.restartMongos(0);
 });
@@ -81,6 +85,7 @@ mock_ocsp = new MockOCSPServer("", 10000);
 mock_ocsp.start();
 
 // Get the mongos back up again so that we can shutdown the ShardingTest.
+jsTest.log("Restart the mongos with MockOCSPServer and expect to have valid OCSP response.");
 st.restartMongos(0);
 
 mock_ocsp.stop();

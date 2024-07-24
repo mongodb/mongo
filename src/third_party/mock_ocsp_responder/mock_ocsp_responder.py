@@ -544,6 +544,7 @@ class OCSPResponder:
         # Check certificate status
         try:
             certificate_status, revocation_date = self.validate()
+            logger.info(f'The certification status is {certificate_status}')
         except Exception as e:
             logger.exception('Could not determine certificate status: %s', e)
             return self._fail(ResponseStatus.internal_error)
@@ -630,7 +631,7 @@ def init_responder(issuer_cert: str, responder_cert: str, responder_key: str, fa
 
 def init(port=8080, debug=False, host=None):
     logger.info('Launching %sserver on port %d', 'debug' if debug else '', port)
-    app.run(port=port, debug=debug, host=host)
+    app.run(port=port, debug=debug, host=host, use_reloader=False)
 
 @app.route('/', methods=['GET'])
 def _handle_root():
@@ -646,6 +647,7 @@ def _handle_get(u_path):
     """
     if "Host" not in request.headers:
         raise ValueError ("Required 'Host' header not present")
+    logger.info("Receive GET request on /status")
     der = base64.b64decode(u_path)
     ocsp_request = responder.parse_ocsp_request(der)
     return responder.build_http_response(ocsp_request)
@@ -659,5 +661,6 @@ def _handle_post():
     """
     if "Host" not in request.headers:
         raise ValueError ("Required 'Host' header not present")
+    logger.info("Receive POST request on /status")
     ocsp_request = responder.parse_ocsp_request(request.data)
     return responder.build_http_response(ocsp_request)
