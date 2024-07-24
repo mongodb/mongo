@@ -61,9 +61,11 @@ std::string PlanExecutor::stateToStr(ExecState execState) {
 }
 
 void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
-    if (MONGO_unlikely(planExecutorAlwaysFails.shouldFail())) {
-        uasserted(ErrorCodes::Error(4382101),
-                  "PlanExecutor hit planExecutorAlwaysFails fail point");
+    if (auto scoped = planExecutorAlwaysFails.scoped(); MONGO_unlikely(scoped.isActive())) {
+        if (scoped.getData().hasField("tassert") && scoped.getData().getBoolField("tassert")) {
+            tasserted(9028201, "PlanExecutor hit planExecutorAlwaysFails fail point");
+        }
+        uasserted(4382101, "PlanExecutor hit planExecutorAlwaysFails fail point");
     }
 }
 
