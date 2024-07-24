@@ -82,8 +82,8 @@ typedef enum {
 } WT_BTREE_CHECKSUM;
 
 typedef enum { /* Start position for eviction walk */
-    WT_EVICT_WALK_NEXT,
     WT_EVICT_WALK_PREV,
+    WT_EVICT_WALK_NEXT,
     WT_EVICT_WALK_RAND_NEXT,
     WT_EVICT_WALK_RAND_PREV
 } WT_EVICT_WALK_TYPE;
@@ -237,16 +237,17 @@ struct __wt_btree {
      * Eviction information is maintained in the btree handle, but owned by eviction, not the btree
      * code.
      */
-    WT_REF *evict_ref;            /* Eviction thread's location */
-    uint64_t evict_priority;      /* Relative priority of cached pages */
-    uint32_t evict_walk_progress; /* Eviction walk progress */
-    uint32_t evict_walk_target;   /* Eviction walk target */
-    u_int evict_walk_period;      /* Skip this many LRU walks */
-    u_int evict_walk_saved;       /* Saved walk skips for checkpoints */
-    u_int evict_walk_skips;       /* Number of walks skipped */
-    int32_t evict_disabled;       /* Eviction disabled count */
-    bool evict_disabled_open;     /* Eviction disabled on open */
-    volatile uint32_t evict_busy; /* Count of threads in eviction */
+    WT_REF *evict_ref;             /* Eviction thread's location */
+    uint32_t linear_walk_restarts; /* next/prev walk restarts */
+    uint64_t evict_priority;       /* Relative priority of cached pages */
+    uint32_t evict_walk_progress;  /* Eviction walk progress */
+    uint32_t evict_walk_target;    /* Eviction walk target */
+    u_int evict_walk_period;       /* Skip this many LRU walks */
+    u_int evict_walk_saved;        /* Saved walk skips for checkpoints */
+    u_int evict_walk_skips;        /* Number of walks skipped */
+    int32_t evict_disabled;        /* Eviction disabled count */
+    bool evict_disabled_open;      /* Eviction disabled on open */
+    volatile uint32_t evict_busy;  /* Count of threads in eviction */
     WT_EVICT_WALK_TYPE evict_start_type;
 
 /*
