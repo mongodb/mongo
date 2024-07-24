@@ -666,7 +666,21 @@ env.CppUnitTest(
     ])
 
 if wiredtiger:
-    env.CppUnitTest(
+    wtEnv = env.Clone()
+    wtEnv.InjectThirdParty(libraries=["wiredtiger"])
+
+    wtEnv.Library(
+        target="storage_engine_collection_options_flags_parser",
+        source=[
+            "storage_engine_collection_options_flags_parser.cpp",
+        ],
+        LIBDEPS_PRIVATE=[
+            "$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger",
+            "$BUILD_DIR/mongo/util/pcre_wrapper",
+        ],
+    )
+
+    wtEnv.CppUnitTest(
         target='db_catalog_test',
         source=[
             'capped_collection_test.cpp',
@@ -691,6 +705,7 @@ if wiredtiger:
             'index_spec_validate_test.cpp',
             'multi_index_block_test.cpp',
             'rename_collection_test.cpp',
+            'storage_engine_collection_options_flags_parser_test.cpp',
             'throttle_cursor_test.cpp',
             'validate_state_test.cpp',
         ],
@@ -739,6 +754,7 @@ if wiredtiger:
             'index_builds_manager',
             'index_key_validate',
             'multi_index_block',
+            'storage_engine_collection_options_flags_parser',
             'throttle_cursor',
             'validate_idl',
             'validate_state',

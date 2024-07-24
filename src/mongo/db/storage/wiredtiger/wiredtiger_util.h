@@ -349,6 +349,17 @@ public:
     static T castStatisticsValue(uint64_t statisticsValue);
 
     /**
+     * Gets the WiredTiger configuration string from storage engine collection options.
+     */
+    static boost::optional<std::string> getConfigStringFromStorageOptions(const BSONObj& options);
+
+    /**
+     * Sets the WiredTiger configuration string to storage engine collection options.
+     */
+    static BSONObj setConfigStringToStorageOptions(const BSONObj& options,
+                                                   const std::string& configString);
+
+    /**
      * Removes encryption configuration from a config string. Should only be applied on custom
      * config strings on secondaries. Fixes an issue where encryption configuration might be
      * replicated to non-encrypted nodes, or nodes with different encryption options, causing
