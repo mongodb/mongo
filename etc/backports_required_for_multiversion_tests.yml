@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/aggregation/bugs/lookup_using_hashed_index.js
+    ticket: SERVER-92668
   - test_file: jstests/core/query/query_settings/query_settings_strictness.js
     ticket: SERVER-92665
   - test_file: jstests/core/query/query_settings/query_settings_cmds_validation.js
@@ -740,6 +742,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/aggregation/bugs/lookup_using_hashed_index.js
+    ticket: SERVER-92668
   - test_file: jstests/core/query/query_settings/query_settings_strictness.js
     ticket: SERVER-92665
   - test_file: jstests/core/query/query_settings/query_settings_cmds_validation.js

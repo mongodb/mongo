@@ -862,15 +862,19 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                           makeSV(valueForIndexBounds),
                           nodeId);
 
-    // For hashed indexes, we need to hash value before computing keystrings.
     if (index.type == INDEX_HASHED) {
-        auto rawValueSlot = valueForIndexBounds;
-        valueForIndexBounds = slotIdGenerator.generate();
-        valueGeneratorStage =
-            makeProjectStage(std::move(valueGeneratorStage),
-                             nodeId,
-                             valueForIndexBounds,
-                             makeFunction("shardHash", makeVariable(rawValueSlot)));
+        // For hashed indexes, we need to hash the value before computing keystrings iff the
+        // lookup's "foreignField" is the hashed field in this index.
+        const BSONElement elt = index.keyPattern.getField(foreignFieldName.fullPath());
+        if (elt.valueStringDataSafe() == IndexNames::HASHED) {
+            auto rawValueSlot = valueForIndexBounds;
+            valueForIndexBounds = slotIdGenerator.generate();
+            valueGeneratorStage =
+                makeProjectStage(std::move(valueGeneratorStage),
+                                 nodeId,
+                                 valueForIndexBounds,
+                                 makeFunction("shardHash", makeVariable(rawValueSlot)));
+        }
     }
 
     // Calculate the low key and high key of each individual local field. They are stored in
