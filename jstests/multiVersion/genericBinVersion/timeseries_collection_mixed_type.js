@@ -20,7 +20,9 @@ const upgradeVersions = [{binVersion: "6.0", fcv: "6.0"}, {binVersion: "latest"}
  * one bucket was created.
  */
 function runTest(docs, query, results, path, bounds) {
-    const oldVersion = "5.0";
+    // Since v5.0 no longer supports writing mixed schema buckets as of 5.0.29, pin the version
+    // to 5.0.28 to retain coverage as v5.0 still supports the presence of mixed schema data.
+    const oldVersion = "5.0.28";
     const nodes = {
         n1: {binVersion: oldVersion},
         n2: {binVersion: oldVersion},

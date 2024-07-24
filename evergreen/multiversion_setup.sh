@@ -80,7 +80,7 @@ db-contrib-tool setup-repro-env \
   --platform $platform \
   --architecture $architecture \
   --debug \
-  $last_continuous_arg 4.4
+  $last_continuous_arg 4.4 5.0.28
 
 if [ ! -z "${multiversion_platform_50_or_later}" ]; then
   platform="${multiversion_platform_50_or_later}"
