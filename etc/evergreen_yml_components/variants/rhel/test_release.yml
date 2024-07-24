@@ -118,7 +118,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: x86_64-rhel80
+    push_arch: x86_64-rhel8
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -316,7 +316,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: aarch64-rhel82
+    push_arch: aarch64-rhel8
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -374,7 +374,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
-    push_arch: aarch64-enterprise-rhel82
+    push_arch: aarch64-enterprise-rhel8
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
