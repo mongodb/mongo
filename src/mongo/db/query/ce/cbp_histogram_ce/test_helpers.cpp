@@ -36,7 +36,7 @@ double estimateCardinalityScalarHistogramInteger(const stats::ScalarHistogram& h
                                                  const cbp::ce::EstimationType type) {
     const auto [tag, val] =
         std::make_pair(sbe::value::TypeTags::NumberInt64, sbe::value::bitcastFrom<int64_t>(v));
-    auto estimate = estimateCardinality(hist, tag, val, cbp::ce::EstimationType::kEqual);
+    auto estimate = estimateCardinality(hist, tag, val, type);
     return estimate.card;
 }
 

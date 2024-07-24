@@ -91,6 +91,9 @@ TEST(ArrayHistogramHelpersTest, UniformIntHistogram) {
     ASSERT_APPROX_EQUAL(1.6,
                         estimateCardinalityEq(*arrHist, NumberInt64, 530, true).card,
                         0.1);  // Actual: 1.
+    ASSERT_APPROX_EQUAL(1.6,
+                        estimateCardinalityEq(*arrHist, NumberInt64, 400, true).card,
+                        0.1);  // Actual: 1.
 }
 
 TEST(ArrayHistogramHelpersTest, NormalIntArrayHistogram) {
@@ -198,11 +201,15 @@ TEST(ArrayHistogramHelpersTest, NormalStrHistogram) {
     const auto arrHist = ArrayHistogram::make(
         hist, stats::TypeCounts{{sbe::value::TypeTags::StringSmall, strCnt}}, strCnt);
 
-    const auto [tag, value] = value::makeNewString("TTV"_sd);
+    auto [tag, value] = value::makeNewString("TTV"_sd);
     value::ValueGuard vg(tag, value);
 
     ASSERT_APPROX_EQUAL(
         5.0, estimateCardinalityEq(*arrHist, tag, value, true).card, 0.1);  // Actual: 5.
+
+    std::tie(tag, value) = value::makeNewString("Pfa"_sd);
+    ASSERT_APPROX_EQUAL(
+        1.75, estimateCardinalityEq(*arrHist, tag, value, true).card, 0.1);  // Actual: 2.
 }
 
 TEST(ArrayHistogramHelpersTest, IntStrHistogram) {

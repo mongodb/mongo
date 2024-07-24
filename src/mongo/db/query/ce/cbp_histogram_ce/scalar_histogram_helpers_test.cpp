@@ -51,6 +51,14 @@ using stats::ScalarHistogram;
 
 auto NumberInt64 = sbe::value::TypeTags::NumberInt64;
 auto kEqual = EstimationType::kEqual;
+auto kLess = EstimationType::kLess;
+auto kLessOrEqual = EstimationType::kLessOrEqual;
+auto kGreater = EstimationType::kGreater;
+auto kGreaterOrEqual = EstimationType::kGreaterOrEqual;
+auto Date = value::TypeTags::Date;
+auto TimeStamp = value::TypeTags::Timestamp;
+
+constexpr double kErrorBound = 0.01;
 
 TEST(ScalarHistogramHelpersTest, ManualHistogram) {
     std::vector<BucketData> data{{0, 1.0, 1.0, 1.0},
@@ -64,6 +72,18 @@ TEST(ScalarHistogramHelpersTest, ManualHistogram) {
     ASSERT_EQ(55.0, getTotals(hist).card);
 
     ASSERT_EQ(1.0, estimateCardinalityScalarHistogramInteger(hist, 0, kEqual));
+    ASSERT_EQ(2.0, estimateCardinalityScalarHistogramInteger(hist, 5, kEqual));
+    ASSERT_EQ(0.0, estimateCardinalityScalarHistogramInteger(hist, 35, kEqual));
+
+    ASSERT_EQ(15.5, estimateCardinalityScalarHistogramInteger(hist, 15, kLess));
+    ASSERT_EQ(20.5, estimateCardinalityScalarHistogramInteger(hist, 15, kLessOrEqual));
+    ASSERT_EQ(28, estimateCardinalityScalarHistogramInteger(hist, 20, kLess));
+    ASSERT_EQ(31.0, estimateCardinalityScalarHistogramInteger(hist, 20, kLessOrEqual));
+
+    ASSERT_EQ(42, estimateCardinalityScalarHistogramInteger(hist, 10, kGreater));
+    ASSERT_EQ(43, estimateCardinalityScalarHistogramInteger(hist, 10, kGreaterOrEqual));
+    ASSERT_EQ(19, estimateCardinalityScalarHistogramInteger(hist, 25, kGreater));
+    ASSERT_EQ(21.5, estimateCardinalityScalarHistogramInteger(hist, 25, kGreaterOrEqual));
 }
 
 TEST(ScalarHistogramHelpersTest, OneBucketIntHistogram) {
@@ -75,12 +95,24 @@ TEST(ScalarHistogramHelpersTest, OneBucketIntHistogram) {
 
     // Estimate with the bucket bound.
     ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 100, kEqual).card);
+    ASSERT_EQ(27.0, estimateCardinality(hist, NumberInt64, 100, kLess).card);
+    ASSERT_EQ(30.0, estimateCardinality(hist, NumberInt64, 100, kLessOrEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 100, kGreater).card);
+    ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 100, kGreaterOrEqual).card);
 
     // Estimate with a value inside the bucket.
     ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 10, kEqual).card);
+    ASSERT_EQ(10.5, estimateCardinality(hist, NumberInt64, 10, kLess).card);
+    ASSERT_EQ(13.5, estimateCardinality(hist, NumberInt64, 10, kLessOrEqual).card);
+    ASSERT_EQ(16.5, estimateCardinality(hist, NumberInt64, 10, kGreater).card);
+    ASSERT_EQ(19.5, estimateCardinality(hist, NumberInt64, 10, kGreaterOrEqual).card);
 
     // Estimate for a value larger than the last bucket bound.
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kEqual).card);
+    ASSERT_EQ(30.0, estimateCardinality(hist, NumberInt64, 1000, kLess).card);
+    ASSERT_EQ(30.0, estimateCardinality(hist, NumberInt64, 1000, kLessOrEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kGreater).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kGreaterOrEqual).card);
 }
 
 TEST(ScalarHistogramHelpersTest, OneExclusiveBucketIntHistogram) {
@@ -95,10 +127,16 @@ TEST(ScalarHistogramHelpersTest, OneExclusiveBucketIntHistogram) {
     // Estimates with the bucket boundary.
 
     ASSERT_EQ(2.0, estimateCardinality(hist, NumberInt64, 100, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 100, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 100, kGreater).card);
 
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 0, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 0, kLess).card);
+    ASSERT_EQ(2.0, estimateCardinality(hist, NumberInt64, 0, kGreater).card);
 
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kEqual).card);
+    ASSERT_EQ(2.0, estimateCardinality(hist, NumberInt64, 1000, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kGreater).card);
 }
 
 TEST(ScalarHistogramHelpersTest, OneBucketTwoIntValuesHistogram) {
@@ -110,10 +148,16 @@ TEST(ScalarHistogramHelpersTest, OneBucketTwoIntValuesHistogram) {
 
     // Estimates with the bucket boundary.
     ASSERT_EQ(2.0, estimateCardinality(hist, NumberInt64, 100, kEqual).card);
+    ASSERT_EQ(1.0, estimateCardinality(hist, NumberInt64, 100, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 100, kGreater).card);
 
     ASSERT_EQ(1.0, estimateCardinality(hist, NumberInt64, 10, kEqual).card);
+    ASSERT_EQ(0.5, estimateCardinality(hist, NumberInt64, 10, kLess).card);
+    ASSERT_EQ(2.5, estimateCardinality(hist, NumberInt64, 10, kGreater).card);
 
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kEqual).card);
+    ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 1000, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kGreater).card);
 }
 
 TEST(ScalarHistogramHelpersTest, OneBucketTwoIntValuesHistogram2) {
@@ -124,10 +168,16 @@ TEST(ScalarHistogramHelpersTest, OneBucketTwoIntValuesHistogram2) {
 
     // Estimates with the bucket boundary.
     ASSERT_EQ(2.0, estimateCardinality(hist, NumberInt64, 100, kEqual).card);
+    ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 100, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 100, kGreater).card);
 
     ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 10, kEqual).card);
+    ASSERT_EQ(1.5, estimateCardinality(hist, NumberInt64, 10, kLess).card);
+    ASSERT_EQ(3.5, estimateCardinality(hist, NumberInt64, 10, kGreater).card);
 
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kEqual).card);
+    ASSERT_EQ(5.0, estimateCardinality(hist, NumberInt64, 1000, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kGreater).card);
 }
 
 TEST(ScalarHistogramHelpersTest, TwoBucketsIntHistogram) {
@@ -138,14 +188,42 @@ TEST(ScalarHistogramHelpersTest, TwoBucketsIntHistogram) {
 
     // Estimates for a value smaller than the first bucket.
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, -42, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, -42, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, -42, kLessOrEqual).card);
+    ASSERT_EQ(30.0, estimateCardinality(hist, NumberInt64, -42, kGreater).card);
+    ASSERT_EQ(30.0, estimateCardinality(hist, NumberInt64, -42, kGreaterOrEqual).card);
+
     // Estimates with bucket bounds.
     ASSERT_EQ(1.0, estimateCardinality(hist, NumberInt64, 1, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1, kLess).card);
+    ASSERT_EQ(1.0, estimateCardinality(hist, NumberInt64, 1, kLessOrEqual).card);
+    ASSERT_EQ(29.0, estimateCardinality(hist, NumberInt64, 1, kGreater).card);
+    ASSERT_EQ(30.0, estimateCardinality(hist, NumberInt64, 1, kGreaterOrEqual).card);
 
     ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 100, kEqual).card);
+    ASSERT_EQ(27.0, estimateCardinality(hist, NumberInt64, 100, kLess).card);
+    ASSERT_EQ(30.0, estimateCardinality(hist, NumberInt64, 100, kLessOrEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 100, kGreater).card);
+    ASSERT_EQ(3.0, estimateCardinality(hist, NumberInt64, 100, kGreaterOrEqual).card);
 
     // Estimates with a value inside the bucket. The estimates use interpolation.
-    ASSERT_APPROX_EQUAL(3.25, estimateCardinality(hist, NumberInt64, 10, kEqual).card, 0.01);
-    ASSERT_APPROX_EQUAL(3.25, estimateCardinality(hist, NumberInt64, 50, kEqual).card, 0.01);
+    ASSERT_APPROX_EQUAL(3.25, estimateCardinality(hist, NumberInt64, 10, kEqual).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(3.36, estimateCardinality(hist, NumberInt64, 10, kLess).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        3.36, estimateCardinality(hist, NumberInt64, 10, kLessOrEqual).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        26.64, estimateCardinality(hist, NumberInt64, 10, kGreater).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        26.64, estimateCardinality(hist, NumberInt64, 10, kGreaterOrEqual).card, kErrorBound);
+
+    ASSERT_APPROX_EQUAL(3.25, estimateCardinality(hist, NumberInt64, 50, kEqual).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(10.61, estimateCardinality(hist, NumberInt64, 50, kLess).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        13.87, estimateCardinality(hist, NumberInt64, 50, kLessOrEqual).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        16.13, estimateCardinality(hist, NumberInt64, 50, kGreater).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        19.38, estimateCardinality(hist, NumberInt64, 50, kGreaterOrEqual).card, kErrorBound);
 }
 
 TEST(ScalarHistogramHelpersTest, ThreeExclusiveBucketsIntHistogram) {
@@ -155,6 +233,10 @@ TEST(ScalarHistogramHelpersTest, ThreeExclusiveBucketsIntHistogram) {
     ASSERT_EQ(10.0, getTotals(hist).card);
 
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 5, kEqual).card);
+    ASSERT_EQ(1.0, estimateCardinality(hist, NumberInt64, 5, kLess).card);
+    ASSERT_EQ(1.0, estimateCardinality(hist, NumberInt64, 5, kLessOrEqual).card);
+    ASSERT_EQ(9.0, estimateCardinality(hist, NumberInt64, 5, kGreater).card);
+    ASSERT_EQ(9.0, estimateCardinality(hist, NumberInt64, 5, kGreaterOrEqual).card);
 }
 
 TEST(ScalarHistogramHelpersTest, OneBucketStrHistogram) {
@@ -167,12 +249,20 @@ TEST(ScalarHistogramHelpersTest, OneBucketStrHistogram) {
     auto [tag, value] = value::makeNewString("xyz"_sd);
     value::ValueGuard vg(tag, value);
     ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(27.0, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(30.0, estimateCardinality(hist, tag, value, kLessOrEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kGreater).card);
+    ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
     // Estimates for a value inside the bucket. Since there is no low value bound in the histogram
     // all values smaller than the upper bound will be estimated the same way using half of the
     // bucket cardinality.
     std::tie(tag, value) = value::makeNewString("a"_sd);
     ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(10.5, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(13.5, estimateCardinality(hist, tag, value, kLessOrEqual).card);
+    ASSERT_EQ(16.5, estimateCardinality(hist, tag, value, kGreater).card);
+    ASSERT_EQ(19.5, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
     std::tie(tag, value) = value::makeNewString(""_sd);
     // In the special case of a single string bucket, we estimate empty string equality as for any
@@ -180,10 +270,14 @@ TEST(ScalarHistogramHelpersTest, OneBucketStrHistogram) {
     // empty string in the data set, it will be chosen as a bound for the first bucket and produce
     // precise estimates.
     ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(30.0, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
     // Estimates for a value larger than the upper bound.
     std::tie(tag, value) = value::makeNewString("z"_sd);
     ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(30.0, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kGreater).card);
 }
 
 TEST(ScalarHistogramHelpersTest, TwoBucketsStrHistogram) {
@@ -198,21 +292,45 @@ TEST(ScalarHistogramHelpersTest, TwoBucketsStrHistogram) {
     value::ValueGuard vg(tag, value);
 
     ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kLessOrEqual).card);
+    ASSERT_EQ(100.0, estimateCardinality(hist, tag, value, kGreater).card);
+    ASSERT_EQ(100.0, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
     // Estimates with bucket bounds.
     std::tie(tag, value) = value::makeNewString("abc"_sd);
     ASSERT_EQ(2.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(2.0, estimateCardinality(hist, tag, value, kLessOrEqual).card);
+    ASSERT_EQ(98.0, estimateCardinality(hist, tag, value, kGreater).card);
+    ASSERT_EQ(100.0, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
     std::tie(tag, value) = value::makeNewString("xyz"_sd);
     ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(97.0, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(100.0, estimateCardinality(hist, tag, value, kLessOrEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kGreater).card);
+    ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
     // Estimates for a value inside the bucket.
     std::tie(tag, value) = value::makeNewString("sun"_sd);
-    ASSERT_APPROX_EQUAL(1.98, estimateCardinality(hist, tag, value, kEqual).card, 0.01);
+    ASSERT_APPROX_EQUAL(1.98, estimateCardinality(hist, tag, value, kEqual).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(74.39, estimateCardinality(hist, tag, value, kLess).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        76.37, estimateCardinality(hist, tag, value, kLessOrEqual).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(23.64, estimateCardinality(hist, tag, value, kGreater).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        25.62, estimateCardinality(hist, tag, value, kGreaterOrEqual).card, kErrorBound);
 
     // Estimate for a value very close to the bucket bound.
     std::tie(tag, value) = value::makeNewString("xyw"_sd);
-    ASSERT_APPROX_EQUAL(1.98, estimateCardinality(hist, tag, value, kEqual).card, 0.01);
+    ASSERT_APPROX_EQUAL(1.98, estimateCardinality(hist, tag, value, kEqual).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(95.02, estimateCardinality(hist, tag, value, kLess).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        96.99, estimateCardinality(hist, tag, value, kLessOrEqual).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(3.0, estimateCardinality(hist, tag, value, kGreater).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        4.98, estimateCardinality(hist, tag, value, kGreaterOrEqual).card, kErrorBound);
 }
 
 TEST(ScalarHistogramHelpersTest, TwoBucketsDateHistogram) {
@@ -229,25 +347,30 @@ TEST(ScalarHistogramHelpersTest, TwoBucketsDateHistogram) {
     ASSERT_EQ(100.0, getTotals(hist).card);
 
     const auto valueBefore = value::bitcastFrom<int64_t>(startInstant - 1);
-    double expectedCard =
-        estimateCardinality(hist, value::TypeTags::Date, valueBefore, kEqual).card;
-    ASSERT_EQ(0.0, expectedCard);
+    ASSERT_EQ(0.0, estimateCardinality(hist, Date, valueBefore, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, Date, valueBefore, kLess).card);
+    ASSERT_EQ(100.0, estimateCardinality(hist, Date, valueBefore, kGreater).card);
 
     const auto valueStart = value::bitcastFrom<int64_t>(startInstant);
-    expectedCard = estimateCardinality(hist, value::TypeTags::Date, valueStart, kEqual).card;
-    ASSERT_EQ(3.0, expectedCard);
+    ASSERT_EQ(3.0, estimateCardinality(hist, Date, valueStart, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, Date, valueStart, kLess).card);
+    ASSERT_EQ(97.0, estimateCardinality(hist, Date, valueStart, kGreater).card);
 
     const auto valueEnd = value::bitcastFrom<int64_t>(endInstant);
-    expectedCard = estimateCardinality(hist, value::TypeTags::Date, valueEnd, kEqual).card;
-    ASSERT_EQ(1.0, expectedCard);
+    ASSERT_EQ(1.0, estimateCardinality(hist, Date, valueEnd, kEqual).card);
+    ASSERT_EQ(99.0, estimateCardinality(hist, Date, valueEnd, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, Date, valueEnd, kGreater).card);
 
     const auto valueIn = value::bitcastFrom<int64_t>(startInstant + 43000000);
-    expectedCard = estimateCardinality(hist, value::TypeTags::Date, valueIn, kEqual).card;
-    ASSERT_EQ(2.0, expectedCard);
+    ASSERT_EQ(2.0, estimateCardinality(hist, Date, valueIn, kEqual).card);
+    ASSERT_APPROX_EQUAL(48.77, estimateCardinality(hist, Date, valueIn, kLess).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(
+        49.22, estimateCardinality(hist, Date, valueIn, kGreater).card, kErrorBound);
 
     const auto valueAfter = value::bitcastFrom<int64_t>(endInstant + 100);
-    expectedCard = estimateCardinality(hist, value::TypeTags::Date, valueAfter, kEqual).card;
-    ASSERT_EQ(0.0, expectedCard);
+    ASSERT_EQ(0.0, estimateCardinality(hist, Date, valueAfter, kEqual).card);
+    ASSERT_EQ(100.0, estimateCardinality(hist, Date, valueAfter, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, Date, valueAfter, kGreater).card);
 }
 
 TEST(ScalarHistogramHelpersTest, TwoBucketsTimestampHistogram) {
@@ -263,26 +386,32 @@ TEST(ScalarHistogramHelpersTest, TwoBucketsTimestampHistogram) {
     ASSERT_EQ(100.0, getTotals(hist).card);
 
     const auto valueBefore = value::bitcastFrom<int64_t>(startTs.asULL() - 1);
-    CEType expectedCard = {
-        estimateCardinality(hist, value::TypeTags::Timestamp, valueBefore, kEqual).card};
-    ASSERT_EQ(0.0, expectedCard._value);
+    ASSERT_EQ(0.0, estimateCardinality(hist, TimeStamp, valueBefore, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, TimeStamp, valueBefore, kLess).card);
+    ASSERT_EQ(100.0, estimateCardinality(hist, TimeStamp, valueBefore, kGreater).card);
 
     const auto valueStart = value::bitcastFrom<int64_t>(
         startTs.asULL());  // NB: startTs.asInt64() produces different value.
-    expectedCard = {estimateCardinality(hist, value::TypeTags::Timestamp, valueStart, kEqual).card};
-    ASSERT_EQ(3.0, expectedCard._value);
+    ASSERT_EQ(3.0, estimateCardinality(hist, TimeStamp, valueStart, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, TimeStamp, valueStart, kLess).card);
+    ASSERT_EQ(97.0, estimateCardinality(hist, TimeStamp, valueStart, kGreater).card);
 
     const auto valueEnd = value::bitcastFrom<int64_t>(endTs.asULL());
-    expectedCard = {estimateCardinality(hist, value::TypeTags::Timestamp, valueEnd, kEqual).card};
-    ASSERT_EQ(1.0, expectedCard._value);
+    ASSERT_EQ(1.0, estimateCardinality(hist, TimeStamp, valueEnd, kEqual).card);
+    ASSERT_EQ(99.0, estimateCardinality(hist, TimeStamp, valueEnd, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, TimeStamp, valueEnd, kGreater).card);
 
     const auto valueIn = value::bitcastFrom<int64_t>((startTs.asULL() + endTs.asULL()) / 2);
-    expectedCard = {estimateCardinality(hist, value::TypeTags::Timestamp, valueIn, kEqual).card};
-    ASSERT_EQ(2.0, expectedCard._value);
+    ASSERT_EQ(2.0, estimateCardinality(hist, TimeStamp, valueIn, kEqual).card);
+    ASSERT_CE_APPROX_EQUAL(
+        49.0, estimateCardinality(hist, TimeStamp, valueIn, kLess).card, kErrorBound);
+    ASSERT_CE_APPROX_EQUAL(
+        49.0, estimateCardinality(hist, TimeStamp, valueIn, kGreater).card, kErrorBound);
 
     const auto valueAfter = value::bitcastFrom<int64_t>(endTs.asULL() + 100);
-    expectedCard = {estimateCardinality(hist, value::TypeTags::Timestamp, valueAfter, kEqual).card};
-    ASSERT_EQ(0.0, expectedCard._value);
+    ASSERT_EQ(0.0, estimateCardinality(hist, TimeStamp, valueAfter, kEqual).card);
+    ASSERT_EQ(100.0, estimateCardinality(hist, TimeStamp, valueAfter, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, TimeStamp, valueAfter, kGreater).card);
 }
 
 TEST(ScalarHistogramHelpersTest, TwoBucketsObjectIdHistogram) {
@@ -298,31 +427,36 @@ TEST(ScalarHistogramHelpersTest, TwoBucketsObjectIdHistogram) {
 
     auto [tag, value] = value::makeNewObjectId();
     value::ValueGuard vg(tag, value);
+
     const auto oidBefore = OID("63340d8d27afef2de7357e8c");
     oidBefore.view().readInto(value::getObjectIdView(value));
-
-    double expectedCard = estimateCardinality(hist, tag, value, kEqual).card;
-    ASSERT_EQ(0.0, expectedCard);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(100.0, estimateCardinality(hist, tag, value, kGreater).card);
 
     // Bucket bounds.
     startOid.view().readInto(value::getObjectIdView(value));
-    expectedCard = estimateCardinality(hist, tag, value, kEqual).card;
-    ASSERT_EQ(2.0, expectedCard);
+    ASSERT_EQ(2.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(98.0, estimateCardinality(hist, tag, value, kGreater).card);
 
     endOid.view().readInto(value::getObjectIdView(value));
-    expectedCard = estimateCardinality(hist, tag, value, kEqual).card;
-    ASSERT_EQ(1.0, expectedCard);
+    ASSERT_EQ(1.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(99.0, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kGreater).card);
 
     // ObjectId value inside the bucket.
     const auto oidInside = OID("63340db2cd4d46ff39178e9d");
     oidInside.view().readInto(value::getObjectIdView(value));
-    expectedCard = estimateCardinality(hist, tag, value, kEqual).card;
-    ASSERT_APPROX_EQUAL(1.25, expectedCard, 0.01);
+    ASSERT_APPROX_EQUAL(1.25, estimateCardinality(hist, tag, value, kEqual).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(74.00, estimateCardinality(hist, tag, value, kLess).card, kErrorBound);
+    ASSERT_APPROX_EQUAL(24.74, estimateCardinality(hist, tag, value, kGreater).card, kErrorBound);
 
     const auto oidAfter = OID("63340dbed6cd8af737d4139b");
     oidAfter.view().readInto(value::getObjectIdView(value));
-    expectedCard = estimateCardinality(hist, tag, value, kEqual).card;
-    ASSERT_EQ(0.0, expectedCard);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kEqual).card);
+    ASSERT_EQ(100.0, estimateCardinality(hist, tag, value, kLess).card);
+    ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kGreater).card);
 }
 
 TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromData) {
@@ -334,8 +468,8 @@ TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromData) {
     const auto endOid = OID("63340dbed6cd8af737d4139a");
 
     std::vector<stats::SBEValue> data;
-    data.emplace_back(value::TypeTags::Date, value::bitcastFrom<int64_t>(startInstant));
-    data.emplace_back(value::TypeTags::Date, value::bitcastFrom<int64_t>(endInstant));
+    data.emplace_back(Date, value::bitcastFrom<int64_t>(startInstant));
+    data.emplace_back(Date, value::bitcastFrom<int64_t>(endInstant));
 
     data.emplace_back(value::TypeTags::Timestamp, value::bitcastFrom<int64_t>(startTs.asULL()));
     data.emplace_back(value::TypeTags::Timestamp, value::bitcastFrom<int64_t>(endTs.asULL()));
@@ -424,20 +558,17 @@ TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromData) {
     // Minimum ObjectId.
     auto&& [minOid, inclOid] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::ObjectId);
     auto [minOidTag, minOidVal] = minOid->cast<mongo::optimizer::Constant>()->get();
-    CEType expectedCard = {estimateCardinality(hist, minOidTag, minOidVal, kEqual).card};
-    ASSERT_EQ(1.0, expectedCard._value);
+    ASSERT_EQ(1.0, estimateCardinality(hist, minOidTag, minOidVal, kEqual).card);
 
     // Minimum date.
-    const auto&& [minDate, inclDate] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Date);
+    const auto&& [minDate, inclDate] = getMinMaxBoundForType(true /*isMin*/, Date);
     const auto [minDateTag, minDateVal] = minDate->cast<mongo::optimizer::Constant>()->get();
-    expectedCard = {estimateCardinality(hist, minDateTag, minDateVal, kEqual).card};
-    ASSERT_EQ(1.0, expectedCard._value);
+    ASSERT_EQ(1.0, estimateCardinality(hist, minDateTag, minDateVal, kEqual).card);
 
     // Minimum timestamp.
     auto&& [minTs, inclTs] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Timestamp);
     auto [minTsTag, minTsVal] = minTs->cast<mongo::optimizer::Constant>()->get();
-    expectedCard = {estimateCardinality(hist, minTsTag, minTsVal, kEqual).card};
-    ASSERT_EQ(1.0, expectedCard._value);
+    ASSERT_EQ(1.0, estimateCardinality(hist, minTsTag, minTsVal, kEqual).card);
 
     // Add minimum values to the data set and create another histogram.
     const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
@@ -451,13 +582,11 @@ TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromData) {
     const ScalarHistogram& hist2 = makeHistogram(data, 6);
 
     // Precise estimate for equality to empty string, it is a bucket boundary.
-    expectedCard = {estimateCardinality(hist2, tagLowStr, valLowStr, kEqual).card};
-    ASSERT_EQ(1.0, expectedCard._value);
+    ASSERT_EQ(1.0, estimateCardinality(hist2, tagLowStr, valLowStr, kEqual).card);
+
     // Equality to the minimum date/ts value is estimated by range_frequency/NDV.
-    expectedCard = {estimateCardinality(hist2, minDateTag, minDateVal, kEqual).card};
-    ASSERT_EQ(1.0, expectedCard._value);
-    expectedCard = {estimateCardinality(hist2, minTsTag, minTsVal, kEqual).card};
-    ASSERT_EQ(1.0, expectedCard._value);
+    ASSERT_EQ(1.0, estimateCardinality(hist2, minDateTag, minDateVal, kEqual).card);
+    ASSERT_EQ(1.0, estimateCardinality(hist2, minTsTag, minTsVal, kEqual).card);
 }
 
 TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromBuckets) {
@@ -480,10 +609,10 @@ TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromBuckets) {
     auto&& [minOid, inclOid] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::ObjectId);
     auto [minOidTag, minOidVal] = minOid->cast<mongo::optimizer::Constant>()->get();
     CEType expectedCard{estimateCardinality(hist, minOidTag, minOidVal, kEqual).card};
-    ASSERT_CE_APPROX_EQUAL(1.9, expectedCard, 0.01);
+    ASSERT_CE_APPROX_EQUAL(1.9, expectedCard, kErrorBound);
 
     // Minimum date.
-    const auto&& [minDate, inclDate] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Date);
+    const auto&& [minDate, inclDate] = getMinMaxBoundForType(true /*isMin*/, Date);
     const auto [minDateTag, minDateVal] = minDate->cast<mongo::optimizer::Constant>()->get();
     expectedCard = {estimateCardinality(hist, minDateTag, minDateVal, kEqual).card};
     ASSERT_EQ(4.0, expectedCard._value);
@@ -492,7 +621,7 @@ TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromBuckets) {
     auto&& [minTs, inclTs] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Timestamp);
     auto [minTsTag, minTsVal] = minTs->cast<mongo::optimizer::Constant>()->get();
     expectedCard = {estimateCardinality(hist, minTsTag, minTsVal, kEqual).card};
-    ASSERT_CE_APPROX_EQUAL(1.9, expectedCard, 0.01);
+    ASSERT_CE_APPROX_EQUAL(1.9, expectedCard, kErrorBound);
 }
 
 }  // namespace
