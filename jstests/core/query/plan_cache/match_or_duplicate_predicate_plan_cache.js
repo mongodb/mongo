@@ -48,3 +48,13 @@ assert.eq(
 assert.eq(
     [{_id: null, s: 2}],
     coll.aggregate([{$match: predicate2}, {$group: {_id: null, s: {$sum: "$foo"}}}]).toArray());
+
+// Tests that $or queries eligible for the $or-to-$in rewrite where the constants contain some
+// non-parameterizable constants do not fail. This is a regression test for SERVER-92603.
+
+// No predicates are parameterizable.
+assert.eq([], coll.find({$or: [{_id: 1, foo: true}, {_id: 1, foo: false}]}).toArray());
+// Some predicates are parameterizable.
+assert.eq(
+    [{_id: 1, foo: 1}],
+    coll.find({$or: [{_id: 1, foo: 1}, {_id: 1, foo: true}, {_id: 1, foo: false}]}).toArray());

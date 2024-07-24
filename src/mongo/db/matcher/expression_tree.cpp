@@ -354,7 +354,8 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                         std::unique_ptr<EqualityMatchExpression> eqExpressionPtr{
                             static_cast<EqualityMatchExpression*>(childExpression.release())};
                         if (isRegEx(eqExpressionPtr->getData()) ||
-                            eqExpressionPtr->getCollator() != eqCollator) {
+                            eqExpressionPtr->getCollator() != eqCollator ||
+                            eqExpressionPtr->getInputParamId().has_value()) {
                             nonEquivOrChildren.push_back(std::move(eqExpressionPtr));
                         } else {
                             bab.append(eqExpressionPtr->getData());

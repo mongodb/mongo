@@ -535,6 +535,8 @@ last-continuous:
     ticket: SERVER-91406
   - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
     ticket: SERVER-91784
+  - test_file: jstests/core/query/plan_cache/match_or_duplicate_predicate_plan_cache.js
+    ticket: SERVER-92603
   - test_file: jstests/core/index/geo/negated_geo_queries.js
     ticket: SERVER-92193
   suites: null
@@ -1122,6 +1124,8 @@ last-lts:
     ticket: SERVER-91406
   - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
     ticket: SERVER-91784
+  - test_file: jstests/core/query/plan_cache/match_or_duplicate_predicate_plan_cache.js
+    ticket: SERVER-92603
   - test_file: jstests/core/index/geo/negated_geo_queries.js
     ticket: SERVER-92193
   suites: null
