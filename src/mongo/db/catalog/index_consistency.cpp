@@ -639,6 +639,13 @@ bool KeyStringIndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* 
     result->errors.push_back(ss.str());
     result->valid = false;
 
+    LOGV2(8943500,
+          "Not all index entry inconsistencies are reported due to memory limitations; the memory "
+          "limit for validation can be configured via the 'maxValidateMemoryUsageMB' server "
+          "parameter",
+          "maxValidateMemoryUsageMB"_attr = maxValidateMemoryUsageMB.load(),
+          "totalMemoryNeededBytes"_attr = totalMemoryNeededBytes);
+
     return true;
 }
 
