@@ -11,7 +11,7 @@ itsdangerous == 2.0.0
 ocspbuilder == 0.10.2
 Werkzeug == 2.0.3
 blackduck == 1.0.1
-PyGithub == 1.53
+PyGithub == 1.58
 urllib3 >= 1.26.0, <= 1.26.7
 distro == 1.5.0
 dnspython == 2.1.0
