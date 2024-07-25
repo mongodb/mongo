@@ -137,7 +137,7 @@ env.Library(
         "shell_options_storage",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/sasl_client",
+        "$BUILD_DIR/mongo/client/cyrus_sasl_client",
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
     ],
 )
@@ -299,6 +299,7 @@ if not has_option("noshell") and jsEngine:
             # please add that library here, as a private library dependency.
             "$BUILD_DIR/mongo/client/clientdriver_network",
             "$BUILD_DIR/mongo/client/connection_string",
+            "$BUILD_DIR/mongo/client/cyrus_sasl_client",
             "$BUILD_DIR/mongo/db/catalog/index_key_validate",
             "$BUILD_DIR/mongo/db/mongohasher",
             "$BUILD_DIR/mongo/db/pipeline/change_stream_error_extra_info",
