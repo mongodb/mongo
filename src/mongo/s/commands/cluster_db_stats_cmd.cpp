@@ -174,12 +174,11 @@ public:
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent);
         std::string errmsg;
-        if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses).responseOK) {
-            uasserted(ErrorCodes::OperationFailed, errmsg);
-        }
+        auto appendResult = appendRawResponses(opCtx, &errmsg, &output, shardResponses);
+        uassert(ErrorCodes::OperationFailed, errmsg, appendResult.responseOK);
 
         output.append("db", DatabaseNameUtil::serialize(dbName, cmd.getSerializationContext()));
-        aggregateResults(cmd, shardResponses, output);
+        aggregateResults(cmd, appendResult.successResponses, output);
         return true;
     }
 
