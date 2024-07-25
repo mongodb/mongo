@@ -112,7 +112,7 @@ buildvariants:
       has_packages: true
       packager_script: packager_enterprise.py
       packager_arch: x86_64
-      packager_distro: rhel80
+      packager_distro: rhel88
       repo_edition: enterprise
       scons_cache_scope: shared
       jstestfuzz_num_generated_files: 40
