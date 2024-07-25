@@ -66,26 +66,37 @@ sh._writeBalancerStateDeprecated = function(onOrNot) {
  * command is retried.
  */
 sh.assertRetryableCommandWorkedOrFailedWithCodes = function(cmd, msg, expectedErrorCodes = []) {
-    var res = undefined;
+    let res = undefined;
     assert.soon(function() {
         try {
-            res = assert.commandWorked(cmd());
+            res = assert.commandWorked((() => {
+                try {
+                    return cmd();
+                } catch (err) {
+                    return err;
+                }
+            })());
             return true;
         } catch (err) {
-            if (err instanceof WriteError && ErrorCodes.isRetriableError(err.code)) {
-                return false;
-            }
-            if (err instanceof WriteResult) {
-                if (err.hasWriteError() && ErrorCodes.isRetriableError(err.getWriteError().code)) {
-                    return false;
+            const errorCode = (() => {
+                if (err.hasOwnProperty("code")) {
+                    return err.code;
                 }
-                if (err.hasWriteConcernError() &&
-                    ErrorCodes.isRetriableError(err.getWriteConcernError().code)) {
-                    return false;
+                if (err.hasOwnProperty("writeErrors")) {
+                    return err.writeErrors[err.writeErrors.length - 1].code;
                 }
-            }
-            if (expectedErrorCodes.includes(err.code)) {
+                if (err.hasOwnProperty("writeConcernError")) {
+                    return err.writeConcernError.code;
+                }
+                return undefined;
+            })();
+
+            if (expectedErrorCodes.includes(errorCode)) {
                 return true;
+            }
+
+            if (ErrorCodes.isRetriableError(errorCode)) {
+                return false;
             }
             throw err;
         }

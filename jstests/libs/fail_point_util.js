@@ -25,17 +25,27 @@ configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "a
         conn: conn,
         failPointName: failPointName,
         timesEntered: res.count,
-        wait: function({maxTimeMS = kDefaultWaitForFailPointTimeout, timesEntered = 1} = {}) {
+        wait: function({
+            maxTimeMS = kDefaultWaitForFailPointTimeout,
+            timesEntered = 1,
+            expectedErrorCodes = []
+        } = {}) {
             // Can only be called once because this function does not keep track of the
             // number of times the fail point is entered between the time it returns
             // and the next time it gets called.
-            sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
+            // This function has three possible outcomes:
+            //
+            // 1) Returns true when the failpoint was hit.
+            // 2) Returns false when the command returned one of the expected error codes.
+            // 3) Otherwise, this throws for an unexpected error.
+            let res = sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
                 return conn.adminCommand({
                     waitForFailPoint: failPointName,
                     timesEntered: this.timesEntered + timesEntered,
                     maxTimeMS: maxTimeMS
                 });
-            }, "Timed out waiting for failpoint " + failPointName);
+            }, "Timed out waiting for failpoint " + failPointName, expectedErrorCodes);
+            return res !== undefined && res["ok"] === 1;
         },
         waitWithTimeout: function(timeoutMS) {
             // This function has three possible outcomes:

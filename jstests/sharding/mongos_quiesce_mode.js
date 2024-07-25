@@ -121,15 +121,10 @@ let pauseWhileKillingOperationsFailPoint =
 quiesceModeFailPoint.off();
 
 // This throws because the configureFailPoint command is killed by the shutdown.
-try {
-    pauseWhileKillingOperationsFailPoint.wait();
-} catch (e) {
-    if (e.code === ErrorCodes.InterruptedAtShutdown) {
-        jsTestLog(
-            "Ignoring InterruptedAtShutdown error because configureFailPoint is killed by shutdown");
-    } else {
-        throw e;
-    }
+if (!pauseWhileKillingOperationsFailPoint.wait(
+        {expectedErrorCodes: [ErrorCodes.InterruptedAtShutdown]})) {
+    jsTestLog(
+        "Ignoring InterruptedAtShutdown error because `waitForFailPoint` is killed by shutdown");
 }
 
 jsTestLog("Operations fail with a shutdown error and append the topologyVersion.");

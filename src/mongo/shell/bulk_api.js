@@ -134,7 +134,7 @@ var _bulk_api_module = (function() {
         };
 
         this.getWriteError = function() {
-            if (bulkResult.writeErrors.length == 0) {
+            if (!bulkResult.hasOwnProperty("writeErrors") || bulkResult.writeErrors.length == 0) {
                 return null;
             } else {
                 return bulkResult.writeErrors[bulkResult.writeErrors.length - 1];
@@ -146,7 +146,8 @@ var _bulk_api_module = (function() {
         };
 
         this.getWriteConcernError = function() {
-            if (bulkResult.writeConcernErrors.length == 0) {
+            if (!bulkResult.hasOwnProperty("writeConcernErrors") ||
+                bulkResult.writeConcernErrors.length == 0) {
                 return null;
             } else {
                 return bulkResult.writeConcernErrors[0];
@@ -243,7 +244,7 @@ var _bulk_api_module = (function() {
         };
 
         this.hasWriteErrors = function() {
-            return bulkResult.writeErrors.length > 0;
+            return bulkResult.hasOwnProperty("writeErrors") && bulkResult.writeErrors.length > 0;
         };
 
         this.getWriteErrorCount = function() {
@@ -264,7 +265,8 @@ var _bulk_api_module = (function() {
         };
 
         this.hasWriteConcernError = function() {
-            return bulkResult.writeConcernErrors.length > 0;
+            return bulkResult.hasOwnProperty("writeConcernErrors") &&
+                bulkResult.writeConcernErrors.length > 0;
         };
 
         this.getWriteConcernError = function() {

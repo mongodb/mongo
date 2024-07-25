@@ -121,11 +121,9 @@ jsTestLog("Let shutdown progress to start killing operations.");
 let pauseWhileKillingOperationsFailPoint =
     configureFailPoint(secondary, "pauseWhileKillingOperationsAtShutdown");
 quiesceModeFailPoint.off();
-try {
-    pauseWhileKillingOperationsFailPoint.wait();
-} catch (e) {
-    // This can throw if the waitForFailPoint command is killed by the shutdown.
-}
+
+// The waitForFailPoint command can fail with InterruptedAtShutdown if killed by the shutdown.
+pauseWhileKillingOperationsFailPoint.wait({expectedErrorCodes: [ErrorCodes.InterruptedAtShutdown]});
 
 jsTestLog("Operations fail with a shutdown error and append the topologyVersion.");
 checkTopologyVersion(assert.commandFailedWithCode(secondaryDB.runCommand({find: collName}),
@@ -209,11 +207,8 @@ jsTestLog("Let shutdown progress to start killing operations.");
 pauseWhileKillingOperationsFailPoint =
     configureFailPoint(primary, "pauseWhileKillingOperationsAtShutdown");
 quiesceModeFailPoint.off();
-try {
-    pauseWhileKillingOperationsFailPoint.wait();
-} catch (e) {
-    // This can throw if the waitForFailPoint command is killed by the shutdown.
-}
+// The waitForFailPoint command can fail with InterruptedAtShutdown if killed by the shutdown.
+pauseWhileKillingOperationsFailPoint.wait({expectedErrorCodes: [ErrorCodes.InterruptedAtShutdown]});
 
 jsTestLog("Operations fail with a shutdown error and append the topologyVersion.");
 checkTopologyVersion(assert.commandFailedWithCode(primaryDB.runCommand({find: collName}),

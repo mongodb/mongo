@@ -84,6 +84,30 @@
         assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
     });
 
+    tests.push(function callingDoAssertCorrectlyAttachesWriteConcernError() {
+        const errorMessage = "Operation was interrupted";
+        const bulkResult = {
+            nModified: 0,
+            n: 0,
+            writeConcernErrors:
+                [{code: 6, codeName: "HostUnreachable", errmsg: errorMessage, errInfo: {}}],
+            upserted: [],
+            ok: 1
+        };
+
+        let error = assert.throws(() => doassert(errorMessage, new BulkWriteError(bulkResult)));
+        assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, new BulkWriteResult(bulkResult)));
+        assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, new WriteResult(bulkResult)));
+        assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, bulkResult));
+        assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
+    });
+
     /* assert tests */
 
     tests.push(function assertShouldFailForMoreThan2Args() {
