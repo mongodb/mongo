@@ -237,11 +237,3 @@ commands:
             CollModRequest: CollModRequest
         reply_type: CollModReply
 
-feature_flags:
-    featureFlagCollModTimeseriesBucketsMayHaveMixedSchemaData:
-        description: >-
-            Feature flag for the timeseriesBucketsMayHaveMixedSchemaData collMod parameter
-        cpp_varname: gCollModTimeseriesBucketsMayHaveMixedSchemaData
-        default: true
-        version: 8.0
-        shouldBeFCVGated: true
