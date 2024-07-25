@@ -62,9 +62,12 @@ jsTestLog("Shutdown recipient primary");
 recipientRst.stopSet(
     null /* signal */, true /* forRestart */, {noCleanData: true, skipValidation: true});
 
-jsTestLog("Wait for the migration to complete");
-TenantMigrationTest.assertAborted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts),
-                                  ErrorCodes.TenantMigrationAborted);
+jsTestLog("Wait for the migration to abort");
+const migrationRes = TenantMigrationTest.assertAborted(
+    tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+assert.includes([ErrorCodes.TenantMigrationAborted, ErrorCodes.HostUnreachable],
+                migrationRes.abortReason.code,
+                tojson(migrationRes));
 
 jsTestLog("Restart recipient primary");
 recipientRst.startSet({restart: true});
