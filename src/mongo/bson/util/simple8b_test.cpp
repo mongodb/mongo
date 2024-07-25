@@ -1437,6 +1437,7 @@ TEST(Simple8b, ResetRLEAfterLargeValue) {
 
     // The second block should be an RLE block
     ASSERT_GT(size, 16);
-    uint64_t secondBlock = *((uint64_t*)(data.get() + sizeof(uint64_t)));
+    uint64_t secondBlock =
+        ConstDataView(data.get() + sizeof(uint64_t)).read<LittleEndian<uint64_t>>();
     ASSERT_TRUE((secondBlock & kBaseSelectorMask) == kRleSelector);
 }
