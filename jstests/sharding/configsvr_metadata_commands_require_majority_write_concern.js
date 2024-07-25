@@ -73,19 +73,40 @@ const cleanupFuncs = {
     },
 };
 
-function checkCommand(
-    conn, command, unacceptableWCs, acceptableWCs, adminCommand, setupFunc, cleanupFunc) {
+function checkCommand(conn,
+                      command,
+                      unacceptableWCs,
+                      acceptableWCs,
+                      adminCommand,
+                      setupFunc,
+                      cleanupFunc,
+                      retryOnShutdownError) {
+    const runCommand = (cmdObj) => {
+        let res;
+        if (adminCommand) {
+            res = conn.adminCommand(cmdObj);
+        } else {
+            res = conn.runCommand(cmdObj);
+        }
+        return res;
+    };
     unacceptableWCs.forEach(function(writeConcern) {
         jsTest.log("testing " + tojson(command) + " with writeConcern " + tojson(writeConcern) +
                    " against " + conn + ", expecting the command to fail");
         setupFunc();
         let commandWithWriteConcern = {};
         Object.assign(commandWithWriteConcern, command, writeConcern);
-        if (adminCommand) {
-            assert.commandFailedWithCode(conn.adminCommand(commandWithWriteConcern),
-                                         ErrorCodes.InvalidOptions);
+
+        if (retryOnShutdownError) {
+            assert.soon(() => {
+                const res = runCommand(commandWithWriteConcern);
+                assert.commandFailedWithCode(
+                    res, [ErrorCodes.InvalidOptions, ErrorCodes.ShutdownInProgress]);
+                // retry ShutdownInProgress when retryOnShutdownError
+                return res.code === ErrorCodes.InvalidOptions;
+            });
         } else {
-            assert.commandFailedWithCode(conn.runCommand(commandWithWriteConcern),
+            assert.commandFailedWithCode(runCommand(commandWithWriteConcern),
                                          ErrorCodes.InvalidOptions);
         }
         cleanupFunc();
@@ -97,33 +118,41 @@ function checkCommand(
         setupFunc();
         let commandWithWriteConcern = {};
         Object.assign(commandWithWriteConcern, command, writeConcern);
-        if (adminCommand) {
-            assert.commandWorked(conn.adminCommand(commandWithWriteConcern));
+
+        if (retryOnShutdownError) {
+            assert.soon(() => {
+                const res = runCommand(commandWithWriteConcern);
+                assert.commandWorkedOrFailedWithCode(res, [ErrorCodes.ShutdownInProgress]);
+                // retry ShutdownInProgress when retryOnShutdownError
+                return res.ok;
+            });
         } else {
-            assert.commandWorked(conn.runCommand(commandWithWriteConcern));
+            assert.commandWorked(runCommand(commandWithWriteConcern));
         }
         cleanupFunc();
     });
 }
 
-function checkCommandMongos(command, setupFunc, cleanupFunc) {
+function checkCommandMongos(command, setupFunc, cleanupFunc, retryOnShutdownError = false) {
     checkCommand(st.s,
                  command,
                  unacceptableWCsForMongos,
                  acceptableWCsForMongos,
                  true,
                  setupFunc,
-                 cleanupFunc);
+                 cleanupFunc,
+                 retryOnShutdownError);
 }
 
-function checkCommandConfigSvr(command, setupFunc, cleanupFunc) {
+function checkCommandConfigSvr(command, setupFunc, cleanupFunc, retryOnShutdownError = false) {
     checkCommand(st.configRS.getPrimary(),
                  command,
                  unacceptableWCsForConfig,
                  acceptableWCsForConfig,
                  true,
                  setupFunc,
-                 cleanupFunc);
+                 cleanupFunc,
+                 retryOnShutdownError);
 }
 
 let st = new ShardingTest({shards: 1});
@@ -164,7 +193,8 @@ checkCommandMongos({addShard: newShard.getURL(), name: newShardName},
                    cleanupFuncs.removeShardIfExists);
 checkCommandConfigSvr({_configsvrAddShard: newShard.getURL(), name: newShardName},
                       setupFuncs.noop,
-                      cleanupFuncs.removeShardIfExists);
+                      cleanupFuncs.removeShardIfExists,
+                      true /* retryOnShutdownError */);
 
 // removeShard
 checkCommandMongos({removeShard: newShardName}, setupFuncs.addShard, cleanupFuncs.noop);
