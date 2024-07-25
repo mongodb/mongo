@@ -25,6 +25,9 @@ selector:
     # index to exist.
     - jstests/core/**/index_many2.js
 
+    # Serverless don't support mapReduce command.
+    - jstests/core/query/mr/**/*.js
+
     #
     # From retryable writes jscore stepdown passthrough
     #
