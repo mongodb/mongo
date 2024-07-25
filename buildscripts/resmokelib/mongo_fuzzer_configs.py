@@ -203,7 +203,7 @@ def generate_normal_mongo_parameters(rng, value):
         ret = rng.choice(choices)
     elif "choices" in value:
         ret = rng.choice(value["choices"])
-    elif "min" and "max" in value:
+    elif "min" in value and "max" in value:
         ret = rng.randint(value["min"], value["max"])
     elif "default" in value:
         ret = value["default"]

@@ -40,6 +40,12 @@ In buildscripts/resmokelib/mongo_fuzzer_configs.py:
 3. Add the parameter's special handling in generate_special_mongod_parameters() or generate_special_mongos_parameters()
 
 If you add a flow control parameter, please add the the parameter's name to flow_control_params in generate_mongod_parameters.
+
+If you would like the fuzzer to change the value of the parameter periodically at _runtime_, rather than just at startup, add your 
+parameter to the runtime_parameter_fuzzer_params dictionary below. The format for describing how a value should be selected is the same
+as what was described above; additionally, the dictionary for each parameter must contain a 'period' key that describes how often the 
+parameter should be changed, in seconds. Every 'period' seconds, the fuzzer will select a new random value for the parameter and use the 
+setParameter command to update the value of the parameter on every node in the cluster while the suite is running.
 """
 
 config_fuzzer_params = {
@@ -150,4 +156,22 @@ config_fuzzer_params = {
         "internalQueryFindCommandBatchSize": {"min": 1, "max": 500},
         "opportunisticSecondaryTargeting": {"choices": [True, False]},
     },
+}
+
+runtime_parameter_fuzzer_params = {
+    "mongod": {
+        "ShardingTaskExecutorPoolMinSize": {"min": 1, "max": 50, "period": 5},
+        "ingressAdmissionControllerTicketPoolSize": {
+            "choices": [500_000, 1_000_000, 2_000_000],
+            "lower_bound": 1000,
+            "upper_bound": 5_000_000,
+            "isRandomizedChoice": True,
+            "period": 1,
+        },
+        "ingressAdmissionControlEnabled": {
+            "choices": [True, False],
+            "period": 10,
+        },
+    },
+    "mongos": {},
 }

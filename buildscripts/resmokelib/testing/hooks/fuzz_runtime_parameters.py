@@ -1,20 +1,60 @@
 """Test hook that periodically makes the primary of a replica set step down."""
 
 import collections
+import copy
 import os.path
 import random
 import threading
 import time
+import sys
 
 import pymongo.errors
 
 from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.mongo_fuzzer_configs import generate_normal_mongo_parameters
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures import standalone
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
+
+
+def validate_runtime_parameter_spec(spec):
+    for key, value in spec.items():
+        if not (isinstance(value, dict) and value.get("period", 0) >= 1):
+            raise ValueError(
+                f"Invalid runtime parameter fuzz config entry for key '{key}' : {value}"
+            )
+
+
+class RuntimeParametersState:
+    """Encapsulates the runtime-state of a set of parameters we are fuzzing. Tracks the last time we set a parameter value and holds
+    the logic for generating new values."""
+
+    def __init__(self, spec, seed):
+        # Initialize the runtime state of each parameter in the spec, including the lastSet time at now, so we start setting the parameters
+        # at appropriate intervals after the suite begins.
+        now = time.time()
+        self._params = {
+            key: {**copy.deepcopy(value), "lastSet": now} for key, value in spec.items()
+        }
+        self._rng = random.Random(seed)
+
+    def generate_mongod_parameters(self):
+        """Returns a dictionary of what parameters should be set now, along with values to set them to, based on the last time the
+        parameter was set and the period provided in the spec"""
+        ret = {}
+        now = time.time()
+        for key, value in self._params.items():
+            if now - value["lastSet"] >= value["period"]:
+                ret[key] = generate_normal_mongo_parameters(self._rng, value)
+                value["lastSet"] = now
+        return ret
+
+    def get_spec(self):
+        """Return a dictionary of all parameters subject to runtime fuzzing suitable for use with getParameter."""
+        return {key: 1 for key in self._params.keys()}
 
 
 class FuzzRuntimeParameters(interface.Hook):
@@ -28,6 +68,7 @@ class FuzzRuntimeParameters(interface.Hook):
         self,
         hook_logger,
         fixture,
+        seed=random.randrange(sys.maxsize),
         auth_options=None,
     ):
         """Initialize the FuzzRuntimeParameters.
@@ -39,6 +80,8 @@ class FuzzRuntimeParameters(interface.Hook):
 
         """
         interface.Hook.__init__(self, hook_logger, fixture, FuzzRuntimeParameters.DESCRIPTION)
+        self._mongod_param_state = None
+        self._seed = seed
 
         self._fixture = fixture
 
@@ -53,12 +96,24 @@ class FuzzRuntimeParameters(interface.Hook):
         """Before suite."""
         self._add_fixture(self._fixture)
 
+        from buildscripts.resmokelib.config_fuzzer_limits import (
+            runtime_parameter_fuzzer_params,
+        )
+
+        validate_runtime_parameter_spec(runtime_parameter_fuzzer_params["mongod"])
+        # Construct the runtime state before the suite begins.
+        # The initial lastSet time of each parameter is the start time of the suite.
+        self._mongod_param_state = RuntimeParametersState(
+            runtime_parameter_fuzzer_params["mongod"], self._seed
+        )
+
         self._setParameter_thread = _SetParameterThread(
             self.logger,
             self._mongos_fixtures,
             self._rs_fixtures,
             self._standalone_fixtures,
             self._fixture,
+            self._mongod_param_state,
             lifecycle_interface.FlagBasedThreadLifecycle(),
             self._auth_options,
         )
@@ -72,16 +127,30 @@ class FuzzRuntimeParameters(interface.Hook):
         self.logger.info("Runtime parameter fuzzing thread stopped.")
 
     def before_test(self, test, test_report):
-        """Before test."""
+        """Before test. Log current config of all runtime-fuzzable params."""
+        for repl_set in self._rs_fixtures:
+            for node in repl_set.nodes:
+                self._invoke_get_parameter_and_log(node)
+
+        for standalone in self._standalone_fixtures:
+            self._invoke_get_parameter_and_log(standalone)
+
         self.logger.info("Resuming the runtime parameter fuzzing thread.")
         self._setParameter_thread.pause()
         self._setParameter_thread.resume()
 
     def after_test(self, test, test_report):
-        """After test."""
+        """After test. Log current config of all runtime-fuzzable params."""
         self.logger.info("Pausing the runtime parameter fuzzing thread.")
         self._setParameter_thread.pause()
         self.logger.info("Paused the runtime parameter fuzzing thread.")
+
+        for repl_set in self._rs_fixtures:
+            for node in repl_set.nodes:
+                self._invoke_get_parameter_and_log(node)
+
+        for standalone in self._standalone_fixtures:
+            self._invoke_get_parameter_and_log(standalone)
 
     def _add_fixture(self, fixture):
         if isinstance(fixture, standalone.MongoDFixture):
@@ -102,6 +171,17 @@ class FuzzRuntimeParameters(interface.Hook):
         else:
             raise ValueError("No fixture to run setParameter on.")
 
+    def _invoke_get_parameter_and_log(self, node):
+        """Helper to print the current state of a node's runtime-fuzzable parameters. Only usable once before_suite has initialized the runtime state of the parameters."""
+        client = fixture_interface.build_client(node, self._auth_options)
+        params_to_get = self._mongod_param_state.get_spec()
+        get_result = client.admin.command("getParameter", 1, **params_to_get)
+        self.logger.info(
+            "Current state of runtime-fuzzable parameters on node on port %d. Parameters: %s",
+            node.port,
+            get_result,
+        )
+
 
 class _SetParameterThread(threading.Thread):
     def __init__(
@@ -111,6 +191,7 @@ class _SetParameterThread(threading.Thread):
         rs_fixtures,
         standalone_fixtures,
         fixture,
+        mongod_param_state,
         lifecycle,
         auth_options=None,
     ):
@@ -122,6 +203,7 @@ class _SetParameterThread(threading.Thread):
         self._rs_fixtures = rs_fixtures
         self._standalone_fixtures = standalone_fixtures
         self._fixture = fixture
+        self._mongod_param_state = mongod_param_state
         self.__lifecycle = lifecycle
         self._auth_options = auth_options
         self._setparameter_interval_secs = 1
@@ -147,14 +229,8 @@ class _SetParameterThread(threading.Thread):
 
                 now = time.time()
                 if now - self._last_exec > self._setparameter_interval_secs:
-                    # TODO SERVER-91123 Choose an appropriate log verbosity to ensure we don't overwhelm the log.
-                    self.logger.info("Changing a setParameter value at runtime")
                     self._do_set_parameter()
                     self._last_exec = time.time()
-                    self.logger.info(
-                        "Completed setParameter in %0d ms",
-                        (self._last_exec - now) * 1000,
-                    )
 
                 found_idle_request = self.__lifecycle.poll_for_idle_request()
                 if found_idle_request:
@@ -219,24 +295,25 @@ class _SetParameterThread(threading.Thread):
             raise errors.ServerFailure(msg)
 
     def _do_set_parameter(self):
-        # TODO SERVER-92714 Intelligently choose paramters to set based on some static configurations.
+        params_to_set = self._mongod_param_state.generate_mongod_parameters()
+
         # TODO SERVER-91123 Accept failure of the command in certain cases. This command can run
         # regardless of replication state but may fail on terminate primary suites.
         def invoke_set_parameter(client):
-            client.admin.command("setParameter", 1, ShardingTaskExecutorPoolMinSize=1)
+            client.admin.command("setParameter", 1, **params_to_set)
 
         for repl_set in self._rs_fixtures:
             self.logger.info(
-                "Setting the parameter ShardingTaskExecutorPoolMinSize to value 1 on all nodes of fixture %s",
+                "Setting parameters on all nodes of fixture %s. Parameters: %s",
                 repl_set.replset_name,
+                params_to_set,
             )
             for node in repl_set.nodes:
                 invoke_set_parameter(fixture_interface.build_client(node, self._auth_options))
 
         for standalone in self._standalone_fixtures:
             self.logger.info(
-                "Setting the parameter ShardingTaskExecutorPoolMinSize to value 1 on standalone node on port %d",
-                standalone.port,
+                "Setting parameters node on port %d. Parameters: %s", standalone.port, params_to_set
             )
             invoke_set_parameter(fixture_interface.build_client(standalone, self._auth_options))
         # TODO SERVER-92715 Handle mongos processes.
