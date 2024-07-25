@@ -444,6 +444,10 @@ executor::TaskExecutor::CallbackHandle ReplicationCoordinatorImpl::getCatchupTak
     return _catchupTakeoverCbh;
 }
 
+int64_t ReplicationCoordinatorImpl::getLastHorizonChange_forTest() const {
+    return _lastHorizonTopologyChange;
+}
+
 OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return _getCurrentCommittedSnapshotOpTime_inlock();
@@ -2387,6 +2391,10 @@ ReplicationCoordinatorImpl::_getHelloResponseFuture(
             prevCounter <= topologyVersionCounter);
 
     if (prevCounter < topologyVersionCounter) {
+        uassert(ErrorCodes::SplitHorizonChange,
+                "Stale horizon detected, we have since received a reconfig that changed the "
+                "horizon mappings.",
+                prevCounter >= _lastHorizonTopologyChange);
         // The received hello command contains a stale topology version so we respond
         // immediately with a more current topology version.
         return SharedSemiFuture<SharedHelloResponse>(
@@ -4454,6 +4462,8 @@ void ReplicationCoordinatorImpl::_errorOnPromisesIfHorizonChanged(WithLock lk,
             promise->setError({ErrorCodes::SplitHorizonChange,
                                "Received a reconfig that changed the horizon mappings."});
         }
+        _topCoord->incrementTopologyVersion();
+        _lastHorizonTopologyChange = _topCoord->getTopologyVersion().getCounter();
         _sniToValidConfigPromiseMap.clear();
         HelloMetrics::get(opCtx)->resetNumAwaitingTopologyChanges();
     }
@@ -4468,6 +4478,10 @@ void ReplicationCoordinatorImpl::_errorOnPromisesIfHorizonChanged(WithLock lk,
                 promise->setError({ErrorCodes::SplitHorizonChange,
                                    "Received a reconfig that changed the horizon mappings."});
             }
+            // Increment topology version to mark a horizon change, since a reconfig doesn't
+            // increment the topology version until the end.
+            _topCoord->incrementTopologyVersion();
+            _lastHorizonTopologyChange = _topCoord->getTopologyVersion().getCounter();
             _createHorizonTopologyChangePromiseMapping(lk);
             HelloMetrics::get(opCtx)->resetNumAwaitingTopologyChanges();
         }

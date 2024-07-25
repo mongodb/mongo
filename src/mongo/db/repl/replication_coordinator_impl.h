@@ -468,6 +468,11 @@ public:
     executor::TaskExecutor::CallbackHandle getCatchupTakeoverCbh_forTest() const;
 
     /**
+     * Returns the cached horizon topology version from most recent SplitHorizonChange.
+     */
+    int64_t getLastHorizonChange_forTest() const;
+
+    /**
      * Simple wrappers around _setLastOptime to make it easier to test.
      */
     Status setLastAppliedOptime_forTest(long long cfgVer,
@@ -1843,6 +1848,9 @@ private:
 
     // The cached value of the 'counter' field in the server's TopologyVersion.
     AtomicWord<int64_t> _cachedTopologyVersionCounter;  // (S)
+
+    // The cached value of the topology from the most recent SplitHorizonChange.
+    int64_t _lastHorizonTopologyChange{-1};  // (M)
 
     // This should be set during sharding initialization.
     boost::optional<bool> _wasCWWCSetOnConfigServerOnStartup;
