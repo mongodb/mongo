@@ -246,17 +246,25 @@ export function checkBackup(backupCursor) {
 
 // Magic restore utility class
 
-// This class implements helpers for testing the magic restore proces. It maintains the state of the
-// backup cursor and handles writing objects to named pipes and running magic restore on a single
-// node. It exposes some of this state so that individual tests can make specific assertions as
-// needed.
+// This class implements helpers for testing the magic restore process. It wraps a ReplSetTest
+// object and maintains the state of the backup cursor, handles writing objects to named pipes and
+// running the restore process. It exposes some of this state so that individual tests can make
+// specific assertions as needed.
 
 export class MagicRestoreUtils {
-    constructor({backupSource, pipeDir, insertHigherTermOplogEntry, backupDbPathSuffix}) {
-        this.backupSource = backupSource;
+    constructor({rst, pipeDir, insertHigherTermOplogEntry = false}) {
+        this.rst = rst;
         this.pipeDir = pipeDir;
-        this.backupDbPath =
-            pipeDir + "/backup" + (backupDbPathSuffix != undefined ? backupDbPathSuffix : "");
+
+        this.backupSource = this._selectBackupSource();
+        // Data files are backed up from the source into 'backupDbPath'. We'll copy these data files
+        // into separate dbpaths for each node, ending with 'restore_{nodeId}'.
+        this.backupDbPath = pipeDir + "/backup";
+        this.restoreDbPaths = [];
+        this.rst.nodes.forEach((node) => {
+            const restoreDbPath = pipeDir + "/restore_" + this.rst.getNodeId(node);
+            this.restoreDbPaths.push(restoreDbPath);
+        });
 
         // isPit is set when we receive the restoreConfiguration.
         this.isPit = false;
@@ -264,11 +272,30 @@ export class MagicRestoreUtils {
         // Default high term value.
         this.restoreToHigherTermThan = 100;
 
+        // The replica set config will be the same across nodes in a cluster.
+        this.expectedConfig = this.rst.getPrimary().adminCommand({replSetGetConfig: 1}).config;
         // These fields are set during the restore process.
         this.backupCursor = undefined;
         this.backupId = undefined;
         this.checkpointTimestamp = undefined;
         this.pointInTimeTimestamp = undefined;
+    }
+
+    /**
+     * Helper function that selects the node to use for data files. For single-node sets we'll use
+     * the primary, but for multi-node sets we'll use the first secondary. In production, we often
+     * retrieve the backup from a secondary node to reduce load on the primary.
+     */
+    _selectBackupSource() {
+        let backupSource;
+        if (this.rst.nodes.length === 1) {
+            backupSource = this.rst.getPrimary();
+            jsTestLog(`Selecting primary ${backupSource.host} as backup source.`);
+            return backupSource;
+        }
+        jsTestLog(`Selecting secondary ${backupSource.host} as backup source.`);
+        backupSource = this.rst.getSecondary();
+        return backupSource;
     }
 
     /**
@@ -281,10 +308,17 @@ export class MagicRestoreUtils {
 
     /**
      * Helper function that returns the dbpath for the backup. Used to start a regular node after
-     * magic restore completes.
+     * magic restore completes. Parameterizes the dbpath to allow for multi-node clusters.
      */
     getBackupDbPath() {
-        return this.backupDbPath;
+        return MagicRestoreUtils.parameterizeDbpath(this.restoreDbPaths[0]);
+    }
+
+    /**
+     * Helper function that returns the expected config after the restore.
+     */
+    getExpectedConfig() {
+        return this.expectedConfig;
     }
 
     /**
@@ -295,10 +329,6 @@ export class MagicRestoreUtils {
     takeCheckpointAndOpenBackup(backupCursorOpts = {}) {
         // Take the initial checkpoint.
         assert.commandWorked(this.backupSource.adminCommand({fsync: 1}));
-
-        resetDbpath(this.backupDbPath);
-        // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
-        mkdir(this.backupDbPath + "/journal");
 
         // Open a backup cursor on the checkpoint.
         this.backupCursor = openBackupCursor(this.backupSource.getDB("admin"), backupCursorOpts);
@@ -315,6 +345,9 @@ export class MagicRestoreUtils {
      * Copies data files from the source dbpath to the backup dbpath.
      */
     copyFiles() {
+        resetDbpath(this.backupDbPath);
+        // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
+        mkdir(this.backupDbPath + "/journal");
         while (this.backupCursor.hasNext()) {
             const doc = this.backupCursor.next();
             jsTestLog("Copying for backup: " + tojson(doc));
@@ -325,11 +358,16 @@ export class MagicRestoreUtils {
     }
 
     /**
-     * Copies data files from the source dbpath to the backup dbpath. Closes the backup cursor.
+     * Copies data files from the source dbpath to the backup dbpath, and then closes the backup
+     * cursor. Copies the data files from the backup path to each node's restore db path.
      */
     copyFilesAndCloseBackup() {
         this.copyFiles();
         this.backupCursor.close();
+        this.restoreDbPaths.forEach((restoreDbPath) => {
+            resetDbpath(restoreDbPath);
+            MagicRestoreUtils.copyBackupFilesToDir(this.backupDbPath, restoreDbPath);
+        });
     }
 
     /**
@@ -345,16 +383,24 @@ export class MagicRestoreUtils {
         this.backupCursor.close();
     }
 
+    // Copies backup cursor data files from directory to another. Makes the destination directory if
+    // needed. Used to copy one set of backup files to multiple nodes.
+    static copyBackupFilesToDir(source, dest) {
+        if (!fileExists(dest)) {
+            assert(mkdir(dest).created);
+        }
+        jsTestLog(`Copying data files from source path ${source} to destination path ${dest}`);
+        copyDir(source, dest);
+    }
+
     /**
      * Helper function that generates the magic restore named pipe path for testing. 'pipeDir'
      * is the directory in the filesystem in which we create the named pipe.
      */
     static _generateMagicRestorePipePath(pipeDir) {
         const pipeName = "magic_restore_named_pipe";
-        // On Windows, the pipe path prefix is ignored. "//./pipe/" is the required path start of
-        // all named pipes on Windows.
-        const pipePath = _isWindows() ? "//./pipe/" + pipeName : `${pipeDir}/tmp/${pipeName}`;
-        if (!_isWindows() && !fileExists(pipeDir + "/tmp/")) {
+        const pipePath = `${pipeDir}/tmp/${pipeName}`;
+        if (!fileExists(pipeDir + "/tmp/")) {
             assert(mkdir(pipeDir + "/tmp/").created);
         }
         return {pipeName, pipePath};
@@ -496,7 +542,6 @@ export class MagicRestoreUtils {
      */
     postRestoreChecks({
         node,
-        expectedConfig,
         dbName,
         collName,
         expectedOplogCountForNs,
@@ -510,9 +555,9 @@ export class MagicRestoreUtils {
         node.setSecondaryOk();
         const restoredConfig =
             assert.commandWorked(node.adminCommand({replSetGetConfig: 1})).config;
-        this._assertConfigIsCorrect(expectedConfig, restoredConfig);
+        this._assertConfigIsCorrect(this.expectedConfig, restoredConfig);
         this.assertOplogCountForNamespace(
-            node, dbName + "." + collName, expectedOplogCountForNs, opFilter);
+            node, {ns: dbName + "." + collName, op: opFilter}, expectedOplogCountForNs);
         this._assertMinValidIsCorrect(node);
         this._assertStableCheckpointIsCorrectAfterRestore(node, shardLastOplogEntryTs);
         this._assertCannotDoSnapshotRead(
@@ -530,11 +575,7 @@ export class MagicRestoreUtils {
      * Performs a find on the oplog for the given name space and asserts that the expected number of
      * entries exists. Optionally takes an op type to filter.
      */
-    assertOplogCountForNamespace(node, ns, expectedNumEntries, op) {
-        let findObj = {ns: ns};
-        if (op) {
-            findObj.op = op;
-        }
+    assertOplogCountForNamespace(node, findObj, expectedNumEntries) {
         const entries =
             node.getDB("local").getCollection('oplog.rs').find(findObj).sort({ts: -1}).toArray();
         assert.eq(entries.length, expectedNumEntries);
@@ -559,9 +600,15 @@ export class MagicRestoreUtils {
         if (this.pointInTimeTimestamp) {
             this.isPit = true;
         }
-        MagicRestoreUtils.writeObjsToMagicRestorePipe(
-            this.pipeDir, [restoreConfiguration, ...entriesAfterBackup]);
-        MagicRestoreUtils.runMagicRestoreNode(this.pipeDir, this.backupDbPath, options);
+        jsTestLog("Restore configuration: " + tojson(restoreConfiguration));
+
+        // Restore each node in serial.
+        this.rst.nodes.forEach((node, idx) => {
+            jsTestLog(`Restoring node ${node.host}`);
+            MagicRestoreUtils.writeObjsToMagicRestorePipe(
+                this.pipeDir, [restoreConfiguration, ...entriesAfterBackup]);
+            MagicRestoreUtils.runMagicRestoreNode(this.pipeDir, this.restoreDbPaths[idx], options);
+        });
     }
 
     /**
