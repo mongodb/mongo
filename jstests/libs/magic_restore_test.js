@@ -48,8 +48,8 @@ export class MagicRestoreUtils {
             jsTestLog(`Selecting primary ${backupSource.host} as backup source.`);
             return backupSource;
         }
-        jsTestLog(`Selecting secondary ${backupSource.host} as backup source.`);
         backupSource = this.rst.getSecondary();
+        jsTestLog(`Selecting secondary ${backupSource.host} as backup source.`);
         return backupSource;
     }
 
