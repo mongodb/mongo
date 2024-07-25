@@ -211,7 +211,7 @@ last-continuous:
       ticket: SERVER-92193
     - test_file: jstests/replsets/write_concern_update_where.js
       ticket: SERVER-87126
-    - test_file: jstsests/core/find_with_resume_after_param.js
+    - test_file: jstests/core/find_with_resume_after_param.js
       ticket: SERVER-92431
   suites: null
 last-lts:
@@ -436,6 +436,6 @@ last-lts:
       ticket: SERVER-92193
     - test_file: jstests/replsets/write_concern_update_where.js
       ticket: SERVER-87126
-    - test_file: jstsests/core/find_with_resume_after_param.js
+    - test_file: jstests/core/find_with_resume_after_param.js
       ticket: SERVER-92431
   suites: null
