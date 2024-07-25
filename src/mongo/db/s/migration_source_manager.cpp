@@ -167,6 +167,11 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                         _args.getToShard(),
                         _args.getFromShard()) {
     invariant(!_opCtx->lockState()->isLocked());
+    // Since the MigrationSourceManager is registered on the CSR from the constructor, another
+    // thread can get it and abort the migration (and get a reference to the completion promise's
+    // future). When this happens, since we throw an exception from the constructor, the destructor
+    // will not run, so we have to do complete it here, otherwise we get a BrokenPromise
+    ScopeGuard scopedGuard([&] { _completion.emplaceValue(); });
 
     LOGV2(22016,
           "Starting chunk migration donation {requestParameters} with expected collection epoch "
@@ -291,6 +296,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
     _moveTimingHelper.done(2);
     moveChunkHangAtStep2.pauseWhileSet();
+    scopedGuard.dismiss();
 }
 
 MigrationSourceManager::~MigrationSourceManager() {
