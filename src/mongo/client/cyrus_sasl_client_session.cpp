@@ -34,14 +34,11 @@
 #include "mongo/base/init.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/native_sasl_client_session.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/str.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 namespace mongo {
 namespace {
@@ -116,7 +113,7 @@ void saslMutexFree(void* mutex) {
  * Configures the SASL library to use allocator and mutex functions we specify,
  * unless the client application has previously initialized the SASL library.
  */
-MONGO_INITIALIZER(CyrusSaslAllocatorsAndMutexesClient)(InitializerContext*) {
+MONGO_INITIALIZER(CyrusSaslAllocatorsAndMutexes)(InitializerContext*) {
     sasl_set_alloc(saslOurMalloc, saslOurCalloc, saslOurRealloc, free);
 
     sasl_set_mutex(saslMutexAlloc, saslMutexLock, saslMutexUnlock, saslMutexFree);
@@ -154,14 +151,13 @@ int saslClientVerifyPluginFile(void*, const char*, sasl_verify_type_t type) {
  *
  * If a client wishes to override this initialization but keep the allocator and mutex
  * initialization, it should implement a MONGO_INITIALIZER_GENERAL with
- * CyrusSaslAllocatorsAndMutexesClient as a prerequisite and CyrusSaslClientContext as a
+ * CyrusSaslAllocatorsAndMutexes as a prerequisite and CyrusSaslClientContext as a
  * dependent.  If it wishes to override both, it should implement a MONGO_INITIALIZER_GENERAL
- * with CyrusSaslAllocatorsAndMutexesClient and CyrusSaslClientContext as dependents, or
+ * with CyrusSaslAllocatorsAndMutexes and CyrusSaslClientContext as dependents, or
  * initialize the library before calling mongo::runGlobalInitializersOrDie().
  */
 MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
-                                     ("NativeSaslClientContext",
-                                      "CyrusSaslAllocatorsAndMutexesClient"))
+                                     ("NativeSaslClientContext", "CyrusSaslAllocatorsAndMutexes"))
 (InitializerContext* context) {
     static sasl_callback_t saslClientGlobalCallbacks[] = {
         {SASL_CB_LOG, SaslCallbackFn(saslClientLogSwallow), nullptr /* context */},
