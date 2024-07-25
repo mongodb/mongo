@@ -5,21 +5,6 @@
 
 ## Aliases.
 patch_aliases:
-  - alias: "embedded"
-    variant: ".*"
-    task: "embedded_.*"
-    variant_tags: []
-    task_tags: []
-  - alias: "hourly"
-    variant: "^(enterprise-windows-all-feature-flags-required|linux-64-debug|ubuntu1804-debug-aubsan-lite|enterprise-rhel-70-64-bit|ubuntu1604-debug|macos-debug|windows-debug )$"
-    task: ".*"
-    variant_tags: []
-    task_tags: []
-  - alias: "query"
-    variant: "^(.*query-patch-only|enterprise-ubuntu-dynamic-1804-clang-tidy-required)$"
-    task: ".*"
-    variant_tags: []
-    task_tags: []
   - alias: "required"
     variant: "^(.*-required$|linux-64-debug|ubuntu1804-debug-aubsan-lite)$"
     task: ".*"
