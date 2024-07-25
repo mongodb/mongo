@@ -345,6 +345,9 @@ TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetDeadline)
 
     keyManager()->startMonitoring(getServiceContext());
 
+    // Wait for the background thread to fail its initial refresh.
+    failRefreshFp->waitForTimesEntered(timesEnteredBefore + 1);
+
     stdx::thread t{[&] {
         ThreadClient client(getServiceContext()->getService());
         auto opCtx = cc().makeOperationContext();
@@ -358,7 +361,9 @@ TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetDeadline)
             ErrorCodes::MaxTimeMSExpired);
     }};
 
+    // The getKeysForValidation call will spark an additional refresh, which will also fail.
     failRefreshFp->waitForTimesEntered(timesEnteredBefore + 2);
+    // Now we can advance the clock. We should hit the timeout before waking up to refresh again.
     ClockSourceMock clock;
     clock.advance(KeysCollectionManager::kRefreshIntervalIfErrored);
     t.join();
@@ -384,6 +389,9 @@ TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetMaxTries)
 
     keyManager()->startMonitoring(getServiceContext());
 
+    // Wait for the background thread to fail its initial refresh.
+    failRefreshFp->waitForTimesEntered(timesEnteredBefore + 1);
+
     stdx::thread t{[&] {
         ThreadClient client(getServiceContext()->getService());
         auto opCtx = cc().makeOperationContext();
@@ -392,7 +400,7 @@ TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetMaxTries)
         ASSERT_EQ(keyStatus.getStatus(), ErrorCodes::KeyNotFound);
     }};
 
-    unsigned timesEntered = 0;
+    unsigned timesEntered = 1;  // Already waited to enter it above.
     while (timesEntered < KeysCollectionManager::kReadConcernMajorityNotAvailableYetMaxTries) {
         failRefreshFp->waitForTimesEntered(timesEnteredBefore + timesEntered + 1);
         timesEntered++;
