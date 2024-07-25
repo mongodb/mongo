@@ -231,7 +231,8 @@ testTimeseriesNamespaceExists((testDB, collName) => {
                 ? TimeseriesTest.BucketVersion.kCompressedSorted
                 : TimeseriesTest.BucketVersion.kUncompressed,
             min: {time: timestamp, "_id": oid, "a": 1},
-            max: {time: timestamp, "_id": oid, "a": 1}
+            max: {time: timestamp, "_id": oid, "a": 1},
+            count: 1
         },
         data: {
             "time": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
