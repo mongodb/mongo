@@ -125,7 +125,7 @@ expected =
     [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
 assert.eq(result, expected);
 
-// Test that a $match with $jsonSchema works as expected although ineligable for absorbtion by a
+// Test that a $match with $jsonSchema works as expected although ineligible for absorbtion by a
 // $lookup.
 result = testDB.animals
                  .aggregate([
@@ -156,7 +156,7 @@ expected =
     [{_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}}];
 assert.eq(result, expected);
 
-// Test that a more complex $match with $jsonSchema works as expected although ineligable for
+// Test that a more complex $match with $jsonSchema works as expected although ineligible for
 // absorbtion by a $lookup.
 result = testDB.animals
                  .aggregate([
@@ -183,8 +183,100 @@ expected =
     [{_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}}];
 assert.eq(result, expected);
 
-// Test that a $match with $alwaysTrue works as expected although ineligable for absorbtion by a
-// $lookup.
+// Test that $match with a $jsonSchema property that will internally translate to a match
+// expression node that has a path that is prefixed by the 'as' field in the lookup and that has
+// children that can operate on that path (in this case, $_internalSchemaAllElemMatchFromIndex)
+// works as expected although ineligible for absorbtion by a $lookup. Note that the jsonSchema below
+// ensures that all elements of 'location.coordinates' are above 0 since the 'items' field is an
+// object.
+result = testDB.animals
+                 .aggregate([
+                     {
+                         $lookup: {
+                             from: "locations",
+                             localField: "locationId",
+                             foreignField: "_id",
+                             as: "location"
+                         }
+                     },
+                     {$unwind: "$location"},
+                     {
+                         $match: {
+                             $jsonSchema: {
+                                 properties: {"location.coordinates": {items: {minimum: 0}}}
+                             }
+                         }
+                     },
+                     {$project: {"location.extra": false, "colors": false}}
+                 ])
+                 .toArray();
+
+expected =
+    [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+assert.eq(result, expected);
+
+// Test that $match with a $jsonSchema property that will internally translate to a match
+// expression node that has a path that is prefixed by the 'as' field in the lookup and that has
+// children that can operate on that path (in this case, $_internalSchemaMatchArrayIndex) works as
+// expected although ineligible for absorbtion by a $lookup. Note that the jsonSchema below ensures
+// that the first element of 'location.coordinates' is above 0 since the 'items' field is an array.
+result = testDB.animals
+                 .aggregate([
+                     {
+                         $lookup: {
+                             from: "locations",
+                             localField: "locationId",
+                             foreignField: "_id",
+                             as: "location"
+                         }
+                     },
+                     {$unwind: "$location"},
+                     {
+                         $match: {
+                             $jsonSchema: {
+                                 properties: {"location.coordinates": {items: [{minimum: 0}]}}
+                             }
+                         }
+                     },
+                     {$project: {"location.extra": false, "colors": false}}
+                 ])
+                 .toArray();
+
+expected =
+    [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+assert.eq(result, expected);
+
+// Test that $match with a $jsonSchema property that will internally translate to a match
+// expression node that has a path that is prefixed by the 'as' field in the lookup and that has
+// children that can operate that path (in this case, $_internalSchemaObjectMatch) works as expected
+// although ineligible for absorbtion by a $lookup.
+result = testDB.animals
+                 .aggregate([
+                     {
+                         $lookup: {
+                             from: "locations",
+                             localField: "locationId",
+                             foreignField: "_id",
+                             as: "location"
+                         }
+                     },
+                     {$unwind: "$location"},
+                     {
+                         $match: {
+                             $jsonSchema: {
+                                 properties: {"location.extra": {type: 'object', properties: {"breeds": {type: 'string'}}}}
+                             }
+                         }
+                     },
+                     {$project: {"location.extra": false, "colors": false}}
+                 ])
+                 .toArray();
+expected =
+    [{_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}}];
+assert.eq(result, expected);
+
+// Test that a $match with $alwaysTrue works as expected although ineligible for absorbtion
+// by a $lookup. The $sort is to guarantee records are returned in the expected order.
 result = testDB.animals
                  .aggregate([
                      {
@@ -209,7 +301,7 @@ expected = [
 ];
 assert.eq(result, expected);
 
-// Test that a $match with $alwaysFalse works as expected although ineligable for absorbtion by a
+// Test that a $match with $alwaysFalse works as expected although ineligible for absorbtion by a
 // $lookup.
 result = testDB.animals
                  .aggregate([
@@ -231,7 +323,7 @@ result = testDB.animals
 expected = [];
 assert.eq(result, expected);
 
-// Test that a $match with $expr works as expected although ineligable for absorbtion by a $lookup.
+// Test that a $match with $expr works as expected although ineligible for absorbtion by a $lookup.
 result = testDB.animals
                  .aggregate([
                      {

@@ -573,6 +573,13 @@ public:
      */
     std::string toString() const;
 
+    /**
+     * Returns true of the match type represents a node that
+     * (1) has a path and
+     * (2) has children that can operate on that path.
+     */
+    static bool isInternalNodeWithPath(MatchType m);
+
 protected:
     /**
      * An ExpressionOptimizerFunc implements tree simplifications for a MatchExpression tree with a
