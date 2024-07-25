@@ -118,6 +118,7 @@ function assertNumEntries(
     // config.image_collection entry for the retryable write in the external session do not get
     // reaped since there is an in-progress internal transaction for that retryable write.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
+    rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
     assertNumEntries(
         sessionOpts,
@@ -248,6 +249,7 @@ function assertNumEntries(
     // config.transactions for the committed internal transaction for that retryable write do not
     // get reaped since there is an in-progress internal transaction for the same retryable write.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
+    rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
     assertNumEntries(
         sessionOpts,
@@ -316,6 +318,7 @@ function assertNumEntries(
     // Force the logical session cache to reap, and verify that the config.transactions entry and
     // config.image_collection entry for the previous write do get reaped.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
+    rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
     assertNumEntries(
         sessionOpts,
@@ -380,6 +383,7 @@ function assertNumEntries(
     // Force the logical session cache to reap, and verify that the config.transactions entry and
     // config.image_collection entry for the previous write do get reaped.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
+    rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
     assertNumEntries(
         sessionOpts,
@@ -440,6 +444,7 @@ function assertNumEntries(
     // since there has not been a retryble write or transaction with a higher txnNumber in the
     // logical session.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
+    rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
     assertNumEntries(
         sessionOpts,
@@ -497,6 +502,7 @@ function assertNumEntries(
     // the committed non retryable-write internal transaction does get reaped since it is unrelated
     // to the in-progress transaction in the external session.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
+    rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
     assertNumEntries(
         sessionOpts,
@@ -594,6 +600,7 @@ function assertNumEntries(
     // config.image_collection entry for the retryable write in the external session do not get
     // reaped.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
+    rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
     assertNumEntries(
         sessionOpts,
@@ -678,6 +685,7 @@ function assertNumEntries(
     // config.image_collection entry for the retryable write in the external session do not get
     // reaped.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
+    rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
     assertNumEntries(
         sessionOpts,
@@ -799,6 +807,7 @@ function assertNumEntries(
     // committed internal transaction for that retryable write do not get reaped since there is an
     // in-progress internal transaction for the same retryable write.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
+    rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
     assertNumEntries(
         sessionOpts,
@@ -883,6 +892,7 @@ function assertNumEntries(
     // Force the logical session cache to reap, and verify that the config.transactions entry and
     // config.image_collection entry for the retryable write in the external session do get reaped.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
+    rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
     assertNumEntries(
         sessionOpts,
