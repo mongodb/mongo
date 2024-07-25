@@ -140,6 +140,21 @@ namespace {
 DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend) {
     auth::ValidatedTenancyScopeGuard tenancyStasher(opCtx);
     DirectClientScope directClientScope(opCtx);
+    // TODO SERVER-77213: Refactor the stashing performed here. Right now this is working fine
+    // because the opCtx will reuse the Locker instance in the sub-operation since it's not yet part
+    // of TransactionResources. However, in case the Locker is stored in them then this has the
+    // potential for a deadlock. An example of this is as follows:
+    // * The parent operation is holding a MODE_IX lock on collA
+    // * A strong MODE_X lock is enqueued for collA
+    // * Sub-operation begins and attempts to acquire a MODE_IS lock on collA.
+    // This would deadlock as the sub-operation's MODE_IS acquisition is enqueued after the MODE_X
+    // lock request which will only be acquired once the parent operation finishes. However, this
+    // functions properly today since we reuse the Locker.
+    //
+    // In theory this stashing could be done at a higher level when we aren't certain if we are
+    // going to perform a remote call. Directly calling DBDirectClient implies opCtx reuse so the
+    // operation already wants to reuse existing lock acquisitions and is just using the client as a
+    // cheap API for existing functionality.
     StashTransactionResourcesForDBDirect stashedTxnResources(opCtx);
 
     CurOp curOp;
