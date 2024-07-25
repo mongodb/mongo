@@ -321,10 +321,6 @@ public:
                      StringData ident,
                      const StorageEngine::DropIdentCallback& onDrop = nullptr) override;
 
-    Status dropIdentSynchronous(RecoveryUnit* ru,
-                                StringData ident,
-                                const StorageEngine::DropIdentCallback& onDrop = nullptr) override;
-
     void dropIdentForImport(OperationContext* opCtx, StringData ident) override;
 
     void alterIdentMetadata(OperationContext* opCtx,

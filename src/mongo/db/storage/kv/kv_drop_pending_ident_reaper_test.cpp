@@ -69,12 +69,6 @@ public:
                      StringData ident,
                      const StorageEngine::DropIdentCallback& onDrop) override;
 
-    Status dropIdentSynchronous(RecoveryUnit* ru,
-                                StringData ident,
-                                const StorageEngine::DropIdentCallback& onDrop) override {
-        return dropIdent(ru, ident, onDrop);
-    }
-
     void dropIdentForImport(OperationContext* opCtx, StringData ident) override {}
 
     // Unused KVEngine functions below.
