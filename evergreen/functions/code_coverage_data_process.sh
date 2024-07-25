@@ -28,11 +28,11 @@ activate_venv
 
 pipx install "cpp-coveralls==0.4.2" || exit 1
 
-# run coveralls - currently dumps to a json file
+# Run coveralls and upload data.
+# View at https://coveralls.io/github/10gen/mongo
 cpp-coveralls \
   --root ./build/debug \
   --build-root . \
   --verbose \
   --gcov ${GCOV_TOOL[@]} \
-  --dump coveralls.json \
   --exclude src/third_party/

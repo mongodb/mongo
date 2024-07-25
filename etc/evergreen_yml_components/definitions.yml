@@ -2628,24 +2628,12 @@ functions:
         - "./src/evergreen/functions/code_coverage_data_process.sh"
       env:
         GCOV_TOOL: ${gcov_tool}
-
-  "archive coveralls json": &archive_coveralls_json
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: "src/coveralls.json"
-      remote_file: ${project}/${build_variant}/${revision}/gcov/coveralls-${task_id}-${execution}.json
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/json
-      display_name: coveralls.json - Execution ${execution}
-      optional: true
+        COVERALLS_REPO_TOKEN: ${coveralls_token}
+        TRAVIS_JOB_ID: ${revision_order_id}
 
   "save code coverage data":
     - *f_expansions_write
     - *process_code_coverage_data
-    - *archive_coveralls_json
 
   "do scons setup":
     - command: manifest.load
