@@ -547,16 +547,14 @@ function runTest(fixture, {isShardedColl, candidateShardKeyField, isHashed}) {
 
     fixture.runCmdsFn(dbName, testCase.cmdObjs);
 
-    // Turn off query sampling and wait for sampling to become inactive. The wait is necessary for
-    // preventing the internal aggregate commands run by the analyzeShardKey commands below from
-    // getting sampled.
-    assert.commandWorked(
-        fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "off"}));
-    fixture.waitForInactiveSamplingFn(sampledNs, sampledCollUuid);
-
     res = waitForSampledQueries(fixture.conn, sampledNs, shardKey, testCase);
     // Verify that the metrics are as expected.
     assertMetricsNonEmptySampleSize(res, testCase.metrics, isHashed);
+
+    // Turn off query sampling and wait for sampling to become inactive.
+    assert.commandWorked(
+        fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "off"}));
+    fixture.waitForInactiveSamplingFn(sampledNs, sampledCollUuid);
 
     assert(notSampledColl.drop());
     // Drop the sampled collection without removing its config.sampledQueries and
@@ -592,9 +590,12 @@ const mongosSetParametersOpts = {
     logComponentVerbosity: tojson({sharding: 3})
 };
 
+const eligibleForSamplingCommentBase = jsTestName() + " sampling ";
+
 {
     jsTest.log("Verify that on a sharded cluster the analyzeShardKey command returns correct read" +
                " and write distribution metrics");
+    const eligibleForSamplingCommentSharded = eligibleForSamplingCommentBase + "sharded";
 
     const numMongoses = 2;  // Test sampling on multiple mongoses.
     const numShards = 3;
@@ -609,6 +610,16 @@ const mongosSetParametersOpts = {
     // This test expects every query to get sampled regardless of which mongos or mongod routes it.
     st.configRS.nodes.forEach(node => {
         configureFailPoint(node, "queryAnalysisCoordinatorDistributeSamplesPerSecondEqually");
+    });
+
+    // We use a sampling filter to prevent internal aggregates run by AnalyzeShardKey from being
+    // sampled.
+    st.forEachConnection(conn => {
+        conn.rs.nodes.forEach(node => {
+            configureFailPoint(node,
+                               "queryAnalysisSamplerFilterByComment",
+                               {comment: eligibleForSamplingCommentSharded});
+        });
     });
 
     const fixture = {
@@ -651,6 +662,7 @@ const mongosSetParametersOpts = {
         runCmdsFn: (dbName, cmdObjs) => {
             for (let i = 0; i < cmdObjs.length; i++) {
                 const db = st["s" + String(i % numMongoses)].getDB(dbName);
+                cmdObjs[i].comment = eligibleForSamplingCommentSharded;
                 assert.commandWorked(db.runCommand(cmdObjs[i]));
             }
         },
@@ -682,14 +694,21 @@ const mongosSetParametersOpts = {
     jsTest.log("Verify that on a replica set the analyzeShardKey command returns correct read " +
                "and write distribution metrics");
 
+    const eligibleForSamplingCommentReplset = eligibleForSamplingCommentBase + "replset";
+
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: mongodSetParameterOpts}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
 
-    // This test expects every query to get sampled regardless of which mongod it runs against.
     rst.nodes.forEach(node => {
+        // This test expects every query to get sampled regardless of which mongod it runs against.
         configureFailPoint(node, "queryAnalysisCoordinatorDistributeSamplesPerSecondEqually");
+        // We use a sampling filter to prevent internal aggregates run by AnalyzeShardKey from being
+        // sampled.
+        configureFailPoint(node,
+                           "queryAnalysisSamplerFilterByComment",
+                           {comment: eligibleForSamplingCommentReplset});
     });
 
     const fixture = {
@@ -703,6 +722,7 @@ const mongosSetParametersOpts = {
         runCmdsFn: (dbName, cmdObjs) => {
             for (let i = 0; i < cmdObjs.length; i++) {
                 const node = isReadCmdObj(cmdObjs[i]) ? rst.getSecondary() : rst.getPrimary();
+                cmdObjs[i].comment = eligibleForSamplingCommentReplset;
                 assert.commandWorked(node.getDB(dbName).runCommand(cmdObjs[i]));
             }
         },
