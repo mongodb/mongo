@@ -690,7 +690,7 @@ UpdateModification UpdateModification::parseFromOplogEntry(const BSONObj& oField
             str::stream() << "Expected _id field or $v:2, but got: " << vField,
             idField.ok() ||
                 (vField.ok() &&
-                 vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)));
+                 vField.safeNumberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)));
 
     // It is important to check for '_id' field first, because a replacement style update can still
     // have a '$v' field in the object.
