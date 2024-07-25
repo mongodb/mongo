@@ -271,6 +271,9 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/docs/testing/OWNERS.yml
 /src/mongo/db/modules/enterprise/docs/testing/**/* @10gen/devprod-correctness
 
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/streams/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/streams/**/* @10gen/streams-engine
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/fle/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/fle/**/query_analysis @10gen/query-integration
 
@@ -285,6 +288,9 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/queryable/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/queryable/**/* @10gen/server-rss-sydney
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/streams/OWNERS.yml
+/src/mongo/db/modules/enterprise/src/streams/**/* @10gen/streams-engine
 
 # The following patterns are parsed from ./src/mongo/db/ops/OWNERS.yml
 /src/mongo/db/ops/**/write_ops_exec* @10gen/query-execution
