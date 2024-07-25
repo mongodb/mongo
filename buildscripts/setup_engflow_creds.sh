@@ -1,6 +1,9 @@
 # Setup script intended to be run locally to extract and upload the EngFlow credentials to a virtual workstation.
 # See /bazel/docs/engflow_credential_setup.md for the full setup steps.
 
+set -o errexit
+set -o verbose
+
 REMOTE_USER=$1
 REMOTE_HOST=$2
 ZIP_FILE=$3
