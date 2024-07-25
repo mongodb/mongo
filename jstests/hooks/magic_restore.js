@@ -3,8 +3,8 @@
  * cursor has already been taken by magic_restore_backup.js.
  */
 
-import {MagicRestoreUtils} from "jstests/libs/backup_utils.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {MagicRestoreUtils} from "jstests/libs/magic_restore_test.js";
 
 // Starts up a new node on dbpath where a backup cursor has already been written from sourceConn.
 // sourceConn must also contain a timestamp in `test.magic_restore_checkpointTimestamp` of when the
