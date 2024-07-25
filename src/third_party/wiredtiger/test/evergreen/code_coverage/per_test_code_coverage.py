@@ -49,12 +49,9 @@ def delete_runtime_coverage_files(build_dir_base: str) -> None:
 
 # Run a series of tests with code coverage, copying the results and cleaning up
 # after each test is complete.
-def run_coverage_task_list(task_list_info):
-    build_dir = task_list_info["build_dir"]
-    task_list = task_list_info["task_bucket"]
-    list_start_time = datetime.now()
-
+def run_coverage_task(index, task):
     env = os.environ.copy()
+    build_dir = os.getcwd()
     # GCOV doesn't like it that we have copied the base build directory to construct the other
     # build directories. GCOV supports cross profiling for reference:
     # https://gcc.gnu.org/onlinedocs/gcc/Cross-profiling.html
@@ -64,41 +61,33 @@ def run_coverage_task_list(task_list_info):
     # build path.
     path_depth = build_dir.count("/")
     env["GCOV_PREFIX_STRIP"] = str(path_depth)
-    for index in range(len(task_list)):
-        task = task_list[index]
-        logging.debug("Running task {} in {}".format(task, build_dir))
-        env["GCOV_PREFIX"] = build_dir
+    env["GCOV_PREFIX"] = build_dir
+    logging.debug("Running task {} in {}".format(task, build_dir))
 
-        start_time = datetime.now()
-        try:
-            delete_runtime_coverage_files(build_dir_base=build_dir)
-            p = PushWorkingDirectory(build_dir)
-            split_command = task.split()
-            subprocess.run(split_command, check=True, env=env)
-            copy_dest_dir = f"{build_dir}_{index}_copy"
-            logging.debug(f"Copying directory {build_dir} to {copy_dest_dir}")
-            shutil.copytree(src=build_dir, dst=copy_dest_dir)
+    start_time = datetime.now()
+    try:
+        delete_runtime_coverage_files(build_dir_base=build_dir)
+        p = PushWorkingDirectory(build_dir)
+        split_command = task.split()
+        subprocess.run(split_command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+        copy_dest_dir = f"{build_dir}_{index}_copy"
+        logging.debug(f"Copying directory {build_dir} to {copy_dest_dir}")
+        shutil.copytree(src=build_dir, dst=copy_dest_dir)
 
-            task_info = {"task": task}
-            task_info_as_json_object = json.dumps(task_info, indent=2)
-            task_info_file_path = os.path.join(copy_dest_dir, "task_info.json")
-            with open(task_info_file_path, "w") as output_file:
-                output_file.write(task_info_as_json_object)
-            p.pop()
-        except subprocess.CalledProcessError as exception:
-            print(f'Command {exception.cmd} failed with error {exception.returncode}')
-        end_time = datetime.now()
-        diff = end_time - start_time
+        task_info = {"task": task}
+        task_info_as_json_object = json.dumps(task_info, indent=2)
+        task_info_file_path = os.path.join(copy_dest_dir, "task_info.json")
+        with open(task_info_file_path, "w") as output_file:
+            output_file.write(task_info_as_json_object)
+        p.pop()
+    except subprocess.CalledProcessError as exception:
+        print(f'Command {exception.cmd} failed with error {exception.returncode}')
+    end_time = datetime.now()
+    diff = end_time - start_time
 
-        logging.debug("Finished task {} in {} : took {} seconds".format(task, build_dir, diff.total_seconds()))
+    logging.debug("Finished task {} in {} : took {} seconds".format(task, build_dir, diff.total_seconds()))
+    return 0
 
-    list_end_time = datetime.now()
-    diff = list_end_time - list_start_time
-
-    return_value = "Completed task list in {} : took {} seconds".format(build_dir, diff.total_seconds())
-    logging.debug(return_value)
-
-    return return_value
 
 # Run gcovr on each copy of a build directory that contains run-time coverage data
 def run_gcovr(build_dir_base: str, gcovr_dir: str):
@@ -188,23 +177,23 @@ def main():
         if not Path(gcovr_dir).is_absolute():
             sys.exit("gcovr_dir must be an absolute path")
 
-    task_bucket_info = []
+    build_dirs_list = []
     if setup:
-        task_bucket_info = setup_build_dirs(build_dir_base=build_dir_base, parallel=parallel_tests, setup_task_list=config['setup_actions'])
+        build_dirs_list = setup_build_dirs(build_dir_base=build_dir_base, parallel=parallel_tests, setup_task_list=config['setup_actions'])
     else:
-        task_bucket_info = check_build_dirs(build_dir_base=build_dir_base, parallel=parallel_tests)
+        build_dirs_list = check_build_dirs(build_dir_base=build_dir_base, parallel=parallel_tests)
 
     # Prepare to run the tasks in the list
+    task_list = list()
     for test_num in range(len(config['test_tasks'])):
         test = config['test_tasks'][test_num]
-        build_dir_number = test_num % parallel_tests
-        logging.debug("Prepping test [{}] as build number {}: {} ".format(test_num, build_dir_number, test))
-        task_bucket_info[build_dir_number]['task_bucket'].append(test)
+        logging.debug("Prepping test {} ".format(test))
+        task_list.append(test)
 
-    logging.debug("task_bucket_info: {}".format(task_bucket_info))
+    logging.debug("task_list: {}".format(task_list))
 
     # Perform code coverage task operations in parallel across the build directories
-    run_task_lists_in_parallel(label="tasks", task_bucket_info=task_bucket_info, run_func=run_coverage_task_list)
+    run_task_lists_in_parallel(build_dirs_list, task_list, run_func=run_coverage_task, analysis=False)
 
     # Run gcovr if required
     if gcovr_dir:

@@ -31,6 +31,7 @@ import logging
 import os
 import shutil
 import subprocess
+import multiprocessing
 import sys
 from datetime import datetime
 
@@ -43,27 +44,49 @@ class PushWorkingDirectory:
     def pop(self):
         os.chdir(self.original_working_directory)
 
+# Setup each process with their own build directory, using a shared queue mechanism
+def setup_run_tasks_parallel(init_args):
+    build_dir = init_args.get()
+    os.chdir(build_dir)
+    return 0
+
 # Execute each list of tasks in parallel
-def run_task_lists_in_parallel(label, task_bucket_info, run_func):
-    parallel = len(task_bucket_info)
+def run_task_lists_in_parallel(build_dirs_list, task_list, run_func, optimize_test_order):
+    parallel = len(build_dirs_list)
     task_start_time = datetime.now()
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as executor:
-        for e in executor.map(run_func, task_bucket_info):
-             logging.debug(e)
+    # Build a shared queue of all the build directories, which will be used to initialize each
+    # process to it's own build directory.
+    build_queue = multiprocessing.Queue()
+    for build_dir in build_dirs_list:
+        build_queue.put(build_dir)
+
+    analyse_test_timings = list()
+    futures = list()
+    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel, initializer=setup_run_tasks_parallel, initargs=(build_queue,)) as executor:
+        for index, task in enumerate(task_list):
+            futures.append(executor.submit(run_func, index, task))
+
+        # Only in analysis mode, do we construct an list of all the tasks and how long they
+        # took to run
+        if (optimize_test_order):
+            for future in concurrent.futures.as_completed(futures):
+                data = future.result()
+                analyse_test_timings.append(data)
 
     task_end_time = datetime.now()
     task_diff = task_end_time - task_start_time
-    logging.debug("Time taken to perform {}: {} seconds".format(label, task_diff.total_seconds()))
+    logging.debug("Time taken to perform tasks: {} seconds".format(task_diff.total_seconds()))
+    return analyse_test_timings
 
 # Check the relevant build directories exist and have the correct status if we are not setting up
 def check_build_dirs(build_dir_base, parallel):
-    task_bucket_info = list()
+    build_dirs_list = list()
 
     for build_num in range(parallel):
         this_build_dir = "{}{}".format(build_dir_base, build_num)
 
-        task_bucket_info.append({'build_dir': this_build_dir, 'task_bucket': []})
+        build_dirs_list.append(this_build_dir)
 
         # Check build dir for coverage files.
         found_compile_time_coverage_files = False
@@ -84,13 +107,13 @@ def check_build_dirs(build_dir_base, parallel):
             sys.exit('No compile time coverage files found within {}. Please build for code coverage.'
                     .format(this_build_dir))
 
-    logging.debug("Build dirs: {}".format(task_bucket_info))
+    logging.debug("Build dirs: {}".format(build_dirs_list))
 
-    return task_bucket_info
+    return build_dirs_list
 
 # Create the relevant build directories to run tasks.
 def setup_build_dirs(build_dir_base, parallel, setup_task_list):
-    task_bucket_info = list()
+    build_dirs_list = list()
 
     base_build_dir = "{}{}".format(build_dir_base, 0)
     if os.path.exists(base_build_dir):
@@ -101,9 +124,9 @@ def setup_build_dirs(build_dir_base, parallel, setup_task_list):
 
     for build_num in range(parallel):
         this_build_dir = "{}{}".format(build_dir_base, build_num)
-        task_bucket_info.append({'build_dir': this_build_dir, 'task_bucket': []})
+        build_dirs_list.append(this_build_dir)
 
-    logging.debug("Build dirs: {}".format(task_bucket_info))
+    logging.debug("Build dirs: {}".format(build_dirs_list))
 
     logging.debug("Compiling base build directory: {}".format(base_build_dir))
     start_time = datetime.now()
@@ -121,8 +144,8 @@ def setup_build_dirs(build_dir_base, parallel, setup_task_list):
     logging.debug("Finished setup and took {} seconds".format(diff.total_seconds()))
     # Copy compiled base build directory into the other build directores.
     logging.debug("Copying base build directory {} into the other build directories.".format(base_build_dir))
-    for task_bucket in task_bucket_info[1:]:
-        shutil.copytree(base_build_dir, task_bucket['build_dir'])
-    return task_bucket_info
+    for build_dir in build_dirs_list[1:]:
+        shutil.copytree(base_build_dir, build_dir)
+    return build_dirs_list
 
 
