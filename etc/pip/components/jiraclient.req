@@ -1,5 +1,5 @@
 # TIG jira integration
 jira <= 3.1.1
 requests-oauth <= 0.4.1
-PyJWT <= 2.3.0 # https://github.com/pycontribs/jira/issues/247
+PyJWT == 2.4.0
 # We are omitting pycrypto based on https://github.com/pycontribs/jira/pull/629
