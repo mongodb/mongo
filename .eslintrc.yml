@@ -156,6 +156,7 @@ globals:
   pathExists: true
   umask: true
   getFileMode: true
+  copyDir: true
 
   # likely could be replaced with `child_process`
   MongoRunner: true
