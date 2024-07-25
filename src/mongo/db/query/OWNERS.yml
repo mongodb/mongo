@@ -1,5 +1,41 @@
 version: 1.0.0
 filters:
+  - "collection_index_usage_tracker*":
+    approvers:
+      - 10gen/query-execution
+  - "collection_query_info*":
+    approvers:
+      - 10gen/query-execution
+  - "cursor_idl_validator*":
+    approvers:
+      - 10gen/query-execution
+  - "cursor_request*":
+    approvers:
+      - 10gen/query-execution
+  - "cursor_response*":
+    approvers:
+      - 10gen/query-execution
+  - "kill*cursors*":
+    approvers:
+      - 10gen/query-execution
+  - "*query_settings*":
+    approvers:
+      - 10gen/query-execution
+  - "mock_yield_policies.h":
+    approvers:
+      - 10gen/query-execution
+  - "*yield_policy*":
+    approvers:
+      - 10gen/query-execution
+  - "*plan_executor*":
+    approvers:
+      - 10gen/query-execution
+  - "plan_insert_listener*":
+    approvers:
+      - 10gen/query-execution
+  - "sbe*":
+    approvers:
+      - 10gen/query-execution
   - "query_stats":
     approvers:
       - 10gen/query-integration

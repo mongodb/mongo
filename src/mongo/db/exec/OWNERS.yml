@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution
   - "*timeseries*":
     approvers:
       - 10gen/query-integration

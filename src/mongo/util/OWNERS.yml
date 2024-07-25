@@ -1,11 +1,11 @@
 version: 1.0.0
 filters:
-  - "storage_stats*":
-    approvers:
-      - 10gen/server-storage-execution
-  - "counters*":
+  - "field_set*":
     approvers:
       - 10gen/query-execution
-  - "top*":
+  - "pcre*":
+    approvers:
+      - 10gen/query-execution
+  - "regex_util*":
     approvers:
       - 10gen/query-execution

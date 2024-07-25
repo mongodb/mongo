@@ -6,3 +6,30 @@ filters:
   - "index_build_interceptor*":
     approvers:
       - 10gen/server-storage-execution
+  - "key_gen_bm.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "multikey_metadata_access_stats.h":
+    approvers:
+      - 10gen/query-execution
+  - "*key_generator*":
+    approvers:
+      - 10gen/query-execution
+  - "*column_cell*":
+    approvers:
+      - 10gen/query-execution
+  - "*column_store*":
+    approvers:
+      - 10gen/query-execution
+  - "expression_keys*":
+    approvers:
+      - 10gen/query-execution
+  - "expression_params*":
+    approvers:
+      - 10gen/query-execution
+  - "wildcard_validation*":
+    approvers:
+      - 10gen/query-execution
+  - "multikey_paths*":
+    approvers:
+      - 10gen/query-execution

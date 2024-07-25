@@ -19,3 +19,6 @@ filters:
   - "vote*index_build*":
     approvers:
       - 10gen/server-storage-execution
+  - "profile*":
+    approvers:
+      - 10gen/query-execution
