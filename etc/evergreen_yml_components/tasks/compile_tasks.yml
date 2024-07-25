@@ -204,11 +204,24 @@ tasks:
           targets: >-
             install-all
             prove-unittests
+            archive-all
           task_compile_flags: >-
             ICECC=
             CCACHE=
             --build-profile=opt
             --ninja=disabled
+            --keep-going
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/all-runtime.tgz
+          remote_file: ${all_mongo_binaries}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/gzip
+          display_name: Binaries
 
   # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
   - name: compile_bazel_dist_test

@@ -550,6 +550,8 @@ functions:
       updates:
         - key: mongo_binaries
           value: ${project}/${compile_variant}/${version_id}/binaries/mongo-${revision_order_id}.${ext|tgz}
+        - key: all_mongo_binaries
+          value: ${project}/${compile_variant}/${version_id}/binaries/all_mongo-${revision_order_id}.${ext|tgz}
         - key: mongo_cryptd
           value: ${project}/${compile_variant}/${version_id}/binaries/mongo-cryptd-${revision_order_id}.${ext|tgz}
         - key: mongo_cryptd_debugsymbols

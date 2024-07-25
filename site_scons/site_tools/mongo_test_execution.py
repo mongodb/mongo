@@ -189,7 +189,7 @@ def generate(env):
             "$( $ICERUN $) ${SOURCES[0]} $UNITTEST_FLAGS > ${TARGETS[0]} 2>&1 ; echo $? > ${TARGETS[1]}"
         )
         env["PROOF_ANALYZER_COMMAND"] = (
-            "if $$(exit $$(cat ${SOURCES[1]})) ; then touch $TARGET ; else exit 1 ; fi"
+            "if $$(exit $$(cat ${SOURCES[1]})) ; then touch $TARGET ; else cat ${SOURCES[0]}; exit 1 ; fi"
         )
 
     # TODO: Condition this on verbosity

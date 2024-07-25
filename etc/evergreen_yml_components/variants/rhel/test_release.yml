@@ -130,6 +130,9 @@ buildvariants:
       - name: compile_integration_and_test_parallel_stream_TG
         distros:
           - rhel8.8-large
+      - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - rhel8.8-large
       - name: test_packages
         distros:
           - ubuntu2204-large
@@ -222,6 +225,9 @@ buildvariants:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
           - rhel8.8-arm64-large
+      - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - rhel8.8-arm64-large
       - name: test_packages
         distros:
           - ubuntu1804-arm64-build
@@ -312,6 +318,9 @@ buildvariants:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
           - rhel93-large
+      - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - rhel93-large
       - name: compile_build_tools_next_TG
         distros:
           - rhel93-large
@@ -357,6 +366,9 @@ buildvariants:
       compile_variant: rhel93-arm64
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel93-arm64-large
+      - name: compile_test_parallel_unittest_stream_TG
         distros:
           - rhel93-arm64-large
       - name: test_packages
