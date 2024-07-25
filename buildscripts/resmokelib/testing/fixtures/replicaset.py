@@ -440,6 +440,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self._await_secondaries()
         self._await_stable_recovery_timestamp()
         self._setup_cwrwc_defaults()
+        self._await_read_concern_available()
         if self.use_auto_bootstrap_procedure:
             # TODO: Remove this in SERVER-80010.
             self._await_auto_bootstrapped_config_shard()
@@ -783,37 +784,30 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                     # of isMaster requests.
                     continue
 
-    def _await_cluster_time_signing_keys_on_node(self, client):
+    def _await_read_concern_available_on_node(self, client):
         retry_time_secs = self.AWAIT_REPL_TIMEOUT_MINS * 60
         retry_start_time = time.time()
-        while client.admin.system.keys.count_documents({"purpose": "HMAC"}) < 2:
+        while "$clusterTime" not in client.admin.command("ping"):
             if time.time() - retry_start_time > retry_time_secs:  # Check for timeout.
                 raise self.fixturelib.ServerFailure(
-                    "The HMAC keys for signing $clusterTime for the node on port {} did not become"
-                    " available in {} seconds.".format(client.port, retry_time_secs)
+                    "$clusterTime did not appear in a command response from the node on port {} in "
+                    "{} seconds.".format(client.port, retry_time_secs)
                 )
             time.sleep(0.1)  # Wait a little bit before trying again.
-        return
 
-    def await_cluster_time_signing_keys(self):
-        """
-        Await keys for signing $clusterTime to become available. This queries the local replica
-        set collection, and will hang if called on a replica set that is a part of a sharded cluster.
-        Callers should call this when instantiating a replica set that is not part of a sharded
-        cluster to maintain readConcern guarantees.
-        """
-        self.logger.info("Waiting for keys to sign $clusterTime to be present on all nodes")
+    def _await_read_concern_available(self):
+        """Await $clusterTime to appear in command responses to satisfy readConcern guarantees."""
+        self.logger.info("Waiting for read concern to become available on all nodes")
         for node in self.nodes:
             self.logger.info(
-                "Waiting for node on port %d to have $clusterTime signing keys.", node.port
+                "Waiting for node on port %d to have readConcern guarantees available.", node.port
             )
-            self._await_cluster_time_signing_keys_on_node(
+            self._await_read_concern_available_on_node(
                 interface.build_client(
                     node, self.auth_options, read_preference=pymongo.ReadPreference.SECONDARY
                 )
             )
-
-        self.logger.info("Found keys for signing $clusterTime on all nodes")
+        self.logger.info("Read concern is available on all nodes")
 
     def stop_primary(self, primary, background_reconfig, kill):
         """Stop the primary node method."""

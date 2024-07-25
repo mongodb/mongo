@@ -105,8 +105,6 @@ class BulkWriteFixture(interface.MultiClusterFixture):
         # Wait for each of the clusters
         for cluster in self.clusters:
             cluster.await_ready()
-            if hasattr(cluster, "replset_name"):
-                cluster.await_cluster_time_signing_keys()
 
     def _do_teardown(self, mode=None):
         """Shut down the clusters."""

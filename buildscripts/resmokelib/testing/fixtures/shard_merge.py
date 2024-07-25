@@ -119,7 +119,6 @@ class ShardMergeFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         # Wait for each of the replica sets
         for replica_set in self.replica_sets:
             replica_set.await_ready()
-            replica_set.await_cluster_time_signing_keys()
 
     def _do_teardown(self, mode=None):
         """Shut down the replica sets."""
