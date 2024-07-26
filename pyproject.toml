@@ -42,9 +42,10 @@ tabulate = "^0.9.0"
 
 [tool.poetry.group.compile.dependencies]
 cheetah3 = "<=3.2.6.post1" # src/mongo/base/generate_error_codes.py
-packaging = "<=21.3"
+packaging = "<=23.1"
 regex = "<=2021.11.10"
 setuptools = "58.1.0"
+wheel = "0.37.0"
 
 [tool.poetry.group.core.dependencies]
 psutil = "5.8.0"
@@ -59,7 +60,7 @@ typer = "^0.12.3"
 pipx = "1.4.3"
 # TODO: Add in pex as we move forward with this
 # pex = "^2.1.137"
-poetry = "1.5.1"
+poetry = "1.8.3"
 
 [tool.poetry.group.evergreen.dependencies]
 click = "^8.1.7"
@@ -83,7 +84,7 @@ ldaptor = "19.0.0"
 
 [tool.poetry.group.idl.dependencies]
 unittest-xml-reporting = "3.0.4" # Pinned because newer versions require lxml which fails to install
-packaging = "21.3"
+packaging = "23.1"
 
 [tool.poetry.group.jira-client.dependencies]
 jira = "<=3.1.1"
@@ -143,7 +144,7 @@ proxy-protocol = "^0.7.5"
 pkce = "^1.0.3"
 oauthlib = "^3.1.1"
 requests-oauthlib = "^1.3.0"
-packaging = "21.3"
+packaging = "23.1"
 docker = "^7.1.0"
 mongomock = "^4.1.2"
 pyjwt = "^2.4.0"

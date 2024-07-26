@@ -75,7 +75,7 @@ WORKDIR /mongo
 COPY src/pyproject.toml src/poetry.lock ./
 
 # Install mongodb python deps with poetry
-RUN python -m pip install 'poetry==1.5.1'
+RUN python -m pip install 'poetry==1.8.3'
 RUN python -m poetry install --no-root --sync
 
 # Add the poetry venv to the $PATH so that it's activated by default

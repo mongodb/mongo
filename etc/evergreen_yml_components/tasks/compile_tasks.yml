@@ -858,11 +858,6 @@ tasks:
     commands:
       - func: "do scons setup"
       - func: "f_expansions_write"
-      - command: subprocess.exec
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/libdeps_setup.sh"
 
       - func: "scons compile"
         vars:
@@ -871,6 +866,11 @@ tasks:
             --force-macos-dynamic-link
             --build-tools=next
           targets: generate-libdeps-graph
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/libdeps_setup.sh"
 
       - command: subprocess.exec
         params:

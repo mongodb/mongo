@@ -40,7 +40,7 @@ def verify_requirements(silent: bool = False, executable=sys.executable):
     try:
         import poetry
     except ModuleNotFoundError as ex:
-        raiseSuggestion(ex, "'poetry==1.5.1'")
+        raiseSuggestion(ex, "'poetry==1.8.3'")
 
     verbose("Checking required python packages...")
 

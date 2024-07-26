@@ -63,7 +63,7 @@ class SetUpEC2Instance(PowercycleCommand):
         cmds = f"{cmds}; $python_loc -m venv --system-site-packages {venv}"
         cmds = f"{cmds}; activate=$(find {venv} -name 'activate')"
         cmds = f"{cmds}; . $activate"
-        cmds = f"{cmds}; python3 -m pip install 'poetry==1.5.1'"
+        cmds = f"{cmds}; python3 -m pip install 'poetry==1.8.3'"
         cmds = f"{cmds}; pushd $remote_dir && python3 -m poetry install --no-root --sync && popd"
 
         self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count)

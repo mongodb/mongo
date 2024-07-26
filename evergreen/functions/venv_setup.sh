@@ -40,7 +40,7 @@ export POETRY_DATA_DIR="$poetry_dir/data"
 export POETRY_CACHE_DIR="$poetry_dir/cache"
 export PIP_CACHE_DIR="$poetry_dir/pip_cache"
 for i in {1..5}; do
-  $POETRY_VENV_PYTHON -m pip install -vvv "poetry==1.5.1" ${EXTRA_IBM_ARGS} && RET=0 && break || RET=$? && sleep 1
+  $POETRY_VENV_PYTHON -m pip install -vvv "poetry==1.8.3" ${EXTRA_IBM_ARGS} && RET=0 && break || RET=$? && sleep 1
   echo "Python failed to install poetry, retrying..."
 done
 

@@ -40,7 +40,7 @@ which python3 # This should point to the python in python3-venv
 
 # It is also non standard to install poetry into its own virtual environment.
 # However, the idea is to make even fewer unpinned dependencies.
-# Install poetry 1.5.1 into the virtual env, then install all
+# Install poetry 1.8.3 into the virtual env, then install all
 # required python dependencies to build and test.
 buildscripts/poetry_sync.sh
 

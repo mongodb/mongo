@@ -284,7 +284,7 @@ functions:
           export POETRY_CONFIG_DIR="$poetry_dir/config"
           export POETRY_DATA_DIR="$poetry_dir/data"
           export POETRY_CACHE_DIR="$poetry_dir/cache"
-          python -m pip install "poetry==1.5.1"
+          python -m pip install "poetry==1.8.3"
           # See BF-29897 / https://github.com/python-poetry/poetry/issues/7584
           poetry config installer.max-workers 10
           # Trying poetry install due to https://github.com/python-poetry/poetry/issues/7611

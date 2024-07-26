@@ -16,7 +16,7 @@
 # Our workspace setup requires a specific version of poetry to be
 # installed, this script automates the pip install of that version.
 
-poetry_version='1.5.1'
+poetry_version='1.8.3'
 
 allow_no_venv=0
 python_optarg=""
