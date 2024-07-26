@@ -86,4 +86,4 @@ assert.soon(
                 shardDoc.host.split(',').length + " in " + shardDoc.host);
     });
 
-st.stop({parallelSupported: false});
+st.stop({parallelSupported: false, skipValidation: true});
