@@ -20,6 +20,9 @@ selector:
   # Skip any tests that run with auth explicitly.
   - jstests/core/administrative/*[aA]uth*.js
 
+  # Serverless don't support mapReduce command.
+  - jstests/core/query/mr/**/*.js
+
   #
   # Denylists from causally_consistent_jscore_passthrough.yml
   #

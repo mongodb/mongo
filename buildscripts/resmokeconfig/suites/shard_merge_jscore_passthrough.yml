@@ -14,6 +14,10 @@ selector:
   - jstests/core/**/*.js
   exclude_files:
   - jstests/core/txns/**/*.js
+
+  # Serverless don't support mapReduce command.
+  - jstests/core/query/mr/**/*.js
+
   # Skip any tests that run with auth explicitly.
   - jstests/core/administrative/*[aA]uth*.js
 
