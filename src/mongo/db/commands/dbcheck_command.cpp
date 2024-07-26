@@ -117,6 +117,22 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingDbCheckRun);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingFirstBatch);
 MONGO_FAIL_POINT_DEFINE(hangBeforeAddingDBCheckBatchToOplog);
 
+namespace {
+// Makes sure that only one dbcheck operation is running at a time.
+Mutex _dbCheckMutex;
+
+// Queue for dbcheck commands that are waiting to be run. There can be at most
+// `gDbCheckMaxRunsOnQueue` (default 5) dbchecks in the queue, including 1 currently running. An
+// error health log entry will be generated when a dbcheck command is issued when the queue is full
+// and that dbcheck will not be added to the queue. Only the first dbcheck on the queue will be
+// running.
+std::deque<boost::optional<DbCheckCollectionInfo>> _dbChecksInProgress;
+
+// This is waited upon if there is found to already be a dbcheck command running, as
+// _dbchecksInProgress would indicate. This is signaled when a dbcheck command finishes.
+stdx::condition_variable _dbCheckNotifier;
+}  // namespace
+
 // The optional `tenantIdForStartStop` is used for dbCheckStart/dbCheckStop oplog entries so that
 // the namespace is still the admin command namespace but the tenantId will be set using the
 // namespace that dbcheck is running for.
@@ -531,6 +547,79 @@ void DbCheckJob::run() {
     if (!_run->empty()) {
         info = _run->front();
     }
+
+    // TODO SERVER-78399: Clean up this check once feature flag is removed.
+    // Only one dbcheck operation can be in progress.
+    if (info && info.value().secondaryIndexCheckParameters) {
+        stdx::unique_lock<Latch> lock(_dbCheckMutex);
+
+        size_t queueCapacity = gDbCheckMaxRunsOnQueue.load();
+        if (_dbChecksInProgress.size() >= queueCapacity) {
+            std::vector<BSONObj> runsInQueue;
+            for (size_t i = 0; i < _dbChecksInProgress.size(); i++) {
+                runsInQueue.push_back(_dbChecksInProgress.at(i).get().toBSON());
+            }
+
+            std::unique_ptr<HealthLogEntry> logEntry =
+                dbCheckHealthLogEntry(info->secondaryIndexCheckParameters,
+                                      boost::none,
+                                      boost::none,
+                                      SeverityEnum::Error,
+                                      "too many dbcheck runs in queue",
+                                      ScopeEnum::Database,
+                                      OplogEntriesEnum::Batch,
+                                      BSON("dbCheckQueue" << runsInQueue));
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+            return;
+        }
+
+        _dbChecksInProgress.push_back(info);
+        // Wait for the dbcheck job this thread enqueued to be at the front of the queue.
+        // Once it is at the front, we can start that job.
+        try {
+            opCtx->waitForConditionOrInterrupt(_dbCheckNotifier, lock, [&] {
+                return _dbChecksInProgress.front().get().toBSON().toString().compare(
+                           info.get().toBSON().toString()) == 0;
+            });
+        } catch (const DBException& ex) {
+            // Catch interrupt exceptions. Log a health log entry and return in this case.
+            auto errCode = ex.code();
+            std::unique_ptr<HealthLogEntry> logEntry;
+            if (ErrorCodes::isA<ErrorCategory::NotPrimaryError>(errCode)) {
+                logEntry = dbCheckWarningHealthLogEntry(
+                    info->secondaryIndexCheckParameters,
+                    info->nss,
+                    info->uuid,
+                    "abandoning dbCheck batch due to stepdown.",
+                    ScopeEnum::Collection,
+                    OplogEntriesEnum::Batch,
+                    Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated due to stepdown"));
+            } else {
+                logEntry = dbCheckErrorHealthLogEntry(info->secondaryIndexCheckParameters,
+                                                      info->nss,
+                                                      info->uuid,
+                                                      "dbCheck failed",
+                                                      ScopeEnum::Cluster,
+                                                      OplogEntriesEnum::Batch,
+                                                      ex.toStatus());
+            }
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+            return;
+        }
+    }
+
+    ON_BLOCK_EXIT([&] {
+        // TODO SERVER-78399: Clean up this check once feature flag is removed.
+        if (info && info.value().secondaryIndexCheckParameters) {
+            // The thread holds onto the _dbcheckMutex and waits for its dbcheck job to be at the
+            // front of the queue. The `waitForConditionOrInterrupt` releases the lock so we
+            // shouldn't run into a deadlock here.
+            stdx::lock_guard<Latch> lock(_dbCheckMutex);
+            _dbChecksInProgress.pop_front();
+            _dbCheckNotifier.notify_all();
+        }
+    });
+
     DbCheckStartAndStopLogger startStop(opCtx, info);
     _initializeCurOp(opCtx, info);
     ON_BLOCK_EXIT([opCtx] { CurOp::get(opCtx)->done(); });

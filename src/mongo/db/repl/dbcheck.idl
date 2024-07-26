@@ -62,6 +62,17 @@ server_parameters:
         default: 1
         redact: false
 
+    dbCheckMaxRunsOnQueue:
+        description: "Parameter for how many dbcheck runs can be in the queue."
+        set_at: [startup, runtime]
+        cpp_vartype: 'AtomicWord<int>'
+        cpp_varname: gDbCheckMaxRunsOnQueue
+        default: 5
+        validator: 
+            gte: 1
+            lte: 100
+        redact: false
+
 # TODO SERVER-78399: Remove once secondaryIndexChecksInDbCheck feature flag is removed.
 types:
   _id_key:
