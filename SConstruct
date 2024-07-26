@@ -1081,6 +1081,18 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    "NON_CONF_CCFLAGS",
+    help="Sets flags for the C and C++ compiler that are not used in configure checks",
+    converter=variable_shlex_converter,
+)
+
+env_vars.Add(
+    "NON_CONF_LINKFLAGS",
+    help="Sets flags for the C and C++ linker that are not used in configure checks",
+    converter=variable_shlex_converter,
+)
+
+env_vars.Add(
     "ASFLAGS",
     help="Sets assembler specific flags",
     converter=variable_shlex_converter,
@@ -1821,6 +1833,25 @@ env.Append(
     LINKFLAGS=["$LINKFLAGS_GENERATE_WERROR"],
     LINKFLAGS_GENERATE_WERROR=create_werror_generator("$LINKFLAGS_WERROR"),
 )
+
+
+def non_conf_ccflags_gen(target, source, env, for_signature):
+    if "conftest" in str(target[0]):
+        return ""
+    return "$NON_CONF_CCFLAGS"
+
+
+def non_conf_linkflags_gen(target, source, env, for_signature):
+    if "conftest" in str(target[0]):
+        return ""
+    return "$NON_CONF_LINKFLAGS"
+
+
+env["_NON_CONF_CCFLAGS_GEN"] = non_conf_ccflags_gen
+env["_NON_CONF_LINKFLAGS_GEN"] = non_conf_linkflags_gen
+
+env.Append(CCFLAGS="$_NON_CONF_CCFLAGS_GEN")
+env.Append(LINKFLAGS="$_NON_CONF_LINKFLAGS_GEN")
 
 for var in ["CC", "CXX"]:
     if var not in env:
