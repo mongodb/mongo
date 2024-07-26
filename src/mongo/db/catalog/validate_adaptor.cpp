@@ -61,6 +61,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(crashOnMultikeyValidateFailure);
 MONGO_FAIL_POINT_DEFINE(failIndexKeyOrdering);
+MONGO_FAIL_POINT_DEFINE(failRecordStoreTraversal);
 
 // Set limit for size of corrupted records that will be reported.
 const long long kMaxErrorSizeBytes = 1 * 1024 * 1024;
@@ -531,6 +532,24 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         size_t validatedSize = 0;
         Status status = validateRecord(opCtx, record->id, record->data, &validatedSize, results);
 
+        // Log the out-of-order entries as errors.
+        //
+        // Validate uses a DataCorruptionDetectionMode::kLogAndContinue mode such that data
+        // corruption errors are logged without throwing, so certain checks must be duplicated here
+        // as well.
+        if ((prevRecordId.isValid() && prevRecordId > record->id) ||
+            MONGO_unlikely(failRecordStoreTraversal.shouldFail())) {
+            // TODO SERVER-78040: Clean this up once we can insert errors blindly into the list and
+            // not care about deduplication.
+            static constexpr auto kErrorMessage = "Detected out-of-order documents. See logs.";
+            if (results->valid ||
+                std::find(results->errors.begin(), results->errors.end(), kErrorMessage) ==
+                    results->errors.end()) {
+                results->errors.push_back(kErrorMessage);
+                results->valid = false;
+            }
+        }
+
         // validatedSize = dataSize is not a general requirement as some storage engines may use
         // padding, but we still require that they return the unpadded record data.
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
@@ -559,8 +578,14 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 results->numRemovedCorruptRecords++;
                 _numRecords--;
             } else {
-                if (results->valid) {
-                    results->errors.push_back("Detected one or more invalid documents. See logs.");
+                // TODO SERVER-78040: Clean this up once we can insert errors blindly into the list
+                // and not care about deduplication.
+                static constexpr auto kErrorMessage =
+                    "Detected one or more invalid documents. See logs.";
+                if (results->valid ||
+                    std::find(results->errors.begin(), results->errors.end(), kErrorMessage) ==
+                        results->errors.end()) {
+                    results->errors.push_back(kErrorMessage);
                     results->valid = false;
                 }
 

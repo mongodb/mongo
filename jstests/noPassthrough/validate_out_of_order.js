@@ -28,11 +28,11 @@ journalFp.wait();
 
 // Test record store out-of-order detection.
 assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "WTRecordStoreUassertOutOfOrder", mode: "alwaysOn"}));
+    primary.adminCommand({configureFailPoint: "failRecordStoreTraversal", mode: "alwaysOn"}));
 let res = assert.commandWorked(coll.validate());
 assert(!res.valid);
 assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "WTRecordStoreUassertOutOfOrder", mode: "off"}));
+    primary.adminCommand({configureFailPoint: "failRecordStoreTraversal", mode: "off"}));
 
 // Test index entry out-of-order detection.
 assert.commandWorked(

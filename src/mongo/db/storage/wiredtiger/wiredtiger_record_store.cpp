@@ -2122,9 +2122,18 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
             invariant(!TestingProctor::instance().isEnabled(), "cursor returned out-of-order keys");
         }
 
-        // uassert with 'DataCorruptionDetected' after logging.
+        auto options = [&] {
+            if (_opCtx->recoveryUnit()->getDataCorruptionDetectionMode() ==
+                DataCorruptionDetectionMode::kThrow) {
+                // uassert with 'DataCorruptionDetected' after logging.
+                return logv2::LogOptions{
+                    logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)};
+            } else {
+                return logv2::LogOptions(logv2::LogComponent::kAutomaticDetermination);
+            }
+        }();
         LOGV2_ERROR_OPTIONS(22406,
-                            {logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)},
+                            options,
                             "WT_Cursor::next -- returned out-of-order keys",
                             "forward"_attr = _forward,
                             "next"_attr = id,

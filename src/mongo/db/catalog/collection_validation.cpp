@@ -530,6 +530,14 @@ Status validate(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         opCtx->recoveryUnit()->setPrepareConflictBehavior(oldPrepareConflictBehavior);
     });
+
+    // Relax corruption detection so that we log and continue scanning instead of failing early.
+    auto oldDataCorruptionMode = opCtx->recoveryUnit()->getDataCorruptionDetectionMode();
+    opCtx->recoveryUnit()->setDataCorruptionDetectionMode(
+        DataCorruptionDetectionMode::kLogAndContinue);
+    ON_BLOCK_EXIT(
+        [&] { opCtx->recoveryUnit()->setDataCorruptionDetectionMode(oldDataCorruptionMode); });
+
     if (validateState.fixErrors()) {
         // Note: cannot set PrepareConflictBehavior here, since the validate command with repair
         // needs kIngnoreConflictsAllowWrites, but validate repair at startup cannot set that here
