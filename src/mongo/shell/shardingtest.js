@@ -595,6 +595,9 @@ var ShardingTest = function ShardingTest(params) {
                 this.reconnectToEmbeddedRouter(routerN);
             }
         });
+        // We wait until a primary has been chosen since startSet can return without having elected
+        // one. This can cause issues that expect a functioning replicaset once this method returns.
+        this.configRS.waitForPrimary();
     };
 
     ShardingTest.prototype.restartAllShards = function(opts) {
@@ -608,6 +611,10 @@ var ShardingTest = function ShardingTest(params) {
                     this.reconnectToEmbeddedRouter(routerN);
                 }
             });
+            // We wait until a primary has been chosen since startSet can return without having
+            // elected one. This can cause issues that expect a functioning replicaset once this
+            // method returns.
+            rs.test.waitForPrimary();
         });
     };
 
