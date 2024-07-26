@@ -54,7 +54,7 @@ db-contrib-tool setup-repro-env \
   --platform $platform \
   --architecture $architecture \
   --debug \
-  4.2
+  4.2 5.0.28
 
 # The platform and architecture for how some of the binaries are reported in
 # https://downloads.mongodb.org/full.json changed between MongoDB 4.2 and MongoDB 4.4.

@@ -13,7 +13,9 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/multiVersion/libs/multi_rs.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
-const oldVersion = "last-lts";
+// Since v5.0 no longer supports writing mixed schema buckets as of 5.0.29, pin the version
+// to 5.0.28 to retain coverage as v5.0 still supports the presence of mixed schema data.
+const oldVersion = "5.0.28";
 const nodes = {
     n1: {binVersion: oldVersion},
     n2: {binVersion: oldVersion}
