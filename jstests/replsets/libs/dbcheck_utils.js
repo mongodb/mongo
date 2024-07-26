@@ -80,7 +80,13 @@ export const logQueries = {
         severity: "warning",
         "msg":
             "skipping applying dbcheck batch because the 'skipApplyingDbCheckBatchOnSecondary' parameter is on",
-    }
+        "data.dbCheckParameters": {$exists: true}
+    },
+    tooManyDbChecksInQueue: {
+        severity: "error",
+        "msg": "too many dbcheck runs in queue",
+        "data.dbCheckParameters": {$exists: true}
+    },
 };
 
 // Apply function on all secondary nodes except arbiters.
@@ -379,7 +385,7 @@ export const runDbCheckForDatabase =
                        db,
                        collName,
                        collDbCheckParameters /* parameters */,
-                       false /* awaitCompletion */,
+                       true /* awaitCompletion */,
                        false /* waitForHealthLogDbCheckStop */,
                        allowedErrorCodes);
             jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is done on ns: " +
@@ -401,7 +407,7 @@ export const runDbCheckForDatabase =
                            db,
                            collName,
                            extraIndexDbCheckParameters /* parameters */,
-                           false /* awaitCompletion */,
+                           true /* awaitCompletion */,
                            false /* waitForHealthLogDbCheckStop */,
                            allowedErrorCodes);
                 jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) + ") is done on ns: " +
