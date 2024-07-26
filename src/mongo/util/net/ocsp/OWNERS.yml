@@ -2,7 +2,4 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-service-architecture
-  - "*redaction*":
-    approvers:
       - 10gen/server-security

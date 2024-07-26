@@ -1,5 +1,11 @@
 version: 1.0.0
 filters:
+  - "cluster_user_management_commands.cpp":
+    approvers:
+      - 10gen/server-security
+  - "cluster_fle2*":
+    approvers:
+      - 10gen/server-security
   - "document_shard_key*":
     approvers:
       - 10gen/server-cluster-scalability

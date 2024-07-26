@@ -1,5 +1,14 @@
 version: 1.0.0
 filters:
+  - "md5*":
+    approvers:
+      - 10gen/server-security
+  - "secure*":
+    approvers:
+      - 10gen/server-security
+  - "password*":
+    approvers:
+      - 10gen/server-security
   - "field_set*":
     approvers:
       - 10gen/query-execution

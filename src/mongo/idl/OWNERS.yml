@@ -12,3 +12,6 @@ filters:
   - "unittest*": # note this also matches _import.idl
     approvers:
       - 10gen/server-service-architecture
+  - "server_parameter*":
+    approvers:
+      - 10gen/server-security

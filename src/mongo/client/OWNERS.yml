@@ -15,6 +15,15 @@ filters:
   - "sasl*":
     approvers:
       - 10gen/server-security
-  - "scram_client_cache*":
+  - "scram_*":
+    approvers:
+      - 10gen/server-security
+  - "sasl_*":
+    approvers:
+      - 10gen/server-security
+  - "native_*":
+    approvers:
+      - 10gen/server-security
+  - "authenticate*":
     approvers:
       - 10gen/server-security

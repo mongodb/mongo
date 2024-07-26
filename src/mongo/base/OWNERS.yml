@@ -6,3 +6,6 @@ filters:
   - "error_codes.yml":
     approvers:
       - NOOWNERS-DO-NOT-USE-DEPRECATED-2024-07-01
+  - "secure_allocator*":
+    approvers:
+      - 10gen/server-security

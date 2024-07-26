@@ -40,6 +40,15 @@ filters:
   - "service_entry_point_shard_role*":
     approvers:
       - 10gen/server-service-architecture
+  - "fle*":
+    approvers:
+      - 10gen/server-security
+  - "server_options*":
+    approvers:
+      - 10gen/server-security
+  - "server_parameter*":
+    approvers:
+      - 10gen/server-security
   - "*change_stream*":
     approvers:
       - 10gen/query-execution

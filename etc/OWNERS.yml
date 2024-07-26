@@ -3,3 +3,6 @@ filters:
   - "yamllint_config.yml":
     approvers:
       - 10gen/devprod-services-integrations
+  - "third_party_components.yml":
+    approvers:
+      - 10gen/server-security
