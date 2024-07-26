@@ -123,7 +123,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
 BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec);
 
 /**
- * Returns a new index spec with boolean values in correct types and unknown field names removed.
+ * Returns a new index spec with boolean values in correct types, unknown field names removed, and
+ * also certain duplicated field names ignored.
  */
 BSONObj repairIndexSpec(const NamespaceString& ns,
                         const BSONObj& indexSpec,

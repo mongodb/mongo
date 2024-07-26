@@ -530,6 +530,13 @@ TEST(IndexKeyValidateTest, RepairIndexSpecs) {
                .binaryEqual(index_key_validate::repairIndexSpec(
                    NamespaceString::createNamespaceString_forTest("coll"),
                    fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: '123'}"))));
+
+    ASSERT(BSON("key" << BSON("a" << 1) << "name"
+                      << "index"
+                      << "background" << true)
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString::createNamespaceString_forTest("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', background: true, background: true}"))));
 }
 
 TEST(IndexKeyValidateTest, GeoIndexSpecs) {

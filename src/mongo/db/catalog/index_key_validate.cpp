@@ -316,6 +316,17 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
     auto fixIndexSpecFn = [&indexSpec, &ns](const BSONElement& indexSpecElem,
                                             BSONObjBuilder* builder) {
         StringData fieldName = indexSpecElem.fieldNameStringData();
+        // The "background" field has been deprecated. Ignore its duplication here so it will be
+        // repaired for new indexes in the future, and also be ignored while listing old indexes.
+        if (IndexDescriptor::kBackgroundFieldName == fieldName && builder->hasField(fieldName)) {
+            LOGV2_WARNING(8072000,
+                          "Ignoring duplicated field from index spec",
+                          "namespace"_attr = redact(toStringForLogging(ns)),
+                          "fieldName"_attr = redact(fieldName),
+                          "indexSpec"_attr = redact(indexSpec));
+            return;
+        }
+
         if ((IndexDescriptor::kBackgroundFieldName == fieldName ||
              IndexDescriptor::kUniqueFieldName == fieldName ||
              IndexDescriptor::kSparseFieldName == fieldName ||
