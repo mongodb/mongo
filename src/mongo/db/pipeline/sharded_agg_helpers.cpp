@@ -1810,6 +1810,7 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
     invariant(expCtx->explain);
+
     // Generate the command object for the targeted shards.
     auto rawStages = [&pipeline]() {
         auto serialization = pipeline->serialize();
@@ -1823,7 +1824,6 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
 
         return stages;
     }();
-
     AggregateCommandRequest aggRequest(expCtx->ns, rawStages);
 
     LiteParsedPipeline liteParsedPipeline(aggRequest);
@@ -1832,17 +1832,26 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
         : startsWithQueue                     ? PipelineDataSource::kQueue
                                               : PipelineDataSource::kNormal;
-    auto shardDispatchResults =
-        dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(expCtx, aggRequest),
-                              pipelineDataSource,
-                              expCtx->eligibleForSampling(),
-                              std::move(pipeline),
-                              expCtx->explain);
-    BSONObjBuilder explainBuilder;
-    auto appendStatus =
-        appendExplainResults(std::move(shardDispatchResults), expCtx, &explainBuilder);
-    uassertStatusOK(appendStatus);
-    return BSON("pipeline" << explainBuilder.done());
+
+    sharding::router::CollectionRouter router(expCtx->opCtx->getServiceContext(), expCtx->ns);
+    return router.route(
+        expCtx->opCtx,
+        "collecting explain from shards"_sd,
+        [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
+            auto shardDispatchResults = dispatchShardPipeline(
+                aggregation_request_helper::serializeToCommandDoc(expCtx, aggRequest),
+                pipelineDataSource,
+                expCtx->eligibleForSampling(),
+                pipeline->clone(),
+                expCtx->explain,
+                false /* requestQueryStatsFromRemotes */,
+                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, expCtx->ns)));
+            BSONObjBuilder explainBuilder;
+            auto appendStatus =
+                appendExplainResults(std::move(shardDispatchResults), expCtx, &explainBuilder);
+            uassertStatusOK(appendStatus);
+            return BSON("pipeline" << explainBuilder.done());
+        });
 }
 
 StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
