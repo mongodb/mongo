@@ -133,6 +133,12 @@ public:
         return Status::OK();
     }
 
+    Status dropIdentSynchronous(RecoveryUnit* ru,
+                                StringData ident,
+                                const StorageEngine::DropIdentCallback& onDrop) override {
+        return Status::OK();
+    }
+
     void dropIdentForImport(OperationContext* opCtx, StringData ident) override {}
 
     bool supportsDirectoryPerDB() const override {

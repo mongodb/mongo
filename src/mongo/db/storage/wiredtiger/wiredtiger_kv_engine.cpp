@@ -1922,6 +1922,19 @@ Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
 Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
                                      StringData ident,
                                      const StorageEngine::DropIdentCallback& onDrop) {
+    return _dropIdent(ru, ident, "checkpoint_wait=false", onDrop);
+}
+
+Status WiredTigerKVEngine::dropIdentSynchronous(RecoveryUnit* ru,
+                                                StringData ident,
+                                                const StorageEngine::DropIdentCallback& onDrop) {
+    return _dropIdent(ru, ident, "checkpoint_wait=true,lock_wait=true", onDrop);
+}
+
+Status WiredTigerKVEngine::_dropIdent(RecoveryUnit* ru,
+                                      StringData ident,
+                                      const char* config,
+                                      const StorageEngine::DropIdentCallback& onDrop) {
     string uri = _uri(ident);
 
     WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(ru);
@@ -1930,8 +1943,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
 
     WiredTigerSession session(_conn);
 
-    int ret =
-        session.getSession()->drop(session.getSession(), uri.c_str(), "checkpoint_wait=false");
+    int ret = session.getSession()->drop(session.getSession(), uri.c_str(), config);
     LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "ret"_attr = ret);
 
     if (ret == EBUSY || MONGO_unlikely(WTDropEBUSY.shouldFail())) {
