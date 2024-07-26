@@ -950,6 +950,16 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
                     uassertStatusOK(
                         indexCatalog->dropIndex(opCtx, coll.getWritableCollection(opCtx), desc));
                 }
+
+                const IndexDescriptor* desc = indexCatalog->findIndexByKeyPatternAndOptions(
+                    opCtx,
+                    spec.getObjectField(IndexDescriptor::kKeyPatternFieldName),
+                    spec,
+                    IndexCatalog::InclusionPolicy::kReady);
+                if (desc) {
+                    uassertStatusOK(
+                        indexCatalog->dropIndex(opCtx, coll.getWritableCollection(opCtx), desc));
+                }
             }
 
             wuow.commit();
