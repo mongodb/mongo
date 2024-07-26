@@ -35,7 +35,7 @@ function runConfigsvrRemoveChunksWithRetries(conn, uuid, lsid, txnNumber) {
     return res;
 }
 
-function insertLeftoverChunks(configDB, uuid) {
+function insertLeftoverChunks(sessionConfigDB, configDB, uuid) {
     const chunkDocsForNs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
     var chunksToInsert = [];
     chunkDocsForNs.forEach(originalChunk => {
@@ -44,12 +44,17 @@ function insertLeftoverChunks(configDB, uuid) {
         newChunk.uuid = otherCollectionUUID;
         chunksToInsert.push(newChunk);
     });
-    assert.commandWorked(configDB.getCollection("chunks").insertMany(chunksToInsert));
+    assert.commandWorked(sessionConfigDB.getCollection("chunks").insertMany(chunksToInsert));
 }
 
 let st = new ShardingTest({mongos: 1, shards: 1});
 
-const configDB = st.s.getDB('config');
+// Use retriable writes when writing to the config server since these are not automatically retried
+const mongosSession = st.s.startSession({retryWrites: true});
+// In v5.0, we cannot run exhaustive find commands under a session. So we use the session for write
+// commands and the database without the session for read commands.
+const sessionConfigDB = mongosSession.getDatabase("config");
+const configDB = st.s.getDB("config");
 
 const dbName = "test";
 const collName = "foo";
@@ -63,7 +68,7 @@ assert.commandWorked(st.s.adminCommand({shardcollection: ns, key: {_id: 1}}));
 // Insert some chunks not associated to any collection to simulate leftovers from a failed
 // shardCollection
 const otherCollectionUUID = UUID();
-insertLeftoverChunks(configDB, otherCollectionUUID);
+insertLeftoverChunks(sessionConfigDB, configDB, otherCollectionUUID);
 assert.eq(1, configDB.getCollection("chunks").find({uuid: otherCollectionUUID}).itcount());
 
 // Remove the leftover chunks matching 'otherCollectionUUID'
@@ -73,7 +78,7 @@ assert.commandWorked(runConfigsvrRemoveChunksWithRetries(
 assert.eq(0, configDB.getCollection("chunks").find({uuid: otherCollectionUUID}).itcount());
 
 // Insert new leftover chunks
-insertLeftoverChunks(configDB, otherCollectionUUID);
+insertLeftoverChunks(sessionConfigDB, configDB, otherCollectionUUID);
 assert.eq(1, configDB.getCollection("chunks").find({uuid: otherCollectionUUID}).itcount());
 
 // Check that _configsvrRemoveChunks with a txnNumber lesser than the previous one won't remove the
@@ -86,7 +91,7 @@ assert.commandFailedWithCode(
 assert.eq(1, configDB.getCollection("chunks").find({uuid: otherCollectionUUID}).itcount());
 
 // Cleanup the leftover chunks before finishing
-configDB.getCollection("chunks").remove({uuid: otherCollectionUUID});
+sessionConfigDB.getCollection("chunks").remove({uuid: otherCollectionUUID});
 
 st.stop();
 })();
