@@ -31,8 +31,11 @@ pipx install "cpp-coveralls==0.4.2" || exit 1
 # Run coveralls and upload data.
 # View at https://coveralls.io/github/10gen/mongo
 cpp-coveralls \
-  --root ./build/debug \
+  --root . \
   --build-root . \
   --verbose \
   --gcov ${GCOV_TOOL[@]} \
-  --exclude src/third_party/
+  --exclude src/third_party/ \
+  --exclude ./grammar.yy \
+  --exclude ./parser_gen.hpp \
+  --exclude ./parser_gen.cpp
