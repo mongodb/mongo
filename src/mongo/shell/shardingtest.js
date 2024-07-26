@@ -1198,8 +1198,7 @@ var ShardingTest = function(params) {
     assert(isObject(params), 'ShardingTest configuration must be a JSON object');
 
     var testName = params.name || jsTest.name();
-    var otherParams = Object.merge(params, params.other || {});
-
+    var otherParams = Object.deepMerge(params, params.other || {});
     var numShards = otherParams.hasOwnProperty('shards') ? otherParams.shards : 2;
     var mongosVerboseLevel = otherParams.hasOwnProperty('verbose') ? otherParams.verbose : 1;
     var numMongos = otherParams.hasOwnProperty('mongos') ? otherParams.mongos : 1;
