@@ -320,7 +320,8 @@ tasks:
   #   OutOfCache: the data set is larger than the WiredTiger Cache. For these tests the record count
   #     should result in a ~30GB database, which should be twice the configured WiredTiger Cache.
   #   InCache: the data set is smaller than the WiredTiger Cache. For these tests the record count
-  #     should result in a ~6GB database, which is much smaller than the configured RAM.
+  #     should result in a ~15GB or ~6GB database, depending on the test, which is much smaller than
+  #     the configured RAM.
   #   OpenLoop: A test framework where new jobs arrive independently of job completions.
   #   ClosedLoop: A test framework where new job arrivals are only triggered by job completions
   #     (followed by think time).
@@ -332,6 +333,8 @@ tasks:
   # These 30GB tests have the following features:
   #    * the database does not fit in the WiredTiger Cache. It is 2x the available Wired Tiger Cache.
   #    * the database files do not fit in the Linux FS Cache. They are 2x the available Linux FS Cache.
+  #    * the database documents are fixed sized (~1KB).
+  #    * the default ycsb compressibility of 1 is used. That is, no compression.
   - name: ycsb_30GB.95read5update.2024-05
     priority: 5
     commands:
@@ -375,6 +378,8 @@ tasks:
   # These 120GB tests have the following features:
   #    * the database does not fit in the WiredTiger Cache. It is 8x the available Wired Tiger Cache.
   #    * the database files do not fit in the Linux FS Cache. It is 8x the available Linux FS Cache.
+  #    * the database documents are fixed sized (~1KB).
+  #    * the default ycsb compressibility of 1 is used. That is, no compression.
   - name: ycsb_120GB.95read5update.2024-05
     priority: 5
     commands:
@@ -423,119 +428,12 @@ tasks:
                time: {maxWarmup: 300, maxPhase: 300 }
             }}
 
-  # These 30GB compressible tests have the following features:
-  #    * the database does not fit in the WiredTiger Cache. It is 2x the available Wired Tiger Cache.
-  #    * the database files fit in the Linux FS Cache. They are a quarter the size of the database (4x Compressible).
-  # As a result of compression, it should warm up faster.
-  - name: ycsb_30GB.95read5update.compressible.2024-05
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: "ycsb-30GB.95read5update.2024-05"
-          test_control_params: |
-            {ycsb:{
-               property: {common_extras: ' -p compressibility=4 '},
-               time: {maxWarmup: 300, maxPhase: 300 }
-            }}
-
-  - name: ycsb_30GB.100read.compressible.2024-05
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: "ycsb-30GB.100read.2024-05"
-          test_control_params: |
-            {ycsb:{
-               property: {common_extras: ' -p compressibility=4 '},
-               time: {maxWarmup: 300, maxPhase: 300 }
-            }}
-
-  - name: ycsb_30GB.50read50update.compressible.2024-05
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: "ycsb-30GB.50read50update.2024-05"
-          test_control_params: |
-            {ycsb:{
-               property: {common_extras: ' -p compressibility=4 '},
-               time: {maxWarmup: 300, maxPhase: 300 }
-            }}
-
-  - name: ycsb_30GB.100update.compressible.2024-05
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: "ycsb-30GB.100update.2024-05"
-          test_control_params: |
-            {ycsb:{
-               property: {common_extras: ' -p compressibility=4 '},
-               time: {maxWarmup: 300, maxPhase: 300 }
-            }}
-
-  # These 120GB compressible tests have the following features:
-  #    * the database does not fit in the WiredTiger Cache. It is 8x the available Wired Tiger Cache.
-  #    * the database files do not fit in the Linux FS Cache. They are twice the size of the FS Cache.
-  # As a result of compression, it should warm up faster.
-  - name: ycsb_120GB.95read5update.compressible.2024-05
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: "ycsb-30GB.95read5update.2024-05"
-          test_control_params: |
-            {ycsb:{
-               property: {common_extras: ' -p compressibility=4 '},
-               count: {records: 112640000},
-               time: {maxWarmup: 300, maxPhase: 300 }
-            }}
-
-  - name: ycsb_120GB.100read.compressible.2024-05
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: "ycsb-30GB.100read.2024-05"
-          test_control_params: |
-            {ycsb:{
-               property: {common_extras: ' -p compressibility=4 '},
-               count: {records: 112640000},
-               time: {maxWarmup: 300, maxPhase: 300 }
-            }}
-
-  - name: ycsb_120GB.50read50update.compressible.2024-05
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: "ycsb-30GB.50read50update.2024-05"
-          test_control_params: |
-            {ycsb:{
-               property: {common_extras: ' -p compressibility=4 '},
-               count: {records: 112640000},
-               time: {maxWarmup: 300, maxPhase: 300 }
-            }}
-
-  - name: ycsb_120GB.100update.compressible.2024-05
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: "ycsb-30GB.100update.2024-05"
-          test_control_params: |
-            {ycsb:{
-               property: {common_extras: ' -p compressibility=4 '},
-               count: {records: 112640000},
-
-               time: {maxWarmup: 300, maxPhase: 300 }
-            }}
-
   # OutOfCache Rate Limited (OpenLoop)
   # These 30GB tests have the following features:
   #    * the database does not fit in the WiredTiger Cache. It is 2x the available Wired Tiger Cache.
   #    * the database files do not fit in the Linux FS Cache. It is 2x the available Linux FS Cache.
+  #    * the database documents are fixed sized (~1KB).
+  #    * the default ycsb compressibility of 1 is used. That is, no compression.
   # These tests are also rate limited.
   - name: ycsb_30GB.95read5update.rate_limited.2024-05
     priority: 5
@@ -583,9 +481,11 @@ tasks:
             }}
 
   # InCache ClosedLoop
-  # The following tests have the following features:
+  # The following 6GB tests have the following features:
   #    * the database fits in the WiredTiger Cache.
   #    * the database files fit in the Linux FS Cache.
+  #    * the database documents are fixed sized (~1KB).
+  #    * the default ycsb compressibility of 1 is used. That is, no compression.
   - name: ycsb.95read5update.2024-05
     priority: 5
     commands:
@@ -634,10 +534,71 @@ tasks:
                time: {maxWarmup: 480, maxPhase: 300}
             }}
 
+  # These 15GB compressible and variable sized document tests have the following features:
+  #    * the database fits in the WiredTiger Cache.
+  #    * the database files fit in the Linux FS Cache. They are a quarter the size of the database (4x compressible).
+  #    * the database documents are variably sized. Each field in a document is drawn from a zipfian distribution rather than fixed.
+  #    * the average database document size is ~770 bytes, with each of its 10 fields having a minimum field length of 50 bytes.
+  #    * 4x compressibility is configured, so the documents are smaller on disk (by the compressibility factor).
+  # As a result of compression, it should warm up faster.
+  - name: ycsb_15GB.95read5update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.95read5update.2024-05"
+          test_control_params: |
+            {ycsb: {
+               property: {common_extras: ' -p compressibility=4 -p fieldlengthdistribution=zipfian -p minfieldlength=50 '},
+               time: {maxWarmup: 240, maxPhase: 300 },
+               count: {records: 43520000}
+            }}
+
+  - name: ycsb_15GB.100read.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100read.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 -p fieldlengthdistribution=zipfian -p minfieldlength=50 '},
+               time: {maxWarmup: 180, maxPhase: 300 },
+               count: {records: 43520000}
+            }}
+
+  - name: ycsb_15GB.50read50update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.50read50update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 -p fieldlengthdistribution=zipfian -p minfieldlength=50 '},
+               time: {maxWarmup: 240, maxPhase: 300 },
+               count: {records: 43520000}
+            }}
+
+  - name: ycsb_15GB.100update.2024-05
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-30GB.100update.2024-05"
+          test_control_params: |
+            {ycsb:{
+               property: {common_extras: ' -p compressibility=4 -p fieldlengthdistribution=zipfian -p minfieldlength=50 '},
+               time: {maxWarmup: 240, maxPhase: 300 },
+               count: {records: 43520000}
+            }}
+
   # InCache Rate Limited (OpenLoop)
-  # The following tests have the following features:
+  # The following 6GB tests have the following features:
   #    * the database fits in the WiredTiger Cache.
   #    * the database files fit in the Linux FS Cache.
+  #    * the database documents are fixed sized (~1KB).
+  #    * the default ycsb compressibility of 1 is used. That is, no compression.
   # These tests are also rate limited.
   - name: ycsb.95read5update.rate_limited.2024-05
     priority: 5

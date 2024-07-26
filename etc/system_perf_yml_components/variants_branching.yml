@@ -406,6 +406,7 @@ buildvariants:
       # 100 Read tests
       - name: ycsb.100read.2024-05
         cron: *high-value-workload-cron
+      - name: ycsb_15GB.100read.2024-05
       - name: ycsb_30GB.100read.2024-05
         cron: *high-value-workload-cron
       - name: ycsb_30GB.100read.rate_limited.2024-05
@@ -413,6 +414,7 @@ buildvariants:
       # 95Read5Update tests
       - name: ycsb.95read5update.2024-05
         cron: *high-value-workload-cron
+      - name: ycsb_15GB.95read5update.2024-05
       - name: ycsb_30GB.95read5update.2024-05
         cron: *high-value-workload-cron
       - name: ycsb_30GB.95read5update.rate_limited.2024-05
@@ -421,12 +423,16 @@ buildvariants:
       # 50Read50Update tests
       - name: ycsb.50read50update.2024-05
         activate: false
+      - name: ycsb_15GB.50read50update.2024-05
+        activate: false
       - name: ycsb_30GB.50read50update.2024-05
         activate: false
       - name: ycsb_30GB.50read50update.rate_limited.2024-05
         activate: false
       # 100Update tests
       - name: ycsb.100update.2024-05
+        activate: false
+      - name: ycsb_15GB.100update.2024-05
         activate: false
       - name: ycsb_30GB.100update.2024-05
         activate: false
