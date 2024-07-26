@@ -45,14 +45,8 @@ parameters:
 
 ## Patch Aliases
 patch_aliases:
-- alias: query
-  variant: '^(.*query-patch-only|linux-x86-dynamic-compile-required)$'
-  task: '.*'
 - alias: required
   variant: '^(.*-required$|linux-64-debug|enterprise-amazon-linux2-arm64-all-feature-flags|amazon-linux2-arm64-dynamic-compile|amazon-linux2-arm64-compile|amazon-linux2-arm64-crypt-compile|run-all-affected-jstests)$'
-  task: '.*'
-- alias: security
-  variant: '^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$'
   task: '.*'
 
 commit_queue_aliases:
