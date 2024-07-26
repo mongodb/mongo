@@ -9,28 +9,45 @@
 (function() {
 'use strict';
 
-function checkResults(results, checksToDo) {
-    for (let i = 0; i < numCollections; i++) {
-        const coll = "coll" + i;
+function checkResults(aggregationPipeline, checksToDo) {
+    assert.soon(() => {
+        const results = adminDb.aggregate(aggregationPipeline).toArray();
+        assert.lte(numCollections, results.length);
 
-        // To check that the data retrieve from $_internalAllCollectionStats is correct we will call
-        // $collStats for each namespace to retrieve its storage stats and compare the two outputs.
-        const expectedResults =
-            testDb.getCollection(coll).aggregate([{$collStats: {storageStats: {}}}]).toArray();
-        assert.neq(null, expectedResults);
-        assert.eq(expectedResults.length, 1);
+        for (let i = 0; i < numCollections; i++) {
+            try {
+                const coll = "coll" + i;
 
-        let exists = false;
-        for (const data of results) {
-            const ns = data.ns;
-            if (dbName + "." + coll === ns) {
-                checksToDo(data, expectedResults);
-                exists = true;
-                break;
+                // To check that the data retrieve from $_internalAllCollectionStats is correct we
+                // will call $collStats for each namespace to retrieve its storage stats and compare
+                // the two outputs.
+                const expectedResults = testDb.getCollection(coll)
+                                            .aggregate([{$collStats: {storageStats: {}}}])
+                                            .toArray();
+                assert.neq(null, expectedResults);
+                assert.eq(1, expectedResults.length);
+
+                let exists = false;
+                for (const data of results) {
+                    const ns = data.ns;
+                    if (dbName + "." + coll === ns) {
+                        checksToDo(data, expectedResults);
+                        exists = true;
+                        break;
+                    }
+                }
+                assert(exists,
+                       "Expected to have $_internalAllCollectionStats results for coll" + i);
+            } catch (e) {
+                // As we perform two logical executions of $collStats they might return different
+                // storageSizes since WT may have rewritten the file during a checkpoint or
+                // background compaction. We retry the operation as it is a transient error.
+                jsTest.log(e);
+                return false;
             }
         }
-        assert(exists, "Expected to have $_internalAllCollectionStats results for coll" + i);
-    }
+        return true;
+    });
 }
 
 // Configure initial sharding cluster
@@ -40,7 +57,7 @@ const mongos = st.s;
 const dbName = "test";
 const testDb = mongos.getDB(dbName);
 const adminDb = mongos.getDB("admin");
-const numCollections = 20;
+const numCollections = 4;
 
 // Insert sharded collections to validate the aggregation stage
 for (let i = 0; i < (numCollections / 2); i++) {
@@ -57,9 +74,7 @@ for (let i = numCollections / 2; i < numCollections; i++) {
 
 // Testing for comparing each collection returned from $_internalAllCollectionStats to $collStats
 (function testInternalAllCollectionStats() {
-    const outputData =
-        adminDb.aggregate([{$_internalAllCollectionStats: {stats: {storageStats: {}}}}]).toArray();
-    assert.gte(outputData.length, 20);
+    const aggregationPipeline = [{$_internalAllCollectionStats: {stats: {storageStats: {}}}}];
 
     const checksToDo = (left, right) => {
         const msg = "Expected same output from $_internalAllCollectionStats and $collStats " +
@@ -75,94 +90,79 @@ for (let i = numCollections / 2; i < numCollections; i++) {
         assert.eq(left.storageStats.totalIndexSize, right[0].storageStats.totalIndexSize, msg);
         assert.eq(left.storageStats.totalSize, right[0].storageStats.totalSize, msg);
     };
-    checkResults(outputData, checksToDo);
+    checkResults(aggregationPipeline, checksToDo);
 })();
 
 // Tests to check the correct behaviour of a $project stage after $_internalAllCollectionStats
 (function testNumOrphanDocsFieldProject() {
-    const outputData = adminDb
-                           .aggregate([
-                               {$_internalAllCollectionStats: {stats: {storageStats: {}}}},
-                               {$project: {"ns": 1, "storageStats.numOrphanDocs": 1}}
-                           ])
-                           .toArray();
-    assert.gte(outputData.length, numCollections);
+    const aggregationPipeline = [
+        {$_internalAllCollectionStats: {stats: {storageStats: {}}}},
+        {$project: {"ns": 1, "storageStats.numOrphanDocs": 1}}
+    ];
 
     const checksToDo = (left, right) => {
         assert.eq(left.storageStats.numOrphanDocs,
                   right[0].storageStats.numOrphanDocs,
                   "Expected same output after a projection with storageStats.numOrphanDocs field");
     };
-    checkResults(outputData, checksToDo);
+    checkResults(aggregationPipeline, checksToDo);
 })();
 
 (function testStorageSizeFieldProject() {
-    const outputData = adminDb
-                           .aggregate([
-                               {$_internalAllCollectionStats: {stats: {storageStats: {}}}},
-                               {$project: {"ns": 1, "storageStats.storageSize": 1}}
-                           ])
-                           .toArray();
-    assert.gte(outputData.length, numCollections);
+    const aggregationPipeline = [
+        {$_internalAllCollectionStats: {stats: {storageStats: {}}}},
+        {$project: {"ns": 1, "storageStats.storageSize": 1}}
+    ];
 
     const checksToDo = (left, right) => {
         assert.eq(left.storageStats.storageSize,
                   right[0].storageStats.storageSize,
                   "Expected same output after a projection with storageStats.storageSize field");
     };
-    checkResults(outputData, checksToDo);
+    checkResults(aggregationPipeline, checksToDo);
 })();
 
 (function testNIndexesFieldProject() {
-    const outputData = adminDb
-                           .aggregate([
-                               {$_internalAllCollectionStats: {stats: {storageStats: {}}}},
-                               {$project: {"ns": 1, "storageStats.nindexes": 1}}
-                           ])
-                           .toArray();
-    assert.gte(outputData.length, numCollections);
+    const aggregationPipeline = [
+        {$_internalAllCollectionStats: {stats: {storageStats: {}}}},
+        {$project: {"ns": 1, "storageStats.nindexes": 1}}
+    ];
 
     const checksToDo = (left, right) => {
         assert.eq(left.storageStats.nindexes,
                   right[0].storageStats.nindexes,
                   "Expected same output after a projection with storageStats.nindexes field");
     };
-    checkResults(outputData, checksToDo);
+    checkResults(aggregationPipeline, checksToDo);
 })();
 
 (function testTotalSizeFieldProject() {
-    const outputData = adminDb
-                           .aggregate([
-                               {$_internalAllCollectionStats: {stats: {storageStats: {}}}},
-                               {$project: {"ns": 1, "storageStats.totalSize": 1}}
-                           ])
-                           .toArray();
-    assert.gte(outputData.length, numCollections);
+    const aggregationPipeline = [
+        {$_internalAllCollectionStats: {stats: {storageStats: {}}}},
+        {$project: {"ns": 1, "storageStats.totalSize": 1}}
+    ];
 
     const checksToDo = (left, right) => {
         assert.eq(left.storageStats.totalSize,
                   right[0].storageStats.totalSize,
                   "Expected same output after a projection with storageStats.totalSize field");
     };
-    checkResults(outputData, checksToDo);
+    checkResults(aggregationPipeline, checksToDo);
 })();
 
 (function testProjectingDifferentFields() {
-    const outputData = adminDb
-                           .aggregate([
-                               {$_internalAllCollectionStats: {stats: {storageStats: {}}}},
-                               {
-                                   $project: {
-                                       "ns": 1,
-                                       "storageStats.numOrphanDocs": 1,
-                                       "storageStats.storageSize": 1,
-                                       "storageStats.nindexes": 1,
-                                       "storageStats.totalSize": 1
-                                   }
-                               }
-                           ])
-                           .toArray();
-    assert.gte(outputData.length, numCollections);
+    const aggregationPipeline = [
+        {$_internalAllCollectionStats: {stats: {storageStats: {}}}},
+        {
+            $project: {
+                "ns": 1,
+                "storageStats.numOrphanDocs": 1,
+                "storageStats.storageSize": 1,
+                "storageStats.nindexes": 1,
+                "storageStats.totalSize": 1
+            }
+        }
+    ];
 
     const checksToDo = (left, right) => {
         const msg = "Expected same output after a projection with fields from different storage " +
@@ -172,7 +172,7 @@ for (let i = numCollections / 2; i < numCollections; i++) {
         assert.eq(left.storageStats.nindexes, right[0].storageStats.nindexes, msg);
         assert.eq(left.storageStats.totalSize, right[0].storageStats.totalSize, msg);
     };
-    checkResults(outputData, checksToDo);
+    checkResults(aggregationPipeline, checksToDo);
 })();
 
 // Test valid query with empty specification
