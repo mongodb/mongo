@@ -211,7 +211,7 @@ executor:
           catchUpTimeoutMillis: 0
       mongod_options:
         set_parameters:
-          reshardingMinimumOperationDurationMillis: 30000 # 30 seconds
+          reshardingMinimumOperationDurationMillis: 15000 # 15 seconds
     shard_options:
       all_nodes_electable: true
       mongod_options:
