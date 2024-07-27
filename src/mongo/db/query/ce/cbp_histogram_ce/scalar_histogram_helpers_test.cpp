@@ -587,6 +587,59 @@ TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromData) {
     // Equality to the minimum date/ts value is estimated by range_frequency/NDV.
     ASSERT_EQ(1.0, estimateCardinality(hist2, minDateTag, minDateVal, kEqual).card);
     ASSERT_EQ(1.0, estimateCardinality(hist2, minTsTag, minTsVal, kEqual).card);
+
+    // [minDate, startInstant], estimated by the half of the date bucket.
+    auto expectedCard = estimateCardinalityRange(hist2,
+                                                 true /* lowInclusive */,
+                                                 minDateTag,
+                                                 minDateVal,
+                                                 true /* highInclusive */,
+                                                 value::TypeTags::Date,
+                                                 value::bitcastFrom<int64_t>(startInstant));
+    ASSERT_EQ(1.0, expectedCard.card);
+
+    // [minDate, endInstant], estimated by the entire date bucket.
+    expectedCard = estimateCardinalityRange(hist2,
+                                            true,
+                                            minDateTag,
+                                            minDateVal,
+                                            true,
+                                            value::TypeTags::Date,
+                                            value::bitcastFrom<int64_t>(endInstant));
+    ASSERT_EQ(3.0, expectedCard.card);
+
+    // [minDate, minTs), estimated by the entire date bucket.
+    // (is this interval possible or is it better to have maxDate upper bound?).
+    expectedCard =
+        estimateCardinalityRange(hist2, true, minDateTag, minDateVal, false, minTsTag, minTsVal);
+    ASSERT_EQ(3.0, expectedCard.card);
+
+    // [minTs, startTs], estimated by the half of the timestamp bucket.
+    expectedCard = estimateCardinalityRange(hist2,
+                                            true,
+                                            minTsTag,
+                                            minTsVal,
+                                            true,
+                                            value::TypeTags::Timestamp,
+                                            value::bitcastFrom<int64_t>(startTs.asULL()));
+    ASSERT_EQ(1.0, expectedCard.card);
+
+    // [minTs, endTs], estimated by the entire timestamp bucket.
+    expectedCard = estimateCardinalityRange(hist2,
+                                            true,
+                                            minTsTag,
+                                            minTsVal,
+                                            true,
+                                            value::TypeTags::Timestamp,
+                                            value::bitcastFrom<int64_t>(endTs.asULL()));
+    ASSERT_EQ(3.0, expectedCard.card);
+
+    // [minTs, maxTs], estimated by the entire timestamp bucket.
+    auto&& [maxTs, inclMaxTs] = getMinMaxBoundForType(false /*isMin*/, value::TypeTags::Timestamp);
+    const auto [maxTsTag, maxTsVal] = maxTs->cast<mongo::optimizer::Constant>()->get();
+    expectedCard =
+        estimateCardinalityRange(hist2, true, minTsTag, minTsVal, true, maxTsTag, maxTsVal);
+    ASSERT_EQ(3.0, expectedCard.card);
 }
 
 TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromBuckets) {
@@ -608,20 +661,41 @@ TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromBuckets) {
     // Minimum ObjectId.
     auto&& [minOid, inclOid] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::ObjectId);
     auto [minOidTag, minOidVal] = minOid->cast<mongo::optimizer::Constant>()->get();
-    CEType expectedCard{estimateCardinality(hist, minOidTag, minOidVal, kEqual).card};
-    ASSERT_CE_APPROX_EQUAL(1.9, expectedCard, kErrorBound);
+    ASSERT_CE_APPROX_EQUAL(
+        1.9, estimateCardinality(hist, minOidTag, minOidVal, kEqual).card, kErrorBound);
 
     // Minimum date.
     const auto&& [minDate, inclDate] = getMinMaxBoundForType(true /*isMin*/, Date);
     const auto [minDateTag, minDateVal] = minDate->cast<mongo::optimizer::Constant>()->get();
-    expectedCard = {estimateCardinality(hist, minDateTag, minDateVal, kEqual).card};
-    ASSERT_EQ(4.0, expectedCard._value);
+    ASSERT_EQ(4.0, estimateCardinality(hist, minDateTag, minDateVal, kEqual).card);
 
     // Minimum timestamp.
     auto&& [minTs, inclTs] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Timestamp);
     auto [minTsTag, minTsVal] = minTs->cast<mongo::optimizer::Constant>()->get();
-    expectedCard = {estimateCardinality(hist, minTsTag, minTsVal, kEqual).card};
-    ASSERT_CE_APPROX_EQUAL(1.9, expectedCard, kErrorBound);
+    ASSERT_CE_APPROX_EQUAL(
+        1.9, estimateCardinality(hist, minTsTag, minTsVal, kEqual).card, kErrorBound);
+
+    // [minDate, innerDate], estimated by the half of the date bucket.
+    const int64_t innerDate = 1516864323000LL;
+    auto expectedCard = estimateCardinalityRange(hist,
+                                                 true,
+                                                 minDateTag,
+                                                 minDateVal,
+                                                 true,
+                                                 value::TypeTags::Date,
+                                                 value::bitcastFrom<int64_t>(innerDate));
+    ASSERT_CE_APPROX_EQUAL(48.0, expectedCard.card, kErrorBound);
+
+    // [minTs, innerTs], estimated by the half of the timestamp bucket.
+    const Timestamp innerTs{Seconds(1516864323LL), 0};
+    expectedCard = estimateCardinalityRange(hist,
+                                            true,
+                                            minTsTag,
+                                            minTsVal,
+                                            true,
+                                            value::TypeTags::Timestamp,
+                                            value::bitcastFrom<int64_t>(innerTs.asULL()));
+    ASSERT_CE_APPROX_EQUAL(47.5, expectedCard.card, kErrorBound);
 }
 
 }  // namespace
