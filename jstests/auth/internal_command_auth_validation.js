@@ -15,17 +15,34 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 const adminDbName = "admin";
 const shard0name = "shard0000";
-const dbName = "test";
-const collName = "internal_command_auth_validation.coll";
-const ns = dbName + "." + collName;
+const dbName = "admin";
+const collName = dbName + ".coll";
+const ns = dbName + ".ns";
 const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles_sharded/");
+const migrationOperationId = UUID();
 
 const testOnlyCommandsSet = new Set(testOnlyCommands);
+const sysUser = {
+    user: "admin",
+    pwd: "password",
+    roles: ["__system"]
+};
+const noroleUser = {
+    user: "testuser",
+    pwd: "password",
+    roles: []
+};
 /**
  * internalCommandsMap contains tests for each internal command. For each command name there is
  * a test object. Each test object inside the map has the following fields.
- * testname: The name of the command to run.
- * command: This includes the command details to run using runCommand.
+ *
+ *  testname: The name of the command to run.
+ *  command: This includes the command details to run using runCommand.
+ *  precommand: This function is run before the sysUser runs the command (to be tested). This
+ * creates preconditions so that the command is not blocked.
+ *  postcommand: This function is run after the sysUser runs the command (to be tested)
+ * successfully. This ensures other commands will not be blocked.
+ *  skip: Some commands are skipped.
  */
 const internalCommandsMap = {
     _clusterQueryWithoutShardKey: {
@@ -413,7 +430,11 @@ const internalCommandsMap = {
     },
     _shardsvrBeginMigrationBlockingOperation: {
         testname: "_shardsvrBeginMigrationBlockingOperation",
-        command: {_shardsvrBeginMigrationBlockingOperation: ns, operationId: UUID()},
+        command: {_shardsvrBeginMigrationBlockingOperation: ns, operationId: migrationOperationId},
+        postcommand: (db) => {
+            assert.commandWorked(db.runCommand(
+                {_shardsvrEndMigrationBlockingOperation: ns, operationId: migrationOperationId}));
+        },
     },
     _shardsvrChangePrimary: {
         testname: "_shardsvrChangePrimary",
@@ -505,7 +526,6 @@ const internalCommandsMap = {
             _shardsvrCreateCollection: "x.y",
             collectionUUID: UUID(),
         },
-
     },
     _shardsvrCreateGlobalIndex: {
         testname: "_shardsvrCreateGlobalIndex",
@@ -559,8 +579,13 @@ const internalCommandsMap = {
         },
     },
     _shardsvrCoordinateMultiUpdate: {
-        skipIfSystemUser: true,
         testname: "_shardsvrCoordinateMultiUpdate",
+        precommand: (precommanddb, user, pwd, coll) => {
+            assert(precommanddb.auth(user, pwd));
+            assert.commandWorked(coll.insert({x: 1, y: 1}));
+            assert.commandWorked(coll.insert({x: 1, y: 2}));
+            precommanddb.logout();
+        },
         command: {
             _shardsvrCoordinateMultiUpdate: collName,
             uuid: UUID(),
@@ -571,7 +596,7 @@ const internalCommandsMap = {
         testname: "_shardsvrEndMigrationBlockingOperation",
         command: {
             _shardsvrEndMigrationBlockingOperation: "ns",
-            operationId: UUID(),
+            operationId: migrationOperationId,
         },
     },
     _shardsvrGetStatsForBalancing: {
@@ -798,16 +823,22 @@ function createUser(db, userName, roles) {
  *     testObject -- testObject contains the test information for a single command.
  *     commandName -- command Name for the test.
  *     db -- db on which the command is going to run.
+ *     secondDb -- the precommands are run on the second db.
+ *     coll -- collection for the second db command.
  * Returns:
  *    result includes the pass/fail value and the command results for both system role
  * and no roles.
  */
-function runOneCommandAuthorizationTest(testObject, commandName, db) {
+function runOneCommandAuthorizationTest(testObject, commandName, db, secondDb, coll) {
     const cmdOK = {commandWorked: 1, commandFailed: 0};
     let result = {pass: true};
-
-    const noRoleUserName = "user|" + commandName + "|noRole";
-    assert(db.auth(createUser(db, noRoleUserName, []), "password"));
+    if (testObject.precommand != undefined) {
+        if (secondDb == undefined) {
+            return result;
+        }
+        testObject.precommand(secondDb, sysUser.user, sysUser.pwd, coll);
+    }
+    assert(db.auth(noroleUser.user, noroleUser.pwd));
     result.noRoleRes = db.runCommand(testObject.command);
     db.logout();
     if (result.noRoleRes.ok === cmdOK.commandWorked ||
@@ -815,13 +846,11 @@ function runOneCommandAuthorizationTest(testObject, commandName, db) {
         result.pass = false;
         return result;
     }
-    if (testObject.skipIfSystemUser) {
-        return result;
-    }
-
-    const sysUserName = "user|" + commandName + "|sys";
-    assert(db.auth(createUser(db, sysUserName, ['__system']), "password"));
+    assert(db.auth(sysUser.user, sysUser.pwd));
     result.sysRes = db.runCommand(testObject.command);
+    if (result.sysRes.ok === cmdOK.commandWorked && testObject.postcommand !== undefined) {
+        testObject.postcommand(db);
+    }
     db.logout();
     const sysRolePass = (result.sysRes.ok === cmdOK.commandWorked ||
                          result.sysRes.code !== ErrorCodes.Unauthorized);
@@ -847,12 +876,14 @@ function skipCommand(testObjectForCommand, commandName) {
  * Parameters:
  *   conn -- connection, either to standalone mongod,
  *      or to mongos in sharded cluster
- *   adminDb -- all commands are tested on admin db.
+ *   firstDb -- all commands are tested on the first db.
+ *   secondDb -- the precommands are run on the second db.
+ *   coll -- collection for the second db command.
  *
  * Returns:
  *   results of the test
  */
-function runAuthorizationTestsOnAllInternalCommands(conn, adminDb) {
+function runAuthorizationTestsOnAllInternalCommands(conn, firstDb, secondDb, coll) {
     let results = {};
     let fails = [];
     const availableCommandsList =
@@ -866,7 +897,8 @@ function runAuthorizationTestsOnAllInternalCommands(conn, adminDb) {
         if (skipCommand(test, commandName)) {
             continue;
         }
-        results[commandName] = runOneCommandAuthorizationTest(test, commandName, adminDb);
+        results[commandName] =
+            runOneCommandAuthorizationTest(test, commandName, firstDb, secondDb, coll);
     }
     return results;
 }
@@ -894,6 +926,7 @@ function runStandaloneTest() {
     const conn = MongoRunner.runMongod(opts);
     const adminDb = conn.getDB(adminDbName);
     adminDb.createUser({user: "admin", pwd: "password", roles: ["__system"]});
+    createUser(adminDb, noroleUser.user, noroleUser.roles);
 
     const results = runAuthorizationTestsOnAllInternalCommands(conn, adminDb);
 
@@ -940,6 +973,7 @@ function runMongosTest(opts) {
     const mongos = shardingTest.s0;
     const mongosAdminDB = mongos.getDB("admin");
     mongosAdminDB.createUser({user: "admin", pwd: "password", roles: ["__system"]});
+    createUser(mongosAdminDB, noroleUser.user, noroleUser.roles);
     const results = runAuthorizationTestsOnAllInternalCommands(mongos, mongosAdminDB);
     shardingTest.stop();
     return results;
@@ -953,6 +987,7 @@ function runShardedServerTest(opts) {
         mongos: 1,
         config: 1,
         keyFile: "jstests/libs/key1",
+        useHostname: false,
         other: {
             shardOptions: opts,
             // We have to set the mongotHost parameter for the $search-related tests to pass
@@ -963,8 +998,15 @@ function runShardedServerTest(opts) {
     });
     const shardPrimary = shardingTest.rs0.getPrimary();
     const shardAdminDB = shardPrimary.getDB("admin");
-    shardAdminDB.createUser({user: "admin", pwd: "password", roles: ["__system"]});
-    const results = runAuthorizationTestsOnAllInternalCommands(shardPrimary, shardAdminDB);
+    const mongosDB = shardingTest.s0.getDB("admin");
+    const coll = mongosDB.getCollection(collName);
+    mongosDB.createUser({user: "admin", pwd: "password", roles: ["__system"]});
+    if (!TestData.configShard) {
+        shardAdminDB.createUser({user: "admin", pwd: "password", roles: ["__system"]});
+    }
+    createUser(shardAdminDB, noroleUser.user, noroleUser.roles);
+    const results =
+        runAuthorizationTestsOnAllInternalCommands(shardPrimary, shardAdminDB, mongosDB, coll);
     shardingTest.stop();
     return results;
 }
@@ -989,8 +1031,7 @@ function runConfigServer(opts) {
     const configPrimary = shardingTest.configRS.getPrimary();
     const configAdminDB = configPrimary.getDB("admin");
     configAdminDB.createUser({user: "admin", pwd: "password", roles: ["__system"]});
-    assert(configAdminDB.auth("admin", "password"));
-    configAdminDB.logout();
+    createUser(configAdminDB, noroleUser.user, noroleUser.roles);
     const results = runAuthorizationTestsOnAllInternalCommands(configPrimary, configAdminDB);
     shardingTest.stop();
     return results;
