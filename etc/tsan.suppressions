@@ -79,8 +79,3 @@ race:mongo::AuthorizationManager::get
 
 # TODO SERVER-91877 inversion b/w SSL manager and some crypto mutex
 deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
-
-# TODO SERVER-91875 inversion b/w replication corodinator impl mutex and FCBIS mutex
-# ReplCoord::_startInitialSync->~FCBIS
-# ReplCoord::_startInitialSnyc->FCBIS::startup->ReplCoord::getMemberState
-deadlock:mongo::repl::ReplicationCoordinatorImpl::_startInitialSync

@@ -899,6 +899,15 @@ void ReplicationCoordinatorImpl::_startInitialSync(
 
     // Initial sync may take locks during startup; make sure there is no possibility of conflict.
     dassert(!shard_role_details::getLocker(opCtx)->isLocked());
+    // Re-assigning a non-null _initialSyncer member variable will call the existing initial syncer
+    // object's destructor. For FCBIS, this acquires the FCBIS mutex. To preserve lock acquisition
+    // ordering between the replication coordinator mutex and the FCBIS mutex, we need to move the
+    // _initialSyncer member variable in a lambda expression while holding the replication
+    // coordinator mutex. The FCBIS mutex will only be acquired after we release it.
+    [&] {
+        stdx::lock_guard<Latch> lock(_mutex);
+        return std::move(_initialSyncer);
+    }();
     try {
         {
             // Must take the lock to set _initialSyncer, but not call it.
