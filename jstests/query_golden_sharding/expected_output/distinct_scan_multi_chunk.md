@@ -33,6 +33,7 @@ TODO SERVER-92458: Shard filter out the orphan documents
 					"indexName" : "shardKey_1",
 					"isMultiKey" : false,
 					"isPartial" : false,
+					"isShardFiltering" : false,
 					"isSparse" : false,
 					"isUnique" : false,
 					"keyPattern" : {
@@ -65,6 +66,7 @@ TODO SERVER-92458: Shard filter out the orphan documents
 					"indexName" : "shardKey_1",
 					"isMultiKey" : false,
 					"isPartial" : false,
+					"isShardFiltering" : false,
 					"isSparse" : false,
 					"isUnique" : false,
 					"keyPattern" : {

@@ -354,6 +354,7 @@ void statsToBSON(const PlanStageStats& stats,
         bob->appendBool("isUnique", spec->isUnique);
         bob->appendBool("isSparse", spec->isSparse);
         bob->appendBool("isPartial", spec->isPartial);
+        bob->appendBool("isShardFiltering", spec->isShardFiltering);
         bob->append("indexVersion", spec->indexVersion);
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 

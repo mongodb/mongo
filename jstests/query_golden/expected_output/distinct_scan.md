@@ -74,6 +74,7 @@
 			"indexName" : "a_1",
 			"isMultiKey" : false,
 			"isPartial" : false,
+			"isShardFiltering" : false,
 			"isSparse" : false,
 			"isUnique" : false,
 			"keyPattern" : {
@@ -126,6 +127,7 @@
 						"indexName" : "a_1",
 						"isMultiKey" : false,
 						"isPartial" : false,
+						"isShardFiltering" : false,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
@@ -178,6 +180,7 @@
 			"indexName" : "a_1",
 			"isMultiKey" : false,
 			"isPartial" : false,
+			"isShardFiltering" : false,
 			"isSparse" : false,
 			"isUnique" : false,
 			"keyPattern" : {
@@ -243,6 +246,7 @@
 						"indexName" : "a_1",
 						"isMultiKey" : false,
 						"isPartial" : false,
+						"isShardFiltering" : false,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
@@ -296,6 +300,7 @@
 			"indexName" : "a_1",
 			"isMultiKey" : false,
 			"isPartial" : false,
+			"isShardFiltering" : false,
 			"isSparse" : false,
 			"isUnique" : false,
 			"keyPattern" : {
@@ -359,6 +364,7 @@
 						"indexName" : "a_1",
 						"isMultiKey" : false,
 						"isPartial" : false,
+						"isShardFiltering" : false,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {

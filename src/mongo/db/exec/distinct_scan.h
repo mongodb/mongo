@@ -29,7 +29,6 @@
 
 #pragma once
 
-
 #include <memory>
 #include <string>
 #include <utility>
@@ -40,17 +39,15 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_index_stage.h"
+#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/assert_util_core.h"
@@ -116,7 +113,8 @@ public:
     DistinctScan(ExpressionContext* expCtx,
                  VariantCollectionPtrOrAcquisition collection,
                  DistinctParams params,
-                 WorkingSet* workingSet);
+                 WorkingSet* workingSet,
+                 std::unique_ptr<ShardFiltererImpl> _shardFilterer = nullptr);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
@@ -156,6 +154,15 @@ private:
     // _checker gives us our start key and ensures we stay in bounds.
     IndexBoundsChecker _checker;
     IndexSeekPoint _seekPoint;
+
+    // State used to implement shard filtering.
+    std::unique_ptr<ShardFiltererImpl> _shardFilterer;
+    // When '_needsSequentialScan' is true, the 'DistinctScan' stage cannot skip over consecutive
+    // index entries with the same value, as it normally would, but must instead examine the next
+    // entry, as a normal index scan does. This step is necessary when the '_shardFilterer' rejects
+    // an entry, requiring the DistinctScan to examine other entries with the same value to
+    // determine if one of them may be accepted.
+    bool _needsSequentialScan = false;
 
     // Stats
     DistinctScanStats _specificStats;
