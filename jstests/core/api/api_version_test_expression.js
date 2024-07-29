@@ -4,7 +4,6 @@
  *
  * Tests which create views aren't expected to work when collections are implicitly sharded.
  * @tags: [
- *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
  *   uses_api_parameters,
  *   no_selinux,
@@ -13,6 +12,8 @@
  */
 
 import {getExecutionStats} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_test_expression";
@@ -21,6 +22,13 @@ coll.drop();
 const collForeignName = collName + "_foreign";
 const collForeign = testDb[collForeignName];
 collForeign.drop();
+
+// TODO SERVER-92954 remove this helper function after validation of validator during creation of
+// tracked collection is fixed
+function useShardingCoordinatorForCreate() {
+    return (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) &&
+        FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation");
+}
 
 for (let i = 0; i < 5; i++) {
     assert.commandWorked(coll.insert({num: i}));
@@ -169,12 +177,14 @@ assert.commandFailedWithCode(
 let validator = {$expr: {$_testApiVersion: {unstable: true}}};
 let validatedCollName = collName + "_validated";
 
-// Creating a collection with the unstable validator is not allowed with apiStrict:true.
-testDb[validatedCollName].drop();
-assert.commandFailedWithCode(
-    testDb.runCommand(
-        {create: validatedCollName, validator: validator, apiVersion: "1", apiStrict: true}),
-    ErrorCodes.APIStrictError);
+if (!useShardingCoordinatorForCreate()) {
+    // Creating a collection with the unstable validator is not allowed with apiStrict:true.
+    testDb[validatedCollName].drop();
+    assert.commandFailedWithCode(
+        testDb.runCommand(
+            {create: validatedCollName, validator: validator, apiVersion: "1", apiStrict: true}),
+        ErrorCodes.APIStrictError);
+}
 
 // Run create and insert commands without apiStrict:true and verify that it is successful.
 assert.commandWorked(testDb.runCommand(
@@ -194,15 +204,17 @@ validator = {
     $expr: {$_testApiVersion: {deprecated: true}}
 };
 
-// Creating a collection with the deprecated validator is not allowed with
-// apiDeprecationErrors:true.
-assert.commandFailedWithCode(testDb.runCommand({
-    create: validatedCollName,
-    validator: validator,
-    apiVersion: "1",
-    apiDeprecationErrors: true,
-}),
-                             ErrorCodes.APIDeprecationError);
+if (!useShardingCoordinatorForCreate) {
+    // Creating a collection with the deprecated validator is not allowed with
+    // apiDeprecationErrors:true.
+    assert.commandFailedWithCode(testDb.runCommand({
+        create: validatedCollName,
+        validator: validator,
+        apiVersion: "1",
+        apiDeprecationErrors: true,
+    }),
+                                 ErrorCodes.APIDeprecationError);
+}
 
 // Run create and insert commands without apiDeprecationErrors:true and verify that it is
 // successful.
