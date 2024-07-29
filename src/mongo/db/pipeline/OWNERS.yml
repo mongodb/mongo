@@ -1,14 +1,103 @@
 version: 1.0.0
 filters:
+  # The files implementing DocumentSource and Expression each contain code related to parsing,
+  # validation, and optimization (QO concerns) as well as execution (QE). Therefore, we give default
+  # ownership of files in this directory to the entire query team.
+  - "*":
+    approvers:
+      - 10gen/query
+  # The IDL files in this directory are generally related to DocumentSource parsing, so they are
+  # owned by QO by default.
+  - "*.idl":
+    approvers:
+      - 10gen/query-optimization
+  # This file deals primarily with parsing for accumulators, and is therefore owned by QO.
+  - "accumulation_statement*":
+    approvers:
+      - 10gen/query-optimization
+  - "accumulator*":
+    approvers:
+      - 10gen/query-execution
+  - "aggregation_request*":
+    approvers:
+      - 10gen/query-optimization
+  - "*change_stream*":
+    approvers:
+      - 10gen/query-execution
+  - "dependencies*":
+    approvers:
+      - 10gen/query-optimization
+  - "document_source_current_op*":
+    approvers:
+      - 10gen/query-execution
+  - "document_source_densify*":
+    approvers:
+      - 10gen/query-integration
+  - "document_source_fill*":
+    approvers:
+      - 10gen/query-integration
+  - "document_source_index_stats*":
+    approvers:
+      - 10gen/query-execution
   - "document_source_internal_unpack_bucket*":
     approvers:
       - 10gen/query-integration
+  - "document_source_internal_convert_bucket_index_stats*":
+    approvers:
+      - 10gen/query-integration
+  - "document_source_parsing_validators*":
+    approvers:
+      - 10gen/query-optimization
   - "document_source_query_stats*":
     approvers:
       - 10gen/query-integration
-  - "search":
+  - "document_source_set_window_fields*":
     approvers:
       - 10gen/query-integration
-  - "window_function":
+  - "granularity_rounder*":
+    approvers:
+      - 10gen/query-execution
+  - "javascript_execution*":
     approvers:
       - 10gen/query-integration
+  - "make_js_function*":
+    approvers:
+      - 10gen/query-integration
+  - "group_processor*":
+    approvers:
+      - 10gen/query-execution
+  - "lite_parsed*":
+    approvers:
+      - 10gen/query-optimization
+  - "merge_processor*":
+    approvers:
+      - 10gen/query-execution
+  # Percentile calculations fall under the umbrella of "analytical extensions" which are owned by
+  # QI.
+  - "percentile_algo*":
+    approvers:
+      - 10gen/query-integration
+  - "plan_executor_pipeline*":
+    approvers:
+      - 10gen/query-execution
+  - "resume_token*":
+    approvers:
+      - 10gen/query-execution
+  - "semantic_analysis*":
+    approvers:
+      - 10gen/query-optimization
+  - "sequential_document_cache*":
+    approvers:
+      - 10gen/query-execution
+  - "single_document_transformation_processor*":
+    approvers:
+      - 10gen/query-execution
+  - "tee_buffer*":
+    approvers:
+      - 10gen/query-execution
+  - "unwind_processor*":
+    approvers:
+      - 10gen/query-execution
+  - "value.idl":
+    approvers:
+      - 10gen/query-execution

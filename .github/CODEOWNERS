@@ -288,6 +288,24 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/index/**/wildcard_validation* @10gen/query-execution
 /src/mongo/db/index/**/multikey_paths* @10gen/query-execution
 
+# The following patterns are parsed from ./src/mongo/db/matcher/OWNERS.yml
+/src/mongo/db/matcher/**/* @10gen/query
+/src/mongo/db/matcher/**/doc_validation* @10gen/query-execution
+/src/mongo/db/matcher/**/expression_parser* @10gen/query-optimization
+/src/mongo/db/matcher/**/implicit_validator* @10gen/query-integration
+/src/mongo/db/matcher/**/rewrite_expr* @10gen/query-optimization
+/src/mongo/db/matcher/**/expression_geo* @10gen/query-integration
+/src/mongo/db/matcher/**/expression_text* @10gen/query-integration
+/src/mongo/db/matcher/**/expression_where* @10gen/query-integration
+/src/mongo/db/matcher/**/expression_bitset_tree_converter* @10gen/query-optimization
+/src/mongo/db/matcher/**/expression_restorer* @10gen/query-optimization
+/src/mongo/db/matcher/**/expression_simplifier* @10gen/query-optimization
+
+# The following patterns are parsed from ./src/mongo/db/matcher/schema/OWNERS.yml
+/src/mongo/db/matcher/schema/**/* @10gen/query
+/src/mongo/db/matcher/schema/**/encrypt_keyword* @10gen/query-integration
+/src/mongo/db/matcher/schema/**/encrypt_schema* @10gen/query-integration
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/docs/testing/OWNERS.yml
 /src/mongo/db/modules/enterprise/docs/testing/**/* @10gen/devprod-correctness
 
@@ -341,10 +359,46 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/ops/**/write_ops_exec* @10gen/query-execution
 
 # The following patterns are parsed from ./src/mongo/db/pipeline/OWNERS.yml
+/src/mongo/db/pipeline/**/* @10gen/query
+/src/mongo/db/pipeline/**/*.idl @10gen/query-optimization
+/src/mongo/db/pipeline/**/accumulation_statement* @10gen/query-optimization
+/src/mongo/db/pipeline/**/accumulator* @10gen/query-execution
+/src/mongo/db/pipeline/**/aggregation_request* @10gen/query-optimization
+/src/mongo/db/pipeline/**/*change_stream* @10gen/query-execution
+/src/mongo/db/pipeline/**/dependencies* @10gen/query-optimization
+/src/mongo/db/pipeline/**/document_source_current_op* @10gen/query-execution
+/src/mongo/db/pipeline/**/document_source_densify* @10gen/query-integration
+/src/mongo/db/pipeline/**/document_source_fill* @10gen/query-integration
+/src/mongo/db/pipeline/**/document_source_index_stats* @10gen/query-execution
 /src/mongo/db/pipeline/**/document_source_internal_unpack_bucket* @10gen/query-integration
+/src/mongo/db/pipeline/**/document_source_internal_convert_bucket_index_stats* @10gen/query-integration
+/src/mongo/db/pipeline/**/document_source_parsing_validators* @10gen/query-optimization
 /src/mongo/db/pipeline/**/document_source_query_stats* @10gen/query-integration
-/src/mongo/db/pipeline/**/search @10gen/query-integration
-/src/mongo/db/pipeline/**/window_function @10gen/query-integration
+/src/mongo/db/pipeline/**/document_source_set_window_fields* @10gen/query-integration
+/src/mongo/db/pipeline/**/granularity_rounder* @10gen/query-execution
+/src/mongo/db/pipeline/**/javascript_execution* @10gen/query-integration
+/src/mongo/db/pipeline/**/make_js_function* @10gen/query-integration
+/src/mongo/db/pipeline/**/group_processor* @10gen/query-execution
+/src/mongo/db/pipeline/**/lite_parsed* @10gen/query-optimization
+/src/mongo/db/pipeline/**/merge_processor* @10gen/query-execution
+/src/mongo/db/pipeline/**/percentile_algo* @10gen/query-integration
+/src/mongo/db/pipeline/**/plan_executor_pipeline* @10gen/query-execution
+/src/mongo/db/pipeline/**/resume_token* @10gen/query-execution
+/src/mongo/db/pipeline/**/semantic_analysis* @10gen/query-optimization
+/src/mongo/db/pipeline/**/sequential_document_cache* @10gen/query-execution
+/src/mongo/db/pipeline/**/single_document_transformation_processor* @10gen/query-execution
+/src/mongo/db/pipeline/**/tee_buffer* @10gen/query-execution
+/src/mongo/db/pipeline/**/unwind_processor* @10gen/query-execution
+/src/mongo/db/pipeline/**/value.idl @10gen/query-execution
+
+# The following patterns are parsed from ./src/mongo/db/pipeline/abt/OWNERS.yml
+/src/mongo/db/pipeline/abt/**/* @10gen/query-optimization
+
+# The following patterns are parsed from ./src/mongo/db/pipeline/search/OWNERS.yml
+/src/mongo/db/pipeline/search/**/* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/db/pipeline/window_function/OWNERS.yml
+/src/mongo/db/pipeline/window_function/**/* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/process_health/OWNERS.yml
 /src/mongo/db/process_health/**/* @10gen/server-service-architecture
@@ -422,6 +476,15 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/test_output/exec/OWNERS.yml
 /src/mongo/db/test_output/exec/**/* @10gen/query-execution
+
+# The following patterns are parsed from ./src/mongo/db/test_output/matcher/OWNERS.yml
+/src/mongo/db/test_output/matcher/**/* @10gen/query
+
+# The following patterns are parsed from ./src/mongo/db/test_output/pipeline/OWNERS.yml
+/src/mongo/db/test_output/pipeline/**/* @10gen/query
+
+# The following patterns are parsed from ./src/mongo/db/test_output/pipeline/abt/OWNERS.yml
+/src/mongo/db/test_output/pipeline/abt/**/* @10gen/query-optimization
 
 # The following patterns are parsed from ./src/mongo/db/timeseries/OWNERS.yml
 /src/mongo/db/timeseries/**/* @10gen/server-storage-execution

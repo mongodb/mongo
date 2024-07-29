@@ -1,0 +1,41 @@
+version: 1.0.0
+filters:
+  # The match expression library involves parsing, validation, and optimization (owned by QO) as
+  # well as execution (owned by QE). Therefore, we give ownership to the entire query team.
+  - "*":
+    approvers:
+      - 10gen/query
+  - "doc_validation*":
+    approvers:
+      - 10gen/query-execution
+  - "expression_parser*":
+    approvers:
+      - 10gen/query-optimization
+  # These files are related to field level encryption, which is owned by QI.
+  - "implicit_validator*":
+    approvers:
+      - 10gen/query-integration
+  - "rewrite_expr*":
+    approvers:
+      - 10gen/query-optimization
+  - "expression_geo*":
+    approvers:
+      - 10gen/query-integration
+  - "expression_text*":
+    approvers:
+      - 10gen/query-integration
+  # The JS engine is owned by QI.
+  - "expression_where*":
+    approvers:
+      - 10gen/query-integration
+
+  # These files are related to boolean simplification and thus owned by QO.
+  - "expression_bitset_tree_converter*":
+    approvers:
+      - 10gen/query-optimization
+  - "expression_restorer*":
+    approvers:
+      - 10gen/query-optimization
+  - "expression_simplifier*":
+    approvers:
+      - 10gen/query-optimization
