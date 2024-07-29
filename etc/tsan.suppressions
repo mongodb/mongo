@@ -77,10 +77,6 @@ deadlock:mongo::executor::PinnedConnectionTaskExecutor::_doNetworking
 race:mongo::AuthorizationManager::set
 race:mongo::AuthorizationManager::get
 
-# TODO SERVER-91872 Race on FCBIS::_stats
-race:mongo::repl::FileCopyBasedInitialSyncer::_extendBackupCursor
-race:mongo::repl::FileCopyBasedInitialSyncer::_getInitialSyncProgress
-
 # TODO SERVER-91877 inversion b/w SSL manager and some crypto mutex
 deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
 
