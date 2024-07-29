@@ -38,7 +38,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/transformer_interface.h"
-#include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_policies.h"
 
 namespace mongo::projection_executor {
@@ -106,20 +105,10 @@ public:
      */
     virtual boost::optional<std::set<FieldRef>> extractExhaustivePaths() const = 0;
 
-    /**
-     * The query shape is made by serializing the first parsed representation of the query, which in
-     * the case of $project queries is a projection_ast::Projection. The ProjectionExecutor, holds
-     * onto the root node of the AST for only $project queries, so that the first parsed
-     * representation is accessible at serialization.
-     */
-    boost::optional<projection_ast::ProjectionPathASTNode> projection = boost::none;
-
 protected:
     ProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       ProjectionPolicies policies,
-                       boost::optional<projection_ast::ProjectionPathASTNode> proj = boost::none)
-        : projection(proj),
-          _expCtx(expCtx),
+                       ProjectionPolicies policies)
+        : _expCtx(expCtx),
           _policies(policies),
           _projectionPostImageVarId{
               _expCtx->variablesParseState.defineVariable(kProjectionPostImageVarName)} {}
