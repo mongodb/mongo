@@ -1,5 +1,6 @@
 """Configure the command line input for the resmoke 'run' subcommand."""
 
+import argparse
 import collections
 import configparser
 import datetime
@@ -22,6 +23,7 @@ from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib import mongod_fuzzer_configs
 from buildscripts.resmokelib.suitesconfig import SuiteFinder
+from buildscripts.util.read_config import read_config_file
 
 
 def validate_and_update_config(parser, args):
@@ -520,3 +522,26 @@ def _update_symbolizer_secrets():
     yml_data = utils.load_yaml_file(_config.EXPANSIONS_FILE)
     _config.SYMBOLIZER_CLIENT_SECRET = yml_data.get("symbolizer_client_secret")
     _config.SYMBOLIZER_CLIENT_ID = yml_data.get("symbolizer_client_id")
+
+
+def detect_evergreen_config(parsed_args: argparse.Namespace,
+                            expansions_file: str = "../expansions.yml"):
+    """Detect evergreen expansions."""
+    if not os.path.exists(expansions_file):
+        return
+
+    expansions = read_config_file(expansions_file)
+
+    parsed_args.build_id = expansions.get("build_id", None)
+    parsed_args.distro_id = expansions.get("distro_id", None)
+    parsed_args.execution_number = expansions.get("execution", None)
+    parsed_args.project_name = expansions.get("project", None)
+    parsed_args.git_revision = expansions.get("revision", None)
+    parsed_args.revision_order_id = expansions.get("revision_order_id", None)
+    parsed_args.task_id = expansions.get("task_id", None)
+    parsed_args.task_name = expansions.get("task_name", None)
+    parsed_args.variant_name = expansions.get("build_variant", None)
+    parsed_args.version_id = expansions.get("version_id", None)
+    parsed_args.work_dir = expansions.get("workdir", None)
+    parsed_args.evg_project_config_path = expansions.get("evergreen_config_file_path", None)
+    parsed_args.requester = expansions.get("requester", None)

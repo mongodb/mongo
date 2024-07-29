@@ -96,7 +96,8 @@ class MultiversionPlugin(PluginInterface):
         :param kwargs: additional args.
         :return: None or a Subcommand.
         """
-        configure_resmoke.validate_and_update_config(parser, parsed_args)
         if subcommand == MULTIVERSION_SUBCOMMAND:
+            configure_resmoke.detect_evergreen_config(parsed_args)
+            configure_resmoke.validate_and_update_config(parser, parsed_args)
             return MultiversionConfigSubcommand(parsed_args)
         return None
