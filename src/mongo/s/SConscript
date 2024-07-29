@@ -332,6 +332,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/update/update_common',

@@ -184,22 +184,29 @@ bool BalancerConfiguration::attemptToBalanceJumboChunks() const {
 }
 
 Status BalancerConfiguration::refreshAndCheck(OperationContext* opCtx) {
-    // Balancer configuration
-    Status balancerSettingsStatus = _refreshBalancerSettings(opCtx);
-    if (!balancerSettingsStatus.isOK()) {
-        return balancerSettingsStatus.withContext("Failed to refresh the balancer settings");
-    }
+    try {
+        Lock::ExclusiveLock settingsRefreshLock(opCtx, _settingsRefreshMutex);
 
-    // Chunk size settings
-    Status chunkSizeStatus = _refreshChunkSizeSettings(opCtx);
-    if (!chunkSizeStatus.isOK()) {
-        return chunkSizeStatus.withContext("Failed to refresh the chunk sizes settings");
-    }
+        // Balancer configuration
+        Status balancerSettingsStatus = _refreshBalancerSettings(opCtx);
+        if (!balancerSettingsStatus.isOK()) {
+            return balancerSettingsStatus.withContext("Failed to refresh the balancer settings");
+        }
 
-    // Global auto merge settings
-    Status autoMergeStatus = _refreshAutoMergeSettings(opCtx);
-    if (!autoMergeStatus.isOK()) {
-        return autoMergeStatus.withContext("Failed to refresh the autoMerge settings");
+        // Chunk size settings
+        Status chunkSizeStatus = _refreshChunkSizeSettings(opCtx);
+        if (!chunkSizeStatus.isOK()) {
+            return chunkSizeStatus.withContext("Failed to refresh the chunk sizes settings");
+        }
+
+        // Global auto merge settings
+        Status autoMergeStatus = _refreshAutoMergeSettings(opCtx);
+        if (!autoMergeStatus.isOK()) {
+            return autoMergeStatus.withContext("Failed to refresh the autoMerge settings");
+        }
+    } catch (DBException& e) {
+        e.addContext("Failed to refresh the balancer configuration settings");
+        return e.toStatus();
     }
 
     return Status::OK();
