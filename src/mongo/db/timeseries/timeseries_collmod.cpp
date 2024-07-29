@@ -80,6 +80,8 @@ std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(OperationContext* o
     request.setChangeStreamPreAndPostImages(origCmd.getChangeStreamPreAndPostImages());
     request.setExpireAfterSeconds(origCmd.getExpireAfterSeconds());
     request.setTimeseries(origCmd.getTimeseries());
+    request.setTimeseriesBucketsMayHaveMixedSchemaData(
+        origCmd.getTimeseriesBucketsMayHaveMixedSchemaData());
     request.setDryRun(origCmd.getDryRun());
     auto cmd = std::make_unique<CollMod>(ns);
     cmd->setCollModRequest(request);

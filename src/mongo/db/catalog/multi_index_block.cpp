@@ -685,10 +685,10 @@ Status MultiIndexBlock::_insert(OperationContext* opCtx,
     // collection to have it.
     if (_containsIndexBuildOnTimeseriesMeasurement &&
         *collection->getTimeseriesBucketsMayHaveMixedSchemaData()) {
-        bool docHasMixedSchemaData =
+        auto docHasMixedSchemaData =
             collection->doesTimeseriesBucketsDocContainMixedSchemaData(doc);
 
-        if (docHasMixedSchemaData) {
+        if (docHasMixedSchemaData.isOK() && docHasMixedSchemaData.getValue()) {
             LOGV2(6057700,
                   "Detected mixed-schema data in time-series bucket collection",
                   logAttrs(collection->ns()),
@@ -704,7 +704,8 @@ Status MultiIndexBlock::_insert(OperationContext* opCtx,
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         const bool replSetAndNotPrimary = !replCoord->canAcceptWritesFor(opCtx, collection->ns());
 
-        if (docHasMixedSchemaData && !replSetAndNotPrimary) {
+        if (docHasMixedSchemaData.isOK() && docHasMixedSchemaData.getValue() &&
+            !replSetAndNotPrimary) {
             return timeseriesMixedSchemaDataFailure(collection.get());
         }
     }

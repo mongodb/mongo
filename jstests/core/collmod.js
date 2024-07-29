@@ -131,3 +131,17 @@ assert.commandFailed(
 // Fails with an unknown key pattern.
 assert.commandFailed(db.runCommand(
     {collmod: coll, index: {keyPattern: {doesnotexist: 1}, expireAfterSeconds: 100}}));
+
+// Exclude from multiversion suites as SERVER-84531 will not be backported to older versions
+const isMultiversion = jsTestOptions().mixedBinVersions || jsTestOptions().shardMixedBinVersions ||
+    jsTestOptions().useRandomBinVersionsWithinReplicaSet;
+if (!isMultiversion) {
+    // The timeseriesBucketsMayHaveMixedSchemaData option can only be used on time-series
+    // collections.
+    assert.commandFailedWithCode(
+        db.runCommand({collMod: coll, timeseriesBucketsMayHaveMixedSchemaData: true}),
+        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        db.runCommand({collMod: coll, timeseriesBucketsMayHaveMixedSchemaData: false}),
+        ErrorCodes.InvalidOptions);
+}

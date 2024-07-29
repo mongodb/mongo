@@ -118,6 +118,7 @@ struct ParsedCollModRequest {
     bool dryRun = false;
     boost::optional<long long> cappedSize;
     boost::optional<long long> cappedMax;
+    boost::optional<bool> timeseriesBucketsMayHaveMixedSchemaData;
 };
 
 Status getNotSupportedOnViewError(StringData fieldName) {
@@ -610,6 +611,22 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
         timeseries->serialize(&subObjBuilder);
     }
 
+    if (auto mixedSchema = cmr.getTimeseriesBucketsMayHaveMixedSchemaData()) {
+        if (!isTimeseries) {
+            return getOnlySupportedOnTimeseriesError(
+                CollMod::kTimeseriesBucketsMayHaveMixedSchemaDataFieldName);
+        }
+
+        if (!*mixedSchema) {
+            return {ErrorCodes::InvalidOptions,
+                    "Cannot set timeseriesBucketsMayHaveMixedSchemaData to false"};
+        }
+
+        parsed.timeseriesBucketsMayHaveMixedSchemaData = mixedSchema;
+        oplogEntryBuilder.append(CollMod::kTimeseriesBucketsMayHaveMixedSchemaDataFieldName,
+                                 *mixedSchema);
+    }
+
     if (auto& dryRun = cmr.getDryRun()) {
         parsed.dryRun = *dryRun;
         // The dry run option should never be included in a collMod oplog entry.
@@ -933,6 +950,11 @@ Status _collModInternal(OperationContext* opCtx,
                                             oldCollOptions,
                                             coll.getWritableCollection(opCtx),
                                             *cmd.getExpireAfterSeconds());
+        }
+
+        if (auto mixedSchema = cmrNew.timeseriesBucketsMayHaveMixedSchemaData) {
+            coll.getWritableCollection(opCtx)->setTimeseriesBucketsMayHaveMixedSchemaData(
+                opCtx, mixedSchema);
         }
 
         // Handle index modifications.
