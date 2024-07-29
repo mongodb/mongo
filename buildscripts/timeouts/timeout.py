@@ -9,7 +9,7 @@ from buildscripts.patch_builds.task_generation import TimeoutInfo
 
 LOGGER = structlog.getLogger(__name__)
 
-AVG_TASK_SETUP_TIME = int(timedelta(minutes=2).total_seconds())
+AVG_TASK_SETUP_TIME = int(timedelta(minutes=5).total_seconds())
 MIN_TIMEOUT_SECONDS = int(timedelta(minutes=5).total_seconds())
 MAX_EXPECTED_TIMEOUT = int(timedelta(hours=48).total_seconds())
 DEFAULT_SCALING_FACTOR = 3.0
