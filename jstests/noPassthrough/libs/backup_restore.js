@@ -27,7 +27,7 @@ var BackupRestoreTest = function(options) {
     }
 
     // Capture the 'this' reference
-    var self = this;
+    let self = this;
 
     self.options = options;
 
@@ -43,16 +43,16 @@ var BackupRestoreTest = function(options) {
      */
     function _crudClient(host, dbName, collectionName, numNodes) {
         // Launch CRUD client
-        var crudClientCmds = function(dbName, collectionName, numNodes) {
-            var bulkNum = 1000;
-            var baseNum = 100000;
+        let crudClientCmds = function(dbName, collectionName, numNodes) {
+            let bulkNum = 1000;
+            let baseNum = 100000;
 
             let iteration = 0;
 
-            var coll = db.getSiblingDB(dbName).getCollection(collectionName);
+            let coll = db.getSiblingDB(dbName).getCollection(collectionName);
             coll.createIndex({x: 1});
 
-            var largeValue = new Array(1024).join('L');
+            let largeValue = new Array(1024).join('L');
 
             Random.setRandomSeed();
 
@@ -72,12 +72,12 @@ var BackupRestoreTest = function(options) {
                 const writeConcern = (iteration % 100 === 0) ? {w: numNodes} : {w: 1};
 
                 try {
-                    var op = Random.rand();
-                    var match = Math.floor(Random.rand() * baseNum);
+                    let op = Random.rand();
+                    let match = Math.floor(Random.rand() * baseNum);
                     if (op < 0.2) {
                         // 20% of the operations: bulk insert bulkNum docs.
-                        var bulk = coll.initializeUnorderedBulkOp();
-                        for (var i = 0; i < bulkNum; i++) {
+                        let bulk = coll.initializeUnorderedBulkOp();
+                        for (let i = 0; i < bulkNum; i++) {
                             bulk.insert({
                                 x: (match * i) % baseNum,
                                 doc: largeValue.substring(0, match % largeValue.length),
@@ -86,7 +86,7 @@ var BackupRestoreTest = function(options) {
                         assert.commandWorked(bulk.execute(writeConcern));
                     } else if (op < 0.4) {
                         // 20% of the operations: update docs.
-                        var updateOpts = {upsert: true, multi: true, writeConcern: writeConcern};
+                        let updateOpts = {upsert: true, multi: true, writeConcern: writeConcern};
                         assert.commandWorked(coll.update({x: {$gte: match}},
                                                          {$inc: {x: baseNum}, $set: {n: 'hello'}},
                                                          updateOpts));
@@ -137,7 +137,7 @@ var BackupRestoreTest = function(options) {
      * Runs the test.
      */
     this.run = function() {
-        var options = this.options;
+        let options = this.options;
 
         jsTestLog("Backup restore " + tojson(options));
 
@@ -147,10 +147,10 @@ var BackupRestoreTest = function(options) {
 
         // Test options
         // Test name
-        var testName = jsTest.name();
+        let testName = jsTest.name();
 
         // Backup type (must be specified)
-        var allowedBackupKeys = ['fsyncLock', 'stopStart', 'rolling', 'backupCursor'];
+        let allowedBackupKeys = ['fsyncLock', 'stopStart', 'rolling', 'backupCursor'];
         assert(options.backup, "Backup option not supplied");
         assert.contains(options.backup,
                         allowedBackupKeys,
@@ -158,18 +158,18 @@ var BackupRestoreTest = function(options) {
                             '; valid options are: ' + tojson(allowedBackupKeys));
 
         // Number of nodes in initial replica set (default 3)
-        var numNodes = options.nodes || 3;
+        let numNodes = options.nodes || 3;
 
         // Time for clients to run before getting the new secondary it's data (default 10 seconds)
-        var clientTime = options.clientTime || 10000;
+        let clientTime = options.clientTime || 10000;
 
         // Set the dbpath for the replica set
-        var dbpathPrefix = MongoRunner.dataPath + 'backupRestore';
+        let dbpathPrefix = MongoRunner.dataPath + 'backupRestore';
         resetDbpath(dbpathPrefix);
-        var dbpathFormat = dbpathPrefix + '/mongod-$port';
+        let dbpathFormat = dbpathPrefix + '/mongod-$port';
 
         // Start numNodes node replSet
-        var rst = new ReplSetTest({
+        let rst = new ReplSetTest({
             nodes: numNodes,
             nodeOptions: {
                 dbpath: dbpathFormat,
@@ -179,33 +179,43 @@ var BackupRestoreTest = function(options) {
         });
 
         // Avoid stepdowns due to heavy workloads on slow machines.
-        var config = rst.getReplSetConfig();
+        let config = rst.getReplSetConfig();
         config.settings = {electionTimeoutMillis: 60000};
-        var nodes = rst.startSet();
+        let nodes = rst.startSet();
         rst.initiate(config);
 
         // Initialize replica set using default timeout. This should give us sufficient time to
         // allocate 1GB oplogs on slow test hosts.
         rst.awaitNodesAgreeOnPrimary();
-        var primary = rst.getPrimary();
-        var secondary = rst.getSecondary();
+        let primary = rst.getPrimary();
+        let secondary = rst.getSecondary();
 
         jsTestLog("Secondary to copy data from: " + secondary);
 
         // Launch CRUD client
-        var crudDb = "crud";
-        var crudColl = "backuprestore";
-        var crudPid = _crudClient(primary.host, crudDb, crudColl, numNodes);
+        let crudDb = "crud";
+        let crudColl = "backuprestore";
+        let crudPid = _crudClient(primary.host, crudDb, crudColl, numNodes);
 
         // Launch FSM client
-        var fsmPid = _fsmClient(primary.host);
+        let fsmPid = 0;
+        let attempts = 0;
+
+        // Make sure the fsm client does not fail within the first few seconds of running due to
+        // some unrelated network error (usually when fetching yml files from a remote location).
+        do {
+            jsTestLog("Attempt " + attempts + " of starting up the fsm client");
+            fsmPid = _fsmClient(primary.host);
+            attempts += 1;
+            sleep(5 * 1000);
+        } while (!checkProgram(fsmPid).alive && attempts < 10);
 
         // Let clients run for specified time before backing up secondary
         sleep(clientTime);
 
         // Perform fsync to create checkpoint. We doublecheck if the storage engine
         // supports fsync here.
-        var ret = primary.adminCommand({fsync: 1});
+        let ret = primary.adminCommand({fsync: 1});
 
         if (!ret.ok) {
             assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
@@ -214,24 +224,24 @@ var BackupRestoreTest = function(options) {
         }
 
         // Configure new hidden secondary
-        var dbpathSecondary = secondary.dbpath;
-        var hiddenDbpath = dbpathPrefix + '/mongod-hiddensecondary';
+        let dbpathSecondary = secondary.dbpath;
+        let hiddenDbpath = dbpathPrefix + '/mongod-hiddensecondary';
         resetDbpath(hiddenDbpath);
 
-        var sourcePath = dbpathSecondary + "/";
-        var destPath = hiddenDbpath;
+        let sourcePath = dbpathSecondary + "/";
+        let destPath = hiddenDbpath;
         // Windows paths for rsync
         if (_isWindows()) {
             sourcePath = "$(cygpath $(cygpath $SYSTEMDRIVE)'" + sourcePath + "')/";
             destPath = "$(cygpath $(cygpath $SYSTEMDRIVE)'" + hiddenDbpath + "')";
         }
-        var copiedFiles;
+        let copiedFiles;
 
         // Perform the data backup to new secondary
         if (options.backup == 'fsyncLock') {
             rst.awaitSecondaryNodes();
             // Test that the secondary supports fsyncLock
-            var ret = secondary.getDB("admin").fsyncLock();
+            let ret = secondary.getDB("admin").fsyncLock();
             if (!ret.ok) {
                 assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
                 jsTestLog('Skipping test of ' + options.backup + ' as it does not support fsync.');
@@ -247,9 +257,9 @@ var BackupRestoreTest = function(options) {
             assert.commandWorked(secondary.getDB("admin").fsyncUnlock(),
                                  testName + ' failed to fsyncUnlock');
         } else if (options.backup == 'rolling') {
-            var rsyncCmd = "rsync -aKkz --del " + sourcePath + " " + destPath;
+            let rsyncCmd = "rsync -aKkz --del " + sourcePath + " " + destPath;
             // Simulate a rolling rsync, do it 3 times before stopping process
-            for (var i = 0; i < 3; i++) {
+            for (let i = 0; i < 3; i++) {
                 _runCmd(rsyncCmd);
                 sleep(10000);
             }
@@ -294,29 +304,35 @@ var BackupRestoreTest = function(options) {
         jsTestLog('Stopping CRUD and FSM clients');
 
         // Stop CRUD client and FSM client.
-        var crudStatus = checkProgram(crudPid);
+        let crudStatus = checkProgram(crudPid);
         assert(crudStatus.alive,
                testName + ' CRUD client was not running at end of test and exited with code: ' +
                    crudStatus.exitCode);
         stopMongoProgramByPid(crudPid);
 
-        var fsmStatus = checkProgram(fsmPid);
-        assert(fsmStatus.alive,
-               testName + ' FSM client was not running at end of test and exited with code: ' +
-                   fsmStatus.exitCode);
+        const fsmStatus = checkProgram(fsmPid);
+        // If the fsmClient ran successfully then kill it, otherwise log that it was not running and
+        // move on. This is okay since the fsm client would have failed for reasons unrelated to the
+        // restore procedure.
+        if (fsmStatus.alive) {
+            const kSIGINT = 2;
+            const exitCode = stopMongoProgramByPid(fsmPid, kSIGINT);
+            if (!_isWindows()) {
+                // The mongo shell calls TerminateProcess() on Windows rather than more gracefully
+                // interrupting resmoke.py test execution.
 
-        const kSIGINT = 2;
-        const exitCode = stopMongoProgramByPid(fsmPid, kSIGINT);
-        if (!_isWindows()) {
-            // The mongo shell calls TerminateProcess() on Windows rather than more gracefully
-            // interrupting resmoke.py test execution.
-
-            // resmoke.py may exit cleanly on SIGINT, returning 130 if the suite tests were running
-            // and returning SIGINT otherwise. It may also exit uncleanly, in which case
-            // stopMongoProgramByPid returns -SIGINT. See SERVER-67390 and SERVER-72449.
-            assert(exitCode == 130 || exitCode == -kSIGINT || exitCode == kSIGINT,
-                   'expected resmoke.py to exit due to being interrupted, but exited with code: ' +
-                       exitCode);
+                // resmoke.py may exit cleanly on SIGINT, returning 130 if the suite tests were
+                // running and returning SIGINT otherwise. It may also exit uncleanly, in which case
+                // stopMongoProgramByPid returns -SIGINT. See SERVER-67390 and SERVER-72449.
+                assert(
+                    exitCode == 130 || exitCode == -kSIGINT || exitCode == kSIGINT,
+                    'expected resmoke.py to exit due to being interrupted, but exited with code: ' +
+                        exitCode);
+            }
+        } else {
+            jsTestLog(testName +
+                      ' FSM client was not running at end of test and exited with code: ' +
+                      fsmStatus.exitCode);
         }
 
         // Make sure the databases are not in a drop-pending state. This can happen if we
@@ -341,12 +357,12 @@ var BackupRestoreTest = function(options) {
         // Add the new hidden node to replSetTest.
         jsTestLog('Starting new hidden node (but do not add to replica set) with dbpath ' +
                   hiddenDbpath + '.');
-        var nodesBeforeAddingHiddenMember = rst.nodes.slice();
+        let nodesBeforeAddingHiddenMember = rst.nodes.slice();
         // ReplSetTest.add() will use default values for --oplogSize and --replSet consistent with
         // existing nodes.
-        var hiddenCfg = {noCleanData: true, dbpath: hiddenDbpath};
-        var hiddenNode = rst.add(hiddenCfg);
-        var hiddenHost = hiddenNode.host;
+        let hiddenCfg = {noCleanData: true, dbpath: hiddenDbpath};
+        let hiddenNode = rst.add(hiddenCfg);
+        let hiddenHost = hiddenNode.host;
 
         // Add the new hidden secondary to the replica set. This triggers an election, so it must be
         // done after stopping the background workloads to prevent the workloads from failing if a
@@ -354,9 +370,9 @@ var BackupRestoreTest = function(options) {
         jsTestLog('Adding new hidden node ' + hiddenHost + ' to replica set.');
         rst.awaitNodesAgreeOnPrimary(ReplSetTest.kDefaultTimeoutMS, nodesBeforeAddingHiddenMember);
         primary = rst.getPrimary();
-        var rsConfig = primary.getDB("local").system.replset.findOne();
+        let rsConfig = primary.getDB("local").system.replset.findOne();
         rsConfig.version += 1;
-        var hiddenMember = {_id: numNodes, host: hiddenHost, priority: 0, hidden: true};
+        let hiddenMember = {_id: numNodes, host: hiddenHost, priority: 0, hidden: true};
         rsConfig.members.push(hiddenMember);
         assert.commandWorked(primary.adminCommand({replSetReconfig: rsConfig}),
                              testName + ' failed to reconfigure replSet ' + tojson(rsConfig));
@@ -381,7 +397,7 @@ var BackupRestoreTest = function(options) {
 
         jsTestLog('Inserting single document into primary ' + primary.host +
                   ' with writeConcern w:' + rst.nodes.length);
-        var writeResult = assert.commandWorked(primary.getDB("test").foo.insert(
+        let writeResult = assert.commandWorked(primary.getDB("test").foo.insert(
             {}, {writeConcern: {w: rst.nodes.length, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
         // Stop set.
