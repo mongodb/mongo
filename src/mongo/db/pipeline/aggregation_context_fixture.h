@@ -179,7 +179,7 @@ public:
     sharded_agg_helpers::SplitPipeline makeAndSplitPipeline(
         const Pipeline::SourceContainer& sources) {
         auto pipeline = makePipeline(sources);
-        return sharded_agg_helpers::splitPipeline(std::move(pipeline));
+        return sharded_agg_helpers::SplitPipeline::split(std::move(pipeline));
     }
 
     void verifyPipelineForDeferredMergeSortTest(

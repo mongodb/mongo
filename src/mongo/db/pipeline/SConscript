@@ -157,6 +157,7 @@ env.Library(
 env.Library(
     target="sharded_agg_helpers",
     source=[
+        "split_pipeline.cpp",
         "sharded_agg_helpers.cpp",
     ],
     LIBDEPS=[

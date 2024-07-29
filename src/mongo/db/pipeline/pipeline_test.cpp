@@ -4588,7 +4588,7 @@ public:
         mergePipe = Pipeline::parse(request.getPipeline(), ctx);
         mergePipe->optimizePipeline();
 
-        auto splitPipeline = sharded_agg_helpers::splitPipeline(std::move(mergePipe));
+        auto splitPipeline = sharded_agg_helpers::SplitPipeline::split(std::move(mergePipe));
         const auto explain = SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
         ASSERT_VALUE_EQ(Value(splitPipeline.shardsPipeline->writeExplainOps(explain)),
@@ -5135,7 +5135,7 @@ DEATH_TEST_F(PipelineMustRunOnMongoSTest,
     // $_internalSplitPipeline.
     ASSERT_FALSE(pipeline->requiredToRunOnMongos());
 
-    auto splitPipeline = sharded_agg_helpers::splitPipeline(std::move(pipeline));
+    auto splitPipeline = sharded_agg_helpers::SplitPipeline::split(std::move(pipeline));
     ASSERT(splitPipeline.shardsPipeline);
     ASSERT(splitPipeline.mergePipeline);
 
@@ -5168,7 +5168,7 @@ TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStageP
     // $_internalSplitPipeline.
     ASSERT_FALSE(pipeline->requiredToRunOnMongos());
 
-    auto splitPipeline = sharded_agg_helpers::splitPipeline(std::move(pipeline));
+    auto splitPipeline = sharded_agg_helpers::SplitPipeline::split(std::move(pipeline));
 
     // The merge pipeline must run on mongoS, but $out needs to run on  the primary shard.
     ASSERT_TRUE(splitPipeline.mergePipeline->requiredToRunOnMongos());

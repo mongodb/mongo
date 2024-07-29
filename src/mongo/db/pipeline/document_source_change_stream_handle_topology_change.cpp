@@ -256,7 +256,7 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::createUpdatedCommandForN
     pipeline->optimizePipeline();
 
     // Split the full pipeline to get the shard pipeline.
-    auto splitPipelines = sharded_agg_helpers::splitPipeline(std::move(pipeline));
+    auto splitPipelines = sharded_agg_helpers::SplitPipeline::split(std::move(pipeline));
 
     // Create the new command that will run on the shard.
     return sharded_agg_helpers::createCommandForTargetedShards(pExpCtx,

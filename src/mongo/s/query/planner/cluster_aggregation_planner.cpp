@@ -637,7 +637,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
             shardDispatchResults->splitPipeline->shardCursorsSortSpec,
             requestQueryStatsFromRemotes);
 
-        consumerPipelines.emplace_back(std::move(consumerPipeline), nullptr, boost::none);
+        consumerPipelines.push_back(SplitPipeline::shardsOnly(std::move(consumerPipeline)));
 
         auto consumerCmdObj =
             sharded_agg_helpers::createCommandForTargetedShards(expCtx,
@@ -671,7 +671,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     auto mergePipeline = Pipeline::create({}, expCtx);
     mergePipeline->setSplitState(Pipeline::SplitState::kSplitForMerge);
 
-    SplitPipeline splitPipeline{nullptr, std::move(mergePipeline), boost::none};
+    auto splitPipeline = SplitPipeline::mergeOnly(std::move(mergePipeline));
 
     // Relinquish ownership of the consumer pipelines' cursors. These cursors are now set up to be
     // merged by a set of $mergeCursors pipelines that we just dispatched to the shards above. Now
