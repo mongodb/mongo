@@ -230,7 +230,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const override {
+    StatusWith<bool> doesTimeseriesBucketsDocContainMixedSchemaData(
+        const BSONObj& bucketsDoc) const override {
         return _coll->doesTimeseriesBucketsDocContainMixedSchemaData(bucketsDoc);
     }
 

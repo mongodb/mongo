@@ -170,6 +170,13 @@ structs:
                 optional: true
                 type: CollModTimeseries
                 stability: stable
+            timeseriesBucketsMayHaveMixedSchemaData:
+                description: >-
+                    Whether the time-series collection may have mixed schema data, which was only
+                    possible to write in FCV 5.1 and earlier.
+                optional: true
+                type: safeBool
+                stability: unstable
             dryRun:
                 description: "Runs the requested modification without modifying any database state.
                               This can be used to determine in advance if a particular collMod

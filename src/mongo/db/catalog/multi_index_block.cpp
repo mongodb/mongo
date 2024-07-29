@@ -767,10 +767,10 @@ Status MultiIndexBlock::_insert(
     // collection to have it.
     if (_containsIndexBuildOnTimeseriesMeasurement &&
         *collection->getTimeseriesBucketsMayHaveMixedSchemaData()) {
-        bool docHasMixedSchemaData =
+        auto docHasMixedSchemaData =
             collection->doesTimeseriesBucketsDocContainMixedSchemaData(doc);
 
-        if (docHasMixedSchemaData) {
+        if (docHasMixedSchemaData.isOK() && docHasMixedSchemaData.getValue()) {
             LOGV2(6057700,
                   "Detected mixed-schema data in time-series bucket collection",
                   logAttrs(collection->ns()),

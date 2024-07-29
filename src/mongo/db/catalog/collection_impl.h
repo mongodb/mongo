@@ -212,7 +212,8 @@ public:
     void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                     boost::optional<bool> setting) final;
 
-    bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const final;
+    StatusWith<bool> doesTimeseriesBucketsDocContainMixedSchemaData(
+        const BSONObj& bucketsDoc) const final;
 
     bool getRequiresTimeseriesExtendedRangeSupport() const final;
     void setRequiresTimeseriesExtendedRangeSupport(OperationContext* opCtx) const final;

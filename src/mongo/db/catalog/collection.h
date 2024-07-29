@@ -390,9 +390,10 @@ public:
                                                             boost::optional<bool> setting) = 0;
 
     /**
-     * Returns true if the passed in time-series bucket document contains mixed-schema data.
+     * Returns true if the passed in time-series bucket document contains mixed-schema data. Returns
+     * a non-OK status if the bucket's min/max is malformed.
      */
-    virtual bool doesTimeseriesBucketsDocContainMixedSchemaData(
+    virtual StatusWith<bool> doesTimeseriesBucketsDocContainMixedSchemaData(
         const BSONObj& bucketsDoc) const = 0;
 
     /**

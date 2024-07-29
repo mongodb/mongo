@@ -180,35 +180,42 @@ bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
     return accessMethod == IndexNames::BTREE || accessMethod == IndexNames::GEO_2DSPHERE;
 }
 
-bool doesMinMaxHaveMixedSchemaData(const BSONObj& min, const BSONObj& max) {
+StatusWith<bool> doesMinMaxHaveMixedSchemaData(const BSONObj& min, const BSONObj& max) {
     auto minIt = min.begin();
     auto minEnd = min.end();
     auto maxIt = max.begin();
     auto maxEnd = max.end();
 
     while (minIt != minEnd && maxIt != maxEnd) {
-        bool typeMatch = minIt->canonicalType() == maxIt->canonicalType();
-        if (!typeMatch) {
+        // The 'control.min' and 'control.max' fields have the same ordering.
+        if (minIt->fieldNameStringData() != maxIt->fieldNameStringData()) {
+            return Status{
+                ErrorCodes::BadValue,
+                "Encountered inconsistent field name ordering in time-series bucket min/max"};
+        }
+
+        if (minIt->canonicalType() != maxIt->canonicalType()) {
             return true;
         } else if (minIt->type() == Object) {
-            // The 'control.min' and 'control.max' fields have the same ordering.
-            invariant(minIt->fieldNameStringData() == maxIt->fieldNameStringData());
-            if (doesMinMaxHaveMixedSchemaData(minIt->Obj(), maxIt->Obj())) {
-                return true;
+            auto result = doesMinMaxHaveMixedSchemaData(minIt->Obj(), maxIt->Obj());
+            if (!result.isOK() || result.getValue()) {
+                return result;
             }
         } else if (minIt->type() == Array) {
-            if (doesMinMaxHaveMixedSchemaData(minIt->Obj(), maxIt->Obj())) {
-                return true;
+            auto result = doesMinMaxHaveMixedSchemaData(minIt->Obj(), maxIt->Obj());
+            if (!result.isOK() || result.getValue()) {
+                return result;
             }
         }
 
-        invariant(typeMatch);
         minIt++;
         maxIt++;
     }
 
-    // The 'control.min' and 'control.max' fields have the same cardinality.
-    invariant(minIt == minEnd && maxIt == maxEnd);
+    if (minIt != minEnd || maxIt != maxEnd) {
+        return Status{ErrorCodes::BadValue,
+                      "Encountered extra field(s) in time-series bucket min/max"};
+    }
 
     return false;
 }
@@ -836,7 +843,7 @@ void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext
     });
 }
 
-bool CollectionImpl::doesTimeseriesBucketsDocContainMixedSchemaData(
+StatusWith<bool> CollectionImpl::doesTimeseriesBucketsDocContainMixedSchemaData(
     const BSONObj& bucketsDoc) const {
     if (!getTimeseriesOptions()) {
         return false;

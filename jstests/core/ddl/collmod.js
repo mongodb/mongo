@@ -131,3 +131,12 @@ assert.commandFailed(
 // Fails with an unknown key pattern.
 assert.commandFailed(db.runCommand(
     {collMod: coll, index: {keyPattern: {doesnotexist: 1}, expireAfterSeconds: 100}}));
+
+// The timeseriesBucketsMayHaveMixedSchemaData option can only be used on time-series
+// collections.
+assert.commandFailedWithCode(
+    db.runCommand({collMod: coll, timeseriesBucketsMayHaveMixedSchemaData: true}),
+    ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    db.runCommand({collMod: coll, timeseriesBucketsMayHaveMixedSchemaData: false}),
+    ErrorCodes.InvalidOptions);

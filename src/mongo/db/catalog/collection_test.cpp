@@ -544,7 +544,9 @@ TEST_F(CollectionTest, CheckTimeseriesBucketDocsForMixedSchemaData) {
                                              "max" : { "x" : [ 2, 3 ] } } })")};
 
     for (const auto& controlDoc : mixedSchemaControlDocs) {
-        ASSERT_TRUE(coll->doesTimeseriesBucketsDocContainMixedSchemaData(controlDoc));
+        auto mixedSchema = coll->doesTimeseriesBucketsDocContainMixedSchemaData(controlDoc);
+        ASSERT_OK(mixedSchema) << controlDoc;
+        ASSERT_TRUE(mixedSchema.getValue()) << controlDoc;
     }
 
     std::vector<BSONObj> nonMixedSchemaControlDocs = {
@@ -601,7 +603,27 @@ TEST_F(CollectionTest, CheckTimeseriesBucketDocsForMixedSchemaData) {
 
 
     for (const auto& controlDoc : nonMixedSchemaControlDocs) {
-        ASSERT_FALSE(coll->doesTimeseriesBucketsDocContainMixedSchemaData(controlDoc));
+        auto mixedSchema = coll->doesTimeseriesBucketsDocContainMixedSchemaData(controlDoc);
+        ASSERT_OK(mixedSchema) << controlDoc;
+        ASSERT_FALSE(mixedSchema.getValue()) << controlDoc;
+    }
+
+    std::vector<BSONObj> malformedControlDocs = {
+        // Inconsistent field name ordering
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1, "y" : 1 },
+                                             "max" : { "y" : 2, "x" : 2 } } })"),
+
+        // Extra field in min
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1, "y" : 1 },
+                                             "max" : { "x" : 2 } } })"),
+
+        // Extra field in max
+        ::mongo::fromjson(R"({ "control" : { "min" : { "y" : 1 },
+                                             "max" : { "y" : 2, "x" : 2 } } })")};
+
+    for (const auto& controlDoc : malformedControlDocs) {
+        ASSERT_NOT_OK(coll->doesTimeseriesBucketsDocContainMixedSchemaData(controlDoc))
+            << controlDoc;
     }
 }
 
