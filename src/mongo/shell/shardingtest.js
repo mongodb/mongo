@@ -575,11 +575,18 @@ var ShardingTest = function(params) {
 
     this.restartAllConfigServers = function(opts) {
         this.configRS.startSet(opts, true);
+        // We wait until a primary has been chosen since startSet can return without having elected
+        // one. This can cause issues that expect a functioning replicaset once this method returns.
+        this.configRS.waitForPrimary();
     };
 
     this.restartAllShards = function(opts) {
         this._rs.forEach((rs) => {
             rs.test.startSet(opts, true);
+            // We wait until a primary has been chosen since startSet can return without having
+            // elected one. This can cause issues that expect a functioning replicaset once this
+            // method returns.
+            rs.test.waitForPrimary();
         });
     };
 
