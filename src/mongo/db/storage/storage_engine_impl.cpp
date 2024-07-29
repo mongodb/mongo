@@ -67,6 +67,7 @@
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -328,7 +329,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
           "Initializing all collections in durable catalog",
           "numEntries"_attr = catalogEntries.size());
     for (DurableCatalog::EntryIdentifier entry : catalogEntries) {
-        if (_options.forRestore) {
+        if (_options.forRestore || storageGlobalParams.magicRestore) {
             // When restoring a subset of user collections from a backup, the collections not
             // restored are in the catalog but are unknown to the storage engine. The catalog
             // entries for these collections will be removed.
