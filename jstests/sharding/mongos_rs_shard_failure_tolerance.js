@@ -130,7 +130,19 @@ jsTest.log("Testing active connection with second primary down...");
 // Reads with read prefs
 mongosConnActive.setSecondaryOk();
 assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1}));
+// This special retry logic is to mimic connection pool timeout in v8.0 and later. In earlier
+// versions, the connection pool may time out with NetworkInterfaceExceededTimeLimit, which
+// is not a retryable error. This is necessary because the now downed primary may time out
+// with NetworkInterfaceExceededTimeLimit instead of HostUnreachable.
+var res = null;
+try {
+    res = mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1});
+} catch (e) {
+    // RSM marks failed host.
+    assert.commandFailedWithCode(e, ErrorCodes.NetworkInterfaceExceededTimeLimit);
+    res = mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1});
+}
+assert.neq(null, res);
 assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 mongosConnActive.setSecondaryOk(false);
 
