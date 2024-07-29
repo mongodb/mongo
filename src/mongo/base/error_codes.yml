@@ -554,6 +554,7 @@ error_codes:
 
     - {code: 426, name: IndexIsEmpty}
     - {code: 427, name: DbCheckSecondaryBatchTimeout}
+    - {code: 428, name: DbCheckAttemptOnClusteredCollectionIdIndex}
 
     # Error codes 4000-8999 are reserved.
 

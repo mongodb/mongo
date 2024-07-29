@@ -131,6 +131,8 @@ std::deque<boost::optional<DbCheckCollectionInfo>> _dbChecksInProgress;
 // This is waited upon if there is found to already be a dbcheck command running, as
 // _dbchecksInProgress would indicate. This is signaled when a dbcheck command finishes.
 stdx::condition_variable _dbCheckNotifier;
+
+const auto kIdIndexName = "_id_"_sd;
 }  // namespace
 
 // The optional `tenantIdForStartStop` is used for dbCheckStart/dbCheckStop oplog entries so that
@@ -813,6 +815,10 @@ bool DbChecker::_shouldRetryExtraKeysCheck(OperationContext* opCtx,
     auto code = status.code();
     if (code == ErrorCodes::IndexNotFound) {
         msg = "abandoning dbCheck extra index keys check because index no longer exists";
+    } else if (code == ErrorCodes::DbCheckAttemptOnClusteredCollectionIdIndex) {
+        msg =
+            "skipping dbCheck extra index keys check on the _id index because the target "
+            "collection is a clustered collection that doesn't have an _id index";
     } else if (code == ErrorCodes::NamespaceNotFound) {
         msg = "abandoning dbCheck extra index keys check because collection no longer exists";
     } else if (code == ErrorCodes::IndexIsEmpty) {
@@ -1188,6 +1194,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     const auto collAcquisition = acquisitionSW.getValue()->coll;
 
     const CollectionPtr& collection = collAcquisition.getCollectionPtr();
+
     auto indexSW = _acquireIndex(opCtx, collection, indexName);
 
     if (!indexSW.isOK()) {
@@ -2079,6 +2086,12 @@ StatusWith<std::unique_ptr<DbCheckAcquisition>> DbChecker::_acquireDBCheckLocks(
 StatusWith<const IndexDescriptor*> DbChecker::_acquireIndex(OperationContext* opCtx,
                                                             const CollectionPtr& collection,
                                                             StringData indexName) {
+    if (indexName == kIdIndexName && collection->isClustered()) {
+        Status status = Status(ErrorCodes::DbCheckAttemptOnClusteredCollectionIdIndex,
+                               str::stream() << "Clustered collection doesn't have an _id index.");
+        return status;
+    }
+
     const IndexDescriptor* index =
         collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
 

@@ -65,12 +65,19 @@ function getMissingIndexKeysQuery(numMissing) {
     };
 }
 
-function checkMissingIndexKeys(doc, numDocs = 1, maxDocsPerBatch = 10000) {
+function checkMissingIndexKeys(doc, collOpts, numDocs = 1, maxDocsPerBatch = 10000) {
     clearHealthLog(replSet);
     primaryDb[collName].drop();
 
     // Create indexes and insert docs without inserting corresponding index keys.
-    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc, numDocs);
+    insertDocsWithMissingIndexKeys(replSet,
+                                   dbName,
+                                   collName,
+                                   doc,
+                                   numDocs,
+                                   true /*doPrimary*/,
+                                   true /*doSecondary*/,
+                                   collOpts);
 
     runDbCheck(replSet, primary.getDB(dbName), collName, {
         maxDocsPerBatch: maxDocsPerBatch,
@@ -98,33 +105,37 @@ function checkMissingIndexKeys(doc, numDocs = 1, maxDocsPerBatch = 10000) {
     });
 }
 
-function testMultipleMissingKeys() {
+function testMultipleMissingKeys(collOpts) {
     jsTestLog(
-        "Testing that dbCheck logs error in health log for each document with missing index key.");
+        "Testing that dbCheck logs error in health log for each document with missing index key. collection options:" +
+        tojson(collOpts));
 
     // Test for documents with 1 or multiple missing index keys.
-    checkMissingIndexKeys(doc1);
-    checkMissingIndexKeys(doc2);
+    checkMissingIndexKeys(doc1, collOpts);
+    checkMissingIndexKeys(doc2, collOpts);
 
     // Test for multiple documents with missing index keys in 1 batch.
-    checkMissingIndexKeys(doc1, 10);
-    checkMissingIndexKeys(doc2, 10);
+    checkMissingIndexKeys(doc1, collOpts, 10);
+    checkMissingIndexKeys(doc2, collOpts, 10);
 
     // Test for multiple batches with missing index keys.
-    checkMissingIndexKeys(doc1, 10, 2);
+    checkMissingIndexKeys(doc1, collOpts, 10, 2);
 }
 
-function testMultipleDocsOneInconsistency() {
+function testMultipleDocsOneInconsistency(collOpts) {
     jsTestLog(
-        "Testing that dbCheck catches the case where there are multiple identical docs but only one of them has an inconsistency");
+        "Testing that dbCheck catches the case where there are multiple identical docs but only one of them has an inconsistency. collection options:" +
+        tojson(collOpts));
     clearHealthLog(replSet);
     primaryDb[collName].drop();
 
     // Insert multiple docs that are consistent.
-    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc1, 10, false, false);
+    insertDocsWithMissingIndexKeys(
+        replSet, dbName, collName, doc1, 10, false /*doPrimary*/, false /*doSecondary*/, collOpts);
 
     // Insert one doc that is inconsistent.
-    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc1, 1, true, true);
+    insertDocsWithMissingIndexKeys(
+        replSet, dbName, collName, doc1, 1, true /*doPrimary*/, true /*doSecondary*/, collOpts);
 
     runDbCheck(replSet,
                primaryDb,
@@ -142,13 +153,16 @@ function testMultipleDocsOneInconsistency() {
     });
 }
 
-function testNoInconsistencies() {
-    jsTestLog("Testing that dbCheck does not log an error when there are no index inconsistencies");
+function testNoInconsistencies(collOpts) {
+    jsTestLog(
+        "Testing that dbCheck does not log an error when there are no index inconsistencies. collection options:" +
+        tojson(collOpts));
     clearHealthLog(replSet);
     primaryDb[collName].drop();
 
     // Insert documents without any inconsistencies.
-    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc1, 2, false, false);
+    insertDocsWithMissingIndexKeys(
+        replSet, dbName, collName, doc1, 2, false /*doPrimary*/, false /*doSecondary*/, collOpts);
 
     runDbCheck(replSet,
                primaryDb,
@@ -162,15 +176,17 @@ function testNoInconsistencies() {
     });
 }
 
-function testPrimaryOnly() {
+function testPrimaryOnly(collOpts) {
     jsTestLog(
-        "Testing that dbCheck logs error in health log for missing index keys on the primary.");
+        "Testing that dbCheck logs error in health log for missing index keys on the primary. collection options:" +
+        tojson(collOpts));
 
     clearHealthLog(replSet);
     primaryDb[collName].drop();
 
     // Insert a document that has missing index keys on the primary only.
-    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc1, 1, true, false);
+    insertDocsWithMissingIndexKeys(
+        replSet, dbName, collName, doc1, 1, true /*doPrimary*/, false /*doSecondary*/, collOpts);
     replSet.awaitReplication();
 
     runDbCheck(replSet,
@@ -191,15 +207,17 @@ function testPrimaryOnly() {
     checkHealthLog(secondary.getDB("local").system.healthlog, errQuery, 0);
 }
 
-function testSecondaryOnly() {
+function testSecondaryOnly(collOpts) {
     jsTestLog(
-        "Testing that dbCheck logs error in health log for missing index keys on the secondary.");
+        "Testing that dbCheck logs error in health log for missing index keys on the secondary. collection options:" +
+        tojson(collOpts));
 
     clearHealthLog(replSet);
     primaryDb[collName].drop();
 
     // Insert a document that has missing index keys on the secondary only.
-    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc1, 1, false, true);
+    insertDocsWithMissingIndexKeys(
+        replSet, dbName, collName, doc1, 1, false /*doPrimary*/, true /*doSecondary*/, collOpts);
     replSet.awaitReplication();
 
     runDbCheck(replSet,
@@ -220,10 +238,14 @@ function testSecondaryOnly() {
     checkHealthLog(secondary.getDB("local").system.healthlog, errQuery, 1);
 }
 
-testMultipleMissingKeys();
-testMultipleDocsOneInconsistency();
-testNoInconsistencies();
-testPrimaryOnly();
-testSecondaryOnly();
+[{},
+ {clusteredIndex: {key: {_id: 1}, unique: true}}]
+    .forEach(collOpts => {
+        testMultipleMissingKeys(collOpts);
+        testMultipleDocsOneInconsistency(collOpts);
+        testNoInconsistencies(collOpts);
+        testPrimaryOnly(collOpts);
+        testSecondaryOnly(collOpts);
+    });
 
 replSet.stopSet();
