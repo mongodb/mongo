@@ -186,6 +186,13 @@ buildvariants:
   tasks:
   - name: .concurrency !.large
   - name: .concurrency .large
+  - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *linux_x86_dynamic_compile_variant_name
   - name: jsCore
   - name: multiversion_gen
   - name: noPassthrough_gen

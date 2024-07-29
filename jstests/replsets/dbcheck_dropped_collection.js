@@ -28,10 +28,15 @@ const primary = rst.getPrimary();
 const testDB = primary.getDB("dbCheck_deleted_collection");
 const collName = "coll_view";
 
-const runTest = (failpoint, mode) => {
-    jsTestLog("Running with failpoint " + failpoint + " and mode " + mode);
+const runTest = (failpoint, mode, dbCheckParameters) => {
+    jsTestLog(`Running with failpoint: ${failpoint}, mode: ${mode}, and parameters: ${
+        dbCheckParameters}`);
     jsTestLog("Reset the health log and delete the collection/view, then create a new collection.");
     resetAndInsert(rst, testDB, collName, 10);
+    assert.commandWorked(testDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {a: 1}, name: 'a_1'}],
+    }));
 
     const dbcheckFp = configureFailPoint(primary, failpoint);
     runDbCheck(rst, testDB, collName);
@@ -108,7 +113,12 @@ jsTestLog("Testing the dbcheck command invocation.");
 jsTestLog("Testing the healthLog inconsistency.");
 const fps = ["hangBeforeProcessingDbCheckRun", "hangBeforeProcessingFirstBatch"];
 const modes = ["doNothing", "createCollection", "createView"];
-fps.forEach(fb => modes.forEach(mode => runTest(fb, mode)));
+const params = [
+    {},
+    {validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
+    {validateMode: "extraIndexKeysCheck", indexName: "a_1"}
+];
+fps.forEach(fb => modes.forEach(mode => params.forEach(param => runTest(fb, mode, param))));
 
 rst.stopSet();
 }());
