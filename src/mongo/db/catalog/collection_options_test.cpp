@@ -1030,7 +1030,7 @@ TEST(FLECollectionOptions, Range_Sparsity) {
                     "path": "firstName",
                     "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
                     "bsonType": "int",
-                    "queries": {"queryType": "range", "sparsity" : 4}
+                    "queries": {"queryType": "range", "sparsity" : 8}
                 }
             ]
         }
@@ -1055,7 +1055,7 @@ TEST(FLECollectionOptions, Range_Sparsity) {
                     "path": "firstName",
                     "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
                     "bsonType": "int",
-                    "queries": {"queryType": "range", "sparsity" : 5}
+                    "queries": {"queryType": "range", "sparsity" : 9}
                 }
             ]
         }

@@ -1652,7 +1652,7 @@ QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryTyp
 
 /**
  * Get the set of edges that minimally cover a range query specified by the given range spec and
- * sparsity.jj
+ * sparsity
  */
 std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t sparsity);
 }  // namespace mongo

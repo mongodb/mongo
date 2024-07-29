@@ -5269,7 +5269,7 @@ public:
             }
         }
 
-        for (int sparsity = 1; sparsity <= 4; ++sparsity) {
+        for (int sparsity = 1; sparsity <= 8; ++sparsity) {
             for (const T lb : testVals) {
                 for (const T ub : testVals) {
                     if (lb >= ub) {
@@ -5343,7 +5343,7 @@ TEST_F(EdgeTestFixture, getEdgesLengthDecimal128) {
         Decimal128(1000000),
     };
 
-    for (int sparsity = 1; sparsity <= 4; ++sparsity) {
+    for (int sparsity = 1; sparsity <= 8; ++sparsity) {
         for (const auto& lb : testVals) {
             for (const auto& ub : testVals) {
                 if (lb >= ub) {
@@ -5497,7 +5497,7 @@ TEST_F(EdgeTestFixture, getEdgesLengthDate) {
         Date_t::max(),
     };
 
-    for (int sparsity = 1; sparsity <= 4; ++sparsity) {
+    for (int sparsity = 1; sparsity <= 8; ++sparsity) {
         for (const auto& lb : testVals) {
             for (const auto& ub : testVals) {
                 if (lb >= ub) {

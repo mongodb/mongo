@@ -322,8 +322,8 @@ void validateRangeIndex(BSONType fieldType, StringData fieldPath, QueryTypeConfi
 
     if (query.getSparsity().has_value()) {
         uassert(6775214,
-                "The field 'sparsity' must be between 1 and 4",
-                query.getSparsity().value() >= 1 && query.getSparsity().value() <= 4);
+                "The field 'sparsity' must be between 1 and 8",
+                query.getSparsity().value() >= 1 && query.getSparsity().value() <= 8);
     }
 
     if (indexMin) {

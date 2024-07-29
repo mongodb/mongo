@@ -89,7 +89,7 @@ structs:
                 type: exactInt64
                 optional: true
                 stability: unstable
-                validator: { gte: 1, lte: 4 }
+                validator: { gte: 1, lte: 8 }
             precision:
                 description: >-
                     Defines the number of digits after the decimal point for floating point numbers.

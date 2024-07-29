@@ -186,7 +186,7 @@ structs:
             type: long
             cpp_name: sparsity
             optional: true
-            validator: { gte: 1, lte: 4 }
+            validator: { gte: 1, lte: 8 }
 
     EdgeTokenSetV2:
         description: "Payload of an indexed field to insert or update. Version 2"
@@ -260,7 +260,7 @@ structs:
             type: long
             cpp_name: sparsity
             optional: true
-            validator: { gte: 1, lte: 4 }
+            validator: { gte: 1, lte: 8 }
           pn:
             cpp_name: precision
             description: "Determines the number of digits after the decimal point for floating point values"
@@ -361,7 +361,7 @@ structs:
             type: long
             cpp_name: sparsity
             optional: true
-            validator: { gte: 1, lte: 4 }
+            validator: { gte: 1, lte: 8 }
           pn:
             cpp_name: precision
             description: "Determines the number of digits after the decimal point for floating point values"
