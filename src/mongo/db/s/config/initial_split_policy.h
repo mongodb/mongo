@@ -97,7 +97,7 @@ public:
      */
     static std::vector<BSONObj> calculateHashedSplitPoints(const ShardKeyPattern& shardKeyPattern,
                                                            BSONObj prefix,
-                                                           int numInitialChunks);
+                                                           size_t numInitialChunks);
 
     /**
      * Produces the initial chunks that need to be written for an *empty* collection which is being
