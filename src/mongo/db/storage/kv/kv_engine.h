@@ -193,17 +193,6 @@ public:
                              const StorageEngine::DropIdentCallback& onDrop = nullptr) = 0;
 
     /**
-     * Removes any knowledge of the ident from the storage engines metadata which includes removing
-     * the underlying files belonging to the ident. Allows the storage engine to perform a blocking
-     * wait if it is unable to process the removal immediately. If a callback is specified, it will
-     * be run upon the drop if this function returns an OK status.
-     */
-    virtual Status dropIdentSynchronous(
-        RecoveryUnit* ru,
-        StringData ident,
-        const StorageEngine::DropIdentCallback& onDrop = nullptr) = 0;
-
-    /**
      * Removes any knowledge of the ident from the storage engines metadata without removing the
      * underlying files belonging to the ident.
      */

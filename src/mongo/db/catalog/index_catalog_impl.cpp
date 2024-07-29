@@ -112,6 +112,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/represent_as.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer_fragment.h"
@@ -140,6 +141,10 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 const BSONObj IndexCatalogImpl::_idObj = BSON("_id" << 1);
 
 namespace {
+
+// Keep retrying dropping unfinished-indexes for atleast this long.
+constexpr int kDropRetryTimeoutMillis = 10000;
+
 /**
  * Similar to _isSpecOK(), checks if the indexSpec is valid, conflicts, or already exists as a
  * clustered index.
@@ -1347,21 +1352,37 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
     invariant(released.get() == entry);
 
     // Drop the ident if it exists. The storage engine will return OK if the ident is not found.
+    // Dropping an index may be blocked by concurrent filesystem operations. See SERVER-92181
+    // for more context.
     auto engine = opCtx->getServiceContext()->getStorageEngine();
     const std::string ident = released->getIdent();
-    Status status = engine->getEngine()->dropIdentSynchronous(
-        shard_role_details::getRecoveryUnit(opCtx), ident);
-    if (!status.isOK()) {
-        return status;
+    size_t attempt = 0;
+    Timer timer;
+    for (;;) {
+        Status status =
+            engine->getEngine()->dropIdent(shard_role_details::getRecoveryUnit(opCtx), ident);
+        if (status.isOK()) {
+            break;
+        } else if (timer.millis() < kDropRetryTimeoutMillis) {
+            logAndBackoff(9218100,
+                          MONGO_LOGV2_DEFAULT_COMPONENT,
+                          logv2::LogSeverity::Warning(),
+                          attempt++,
+                          "Retrying unfinished index drop",
+                          "ident"_attr = ident,
+                          "status"_attr = status);
+        } else {
+            return status;
+        }
     }
 
     // Recreate the ident on-disk. DurableCatalog::createIndex() will lookup the ident internally
     // using the catalogId and index name.
-    status = DurableCatalog::get(opCtx)->createIndex(opCtx,
-                                                     collection->getCatalogId(),
-                                                     collection->ns(),
-                                                     collection->getCollectionOptions(),
-                                                     released->descriptor());
+    Status status = DurableCatalog::get(opCtx)->createIndex(opCtx,
+                                                            collection->getCatalogId(),
+                                                            collection->ns(),
+                                                            collection->getCollectionOptions(),
+                                                            released->descriptor());
     if (!status.isOK()) {
         return status;
     }
