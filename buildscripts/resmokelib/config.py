@@ -69,7 +69,7 @@ DEFAULTS = {
     "flow_control_tickets": None,
     "force_excluded_tests": False,
     "fuzz_mongod_configs": None,
-    "fuzz_mongod_runtime_params": None,
+    "fuzz_runtime_params": None,
     "fuzz_mongos_configs": None,
     "config_fuzz_seed": None,
     "genny_executable": None,
@@ -409,8 +409,8 @@ FAIL_FAST = None
 # Defines how to fuzz mongod parameters on startup
 FUZZ_MONGOD_CONFIGS = None
 
-# Defines how to fuzz mongod parameters at test run-time
-FUZZ_MONGOD_RUNTIME_PARAMS = None
+# Defines how to fuzz mongod/mongos parameters at test run-time
+FUZZ_RUNTIME_PARAMS = None
 
 # Defines how to fuzz mongos parameters on startup
 FUZZ_MONGOS_CONFIGS = None

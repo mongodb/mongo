@@ -173,5 +173,7 @@ runtime_parameter_fuzzer_params = {
             "period": 10,
         },
     },
-    "mongos": {},
+    "mongos": {
+        "ShardingTaskExecutorPoolMinSize": {"min": 1, "max": 50, "period": 5},
+    },
 }

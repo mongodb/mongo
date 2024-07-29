@@ -41,7 +41,7 @@ class RuntimeParametersState:
         }
         self._rng = random.Random(seed)
 
-    def generate_mongod_parameters(self):
+    def generate_parameters(self):
         """Returns a dictionary of what parameters should be set now, along with values to set them to, based on the last time the
         parameter was set and the period provided in the spec"""
         ret = {}
@@ -101,10 +101,15 @@ class FuzzRuntimeParameters(interface.Hook):
         )
 
         validate_runtime_parameter_spec(runtime_parameter_fuzzer_params["mongod"])
+        validate_runtime_parameter_spec(runtime_parameter_fuzzer_params["mongos"])
         # Construct the runtime state before the suite begins.
         # The initial lastSet time of each parameter is the start time of the suite.
         self._mongod_param_state = RuntimeParametersState(
             runtime_parameter_fuzzer_params["mongod"], self._seed
+        )
+
+        self._mongos_param_state = RuntimeParametersState(
+            runtime_parameter_fuzzer_params["mongos"], self._seed
         )
 
         self._setParameter_thread = _SetParameterThread(
@@ -114,6 +119,7 @@ class FuzzRuntimeParameters(interface.Hook):
             self._standalone_fixtures,
             self._fixture,
             self._mongod_param_state,
+            self._mongos_param_state,
             lifecycle_interface.FlagBasedThreadLifecycle(),
             self._auth_options,
         )
@@ -135,6 +141,9 @@ class FuzzRuntimeParameters(interface.Hook):
         for standalone in self._standalone_fixtures:
             self._invoke_get_parameter_and_log(standalone)
 
+        for mongos in self._mongos_fixtures:
+            self._invoke_get_parameter_and_log(mongos)
+
         self.logger.info("Resuming the runtime parameter fuzzing thread.")
         self._setParameter_thread.pause()
         self._setParameter_thread.resume()
@@ -151,6 +160,9 @@ class FuzzRuntimeParameters(interface.Hook):
 
         for standalone in self._standalone_fixtures:
             self._invoke_get_parameter_and_log(standalone)
+
+        for mongos in self._mongos_fixtures:
+            self._invoke_get_parameter_and_log(mongos)
 
     def _add_fixture(self, fixture):
         if isinstance(fixture, standalone.MongoDFixture):
@@ -174,7 +186,11 @@ class FuzzRuntimeParameters(interface.Hook):
     def _invoke_get_parameter_and_log(self, node):
         """Helper to print the current state of a node's runtime-fuzzable parameters. Only usable once before_suite has initialized the runtime state of the parameters."""
         client = fixture_interface.build_client(node, self._auth_options)
-        params_to_get = self._mongod_param_state.get_spec()
+        params_to_get = (
+            self._mongos_param_state.get_spec()
+            if client.is_mongos
+            else self._mongod_param_state.get_spec()
+        )
         get_result = client.admin.command("getParameter", 1, **params_to_get)
         self.logger.info(
             "Current state of runtime-fuzzable parameters on node on port %d. Parameters: %s",
@@ -192,6 +208,7 @@ class _SetParameterThread(threading.Thread):
         standalone_fixtures,
         fixture,
         mongod_param_state,
+        mongos_param_state,
         lifecycle,
         auth_options=None,
     ):
@@ -204,6 +221,7 @@ class _SetParameterThread(threading.Thread):
         self._standalone_fixtures = standalone_fixtures
         self._fixture = fixture
         self._mongod_param_state = mongod_param_state
+        self._mongos_param_state = mongos_param_state
         self.__lifecycle = lifecycle
         self._auth_options = auth_options
         self._setparameter_interval_secs = 1
@@ -295,25 +313,44 @@ class _SetParameterThread(threading.Thread):
             raise errors.ServerFailure(msg)
 
     def _do_set_parameter(self):
-        params_to_set = self._mongod_param_state.generate_mongod_parameters()
+        mongod_params_to_set = self._mongod_param_state.generate_parameters()
+        mongos_params_to_set = self._mongos_param_state.generate_parameters()
 
         # TODO SERVER-91123 Accept failure of the command in certain cases. This command can run
         # regardless of replication state but may fail on terminate primary suites.
-        def invoke_set_parameter(client):
-            client.admin.command("setParameter", 1, **params_to_set)
+        def invoke_set_parameter(client, params):
+            # Do nothing if there are no params to set this iteration.
+            if not params:
+                return
+            client.admin.command("setParameter", 1, **params)
 
         for repl_set in self._rs_fixtures:
             self.logger.info(
-                "Setting parameters on all nodes of fixture %s. Parameters: %s",
+                "Setting parameters on all nodes of replica set %s. Parameters: %s",
                 repl_set.replset_name,
-                params_to_set,
+                mongod_params_to_set,
             )
             for node in repl_set.nodes:
-                invoke_set_parameter(fixture_interface.build_client(node, self._auth_options))
+                invoke_set_parameter(
+                    fixture_interface.build_client(node, self._auth_options), mongod_params_to_set
+                )
 
         for standalone in self._standalone_fixtures:
             self.logger.info(
-                "Setting parameters node on port %d. Parameters: %s", standalone.port, params_to_set
+                "Setting parameters on standalone on port %d. Parameters: %s",
+                standalone.port,
+                mongod_params_to_set,
             )
-            invoke_set_parameter(fixture_interface.build_client(standalone, self._auth_options))
-        # TODO SERVER-92715 Handle mongos processes.
+            invoke_set_parameter(
+                fixture_interface.build_client(standalone, self._auth_options), mongod_params_to_set
+            )
+
+        for mongos in self._mongos_fixtures:
+            self.logger.info(
+                "Setting parameters on mongos port %d. Parameters: %s",
+                mongos.port,
+                mongos_params_to_set,
+            )
+            invoke_set_parameter(
+                fixture_interface.build_client(mongos, self._auth_options), mongos_params_to_set
+            )

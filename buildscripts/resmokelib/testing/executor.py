@@ -63,7 +63,7 @@ class TestSuiteExecutor(object):
             self.fixture_config = fixture
 
         self.hooks_config = utils.default_if_none(hooks, [])
-        if _config.FUZZ_MONGOD_RUNTIME_PARAMS:
+        if _config.FUZZ_RUNTIME_PARAMS:
             self.hooks_config.append({"class": "FuzzRuntimeParameters"})
 
         self.test_config = utils.default_if_none(config, {})
