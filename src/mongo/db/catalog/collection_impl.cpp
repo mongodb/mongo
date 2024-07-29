@@ -33,11 +33,13 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/db/catalog/backwards_compatible_collection_options_util.h"
 #include "mongo/db/catalog/catalog_stats.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/catalog/storage_engine_collection_options_flags_parser.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -824,6 +826,19 @@ bool CollectionImpl::isTemporary() const {
 }
 
 boost::optional<bool> CollectionImpl::getTimeseriesBucketsMayHaveMixedSchemaData() const {
+    if (!getTimeseriesOptions()) {
+        return boost::none;
+    }
+
+    // If present, reuse storageEngine options to work around the issue described in SERVER-91194
+    boost::optional<bool> optBackwardsCompatibleFlag = getFlagFromStorageEngineBson(
+        _metadata->options.storageEngine,
+        backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
+    if (optBackwardsCompatibleFlag) {
+        return *optBackwardsCompatibleFlag;
+    }
+
+    // Else, fallback to legacy parameter
     return _metadata->timeseriesBucketsMayHaveMixedSchemaData;
 }
 
@@ -839,6 +854,16 @@ void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext
                 "setting"_attr = setting);
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        // Reuse storageEngine options to work around the issue described in SERVER-91194
+        if (setting.has_value()) {
+            md.options.storageEngine = setFlagToStorageEngineBson(
+                md.options.storageEngine,
+                backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData,
+                *setting);
+        }
+
+        // Also update legacy parameter for compatibility when downgrading to older sub-versions
+        // only relying on this option (best-effort because it may be lost due to SERVER-91194)
         md.timeseriesBucketsMayHaveMixedSchemaData = setting;
     });
 }

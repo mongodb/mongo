@@ -1140,6 +1140,8 @@ last-lts:
     ticket: SERVER-92193
   - test_file: jstests/core/ddl/collmod.js
     ticket: SERVER-84531
+  - test_file: jstests/replsets/backwards_compatible_timeseries_catalog_options.js
+    ticket: SERVER-91195
   - test_file: jstests/core/timeseries/timeseries_insert_mixed_schema_bucket.js
     ticket: SERVER-91195
   - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js

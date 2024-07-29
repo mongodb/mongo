@@ -434,6 +434,7 @@ env.Library(
         'index_key_validate',
         'index_repair',
         'local_oplog_info',
+        'storage_engine_collection_options_flags_parser',
         'throttle_cursor',
         'validate_idl',
         'validate_state',
@@ -530,6 +531,7 @@ env.Library(
 env.Library(
     target='catalog_helpers',
     source=[
+        'backwards_compatible_collection_options_util.cpp',
         'capped_utils.cpp',
         'coll_mod.cpp',
         'coll_mod_index.cpp',
@@ -683,6 +685,7 @@ if wiredtiger:
     wtEnv.CppUnitTest(
         target='db_catalog_test',
         source=[
+            'backwards_compatible_collection_options_util_test.cpp',
             'capped_collection_test.cpp',
             'capped_visibility_test.cpp',
             'capped_utils_test.cpp',
@@ -711,17 +714,21 @@ if wiredtiger:
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/auth/authmocks',
+            '$BUILD_DIR/mongo/db/commands/create_command',
             '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+            '$BUILD_DIR/mongo/db/dbhelpers',
             '$BUILD_DIR/mongo/db/index/index_access_method',
             '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
             '$BUILD_DIR/mongo/db/multitenancy',
             '$BUILD_DIR/mongo/db/op_observer/op_observer',
             '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
+            '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
             '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
             '$BUILD_DIR/mongo/db/query/query_test_service_context',
             '$BUILD_DIR/mongo/db/query_expressions',
             '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
             '$BUILD_DIR/mongo/db/repl/oplog',
+            '$BUILD_DIR/mongo/db/repl/oplog_application',
             '$BUILD_DIR/mongo/db/repl/optime',
             '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
             '$BUILD_DIR/mongo/db/repl/replmocks',
@@ -732,6 +739,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/service_context_test_fixture',
             '$BUILD_DIR/mongo/db/shard_role',
             '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
+            '$BUILD_DIR/mongo/db/timeseries/timeseries_collmod',
             '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
             '$BUILD_DIR/mongo/unittest/unittest',
             '$BUILD_DIR/mongo/util/clock_source_mock',
