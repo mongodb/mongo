@@ -13,11 +13,10 @@
 //   tenant_migration_incompatible,
 //   # This test depends on the strict argument since 6.1.
 //   requires_fcv_61,
-//   # When the config fuzzer changes 'internalQueryFindCommandBatchSize' to a value < 3,
-//   # 'cursor.firstBatch' is too small to have all the expected results.
-//   # TODO(SERVER-91719): unblock if test is rewritten to account for small batch size.
-//   does_not_support_config_fuzzer,
 // ]
+
+const findCommandBatchSize = assert.commandWorked(db.adminCommand(
+    {getParameter: 1, internalQueryFindCommandBatchSize: 1}))["internalQueryFindCommandBatchSize"];
 
 // function argument overwritten won't affect original value and it can be run in parallel tests
 function profileCursor(testDb, query) {
@@ -74,8 +73,10 @@ try {
     msg += tojson(testDb.system.profile.stats());
 
     // If these nunmbers don't match, it is possible the collection has rolled over
-    // (set to 32MB above in the hope this doesn't happen)
-    assert.eq(2, profileItems.length, "E2 -- " + msg);
+    // (set to 32MB above in the hope this doesn't happen).
+    // When the 'findCommandBatchSize' is < 3 an additional getMore is required.
+    const expectedDocs = findCommandBatchSize < 3 ? 3 : 2;
+    assert.eq(expectedDocs, profileItems.length, "E2 -- " + msg);
 
     // Make sure we can't drop if profiling is still on
     assert.throws(function(z) {

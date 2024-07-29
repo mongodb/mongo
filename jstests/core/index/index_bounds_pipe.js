@@ -4,13 +4,10 @@
  * @tags: [
  *   assumes_read_concern_local,
  *   requires_fcv_80,
- *   # When the config fuzzer changes 'internalQueryFindCommandBatchSize' to a value < 3,
- *   # 'cursor.firstBatch' is too small to have all the expected results.
- *   # TODO(SERVER-91719): unblock if test is rewritten to account for small batch size.
- *   does_not_support_config_fuzzer,
  * ]
  */
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {exhaustFindCursorAndReturnResults} from "jstests/libs/find_cmd_util.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
@@ -48,12 +45,9 @@ function assertIndexBoundsAndResult(params) {
                       tojson(ixscan.indexBounds._id)}. i=${i}, all output: ${tojson(explain)}`);
     }
 
-    // Check that the query regex matches expected strings.
-    const results = db.runCommand(command);
-    assert.commandWorked(results);
-    assert.eq(results.cursor.firstBatch,
-              params.results,
-              'Regex query ' + tojson(query) + ' returned incorrect results');
+    const results = exhaustFindCursorAndReturnResults(db, command);
+    assert.eq(
+        results, params.results, 'Regex query ' + tojson(query) + ' returned incorrect results');
 
     // Check that the query regex will exactly match identical regular expression objects.
     const collRegexValue = db.getCollection(collName + params.regex);

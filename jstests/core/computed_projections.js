@@ -1,9 +1,3 @@
-// @tags: [
-//   # When the config fuzzer changes 'internalQueryFindCommandBatchSize' to a value < 3,
-//   # there aren't enough results in the first batch to detect expected errors.
-//   # TODO(SERVER-91719): unblock if test is rewritten to account for small batch size.
-//   does_not_support_config_fuzzer,
-// ]
 import "jstests/libs/sbe_assert_error_override.js";
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
@@ -1116,9 +1110,10 @@ testCases.forEach(function(test) {
         assert(arrayEq(actual, test.expected), Object.assign({actual: actual}, test));
     } else {
         assert(test.expectedErrorCode, test);
-        const result =
-            db.runCommand({find: coll.getName(), filter: test.query, projection: test.proj});
-        assert.commandFailedWithCode(
-            result, test.expectedErrorCode, Object.assign({result: result}, test));
+        let result;
+        assert.throwsWithCode(() => result = coll.find(test.query, test.proj).toArray(),
+                              test.expectedErrorCode,
+                              [],
+                              Object.assign({result: result}, test));
     }
 });

@@ -45,15 +45,9 @@ selector:
   - jstests/core/txns/**/*.js
   - jstests/core/queryable_encryption/**/*.js
   - jstests/core/query/query_settings/**/*.js
-  - jstests/core/**/profile1.js
-  - jstests/core/**/profile2.js
-  - jstests/core/**/find9.js
   - jstests/core/**/express.js
-  - jstests/core/computed_projections.js
   - jstests/core/query/sort/sortk.js
   - jstests/core/query/sort/sorth.js
-  - jstests/core/index/covered/covered_index_sort_no_fetch_optimization.js
-  - jstests/core/index/index_bounds_pipe.js
   exclude_with_any_tags:
   - does_not_support_encrypted_storage_engine
   - does_not_support_repeated_reads

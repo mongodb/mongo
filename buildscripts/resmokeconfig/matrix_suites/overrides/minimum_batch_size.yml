@@ -12,12 +12,6 @@
 - name: excluded_files
   value:
     exclude_files:
-      - jstests/core/**/profile1.js # Extra operation for a getmore.
-      - jstests/core/**/profile2.js # Extra operation for a getmore.
-      - jstests/core/**/find9.js # Extra operation for a getmore.
       - jstests/core/**/express.js # Assumes default batch size.
-      - jstests/core/computed_projections.js # Doesn't hit error code due to batch size.
       - jstests/core/query/sort/sortk.js # Limit is not reached due to batch size.
       - jstests/core/query/sort/sorth.js # Limit is not reached due to batch size.
-      - jstests/core/index/covered/covered_index_sort_no_fetch_optimization.js # First batch not big enough for all expected results due to batch size.
-      - jstests/core/index/index_bounds_pipe.js # First batch not big enough for all expected results due to batch size.
