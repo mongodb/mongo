@@ -216,13 +216,6 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
     Client::initThread("OplogVisibilityThread",
                        getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
-    // This job is primary/secondary agnostic and doesn't write to WT, stepdown won't and
-    // shouldn't interrupt it, so keep it as unkillable.
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
-
     // This thread updates the oplog read timestamp, the timestamp used to read from the oplog with
     // forward cursors. The timestamp is used to hide oplog entries that might be committed but have
     // uncommitted entries behind them. This prevents cursors from seeing 'holes' in the oplog and

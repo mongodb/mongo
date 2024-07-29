@@ -85,13 +85,11 @@ void DiskSpaceMonitor::_start(ServiceContext* svcCtx) {
     LOGV2(7333401, "Starting the DiskSpaceMonitor");
     invariant(!_job, "DiskSpaceMonitor is already started");
     _dbpath = storageGlobalParams.dbpath;
-    _job = svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
-        "DiskSpaceMonitor",
-        [this](Client* client) { _run(client); },
-        Seconds(1),
-        // This job is primary/secondary agnostic and doesn't write to WT, stepdown won't and
-        // shouldn't interrupt it, so keep it as unkillable.
-        false /*isKillableByStepdown*/});
+    _job = svcCtx->getPeriodicRunner()->makeJob(
+        PeriodicRunner::PeriodicJob{"DiskSpaceMonitor",
+                                    [this](Client* client) { _run(client); },
+                                    Seconds(1),
+                                    true /*isKillableByStepdown*/});
     _job.start();
 }
 

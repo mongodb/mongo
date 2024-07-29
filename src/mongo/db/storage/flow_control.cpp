@@ -176,9 +176,7 @@ FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* 
              FlowControlTicketholder::get(client->getServiceContext())->refreshTo(getNumTickets());
          },
          Seconds(1),
-         // This job is primary/secondary agnostic and doesn't write to WT, stepdown won't and
-         // shouldn't interrupt it, so keep it as unkillable.
-         false /*isKillableByStepdown*/});
+         true /*isKillableByStepdown*/});
     _jobAnchor.start();
 }
 

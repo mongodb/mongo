@@ -108,13 +108,11 @@ ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
                            gMinConcurrency * 2,
                            gMaxConcurrency.load() * 2)),
       _timer(svcCtx->getTickSource()),
-      _job(svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
-          "ThroughputProbingTicketHolderMonitor",
-          [this](Client* client) { _run(client); },
-          interval,
-          // This job is primary/secondary agnostic and doesn't write to
-          // WT, stepdown won't and shouldn't interrupt it, so keep it as unkillable.
-          false /*isKillableByStepdown*/})) {
+      _job(svcCtx->getPeriodicRunner()->makeJob(
+          PeriodicRunner::PeriodicJob{"ThroughputProbingTicketHolderMonitor",
+                                      [this](Client* client) { _run(client); },
+                                      interval,
+                                      true /*isKillableByStepdown*/})) {
     auto client = svcCtx->getService()->makeClient("ThroughputProbingInit");
     auto opCtx = client->makeOperationContext();
     _resetConcurrency(opCtx.get());

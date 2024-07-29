@@ -39,13 +39,11 @@ TicketHolderMonitor::TicketHolderMonitor(ServiceContext* svcCtx,
                                          Milliseconds interval)
     : _readTicketHolder(readTicketHolder),
       _writeTicketHolder(writeTicketHolder),
-      _job(svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
-          "TicketHolderMonitor",
-          [this](Client* client) { _run(client); },
-          interval,
-          // This job is primary/secondary agnostic and doesn't write to WT, stepdown won't and
-          // shouldn't interrupt it, so keep it as unkillable.
-          false /*isKillableByStepdown*/})) {}
+      _job(svcCtx->getPeriodicRunner()->makeJob(
+          PeriodicRunner::PeriodicJob{"TicketHolderMonitor",
+                                      [this](Client* client) { _run(client); },
+                                      interval,
+                                      true /*isKillableByStepdown*/})) {}
 
 void TicketHolderMonitor::start() {
     _job.start();

@@ -287,13 +287,6 @@ public:
     void run() override {
         ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
-        // This job is primary/secondary agnostic and doesn't write to WT, stepdown won't and
-        // shouldn't interrupt it, so keep it as unkillable.
-        {
-            stdx::lock_guard<Client> lk(*tc.get());
-            tc.get()->setSystemOperationUnkillableByStepdown(lk);
-        }
-
         LOGV2_DEBUG(22303, 1, "starting {name} thread", "name"_attr = name());
 
         while (!_shuttingDown.load()) {
