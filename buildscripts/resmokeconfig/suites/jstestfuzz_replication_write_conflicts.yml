@@ -7,6 +7,8 @@ selector:
 executor:
   archive:
     hooks:
+      - CheckReplOplogs
+      - CheckReplDBHash
       - ValidateCollections
   config:
     shell_options:
@@ -20,6 +22,15 @@ executor:
             WTWriteConflictExceptionChance: 0.001
             WTWriteConflictExceptionForReadsChance: 0.001
     - class: FuzzerRestoreSettings
+    - class: CheckReplOplogs
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplDBHash
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
     - class: ValidateCollections
       shell_options:
         global_vars:
