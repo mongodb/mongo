@@ -100,15 +100,21 @@ function checkNumBatchesAndSnapshots(
     }
 }
 
-function noExtraIndexKeys(
-    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start = null, end = null) {
+function noExtraIndexKeys(nDocs,
+                          batchSize,
+                          snapshotSize,
+                          skipLookupForExtraKeys,
+                          docSuffix,
+                          collOpts,
+                          start = null,
+                          end = null) {
     clearRawMongoProgramOutput();
     jsTestLog(`Testing that a valid index will not result in any health log entries with ${nDocs} docs, 
-    batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
+    collOpts: ${collOpts}, batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
               , skipLookupForExtraKeys: ${skipLookupForExtraKeys}, docSuffix: ${docSuffix}
               , start: ${start}, end: ${end}`);
 
-    resetAndInsert(replSet, primaryDB, collName, nDocs, docSuffix);
+    resetAndInsert(replSet, primaryDB, collName, nDocs, docSuffix, collOpts);
     assert.commandWorked(primaryDB.runCommand({
         createIndexes: collName,
         indexes: [{key: {a: 1}, name: 'a_1'}],
@@ -156,15 +162,21 @@ function noExtraIndexKeys(
     resetSnapshotSize(replSet);
 }
 
-function recordNotFound(
-    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start = null, end = null) {
+function recordNotFound(nDocs,
+                        batchSize,
+                        snapshotSize,
+                        skipLookupForExtraKeys,
+                        docSuffix,
+                        collOpts,
+                        start = null,
+                        end = null) {
     clearRawMongoProgramOutput();
     jsTestLog(`Testing that an extra key will generate a health log entry with ${nDocs} docs, 
-              batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
+              collOpts: ${collOpts}, batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
                         , skipLookupForExtraKeys: ${skipLookupForExtraKeys}, docSuffix: ${docSuffix}
                         , start: ${start}, end: ${end}`);
 
-    resetAndInsert(replSet, primaryDB, collName, nDocs, docSuffix);
+    resetAndInsert(replSet, primaryDB, collName, nDocs, docSuffix, collOpts);
     const primaryColl = primaryDB.getCollection(collName);
     assert.commandWorked(primaryDB.runCommand({
         createIndexes: collName,
@@ -235,15 +247,21 @@ function recordNotFound(
     resetSnapshotSize(replSet);
 }
 
-function recordDoesNotMatch(
-    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start = null, end = null) {
+function recordDoesNotMatch(nDocs,
+                            batchSize,
+                            snapshotSize,
+                            skipLookupForExtraKeys,
+                            docSuffix,
+                            collOpts,
+                            start = null,
+                            end = null) {
     clearRawMongoProgramOutput();
     jsTestLog(`Testing that a key with a record that does not contain the expected keystring will generate a health log entry with ${nDocs} docs, 
-        batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
+        collOpts: ${collOpts}, batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
                   , skipLookupForExtraKeys: ${skipLookupForExtraKeys}, docSuffix: ${docSuffix}
                   , start: ${start}, end: ${end}`);
 
-    resetAndInsert(replSet, primaryDB, collName, nDocs, docSuffix);
+    resetAndInsert(replSet, primaryDB, collName, nDocs, docSuffix, collOpts);
     const primaryColl = primaryDB.getCollection(collName);
 
     assert.commandWorked(primaryDB.runCommand({
@@ -315,17 +333,23 @@ function recordDoesNotMatch(
     resetSnapshotSize(replSet);
 }
 
-function hashingInconsistentExtraKeyOnPrimary(
-    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start = null, end = null) {
+function hashingInconsistentExtraKeyOnPrimary(nDocs,
+                                              batchSize,
+                                              snapshotSize,
+                                              skipLookupForExtraKeys,
+                                              docSuffix,
+                                              collOpts,
+                                              start = null,
+                                              end = null) {
     clearRawMongoProgramOutput();
     jsTestLog(`Testing that an extra key on only the primary will log an inconsistent batch health log entry with ${nDocs} docs, 
-        batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
+        collOpts: ${collOpts}, batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
                   , skipLookupForExtraKeys: ${skipLookupForExtraKeys}, docSuffix: ${docSuffix}
                   , start: ${start}, end: ${end}`);
 
     setSnapshotSize(replSet, snapshotSize);
     const primaryColl = primaryDB.getCollection(collName);
-    resetAndInsert(replSet, primaryDB, collName, nDocs, docSuffix);
+    resetAndInsert(replSet, primaryDB, collName, nDocs, docSuffix, collOpts);
     assert.commandWorked(primaryDB.runCommand({
         createIndexes: collName,
         indexes: [{key: {a: 1}, name: 'a_1'}],
@@ -399,17 +423,23 @@ function hashingInconsistentExtraKeyOnPrimary(
     resetSnapshotSize(replSet);
 }
 
-function hashingInconsistentExtraKeyOnPrimaryCompoundIndex(
-    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start = null, end = null) {
+function hashingInconsistentExtraKeyOnPrimaryCompoundIndex(nDocs,
+                                                           batchSize,
+                                                           snapshotSize,
+                                                           skipLookupForExtraKeys,
+                                                           docSuffix,
+                                                           collOpts,
+                                                           start = null,
+                                                           end = null) {
     clearRawMongoProgramOutput();
     jsTestLog(`Testing that an extra key on only the primary with compound index will log an inconsistent batch health log entry with ${nDocs} docs, 
-batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
+        collOpts: ${collOpts}, batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
           , skipLookupForExtraKeys: ${skipLookupForExtraKeys}, docSuffix: ${docSuffix}
           , start: ${start}, end: ${end}`);
 
     setSnapshotSize(replSet, snapshotSize);
     const primaryColl = primaryDB.getCollection(collName);
-    resetAndInsertTwoFields(replSet, primaryDB, collName, nDocs, docSuffix);
+    resetAndInsertTwoFields(replSet, primaryDB, collName, nDocs, docSuffix, collOpts);
     assert.commandWorked(primaryDB.runCommand({
         createIndexes: collName,
         indexes: [{key: {a: 1, b: 1}, name: 'a_1b_1'}],
@@ -488,16 +518,48 @@ batchSize: ${batchSize}, snapshotSize: ${snapshotSize}
 
 function runMainTests(nDocs, batchSize, snapshotSize, docSuffix, start = null, end = null) {
     [true, false].forEach((skipLookupForExtraKeys) => {
-        noExtraIndexKeys(
-            nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start, end);
-        recordDoesNotMatch(
-            nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start, end);
-        recordNotFound(
-            nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start, end);
-        hashingInconsistentExtraKeyOnPrimary(
-            nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start, end);
-        hashingInconsistentExtraKeyOnPrimaryCompoundIndex(
-            nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start, end);
+        [{}, {clusteredIndex: {key: {_id: 1}, unique: true}}].forEach(collOpts => {
+            noExtraIndexKeys(nDocs,
+                             batchSize,
+                             snapshotSize,
+                             skipLookupForExtraKeys,
+                             docSuffix,
+                             collOpts,
+                             start,
+                             end);
+            recordDoesNotMatch(nDocs,
+                               batchSize,
+                               snapshotSize,
+                               skipLookupForExtraKeys,
+                               docSuffix,
+                               collOpts,
+                               start,
+                               end);
+            recordNotFound(nDocs,
+                           batchSize,
+                           snapshotSize,
+                           skipLookupForExtraKeys,
+                           docSuffix,
+                           collOpts,
+                           start,
+                           end);
+            hashingInconsistentExtraKeyOnPrimary(nDocs,
+                                                 batchSize,
+                                                 snapshotSize,
+                                                 skipLookupForExtraKeys,
+                                                 docSuffix,
+                                                 collOpts,
+                                                 start,
+                                                 end);
+            hashingInconsistentExtraKeyOnPrimaryCompoundIndex(nDocs,
+                                                              batchSize,
+                                                              snapshotSize,
+                                                              skipLookupForExtraKeys,
+                                                              docSuffix,
+                                                              collOpts,
+                                                              start,
+                                                              end);
+        });
     });
 }
 

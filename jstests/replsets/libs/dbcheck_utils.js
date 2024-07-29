@@ -101,7 +101,15 @@ export const logQueries = {
         severity: "error",
         operation: "dbCheckBatch",
         "data.error": "IndexNotFound: dbCheck needs _id index",
-    }
+    },
+    checkIdIndexOnClusteredCollectionWarningQuery: {
+        severity: "warning",
+        "msg":
+            "skipping dbCheck extra index keys check on the _id index because the target collection is a clustered collection that doesn't have an _id index",
+        "data.dbCheckParameters": {$exists: true},
+        "data.error":
+            "DbCheckAttemptOnClusteredCollectionIdIndex: Clustered collection doesn't have an _id index.",
+    },
 };
 
 // Apply function on all secondary nodes except arbiters.
@@ -174,9 +182,11 @@ export const awaitDbCheckCompletion =
     };
 
 // Clear health log and insert nDocs documents.
-export const resetAndInsert = (replSet, db, collName, nDocs, docSuffix = null) => {
+export const resetAndInsert = (replSet, db, collName, nDocs, docSuffix = null, collOpts = {}) => {
     db[collName].drop();
     clearHealthLog(replSet);
+
+    assert.commandWorked(db.createCollection(collName, collOpts));
 
     if (docSuffix) {
         assert.commandWorked(db[collName].insertMany(
@@ -191,28 +201,33 @@ export const resetAndInsert = (replSet, db, collName, nDocs, docSuffix = null) =
 };
 
 // Clear health log and insert nDocs documents with two fields `a` and `b`.
-export const resetAndInsertTwoFields = (replSet, db, collName, nDocs, docSuffix = null) => {
-    db[collName].drop();
-    clearHealthLog(replSet);
+export const resetAndInsertTwoFields =
+    (replSet, db, collName, nDocs, docSuffix = null, collOpts = {}) => {
+        db[collName].drop();
+        clearHealthLog(replSet);
 
-    if (docSuffix) {
-        assert.commandWorked(db[collName].insertMany(
-            [...Array(nDocs).keys()].map(
-                x => ({a: x.toString() + docSuffix, b: x.toString() + docSuffix})),
-            {ordered: false}));
-    } else {
-        assert.commandWorked(db[collName].insertMany(
-            [...Array(nDocs).keys()].map(x => ({a: x, b: x})), {ordered: false}));
-    }
+        assert.commandWorked(db.createCollection(collName, collOpts));
 
-    replSet.awaitReplication();
-    assert.eq(db.getCollection(collName).find({}).count(), nDocs);
-};
+        if (docSuffix) {
+            assert.commandWorked(db[collName].insertMany(
+                [...Array(nDocs).keys()].map(
+                    x => ({a: x.toString() + docSuffix, b: x.toString() + docSuffix})),
+                {ordered: false}));
+        } else {
+            assert.commandWorked(db[collName].insertMany(
+                [...Array(nDocs).keys()].map(x => ({a: x, b: x})), {ordered: false}));
+        }
+
+        replSet.awaitReplication();
+        assert.eq(db.getCollection(collName).find({}).count(), nDocs);
+    };
 
 // Clear health log and insert nDocs documents with identical 'a' field
-export const resetAndInsertIdentical = (replSet, db, collName, nDocs) => {
+export const resetAndInsertIdentical = (replSet, db, collName, nDocs, collOpts = {}) => {
     db[collName].drop();
     clearHealthLog(replSet);
+
+    assert.commandWorked(db.createCollection(collName, collOpts));
 
     assert.commandWorked(db[collName].insertMany(
         [...Array(nDocs).keys()].map(x => ({_id: x, a: 0.1})), {ordered: false}));
@@ -222,50 +237,55 @@ export const resetAndInsertIdentical = (replSet, db, collName, nDocs) => {
 };
 
 // Insert numDocs documents with missing index keys for testing.
-export const insertDocsWithMissingIndexKeys =
-    (replSet, dbName, collName, doc, numDocs = 1, doPrimary = true, doSecondary = true) => {
-        const primaryDb = replSet.getPrimary().getDB(dbName);
-        const secondaryDb = replSet.getSecondary().getDB(dbName);
+export const insertDocsWithMissingIndexKeys = (replSet,
+                                               dbName,
+                                               collName,
+                                               doc,
+                                               numDocs = 1,
+                                               doPrimary = true,
+                                               doSecondary = true,
+                                               collOpts = {}) => {
+    const primaryDb = replSet.getPrimary().getDB(dbName);
+    const secondaryDb = replSet.getSecondary().getDB(dbName);
 
-        assert.commandWorked(primaryDb.createCollection(collName));
+    assert.commandWorked(primaryDb.createCollection(collName, collOpts));
 
-        // Create an index for every key in the document.
-        let index = {};
-        for (let key in doc) {
-            index[key] = 1;
-            assert.commandWorked(primaryDb[collName].createIndex(index));
-            index = {};
-        }
-        replSet.awaitReplication();
+    // Create an index for every key in the document.
+    let index = {};
+    for (let key in doc) {
+        index[key] = 1;
+        assert.commandWorked(primaryDb[collName].createIndex(index));
+        index = {};
+    }
+    replSet.awaitReplication();
 
-        // dbCheck requires the _id index to iterate through documents in a batch.
-        let skipIndexNewRecordsExceptIdPrimary;
-        let skipIndexNewRecordsExceptIdSecondary;
-        if (doPrimary) {
-            skipIndexNewRecordsExceptIdPrimary =
-                configureFailPoint(primaryDb, "skipIndexNewRecords", {skipIdIndex: false});
-        }
-        if (doSecondary) {
-            skipIndexNewRecordsExceptIdSecondary =
-                configureFailPoint(secondaryDb, "skipIndexNewRecords", {skipIdIndex: false});
-        }
-        for (let i = 0; i < numDocs; i++) {
-            assert.commandWorked(primaryDb[collName].insert(doc));
-        }
-        replSet.awaitReplication();
-        if (doPrimary) {
-            skipIndexNewRecordsExceptIdPrimary.off();
-        }
-        if (doSecondary) {
-            skipIndexNewRecordsExceptIdSecondary.off();
-        }
+    // dbCheck requires the _id index to iterate through documents in a batch.
+    let skipIndexNewRecordsExceptIdPrimary;
+    let skipIndexNewRecordsExceptIdSecondary;
+    if (doPrimary) {
+        skipIndexNewRecordsExceptIdPrimary =
+            configureFailPoint(primaryDb, "skipIndexNewRecords", {skipIdIndex: false});
+    }
+    if (doSecondary) {
+        skipIndexNewRecordsExceptIdSecondary =
+            configureFailPoint(secondaryDb, "skipIndexNewRecords", {skipIdIndex: false});
+    }
+    for (let i = 0; i < numDocs; i++) {
+        assert.commandWorked(primaryDb[collName].insert(doc));
+    }
+    replSet.awaitReplication();
+    if (doPrimary) {
+        skipIndexNewRecordsExceptIdPrimary.off();
+    }
+    if (doSecondary) {
+        skipIndexNewRecordsExceptIdSecondary.off();
+    }
 
-        // Verify that index has been replicated to all nodes, including _id index.
-        forEachNonArbiterNode(replSet, function(node) {
-            assert.eq(Object.keys(doc).length + 1,
-                      node.getDB(dbName)[collName].getIndexes().length);
-        });
-    };
+    // Verify that index has been replicated to all nodes, including _id index.
+    forEachNonArbiterNode(replSet, function(node) {
+        assert.eq(Object.keys(doc).length + 1, node.getDB(dbName)[collName].getIndexes().length);
+    });
+};
 
 // Run dbCheck with given parameters and potentially wait for completion.
 export const runDbCheck = (replSet,
@@ -292,19 +312,20 @@ export const runDbCheck = (replSet,
 };
 
 export const checkHealthLog = (healthlog, query, numExpected, timeout = 60 * 1000) => {
-    let query_count;
+    let queryCount;
     assert.soon(
         function() {
-            query_count = healthlog.find(query).count();
-            if (query_count != numExpected) {
-                jsTestLog("health log query returned " + query_count + " entries, expected " +
+            queryCount = healthlog.find(query).count();
+            if (queryCount != numExpected) {
+                jsTestLog("health log query returned " + queryCount + " entries, expected " +
                           numExpected + "  query: " + tojson(query) +
                           " found: " + tojson(healthlog.find(query).toArray()));
             }
-            return query_count == numExpected;
+            return queryCount == numExpected;
         },
-        "health log query returned " + query_count + " entries, expected " + numExpected +
-            "  query: " + tojson(query) + " found: " + tojson(healthlog.find(query).toArray()) +
+        "health log query returned " + healthlog.find(query).count() + " entries, expected " +
+            numExpected + "  query: " + tojson(query) +
+            " found: " + tojson(healthlog.find(query).toArray()) +
             " HealthLog: " + tojson(healthlog.find().toArray()),
         timeout);
 };
