@@ -1194,6 +1194,30 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
     return cfg;
 }
 
+// static
+boost::optional<std::string> WiredTigerUtil::getConfigStringFromStorageOptions(
+    const BSONObj& options) {
+    if (auto wtElem = options[kWiredTigerEngineName]) {
+        BSONObj wtObj = wtElem.Obj();
+        if (auto configStringElem = wtObj.getField(kConfigStringField)) {
+            return configStringElem.String();
+        }
+    }
+
+    return boost::none;
+}
+
+// static
+BSONObj WiredTigerUtil::setConfigStringToStorageOptions(const BSONObj& options,
+                                                        const std::string& configString) {
+    // Storage options may contain settings for non-WiredTiger storage engines (e.g. inMemory).
+    // We should leave these settings intact.
+    auto wtElem = options[kWiredTigerEngineName];
+    auto wtObj = wtElem ? wtElem.Obj() : BSONObj();
+    return options.addFields(
+        BSON(kWiredTigerEngineName << wtObj.addFields(BSON(kConfigStringField << configString))));
+}
+
 void WiredTigerUtil::removeEncryptionFromConfigString(std::string* configString) {
     static const StaticImmortal<pcrecpp::RE> encryptionOptsRegex(R"re(encryption=\([^\)]*\),?)re");
     encryptionOptsRegex->GlobalReplace("", configString);
@@ -1201,20 +1225,13 @@ void WiredTigerUtil::removeEncryptionFromConfigString(std::string* configString)
 
 // static
 BSONObj WiredTigerUtil::getSanitizedStorageOptionsForSecondaryReplication(const BSONObj& options) {
-    // Storage options may contain settings for non-WiredTiger storage engines (e.g. inMemory).
-    // We should leave these settings intact.
-    if (auto wtElem = options[kWiredTigerEngineName]) {
-        BSONObj wtObj = wtElem.Obj();
-        if (auto configStringElem = wtObj.getField(kConfigStringField)) {
-            auto configString = configStringElem.String();
-            removeEncryptionFromConfigString(&configString);
-            // Return a new BSONObj with the configString field sanitized.
-            return options.addFields(BSON(kWiredTigerEngineName << wtObj.addFields(
-                                              BSON(kConfigStringField << configString))));
-        }
+    auto configString = getConfigStringFromStorageOptions(options);
+    if (!configString) {
+        return options;
     }
 
-    return options;
+    removeEncryptionFromConfigString(configString.get_ptr());
+    return setConfigStringToStorageOptions(options, *configString);
 }
 
 }  // namespace mongo
