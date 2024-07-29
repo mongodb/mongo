@@ -30,8 +30,10 @@
 #pragma once
 
 #include <boost/functional/hash.hpp>
+#include <boost/operators.hpp>
 #include <boost/optional.hpp>
 #include <climits>
+#include <cstddef>
 #include <cstdint>
 #include <fmt/format.h>
 #include <ostream>
@@ -47,7 +49,7 @@ namespace mongo {
 /**
  * The key that uniquely identifies a Record in a Collection or RecordStore.
  */
-class RecordId {
+class RecordId : boost::totally_ordered<RecordId> {
 public:
     // This set of constants define the boundaries of the 'normal' id ranges for the int64_t format.
     static constexpr int64_t kMinRepr = LLONG_MIN;
@@ -237,6 +239,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool operator==(const RecordId& rhs) const {
+        return compare(rhs) == 0;
+    }
+
+    bool operator<(const RecordId& rhs) const {
+        return compare(rhs) < 0;
+    }
+
     size_t hash() const {
         size_t hash = 0;
         withFormat([](Null n) {},
@@ -423,25 +433,6 @@ private:
     // Used only for the kBigStr Format.
     ConstSharedBuffer _sharedBuffer;
 };
-
-inline bool operator==(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs) == 0;
-}
-inline bool operator!=(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs);
-}
-inline bool operator<(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs) < 0;
-}
-inline bool operator<=(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs) <= 0;
-}
-inline bool operator>(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs) > 0;
-}
-inline bool operator>=(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs) >= 0;
-}
 
 inline StringBuilder& operator<<(StringBuilder& stream, const RecordId& id) {
     return stream << "RecordId(" << id.toString() << ')';

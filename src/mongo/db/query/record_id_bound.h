@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/operators.hpp>
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 #include <ostream>
@@ -44,7 +45,7 @@ namespace mongo {
 /**
  * A RecordId bound for a collection scan, with an optional BSON representation for pretty printing.
  */
-class RecordIdBound {
+class RecordIdBound : boost::totally_ordered<RecordIdBound> {
 public:
     RecordIdBound() = default;
 
@@ -79,6 +80,14 @@ public:
      */
     int compare(const RecordIdBound& rhs) const {
         return _recordId.compare(rhs._recordId);
+    }
+
+    bool operator==(const RecordIdBound& rhs) const {
+        return compare(rhs) == 0;
+    }
+
+    bool operator<(const RecordIdBound& rhs) const {
+        return compare(rhs) < 0;
     }
 
 private:
