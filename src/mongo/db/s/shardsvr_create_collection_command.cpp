@@ -149,13 +149,10 @@ bool isAlwaysUntracked(OperationContext* opCtx,
                        NamespaceString&& nss,
                        const ShardsvrCreateCollection& request) {
     bool isView = request.getViewOn().has_value();
-    bool hasApiParams = APIParameters::get(opCtx).getParamsPassed();
 
     // TODO SERVER-83713 Reconsider isFLE2StateCollection check
     // TODO SERVER-83714 Reconsider isFLE2StateCollection check
-    // TODO SERVER-86018 Remove hasApiParams
-    return isView || nss.isFLE2StateCollection() || nss.isNamespaceAlwaysUntracked() ||
-        hasApiParams;
+    return isView || nss.isFLE2StateCollection() || nss.isNamespaceAlwaysUntracked();
 }
 
 class ShardsvrCreateCollectionCommand final : public TypedCommand<ShardsvrCreateCollectionCommand> {
