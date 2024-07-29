@@ -70,3 +70,6 @@ commands:
                 description: "Query settings for the given query"
                 type: QuerySettings
                 optional: true
+            includeQueryStatsMetrics:
+                description: "Determines whether or not to include query stats metrics in the response."
+                type: optionalBool

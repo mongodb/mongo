@@ -5,7 +5,6 @@
  *
  * @tags: [featureFlagQueryStatsCountDistinct]
  */
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertAggregatedMetricsSingleExec,
     assertExpectedResults,
@@ -42,28 +41,14 @@ withQueryStatsEnabled(collName, (coll) => {
     const firstEntry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
     assert.eq(firstEntry.key.queryShape.command, "distinct");
 
-    // TODO SERVER-90651: remove if statement, since metrics should be identical
-    // after enabling data bearing nodes. keysExamined and docsExamined will be 0
-    // until data bearing nodes is enabled.
-    if (FixtureHelpers.isMongos(testDB)) {
-        assertAggregatedMetricsSingleExec(firstEntry, {
-            keysExamined: 0,
-            docsExamined: 0,
-            hasSortStage: false,
-            usedDisk: false,
-            fromMultiPlanner: false,
-            fromPlanCache: false
-        });
-    } else {
-        assertAggregatedMetricsSingleExec(firstEntry, {
-            keysExamined: 0,
-            docsExamined: 6,
-            hasSortStage: false,
-            usedDisk: false,
-            fromMultiPlanner: false,
-            fromPlanCache: false
-        });
-    }
+    assertAggregatedMetricsSingleExec(firstEntry, {
+        keysExamined: 0,
+        docsExamined: 6,
+        hasSortStage: false,
+        usedDisk: false,
+        fromMultiPlanner: false,
+        fromPlanCache: false
+    });
     assertExpectedResults(firstEntry,
                           firstEntry.key,
                           /* expectedExecCount */ 1,

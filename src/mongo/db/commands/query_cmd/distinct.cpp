@@ -161,6 +161,12 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
             return std::make_unique<query_stats::DistinctKey>(
                 expCtx, *parsedDistinct, collOrViewAcquisition.getCollectionType());
         });
+
+        if (parsedDistinct->distinctCommandRequest->getIncludeQueryStatsMetrics() &&
+            feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested = true;
+        }
     }
 
     // TODO: SERVER-73632 Remove feature flag for PM-635.
@@ -576,11 +582,21 @@ public:
 
         uassert(31299, "distinct too big, 16mb cap", result.len() < kMaxResponseSize);
 
-        if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            auto* cq = executor->getCanonicalQuery();
-            collectQueryStatsMongod(
-                opCtx, cq->getExpCtx(), std::move(curOp->debug().queryStatsInfo.key));
+        auto* cq = executor->getCanonicalQuery();
+        collectQueryStatsMongod(
+            opCtx, cq->getExpCtx(), std::move(curOp->debug().queryStatsInfo.key));
+
+        // Include queryStats metrics in the result to be sent to mongos.
+        const bool includeMetrics = CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested;
+
+        if (includeMetrics) {
+            auto metrics = CurOp::get(opCtx)->debug().getCursorMetrics().toBSON();
+
+            // Only append the metrics if they were requested and they do not cause the result to
+            // exceed max size.
+            if (result.len() + metrics.objsize() < kMaxResponseSize) {
+                result.append("metrics", metrics);
+            }
         }
 
         return true;

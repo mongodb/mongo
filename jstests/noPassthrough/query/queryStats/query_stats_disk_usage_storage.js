@@ -6,11 +6,15 @@
  *      requires_fcv_80
  * ]
  */
-
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
+    assertAggregatedMetricsSingleExec,
+    assertExpectedResults,
     clearPlanCacheAndQueryStatsStore,
     exhaustCursorAndGetQueryStats,
+    getDistinctQueryStatsKey,
     getFindQueryStatsKey,
+    getQueryStatsDistinctCmd,
 } from "jstests/libs/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -43,7 +47,7 @@ function makeShardedCollection(st) {
     return coll;
 }
 
-function runStorageStatsTest(conn, coll) {
+function runStorageStatsTestFind(conn, coll) {
     const cmd = {find: coll.getName(), filter: {}, batchSize: 100};
     const shape = {filter: {}};
     const expectedDocs = 7;
@@ -59,6 +63,43 @@ function runStorageStatsTest(conn, coll) {
     // The read time can be zero even when the number of bytes read is non-zero, so we can assert
     // a non-negative value here.
     assert.gte(queryStats.metrics.readTimeMicros.min, 0);
+}
+
+function runStorageStatsTestDistinct(conn, coll) {
+    if (!FeatureFlagUtil.isEnabled(conn, "QueryStatsCountDistinct"))
+        return;
+
+    const testDB = conn.getDB("test");
+    const cmd = {distinct: coll.getName(), key: "y"};
+    const shape = {key: "y"};
+    const expectedDocs = 7;
+
+    const queryStatsKey = getDistinctQueryStatsKey(conn, coll.getName(), shape);
+    clearPlanCacheAndQueryStatsStore(conn, coll);
+
+    assert.commandWorked(testDB.runCommand(cmd));
+    const queryStats = getQueryStatsDistinctCmd(conn);
+    assert.eq(queryStats.length, 1, queryStats);
+
+    assertAggregatedMetricsSingleExec(queryStats[0], {
+        keysExamined: 7,
+        docsExamined: 0,
+        hasSortStage: false,
+        usedDisk: false,
+        fromMultiPlanner: false,
+        fromPlanCache: false
+    });
+    assertExpectedResults(queryStats[0],
+                          queryStatsKey,
+                          /* expectedExecCount */ 1,
+                          /* expectedDocsReturnedSum */ expectedDocs,
+                          /* expectedDocsReturnedMax */ expectedDocs,
+                          /* expectedDocsReturnedMin */ expectedDocs,
+                          /* expectedDocsReturnedSumOfSq */ expectedDocs ** 2,
+                          false);
+
+    assert.gt(queryStats[0].metrics.bytesRead.min, 0);
+    assert.gte(queryStats[0].metrics.readTimeMicros.min, 0);
 }
 
 // The options passed to runMongod, rst.startSet(), and others, sometimes get modified by those
@@ -77,7 +118,8 @@ function defaultOptions() {
     const conn = MongoRunner.runMongod(Object.assign(
         defaultOptions(), {restart: true, cleanData: false, dbpath: setupConn.dbpath}));
     const coll = conn.getDB("test")[collName];
-    runStorageStatsTest(conn, coll);
+    runStorageStatsTestFind(conn, coll);
+    runStorageStatsTestDistinct(conn, coll);
     MongoRunner.stopMongod(conn);
 }
 
@@ -93,7 +135,8 @@ function defaultOptions() {
 
     const conn = rst.getPrimary();
     const coll = conn.getDB("test")[collName];
-    runStorageStatsTest(conn, coll);
+    runStorageStatsTestFind(conn, coll);
+    runStorageStatsTestDistinct(conn, coll);
 
     rst.stopSet();
 }
@@ -112,7 +155,8 @@ function defaultOptions() {
 
     const conn = st.s;
     const coll = conn.getDB("test")[collName];
-    runStorageStatsTest(conn, coll);
+    runStorageStatsTestFind(conn, coll);
+    runStorageStatsTestDistinct(conn, coll);
 
     st.stop();
 }

@@ -154,16 +154,23 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
                                                         std::move(parsedDistinct));
 }
 
-BSONObj prepareDistinctForPassthrough(const BSONObj& cmd, const query_settings::QuerySettings& qs) {
+BSONObj prepareDistinctForPassthrough(const BSONObj& cmd,
+                                      const query_settings::QuerySettings& qs,
+                                      const bool requestQueryStats) {
     const auto qsBson = qs.toBSON();
-    if (qsBson.isEmpty()) {
-        return CommandHelpers::filterCommandRequestForPassthrough(cmd);
+    if (requestQueryStats || !qsBson.isEmpty()) {
+        BSONObjBuilder bob(cmd);
+        // Append distinct command with the query settings and includeQueryStatsMetrics if needed.
+        if (requestQueryStats) {
+            bob.append("includeQueryStatsMetrics", true);
+        }
+        if (!qsBson.isEmpty()) {
+            bob.append("querySettings", qsBson);
+        }
+        return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
     }
 
-    // Append distinct command with the query settings.
-    BSONObjBuilder bob(cmd);
-    bob.append("querySettings", qsBson);
-    return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
+    return CommandHelpers::filterCommandRequestForPassthrough(cmd);
 }
 
 class DistinctCmd : public BasicCommand {
@@ -300,11 +307,18 @@ public:
             return true;
         }
 
-        BSONObj distinctReadyForPassthrough =
-            prepareDistinctForPassthrough(cmdObj, canonicalQuery->getExpCtx()->getQuerySettings());
+        auto origValue = canonicalQuery->getFindCommandRequest().getIncludeQueryStatsMetrics();
+        bool requestQueryStats = origValue.value_or(false) ||
+            query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
+
+        BSONObj distinctReadyForPassthrough = prepareDistinctForPassthrough(
+            cmdObj, canonicalQuery->getExpCtx()->getQuerySettings(), requestQueryStats);
 
         const auto cri = uassertStatusOK(std::move(swCri));
         const auto& cm = cri.cm;
+
+        // This boolean will always remain true if shard metrics were not requested.
+        bool allShardMetricsReturned = true;
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
@@ -359,6 +373,19 @@ public:
                 temp.appendAs(nxt, "");
                 all.insert(temp.obj());
             }
+
+            if (requestQueryStats) {
+                BSONElement shardMetrics = res["metrics"];
+
+                // If we requested query stats and any of the shard responses did not include
+                // metrics, the flag should be set to false so query stats are not collected later.
+                allShardMetricsReturned &= shardMetrics.isABSONObj();
+                if (allShardMetricsReturned) {
+                    auto metrics =
+                        CursorMetrics::parse(IDLParserContext("CursorMetrics"), shardMetrics.Obj());
+                    CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(metrics);
+                }
+            }
         }
 
         BSONObjBuilder b(32);
@@ -377,7 +404,13 @@ public:
         }
 
         CurOp::get(opCtx)->setEndOfOpMetrics(n);
-        collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+
+        // Collect query stats if all shards returned metrics when requested or if metrics were
+        // never requested from shards.
+        if (allShardMetricsReturned) {
+            collectQueryStatsMongos(opCtx,
+                                    std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+        }
 
         return true;
     }

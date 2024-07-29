@@ -263,6 +263,9 @@ std::unique_ptr<CanonicalQuery> parseCanonicalQuery(
     if (auto& queryOptions = distinctRequest.getUnwrappedReadPref()) {
         findRequest->setUnwrappedReadPref(queryOptions->getOwned());
     }
+    if (auto& includeQueryStatsMetrics = distinctRequest.getIncludeQueryStatsMetrics()) {
+        findRequest->setIncludeQueryStatsMetrics(includeQueryStatsMetrics);
+    }
 
     auto parsedFind = uassertStatusOK(
         ParsedFindCommand::withExistingFilter(expCtx,
