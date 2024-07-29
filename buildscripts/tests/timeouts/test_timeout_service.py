@@ -126,7 +126,7 @@ class TestGetTimeoutEstimate(unittest.TestCase):
 
         self.assertTrue(timeout.is_specified())
         self.assertEqual(None, timeout.calculate_test_timeout(1))
-        self.assertEqual(54180, timeout.calculate_task_timeout(1))
+        self.assertEqual(54360, timeout.calculate_task_timeout(1))
 
     @patch(ns("HistoricTaskData.from_s3"))
     def test_enough_history_but_some_tests_with_zero_runtime_should_cause_custom_task_and_default_test_timeout(
@@ -155,7 +155,7 @@ class TestGetTimeoutEstimate(unittest.TestCase):
 
         self.assertTrue(timeout.is_specified())
         self.assertEqual(None, timeout.calculate_test_timeout(1))
-        self.assertEqual(54180, timeout.calculate_task_timeout(1))
+        self.assertEqual(54360, timeout.calculate_task_timeout(1))
 
     @patch(ns("HistoricTaskData.from_s3"))
     def test_all_tests_with_runtime_history_should_use_custom_timeout(self,
@@ -180,7 +180,7 @@ class TestGetTimeoutEstimate(unittest.TestCase):
 
         self.assertTrue(timeout.is_specified())
         self.assertEqual(1860, timeout.calculate_test_timeout(1))
-        self.assertEqual(54180, timeout.calculate_task_timeout(1))
+        self.assertEqual(54360, timeout.calculate_task_timeout(1))
 
 
 class TestGetTaskHookOverhead(unittest.TestCase):
