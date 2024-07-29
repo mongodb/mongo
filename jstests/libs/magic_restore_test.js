@@ -34,6 +34,7 @@ export class MagicRestoreUtils {
         this.backupId = undefined;
         this.checkpointTimestamp = undefined;
         this.pointInTimeTimestamp = undefined;
+        this.collectionsToRestore = [];
     }
 
     /**
@@ -77,6 +78,13 @@ export class MagicRestoreUtils {
     }
 
     /**
+     * Helper function that returns the collections to restore during magic restore.
+     */
+    getCollectionsToRestore() {
+        return this.collectionsToRestore;
+    }
+
+    /**
      * Takes a checkpoint and opens the backup cursor on the source. backupCursorOpts is an optional
      * parameter which will be passed to the openBackupCursor call if provided. This function
      * returns the backup cursor metadata object.
@@ -100,16 +108,23 @@ export class MagicRestoreUtils {
     /**
      * Copies data files from the source dbpath to the backup dbpath.
      */
-    copyFiles() {
+    copyFiles(namespacesToSkip = []) {
         resetDbpath(this.backupDbPath);
         // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
         mkdir(this.backupDbPath + "/journal");
         while (this.backupCursor.hasNext()) {
             const doc = this.backupCursor.next();
-            jsTestLog("Copying for backup: " + tojson(doc));
-            backupUtils.copyFileHelper({filename: doc.filename, fileSize: doc.fileSize},
-                                       this.backupSource.dbpath,
-                                       this.backupDbPath);
+            if (namespacesToSkip.includes(doc.ns) && !doc.required) {
+                jsTestLog("Skipping backup for: " + tojson(doc));
+            } else {
+                jsTestLog("Copying for backup: " + tojson(doc));
+                backupUtils.copyFileHelper({filename: doc.filename, fileSize: doc.fileSize},
+                                           this.backupSource.dbpath,
+                                           this.backupDbPath);
+                if (doc.ns && doc.uuid) {
+                    this.collectionsToRestore.push({ns: doc.ns, uuid: UUID(doc.uuid)});
+                }
+            }
         }
     }
 
@@ -117,8 +132,8 @@ export class MagicRestoreUtils {
      * Copies data files from the source dbpath to the backup dbpath, and then closes the backup
      * cursor. Copies the data files from the backup path to each node's restore db path.
      */
-    copyFilesAndCloseBackup() {
-        this.copyFiles();
+    copyFilesAndCloseBackup(namespacesToSkip = []) {
+        this.copyFiles(namespacesToSkip);
         this.backupCursor.close();
         this.restoreDbPaths.forEach((restoreDbPath) => {
             resetDbpath(restoreDbPath);
@@ -279,10 +294,12 @@ export class MagicRestoreUtils {
      * Returns an object with the timestamp of the last oplog entry, as well as the oplog
      * entry array
      */
-    getEntriesAfterBackup(sourceNode) {
+    getEntriesAfterBackup(sourceNode, namespacesToSkip = []) {
         let oplog = sourceNode.getDB("local").getCollection('oplog.rs');
-        const entriesAfterBackup =
-            oplog.find({ts: {$gt: this.checkpointTimestamp}}).sort({ts: 1}).toArray();
+        const entriesAfterBackup = oplog.find({ts: {$gt: this.checkpointTimestamp}})
+                                       .sort({ts: 1})
+                                       .toArray()
+                                       .filter((entry) => !namespacesToSkip.includes(entry.ns));
         return {
             lastOplogEntryTs: entriesAfterBackup[entriesAfterBackup.length - 1].ts,
             entriesAfterBackup
