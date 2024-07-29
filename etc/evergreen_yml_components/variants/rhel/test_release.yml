@@ -153,15 +153,15 @@ buildvariants:
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
-    packager_distro: rhel82
+    packager_distro: rhel88
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: rhel82-arm64-large
+    large_distro_name: rhel8.8-arm64-large
     compile_variant: rhel-8-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - rhel82-arm64-large
+    - rhel8.8-arm64-large
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
