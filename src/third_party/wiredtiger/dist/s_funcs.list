@@ -23,6 +23,9 @@ __wt_debug_set_verbose
 __wt_debug_tree
 __wt_debug_tree_all
 __wt_debug_tree_shape
+# FIXME-13125 should be used by waitable_atomic
+__wt_futex_wake
+__wt_futex_wait
 __wt_lex_compare
 __wt_lex_compare_skip
 __wt_log_scan

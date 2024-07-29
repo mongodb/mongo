@@ -88,7 +88,7 @@ def prototypes_extern():
     tests = []
     for name in source_files():
         if not fnmatch.fnmatch(name, '*.c') + fnmatch.fnmatch(name, '*_inline.h'):
-                continue;
+            continue;
         if fnmatch.fnmatch(name, '*/checksum/arm64/*'):
             continue
         if fnmatch.fnmatch(name, '*/checksum/loongarch64/*'):
@@ -99,9 +99,8 @@ def prototypes_extern():
             continue
         if fnmatch.fnmatch(name, '*/checksum/zseries/*'):
             continue
-        if fnmatch.fnmatch(name, '*/os_posix/*'):
-            continue
-        if fnmatch.fnmatch(name, '*/os_win/*'):
+        if re.match(r'^.*/os_(?:posix|win|linux|darwin)/.*', name):
+            # Handled separately in prototypes_os().
             continue
         if fnmatch.fnmatch(name, '*/ext/*'):
             continue
@@ -109,32 +108,22 @@ def prototypes_extern():
 
     output(fns, tests, "../src/include/extern.h")
 
-# Update POSIX-specific function prototypes.
-def prototypes_posix():
-    fns = []
-    tests = []
+def prototypes_os():
+    """
+    The operating system abstraction layer duplicates function names. So each 
+    os gets its own extern header file.
+    """
+    ports = 'posix win linux darwin'.split()
+    fns = {k:[] for k in ports}
+    tests = {k:[] for k in ports}
     for name in source_files():
-        if not fnmatch.fnmatch(name, '*.c') + fnmatch.fnmatch(name, '*_inline.h'):
-                continue;
-        if not fnmatch.fnmatch(name, '*/os_posix/*'):
-            continue
-        fn_prototypes(fns, tests, name)
+        if m := re.match(r'^.*/os_(posix|win|linux|darwin)/.*', name):
+            port = m.group(1)
+            assert port in ports
+            fn_prototypes(fns[port], tests[port], name)
 
-    output(fns, tests, "../src/include/extern_posix.h")
-
-# Update Windows-specific function prototypes.
-def prototypes_win():
-    fns = []
-    tests = []
-    for name in source_files():
-        if not fnmatch.fnmatch(name, '*.c') + fnmatch.fnmatch(name, '*_inline.h'):
-                continue;
-        if not fnmatch.fnmatch(name, '*/os_win/*'):
-            continue
-        fn_prototypes(fns, tests, name)
-
-    output(fns, tests, "../src/include/extern_win.h")
+    for p in ports:
+        output(fns[p], tests[p], f"../src/include/extern_{p}.h")
 
 prototypes_extern()
-prototypes_posix()
-prototypes_win()
+prototypes_os()

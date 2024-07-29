@@ -234,12 +234,16 @@ public:
         std::vector<collection_cursor> ccv;
         uint64_t collection_count = tw->db.get_collection_count();
         testutil_assert(collection_count != 0);
-        uint64_t collections_per_thread = collection_count / tw->thread_count;
-        /* Must have unique collections for each thread. */
-        testutil_assert(collection_count % tw->thread_count == 0);
-        for (int i = tw->id * collections_per_thread;
-             i < (tw->id * collections_per_thread) + collections_per_thread && tw->running(); ++i) {
-            collection &coll = tw->db.get_collection(i);
+        uint64_t tw_collection_count = tw->get_assigned_collection_count();
+        uint64_t tw_first_collection_id = tw->get_assigned_first_collection_id();
+        /*
+         * Extra threads will keep idle if there are more threads than collections, so
+         * collection_count must be greater than or equal to thread_count.
+         */
+        testutil_assert(tw->db.get_collection_count() >= tw->thread_count);
+
+        for (uint64_t i = 0; i < tw_collection_count && tw->running(); ++i) {
+            collection &coll = tw->db.get_collection(tw_first_collection_id + i);
             scoped_cursor cursor = tw->session.open_scoped_cursor(coll.name);
             ccv.push_back({coll, std::move(cursor)});
         }
@@ -286,9 +290,9 @@ public:
             /* Reset our cursor to avoid pinning content. */
             testutil_check(cc.cursor->reset(cc.cursor.get()));
             counter++;
-            if (counter == collections_per_thread)
+            if (counter == tw_collection_count)
                 counter = 0;
-            testutil_assert(counter < collections_per_thread);
+            testutil_assert(counter < tw_collection_count);
         }
         /* Make sure the last transaction is rolled back now the work is finished. */
         tw->txn.try_rollback();

@@ -236,9 +236,11 @@ def function_scoping():
         else:
             module = parts[1]
 
-        # Make "os_posix" and "os_win" one module because they declare the same "__wt" functions.
-        if module == 'os_posix' or module == 'os_win':
-            return 'os_posix/os_win'
+        # Porting layer contains duplicate function names across platforms. So treat as a single
+        # module to avoid false duplicates below.
+        os_ports = ['os_posix', 'os_win', 'os_darwin', 'os_linux']
+        if module in os_ports:
+            return '/'.join(os_ports)
         return module
 
     # Find all "__wt" and "__wti" function definitions.
@@ -260,7 +262,7 @@ def function_scoping():
                 continue
             if fn_name in fn_defs and fn_defs[fn_name].module != module:
                 print(f'{source_file}: {fn_name} is already defined in ' +
-                      f'module "{fn_defs[fn_name].module})"')
+                      f'module "{fn_defs[fn_name].module}"')
                 sys.exit(1)
             fn_defs[fn_name] = FunctionDefinition(fn_name, module, source_file)
 

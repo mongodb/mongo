@@ -193,7 +193,7 @@ def main():
     logging.debug("task_list: {}".format(task_list))
 
     # Perform code coverage task operations in parallel across the build directories
-    run_task_lists_in_parallel(build_dirs_list, task_list, run_func=run_coverage_task, analysis=False)
+    run_task_lists_in_parallel(build_dirs_list, task_list, run_func=run_coverage_task, optimize_test_order=False)
 
     # Run gcovr if required
     if gcovr_dir:

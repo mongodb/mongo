@@ -223,3 +223,14 @@ __wt_timer_evaluate_ms(WT_SESSION_IMPL *session, WT_TIMER *start_time, uint64_t 
     __wt_epoch(session, &cur_time);
     *time_diff_ms = WT_TIMEDIFF_MS(cur_time, *start_time);
 }
+
+/*
+ * __wt_usec_to_timespec --
+ *     Initialize to represent specified number of microseconds.
+ */
+static WT_INLINE void
+__wt_usec_to_timespec(time_t usec, struct timespec *tsp)
+{
+    tsp->tv_sec = usec / WT_MILLION;
+    tsp->tv_nsec = (usec % WT_MILLION) * WT_THOUSAND;
+}

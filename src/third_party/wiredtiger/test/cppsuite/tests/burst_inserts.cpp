@@ -69,14 +69,16 @@ public:
 
         /* Collection cursor vector. */
         std::vector<collection_cursor> ccv;
-        uint64_t collection_count = tc->db.get_collection_count();
-        uint64_t collections_per_thread = collection_count / tc->thread_count;
-        /* Must have unique collections for each thread. */
-        testutil_assert(collection_count % tc->thread_count == 0);
-        int thread_offset = tc->id * collections_per_thread;
-        for (int i = thread_offset; i < thread_offset + collections_per_thread && tc->running();
-             ++i) {
-            collection &coll = tc->db.get_collection(i);
+        uint64_t tc_collection_count = tc->get_assigned_collection_count();
+        uint64_t tc_first_collection_id = tc->get_assigned_first_collection_id();
+        /*
+         * Extra threads will keep idle if there are more threads than collections, so
+         * collection_count must be greater than or equal to thread_count.
+         */
+        testutil_assert(tc->db.get_collection_count() >= tc->thread_count);
+
+        for (uint64_t i = 0; i < tc_collection_count && tc->running(); ++i) {
+            collection &coll = tc->db.get_collection(tc_first_collection_id + i);
             /*
              * Create a reading cursor that will read random documents for every next call. This
              * will help generate cache pressure.
@@ -140,9 +142,9 @@ public:
             testutil_check(cc.write_cursor->reset(cc.write_cursor.get()));
             testutil_check(cc.read_cursor->reset(cc.read_cursor.get()));
             counter++;
-            if (counter == collections_per_thread)
+            if (counter == tc_collection_count)
                 counter = 0;
-            testutil_assert(counter < collections_per_thread);
+            testutil_assert(counter < tc_collection_count);
             tc->sleep();
         }
         /* Make sure the last transaction is rolled back now the work is finished. */

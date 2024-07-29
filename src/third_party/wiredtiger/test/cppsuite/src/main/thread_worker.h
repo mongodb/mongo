@@ -102,6 +102,12 @@ public:
     bool running() const;
     void sync();
 
+    /* Get the first collection id assigned to the thread worker */
+    uint64_t get_assigned_first_collection_id() const;
+
+    /* Get the number of collections assigned to the thread worker */
+    uint64_t get_assigned_collection_count() const;
+
 public:
     const int64_t collection_count;
     const int64_t free_space_target_mb;

@@ -607,9 +607,11 @@ function(parse_filelist_source filelist output_var)
     elseif(WT_LOONGARCH64)
         set(arch_host "LOONGARCH64_HOST")
     endif()
-    # Determine platform host for our filelist parse.
-    if(WT_POSIX)
-        set(plat_host "POSIX_HOST")
+
+    if(WT_LINUX)
+        set(plat_host "LINUX_HOST;POSIX_HOST")
+    elseif(WT_DARWIN)
+        set(plat_host "DARWIN_HOST;POSIX_HOST")
     elseif(WT_WIN)
         set(plat_host "WINDOWS_HOST")
     endif()
@@ -629,7 +631,11 @@ function(parse_filelist_source filelist output_var)
         elseif(file_contents_len EQUAL 2)
             list(GET file_contents 0 file_name)
             list(GET file_contents 1 file_group)
-            if ((${file_group} STREQUAL "${plat_host}") OR (${file_group} STREQUAL "${arch_host}"))
+
+            # CMake does not support testing for membership in a list.
+            set(plat_index "-1")
+            list(FIND plat_host "${file_group}" plat_index)
+            if (("${plat_index}" GREATER_EQUAL "0") OR (${file_group} STREQUAL "${arch_host}"))
                 list(APPEND output_files ${file_name})
                 get_filename_component(file_ext ${file_name} EXT)
                 # POWERPC and ZSERIES hosts use the '.sx' extension for their ASM files. We need to

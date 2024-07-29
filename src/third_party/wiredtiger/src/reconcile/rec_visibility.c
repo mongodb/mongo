@@ -480,22 +480,39 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *s
      * reconciliations ondisk value that we will be comparing against.
      */
     if (vpack != NULL && !vpack->tw.prepare) {
-        WT_ASSERT_ALWAYS(session,
-          prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
-            prev_upd->start_ts == prev_upd->durable_ts ||
-            prev_upd->durable_ts >= vpack->tw.durable_start_ts,
-          "Durable timestamps cannot be out of order for prepared updates");
-        WT_ASSERT_ALWAYS(session,
-          prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
-            prev_upd->start_ts == prev_upd->durable_ts || !WT_TIME_WINDOW_HAS_STOP(&vpack->tw) ||
-            prev_upd->durable_ts >= vpack->tw.durable_stop_ts,
-          "Durable timestamps cannot be out of order for prepared updates");
-        if (prev_upd->start_ts < vpack->tw.start_ts ||
-          (WT_TIME_WINDOW_HAS_STOP(&vpack->tw) && prev_upd->start_ts < vpack->tw.stop_ts)) {
-            WT_ASSERT(session, prev_upd->start_ts == WT_TS_NONE);
-            WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_no_ts_checkpoint_race_1);
-            return (EBUSY);
-        }
+        if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw))
+            WT_ASSERT_ALWAYS(session,
+              prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
+                prev_upd->start_ts == prev_upd->durable_ts ||
+                prev_upd->durable_ts >= vpack->tw.durable_stop_ts,
+              "Stop: Durable timestamps cannot be out of order for prepared updates");
+        else
+            WT_ASSERT_ALWAYS(session,
+              prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
+                prev_upd->start_ts == prev_upd->durable_ts ||
+                prev_upd->durable_ts >= vpack->tw.durable_start_ts,
+              "Start: Durable timestamps cannot be out of order for prepared updates");
+
+        if (prev_upd->start_ts == WT_TS_NONE) {
+            if (vpack->tw.start_ts != WT_TS_NONE ||
+              (WT_TIME_WINDOW_HAS_STOP(&vpack->tw) && vpack->tw.stop_ts != WT_TS_NONE)) {
+                WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_no_ts_checkpoint_race_1);
+                return (EBUSY);
+            }
+        } else
+            /*
+             * Rollback to stable may recover updates from the history store that is out of order to
+             * the on-disk value. Normally these updates have the WT_UPDATE_RESTORED_FROM_HS flag on
+             * them. However, in rare cases, if the newer update becomes globally visible, the
+             * restored update may be removed by the obsolete check. This may lead to an out of
+             * order edge case but it is benign. Check the global visibility of the update and
+             * ignore this case.
+             */
+            WT_ASSERT(session,
+              __wt_txn_upd_visible_all(session, prev_upd) ||
+                (prev_upd->start_ts >= vpack->tw.start_ts &&
+                  (!WT_TIME_WINDOW_HAS_STOP(&vpack->tw) ||
+                    prev_upd->start_ts >= vpack->tw.stop_ts)));
     }
 
     return (0);

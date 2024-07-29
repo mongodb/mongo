@@ -186,6 +186,8 @@ func_ok()
         -e '/int __wt_struct_unpack_prev_lsn$/d' \
         -e '/int __wt_struct_unpack_backup_id$/d' \
         -e '/int __wt_struct_unpack_txn_timestamp$/d' \
+        -e '/int __wt_futex_wait/d' \
+        -e '/int __wt_futex_wake/d' \
         ;
 }
 
