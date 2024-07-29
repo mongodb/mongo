@@ -54,7 +54,7 @@ db-contrib-tool setup-repro-env \
   --platform $platform \
   --architecture $architecture \
   --debug \
-  4.2 5.0.28
+  4.2
 
 # The platform and architecture for how some of the binaries are reported in
 # https://downloads.mongodb.org/full.json changed between MongoDB 4.2 and MongoDB 4.4.
@@ -93,7 +93,7 @@ db-contrib-tool setup-repro-env \
   --fallbackToMaster \
   --resmokeCmd "python buildscripts/resmoke.py" \
   --debug \
-  $last_continuous_arg 4.4
+  $last_continuous_arg 4.4 5.0.28
 
 # Certain build variants define additional multiversion_*_last_lts expansions in order to
 # be able to fetch a complete set of versions.
