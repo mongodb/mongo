@@ -1,6 +1,44 @@
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library")
+load("//bazel/config:render_template.bzl", "render_template")
+load("@poetry//:dependencies.bzl", "dependency")
 
 package(default_visibility = ["//visibility:public"])
+
+render_template(
+    name = "error_codes_source",
+    generator_script = "generate_error_codes.py",
+    output = "error_codes.cpp",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+    template = "error_codes.tpl.cpp",
+    yml = "error_codes.yml",
+)
+
+render_template(
+    name = "error_codes_header",
+    generator_script = "generate_error_codes.py",
+    output = "error_codes.h",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+    template = "error_codes.tpl.h",
+    yml = "error_codes.yml",
+)
 
 mongo_cc_library(
     name = "environment_buffer",

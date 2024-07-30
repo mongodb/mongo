@@ -32,6 +32,7 @@ from Cheetah.Template import Template
 import argparse
 import sys
 import yaml
+import os
 
 help_epilog = """
 The error_codes_spec YAML document is a mapping containing two toplevel fields:
@@ -120,6 +121,8 @@ def main():
     error_codes_spec = parsed.error_codes_spec
     template_file = parsed.template_file
     output_file = parsed.output_file
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
     # Parse and validate error_codes.yml
     error_codes, error_classes = parse_error_definitions_from_file(error_codes_spec)

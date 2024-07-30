@@ -889,7 +889,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         ["aquery"]
         + env["BAZEL_FLAGS_STR"]
         + [
-            'mnemonic("StripDebuginfo|ExtractDebuginfo|Symlink|IdlcGenerator", (outputs("bazel-out/.*/bin/src/.*", deps(@//src/...))))'
+            'mnemonic("StripDebuginfo|ExtractDebuginfo|Symlink|IdlcGenerator|TemplateRenderer", (outputs("bazel-out/.*/bin/src/.*", deps(@//src/...))))'
         ]
     )
 
