@@ -643,7 +643,6 @@ static BSONField<double> minField("min", -180.0);
 // the last place).  For double-precision numbers, this works out to 2**-53
 // (about 1.11e-16) times the magnitude of the result.
 double const GeoHashConverter::kMachinePrecision = 0.5 * std::numeric_limits<double>::epsilon();
-double const GeoHashConverter::kNumBuckets = 4.0 * 1024 * 1024 * 1024;
 
 StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromDoc(
     const BSONObj& paramDoc) {
@@ -679,7 +678,8 @@ StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromDoc(
                                     << "was specified");
     }
 
-    params.scaling = kNumBuckets / (params.max - params.min);
+    constexpr double numBuckets = 4.0 * 1024 * 1024 * 1024;
+    params.scaling = numBuckets / (params.max - params.min);
     const bool scalingValid = params.scaling > 0;
     if (!scalingValid || std::isinf(params.scaling)) {
         return Status(ErrorCodes::InvalidOptions,
@@ -883,6 +883,13 @@ double GeoHashConverter::convertFromHashScale(unsigned in) const {
 // Convert from a double that is [min, max] to a double in [0, (max-min)*scaling]
 double GeoHashConverter::convertToDoubleHashScale(double in) const {
     MONGO_verify(in <= _params.max && in >= _params.min);
+
+    if (in == _params.max) {
+        // prevent aliasing with _min by moving inside the "box"
+        // makes 180 == 179.999 (roughly)
+        in -= _error / 2;
+    }
+
     in -= _params.min;
     MONGO_verify(in >= 0);
     return in * _params.scaling;
@@ -890,15 +897,7 @@ double GeoHashConverter::convertToDoubleHashScale(double in) const {
 
 // Convert from a double that is [min, max] to an unsigned in [0, (max-min)*scaling]
 unsigned GeoHashConverter::convertToHashScale(double in) const {
-    double ret = convertToDoubleHashScale(in);
-
-    // Clip the return value to the highest index bucket hash (kNumBuckets - 1). The max value will
-    // scale to kNumBuckets, but because 2d indexes do not wrap, we must make sure max and min are
-    // not treated as equal, in case max overflows to 0 on downcasting from double to unsigned int.
-    // It's possible a value very close to max would have a similar issue, so we just clip the value
-    // to the highest index bucket hash.
-    ret = std::min(ret, kNumBuckets - 1);
-    return static_cast<unsigned>(ret);
+    return static_cast<unsigned>(convertToDoubleHashScale(in));
 }
 
 
