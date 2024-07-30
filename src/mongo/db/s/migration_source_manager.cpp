@@ -40,6 +40,7 @@
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -275,6 +276,47 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         return std::make_tuple(
             std::move(metadata), std::move(indexInfo), std::move(collectionUUID));
     }();
+
+    // Drain the execution/cancellation of any existing range deletion task overlapping with the
+    // targeted range (a task issued by a previous migration may still be present when the migration
+    // gets interrupted post-commit).
+    const ChunkRange range(*_args.getMin(), *_args.getMax());
+    const auto rangeDeletionWaitDeadline = opCtx->getServiceContext()->getFastClockSource()->now() +
+        Milliseconds(drainOverlappingRangeDeletionsOnStartTimeoutMS.load());
+    // CollectionShardingRuntime::waitForClean() allows to sync on tasks already registered on the
+    // RangeDeleterService, but may miss pending ones in case this code runs after a failover. The
+    // enclosing while loop allows to address such a gap.
+    while (migrationutil::checkForConflictingDeletions(opCtx, range, collectionUUID)) {
+        uassert(ErrorCodes::ResumableRangeDeleterDisabled,
+                "Failing migration because the disableResumableRangeDeleter server "
+                "parameter is set to true on the donor shard, which contains range "
+                "deletion tasks overlapping with the incoming range.",
+                !disableResumableRangeDeleter.load());
+
+        LOGV2(9197000,
+              "Migration start deferred because the requested range overlaps with one or more "
+              "ranges already scheduled for deletion",
+              logAttrs(nss()),
+              "range"_attr = redact(range.toString()));
+
+        auto status = CollectionShardingRuntime::waitForClean(
+            opCtx, nss(), collectionUUID, range, rangeDeletionWaitDeadline);
+
+        if (status.isOK() &&
+            opCtx->getServiceContext()->getFastClockSource()->now() >= rangeDeletionWaitDeadline) {
+            status = Status(
+                ErrorCodes::ExceededTimeLimit,
+                "Failed to start new migration - a conflicting range deletion is still pending");
+        }
+
+        uassertStatusOK(status);
+
+        // If the filtering metadata was cleared while the range deletion task was ongoing, then
+        // 'waitForClean' would return immediately even though there really is an ongoing range
+        // deletion task. For that case, we loop again until there is no conflicting task in
+        // config.rangeDeletions
+        opCtx->sleepFor(Milliseconds(1000));
+    }
 
     checkShardKeyPattern(_opCtx,
                          nss(),

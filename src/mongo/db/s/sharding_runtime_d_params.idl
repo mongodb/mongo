@@ -93,11 +93,12 @@ server_parameters:
 
     receiveChunkWaitForRangeDeleterTimeoutMS:
         description: >-
-          Amount of time in milliseconds an incoming migration will wait for an intersecting range
-          with data in it to be cleared up before failing.
+          Maximum amount of time for which the start of a new chunk migration request may be deferred,
+          while pending range deletions that overlap with the request get completed/canceled.
+          If overlapping range deletions are still present upon timeout expiration, the request is aborted.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
-        cpp_varname: receiveChunkWaitForRangeDeleterTimeoutMS
+        cpp_varname: drainOverlappingRangeDeletionsOnStartTimeoutMS
         validator:
           gte: 0
         default: 10000
