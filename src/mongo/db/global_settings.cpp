@@ -114,7 +114,8 @@ Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e,
     const auto updater = getClusterNetworkRestrictionManager(service).get();
     if (updater) {
         stdx::lock_guard<Mutex> guard(mtxSetAllowListedCluster);
-        mongodGlobalParams.allowlistedClusterNetwork = allowlistedClusterNetwork;
+        std::atomic_store(&mongodGlobalParams.allowlistedClusterNetwork,
+                          std::move(allowlistedClusterNetwork));
         updater->updateClusterNetworkRestrictions();
     }
 
