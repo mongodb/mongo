@@ -1,5 +1,11 @@
 version: 1.0.0
 filters:
+  # Code in the generic "query" is owned by the entire query team by default. However, this should
+  # largely be broken down into components where the source code for these components resides in
+  # subdirectories owned by a particular subteam such as QO, QE, or QI.
+  - "*":
+    approvers:
+      - 10gen/query
   - "collection_index_usage_tracker*":
     approvers:
       - 10gen/query-execution
@@ -36,12 +42,3 @@ filters:
   - "sbe*":
     approvers:
       - 10gen/query-execution
-  - "query_stats":
-    approvers:
-      - 10gen/query-integration
-  - "query_shape":
-    approvers:
-      - 10gen/query-integration
-  - "timeseries":
-    approvers:
-      - 10gen/query-integration

@@ -1,0 +1,7 @@
+version: 1.0.0
+filters:
+  # This directory contains utilities for processing BSON that are primarily used for query
+  # processing, and hence are owned by the query team.
+  - "*":
+    approvers:
+      - 10gen/query

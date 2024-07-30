@@ -1,11 +1,5 @@
 version: 1.0.0
 filters:
-  - "fts":
-    approvers:
-      - 10gen/query-integration
-  - "geo":
-    approvers:
-      - 10gen/query-integration
   - "*global_index*":
     approvers:
       - 10gen/server-cluster-scalability
@@ -88,3 +82,15 @@ filters:
   - "startup_recovery*":
     approvers:
       - 10gen/server-storage-execution
+  - "explain.idl":
+    approvers:
+      - 10gen/query-optimization
+  - "explain_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "field_ref*":
+    approvers:
+      - 10gen/query
+  - "fle_*":
+    approvers:
+      - 10gen/query-integration

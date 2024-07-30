@@ -3,3 +3,15 @@ filters:
   - "*":
     approvers:
       - 10gen/query-execution
+  - "cluster_aggregate*":
+    approvers:
+      - 10gen/query-optimization
+  - "cluster_aggregation_planner*":
+    approvers:
+      - 10gen/query-optimization
+  - "cluster_find*":
+    approvers:
+      - 10gen/query-optimization
+  - "cqf_utils*":
+    approvers:
+      - 10gen/query-optimization

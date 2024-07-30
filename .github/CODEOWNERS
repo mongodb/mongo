@@ -42,6 +42,9 @@ WORKSPACE.bazel @10gen/devprod-build
 /buildscripts/**/* @10gen/devprod-build @10gen/devprod-correctness
 /buildscripts/**/burn_in_tests.py @10gen/devprod-correctness
 
+# The following patterns are parsed from ./buildscripts/cost_model/OWNERS.yml
+/buildscripts/cost_model/**/* @10gen/query-optimization
+
 # The following patterns are parsed from ./buildscripts/idl/OWNERS.yml
 /buildscripts/idl/**/* @10gen/server-service-architecture
 /buildscripts/idl/**/*.bazel @10gen/devprod-build
@@ -74,6 +77,9 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./etc/OWNERS.yml
 /etc/**/yamllint_config.yml @10gen/devprod-services-integrations
 /etc/**/third_party_components.yml @10gen/server-security
+
+# The following patterns are parsed from ./etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/OWNERS.yml
+/etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/**/* @10gen/query
 
 # The following patterns are parsed from ./etc/evergreen_yml_components/variants/mongot/OWNERS.yml
 /etc/evergreen_yml_components/variants/mongot/**/* @TedTuckman @madelinezec
@@ -218,8 +224,6 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/crypto/**/* @10gen/server-security
 
 # The following patterns are parsed from ./src/mongo/db/OWNERS.yml
-/src/mongo/db/**/fts @10gen/query-integration
-/src/mongo/db/**/geo @10gen/query-integration
 /src/mongo/db/**/*global_index* @10gen/server-cluster-scalability
 /src/mongo/db/**/*index_build* @10gen/server-storage-execution
 /src/mongo/db/**/keys_collection* @10gen/server-cluster-scalability
@@ -247,9 +251,16 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/**/profile_filter* @10gen/query-execution
 /src/mongo/db/**/update_index_data* @10gen/query-execution
 /src/mongo/db/**/startup_recovery* @10gen/server-storage-execution
+/src/mongo/db/**/explain.idl @10gen/query-optimization
+/src/mongo/db/**/explain_test.cpp @10gen/query-optimization
+/src/mongo/db/**/field_ref* @10gen/query
+/src/mongo/db/**/fle_* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/auth/OWNERS.yml
 /src/mongo/db/auth/**/* @10gen/server-security
+
+# The following patterns are parsed from ./src/mongo/db/bson/OWNERS.yml
+/src/mongo/db/bson/**/* @10gen/query
 
 # The following patterns are parsed from ./src/mongo/db/catalog/OWNERS.yml
 /src/mongo/db/catalog/**/capped* @10gen/server-storage-execution
@@ -282,11 +293,21 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/concurrency/OWNERS.yml
 /src/mongo/db/concurrency/**/exception_util* @10gen/server-service-architecture
 
+# The following patterns are parsed from ./src/mongo/db/cst/OWNERS.yml
+/src/mongo/db/cst/**/* @10gen/query-optimization
+
 # The following patterns are parsed from ./src/mongo/db/exec/OWNERS.yml
 /src/mongo/db/exec/**/* @10gen/query-execution
 /src/mongo/db/exec/**/*timeseries* @10gen/query-integration
 /src/mongo/db/exec/**/text_* @10gen/query-integration
 /src/mongo/db/exec/**/geo_* @10gen/query-integration
+/src/mongo/db/exec/**/cached_plan* @10gen/query-optimization
+/src/mongo/db/exec/**/multi_plan* @10gen/query-optimization
+/src/mongo/db/exec/**/subplan* @10gen/query-optimization
+/src/mongo/db/exec/**/plan_cache_util* @10gen/query-optimization
+/src/mongo/db/exec/**/trial_period_utils* @10gen/query-optimization
+/src/mongo/db/exec/**/trial_run_tracker.h @10gen/query-optimization
+/src/mongo/db/exec/**/trial_stage* @10gen/query-optimization
 
 # The following patterns are parsed from ./src/mongo/db/exec/sbe/OWNERS.yml
 /src/mongo/db/exec/sbe/**/*columnar* @10gen/query-integration
@@ -294,6 +315,12 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/ftdc/OWNERS.yml
 /src/mongo/db/ftdc/**/* @10gen/server-service-architecture @markbenvenuto
+
+# The following patterns are parsed from ./src/mongo/db/fts/OWNERS.yml
+/src/mongo/db/fts/**/* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/db/geo/OWNERS.yml
+/src/mongo/db/geo/**/* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/index/OWNERS.yml
 /src/mongo/db/index/**/index_access_method* @10gen/server-storage-execution
@@ -380,7 +407,10 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/op_observer/**/batched_write* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./src/mongo/db/ops/OWNERS.yml
+/src/mongo/db/ops/**/* @10gen/query-optimization
 /src/mongo/db/ops/**/write_ops_exec* @10gen/query-execution
+/src/mongo/db/ops/**/delete.* @10gen/query
+/src/mongo/db/ops/**/update.* @10gen/query
 
 # The following patterns are parsed from ./src/mongo/db/pipeline/OWNERS.yml
 /src/mongo/db/pipeline/**/* @10gen/query
@@ -428,6 +458,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/process_health/**/* @10gen/server-service-architecture
 
 # The following patterns are parsed from ./src/mongo/db/query/OWNERS.yml
+/src/mongo/db/query/**/* @10gen/query
 /src/mongo/db/query/**/collection_index_usage_tracker* @10gen/query-execution
 /src/mongo/db/query/**/collection_query_info* @10gen/query-execution
 /src/mongo/db/query/**/cursor_idl_validator* @10gen/query-execution
@@ -440,15 +471,51 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/query/**/*plan_executor* @10gen/query-execution
 /src/mongo/db/query/**/plan_insert_listener* @10gen/query-execution
 /src/mongo/db/query/**/sbe* @10gen/query-execution
-/src/mongo/db/query/**/query_stats @10gen/query-integration
-/src/mongo/db/query/**/query_shape @10gen/query-integration
-/src/mongo/db/query/**/timeseries @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/db/query/boolean_simplification/OWNERS.yml
+/src/mongo/db/query/boolean_simplification/**/* @10gen/query-optimization
+
+# The following patterns are parsed from ./src/mongo/db/query/ce/OWNERS.yml
+/src/mongo/db/query/ce/**/* @10gen/query-optimization
+
+# The following patterns are parsed from ./src/mongo/db/query/classic_runtime_planner/OWNERS.yml
+/src/mongo/db/query/classic_runtime_planner/**/* @10gen/query-optimization
+
+# The following patterns are parsed from ./src/mongo/db/query/classic_runtime_planner_for_sbe/OWNERS.yml
+/src/mongo/db/query/classic_runtime_planner_for_sbe/**/* @10gen/query-optimization
 
 # The following patterns are parsed from ./src/mongo/db/query/collation/OWNERS.yml
 /src/mongo/db/query/collation/**/* @10gen/query-execution
 
+# The following patterns are parsed from ./src/mongo/db/query/cost_model/OWNERS.yml
+/src/mongo/db/query/cost_model/**/* @10gen/query-optimization
+
 # The following patterns are parsed from ./src/mongo/db/query/datetime/OWNERS.yml
 /src/mongo/db/query/datetime/**/* @10gen/query-execution
+
+# The following patterns are parsed from ./src/mongo/db/query/fle/OWNERS.yml
+/src/mongo/db/query/fle/**/* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/db/query/optimizer/OWNERS.yml
+/src/mongo/db/query/optimizer/**/* @10gen/query-optimization
+
+# The following patterns are parsed from ./src/mongo/db/query/plan_enumerator/OWNERS.yml
+/src/mongo/db/query/plan_enumerator/**/* @10gen/query-optimization
+
+# The following patterns are parsed from ./src/mongo/db/query/query_shape/OWNERS.yml
+/src/mongo/db/query/query_shape/**/* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/db/query/query_stats/OWNERS.yml
+/src/mongo/db/query/query_stats/**/* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/db/query/search/OWNERS.yml
+/src/mongo/db/query/search/**/* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/db/query/stats/OWNERS.yml
+/src/mongo/db/query/stats/**/* @10gen/query-optimization
+
+# The following patterns are parsed from ./src/mongo/db/query/timeseries/OWNERS.yml
+/src/mongo/db/query/timeseries/**/* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/s/OWNERS.yml
 /src/mongo/db/s/**/*active_migrations_registry* @10gen/server-cluster-scalability
@@ -510,11 +577,23 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/test_output/pipeline/abt/OWNERS.yml
 /src/mongo/db/test_output/pipeline/abt/**/* @10gen/query-optimization
 
+# The following patterns are parsed from ./src/mongo/db/test_output/query/OWNERS.yml
+/src/mongo/db/test_output/query/**/* @10gen/query
+
+# The following patterns are parsed from ./src/mongo/db/test_output/query/canonical_query_encoder_test/OWNERS.yml
+/src/mongo/db/test_output/query/canonical_query_encoder_test/**/* @10gen/query-optimization
+
+# The following patterns are parsed from ./src/mongo/db/test_output/query/optimizer/OWNERS.yml
+/src/mongo/db/test_output/query/optimizer/**/* @10gen/query-optimization
+
 # The following patterns are parsed from ./src/mongo/db/timeseries/OWNERS.yml
 /src/mongo/db/timeseries/**/* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./src/mongo/db/update/OWNERS.yml
 /src/mongo/db/update/**/* @10gen/query-execution
+
+# The following patterns are parsed from ./src/mongo/db/views/OWNERS.yml
+/src/mongo/db/views/**/* @10gen/query-optimization
 
 # The following patterns are parsed from ./src/mongo/dbtests/OWNERS.yml
 /src/mongo/dbtests/**/mock_dbclient_conn_test.cpp @10gen/server-service-architecture
@@ -527,6 +606,8 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/dbtests/**/query_stage* @10gen/query-execution
 /src/mongo/dbtests/**/querytests.cpp @10gen/query-execution
 /src/mongo/dbtests/**/updatetests.cpp @10gen/query-execution
+/src/mongo/dbtests/**/plan_ranking.cpp @10gen/query-optimization
+/src/mongo/dbtests/**/query_stage_multiplan.cpp @10gen/query-optimization
 
 # The following patterns are parsed from ./src/mongo/dbtests/mock/OWNERS.yml
 /src/mongo/dbtests/mock/**/mock_conn_registry.* @10gen/server-service-architecture
@@ -576,6 +657,10 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/s/query/OWNERS.yml
 /src/mongo/s/query/**/* @10gen/query-execution
+/src/mongo/s/query/**/cluster_aggregate* @10gen/query-optimization
+/src/mongo/s/query/**/cluster_aggregation_planner* @10gen/query-optimization
+/src/mongo/s/query/**/cluster_find* @10gen/query-optimization
+/src/mongo/s/query/**/cqf_utils* @10gen/query-optimization
 
 # The following patterns are parsed from ./src/mongo/s/request_types/OWNERS.yml
 /src/mongo/s/request_types/**/coordinate_multi_update.idl @10gen/server-cluster-scalability

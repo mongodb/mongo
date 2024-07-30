@@ -1,5 +1,19 @@
 version: 1.0.0
 filters:
+  # Most of the code here is about parsing or representing write operations, and therefore is owned
+  # by QO by default.
+  - "*":
+    approvers:
+      - 10gen/query-optimization
   - "write_ops_exec*":
     approvers:
       - 10gen/query-execution
+
+  # These files contain high-level APIs for running write operations which are not currently owned
+  # by a particular query subteam.
+  - "delete.*":
+    approvers:
+      - 10gen/query
+  - "update.*":
+    approvers:
+      - 10gen/query
