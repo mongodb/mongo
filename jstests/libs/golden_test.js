@@ -33,11 +33,3 @@ export function show(cursorOrArray) {
 
     print(normalize(cursorOrArray));
 }
-
-// Run any set-up necessary for a golden jstest.
-// This function should be called from the suite definition, so that individual tests don't need
-// to remember to call it. This function should not be called from any libs/*.js file, because
-// it's surprising if load() has side effects (besides defining JS functions / values).
-export function beginGoldenTest() {
-    _openGoldenData(jsTestName());
-}

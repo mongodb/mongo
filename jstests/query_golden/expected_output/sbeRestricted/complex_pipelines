@@ -1,0 +1,941 @@
+setting random seed: 20240725
+Docs:
+
+{_id: 1, e: 95, a: 32, h: 71, d: 10, x: {a: 4, b: 40, c: 0}, g: 26, c: 60, w: {a: 18, b: 25, c: 26}, f: 85, b: 64, i: 65},
+{_id: 2, e: 13, w: {a: 94, b: 32, c: 58}, d: 94, i: 42, c: 32, h: 50, b: 21, g: 2, a: 85, f: 98, x: {a: 8, b: 71, c: 40}},
+{_id: 3, a: 27, h: 72, d: 93, x: {a: 19, b: 99, c: 77}, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, f: 49, b: 47, i: 67, e: 40},
+{_id: 4, a: 29, h: 83, d: 34, x: {a: 81, b: 68, c: 20}, g: 16, c: 87, w: {a: 86, b: 75, c: 3}, f: 50, b: 76, i: 38, e: 82},
+{_id: 5, d: 7, b: 4, x: {a: 75, b: 5, c: 70}, i: 93, g: 15, e: 87, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, h: 75, f: 69},
+{_id: 6, f: 41, e: 55, d: 54, c: 94, b: 71, a: 85, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, i: 84, h: 71, g: 16},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 86, f: 18, d: 65, b: 40, x: {a: 47, b: 88, c: 40}, i: 44, g: 66, e: 78, c: 11, a: 85},
+{_id: 8, g: 62, c: 24, w: {a: 15, b: 23, c: 89}, f: 4, b: 81, i: 43, e: 63, a: 75, h: 74, d: 92, x: {a: 9, b: 4, c: 79}}
+
+
+Foreign docs:
+
+{_id: 1, b: 57, c: 58, a: 41},
+{_id: 2, b: 12, c: 54, a: 92},
+{_id: 3, c: 99, a: 47, b: 57},
+{_id: 4, b: 16, c: 7, a: 60},
+{_id: 5, a: 16, b: 71, c: 91},
+{_id: 6, c: 78, a: 37, b: 67},
+{_id: 7, a: 0, c: 4, b: 1},
+{_id: 8, a: 14, b: 86, c: 90}
+
+
+Query 1 (with useIndex=false): [ { "$addFields" : { "l" : 71, "h" : 0, "c" : 3 } }, { "$addFields" : { "c" : 5, "b" : 8, "j" : "$e" } }, { "$project" : { "g" : 0, "h" : 0, "y" : 0 } }, { "$match" : { "e" : { "$gt" : 6 } } }, { "$project" : { "c" : 0, "x" : 0 } }, { "$addFields" : { "c" : "$c", "e" : "$g", "k" : 75 } }, { "$addFields" : { "d" : 67, "c" : "$g", "i" : 14, "y" : "$y" } }, { "$project" : { "d" : 0 } }, { "$project" : { "e" : 0 } }, { "$addFields" : { "l" : "$g", "i" : 9, "a" : 93, "w" : "$y" } } ]
+
+{_id: 1, a: 93, f: 85, b: 8, i: 9, j: 95, k: 75},
+{_id: 2, i: 9, b: 8, a: 93, f: 98, j: 13, k: 75},
+{_id: 3, a: 93, f: 49, b: 8, i: 9, j: 40, k: 75},
+{_id: 4, a: 93, f: 50, b: 8, i: 9, j: 82, k: 75},
+{_id: 5, b: 8, i: 9, a: 93, f: 69, j: 87, k: 75},
+{_id: 6, f: 41, b: 8, a: 93, i: 9, j: 55, k: 75},
+{_id: 7, f: 18, b: 8, i: 9, a: 93, j: 78, k: 75},
+{_id: 8, f: 4, b: 8, i: 9, a: 93, j: 63, k: 75}
+
+Query 2 (with useIndex=false): [ { "$addFields" : { "e" : 61, "w" : "$x" } }, { "$addFields" : { "a" : "$o", "b" : 78, "y" : "$y" } }, { "$addFields" : { "f" : "$j", "a" : "$i", "w" : "$w" } }, { "$addFields" : { "b" : 43, "g" : 97, "l" : 94, "y" : "$x" } }, { "$addFields" : { "a" : 10, "f" : 35, "c" : 80 } }, { "$match" : { "q" : { "$lte" : 75 } } }, { "$match" : { "h" : { "$gte" : 4 } } }, { "$project" : { "l" : 0 } }, { "$match" : { "b" : { "$gte" : 2 } } }, { "$addFields" : { "c" : 4 } } ]
+
+
+Query 3 (with useIndex=false): [ { "$project" : { "j" : 0, "d" : 0, "y" : 0 } }, { "$addFields" : { "d" : "$k", "x" : "$x" } }, { "$match" : { "q" : { "$gte" : 9 } } }, { "$addFields" : { "b" : 15, "k" : 48, "l" : 61, "w" : "$w" } }, { "$project" : { "l" : 0 } }, { "$match" : { "q" : { "$lte" : 99 } } }, { "$match" : { "h" : { "$gt" : 10 } } }, { "$project" : { "c" : 0, "h" : 0 } }, { "$addFields" : { "b" : 24 } }, { "$addFields" : { "a" : 88 } }, { "$addFields" : { "f" : "$l", "y" : "$x" } }, { "$project" : { "b" : 0, "c" : 0 } } ]
+
+
+Query 4 (with useIndex=false): [ { "$addFields" : { "i" : "$l", "w" : "$x" } }, { "$project" : { "e" : 0, "d" : 0, "y" : 0 } }, { "$project" : { "i" : 1, "g" : 1, "b" : 1, "e" : "$k", "k" : 1, "h" : 1, "f" : { "$literal" : 16 }, "c" : 1, "j" : 1, "l" : 1, "x" : 1, "w" : 1 } }, { "$match" : { "c" : { "$lte" : 94 } } }, { "$project" : { "a" : 0, "b" : 0, "x" : 0 } }, { "$project" : { "b" : 1, "k" : "$b", "e" : "$a", "l" : 1, "j" : "$j", "f" : 1, "i" : 1, "d" : "$h", "g" : 1, "a" : 1, "c" : 1, "x" : 1, "w" : 1 } }, { "$project" : { "l" : 1, "f" : 1, "i" : 1, "k" : 1, "e" : "$h", "c" : 1, "g" : 1, "d" : 1, "h" : 1, "y" : 1 } }, { "$match" : { "f" : { "$lte" : 80 } } } ]
+
+{_id: 1, g: 26, c: 60, f: 16, d: 71},
+{_id: 2, c: 32, g: 2, f: 16, d: 50},
+{_id: 3, g: 8, c: 77, f: 16, d: 72},
+{_id: 4, g: 16, c: 87, f: 16, d: 83},
+{_id: 5, g: 15, c: 49, f: 16, d: 75},
+{_id: 6, c: 94, g: 16, f: 16, d: 71},
+{_id: 7, g: 66, c: 11, f: 16, d: 86},
+{_id: 8, g: 62, c: 24, f: 16, d: 74}
+
+Query 5 (with useIndex=false): [ { "$project" : { "f" : 0 } }, { "$addFields" : { "h" : "$s", "a" : 30, "y" : "$w" } }, { "$addFields" : { "h" : 21, "l" : 9 } }, { "$project" : { "g" : 0 } }, { "$project" : { "g" : 0, "l" : 0 } }, { "$match" : { "e" : { "$lte" : 83 } } }, { "$project" : { "k" : "$k", "d" : 1, "b" : 1, "l" : 1, "a" : "$f", "f" : 1, "i" : 1, "e" : 1, "g" : 1, "h" : 1, "j" : 1, "y" : 1 } }, { "$project" : { "j" : 0, "c" : 0 } } ]
+
+{_id: 2, e: 13, d: 94, i: 42, b: 21, h: 21, y: {a: 94, b: 32, c: 58}},
+{_id: 3, d: 93, b: 47, i: 67, e: 40, h: 21, y: {a: 11, b: 3, c: 9}},
+{_id: 4, d: 34, b: 76, i: 38, e: 82, h: 21, y: {a: 86, b: 75, c: 3}},
+{_id: 6, e: 55, d: 54, b: 71, i: 84, h: 21, y: {a: 10, b: 66, c: 62}},
+{_id: 7, d: 65, b: 40, i: 44, e: 78, h: 21, y: {a: 48, b: 63, c: 47}},
+{_id: 8, b: 81, i: 43, e: 63, d: 92, h: 21, y: {a: 15, b: 23, c: 89}}
+
+Query 6 (with useIndex=false): [ { "$project" : { "f" : "$k", "d" : 1, "l" : 1, "b" : 1, "a" : "$c", "k" : 1, "g" : 1, "i" : "$b", "j" : 1, "y" : 1 } }, { "$project" : { "c" : 0, "x" : 0 } }, { "$addFields" : { "b" : 60, "d" : 5 } }, { "$project" : { "j" : 0 } }, { "$match" : { "g" : { "$gte" : 7 } } } ]
+
+{_id: 1, d: 5, g: 26, b: 60, a: 60, i: 64},
+{_id: 3, d: 5, g: 8, b: 60, a: 77, i: 47},
+{_id: 4, d: 5, g: 16, b: 60, a: 87, i: 76},
+{_id: 5, d: 5, b: 60, g: 15, a: 49, i: 4},
+{_id: 6, d: 5, b: 60, g: 16, a: 94, i: 71},
+{_id: 7, d: 5, b: 60, g: 66, a: 11, i: 40},
+{_id: 8, g: 62, b: 60, d: 5, a: 24, i: 81}
+
+Query 7 (with useIndex=false): [ { "$addFields" : { "h" : "$r", "c" : "$a", "i" : "$c" } }, { "$addFields" : { "j" : 72, "y" : "$y" } }, { "$addFields" : { "e" : 48, "j" : "$q", "w" : "$x" } }, { "$group" : { "_id" : "$g", "i" : { "$sum" : "$i" }, "j" : { "$sum" : "$j" }, "k" : { "$sum" : "$k" }, "e" : { "$sum" : "$e" }, "d" : { "$sum" : "$d" }, "c" : { "$sum" : "$c" }, "b" : { "$sum" : "$b" }, "f" : { "$sum" : "$f" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "e" : "$j" } } ]
+
+{_id: 15, i: 49, j: 0, k: 0, e: 0, d: 7, c: 89, b: 4, f: 69, x: {a: 75, b: 5, c: 70}, w: {a: 75, b: 5, c: 70}, y: null},
+{_id: 16, i: 181, j: 0, k: 0, e: 0, d: 88, c: 114, b: 147, f: 91, x: {a: 59, b: 36, c: 59}, w: {a: 59, b: 36, c: 59}, y: null},
+{_id: 2, i: 32, j: 0, k: 0, e: 0, d: 94, c: 85, b: 21, f: 98, x: {a: 8, b: 71, c: 40}, w: {a: 8, b: 71, c: 40}, y: null},
+{_id: 26, i: 60, j: 0, k: 0, e: 0, d: 10, c: 32, b: 64, f: 85, x: {a: 4, b: 40, c: 0}, w: {a: 4, b: 40, c: 0}, y: null},
+{_id: 62, i: 24, j: 0, k: 0, e: 0, d: 92, c: 75, b: 81, f: 4, x: {a: 9, b: 4, c: 79}, w: {a: 9, b: 4, c: 79}, y: null},
+{_id: 66, i: 11, j: 0, k: 0, e: 0, d: 65, c: 85, b: 40, f: 18, x: {a: 47, b: 88, c: 40}, w: {a: 47, b: 88, c: 40}, y: null},
+{_id: 8, i: 77, j: 0, k: 0, e: 0, d: 93, c: 27, b: 47, f: 49, x: {a: 19, b: 99, c: 77}, w: {a: 19, b: 99, c: 77}, y: null}
+
+Query 8 (with useIndex=false): [ { "$project" : { "g" : 0, "w" : 0 } }, { "$addFields" : { "e" : "$o", "h" : 29, "f" : "$n" } }, { "$addFields" : { "a" : "$f", "j" : "$k", "x" : "$x" } }, { "$addFields" : { "h" : "$h", "l" : "$l", "d" : 28 } }, { "$project" : { "d" : 0, "f" : 0, "y" : 0 } }, { "$project" : { "k" : 0 } } ]
+
+{_id: 1, h: 29, x: {a: 4, b: 40, c: 0}, c: 60, b: 64, i: 65},
+{_id: 2, i: 42, c: 32, h: 29, b: 21, x: {a: 8, b: 71, c: 40}},
+{_id: 3, h: 29, x: {a: 19, b: 99, c: 77}, c: 77, b: 47, i: 67},
+{_id: 4, h: 29, x: {a: 81, b: 68, c: 20}, c: 87, b: 76, i: 38},
+{_id: 5, b: 4, x: {a: 75, b: 5, c: 70}, i: 93, c: 49, h: 29},
+{_id: 6, c: 94, b: 71, x: {a: 59, b: 36, c: 59}, i: 84, h: 29},
+{_id: 7, h: 29, b: 40, x: {a: 47, b: 88, c: 40}, i: 44, c: 11},
+{_id: 8, c: 24, b: 81, i: 43, h: 29, x: {a: 9, b: 4, c: 79}}
+
+Query 9 (with useIndex=false): [ { "$project" : { "l" : 0, "x" : 0 } }, { "$addFields" : { "b" : 13 } }, { "$group" : { "_id" : "$q", "c" : { "$sum" : "$c" }, "j" : { "$sum" : "$j" }, "b" : { "$sum" : "$b" }, "a" : { "$sum" : "$a" }, "k" : { "$sum" : "$k" }, "f" : { "$sum" : "$f" }, "h" : { "$sum" : "$h" }, "e" : { "$sum" : "$e" }, "g" : { "$sum" : "$g" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$match" : { "e" : { "$lte" : 84 } } }, { "$addFields" : { "f" : 19, "e" : "$q", "h" : 69 } }, { "$addFields" : { "g" : 48, "k" : 94, "c" : 6, "y" : "$x" } }, { "$match" : { "b" : { "$lte" : 80 } } }, { "$project" : { "a" : 0, "w" : 0 } }, { "$addFields" : { "j" : 99, "x" : "$x" } }, { "$addFields" : { "b" : 82, "d" : "$e", "h" : 49, "x" : "$y" } }, { "$match" : { "c" : { "$gt" : 13 } } } ]
+
+
+Query 10 (with useIndex=false): [ { "$addFields" : { "a" : 98, "k" : 81, "e" : 47 } }, { "$group" : { "_id" : "$h", "j" : { "$sum" : "$j" }, "h" : { "$sum" : "$h" }, "l" : { "$sum" : "$l" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "a" : { "$sum" : "$a" }, "b" : { "$sum" : "$b" }, "g" : { "$sum" : "$g" }, "d" : { "$sum" : "$d" }, "e" : { "$sum" : "$e" }, "i" : { "$sum" : "$i" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "c" : 24 } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "y" } }, { "$unwind" : "$y" }, { "$addFields" : { "d" : 34 } }, { "$project" : { "a" : 0, "w" : 0 } }, { "$addFields" : { "f" : 47, "j" : 56, "y" : "$w" } }, { "$match" : { "h" : { "$gt" : 21 } } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "x" } }, { "$unwind" : "$x" }, { "$project" : { "g" : 0 } } ]
+
+
+Query 11 (with useIndex=false): [ { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "x" } }, { "$unwind" : "$x" }, { "$project" : { "e" : 0, "a" : 0 } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "y" } }, { "$unwind" : "$y" }, { "$group" : { "_id" : "$p", "b" : { "$sum" : "$b" }, "c" : { "$sum" : "$c" }, "j" : { "$sum" : "$j" }, "d" : { "$sum" : "$d" }, "e" : { "$sum" : "$e" }, "i" : { "$sum" : "$i" }, "a" : { "$sum" : "$a" }, "g" : { "$sum" : "$g" }, "k" : { "$sum" : "$k" }, "h" : { "$sum" : "$h" }, "l" : { "$sum" : "$l" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } }, { "$match" : { "c" : { "$gt" : 2 } } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "x" } }, { "$unwind" : "$x" }, { "$addFields" : { "d" : "$p", "e" : 34, "x" : "$y" } }, { "$addFields" : { "l" : "$e", "i" : "$l" } }, { "$project" : { "i" : 0, "x" : 0 } }, { "$project" : { "k" : 0, "x" : 0 } }, { "$addFields" : { "e" : 92, "k" : 9, "w" : "$x" } } ]
+
+
+Query 12 (with useIndex=false): [ { "$project" : { "i" : 0, "b" : 0 } }, { "$project" : { "h" : 0, "i" : 0, "x" : 0 } }, { "$project" : { "d" : 0, "y" : 0 } }, { "$match" : { "c" : { "$lt" : 88 } } } ]
+
+{_id: 1, e: 95, a: 32, g: 26, c: 60, w: {a: 18, b: 25, c: 26}, f: 85},
+{_id: 2, e: 13, w: {a: 94, b: 32, c: 58}, c: 32, g: 2, a: 85, f: 98},
+{_id: 3, a: 27, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, f: 49, e: 40},
+{_id: 4, a: 29, g: 16, c: 87, w: {a: 86, b: 75, c: 3}, f: 50, e: 82},
+{_id: 5, g: 15, e: 87, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, f: 69},
+{_id: 7, w: {a: 48, b: 63, c: 47}, f: 18, g: 66, e: 78, c: 11, a: 85},
+{_id: 8, g: 62, c: 24, w: {a: 15, b: 23, c: 89}, f: 4, e: 63, a: 75}
+
+Query 13 (with useIndex=false): [ { "$addFields" : { "k" : "$a", "x" : "$x" } }, { "$addFields" : { "j" : "$o", "c" : "$o", "f" : "$k", "w" : "$w" } }, { "$addFields" : { "h" : "$k", "x" : "$y" } }, { "$project" : { "a" : 0 } }, { "$project" : { "k" : 0, "b" : 0 } }, { "$addFields" : { "e" : 21, "k" : 91, "y" : "$y" } }, { "$project" : { "h" : 0, "c" : 0 } }, { "$addFields" : { "e" : "$p" } }, { "$match" : { "e" : { "$lte" : 77 } } }, { "$addFields" : { "l" : "$j", "f" : "$t", "h" : "$h" } }, { "$project" : { "d" : 0, "i" : 0 } } ]
+
+
+Query 14 (with useIndex=false): [ { "$match" : { "i" : { "$gt" : 9 } } }, { "$match" : { "f" : { "$lt" : 75 } } }, { "$match" : { "f" : { "$gt" : 11 } } }, { "$addFields" : { "a" : 51, "b" : 65, "y" : "$y" } }, { "$addFields" : { "h" : 40, "a" : "$i", "x" : "$x" } } ]
+
+{_id: 3, a: 67, h: 40, d: 93, x: {a: 19, b: 99, c: 77}, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, f: 49, b: 65, i: 67, e: 40},
+{_id: 4, a: 38, h: 40, d: 34, x: {a: 81, b: 68, c: 20}, g: 16, c: 87, w: {a: 86, b: 75, c: 3}, f: 50, b: 65, i: 38, e: 82},
+{_id: 5, d: 7, b: 65, x: {a: 75, b: 5, c: 70}, i: 93, g: 15, e: 87, c: 49, a: 93, w: {a: 44, b: 19, c: 96}, h: 40, f: 69},
+{_id: 6, f: 41, e: 55, d: 54, c: 94, b: 65, a: 84, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, i: 84, h: 40, g: 16},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 40, f: 18, d: 65, b: 65, x: {a: 47, b: 88, c: 40}, i: 44, g: 66, e: 78, c: 11, a: 44}
+
+Query 15 (with useIndex=false): [ { "$project" : { "f" : 0, "d" : 0, "y" : 0 } }, { "$sort" : { "i" : -1 } }, { "$addFields" : { "g" : 51, "f" : "$c", "y" : "$x" } }, { "$addFields" : { "l" : "$e" } }, { "$match" : { "h" : { "$gte" : 0 } } } ]
+
+{_id: 1, e: 95, a: 32, h: 71, x: {a: 4, b: 40, c: 0}, g: 51, c: 60, w: {a: 18, b: 25, c: 26}, b: 64, i: 65, f: 60, y: {a: 4, b: 40, c: 0}, l: 95},
+{_id: 2, e: 13, w: {a: 94, b: 32, c: 58}, i: 42, c: 32, h: 50, b: 21, g: 51, a: 85, x: {a: 8, b: 71, c: 40}, f: 32, y: {a: 8, b: 71, c: 40}, l: 13},
+{_id: 3, a: 27, h: 72, x: {a: 19, b: 99, c: 77}, g: 51, c: 77, w: {a: 11, b: 3, c: 9}, b: 47, i: 67, e: 40, f: 77, y: {a: 19, b: 99, c: 77}, l: 40},
+{_id: 4, a: 29, h: 83, x: {a: 81, b: 68, c: 20}, g: 51, c: 87, w: {a: 86, b: 75, c: 3}, b: 76, i: 38, e: 82, f: 87, y: {a: 81, b: 68, c: 20}, l: 82},
+{_id: 5, b: 4, x: {a: 75, b: 5, c: 70}, i: 93, g: 51, e: 87, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, h: 75, f: 49, y: {a: 75, b: 5, c: 70}, l: 87},
+{_id: 6, e: 55, c: 94, b: 71, a: 85, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, i: 84, h: 71, g: 51, f: 94, y: {a: 59, b: 36, c: 59}, l: 55},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 86, b: 40, x: {a: 47, b: 88, c: 40}, i: 44, g: 51, e: 78, c: 11, a: 85, f: 11, y: {a: 47, b: 88, c: 40}, l: 78},
+{_id: 8, g: 51, c: 24, w: {a: 15, b: 23, c: 89}, b: 81, i: 43, e: 63, a: 75, h: 74, x: {a: 9, b: 4, c: 79}, f: 24, y: {a: 9, b: 4, c: 79}, l: 63}
+
+Query 16 (with useIndex=false): [ { "$addFields" : { "j" : 69, "w" : "$y" } }, { "$addFields" : { "f" : "$i" } }, { "$match" : { "a" : { "$lte" : 75 } } }, { "$addFields" : { "f" : "$l", "g" : 97, "k" : 51 } }, { "$addFields" : { "j" : 52, "h" : "$j", "x" : "$x" } }, { "$addFields" : { "h" : 1, "x" : "$w" } }, { "$addFields" : { "f" : 30 } }, { "$match" : { "g" : { "$gte" : 2 } } }, { "$addFields" : { "e" : "$a" } }, { "$project" : { "h" : "$d", "c" : 1, "b" : 1, "i" : 1, "g" : { "$literal" : 0 }, "d" : "$b", "e" : 1, "k" : 1, "a" : 1, "w" : 1 } }, { "$project" : { "h" : 0, "w" : 0 } }, { "$match" : { "c" : { "$lt" : 86 } } } ]
+
+{_id: 1, a: 32, c: 60, b: 64, i: 65, k: 51, e: 32, g: 0, d: 64},
+{_id: 3, a: 27, c: 77, b: 47, i: 67, k: 51, e: 27, g: 0, d: 47},
+{_id: 8, c: 24, b: 81, i: 43, a: 75, k: 51, e: 75, g: 0, d: 81}
+
+Query 17 (with useIndex=false): [ { "$addFields" : { "i" : "$k", "w" : "$w" } }, { "$project" : { "i" : 0, "w" : 0 } }, { "$project" : { "f" : 0, "h" : 0 } }, { "$addFields" : { "i" : 82, "h" : "$g" } }, { "$project" : { "g" : 0, "h" : 0, "w" : 0 } }, { "$addFields" : { "a" : 10, "j" : 48, "g" : "$t" } }, { "$match" : { "q" : { "$lt" : 96 } } } ]
+
+
+Query 18 (with useIndex=false): [ { "$project" : { "k" : 0, "f" : 0 } }, { "$sort" : { "l" : 1 } }, { "$addFields" : { "d" : 64 } }, { "$sort" : { "d" : 1, "k" : 1 } } ]
+
+{_id: 1, e: 95, a: 32, h: 71, d: 64, x: {a: 4, b: 40, c: 0}, g: 26, c: 60, w: {a: 18, b: 25, c: 26}, b: 64, i: 65},
+{_id: 2, e: 13, w: {a: 94, b: 32, c: 58}, d: 64, i: 42, c: 32, h: 50, b: 21, g: 2, a: 85, x: {a: 8, b: 71, c: 40}},
+{_id: 3, a: 27, h: 72, d: 64, x: {a: 19, b: 99, c: 77}, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, b: 47, i: 67, e: 40},
+{_id: 4, a: 29, h: 83, d: 64, x: {a: 81, b: 68, c: 20}, g: 16, c: 87, w: {a: 86, b: 75, c: 3}, b: 76, i: 38, e: 82},
+{_id: 5, d: 64, b: 4, x: {a: 75, b: 5, c: 70}, i: 93, g: 15, e: 87, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, h: 75},
+{_id: 6, e: 55, d: 64, c: 94, b: 71, a: 85, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, i: 84, h: 71, g: 16},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 86, d: 64, b: 40, x: {a: 47, b: 88, c: 40}, i: 44, g: 66, e: 78, c: 11, a: 85},
+{_id: 8, g: 62, c: 24, w: {a: 15, b: 23, c: 89}, b: 81, i: 43, e: 63, a: 75, h: 74, d: 64, x: {a: 9, b: 4, c: 79}}
+
+Query 19 (with useIndex=false): [ { "$group" : { "_id" : "$a", "b" : { "$sum" : "$b" }, "e" : { "$sum" : "$e" }, "d" : { "$sum" : "$d" }, "g" : { "$sum" : "$g" }, "k" : { "$sum" : "$k" }, "h" : { "$sum" : "$h" }, "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "c" : { "$sum" : "$c" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" } } }, { "$addFields" : { "h" : "$h", "f" : 10 } }, { "$sort" : { "d" : -1 } }, { "$project" : { "e" : 0 } }, { "$match" : { "g" : { "$gte" : 16 } } }, { "$project" : { "b" : 0, "e" : 0, "w" : 0 } }, { "$addFields" : { "f" : 46 } }, { "$project" : { "f" : 0 } } ]
+
+{_id: 29, d: 34, g: 16, k: 0, h: 83, a: 29, c: 87, y: null, x: {a: 81, b: 68, c: 20}},
+{_id: 32, d: 10, g: 26, k: 0, h: 71, a: 32, c: 60, y: null, x: {a: 4, b: 40, c: 0}},
+{_id: 75, d: 92, g: 62, k: 0, h: 74, a: 75, c: 24, y: null, x: {a: 9, b: 4, c: 79}},
+{_id: 85, d: 213, g: 84, k: 0, h: 207, a: 255, c: 137, y: null, x: {a: 8, b: 71, c: 40}}
+
+Query 20 (with useIndex=false): [ { "$addFields" : { "a" : "$r", "i" : 67, "y" : "$w" } }, { "$addFields" : { "l" : 35, "k" : "$q", "a" : 64, "x" : "$w" } }, { "$addFields" : { "l" : 81, "y" : "$y" } }, { "$project" : { "b" : 0, "f" : 0 } }, { "$addFields" : { "h" : 34, "x" : "$w" } }, { "$match" : { "k" : { "$lt" : 85 } } }, { "$project" : { "i" : 0, "f" : 0, "x" : 0 } } ]
+
+
+Query 21 (with useIndex=false): [ { "$group" : { "_id" : "$c", "f" : { "$sum" : "$f" }, "l" : { "$sum" : "$l" }, "d" : { "$sum" : "$d" }, "e" : { "$sum" : "$e" }, "i" : { "$sum" : "$i" }, "h" : { "$sum" : "$h" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "g" : { "$sum" : "$g" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } }, { "$project" : { "h" : 0 } }, { "$project" : { "c" : 0 } }, { "$match" : { "f" : { "$gte" : 18 } } }, { "$addFields" : { "j" : 49, "a" : 91, "h" : "$o", "x" : "$w" } }, { "$addFields" : { "d" : 47 } }, { "$group" : { "_id" : "$i", "a" : { "$sum" : "$a" }, "e" : { "$sum" : "$e" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "b" : { "$sum" : "$b" }, "j" : { "$sum" : "$j" }, "l" : { "$sum" : "$l" }, "h" : { "$sum" : "$h" }, "i" : { "$sum" : "$i" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$match" : { "e" : { "$lte" : 92 } } } ]
+
+{_id: 38, a: 91, e: 82, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 38, w: {a: 86, b: 75, c: 3}, x: {a: 86, b: 75, c: 3}, y: null},
+{_id: 42, a: 91, e: 13, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 42, w: {a: 94, b: 32, c: 58}, x: {a: 94, b: 32, c: 58}, y: null},
+{_id: 44, a: 91, e: 78, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 44, w: {a: 48, b: 63, c: 47}, x: {a: 48, b: 63, c: 47}, y: null},
+{_id: 67, a: 91, e: 40, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 67, w: {a: 11, b: 3, c: 9}, x: {a: 11, b: 3, c: 9}, y: null},
+{_id: 84, a: 91, e: 55, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 84, w: {a: 10, b: 66, c: 62}, x: {a: 10, b: 66, c: 62}, y: null},
+{_id: 93, a: 91, e: 87, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 93, w: {a: 44, b: 19, c: 96}, x: {a: 44, b: 19, c: 96}, y: null}
+
+Query 22 (with useIndex=false): [ { "$addFields" : { "d" : 43, "k" : 65, "b" : "$p", "w" : "$w" } }, { "$project" : { "g" : 0, "f" : 0 } }, { "$addFields" : { "a" : 57, "x" : "$y" } }, { "$project" : { "i" : 0, "g" : 0, "y" : 0 } }, { "$addFields" : { "e" : 57, "j" : 48 } }, { "$match" : { "q" : { "$lte" : 82 } } }, { "$match" : { "b" : { "$gte" : 11 } } }, { "$project" : { "b" : 1, "d" : 1, "i" : 1, "l" : 1, "c" : "$b", "g" : "$l", "h" : "$g", "k" : 1, "f" : "$j", "x" : 1, "w" : 1 } } ]
+
+
+Query 23 (with useIndex=false): [ { "$addFields" : { "h" : "$m", "a" : 28, "c" : "$r", "x" : "$w" } }, { "$addFields" : { "f" : 78, "h" : 63, "a" : 13, "y" : "$y" } }, { "$sort" : { "l" : -1, "e" : 1 } }, { "$addFields" : { "f" : "$n", "w" : "$x" } }, { "$addFields" : { "b" : "$b", "j" : 53 } }, { "$group" : { "_id" : "$c", "d" : { "$sum" : "$d" }, "g" : { "$sum" : "$g" }, "c" : { "$sum" : "$c" }, "a" : { "$sum" : "$a" }, "b" : { "$sum" : "$b" }, "j" : { "$sum" : "$j" }, "i" : { "$sum" : "$i" }, "f" : { "$sum" : "$f" }, "l" : { "$sum" : "$l" }, "k" : { "$sum" : "$k" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$sort" : { "a" : 1 } }, { "$addFields" : { "a" : "$s", "c" : 29 } }, { "$addFields" : { "g" : "$q" } } ]
+
+{_id: null, d: 449, c: 29, b: 404, j: 424, i: 476, f: 0, l: 0, k: 0, x: {a: 10, b: 66, c: 62}, w: {a: 10, b: 66, c: 62}, y: null}
+
+Query 24 (with useIndex=false): [ { "$match" : { "g" : { "$gte" : 7 } } }, { "$addFields" : { "i" : "$q" } }, { "$addFields" : { "h" : "$j", "y" : "$w" } }, { "$project" : { "l" : 0, "d" : 0 } } ]
+
+{_id: 1, e: 95, a: 32, x: {a: 4, b: 40, c: 0}, g: 26, c: 60, w: {a: 18, b: 25, c: 26}, f: 85, b: 64, y: {a: 18, b: 25, c: 26}},
+{_id: 3, a: 27, x: {a: 19, b: 99, c: 77}, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, f: 49, b: 47, e: 40, y: {a: 11, b: 3, c: 9}},
+{_id: 4, a: 29, x: {a: 81, b: 68, c: 20}, g: 16, c: 87, w: {a: 86, b: 75, c: 3}, f: 50, b: 76, e: 82, y: {a: 86, b: 75, c: 3}},
+{_id: 5, b: 4, x: {a: 75, b: 5, c: 70}, g: 15, e: 87, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, f: 69, y: {a: 44, b: 19, c: 96}},
+{_id: 6, f: 41, e: 55, c: 94, b: 71, a: 85, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, g: 16, y: {a: 10, b: 66, c: 62}},
+{_id: 7, w: {a: 48, b: 63, c: 47}, f: 18, b: 40, x: {a: 47, b: 88, c: 40}, g: 66, e: 78, c: 11, a: 85, y: {a: 48, b: 63, c: 47}},
+{_id: 8, g: 62, c: 24, w: {a: 15, b: 23, c: 89}, f: 4, b: 81, e: 63, a: 75, x: {a: 9, b: 4, c: 79}, y: {a: 15, b: 23, c: 89}}
+
+Query 25 (with useIndex=false): [ { "$addFields" : { "j" : 50, "w" : "$y" } }, { "$project" : { "a" : 0, "h" : 0 } }, { "$addFields" : { "c" : 50, "f" : 20, "w" : "$y" } }, { "$addFields" : { "l" : 15, "d" : 88, "k" : "$p", "x" : "$y" } }, { "$match" : { "k" : { "$lt" : 87 } } }, { "$addFields" : { "f" : 58 } }, { "$project" : { "b" : 0, "j" : 0 } }, { "$project" : { "a" : 0, "y" : 0 } } ]
+
+
+Query 26 (with useIndex=false): [ { "$match" : { "h" : { "$lt" : 85 } } }, { "$addFields" : { "k" : "$t", "h" : 19, "j" : "$o", "w" : "$x" } }, { "$addFields" : { "k" : "$m", "y" : "$x" } }, { "$sort" : { "b" : 1, "e" : -1 } }, { "$match" : { "e" : { "$gt" : 20 } } }, { "$match" : { "q" : { "$gte" : 0 } } }, { "$addFields" : { "k" : 89, "h" : "$b", "c" : 35, "y" : "$x" } }, { "$addFields" : { "d" : "$m", "h" : "$g" } }, { "$project" : { "h" : 0 } }, { "$addFields" : { "f" : "$s", "h" : 19, "g" : "$m" } } ]
+
+
+Query 27 (with useIndex=false): [ { "$sort" : { "e" : -1, "h" : -1 } }, { "$limit" : 10 }, { "$sort" : { "i" : -1, "b" : -1 } }, { "$match" : { "q" : { "$gt" : 21 } } }, { "$project" : { "h" : 0 } }, { "$project" : { "j" : 0, "d" : 0, "y" : 0 } }, { "$addFields" : { "d" : 79 } } ]
+
+
+Query 28 (with useIndex=false): [ { "$sort" : { "l" : -1, "i" : 1 } }, { "$limit" : 9 }, { "$match" : { "h" : { "$lte" : 99 } } }, { "$project" : { "d" : 1, "i" : 1, "c" : 1, "f" : "$e", "a" : 1, "g" : 1, "e" : 1, "h" : "$i", "x" : 1 } }, { "$project" : { "a" : 1, "c" : 1, "b" : 1, "k" : "$a", "g" : 1, "h" : 1, "j" : 1, "d" : 1, "l" : "$c", "i" : "$j", "e" : 1, "x" : 1, "w" : 1 } }, { "$sort" : { "c" : 1, "l" : 1 } }, { "$addFields" : { "c" : 11, "d" : "$k", "l" : 49 } }, { "$addFields" : { "h" : "$o", "b" : 23, "i" : 51 } }, { "$project" : { "d" : 1, "k" : 1, "c" : 1, "i" : 1, "l" : "$f", "g" : "$l", "a" : 1, "j" : 1, "f" : 1, "h" : "$j", "x" : 1 } }, { "$project" : { "i" : 0, "l" : 0 } }, { "$match" : { "d" : { "$gt" : 3 } } }, { "$addFields" : { "b" : "$s", "d" : "$h", "w" : "$x" } } ]
+
+{_id: 1, a: 32, x: {a: 4, b: 40, c: 0}, c: 11, k: 32, g: 49, w: {a: 4, b: 40, c: 0}},
+{_id: 2, c: 11, a: 85, x: {a: 8, b: 71, c: 40}, k: 85, g: 49, w: {a: 8, b: 71, c: 40}},
+{_id: 3, a: 27, x: {a: 19, b: 99, c: 77}, c: 11, k: 27, g: 49, w: {a: 19, b: 99, c: 77}},
+{_id: 4, a: 29, x: {a: 81, b: 68, c: 20}, c: 11, k: 29, g: 49, w: {a: 81, b: 68, c: 20}},
+{_id: 5, x: {a: 75, b: 5, c: 70}, c: 11, a: 89, k: 89, g: 49, w: {a: 75, b: 5, c: 70}},
+{_id: 6, c: 11, a: 85, x: {a: 59, b: 36, c: 59}, k: 85, g: 49, w: {a: 59, b: 36, c: 59}},
+{_id: 7, x: {a: 47, b: 88, c: 40}, c: 11, a: 85, k: 85, g: 49, w: {a: 47, b: 88, c: 40}},
+{_id: 8, c: 11, a: 75, x: {a: 9, b: 4, c: 79}, k: 75, g: 49, w: {a: 9, b: 4, c: 79}}
+
+Query 29 (with useIndex=false): [ { "$project" : { "e" : 0 } }, { "$sort" : { "c" : -1, "j" : 1 } }, { "$limit" : 9 }, { "$sort" : { "l" : 1 } }, { "$limit" : 7 }, { "$project" : { "a" : 0, "w" : 0 } }, { "$addFields" : { "i" : 16, "a" : "$g", "g" : "$a", "x" : "$w" } }, { "$match" : { "c" : { "$gte" : 8 } } }, { "$addFields" : { "f" : 46, "c" : 40 } }, { "$sort" : { "d" : 1, "f" : -1 } }, { "$limit" : 10 }, { "$project" : { "i" : "$c", "g" : 1, "j" : 1, "c" : 1, "h" : 1, "b" : 1, "e" : 1, "l" : "$j", "k" : 1, "w" : 1 } } ]
+
+{_id: 1, h: 71, c: 40, b: 64, i: 40},
+{_id: 2, c: 40, h: 50, b: 21, i: 40},
+{_id: 3, h: 72, c: 40, b: 47, i: 40},
+{_id: 4, h: 83, c: 40, b: 76, i: 40},
+{_id: 5, b: 4, c: 40, h: 75, i: 40},
+{_id: 6, c: 40, b: 71, h: 71, i: 40},
+{_id: 8, c: 40, b: 81, h: 74, i: 40}
+
+Query 30 (with useIndex=false): [ { "$project" : { "h" : 1, "l" : 1, "j" : "$h", "d" : { "$literal" : 98 }, "k" : "$c", "b" : 1, "g" : "$f", "c" : 1, "x" : 1 } }, { "$match" : { "d" : { "$gt" : 2 } } }, { "$project" : { "b" : 0, "x" : 0 } }, { "$addFields" : { "g" : "$o", "e" : "$f", "y" : "$x" } }, { "$project" : { "k" : 0, "a" : 0, "x" : 0 } }, { "$match" : { "g" : { "$lte" : 92 } } }, { "$project" : { "e" : 1, "i" : 1, "g" : 1, "d" : 1, "j" : 1, "f" : 1, "l" : 1, "a" : 1, "k" : 1, "x" : 1, "w" : 1 } }, { "$match" : { "d" : { "$gt" : 2 } } }, { "$project" : { "i" : "$e", "e" : "$g", "g" : "$h", "d" : 1, "a" : 1, "b" : 1, "f" : 1, "h" : 1, "c" : 1, "k" : 1, "l" : 1, "y" : 1 } } ]
+
+
+Query 31 (with useIndex=false): [ { "$match" : { "h" : { "$gte" : 0 } } }, { "$match" : { "q" : { "$gte" : 15 } } }, { "$match" : { "c" : { "$gte" : 2 } } }, { "$group" : { "_id" : "$d", "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "e" : { "$sum" : "$e" }, "h" : { "$sum" : "$h" }, "c" : { "$sum" : "$c" }, "g" : { "$sum" : "$g" }, "j" : { "$sum" : "$j" }, "l" : { "$sum" : "$l" }, "b" : { "$sum" : "$b" }, "i" : { "$sum" : "$i" }, "k" : { "$sum" : "$k" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "k" : "$k", "d" : "$k", "c" : 44 } }, { "$addFields" : { "f" : 24, "y" : "$x" } }, { "$addFields" : { "e" : "$r", "a" : 46, "b" : 88, "y" : "$y" } }, { "$addFields" : { "j" : "$i", "d" : 76 } } ]
+
+
+Query 32 (with useIndex=false): [ { "$match" : { "i" : { "$gte" : 12 } } }, { "$addFields" : { "a" : "$p", "k" : "$d" } }, { "$project" : { "g" : 0, "w" : 0 } }, { "$match" : { "d" : { "$gt" : 24 } } }, { "$match" : { "c" : { "$lt" : 85 } } }, { "$match" : { "q" : { "$gte" : 21 } } }, { "$addFields" : { "b" : "$s", "c" : 45, "a" : "$m", "w" : "$w" } } ]
+
+
+Query 33 (with useIndex=false): [ { "$match" : { "g" : { "$gt" : 18 } } }, { "$sort" : { "c" : -1 } }, { "$match" : { "b" : { "$gt" : 9 } } }, { "$addFields" : { "b" : 24, "w" : "$y" } }, { "$addFields" : { "d" : "$h", "g" : 76 } }, { "$sort" : { "j" : -1 } }, { "$sort" : { "b" : -1 } }, { "$limit" : 9 }, { "$sort" : { "g" : -1, "b" : 1 } }, { "$limit" : 6 }, { "$match" : { "p" : { "$lte" : 79 } } }, { "$sort" : { "b" : -1 } }, { "$sort" : { "l" : -1 } } ]
+
+
+Query 34 (with useIndex=false): [ { "$project" : { "h" : 0, "a" : 0 } }, { "$project" : { "c" : 0 } }, { "$addFields" : { "h" : 36, "x" : "$y" } }, { "$addFields" : { "h" : 64, "b" : "$i", "j" : "$m", "y" : "$y" } }, { "$project" : { "l" : 0, "i" : 0 } } ]
+
+{_id: 1, e: 95, d: 10, g: 26, w: {a: 18, b: 25, c: 26}, f: 85, b: 65, h: 64},
+{_id: 2, e: 13, w: {a: 94, b: 32, c: 58}, d: 94, b: 42, g: 2, f: 98, h: 64},
+{_id: 3, d: 93, g: 8, w: {a: 11, b: 3, c: 9}, f: 49, b: 67, e: 40, h: 64},
+{_id: 4, d: 34, g: 16, w: {a: 86, b: 75, c: 3}, f: 50, b: 38, e: 82, h: 64},
+{_id: 5, d: 7, b: 93, g: 15, e: 87, w: {a: 44, b: 19, c: 96}, f: 69, h: 64},
+{_id: 6, f: 41, e: 55, d: 54, b: 84, w: {a: 10, b: 66, c: 62}, g: 16, h: 64},
+{_id: 7, w: {a: 48, b: 63, c: 47}, f: 18, d: 65, b: 44, g: 66, e: 78, h: 64},
+{_id: 8, g: 62, w: {a: 15, b: 23, c: 89}, f: 4, b: 43, e: 63, d: 92, h: 64}
+
+Query 35 (with useIndex=false): [ { "$addFields" : { "h" : "$d", "y" : "$x" } }, { "$sort" : { "d" : 1, "f" : -1 } }, { "$match" : { "g" : { "$gt" : 3 } } }, { "$addFields" : { "g" : 22, "c" : "$h", "y" : "$y" } }, { "$match" : { "i" : { "$gt" : 0 } } }, { "$project" : { "j" : 0, "g" : 0 } }, { "$match" : { "h" : { "$lt" : 86 } } }, { "$project" : { "f" : "$g", "h" : 1, "i" : 1, "b" : "$a", "j" : 1, "k" : 1, "c" : 1, "l" : "$a", "g" : 1, "e" : 1, "y" : 1, "x" : 1 } }, { "$project" : { "j" : 0, "e" : 0 } }, { "$group" : { "_id" : "$h", "g" : { "$sum" : "$g" }, "b" : { "$sum" : "$b" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "j" : { "$sum" : "$j" }, "a" : { "$sum" : "$a" }, "i" : { "$sum" : "$i" }, "f" : { "$sum" : "$f" }, "d" : { "$sum" : "$d" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "y" } }, { "$unwind" : "$y" }, { "$project" : { "g" : "$e", "a" : 1, "b" : 1, "j" : 1, "f" : 1, "e" : "$k", "i" : 1, "d" : 1, "c" : 1, "k" : 1, "w" : 1, "x" : 1 } } ]
+
+{_id: 7, b: 89, k: 0, c: 7, j: 0, a: 0, i: 93, f: 0, d: 0, w: null, x: {a: 75, b: 5, c: 70}, e: 0}
+
+Query 36 (with useIndex=false): [ { "$project" : { "k" : 1, "g" : 1, "h" : 1, "b" : 1, "f" : 1, "c" : "$c", "a" : 1, "i" : 1, "l" : 1, "e" : 1, "d" : 1, "y" : 1, "x" : 1 } }, { "$match" : { "b" : { "$gte" : 15 } } }, { "$addFields" : { "l" : "$q" } }, { "$group" : { "_id" : "$i", "j" : { "$sum" : "$j" }, "k" : { "$sum" : "$k" }, "h" : { "$sum" : "$h" }, "e" : { "$sum" : "$e" }, "f" : { "$sum" : "$f" }, "a" : { "$sum" : "$a" }, "i" : { "$sum" : "$i" }, "g" : { "$sum" : "$g" }, "c" : { "$sum" : "$c" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } }, { "$project" : { "k" : 0, "x" : 0 } }, { "$project" : { "e" : 0, "x" : 0 } } ]
+
+{_id: 38, j: 0, h: 83, f: 50, a: 29, i: 38, g: 16, c: 87, y: null, w: null},
+{_id: 42, j: 0, h: 50, f: 98, a: 85, i: 42, g: 2, c: 32, y: null, w: null},
+{_id: 43, j: 0, h: 74, f: 4, a: 75, i: 43, g: 62, c: 24, y: null, w: null},
+{_id: 44, j: 0, h: 86, f: 18, a: 85, i: 44, g: 66, c: 11, y: null, w: null},
+{_id: 65, j: 0, h: 71, f: 85, a: 32, i: 65, g: 26, c: 60, y: null, w: null},
+{_id: 67, j: 0, h: 72, f: 49, a: 27, i: 67, g: 8, c: 77, y: null, w: null},
+{_id: 84, j: 0, h: 71, f: 41, a: 85, i: 84, g: 16, c: 94, y: null, w: null}
+
+Query 37 (with useIndex=false): [ { "$addFields" : { "a" : 78, "d" : "$r", "g" : 57 } }, { "$addFields" : { "f" : "$k" } }, { "$project" : { "i" : 0, "w" : 0 } }, { "$match" : { "w.c" : { "$gte" : 7 } } }, { "$addFields" : { "f" : 36, "d" : "$a" } }, { "$project" : { "d" : 0, "w" : 0 } }, { "$project" : { "e" : 0, "d" : 0 } } ]
+
+
+Query 38 (with useIndex=false): [ { "$addFields" : { "a" : "$n", "f" : 32, "l" : 97 } }, { "$addFields" : { "f" : 79, "h" : 79, "x" : "$w" } }, { "$addFields" : { "c" : 89 } }, { "$match" : { "l" : { "$lt" : 93 } } } ]
+
+
+Query 39 (with useIndex=false): [ { "$match" : { "d" : { "$lte" : 84 } } }, { "$project" : { "b" : 0, "e" : 0 } }, { "$project" : { "g" : 0, "w" : 0 } }, { "$match" : { "y.c" : { "$lt" : 75 } } }, { "$project" : { "l" : 0 } }, { "$match" : { "y.c" : { "$lte" : 97 } } } ]
+
+
+Query 40 (with useIndex=false): [ { "$project" : { "c" : 0, "i" : 0, "x.b" : 0, "x.c" : 0 } }, { "$addFields" : { "f" : 89, "c" : "$k", "h" : "$f" } }, { "$match" : { "w.a" : { "$lt" : 88 } } }, { "$project" : { "j" : 0, "y" : 0 } } ]
+
+{_id: 1, e: 95, a: 32, h: 85, d: 10, x: {a: 4}, g: 26, w: {a: 18, b: 25, c: 26}, f: 89, b: 64},
+{_id: 3, a: 27, h: 49, d: 93, x: {a: 19}, g: 8, w: {a: 11, b: 3, c: 9}, f: 89, b: 47, e: 40},
+{_id: 4, a: 29, h: 50, d: 34, x: {a: 81}, g: 16, w: {a: 86, b: 75, c: 3}, f: 89, b: 76, e: 82},
+{_id: 5, d: 7, b: 4, x: {a: 75}, g: 15, e: 87, a: 89, w: {a: 44, b: 19, c: 96}, h: 69, f: 89},
+{_id: 6, f: 89, e: 55, d: 54, b: 71, a: 85, x: {a: 59}, w: {a: 10, b: 66, c: 62}, h: 41, g: 16},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 18, f: 89, d: 65, b: 40, x: {a: 47}, g: 66, e: 78, a: 85},
+{_id: 8, g: 62, w: {a: 15, b: 23, c: 89}, f: 89, b: 81, e: 63, a: 75, h: 4, d: 92, x: {a: 9}}
+
+Query 41 (with useIndex=false): [ { "$project" : { "j" : 0, "b" : 0 } }, { "$addFields" : { "a" : 19, "g" : 97, "h" : 25, "w" : "$x" } }, { "$project" : { "a" : 0, "i" : 0, "y" : 0 } }, { "$project" : { "e" : 1, "h" : 1, "a" : 1, "j" : "$l", "d" : 1, "f" : 1, "l" : 1, "i" : 1, "y.b" : 1 } }, { "$project" : { "f" : 0, "x" : 0 } }, { "$addFields" : { "f" : "$g", "k" : "$e", "h" : 62, "y" : "$y" } } ]
+
+{_id: 1, e: 95, d: 10, h: 62, k: 95},
+{_id: 2, e: 13, d: 94, h: 62, k: 13},
+{_id: 3, d: 93, e: 40, h: 62, k: 40},
+{_id: 4, d: 34, e: 82, h: 62, k: 82},
+{_id: 5, d: 7, e: 87, h: 62, k: 87},
+{_id: 6, e: 55, d: 54, h: 62, k: 55},
+{_id: 7, d: 65, e: 78, h: 62, k: 78},
+{_id: 8, e: 63, d: 92, h: 62, k: 63}
+
+Query 42 (with useIndex=false): [ { "$project" : { "e" : 0 } }, { "$addFields" : { "l" : 0 } }, { "$project" : { "k" : 0, "l" : 0 } }, { "$addFields" : { "d" : "$s", "y" : "$y" } }, { "$project" : { "k" : 0, "g" : 0, "x" : 0 } }, { "$project" : { "g" : 1, "h" : "$i", "i" : 1, "l" : 1, "d" : { "$literal" : 14 }, "f" : 1, "a" : 1, "b" : 1, "e" : 1, "y" : 1, "w.b" : 1 } } ]
+
+{_id: 1, a: 32, w: {b: 25}, f: 85, b: 64, i: 65, h: 65, d: 14},
+{_id: 2, w: {b: 32}, i: 42, b: 21, a: 85, f: 98, h: 42, d: 14},
+{_id: 3, a: 27, w: {b: 3}, f: 49, b: 47, i: 67, h: 67, d: 14},
+{_id: 4, a: 29, w: {b: 75}, f: 50, b: 76, i: 38, h: 38, d: 14},
+{_id: 5, b: 4, i: 93, a: 89, w: {b: 19}, f: 69, h: 93, d: 14},
+{_id: 6, f: 41, b: 71, a: 85, w: {b: 66}, i: 84, h: 84, d: 14},
+{_id: 7, w: {b: 63}, f: 18, b: 40, i: 44, a: 85, h: 44, d: 14},
+{_id: 8, w: {b: 23}, f: 4, b: 81, i: 43, a: 75, h: 43, d: 14}
+
+Query 43 (with useIndex=false): [ { "$project" : { "c" : 0, "w" : 0 } }, { "$addFields" : { "i" : "$l", "k" : "$i", "f" : "$r", "y" : "$x" } }, { "$addFields" : { "e" : 65, "l" : 89, "w" : "$y" } }, { "$match" : { "f" : { "$lt" : 87 } } }, { "$match" : { "x.a" : { "$gt" : 14 } } }, { "$match" : { "e" : { "$lte" : 86 } } }, { "$group" : { "_id" : "$q", "a" : { "$sum" : "$a" }, "h" : { "$sum" : "$h" }, "f" : { "$sum" : "$f" }, "d" : { "$sum" : "$d" }, "k" : { "$sum" : "$k" }, "b" : { "$sum" : "$b" }, "i" : { "$sum" : "$i" }, "g" : { "$sum" : "$g" }, "e" : { "$sum" : "$e" }, "j" : { "$sum" : "$j" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } }, { "$match" : { "x.b" : { "$lte" : 96 } } } ]
+
+
+Query 44 (with useIndex=false): [ { "$addFields" : { "e" : 52, "y.c" : 51 } }, { "$addFields" : { "d" : "$k", "l" : 68, "i" : 6 } }, { "$project" : { "j" : 0, "w" : 0 } }, { "$match" : { "y.c" : { "$gte" : 17 } } }, { "$group" : { "_id" : "$a", "a" : { "$sum" : "$a" }, "j" : { "$sum" : "$j" }, "g" : { "$sum" : "$g" }, "b" : { "$sum" : "$b" }, "h" : { "$sum" : "$h" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "e" : { "$sum" : "$e" }, "i" : { "$sum" : "$i" }, "f" : { "$sum" : "$f" }, "d" : { "$sum" : "$d" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$match" : { "y.a" : { "$gt" : 2 } } } ]
+
+
+Query 45 (with useIndex=false): [ { "$match" : { "p" : { "$lte" : 96 } } }, { "$addFields" : { "a" : 0, "w.b" : 43, "w.a" : 93 } }, { "$project" : { "f" : 0, "y.b" : 0 } }, { "$addFields" : { "e" : "$d" } }, { "$match" : { "w.a" : { "$gt" : 10 } } }, { "$match" : { "w.c" : { "$gt" : 8 } } }, { "$addFields" : { "i" : 50, "l" : "$l", "g" : 18 } } ]
+
+
+Query 46 (with useIndex=false): [ { "$group" : { "_id" : "$q", "k" : { "$sum" : "$k" }, "j" : { "$sum" : "$j" }, "d" : { "$sum" : "$d" }, "c" : { "$sum" : "$c" }, "e" : { "$sum" : "$e" }, "a" : { "$sum" : "$a" }, "b" : { "$sum" : "$b" }, "f" : { "$sum" : "$f" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" } } }, { "$addFields" : { "c" : 32, "e" : 69, "y" : "$y" } }, { "$addFields" : { "a" : 21, "i" : 22, "j" : "$h" } }, { "$addFields" : { "h" : "$i", "k" : "$c", "e" : 45, "w.b" : 6, "w.c" : 3 } }, { "$addFields" : { "c" : "$g", "e" : 95, "y" : "$y" } }, { "$group" : { "_id" : "$f", "j" : { "$sum" : "$j" }, "k" : { "$sum" : "$k" }, "a" : { "$sum" : "$a" }, "c" : { "$sum" : "$c" }, "e" : { "$sum" : "$e" }, "b" : { "$sum" : "$b" }, "h" : { "$sum" : "$h" }, "i" : { "$sum" : "$i" }, "g" : { "$sum" : "$g" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } }, { "$match" : { "w.c" : { "$gt" : 12 } } }, { "$group" : { "_id" : "$h", "c" : { "$sum" : "$c" }, "e" : { "$sum" : "$e" }, "d" : { "$sum" : "$d" }, "h" : { "$sum" : "$h" }, "j" : { "$sum" : "$j" }, "b" : { "$sum" : "$b" }, "k" : { "$sum" : "$k" }, "i" : { "$sum" : "$i" }, "g" : { "$sum" : "$g" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "a" : "$a", "y.c" : 79, "y.a" : 17 } }, { "$addFields" : { "k" : "$b", "d" : 43, "l" : 23, "x.c" : 3 } } ]
+
+
+Query 47 (with useIndex=false): [ { "$project" : { "d" : 0, "c" : 0 } }, { "$project" : { "e" : 1, "i" : "$c", "a" : 1, "l" : 1, "d" : 1, "c" : { "$literal" : 60 }, "j" : 1, "b" : "$h", "h" : 1, "f" : 1, "x" : 1 } }, { "$group" : { "_id" : "$a", "l" : { "$sum" : "$l" }, "h" : { "$sum" : "$h" }, "f" : { "$sum" : "$f" }, "c" : { "$sum" : "$c" }, "b" : { "$sum" : "$b" }, "d" : { "$sum" : "$d" }, "e" : { "$sum" : "$e" }, "g" : { "$sum" : "$g" }, "j" : { "$sum" : "$j" }, "a" : { "$sum" : "$a" }, "k" : { "$sum" : "$k" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } }, { "$project" : { "e" : 0, "d" : 0, "w.c" : 0 } }, { "$group" : { "_id" : "$b", "d" : { "$sum" : "$d" }, "i" : { "$sum" : "$i" }, "l" : { "$sum" : "$l" }, "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "b" : { "$sum" : "$b" }, "h" : { "$sum" : "$h" }, "g" : { "$sum" : "$g" }, "c" : { "$sum" : "$c" }, "k" : { "$sum" : "$k" }, "j" : { "$sum" : "$j" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } }, { "$project" : { "d" : 0 } }, { "$addFields" : { "f" : 45, "j" : 37, "y" : "$x" } }, { "$match" : { "y.c" : { "$lt" : 80 } } }, { "$project" : { "i" : 0 } }, { "$group" : { "_id" : "$c", "j" : { "$sum" : "$j" }, "i" : { "$sum" : "$i" }, "a" : { "$sum" : "$a" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "g" : { "$sum" : "$g" }, "d" : { "$sum" : "$d" }, "h" : { "$sum" : "$h" }, "f" : { "$sum" : "$f" }, "l" : { "$sum" : "$l" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$group" : { "_id" : "$h", "h" : { "$sum" : "$h" }, "f" : { "$sum" : "$f" }, "l" : { "$sum" : "$l" }, "i" : { "$sum" : "$i" }, "a" : { "$sum" : "$a" }, "g" : { "$sum" : "$g" }, "e" : { "$sum" : "$e" }, "j" : { "$sum" : "$j" }, "c" : { "$sum" : "$c" }, "k" : { "$sum" : "$k" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } } ]
+
+{_id: 207, h: 207, f: 45, l: 0, i: 0, a: 255, g: 0, e: 0, j: 37, c: 180, k: 0, w: null, y: {a: 8, b: 71, c: 40}, x: {a: 8, b: 71, c: 40}},
+{_id: 375, h: 375, f: 225, l: 0, i: 0, a: 252, g: 0, e: 0, j: 185, c: 300, k: 0, w: null, y: {a: 4, b: 40, c: 0}, x: {a: 4, b: 40, c: 0}}
+
+Query 48 (with useIndex=false): [ { "$addFields" : { "l" : 42 } }, { "$match" : { "c" : { "$gte" : 23 } } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "y" } }, { "$unwind" : "$y" }, { "$addFields" : { "f" : 65, "h" : 73, "i" : "$p", "x" : "$y" } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "w" } }, { "$unwind" : "$w" }, { "$addFields" : { "c" : 89 } }, { "$project" : { "f" : 1, "c" : 1, "h" : "$j", "j" : { "$literal" : 17 }, "d" : 1, "l" : 1, "e" : "$g", "k" : 1, "a" : 1, "b" : 1, "y.c" : 1, "y.b" : 1 } }, { "$addFields" : { "g" : 39, "e" : 19, "b" : 99 } } ]
+
+{_id: 1, a: 32, d: 10, b: 99, l: 42, y: {b: 57, c: 58}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 2, d: 94, b: 99, a: 85, l: 42, y: {b: 12, c: 54}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 3, a: 27, d: 93, b: 99, l: 42, y: {c: 99, b: 57}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 4, a: 29, d: 34, b: 99, l: 42, y: {b: 16, c: 7}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 5, d: 7, b: 99, a: 89, l: 42, y: {b: 71, c: 91}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 6, d: 54, b: 99, a: 85, l: 42, y: {c: 78, b: 67}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 8, b: 99, a: 75, d: 92, l: 42, y: {b: 86, c: 90}, f: 65, c: 89, j: 17, e: 19, g: 39}
+
+Query 49 (with useIndex=false): [ { "$project" : { "c" : 0, "d" : 0 } }, { "$match" : { "b" : { "$lt" : 94 } } }, { "$addFields" : { "i" : "$r", "e" : 34, "a" : 5 } }, { "$match" : { "b" : { "$gt" : 10 } } }, { "$addFields" : { "d" : 48, "g" : "$i", "w" : "$w" } }, { "$match" : { "q" : { "$gt" : 1 } } }, { "$project" : { "g" : 0, "i" : 0 } }, { "$match" : { "w.b" : { "$gte" : 3 } } }, { "$project" : { "c" : 0, "a" : 0, "x.a" : 0 } }, { "$project" : { "j" : 0 } }, { "$match" : { "y.a" : { "$gt" : 24 } } }, { "$sort" : { "a" : -1 } } ]
+
+
+Query 50 (with useIndex=false): [ { "$addFields" : { "h" : "$g", "d" : 77, "x.c" : 95 } }, { "$match" : { "x.c" : { "$lte" : 82 } } }, { "$addFields" : { "a" : "$a", "d" : "$k", "w.c" : 72 } }, { "$project" : { "d" : 0, "f" : 0 } }, { "$project" : { "k" : 0, "b" : 0, "y.a" : 0 } }, { "$sort" : { "f" : 1, "d" : -1 } }, { "$addFields" : { "h" : 84, "c" : "$n" } }, { "$project" : { "g" : 0, "h" : 0 } }, { "$match" : { "x.b" : { "$gte" : 0 } } }, { "$addFields" : { "a" : "$e", "b" : 67, "k" : 31 } }, { "$addFields" : { "h" : 38, "a" : 32, "j" : 62, "x" : "$x" } } ]
+
+
+Query 51 (with useIndex=false): [ { "$addFields" : { "e" : 84, "c" : "$h", "x.a" : 51, "x.b" : 60 } }, { "$project" : { "d" : 0 } }, { "$addFields" : { "k" : "$n", "w.a" : 27, "w.b" : 90 } }, { "$sort" : { "f" : 1, "g" : 1 } }, { "$match" : { "i" : { "$gt" : 2 } } }, { "$project" : { "b" : 0 } }, { "$match" : { "x.a" : { "$gt" : 9 } } }, { "$project" : { "c" : 0 } }, { "$addFields" : { "e" : 40, "l" : 63, "f" : 53, "x.a" : 53 } }, { "$project" : { "e" : 0, "c" : 0, "w.a" : 0, "w.c" : 0 } }, { "$project" : { "j" : 0, "b" : 0 } }, { "$match" : { "a" : { "$gt" : 19 } } } ]
+
+{_id: 1, a: 32, h: 71, x: {a: 53, b: 60, c: 0}, g: 26, w: {b: 90}, f: 53, i: 65, l: 63},
+{_id: 2, w: {b: 90}, i: 42, h: 50, g: 2, a: 85, f: 53, x: {a: 53, b: 60, c: 40}, l: 63},
+{_id: 3, a: 27, h: 72, x: {a: 53, b: 60, c: 77}, g: 8, w: {b: 90}, f: 53, i: 67, l: 63},
+{_id: 4, a: 29, h: 83, x: {a: 53, b: 60, c: 20}, g: 16, w: {b: 90}, f: 53, i: 38, l: 63},
+{_id: 5, x: {a: 53, b: 60, c: 70}, i: 93, g: 15, a: 89, w: {b: 90}, h: 75, f: 53, l: 63},
+{_id: 6, f: 53, a: 85, x: {a: 53, b: 60, c: 59}, w: {b: 90}, i: 84, h: 71, g: 16, l: 63},
+{_id: 7, w: {b: 90}, h: 86, f: 53, x: {a: 53, b: 60, c: 40}, i: 44, g: 66, a: 85, l: 63},
+{_id: 8, g: 62, w: {b: 90}, f: 53, i: 43, a: 75, h: 74, x: {a: 53, b: 60, c: 79}, l: 63}
+
+Query 52 (with useIndex=false): [ { "$addFields" : { "g" : 56, "k" : 56, "a" : "$n" } }, { "$project" : { "i" : 0, "c" : 0 } }, { "$addFields" : { "k" : "$p" } }, { "$project" : { "k" : 0, "c" : 0, "w" : 0 } }, { "$sort" : { "k" : 1, "e" : -1 } }, { "$project" : { "f" : 1, "i" : 1, "e" : 1, "k" : 1, "d" : 1, "h" : 1, "c" : 1, "g" : "$k", "j" : 1, "l" : "$e", "b" : 1, "y.a" : 1, "y.c" : 1, "x" : 1 } }, { "$match" : { "y.c" : { "$lt" : 98 } } }, { "$project" : { "a" : 0 } }, { "$project" : { "k" : 0 } }, { "$addFields" : { "g" : 30, "d" : 89, "x" : "$w" } } ]
+
+
+Query 53 (with useIndex=false): [ { "$match" : { "y.c" : { "$lte" : 88 } } }, { "$addFields" : { "c" : 75 } }, { "$project" : { "l" : 0 } }, { "$addFields" : { "b" : 78, "k" : "$f", "d" : 60, "y.b" : 58, "y.c" : 68 } }, { "$match" : { "y.c" : { "$lte" : 77 } } }, { "$project" : { "c" : { "$literal" : 91 }, "e" : 1, "f" : 1, "j" : "$k", "i" : 1, "a" : 1, "h" : "$k", "l" : 1, "g" : 1, "d" : 1, "b" : 1, "x.b" : 1, "x.c" : 1 } }, { "$addFields" : { "j" : "$m", "h" : 37, "y.b" : 24 } }, { "$project" : { "a" : 0 } }, { "$addFields" : { "i" : 14 } }, { "$project" : { "e" : 0 } }, { "$project" : { "k" : 0, "f" : 0 } } ]
+
+
+Query 54 (with useIndex=false): [ { "$addFields" : { "h" : 32, "c" : 68, "y.c" : 44 } }, { "$sort" : { "b" : 1 } }, { "$addFields" : { "f" : 19 } }, { "$project" : { "f" : 0, "j" : 0, "x.a" : 0 } }, { "$match" : { "y.c" : { "$gt" : 20 } } }, { "$project" : { "e" : 1, "a" : 1, "d" : { "$literal" : 94 }, "j" : 1, "k" : { "$literal" : 61 }, "h" : "$l", "l" : "$d", "f" : 1, "i" : 1, "g" : 1, "w" : 1, "y.b" : 1, "y.a" : 1 } }, { "$project" : { "h" : 0 } }, { "$project" : { "a" : 0, "d" : 0, "x.a" : 0 } }, { "$project" : { "b" : 0, "y" : 0 } }, { "$addFields" : { "g" : 94, "h" : 38, "b" : 5 } }, { "$sort" : { "l" : -1 } } ]
+
+{_id: 1, e: 95, g: 94, w: {a: 18, b: 25, c: 26}, i: 65, k: 61, h: 38, l: 10, b: 5},
+{_id: 2, e: 13, w: {a: 94, b: 32, c: 58}, i: 42, g: 94, k: 61, h: 38, l: 94, b: 5},
+{_id: 3, g: 94, w: {a: 11, b: 3, c: 9}, i: 67, e: 40, k: 61, h: 38, l: 93, b: 5},
+{_id: 4, g: 94, w: {a: 86, b: 75, c: 3}, i: 38, e: 82, k: 61, h: 38, l: 34, b: 5},
+{_id: 5, i: 93, g: 94, e: 87, w: {a: 44, b: 19, c: 96}, k: 61, h: 38, l: 7, b: 5},
+{_id: 6, e: 55, w: {a: 10, b: 66, c: 62}, i: 84, g: 94, k: 61, h: 38, l: 54, b: 5},
+{_id: 7, w: {a: 48, b: 63, c: 47}, i: 44, g: 94, e: 78, k: 61, h: 38, l: 65, b: 5},
+{_id: 8, g: 94, w: {a: 15, b: 23, c: 89}, i: 43, e: 63, k: 61, h: 38, l: 92, b: 5}
+
+Query 55 (with useIndex=false): [ { "$match" : { "x.a" : { "$gte" : 18 } } }, { "$project" : { "b" : 0, "h" : 0, "y.a" : 0, "y.c" : 0 } }, { "$project" : { "h" : 0, "l" : 0 } }, { "$sort" : { "k" : -1 } }, { "$group" : { "_id" : "$d", "l" : { "$sum" : "$l" }, "i" : { "$sum" : "$i" }, "j" : { "$sum" : "$j" }, "f" : { "$sum" : "$f" }, "c" : { "$sum" : "$c" }, "k" : { "$sum" : "$k" }, "b" : { "$sum" : "$b" }, "g" : { "$sum" : "$g" }, "d" : { "$sum" : "$d" }, "e" : { "$sum" : "$e" }, "a" : { "$sum" : "$a" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$project" : { "d" : 0, "i" : 0 } }, { "$addFields" : { "d" : 94, "b" : "$j", "w.a" : 34 } }, { "$addFields" : { "k" : 49, "e" : 75, "x" : "$w" } } ]
+
+{_id: 34, l: 0, j: 0, f: 50, c: 87, k: 49, b: 0, g: 16, d: 94, e: 75, a: 29, x: {a: 34, b: 75, c: 3}, w: {a: 34, b: 75, c: 3}, y: null},
+{_id: 54, l: 0, j: 0, f: 41, c: 94, k: 49, b: 0, g: 16, d: 94, e: 75, a: 85, x: {a: 34, b: 66, c: 62}, w: {a: 34, b: 66, c: 62}, y: null},
+{_id: 65, l: 0, j: 0, f: 18, c: 11, k: 49, b: 0, g: 66, d: 94, e: 75, a: 85, x: {a: 34, b: 63, c: 47}, w: {a: 34, b: 63, c: 47}, y: null},
+{_id: 7, l: 0, j: 0, f: 69, c: 49, k: 49, b: 0, g: 15, d: 94, e: 75, a: 89, x: {a: 34, b: 19, c: 96}, w: {a: 34, b: 19, c: 96}, y: null},
+{_id: 93, l: 0, j: 0, f: 49, c: 77, k: 49, b: 0, g: 8, d: 94, e: 75, a: 27, x: {a: 34, b: 3, c: 9}, w: {a: 34, b: 3, c: 9}, y: null}
+
+Query 56 (with useIndex=false): [ { "$addFields" : { "f" : "$f" } }, { "$project" : { "g" : 0, "h" : 0, "y" : 0 } }, { "$match" : { "f" : { "$lte" : 93 } } }, { "$project" : { "f" : 0 } }, { "$addFields" : { "g" : "$s", "k" : "$n", "y.a" : 42 } }, { "$project" : { "e" : 0, "g" : 0 } }, { "$project" : { "k" : 0, "i" : 0 } } ]
+
+{_id: 1, a: 32, d: 10, x: {a: 4, b: 40, c: 0}, c: 60, w: {a: 18, b: 25, c: 26}, b: 64, y: {a: 42}},
+{_id: 3, a: 27, d: 93, x: {a: 19, b: 99, c: 77}, c: 77, w: {a: 11, b: 3, c: 9}, b: 47, y: {a: 42}},
+{_id: 4, a: 29, d: 34, x: {a: 81, b: 68, c: 20}, c: 87, w: {a: 86, b: 75, c: 3}, b: 76, y: {a: 42}},
+{_id: 5, d: 7, b: 4, x: {a: 75, b: 5, c: 70}, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, y: {a: 42}},
+{_id: 6, d: 54, c: 94, b: 71, a: 85, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, y: {a: 42}},
+{_id: 7, w: {a: 48, b: 63, c: 47}, d: 65, b: 40, x: {a: 47, b: 88, c: 40}, c: 11, a: 85, y: {a: 42}},
+{_id: 8, c: 24, w: {a: 15, b: 23, c: 89}, b: 81, a: 75, d: 92, x: {a: 9, b: 4, c: 79}, y: {a: 42}}
+
+Query 57 (with useIndex=false): [ { "$project" : { "f" : 0 } }, { "$addFields" : { "c" : 63, "b" : 26, "a" : 21 } }, { "$project" : { "a" : 0, "x" : 0 } }, { "$match" : { "g" : { "$gte" : 13 } } }, { "$group" : { "_id" : "$i", "h" : { "$sum" : "$h" }, "i" : { "$sum" : "$i" }, "c" : { "$sum" : "$c" }, "g" : { "$sum" : "$g" }, "d" : { "$sum" : "$d" }, "k" : { "$sum" : "$k" }, "b" : { "$sum" : "$b" }, "e" : { "$sum" : "$e" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } }, { "$group" : { "_id" : "$b", "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "e" : { "$sum" : "$e" }, "b" : { "$sum" : "$b" }, "c" : { "$sum" : "$c" }, "g" : { "$sum" : "$g" }, "i" : { "$sum" : "$i" }, "k" : { "$sum" : "$k" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" } } }, { "$project" : { "a" : 0 } }, { "$addFields" : { "j" : 13 } } ]
+
+{_id: 26, f: 0, e: 460, b: 156, c: 378, g: 201, i: 367, k: 0, y: null, w: {a: 10, b: 66, c: 62}, x: null, j: 13}
+
+Query 58 (with useIndex=false): [ { "$addFields" : { "j" : 24 } }, { "$match" : { "x.c" : { "$lt" : 84 } } }, { "$project" : { "e" : 0, "h" : 0, "w.a" : 0, "w.c" : 0 } }, { "$project" : { "a" : 0, "x" : 0 } }, { "$project" : { "k" : 0, "c" : 0, "y" : 0 } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "x" } }, { "$unwind" : "$x" } ]
+
+{_id: 1, d: 10, x: {_id: 1, b: 57, c: 58, a: 41}, g: 26, w: {b: 25}, f: 85, b: 64, i: 65, j: 24},
+{_id: 2, w: {b: 32}, d: 94, i: 42, b: 21, g: 2, f: 98, x: {_id: 2, b: 12, c: 54, a: 92}, j: 24},
+{_id: 3, d: 93, x: {_id: 3, c: 99, a: 47, b: 57}, g: 8, w: {b: 3}, f: 49, b: 47, i: 67, j: 24},
+{_id: 4, d: 34, x: {_id: 4, b: 16, c: 7, a: 60}, g: 16, w: {b: 75}, f: 50, b: 76, i: 38, j: 24},
+{_id: 5, d: 7, b: 4, x: {_id: 5, a: 16, b: 71, c: 91}, i: 93, g: 15, w: {b: 19}, f: 69, j: 24},
+{_id: 6, f: 41, d: 54, b: 71, x: {_id: 6, c: 78, a: 37, b: 67}, w: {b: 66}, i: 84, g: 16, j: 24},
+{_id: 7, w: {b: 63}, f: 18, d: 65, b: 40, x: {_id: 7, a: 0, c: 4, b: 1}, i: 44, g: 66, j: 24},
+{_id: 8, g: 62, w: {b: 23}, f: 4, b: 81, i: 43, d: 92, x: {_id: 8, a: 14, b: 86, c: 90}, j: 24}
+
+Query 59 (with useIndex=false): [ { "$project" : { "h" : 0 } }, { "$addFields" : { "b" : 82, "l" : 85, "j" : 94 } }, { "$group" : { "_id" : "$j", "a" : { "$sum" : "$a" }, "d" : { "$sum" : "$d" }, "h" : { "$sum" : "$h" }, "e" : { "$sum" : "$e" }, "b" : { "$sum" : "$b" }, "f" : { "$sum" : "$f" }, "k" : { "$sum" : "$k" }, "j" : { "$sum" : "$j" }, "g" : { "$sum" : "$g" }, "i" : { "$sum" : "$i" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$sort" : { "f" : -1 } }, { "$match" : { "e" : { "$lte" : 86 } } }, { "$sort" : { "i" : -1, "a" : -1 } }, { "$group" : { "_id" : "$a", "k" : { "$sum" : "$k" }, "l" : { "$sum" : "$l" }, "j" : { "$sum" : "$j" }, "g" : { "$sum" : "$g" }, "d" : { "$sum" : "$d" }, "f" : { "$sum" : "$f" }, "c" : { "$sum" : "$c" }, "h" : { "$sum" : "$h" }, "b" : { "$sum" : "$b" }, "e" : { "$sum" : "$e" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } }, { "$sort" : { "l" : 1 } }, { "$project" : { "d" : 0, "b" : 0 } }, { "$match" : { "g" : { "$lt" : 75 } } }, { "$match" : { "f" : { "$gt" : 14 } } } ]
+
+
+Query 60 (with useIndex=false): [ { "$project" : { "f" : "$j", "d" : "$a", "j" : 1, "h" : 1, "e" : 1, "b" : "$f", "a" : 1, "c" : 1, "x.b" : 1 } }, { "$group" : { "_id" : "$c", "h" : { "$sum" : "$h" }, "f" : { "$sum" : "$f" }, "e" : { "$sum" : "$e" }, "i" : { "$sum" : "$i" }, "a" : { "$sum" : "$a" }, "b" : { "$sum" : "$b" }, "l" : { "$sum" : "$l" }, "j" : { "$sum" : "$j" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "f" : 61, "g" : "$j" } }, { "$addFields" : { "f" : 55, "i" : 62, "y" : "$y" } }, { "$project" : { "f" : 1, "k" : "$k", "b" : 1, "j" : 1, "a" : 1, "l" : 1, "e" : 1, "i" : 1, "g" : 1, "x" : 1, "w.b" : 1, "w.c" : 1 } }, { "$addFields" : { "a" : 35, "d" : 36, "x" : "$y" } }, { "$group" : { "_id" : "$i", "i" : { "$sum" : "$i" }, "l" : { "$sum" : "$l" }, "k" : { "$sum" : "$k" }, "g" : { "$sum" : "$g" }, "e" : { "$sum" : "$e" }, "b" : { "$sum" : "$b" }, "h" : { "$sum" : "$h" }, "j" : { "$sum" : "$j" }, "c" : { "$sum" : "$c" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" } } }, { "$project" : { "i" : 0, "e" : 0 } } ]
+
+{_id: 62, l: 0, k: 0, g: 0, b: 414, h: 0, j: 0, c: 0, y: null, w: null, x: null}
+
+Query 61 (with useIndex=false): [ { "$addFields" : { "e" : 45, "k" : "$t", "a" : 41, "x" : "$w" } }, { "$addFields" : { "l" : 60 } }, { "$addFields" : { "a" : 55, "y.a" : 18 } }, { "$addFields" : { "b" : 70 } }, { "$addFields" : { "c" : "$q", "x.b" : 15 } }, { "$addFields" : { "h" : 41, "b" : 53, "e" : "$n", "w" : "$y" } }, { "$match" : { "y.b" : { "$gte" : 11 } } }, { "$project" : { "f" : 0, "d" : 0, "w" : 0 } }, { "$match" : { "b" : { "$gte" : 16 } } } ]
+
+
+Query 62 (with useIndex=false): [ { "$sort" : { "g" : -1, "b" : -1 } }, { "$addFields" : { "k" : 27 } }, { "$addFields" : { "g" : 99, "i" : "$l" } }, { "$project" : { "b" : 0, "w" : 0 } }, { "$addFields" : { "i" : 80, "h" : 49 } }, { "$addFields" : { "j" : 55 } } ]
+
+{_id: 1, e: 95, a: 32, h: 49, d: 10, x: {a: 4, b: 40, c: 0}, g: 99, c: 60, f: 85, i: 80, k: 27, j: 55},
+{_id: 2, e: 13, d: 94, i: 80, c: 32, h: 49, g: 99, a: 85, f: 98, x: {a: 8, b: 71, c: 40}, k: 27, j: 55},
+{_id: 3, a: 27, h: 49, d: 93, x: {a: 19, b: 99, c: 77}, g: 99, c: 77, f: 49, i: 80, e: 40, k: 27, j: 55},
+{_id: 4, a: 29, h: 49, d: 34, x: {a: 81, b: 68, c: 20}, g: 99, c: 87, f: 50, i: 80, e: 82, k: 27, j: 55},
+{_id: 5, d: 7, x: {a: 75, b: 5, c: 70}, i: 80, g: 99, e: 87, c: 49, a: 89, h: 49, f: 69, k: 27, j: 55},
+{_id: 6, f: 41, e: 55, d: 54, c: 94, a: 85, x: {a: 59, b: 36, c: 59}, i: 80, h: 49, g: 99, k: 27, j: 55},
+{_id: 7, h: 49, f: 18, d: 65, x: {a: 47, b: 88, c: 40}, i: 80, g: 99, e: 78, c: 11, a: 85, k: 27, j: 55},
+{_id: 8, g: 99, c: 24, f: 4, i: 80, e: 63, a: 75, h: 49, d: 92, x: {a: 9, b: 4, c: 79}, k: 27, j: 55}
+
+Query 63 (with useIndex=false): [ { "$project" : { "h" : 0, "y.c" : 0, "y.a" : 0 } }, { "$addFields" : { "f" : 52, "a" : 20, "x.c" : 49, "x.b" : 5 } }, { "$match" : { "e" : { "$lt" : 94 } } }, { "$project" : { "k" : 0, "e" : 0, "y.c" : 0 } }, { "$addFields" : { "d" : "$m", "a" : 99, "l" : 26, "x" : "$w" } }, { "$addFields" : { "h" : 31, "l" : 94, "y.a" : 57, "y.b" : 34 } }, { "$addFields" : { "b" : 14, "x" : "$x" } }, { "$sort" : { "i" : -1, "c" : -1 } }, { "$project" : { "c" : 0, "y.a" : 0 } } ]
+
+{_id: 2, w: {a: 94, b: 32, c: 58}, i: 42, b: 14, g: 2, a: 99, f: 52, x: {a: 94, b: 32, c: 58}, l: 94, h: 31, y: {b: 34}},
+{_id: 3, a: 99, x: {a: 11, b: 3, c: 9}, g: 8, w: {a: 11, b: 3, c: 9}, f: 52, b: 14, i: 67, l: 94, h: 31, y: {b: 34}},
+{_id: 4, a: 99, x: {a: 86, b: 75, c: 3}, g: 16, w: {a: 86, b: 75, c: 3}, f: 52, b: 14, i: 38, l: 94, h: 31, y: {b: 34}},
+{_id: 5, b: 14, x: {a: 44, b: 19, c: 96}, i: 93, g: 15, a: 99, w: {a: 44, b: 19, c: 96}, f: 52, l: 94, h: 31, y: {b: 34}},
+{_id: 6, f: 52, b: 14, a: 99, x: {a: 10, b: 66, c: 62}, w: {a: 10, b: 66, c: 62}, i: 84, g: 16, l: 94, h: 31, y: {b: 34}},
+{_id: 7, w: {a: 48, b: 63, c: 47}, f: 52, b: 14, x: {a: 48, b: 63, c: 47}, i: 44, g: 66, a: 99, l: 94, h: 31, y: {b: 34}},
+{_id: 8, g: 62, w: {a: 15, b: 23, c: 89}, f: 52, b: 14, i: 43, a: 99, x: {a: 15, b: 23, c: 89}, l: 94, h: 31, y: {b: 34}}
+
+Query 64 (with useIndex=false): [ { "$addFields" : { "j" : 53, "h" : 18, "b" : "$m" } }, { "$match" : { "y.a" : { "$lte" : 82 } } }, { "$addFields" : { "j" : "$j", "y" : "$w" } }, { "$addFields" : { "g" : 79, "k" : 47, "j" : 98 } }, { "$project" : { "f" : 1, "b" : "$i", "c" : 1, "g" : 1, "d" : "$g", "l" : "$a", "a" : 1, "e" : "$h", "j" : 1, "k" : { "$literal" : 67 }, "i" : "$c", "y" : 1, "x" : 1 } }, { "$addFields" : { "i" : 15, "x" : "$y" } }, { "$sort" : { "d" : -1 } }, { "$addFields" : { "j" : 94, "w.a" : 51, "w.b" : 53 } }, { "$sort" : { "j" : -1, "k" : -1 } }, { "$project" : { "c" : 0, "a" : 0, "w.b" : 0, "w.a" : 0 } } ]
+
+
+Query 65 (with useIndex=false): [ { "$match" : { "d" : { "$lt" : 81 } } }, { "$addFields" : { "f" : "$p" } }, { "$addFields" : { "j" : 39, "e" : "$m", "x" : "$w" } }, { "$addFields" : { "k" : 96, "a" : 68 } }, { "$addFields" : { "c" : "$q" } }, { "$project" : { "g" : 1, "i" : 1, "d" : 1, "j" : 1, "k" : 1, "a" : 1, "l" : 1, "e" : 1, "b" : 1, "c" : "$c", "f" : 1, "x" : 1 } }, { "$addFields" : { "h" : 36, "g" : "$g", "y.a" : 54, "y.c" : 95 } }, { "$addFields" : { "a" : 75 } } ]
+
+{_id: 1, d: 10, g: 26, b: 64, i: 65, j: 39, x: {a: 18, b: 25, c: 26}, k: 96, a: 75, h: 36, y: {a: 54, c: 95}},
+{_id: 4, d: 34, g: 16, b: 76, i: 38, j: 39, x: {a: 86, b: 75, c: 3}, k: 96, a: 75, h: 36, y: {a: 54, c: 95}},
+{_id: 5, d: 7, b: 4, i: 93, g: 15, j: 39, x: {a: 44, b: 19, c: 96}, k: 96, a: 75, h: 36, y: {a: 54, c: 95}},
+{_id: 6, d: 54, b: 71, i: 84, g: 16, j: 39, x: {a: 10, b: 66, c: 62}, k: 96, a: 75, h: 36, y: {a: 54, c: 95}},
+{_id: 7, d: 65, b: 40, i: 44, g: 66, j: 39, x: {a: 48, b: 63, c: 47}, k: 96, a: 75, h: 36, y: {a: 54, c: 95}}
+
+Query 66 (with useIndex=false): [ { "$sort" : { "f" : 1 } }, { "$project" : { "b" : 0 } }, { "$project" : { "g" : 0 } }, { "$sort" : { "d" : -1, "e" : -1 } }, { "$limit" : 6 }, { "$project" : { "b" : 0, "g" : 0, "w.c" : 0 } }, { "$sort" : { "i" : -1, "g" : 1 } }, { "$project" : { "b" : 1, "k" : 1, "j" : "$b", "i" : 1, "e" : "$k", "d" : 1, "g" : 1, "f" : 1, "w.a" : 1, "y" : 1 } }, { "$project" : { "l" : 0 } }, { "$project" : { "d" : "$l", "h" : 1, "b" : { "$literal" : 73 }, "i" : 1, "a" : "$f", "f" : "$d", "c" : "$a", "e" : 1, "l" : "$f", "x" : 1 } }, { "$addFields" : { "h" : "$k" } } ]
+
+{_id: 2, i: 42, b: 73, a: 98, f: 94, l: 98},
+{_id: 3, i: 67, b: 73, a: 49, f: 93, l: 49},
+{_id: 4, i: 38, b: 73, a: 50, f: 34, l: 50},
+{_id: 6, i: 84, b: 73, a: 41, f: 54, l: 41},
+{_id: 7, i: 44, b: 73, a: 18, f: 65, l: 18},
+{_id: 8, i: 43, b: 73, a: 4, f: 92, l: 4}
+
+Query 67 (with useIndex=false): [ { "$addFields" : { "j" : "$l", "i" : 6, "k" : 6, "y.b" : 17, "y.a" : 25 } }, { "$project" : { "a" : 0 } }, { "$match" : { "y.b" : { "$lt" : 88 } } }, { "$addFields" : { "a" : 52 } }, { "$addFields" : { "h" : 22, "g" : 72, "b" : "$e" } }, { "$addFields" : { "c" : 63, "k" : 84 } }, { "$group" : { "_id" : "$a", "e" : { "$sum" : "$e" }, "g" : { "$sum" : "$g" }, "l" : { "$sum" : "$l" }, "k" : { "$sum" : "$k" }, "i" : { "$sum" : "$i" }, "b" : { "$sum" : "$b" }, "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "c" : { "$sum" : "$c" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "f" : "$p", "a" : "$r", "l" : 38, "x.b" : 89, "x.a" : 82 } }, { "$project" : { "j" : 0, "g" : 0, "x.c" : 0, "x.b" : 0 } }, { "$addFields" : { "k" : "$j", "b" : 99, "g" : "$n", "w.c" : 12 } }, { "$group" : { "_id" : "$k", "e" : { "$sum" : "$e" }, "b" : { "$sum" : "$b" }, "i" : { "$sum" : "$i" }, "d" : { "$sum" : "$d" }, "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "k" : { "$sum" : "$k" }, "g" : { "$sum" : "$g" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } } ]
+
+{_id: null, e: 513, b: 99, i: 48, d: 0, a: 0, f: 0, k: 0, g: 0, y: {b: 17, a: 25}, x: {a: 82}, w: {a: 10, b: 66, c: 12}}
+
+Query 68 (with useIndex=false): [ { "$addFields" : { "k" : "$d", "x" : "$y" } }, { "$match" : { "w.a" : { "$gte" : 19 } } }, { "$sort" : { "e" : -1, "j" : -1 } }, { "$limit" : 8 }, { "$project" : { "j" : 0, "a" : 0, "x.b" : 0 } }, { "$project" : { "c" : 0, "f" : 0 } }, { "$project" : { "j" : 0, "w.a" : 0, "w.b" : 0 } } ]
+
+{_id: 2, e: 13, w: {c: 58}, d: 94, i: 42, h: 50, b: 21, g: 2, k: 94},
+{_id: 4, h: 83, d: 34, g: 16, w: {c: 3}, b: 76, i: 38, e: 82, k: 34},
+{_id: 5, d: 7, b: 4, i: 93, g: 15, e: 87, w: {c: 96}, h: 75, k: 7},
+{_id: 7, w: {c: 47}, h: 86, d: 65, b: 40, i: 44, g: 66, e: 78, k: 65}
+
+Query 69 (with useIndex=false): [ { "$addFields" : { "f" : "$t", "a" : 70 } }, { "$sort" : { "b" : 1, "j" : 1 } }, { "$limit" : 6 }, { "$addFields" : { "d" : 95, "k" : "$m", "e" : 85 } }, { "$addFields" : { "f" : 24, "l" : 49, "i" : "$q", "x" : "$w" } }, { "$project" : { "b" : 0, "a" : 0 } }, { "$match" : { "f" : { "$lt" : 78 } } }, { "$sort" : { "c" : -1 } }, { "$limit" : 9 } ]
+
+{_id: 1, e: 85, h: 71, d: 95, x: {a: 18, b: 25, c: 26}, g: 26, c: 60, w: {a: 18, b: 25, c: 26}, f: 24, l: 49},
+{_id: 2, e: 85, w: {a: 94, b: 32, c: 58}, d: 95, c: 32, h: 50, g: 2, f: 24, x: {a: 94, b: 32, c: 58}, l: 49},
+{_id: 3, h: 72, d: 95, x: {a: 11, b: 3, c: 9}, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, f: 24, e: 85, l: 49},
+{_id: 5, d: 95, x: {a: 44, b: 19, c: 96}, g: 15, e: 85, c: 49, w: {a: 44, b: 19, c: 96}, h: 75, f: 24, l: 49},
+{_id: 6, f: 24, e: 85, d: 95, c: 94, x: {a: 10, b: 66, c: 62}, w: {a: 10, b: 66, c: 62}, h: 71, g: 16, l: 49},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 86, f: 24, d: 95, x: {a: 48, b: 63, c: 47}, g: 66, e: 85, c: 11, l: 49}
+
+Query 70 (with useIndex=false): [ { "$group" : { "_id" : "$g", "f" : { "$sum" : "$f" }, "l" : { "$sum" : "$l" }, "c" : { "$sum" : "$c" }, "e" : { "$sum" : "$e" }, "k" : { "$sum" : "$k" }, "a" : { "$sum" : "$a" }, "i" : { "$sum" : "$i" }, "d" : { "$sum" : "$d" }, "j" : { "$sum" : "$j" }, "h" : { "$sum" : "$h" }, "g" : { "$sum" : "$g" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" } } }, { "$match" : { "x.b" : { "$lte" : 82 } } }, { "$match" : { "w.b" : { "$gt" : 11 } } }, { "$sort" : { "k" : -1, "h" : 1 } }, { "$addFields" : { "c" : 68, "l" : 56, "h" : 18 } }, { "$addFields" : { "k" : 53, "i" : "$s", "b" : 83 } }, { "$match" : { "a" : { "$lte" : 98 } } }, { "$project" : { "k" : 0, "l" : 0 } }, { "$match" : { "x.c" : { "$gte" : 19 } } } ]
+
+{_id: 15, f: 69, c: 68, e: 87, a: 89, d: 7, j: 0, h: 18, g: 15, y: null, w: {a: 44, b: 19, c: 96}, x: {a: 75, b: 5, c: 70}, b: 83},
+{_id: 2, f: 98, c: 68, e: 13, a: 85, d: 94, j: 0, h: 18, g: 2, y: null, w: {a: 94, b: 32, c: 58}, x: {a: 8, b: 71, c: 40}, b: 83},
+{_id: 62, f: 4, c: 68, e: 63, a: 75, d: 92, j: 0, h: 18, g: 62, y: null, w: {a: 15, b: 23, c: 89}, x: {a: 9, b: 4, c: 79}, b: 83}
+
+Query 71 (with useIndex=false): [ { "$project" : { "l" : 1, "b" : "$k", "a" : 1, "h" : "$a", "k" : "$e", "e" : 1, "f" : 1, "g" : "$g", "x" : 1 } }, { "$project" : { "j" : 0, "l" : 0 } }, { "$project" : { "b" : 0, "g" : 0 } }, { "$addFields" : { "j" : 58, "c" : 12, "f" : "$j", "w.b" : 31 } }, { "$addFields" : { "c" : 23, "f" : 85 } } ]
+
+{_id: 1, e: 95, a: 32, x: {a: 4, b: 40, c: 0}, f: 85, h: 32, k: 95, j: 58, c: 23, w: {b: 31}},
+{_id: 2, e: 13, a: 85, f: 85, x: {a: 8, b: 71, c: 40}, h: 85, k: 13, j: 58, c: 23, w: {b: 31}},
+{_id: 3, a: 27, x: {a: 19, b: 99, c: 77}, f: 85, e: 40, h: 27, k: 40, j: 58, c: 23, w: {b: 31}},
+{_id: 4, a: 29, x: {a: 81, b: 68, c: 20}, f: 85, e: 82, h: 29, k: 82, j: 58, c: 23, w: {b: 31}},
+{_id: 5, x: {a: 75, b: 5, c: 70}, e: 87, a: 89, f: 85, h: 89, k: 87, j: 58, c: 23, w: {b: 31}},
+{_id: 6, f: 85, e: 55, a: 85, x: {a: 59, b: 36, c: 59}, h: 85, k: 55, j: 58, c: 23, w: {b: 31}},
+{_id: 7, f: 85, x: {a: 47, b: 88, c: 40}, e: 78, a: 85, h: 85, k: 78, j: 58, c: 23, w: {b: 31}},
+{_id: 8, f: 85, e: 63, a: 75, x: {a: 9, b: 4, c: 79}, h: 75, k: 63, j: 58, c: 23, w: {b: 31}}
+
+Query 72 (with useIndex=false): [ { "$project" : { "j" : 0, "l" : 0, "x.a" : 0, "x.b" : 0 } }, { "$match" : { "x.a" : { "$gt" : 5 } } }, { "$project" : { "i" : 0, "y.b" : 0, "y.c" : 0 } }, { "$sort" : { "i" : -1, "f" : -1 } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "y" } }, { "$unwind" : "$y" }, { "$group" : { "_id" : "$p", "j" : { "$sum" : "$j" }, "f" : { "$sum" : "$f" }, "i" : { "$sum" : "$i" }, "a" : { "$sum" : "$a" }, "b" : { "$sum" : "$b" }, "g" : { "$sum" : "$g" }, "c" : { "$sum" : "$c" }, "k" : { "$sum" : "$k" }, "e" : { "$sum" : "$e" }, "l" : { "$sum" : "$l" }, "h" : { "$sum" : "$h" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" } } } ]
+
+
+Query 1 (with useIndex=true): [ { "$addFields" : { "l" : 71, "h" : 0, "c" : 3 } }, { "$addFields" : { "c" : 5, "b" : 8, "j" : "$e" } }, { "$project" : { "g" : 0, "h" : 0, "y" : 0 } }, { "$match" : { "e" : { "$gt" : 6 } } }, { "$project" : { "c" : 0, "x" : 0 } }, { "$addFields" : { "c" : "$c", "e" : "$g", "k" : 75 } }, { "$addFields" : { "d" : 67, "c" : "$g", "i" : 14, "y" : "$y" } }, { "$project" : { "d" : 0 } }, { "$project" : { "e" : 0 } }, { "$addFields" : { "l" : "$g", "i" : 9, "a" : 93, "w" : "$y" } } ]
+
+{_id: 1, a: 93, f: 85, b: 8, i: 9, j: 95, k: 75},
+{_id: 2, i: 9, b: 8, a: 93, f: 98, j: 13, k: 75},
+{_id: 3, a: 93, f: 49, b: 8, i: 9, j: 40, k: 75},
+{_id: 4, a: 93, f: 50, b: 8, i: 9, j: 82, k: 75},
+{_id: 5, b: 8, i: 9, a: 93, f: 69, j: 87, k: 75},
+{_id: 6, f: 41, b: 8, a: 93, i: 9, j: 55, k: 75},
+{_id: 7, f: 18, b: 8, i: 9, a: 93, j: 78, k: 75},
+{_id: 8, f: 4, b: 8, i: 9, a: 93, j: 63, k: 75}
+
+Query 2 (with useIndex=true): [ { "$addFields" : { "e" : 61, "w" : "$x" } }, { "$addFields" : { "a" : "$o", "b" : 78, "y" : "$y" } }, { "$addFields" : { "f" : "$j", "a" : "$i", "w" : "$w" } }, { "$addFields" : { "b" : 43, "g" : 97, "l" : 94, "y" : "$x" } }, { "$addFields" : { "a" : 10, "f" : 35, "c" : 80 } }, { "$match" : { "q" : { "$lte" : 75 } } }, { "$match" : { "h" : { "$gte" : 4 } } }, { "$project" : { "l" : 0 } }, { "$match" : { "b" : { "$gte" : 2 } } }, { "$addFields" : { "c" : 4 } } ]
+
+
+Query 3 (with useIndex=true): [ { "$project" : { "j" : 0, "d" : 0, "y" : 0 } }, { "$addFields" : { "d" : "$k", "x" : "$x" } }, { "$match" : { "q" : { "$gte" : 9 } } }, { "$addFields" : { "b" : 15, "k" : 48, "l" : 61, "w" : "$w" } }, { "$project" : { "l" : 0 } }, { "$match" : { "q" : { "$lte" : 99 } } }, { "$match" : { "h" : { "$gt" : 10 } } }, { "$project" : { "c" : 0, "h" : 0 } }, { "$addFields" : { "b" : 24 } }, { "$addFields" : { "a" : 88 } }, { "$addFields" : { "f" : "$l", "y" : "$x" } }, { "$project" : { "b" : 0, "c" : 0 } } ]
+
+
+Query 4 (with useIndex=true): [ { "$addFields" : { "i" : "$l", "w" : "$x" } }, { "$project" : { "e" : 0, "d" : 0, "y" : 0 } }, { "$project" : { "i" : 1, "g" : 1, "b" : 1, "e" : "$k", "k" : 1, "h" : 1, "f" : { "$literal" : 16 }, "c" : 1, "j" : 1, "l" : 1, "x" : 1, "w" : 1 } }, { "$match" : { "c" : { "$lte" : 94 } } }, { "$project" : { "a" : 0, "b" : 0, "x" : 0 } }, { "$project" : { "b" : 1, "k" : "$b", "e" : "$a", "l" : 1, "j" : "$j", "f" : 1, "i" : 1, "d" : "$h", "g" : 1, "a" : 1, "c" : 1, "x" : 1, "w" : 1 } }, { "$project" : { "l" : 1, "f" : 1, "i" : 1, "k" : 1, "e" : "$h", "c" : 1, "g" : 1, "d" : 1, "h" : 1, "y" : 1 } }, { "$match" : { "f" : { "$lte" : 80 } } } ]
+
+{_id: 1, g: 26, c: 60, f: 16, d: 71},
+{_id: 2, c: 32, g: 2, f: 16, d: 50},
+{_id: 3, g: 8, c: 77, f: 16, d: 72},
+{_id: 4, g: 16, c: 87, f: 16, d: 83},
+{_id: 5, g: 15, c: 49, f: 16, d: 75},
+{_id: 6, c: 94, g: 16, f: 16, d: 71},
+{_id: 7, g: 66, c: 11, f: 16, d: 86},
+{_id: 8, g: 62, c: 24, f: 16, d: 74}
+
+Query 5 (with useIndex=true): [ { "$project" : { "f" : 0 } }, { "$addFields" : { "h" : "$s", "a" : 30, "y" : "$w" } }, { "$addFields" : { "h" : 21, "l" : 9 } }, { "$project" : { "g" : 0 } }, { "$project" : { "g" : 0, "l" : 0 } }, { "$match" : { "e" : { "$lte" : 83 } } }, { "$project" : { "k" : "$k", "d" : 1, "b" : 1, "l" : 1, "a" : "$f", "f" : 1, "i" : 1, "e" : 1, "g" : 1, "h" : 1, "j" : 1, "y" : 1 } }, { "$project" : { "j" : 0, "c" : 0 } } ]
+
+{_id: 2, e: 13, d: 94, i: 42, b: 21, h: 21, y: {a: 94, b: 32, c: 58}},
+{_id: 3, d: 93, b: 47, i: 67, e: 40, h: 21, y: {a: 11, b: 3, c: 9}},
+{_id: 4, d: 34, b: 76, i: 38, e: 82, h: 21, y: {a: 86, b: 75, c: 3}},
+{_id: 6, e: 55, d: 54, b: 71, i: 84, h: 21, y: {a: 10, b: 66, c: 62}},
+{_id: 7, d: 65, b: 40, i: 44, e: 78, h: 21, y: {a: 48, b: 63, c: 47}},
+{_id: 8, b: 81, i: 43, e: 63, d: 92, h: 21, y: {a: 15, b: 23, c: 89}}
+
+Query 6 (with useIndex=true): [ { "$project" : { "f" : "$k", "d" : 1, "l" : 1, "b" : 1, "a" : "$c", "k" : 1, "g" : 1, "i" : "$b", "j" : 1, "y" : 1 } }, { "$project" : { "c" : 0, "x" : 0 } }, { "$addFields" : { "b" : 60, "d" : 5 } }, { "$project" : { "j" : 0 } }, { "$match" : { "g" : { "$gte" : 7 } } } ]
+
+{_id: 1, d: 5, g: 26, b: 60, a: 60, i: 64},
+{_id: 3, d: 5, g: 8, b: 60, a: 77, i: 47},
+{_id: 4, d: 5, g: 16, b: 60, a: 87, i: 76},
+{_id: 5, d: 5, b: 60, g: 15, a: 49, i: 4},
+{_id: 6, d: 5, b: 60, g: 16, a: 94, i: 71},
+{_id: 7, d: 5, b: 60, g: 66, a: 11, i: 40},
+{_id: 8, g: 62, b: 60, d: 5, a: 24, i: 81}
+
+Query 7 (with useIndex=true): [ { "$addFields" : { "h" : "$r", "c" : "$a", "i" : "$c" } }, { "$addFields" : { "j" : 72, "y" : "$y" } }, { "$addFields" : { "e" : 48, "j" : "$q", "w" : "$x" } }, { "$group" : { "_id" : "$g", "i" : { "$sum" : "$i" }, "j" : { "$sum" : "$j" }, "k" : { "$sum" : "$k" }, "e" : { "$sum" : "$e" }, "d" : { "$sum" : "$d" }, "c" : { "$sum" : "$c" }, "b" : { "$sum" : "$b" }, "f" : { "$sum" : "$f" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "e" : "$j" } } ]
+
+{_id: 15, i: 49, j: 0, k: 0, e: 0, d: 7, c: 89, b: 4, f: 69, x: {a: 75, b: 5, c: 70}, w: {a: 75, b: 5, c: 70}, y: null},
+{_id: 16, i: 181, j: 0, k: 0, e: 0, d: 88, c: 114, b: 147, f: 91, x: {a: 59, b: 36, c: 59}, w: {a: 59, b: 36, c: 59}, y: null},
+{_id: 2, i: 32, j: 0, k: 0, e: 0, d: 94, c: 85, b: 21, f: 98, x: {a: 8, b: 71, c: 40}, w: {a: 8, b: 71, c: 40}, y: null},
+{_id: 26, i: 60, j: 0, k: 0, e: 0, d: 10, c: 32, b: 64, f: 85, x: {a: 4, b: 40, c: 0}, w: {a: 4, b: 40, c: 0}, y: null},
+{_id: 62, i: 24, j: 0, k: 0, e: 0, d: 92, c: 75, b: 81, f: 4, x: {a: 9, b: 4, c: 79}, w: {a: 9, b: 4, c: 79}, y: null},
+{_id: 66, i: 11, j: 0, k: 0, e: 0, d: 65, c: 85, b: 40, f: 18, x: {a: 47, b: 88, c: 40}, w: {a: 47, b: 88, c: 40}, y: null},
+{_id: 8, i: 77, j: 0, k: 0, e: 0, d: 93, c: 27, b: 47, f: 49, x: {a: 19, b: 99, c: 77}, w: {a: 19, b: 99, c: 77}, y: null}
+
+Query 8 (with useIndex=true): [ { "$project" : { "g" : 0, "w" : 0 } }, { "$addFields" : { "e" : "$o", "h" : 29, "f" : "$n" } }, { "$addFields" : { "a" : "$f", "j" : "$k", "x" : "$x" } }, { "$addFields" : { "h" : "$h", "l" : "$l", "d" : 28 } }, { "$project" : { "d" : 0, "f" : 0, "y" : 0 } }, { "$project" : { "k" : 0 } } ]
+
+{_id: 1, h: 29, x: {a: 4, b: 40, c: 0}, c: 60, b: 64, i: 65},
+{_id: 2, i: 42, c: 32, h: 29, b: 21, x: {a: 8, b: 71, c: 40}},
+{_id: 3, h: 29, x: {a: 19, b: 99, c: 77}, c: 77, b: 47, i: 67},
+{_id: 4, h: 29, x: {a: 81, b: 68, c: 20}, c: 87, b: 76, i: 38},
+{_id: 5, b: 4, x: {a: 75, b: 5, c: 70}, i: 93, c: 49, h: 29},
+{_id: 6, c: 94, b: 71, x: {a: 59, b: 36, c: 59}, i: 84, h: 29},
+{_id: 7, h: 29, b: 40, x: {a: 47, b: 88, c: 40}, i: 44, c: 11},
+{_id: 8, c: 24, b: 81, i: 43, h: 29, x: {a: 9, b: 4, c: 79}}
+
+Query 9 (with useIndex=true): [ { "$project" : { "l" : 0, "x" : 0 } }, { "$addFields" : { "b" : 13 } }, { "$group" : { "_id" : "$q", "c" : { "$sum" : "$c" }, "j" : { "$sum" : "$j" }, "b" : { "$sum" : "$b" }, "a" : { "$sum" : "$a" }, "k" : { "$sum" : "$k" }, "f" : { "$sum" : "$f" }, "h" : { "$sum" : "$h" }, "e" : { "$sum" : "$e" }, "g" : { "$sum" : "$g" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$match" : { "e" : { "$lte" : 84 } } }, { "$addFields" : { "f" : 19, "e" : "$q", "h" : 69 } }, { "$addFields" : { "g" : 48, "k" : 94, "c" : 6, "y" : "$x" } }, { "$match" : { "b" : { "$lte" : 80 } } }, { "$project" : { "a" : 0, "w" : 0 } }, { "$addFields" : { "j" : 99, "x" : "$x" } }, { "$addFields" : { "b" : 82, "d" : "$e", "h" : 49, "x" : "$y" } }, { "$match" : { "c" : { "$gt" : 13 } } } ]
+
+
+Query 10 (with useIndex=true): [ { "$addFields" : { "a" : 98, "k" : 81, "e" : 47 } }, { "$group" : { "_id" : "$h", "j" : { "$sum" : "$j" }, "h" : { "$sum" : "$h" }, "l" : { "$sum" : "$l" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "a" : { "$sum" : "$a" }, "b" : { "$sum" : "$b" }, "g" : { "$sum" : "$g" }, "d" : { "$sum" : "$d" }, "e" : { "$sum" : "$e" }, "i" : { "$sum" : "$i" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "c" : 24 } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "y" } }, { "$unwind" : "$y" }, { "$addFields" : { "d" : 34 } }, { "$project" : { "a" : 0, "w" : 0 } }, { "$addFields" : { "f" : 47, "j" : 56, "y" : "$w" } }, { "$match" : { "h" : { "$gt" : 21 } } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "x" } }, { "$unwind" : "$x" }, { "$project" : { "g" : 0 } } ]
+
+
+Query 11 (with useIndex=true): [ { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "x" } }, { "$unwind" : "$x" }, { "$project" : { "e" : 0, "a" : 0 } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "y" } }, { "$unwind" : "$y" }, { "$group" : { "_id" : "$p", "b" : { "$sum" : "$b" }, "c" : { "$sum" : "$c" }, "j" : { "$sum" : "$j" }, "d" : { "$sum" : "$d" }, "e" : { "$sum" : "$e" }, "i" : { "$sum" : "$i" }, "a" : { "$sum" : "$a" }, "g" : { "$sum" : "$g" }, "k" : { "$sum" : "$k" }, "h" : { "$sum" : "$h" }, "l" : { "$sum" : "$l" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } }, { "$match" : { "c" : { "$gt" : 2 } } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "x" } }, { "$unwind" : "$x" }, { "$addFields" : { "d" : "$p", "e" : 34, "x" : "$y" } }, { "$addFields" : { "l" : "$e", "i" : "$l" } }, { "$project" : { "i" : 0, "x" : 0 } }, { "$project" : { "k" : 0, "x" : 0 } }, { "$addFields" : { "e" : 92, "k" : 9, "w" : "$x" } } ]
+
+
+Query 12 (with useIndex=true): [ { "$project" : { "i" : 0, "b" : 0 } }, { "$project" : { "h" : 0, "i" : 0, "x" : 0 } }, { "$project" : { "d" : 0, "y" : 0 } }, { "$match" : { "c" : { "$lt" : 88 } } } ]
+
+{_id: 1, e: 95, a: 32, g: 26, c: 60, w: {a: 18, b: 25, c: 26}, f: 85},
+{_id: 2, e: 13, w: {a: 94, b: 32, c: 58}, c: 32, g: 2, a: 85, f: 98},
+{_id: 3, a: 27, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, f: 49, e: 40},
+{_id: 4, a: 29, g: 16, c: 87, w: {a: 86, b: 75, c: 3}, f: 50, e: 82},
+{_id: 5, g: 15, e: 87, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, f: 69},
+{_id: 7, w: {a: 48, b: 63, c: 47}, f: 18, g: 66, e: 78, c: 11, a: 85},
+{_id: 8, g: 62, c: 24, w: {a: 15, b: 23, c: 89}, f: 4, e: 63, a: 75}
+
+Query 13 (with useIndex=true): [ { "$addFields" : { "k" : "$a", "x" : "$x" } }, { "$addFields" : { "j" : "$o", "c" : "$o", "f" : "$k", "w" : "$w" } }, { "$addFields" : { "h" : "$k", "x" : "$y" } }, { "$project" : { "a" : 0 } }, { "$project" : { "k" : 0, "b" : 0 } }, { "$addFields" : { "e" : 21, "k" : 91, "y" : "$y" } }, { "$project" : { "h" : 0, "c" : 0 } }, { "$addFields" : { "e" : "$p" } }, { "$match" : { "e" : { "$lte" : 77 } } }, { "$addFields" : { "l" : "$j", "f" : "$t", "h" : "$h" } }, { "$project" : { "d" : 0, "i" : 0 } } ]
+
+
+Query 14 (with useIndex=true): [ { "$match" : { "i" : { "$gt" : 9 } } }, { "$match" : { "f" : { "$lt" : 75 } } }, { "$match" : { "f" : { "$gt" : 11 } } }, { "$addFields" : { "a" : 51, "b" : 65, "y" : "$y" } }, { "$addFields" : { "h" : 40, "a" : "$i", "x" : "$x" } } ]
+
+{_id: 3, a: 67, h: 40, d: 93, x: {a: 19, b: 99, c: 77}, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, f: 49, b: 65, i: 67, e: 40},
+{_id: 4, a: 38, h: 40, d: 34, x: {a: 81, b: 68, c: 20}, g: 16, c: 87, w: {a: 86, b: 75, c: 3}, f: 50, b: 65, i: 38, e: 82},
+{_id: 5, d: 7, b: 65, x: {a: 75, b: 5, c: 70}, i: 93, g: 15, e: 87, c: 49, a: 93, w: {a: 44, b: 19, c: 96}, h: 40, f: 69},
+{_id: 6, f: 41, e: 55, d: 54, c: 94, b: 65, a: 84, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, i: 84, h: 40, g: 16},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 40, f: 18, d: 65, b: 65, x: {a: 47, b: 88, c: 40}, i: 44, g: 66, e: 78, c: 11, a: 44}
+
+Query 15 (with useIndex=true): [ { "$project" : { "f" : 0, "d" : 0, "y" : 0 } }, { "$sort" : { "i" : -1 } }, { "$addFields" : { "g" : 51, "f" : "$c", "y" : "$x" } }, { "$addFields" : { "l" : "$e" } }, { "$match" : { "h" : { "$gte" : 0 } } } ]
+
+{_id: 1, e: 95, a: 32, h: 71, x: {a: 4, b: 40, c: 0}, g: 51, c: 60, w: {a: 18, b: 25, c: 26}, b: 64, i: 65, f: 60, y: {a: 4, b: 40, c: 0}, l: 95},
+{_id: 2, e: 13, w: {a: 94, b: 32, c: 58}, i: 42, c: 32, h: 50, b: 21, g: 51, a: 85, x: {a: 8, b: 71, c: 40}, f: 32, y: {a: 8, b: 71, c: 40}, l: 13},
+{_id: 3, a: 27, h: 72, x: {a: 19, b: 99, c: 77}, g: 51, c: 77, w: {a: 11, b: 3, c: 9}, b: 47, i: 67, e: 40, f: 77, y: {a: 19, b: 99, c: 77}, l: 40},
+{_id: 4, a: 29, h: 83, x: {a: 81, b: 68, c: 20}, g: 51, c: 87, w: {a: 86, b: 75, c: 3}, b: 76, i: 38, e: 82, f: 87, y: {a: 81, b: 68, c: 20}, l: 82},
+{_id: 5, b: 4, x: {a: 75, b: 5, c: 70}, i: 93, g: 51, e: 87, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, h: 75, f: 49, y: {a: 75, b: 5, c: 70}, l: 87},
+{_id: 6, e: 55, c: 94, b: 71, a: 85, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, i: 84, h: 71, g: 51, f: 94, y: {a: 59, b: 36, c: 59}, l: 55},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 86, b: 40, x: {a: 47, b: 88, c: 40}, i: 44, g: 51, e: 78, c: 11, a: 85, f: 11, y: {a: 47, b: 88, c: 40}, l: 78},
+{_id: 8, g: 51, c: 24, w: {a: 15, b: 23, c: 89}, b: 81, i: 43, e: 63, a: 75, h: 74, x: {a: 9, b: 4, c: 79}, f: 24, y: {a: 9, b: 4, c: 79}, l: 63}
+
+Query 16 (with useIndex=true): [ { "$addFields" : { "j" : 69, "w" : "$y" } }, { "$addFields" : { "f" : "$i" } }, { "$match" : { "a" : { "$lte" : 75 } } }, { "$addFields" : { "f" : "$l", "g" : 97, "k" : 51 } }, { "$addFields" : { "j" : 52, "h" : "$j", "x" : "$x" } }, { "$addFields" : { "h" : 1, "x" : "$w" } }, { "$addFields" : { "f" : 30 } }, { "$match" : { "g" : { "$gte" : 2 } } }, { "$addFields" : { "e" : "$a" } }, { "$project" : { "h" : "$d", "c" : 1, "b" : 1, "i" : 1, "g" : { "$literal" : 0 }, "d" : "$b", "e" : 1, "k" : 1, "a" : 1, "w" : 1 } }, { "$project" : { "h" : 0, "w" : 0 } }, { "$match" : { "c" : { "$lt" : 86 } } } ]
+
+{_id: 1, a: 32, c: 60, b: 64, i: 65, k: 51, e: 32, g: 0, d: 64},
+{_id: 3, a: 27, c: 77, b: 47, i: 67, k: 51, e: 27, g: 0, d: 47},
+{_id: 8, c: 24, b: 81, i: 43, a: 75, k: 51, e: 75, g: 0, d: 81}
+
+Query 17 (with useIndex=true): [ { "$addFields" : { "i" : "$k", "w" : "$w" } }, { "$project" : { "i" : 0, "w" : 0 } }, { "$project" : { "f" : 0, "h" : 0 } }, { "$addFields" : { "i" : 82, "h" : "$g" } }, { "$project" : { "g" : 0, "h" : 0, "w" : 0 } }, { "$addFields" : { "a" : 10, "j" : 48, "g" : "$t" } }, { "$match" : { "q" : { "$lt" : 96 } } } ]
+
+
+Query 18 (with useIndex=true): [ { "$project" : { "k" : 0, "f" : 0 } }, { "$sort" : { "l" : 1 } }, { "$addFields" : { "d" : 64 } }, { "$sort" : { "d" : 1, "k" : 1 } } ]
+
+{_id: 1, e: 95, a: 32, h: 71, d: 64, x: {a: 4, b: 40, c: 0}, g: 26, c: 60, w: {a: 18, b: 25, c: 26}, b: 64, i: 65},
+{_id: 2, e: 13, w: {a: 94, b: 32, c: 58}, d: 64, i: 42, c: 32, h: 50, b: 21, g: 2, a: 85, x: {a: 8, b: 71, c: 40}},
+{_id: 3, a: 27, h: 72, d: 64, x: {a: 19, b: 99, c: 77}, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, b: 47, i: 67, e: 40},
+{_id: 4, a: 29, h: 83, d: 64, x: {a: 81, b: 68, c: 20}, g: 16, c: 87, w: {a: 86, b: 75, c: 3}, b: 76, i: 38, e: 82},
+{_id: 5, d: 64, b: 4, x: {a: 75, b: 5, c: 70}, i: 93, g: 15, e: 87, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, h: 75},
+{_id: 6, e: 55, d: 64, c: 94, b: 71, a: 85, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, i: 84, h: 71, g: 16},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 86, d: 64, b: 40, x: {a: 47, b: 88, c: 40}, i: 44, g: 66, e: 78, c: 11, a: 85},
+{_id: 8, g: 62, c: 24, w: {a: 15, b: 23, c: 89}, b: 81, i: 43, e: 63, a: 75, h: 74, d: 64, x: {a: 9, b: 4, c: 79}}
+
+Query 19 (with useIndex=true): [ { "$group" : { "_id" : "$a", "b" : { "$sum" : "$b" }, "e" : { "$sum" : "$e" }, "d" : { "$sum" : "$d" }, "g" : { "$sum" : "$g" }, "k" : { "$sum" : "$k" }, "h" : { "$sum" : "$h" }, "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "c" : { "$sum" : "$c" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" } } }, { "$addFields" : { "h" : "$h", "f" : 10 } }, { "$sort" : { "d" : -1 } }, { "$project" : { "e" : 0 } }, { "$match" : { "g" : { "$gte" : 16 } } }, { "$project" : { "b" : 0, "e" : 0, "w" : 0 } }, { "$addFields" : { "f" : 46 } }, { "$project" : { "f" : 0 } } ]
+
+{_id: 29, d: 34, g: 16, k: 0, h: 83, a: 29, c: 87, y: null, x: {a: 81, b: 68, c: 20}},
+{_id: 32, d: 10, g: 26, k: 0, h: 71, a: 32, c: 60, y: null, x: {a: 4, b: 40, c: 0}},
+{_id: 75, d: 92, g: 62, k: 0, h: 74, a: 75, c: 24, y: null, x: {a: 9, b: 4, c: 79}},
+{_id: 85, d: 213, g: 84, k: 0, h: 207, a: 255, c: 137, y: null, x: {a: 8, b: 71, c: 40}}
+
+Query 20 (with useIndex=true): [ { "$addFields" : { "a" : "$r", "i" : 67, "y" : "$w" } }, { "$addFields" : { "l" : 35, "k" : "$q", "a" : 64, "x" : "$w" } }, { "$addFields" : { "l" : 81, "y" : "$y" } }, { "$project" : { "b" : 0, "f" : 0 } }, { "$addFields" : { "h" : 34, "x" : "$w" } }, { "$match" : { "k" : { "$lt" : 85 } } }, { "$project" : { "i" : 0, "f" : 0, "x" : 0 } } ]
+
+
+Query 21 (with useIndex=true): [ { "$group" : { "_id" : "$c", "f" : { "$sum" : "$f" }, "l" : { "$sum" : "$l" }, "d" : { "$sum" : "$d" }, "e" : { "$sum" : "$e" }, "i" : { "$sum" : "$i" }, "h" : { "$sum" : "$h" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "g" : { "$sum" : "$g" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } }, { "$project" : { "h" : 0 } }, { "$project" : { "c" : 0 } }, { "$match" : { "f" : { "$gte" : 18 } } }, { "$addFields" : { "j" : 49, "a" : 91, "h" : "$o", "x" : "$w" } }, { "$addFields" : { "d" : 47 } }, { "$group" : { "_id" : "$i", "a" : { "$sum" : "$a" }, "e" : { "$sum" : "$e" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "b" : { "$sum" : "$b" }, "j" : { "$sum" : "$j" }, "l" : { "$sum" : "$l" }, "h" : { "$sum" : "$h" }, "i" : { "$sum" : "$i" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$match" : { "e" : { "$lte" : 92 } } } ]
+
+{_id: 38, a: 91, e: 82, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 38, w: {a: 86, b: 75, c: 3}, x: {a: 86, b: 75, c: 3}, y: null},
+{_id: 42, a: 91, e: 13, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 42, w: {a: 94, b: 32, c: 58}, x: {a: 94, b: 32, c: 58}, y: null},
+{_id: 44, a: 91, e: 78, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 44, w: {a: 48, b: 63, c: 47}, x: {a: 48, b: 63, c: 47}, y: null},
+{_id: 67, a: 91, e: 40, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 67, w: {a: 11, b: 3, c: 9}, x: {a: 11, b: 3, c: 9}, y: null},
+{_id: 84, a: 91, e: 55, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 84, w: {a: 10, b: 66, c: 62}, x: {a: 10, b: 66, c: 62}, y: null},
+{_id: 93, a: 91, e: 87, k: 0, c: 0, b: 0, j: 49, l: 0, h: 0, i: 93, w: {a: 44, b: 19, c: 96}, x: {a: 44, b: 19, c: 96}, y: null}
+
+Query 22 (with useIndex=true): [ { "$addFields" : { "d" : 43, "k" : 65, "b" : "$p", "w" : "$w" } }, { "$project" : { "g" : 0, "f" : 0 } }, { "$addFields" : { "a" : 57, "x" : "$y" } }, { "$project" : { "i" : 0, "g" : 0, "y" : 0 } }, { "$addFields" : { "e" : 57, "j" : 48 } }, { "$match" : { "q" : { "$lte" : 82 } } }, { "$match" : { "b" : { "$gte" : 11 } } }, { "$project" : { "b" : 1, "d" : 1, "i" : 1, "l" : 1, "c" : "$b", "g" : "$l", "h" : "$g", "k" : 1, "f" : "$j", "x" : 1, "w" : 1 } } ]
+
+
+Query 23 (with useIndex=true): [ { "$addFields" : { "h" : "$m", "a" : 28, "c" : "$r", "x" : "$w" } }, { "$addFields" : { "f" : 78, "h" : 63, "a" : 13, "y" : "$y" } }, { "$sort" : { "l" : -1, "e" : 1 } }, { "$addFields" : { "f" : "$n", "w" : "$x" } }, { "$addFields" : { "b" : "$b", "j" : 53 } }, { "$group" : { "_id" : "$c", "d" : { "$sum" : "$d" }, "g" : { "$sum" : "$g" }, "c" : { "$sum" : "$c" }, "a" : { "$sum" : "$a" }, "b" : { "$sum" : "$b" }, "j" : { "$sum" : "$j" }, "i" : { "$sum" : "$i" }, "f" : { "$sum" : "$f" }, "l" : { "$sum" : "$l" }, "k" : { "$sum" : "$k" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$sort" : { "a" : 1 } }, { "$addFields" : { "a" : "$s", "c" : 29 } }, { "$addFields" : { "g" : "$q" } } ]
+
+{_id: null, d: 449, c: 29, b: 404, j: 424, i: 476, f: 0, l: 0, k: 0, x: {a: 10, b: 66, c: 62}, w: {a: 10, b: 66, c: 62}, y: null}
+
+Query 24 (with useIndex=true): [ { "$match" : { "g" : { "$gte" : 7 } } }, { "$addFields" : { "i" : "$q" } }, { "$addFields" : { "h" : "$j", "y" : "$w" } }, { "$project" : { "l" : 0, "d" : 0 } } ]
+
+{_id: 1, e: 95, a: 32, x: {a: 4, b: 40, c: 0}, g: 26, c: 60, w: {a: 18, b: 25, c: 26}, f: 85, b: 64, y: {a: 18, b: 25, c: 26}},
+{_id: 3, a: 27, x: {a: 19, b: 99, c: 77}, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, f: 49, b: 47, e: 40, y: {a: 11, b: 3, c: 9}},
+{_id: 4, a: 29, x: {a: 81, b: 68, c: 20}, g: 16, c: 87, w: {a: 86, b: 75, c: 3}, f: 50, b: 76, e: 82, y: {a: 86, b: 75, c: 3}},
+{_id: 5, b: 4, x: {a: 75, b: 5, c: 70}, g: 15, e: 87, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, f: 69, y: {a: 44, b: 19, c: 96}},
+{_id: 6, f: 41, e: 55, c: 94, b: 71, a: 85, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, g: 16, y: {a: 10, b: 66, c: 62}},
+{_id: 7, w: {a: 48, b: 63, c: 47}, f: 18, b: 40, x: {a: 47, b: 88, c: 40}, g: 66, e: 78, c: 11, a: 85, y: {a: 48, b: 63, c: 47}},
+{_id: 8, g: 62, c: 24, w: {a: 15, b: 23, c: 89}, f: 4, b: 81, e: 63, a: 75, x: {a: 9, b: 4, c: 79}, y: {a: 15, b: 23, c: 89}}
+
+Query 25 (with useIndex=true): [ { "$addFields" : { "j" : 50, "w" : "$y" } }, { "$project" : { "a" : 0, "h" : 0 } }, { "$addFields" : { "c" : 50, "f" : 20, "w" : "$y" } }, { "$addFields" : { "l" : 15, "d" : 88, "k" : "$p", "x" : "$y" } }, { "$match" : { "k" : { "$lt" : 87 } } }, { "$addFields" : { "f" : 58 } }, { "$project" : { "b" : 0, "j" : 0 } }, { "$project" : { "a" : 0, "y" : 0 } } ]
+
+
+Query 26 (with useIndex=true): [ { "$match" : { "h" : { "$lt" : 85 } } }, { "$addFields" : { "k" : "$t", "h" : 19, "j" : "$o", "w" : "$x" } }, { "$addFields" : { "k" : "$m", "y" : "$x" } }, { "$sort" : { "b" : 1, "e" : -1 } }, { "$match" : { "e" : { "$gt" : 20 } } }, { "$match" : { "q" : { "$gte" : 0 } } }, { "$addFields" : { "k" : 89, "h" : "$b", "c" : 35, "y" : "$x" } }, { "$addFields" : { "d" : "$m", "h" : "$g" } }, { "$project" : { "h" : 0 } }, { "$addFields" : { "f" : "$s", "h" : 19, "g" : "$m" } } ]
+
+
+Query 27 (with useIndex=true): [ { "$sort" : { "e" : -1, "h" : -1 } }, { "$limit" : 10 }, { "$sort" : { "i" : -1, "b" : -1 } }, { "$match" : { "q" : { "$gt" : 21 } } }, { "$project" : { "h" : 0 } }, { "$project" : { "j" : 0, "d" : 0, "y" : 0 } }, { "$addFields" : { "d" : 79 } } ]
+
+
+Query 28 (with useIndex=true): [ { "$sort" : { "l" : -1, "i" : 1 } }, { "$limit" : 9 }, { "$match" : { "h" : { "$lte" : 99 } } }, { "$project" : { "d" : 1, "i" : 1, "c" : 1, "f" : "$e", "a" : 1, "g" : 1, "e" : 1, "h" : "$i", "x" : 1 } }, { "$project" : { "a" : 1, "c" : 1, "b" : 1, "k" : "$a", "g" : 1, "h" : 1, "j" : 1, "d" : 1, "l" : "$c", "i" : "$j", "e" : 1, "x" : 1, "w" : 1 } }, { "$sort" : { "c" : 1, "l" : 1 } }, { "$addFields" : { "c" : 11, "d" : "$k", "l" : 49 } }, { "$addFields" : { "h" : "$o", "b" : 23, "i" : 51 } }, { "$project" : { "d" : 1, "k" : 1, "c" : 1, "i" : 1, "l" : "$f", "g" : "$l", "a" : 1, "j" : 1, "f" : 1, "h" : "$j", "x" : 1 } }, { "$project" : { "i" : 0, "l" : 0 } }, { "$match" : { "d" : { "$gt" : 3 } } }, { "$addFields" : { "b" : "$s", "d" : "$h", "w" : "$x" } } ]
+
+{_id: 1, x: {a: 4, b: 40, c: 0}, c: 11, a: 32, k: 32, g: 49, w: {a: 4, b: 40, c: 0}},
+{_id: 2, x: {a: 8, b: 71, c: 40}, c: 11, a: 85, k: 85, g: 49, w: {a: 8, b: 71, c: 40}},
+{_id: 3, x: {a: 19, b: 99, c: 77}, c: 11, a: 27, k: 27, g: 49, w: {a: 19, b: 99, c: 77}},
+{_id: 4, x: {a: 81, b: 68, c: 20}, c: 11, a: 29, k: 29, g: 49, w: {a: 81, b: 68, c: 20}},
+{_id: 5, x: {a: 75, b: 5, c: 70}, c: 11, a: 89, k: 89, g: 49, w: {a: 75, b: 5, c: 70}},
+{_id: 6, x: {a: 59, b: 36, c: 59}, c: 11, a: 85, k: 85, g: 49, w: {a: 59, b: 36, c: 59}},
+{_id: 7, x: {a: 47, b: 88, c: 40}, c: 11, a: 85, k: 85, g: 49, w: {a: 47, b: 88, c: 40}},
+{_id: 8, x: {a: 9, b: 4, c: 79}, c: 11, a: 75, k: 75, g: 49, w: {a: 9, b: 4, c: 79}}
+
+Query 29 (with useIndex=true): [ { "$project" : { "e" : 0 } }, { "$sort" : { "c" : -1, "j" : 1 } }, { "$limit" : 9 }, { "$sort" : { "l" : 1 } }, { "$limit" : 7 }, { "$project" : { "a" : 0, "w" : 0 } }, { "$addFields" : { "i" : 16, "a" : "$g", "g" : "$a", "x" : "$w" } }, { "$match" : { "c" : { "$gte" : 8 } } }, { "$addFields" : { "f" : 46, "c" : 40 } }, { "$sort" : { "d" : 1, "f" : -1 } }, { "$limit" : 10 }, { "$project" : { "i" : "$c", "g" : 1, "j" : 1, "c" : 1, "h" : 1, "b" : 1, "e" : 1, "l" : "$j", "k" : 1, "w" : 1 } } ]
+
+{_id: 1, k: null, j: null, h: 71, c: 40, b: 64, i: 40, l: null},
+{_id: 2, k: null, j: null, h: 50, c: 40, b: 21, i: 40, l: null},
+{_id: 3, k: null, j: null, h: 72, c: 40, b: 47, i: 40, l: null},
+{_id: 4, k: null, j: null, h: 83, c: 40, b: 76, i: 40, l: null},
+{_id: 5, k: null, j: null, h: 75, c: 40, b: 4, i: 40, l: null},
+{_id: 6, k: null, j: null, h: 71, c: 40, b: 71, i: 40, l: null},
+{_id: 8, k: null, j: null, h: 74, c: 40, b: 81, i: 40, l: null}
+
+Query 30 (with useIndex=true): [ { "$project" : { "h" : 1, "l" : 1, "j" : "$h", "d" : { "$literal" : 98 }, "k" : "$c", "b" : 1, "g" : "$f", "c" : 1, "x" : 1 } }, { "$match" : { "d" : { "$gt" : 2 } } }, { "$project" : { "b" : 0, "x" : 0 } }, { "$addFields" : { "g" : "$o", "e" : "$f", "y" : "$x" } }, { "$project" : { "k" : 0, "a" : 0, "x" : 0 } }, { "$match" : { "g" : { "$lte" : 92 } } }, { "$project" : { "e" : 1, "i" : 1, "g" : 1, "d" : 1, "j" : 1, "f" : 1, "l" : 1, "a" : 1, "k" : 1, "x" : 1, "w" : 1 } }, { "$match" : { "d" : { "$gt" : 2 } } }, { "$project" : { "i" : "$e", "e" : "$g", "g" : "$h", "d" : 1, "a" : 1, "b" : 1, "f" : 1, "h" : 1, "c" : 1, "k" : 1, "l" : 1, "y" : 1 } } ]
+
+
+Query 31 (with useIndex=true): [ { "$match" : { "h" : { "$gte" : 0 } } }, { "$match" : { "q" : { "$gte" : 15 } } }, { "$match" : { "c" : { "$gte" : 2 } } }, { "$group" : { "_id" : "$d", "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "e" : { "$sum" : "$e" }, "h" : { "$sum" : "$h" }, "c" : { "$sum" : "$c" }, "g" : { "$sum" : "$g" }, "j" : { "$sum" : "$j" }, "l" : { "$sum" : "$l" }, "b" : { "$sum" : "$b" }, "i" : { "$sum" : "$i" }, "k" : { "$sum" : "$k" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "k" : "$k", "d" : "$k", "c" : 44 } }, { "$addFields" : { "f" : 24, "y" : "$x" } }, { "$addFields" : { "e" : "$r", "a" : 46, "b" : 88, "y" : "$y" } }, { "$addFields" : { "j" : "$i", "d" : 76 } } ]
+
+
+Query 32 (with useIndex=true): [ { "$match" : { "i" : { "$gte" : 12 } } }, { "$addFields" : { "a" : "$p", "k" : "$d" } }, { "$project" : { "g" : 0, "w" : 0 } }, { "$match" : { "d" : { "$gt" : 24 } } }, { "$match" : { "c" : { "$lt" : 85 } } }, { "$match" : { "q" : { "$gte" : 21 } } }, { "$addFields" : { "b" : "$s", "c" : 45, "a" : "$m", "w" : "$w" } } ]
+
+
+Query 33 (with useIndex=true): [ { "$match" : { "g" : { "$gt" : 18 } } }, { "$sort" : { "c" : -1 } }, { "$match" : { "b" : { "$gt" : 9 } } }, { "$addFields" : { "b" : 24, "w" : "$y" } }, { "$addFields" : { "d" : "$h", "g" : 76 } }, { "$sort" : { "j" : -1 } }, { "$sort" : { "b" : -1 } }, { "$limit" : 9 }, { "$sort" : { "g" : -1, "b" : 1 } }, { "$limit" : 6 }, { "$match" : { "p" : { "$lte" : 79 } } }, { "$sort" : { "b" : -1 } }, { "$sort" : { "l" : -1 } } ]
+
+
+Query 34 (with useIndex=true): [ { "$project" : { "h" : 0, "a" : 0 } }, { "$project" : { "c" : 0 } }, { "$addFields" : { "h" : 36, "x" : "$y" } }, { "$addFields" : { "h" : 64, "b" : "$i", "j" : "$m", "y" : "$y" } }, { "$project" : { "l" : 0, "i" : 0 } } ]
+
+{_id: 1, e: 95, d: 10, g: 26, w: {a: 18, b: 25, c: 26}, f: 85, b: 65, h: 64},
+{_id: 2, e: 13, w: {a: 94, b: 32, c: 58}, d: 94, b: 42, g: 2, f: 98, h: 64},
+{_id: 3, d: 93, g: 8, w: {a: 11, b: 3, c: 9}, f: 49, b: 67, e: 40, h: 64},
+{_id: 4, d: 34, g: 16, w: {a: 86, b: 75, c: 3}, f: 50, b: 38, e: 82, h: 64},
+{_id: 5, d: 7, b: 93, g: 15, e: 87, w: {a: 44, b: 19, c: 96}, f: 69, h: 64},
+{_id: 6, f: 41, e: 55, d: 54, b: 84, w: {a: 10, b: 66, c: 62}, g: 16, h: 64},
+{_id: 7, w: {a: 48, b: 63, c: 47}, f: 18, d: 65, b: 44, g: 66, e: 78, h: 64},
+{_id: 8, g: 62, w: {a: 15, b: 23, c: 89}, f: 4, b: 43, e: 63, d: 92, h: 64}
+
+Query 35 (with useIndex=true): [ { "$addFields" : { "h" : "$d", "y" : "$x" } }, { "$sort" : { "d" : 1, "f" : -1 } }, { "$match" : { "g" : { "$gt" : 3 } } }, { "$addFields" : { "g" : 22, "c" : "$h", "y" : "$y" } }, { "$match" : { "i" : { "$gt" : 0 } } }, { "$project" : { "j" : 0, "g" : 0 } }, { "$match" : { "h" : { "$lt" : 86 } } }, { "$project" : { "f" : "$g", "h" : 1, "i" : 1, "b" : "$a", "j" : 1, "k" : 1, "c" : 1, "l" : "$a", "g" : 1, "e" : 1, "y" : 1, "x" : 1 } }, { "$project" : { "j" : 0, "e" : 0 } }, { "$group" : { "_id" : "$h", "g" : { "$sum" : "$g" }, "b" : { "$sum" : "$b" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "j" : { "$sum" : "$j" }, "a" : { "$sum" : "$a" }, "i" : { "$sum" : "$i" }, "f" : { "$sum" : "$f" }, "d" : { "$sum" : "$d" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "y" } }, { "$unwind" : "$y" }, { "$project" : { "g" : "$e", "a" : 1, "b" : 1, "j" : 1, "f" : 1, "e" : "$k", "i" : 1, "d" : 1, "c" : 1, "k" : 1, "w" : 1, "x" : 1 } } ]
+
+{_id: 7, b: 89, k: 0, c: 7, j: 0, a: 0, i: 93, f: 0, d: 0, w: null, x: {a: 75, b: 5, c: 70}, e: 0}
+
+Query 36 (with useIndex=true): [ { "$project" : { "k" : 1, "g" : 1, "h" : 1, "b" : 1, "f" : 1, "c" : "$c", "a" : 1, "i" : 1, "l" : 1, "e" : 1, "d" : 1, "y" : 1, "x" : 1 } }, { "$match" : { "b" : { "$gte" : 15 } } }, { "$addFields" : { "l" : "$q" } }, { "$group" : { "_id" : "$i", "j" : { "$sum" : "$j" }, "k" : { "$sum" : "$k" }, "h" : { "$sum" : "$h" }, "e" : { "$sum" : "$e" }, "f" : { "$sum" : "$f" }, "a" : { "$sum" : "$a" }, "i" : { "$sum" : "$i" }, "g" : { "$sum" : "$g" }, "c" : { "$sum" : "$c" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } }, { "$project" : { "k" : 0, "x" : 0 } }, { "$project" : { "e" : 0, "x" : 0 } } ]
+
+{_id: 38, j: 0, h: 83, f: 50, a: 29, i: 38, g: 16, c: 87, y: null, w: null},
+{_id: 42, j: 0, h: 50, f: 98, a: 85, i: 42, g: 2, c: 32, y: null, w: null},
+{_id: 43, j: 0, h: 74, f: 4, a: 75, i: 43, g: 62, c: 24, y: null, w: null},
+{_id: 44, j: 0, h: 86, f: 18, a: 85, i: 44, g: 66, c: 11, y: null, w: null},
+{_id: 65, j: 0, h: 71, f: 85, a: 32, i: 65, g: 26, c: 60, y: null, w: null},
+{_id: 67, j: 0, h: 72, f: 49, a: 27, i: 67, g: 8, c: 77, y: null, w: null},
+{_id: 84, j: 0, h: 71, f: 41, a: 85, i: 84, g: 16, c: 94, y: null, w: null}
+
+Query 37 (with useIndex=true): [ { "$addFields" : { "a" : 78, "d" : "$r", "g" : 57 } }, { "$addFields" : { "f" : "$k" } }, { "$project" : { "i" : 0, "w" : 0 } }, { "$match" : { "w.c" : { "$gte" : 7 } } }, { "$addFields" : { "f" : 36, "d" : "$a" } }, { "$project" : { "d" : 0, "w" : 0 } }, { "$project" : { "e" : 0, "d" : 0 } } ]
+
+
+Query 38 (with useIndex=true): [ { "$addFields" : { "a" : "$n", "f" : 32, "l" : 97 } }, { "$addFields" : { "f" : 79, "h" : 79, "x" : "$w" } }, { "$addFields" : { "c" : 89 } }, { "$match" : { "l" : { "$lt" : 93 } } } ]
+
+
+Query 39 (with useIndex=true): [ { "$match" : { "d" : { "$lte" : 84 } } }, { "$project" : { "b" : 0, "e" : 0 } }, { "$project" : { "g" : 0, "w" : 0 } }, { "$match" : { "y.c" : { "$lt" : 75 } } }, { "$project" : { "l" : 0 } }, { "$match" : { "y.c" : { "$lte" : 97 } } } ]
+
+
+Query 40 (with useIndex=true): [ { "$project" : { "c" : 0, "i" : 0, "x.b" : 0, "x.c" : 0 } }, { "$addFields" : { "f" : 89, "c" : "$k", "h" : "$f" } }, { "$match" : { "w.a" : { "$lt" : 88 } } }, { "$project" : { "j" : 0, "y" : 0 } } ]
+
+{_id: 1, e: 95, a: 32, h: 85, d: 10, x: {a: 4}, g: 26, w: {a: 18, b: 25, c: 26}, f: 89, b: 64},
+{_id: 3, a: 27, h: 49, d: 93, x: {a: 19}, g: 8, w: {a: 11, b: 3, c: 9}, f: 89, b: 47, e: 40},
+{_id: 4, a: 29, h: 50, d: 34, x: {a: 81}, g: 16, w: {a: 86, b: 75, c: 3}, f: 89, b: 76, e: 82},
+{_id: 5, d: 7, b: 4, x: {a: 75}, g: 15, e: 87, a: 89, w: {a: 44, b: 19, c: 96}, h: 69, f: 89},
+{_id: 6, f: 89, e: 55, d: 54, b: 71, a: 85, x: {a: 59}, w: {a: 10, b: 66, c: 62}, h: 41, g: 16},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 18, f: 89, d: 65, b: 40, x: {a: 47}, g: 66, e: 78, a: 85},
+{_id: 8, g: 62, w: {a: 15, b: 23, c: 89}, f: 89, b: 81, e: 63, a: 75, h: 4, d: 92, x: {a: 9}}
+
+Query 41 (with useIndex=true): [ { "$project" : { "j" : 0, "b" : 0 } }, { "$addFields" : { "a" : 19, "g" : 97, "h" : 25, "w" : "$x" } }, { "$project" : { "a" : 0, "i" : 0, "y" : 0 } }, { "$project" : { "e" : 1, "h" : 1, "a" : 1, "j" : "$l", "d" : 1, "f" : 1, "l" : 1, "i" : 1, "y.b" : 1 } }, { "$project" : { "f" : 0, "x" : 0 } }, { "$addFields" : { "f" : "$g", "k" : "$e", "h" : 62, "y" : "$y" } } ]
+
+{_id: 1, e: 95, d: 10, h: 62, k: 95},
+{_id: 2, e: 13, d: 94, h: 62, k: 13},
+{_id: 3, d: 93, e: 40, h: 62, k: 40},
+{_id: 4, d: 34, e: 82, h: 62, k: 82},
+{_id: 5, d: 7, e: 87, h: 62, k: 87},
+{_id: 6, e: 55, d: 54, h: 62, k: 55},
+{_id: 7, d: 65, e: 78, h: 62, k: 78},
+{_id: 8, e: 63, d: 92, h: 62, k: 63}
+
+Query 42 (with useIndex=true): [ { "$project" : { "e" : 0 } }, { "$addFields" : { "l" : 0 } }, { "$project" : { "k" : 0, "l" : 0 } }, { "$addFields" : { "d" : "$s", "y" : "$y" } }, { "$project" : { "k" : 0, "g" : 0, "x" : 0 } }, { "$project" : { "g" : 1, "h" : "$i", "i" : 1, "l" : 1, "d" : { "$literal" : 14 }, "f" : 1, "a" : 1, "b" : 1, "e" : 1, "y" : 1, "w.b" : 1 } } ]
+
+{_id: 1, a: 32, w: {b: 25}, f: 85, b: 64, i: 65, h: 65, d: 14},
+{_id: 2, w: {b: 32}, i: 42, b: 21, a: 85, f: 98, h: 42, d: 14},
+{_id: 3, a: 27, w: {b: 3}, f: 49, b: 47, i: 67, h: 67, d: 14},
+{_id: 4, a: 29, w: {b: 75}, f: 50, b: 76, i: 38, h: 38, d: 14},
+{_id: 5, b: 4, i: 93, a: 89, w: {b: 19}, f: 69, h: 93, d: 14},
+{_id: 6, f: 41, b: 71, a: 85, w: {b: 66}, i: 84, h: 84, d: 14},
+{_id: 7, w: {b: 63}, f: 18, b: 40, i: 44, a: 85, h: 44, d: 14},
+{_id: 8, w: {b: 23}, f: 4, b: 81, i: 43, a: 75, h: 43, d: 14}
+
+Query 43 (with useIndex=true): [ { "$project" : { "c" : 0, "w" : 0 } }, { "$addFields" : { "i" : "$l", "k" : "$i", "f" : "$r", "y" : "$x" } }, { "$addFields" : { "e" : 65, "l" : 89, "w" : "$y" } }, { "$match" : { "f" : { "$lt" : 87 } } }, { "$match" : { "x.a" : { "$gt" : 14 } } }, { "$match" : { "e" : { "$lte" : 86 } } }, { "$group" : { "_id" : "$q", "a" : { "$sum" : "$a" }, "h" : { "$sum" : "$h" }, "f" : { "$sum" : "$f" }, "d" : { "$sum" : "$d" }, "k" : { "$sum" : "$k" }, "b" : { "$sum" : "$b" }, "i" : { "$sum" : "$i" }, "g" : { "$sum" : "$g" }, "e" : { "$sum" : "$e" }, "j" : { "$sum" : "$j" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } }, { "$match" : { "x.b" : { "$lte" : 96 } } } ]
+
+
+Query 44 (with useIndex=true): [ { "$addFields" : { "e" : 52, "y.c" : 51 } }, { "$addFields" : { "d" : "$k", "l" : 68, "i" : 6 } }, { "$project" : { "j" : 0, "w" : 0 } }, { "$match" : { "y.c" : { "$gte" : 17 } } }, { "$group" : { "_id" : "$a", "a" : { "$sum" : "$a" }, "j" : { "$sum" : "$j" }, "g" : { "$sum" : "$g" }, "b" : { "$sum" : "$b" }, "h" : { "$sum" : "$h" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "e" : { "$sum" : "$e" }, "i" : { "$sum" : "$i" }, "f" : { "$sum" : "$f" }, "d" : { "$sum" : "$d" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$match" : { "y.a" : { "$gt" : 2 } } } ]
+
+
+Query 45 (with useIndex=true): [ { "$match" : { "p" : { "$lte" : 96 } } }, { "$addFields" : { "a" : 0, "w.b" : 43, "w.a" : 93 } }, { "$project" : { "f" : 0, "y.b" : 0 } }, { "$addFields" : { "e" : "$d" } }, { "$match" : { "w.a" : { "$gt" : 10 } } }, { "$match" : { "w.c" : { "$gt" : 8 } } }, { "$addFields" : { "i" : 50, "l" : "$l", "g" : 18 } } ]
+
+
+Query 46 (with useIndex=true): [ { "$group" : { "_id" : "$q", "k" : { "$sum" : "$k" }, "j" : { "$sum" : "$j" }, "d" : { "$sum" : "$d" }, "c" : { "$sum" : "$c" }, "e" : { "$sum" : "$e" }, "a" : { "$sum" : "$a" }, "b" : { "$sum" : "$b" }, "f" : { "$sum" : "$f" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" } } }, { "$addFields" : { "c" : 32, "e" : 69, "y" : "$y" } }, { "$addFields" : { "a" : 21, "i" : 22, "j" : "$h" } }, { "$addFields" : { "h" : "$i", "k" : "$c", "e" : 45, "w.b" : 6, "w.c" : 3 } }, { "$addFields" : { "c" : "$g", "e" : 95, "y" : "$y" } }, { "$group" : { "_id" : "$f", "j" : { "$sum" : "$j" }, "k" : { "$sum" : "$k" }, "a" : { "$sum" : "$a" }, "c" : { "$sum" : "$c" }, "e" : { "$sum" : "$e" }, "b" : { "$sum" : "$b" }, "h" : { "$sum" : "$h" }, "i" : { "$sum" : "$i" }, "g" : { "$sum" : "$g" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } }, { "$match" : { "w.c" : { "$gt" : 12 } } }, { "$group" : { "_id" : "$h", "c" : { "$sum" : "$c" }, "e" : { "$sum" : "$e" }, "d" : { "$sum" : "$d" }, "h" : { "$sum" : "$h" }, "j" : { "$sum" : "$j" }, "b" : { "$sum" : "$b" }, "k" : { "$sum" : "$k" }, "i" : { "$sum" : "$i" }, "g" : { "$sum" : "$g" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "a" : "$a", "y.c" : 79, "y.a" : 17 } }, { "$addFields" : { "k" : "$b", "d" : 43, "l" : 23, "x.c" : 3 } } ]
+
+
+Query 47 (with useIndex=true): [ { "$project" : { "d" : 0, "c" : 0 } }, { "$project" : { "e" : 1, "i" : "$c", "a" : 1, "l" : 1, "d" : 1, "c" : { "$literal" : 60 }, "j" : 1, "b" : "$h", "h" : 1, "f" : 1, "x" : 1 } }, { "$group" : { "_id" : "$a", "l" : { "$sum" : "$l" }, "h" : { "$sum" : "$h" }, "f" : { "$sum" : "$f" }, "c" : { "$sum" : "$c" }, "b" : { "$sum" : "$b" }, "d" : { "$sum" : "$d" }, "e" : { "$sum" : "$e" }, "g" : { "$sum" : "$g" }, "j" : { "$sum" : "$j" }, "a" : { "$sum" : "$a" }, "k" : { "$sum" : "$k" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } }, { "$project" : { "e" : 0, "d" : 0, "w.c" : 0 } }, { "$group" : { "_id" : "$b", "d" : { "$sum" : "$d" }, "i" : { "$sum" : "$i" }, "l" : { "$sum" : "$l" }, "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "b" : { "$sum" : "$b" }, "h" : { "$sum" : "$h" }, "g" : { "$sum" : "$g" }, "c" : { "$sum" : "$c" }, "k" : { "$sum" : "$k" }, "j" : { "$sum" : "$j" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } }, { "$project" : { "d" : 0 } }, { "$addFields" : { "f" : 45, "j" : 37, "y" : "$x" } }, { "$match" : { "y.c" : { "$lt" : 80 } } }, { "$project" : { "i" : 0 } }, { "$group" : { "_id" : "$c", "j" : { "$sum" : "$j" }, "i" : { "$sum" : "$i" }, "a" : { "$sum" : "$a" }, "k" : { "$sum" : "$k" }, "c" : { "$sum" : "$c" }, "g" : { "$sum" : "$g" }, "d" : { "$sum" : "$d" }, "h" : { "$sum" : "$h" }, "f" : { "$sum" : "$f" }, "l" : { "$sum" : "$l" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$group" : { "_id" : "$h", "h" : { "$sum" : "$h" }, "f" : { "$sum" : "$f" }, "l" : { "$sum" : "$l" }, "i" : { "$sum" : "$i" }, "a" : { "$sum" : "$a" }, "g" : { "$sum" : "$g" }, "e" : { "$sum" : "$e" }, "j" : { "$sum" : "$j" }, "c" : { "$sum" : "$c" }, "k" : { "$sum" : "$k" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } } ]
+
+{_id: 207, h: 207, f: 45, l: 0, i: 0, a: 255, g: 0, e: 0, j: 37, c: 180, k: 0, w: null, y: {a: 8, b: 71, c: 40}, x: {a: 8, b: 71, c: 40}},
+{_id: 375, h: 375, f: 225, l: 0, i: 0, a: 252, g: 0, e: 0, j: 185, c: 300, k: 0, w: null, y: {a: 4, b: 40, c: 0}, x: {a: 4, b: 40, c: 0}}
+
+Query 48 (with useIndex=true): [ { "$addFields" : { "l" : 42 } }, { "$match" : { "c" : { "$gte" : 23 } } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "y" } }, { "$unwind" : "$y" }, { "$addFields" : { "f" : 65, "h" : 73, "i" : "$p", "x" : "$y" } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "w" } }, { "$unwind" : "$w" }, { "$addFields" : { "c" : 89 } }, { "$project" : { "f" : 1, "c" : 1, "h" : "$j", "j" : { "$literal" : 17 }, "d" : 1, "l" : 1, "e" : "$g", "k" : 1, "a" : 1, "b" : 1, "y.c" : 1, "y.b" : 1 } }, { "$addFields" : { "g" : 39, "e" : 19, "b" : 99 } } ]
+
+{_id: 1, a: 32, d: 10, b: 99, l: 42, y: {b: 57, c: 58}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 2, d: 94, b: 99, a: 85, l: 42, y: {b: 12, c: 54}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 3, a: 27, d: 93, b: 99, l: 42, y: {c: 99, b: 57}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 4, a: 29, d: 34, b: 99, l: 42, y: {b: 16, c: 7}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 5, d: 7, b: 99, a: 89, l: 42, y: {b: 71, c: 91}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 6, d: 54, b: 99, a: 85, l: 42, y: {c: 78, b: 67}, f: 65, c: 89, j: 17, e: 19, g: 39},
+{_id: 8, b: 99, a: 75, d: 92, l: 42, y: {b: 86, c: 90}, f: 65, c: 89, j: 17, e: 19, g: 39}
+
+Query 49 (with useIndex=true): [ { "$project" : { "c" : 0, "d" : 0 } }, { "$match" : { "b" : { "$lt" : 94 } } }, { "$addFields" : { "i" : "$r", "e" : 34, "a" : 5 } }, { "$match" : { "b" : { "$gt" : 10 } } }, { "$addFields" : { "d" : 48, "g" : "$i", "w" : "$w" } }, { "$match" : { "q" : { "$gt" : 1 } } }, { "$project" : { "g" : 0, "i" : 0 } }, { "$match" : { "w.b" : { "$gte" : 3 } } }, { "$project" : { "c" : 0, "a" : 0, "x.a" : 0 } }, { "$project" : { "j" : 0 } }, { "$match" : { "y.a" : { "$gt" : 24 } } }, { "$sort" : { "a" : -1 } } ]
+
+
+Query 50 (with useIndex=true): [ { "$addFields" : { "h" : "$g", "d" : 77, "x.c" : 95 } }, { "$match" : { "x.c" : { "$lte" : 82 } } }, { "$addFields" : { "a" : "$a", "d" : "$k", "w.c" : 72 } }, { "$project" : { "d" : 0, "f" : 0 } }, { "$project" : { "k" : 0, "b" : 0, "y.a" : 0 } }, { "$sort" : { "f" : 1, "d" : -1 } }, { "$addFields" : { "h" : 84, "c" : "$n" } }, { "$project" : { "g" : 0, "h" : 0 } }, { "$match" : { "x.b" : { "$gte" : 0 } } }, { "$addFields" : { "a" : "$e", "b" : 67, "k" : 31 } }, { "$addFields" : { "h" : 38, "a" : 32, "j" : 62, "x" : "$x" } } ]
+
+
+Query 51 (with useIndex=true): [ { "$addFields" : { "e" : 84, "c" : "$h", "x.a" : 51, "x.b" : 60 } }, { "$project" : { "d" : 0 } }, { "$addFields" : { "k" : "$n", "w.a" : 27, "w.b" : 90 } }, { "$sort" : { "f" : 1, "g" : 1 } }, { "$match" : { "i" : { "$gt" : 2 } } }, { "$project" : { "b" : 0 } }, { "$match" : { "x.a" : { "$gt" : 9 } } }, { "$project" : { "c" : 0 } }, { "$addFields" : { "e" : 40, "l" : 63, "f" : 53, "x.a" : 53 } }, { "$project" : { "e" : 0, "c" : 0, "w.a" : 0, "w.c" : 0 } }, { "$project" : { "j" : 0, "b" : 0 } }, { "$match" : { "a" : { "$gt" : 19 } } } ]
+
+{_id: 1, a: 32, h: 71, x: {a: 53, b: 60, c: 0}, g: 26, w: {b: 90}, f: 53, i: 65, l: 63},
+{_id: 2, w: {b: 90}, i: 42, h: 50, g: 2, a: 85, f: 53, x: {a: 53, b: 60, c: 40}, l: 63},
+{_id: 3, a: 27, h: 72, x: {a: 53, b: 60, c: 77}, g: 8, w: {b: 90}, f: 53, i: 67, l: 63},
+{_id: 4, a: 29, h: 83, x: {a: 53, b: 60, c: 20}, g: 16, w: {b: 90}, f: 53, i: 38, l: 63},
+{_id: 5, x: {a: 53, b: 60, c: 70}, i: 93, g: 15, a: 89, w: {b: 90}, h: 75, f: 53, l: 63},
+{_id: 6, f: 53, a: 85, x: {a: 53, b: 60, c: 59}, w: {b: 90}, i: 84, h: 71, g: 16, l: 63},
+{_id: 7, w: {b: 90}, h: 86, f: 53, x: {a: 53, b: 60, c: 40}, i: 44, g: 66, a: 85, l: 63},
+{_id: 8, g: 62, w: {b: 90}, f: 53, i: 43, a: 75, h: 74, x: {a: 53, b: 60, c: 79}, l: 63}
+
+Query 52 (with useIndex=true): [ { "$addFields" : { "g" : 56, "k" : 56, "a" : "$n" } }, { "$project" : { "i" : 0, "c" : 0 } }, { "$addFields" : { "k" : "$p" } }, { "$project" : { "k" : 0, "c" : 0, "w" : 0 } }, { "$sort" : { "k" : 1, "e" : -1 } }, { "$project" : { "f" : 1, "i" : 1, "e" : 1, "k" : 1, "d" : 1, "h" : 1, "c" : 1, "g" : "$k", "j" : 1, "l" : "$e", "b" : 1, "y.a" : 1, "y.c" : 1, "x" : 1 } }, { "$match" : { "y.c" : { "$lt" : 98 } } }, { "$project" : { "a" : 0 } }, { "$project" : { "k" : 0 } }, { "$addFields" : { "g" : 30, "d" : 89, "x" : "$w" } } ]
+
+
+Query 53 (with useIndex=true): [ { "$match" : { "y.c" : { "$lte" : 88 } } }, { "$addFields" : { "c" : 75 } }, { "$project" : { "l" : 0 } }, { "$addFields" : { "b" : 78, "k" : "$f", "d" : 60, "y.b" : 58, "y.c" : 68 } }, { "$match" : { "y.c" : { "$lte" : 77 } } }, { "$project" : { "c" : { "$literal" : 91 }, "e" : 1, "f" : 1, "j" : "$k", "i" : 1, "a" : 1, "h" : "$k", "l" : 1, "g" : 1, "d" : 1, "b" : 1, "x.b" : 1, "x.c" : 1 } }, { "$addFields" : { "j" : "$m", "h" : 37, "y.b" : 24 } }, { "$project" : { "a" : 0 } }, { "$addFields" : { "i" : 14 } }, { "$project" : { "e" : 0 } }, { "$project" : { "k" : 0, "f" : 0 } } ]
+
+
+Query 54 (with useIndex=true): [ { "$addFields" : { "h" : 32, "c" : 68, "y.c" : 44 } }, { "$sort" : { "b" : 1 } }, { "$addFields" : { "f" : 19 } }, { "$project" : { "f" : 0, "j" : 0, "x.a" : 0 } }, { "$match" : { "y.c" : { "$gt" : 20 } } }, { "$project" : { "e" : 1, "a" : 1, "d" : { "$literal" : 94 }, "j" : 1, "k" : { "$literal" : 61 }, "h" : "$l", "l" : "$d", "f" : 1, "i" : 1, "g" : 1, "w" : 1, "y.b" : 1, "y.a" : 1 } }, { "$project" : { "h" : 0 } }, { "$project" : { "a" : 0, "d" : 0, "x.a" : 0 } }, { "$project" : { "b" : 0, "y" : 0 } }, { "$addFields" : { "g" : 94, "h" : 38, "b" : 5 } }, { "$sort" : { "l" : -1 } } ]
+
+{_id: 1, w: {a: 18, b: 25, c: 26}, i: 65, g: 94, e: 95, k: 61, h: 38, l: 10, b: 5},
+{_id: 2, w: {a: 94, b: 32, c: 58}, i: 42, g: 94, e: 13, k: 61, h: 38, l: 94, b: 5},
+{_id: 3, w: {a: 11, b: 3, c: 9}, i: 67, g: 94, e: 40, k: 61, h: 38, l: 93, b: 5},
+{_id: 4, w: {a: 86, b: 75, c: 3}, i: 38, g: 94, e: 82, k: 61, h: 38, l: 34, b: 5},
+{_id: 5, w: {a: 44, b: 19, c: 96}, i: 93, g: 94, e: 87, k: 61, h: 38, l: 7, b: 5},
+{_id: 6, w: {a: 10, b: 66, c: 62}, i: 84, g: 94, e: 55, k: 61, h: 38, l: 54, b: 5},
+{_id: 7, w: {a: 48, b: 63, c: 47}, i: 44, g: 94, e: 78, k: 61, h: 38, l: 65, b: 5},
+{_id: 8, w: {a: 15, b: 23, c: 89}, i: 43, g: 94, e: 63, k: 61, h: 38, l: 92, b: 5}
+
+Query 55 (with useIndex=true): [ { "$match" : { "x.a" : { "$gte" : 18 } } }, { "$project" : { "b" : 0, "h" : 0, "y.a" : 0, "y.c" : 0 } }, { "$project" : { "h" : 0, "l" : 0 } }, { "$sort" : { "k" : -1 } }, { "$group" : { "_id" : "$d", "l" : { "$sum" : "$l" }, "i" : { "$sum" : "$i" }, "j" : { "$sum" : "$j" }, "f" : { "$sum" : "$f" }, "c" : { "$sum" : "$c" }, "k" : { "$sum" : "$k" }, "b" : { "$sum" : "$b" }, "g" : { "$sum" : "$g" }, "d" : { "$sum" : "$d" }, "e" : { "$sum" : "$e" }, "a" : { "$sum" : "$a" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$project" : { "d" : 0, "i" : 0 } }, { "$addFields" : { "d" : 94, "b" : "$j", "w.a" : 34 } }, { "$addFields" : { "k" : 49, "e" : 75, "x" : "$w" } } ]
+
+{_id: 34, l: 0, j: 0, f: 50, c: 87, k: 49, b: 0, g: 16, d: 94, e: 75, a: 29, x: {a: 34, b: 75, c: 3}, w: {a: 34, b: 75, c: 3}, y: null},
+{_id: 54, l: 0, j: 0, f: 41, c: 94, k: 49, b: 0, g: 16, d: 94, e: 75, a: 85, x: {a: 34, b: 66, c: 62}, w: {a: 34, b: 66, c: 62}, y: null},
+{_id: 65, l: 0, j: 0, f: 18, c: 11, k: 49, b: 0, g: 66, d: 94, e: 75, a: 85, x: {a: 34, b: 63, c: 47}, w: {a: 34, b: 63, c: 47}, y: null},
+{_id: 7, l: 0, j: 0, f: 69, c: 49, k: 49, b: 0, g: 15, d: 94, e: 75, a: 89, x: {a: 34, b: 19, c: 96}, w: {a: 34, b: 19, c: 96}, y: null},
+{_id: 93, l: 0, j: 0, f: 49, c: 77, k: 49, b: 0, g: 8, d: 94, e: 75, a: 27, x: {a: 34, b: 3, c: 9}, w: {a: 34, b: 3, c: 9}, y: null}
+
+Query 56 (with useIndex=true): [ { "$addFields" : { "f" : "$f" } }, { "$project" : { "g" : 0, "h" : 0, "y" : 0 } }, { "$match" : { "f" : { "$lte" : 93 } } }, { "$project" : { "f" : 0 } }, { "$addFields" : { "g" : "$s", "k" : "$n", "y.a" : 42 } }, { "$project" : { "e" : 0, "g" : 0 } }, { "$project" : { "k" : 0, "i" : 0 } } ]
+
+{_id: 1, a: 32, d: 10, x: {a: 4, b: 40, c: 0}, c: 60, w: {a: 18, b: 25, c: 26}, b: 64, y: {a: 42}},
+{_id: 3, a: 27, d: 93, x: {a: 19, b: 99, c: 77}, c: 77, w: {a: 11, b: 3, c: 9}, b: 47, y: {a: 42}},
+{_id: 4, a: 29, d: 34, x: {a: 81, b: 68, c: 20}, c: 87, w: {a: 86, b: 75, c: 3}, b: 76, y: {a: 42}},
+{_id: 5, d: 7, b: 4, x: {a: 75, b: 5, c: 70}, c: 49, a: 89, w: {a: 44, b: 19, c: 96}, y: {a: 42}},
+{_id: 6, d: 54, c: 94, b: 71, a: 85, x: {a: 59, b: 36, c: 59}, w: {a: 10, b: 66, c: 62}, y: {a: 42}},
+{_id: 7, w: {a: 48, b: 63, c: 47}, d: 65, b: 40, x: {a: 47, b: 88, c: 40}, c: 11, a: 85, y: {a: 42}},
+{_id: 8, c: 24, w: {a: 15, b: 23, c: 89}, b: 81, a: 75, d: 92, x: {a: 9, b: 4, c: 79}, y: {a: 42}}
+
+Query 57 (with useIndex=true): [ { "$project" : { "f" : 0 } }, { "$addFields" : { "c" : 63, "b" : 26, "a" : 21 } }, { "$project" : { "a" : 0, "x" : 0 } }, { "$match" : { "g" : { "$gte" : 13 } } }, { "$group" : { "_id" : "$i", "h" : { "$sum" : "$h" }, "i" : { "$sum" : "$i" }, "c" : { "$sum" : "$c" }, "g" : { "$sum" : "$g" }, "d" : { "$sum" : "$d" }, "k" : { "$sum" : "$k" }, "b" : { "$sum" : "$b" }, "e" : { "$sum" : "$e" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" } } }, { "$group" : { "_id" : "$b", "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "e" : { "$sum" : "$e" }, "b" : { "$sum" : "$b" }, "c" : { "$sum" : "$c" }, "g" : { "$sum" : "$g" }, "i" : { "$sum" : "$i" }, "k" : { "$sum" : "$k" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" } } }, { "$project" : { "a" : 0 } }, { "$addFields" : { "j" : 13 } } ]
+
+{_id: 26, f: 0, e: 460, b: 156, c: 378, g: 201, i: 367, k: 0, y: null, w: {a: 10, b: 66, c: 62}, x: null, j: 13}
+
+Query 58 (with useIndex=true): [ { "$addFields" : { "j" : 24 } }, { "$match" : { "x.c" : { "$lt" : 84 } } }, { "$project" : { "e" : 0, "h" : 0, "w.a" : 0, "w.c" : 0 } }, { "$project" : { "a" : 0, "x" : 0 } }, { "$project" : { "k" : 0, "c" : 0, "y" : 0 } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "x" } }, { "$unwind" : "$x" } ]
+
+{_id: 1, d: 10, x: {_id: 1, b: 57, c: 58, a: 41}, g: 26, w: {b: 25}, f: 85, b: 64, i: 65, j: 24},
+{_id: 2, w: {b: 32}, d: 94, i: 42, b: 21, g: 2, f: 98, x: {_id: 2, b: 12, c: 54, a: 92}, j: 24},
+{_id: 3, d: 93, x: {_id: 3, c: 99, a: 47, b: 57}, g: 8, w: {b: 3}, f: 49, b: 47, i: 67, j: 24},
+{_id: 4, d: 34, x: {_id: 4, b: 16, c: 7, a: 60}, g: 16, w: {b: 75}, f: 50, b: 76, i: 38, j: 24},
+{_id: 5, d: 7, b: 4, x: {_id: 5, a: 16, b: 71, c: 91}, i: 93, g: 15, w: {b: 19}, f: 69, j: 24},
+{_id: 6, f: 41, d: 54, b: 71, x: {_id: 6, c: 78, a: 37, b: 67}, w: {b: 66}, i: 84, g: 16, j: 24},
+{_id: 7, w: {b: 63}, f: 18, d: 65, b: 40, x: {_id: 7, a: 0, c: 4, b: 1}, i: 44, g: 66, j: 24},
+{_id: 8, g: 62, w: {b: 23}, f: 4, b: 81, i: 43, d: 92, x: {_id: 8, a: 14, b: 86, c: 90}, j: 24}
+
+Query 59 (with useIndex=true): [ { "$project" : { "h" : 0 } }, { "$addFields" : { "b" : 82, "l" : 85, "j" : 94 } }, { "$group" : { "_id" : "$j", "a" : { "$sum" : "$a" }, "d" : { "$sum" : "$d" }, "h" : { "$sum" : "$h" }, "e" : { "$sum" : "$e" }, "b" : { "$sum" : "$b" }, "f" : { "$sum" : "$f" }, "k" : { "$sum" : "$k" }, "j" : { "$sum" : "$j" }, "g" : { "$sum" : "$g" }, "i" : { "$sum" : "$i" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$sort" : { "f" : -1 } }, { "$match" : { "e" : { "$lte" : 86 } } }, { "$sort" : { "i" : -1, "a" : -1 } }, { "$group" : { "_id" : "$a", "k" : { "$sum" : "$k" }, "l" : { "$sum" : "$l" }, "j" : { "$sum" : "$j" }, "g" : { "$sum" : "$g" }, "d" : { "$sum" : "$d" }, "f" : { "$sum" : "$f" }, "c" : { "$sum" : "$c" }, "h" : { "$sum" : "$h" }, "b" : { "$sum" : "$b" }, "e" : { "$sum" : "$e" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } }, { "$sort" : { "l" : 1 } }, { "$project" : { "d" : 0, "b" : 0 } }, { "$match" : { "g" : { "$lt" : 75 } } }, { "$match" : { "f" : { "$gt" : 14 } } } ]
+
+
+Query 60 (with useIndex=true): [ { "$project" : { "f" : "$j", "d" : "$a", "j" : 1, "h" : 1, "e" : 1, "b" : "$f", "a" : 1, "c" : 1, "x.b" : 1 } }, { "$group" : { "_id" : "$c", "h" : { "$sum" : "$h" }, "f" : { "$sum" : "$f" }, "e" : { "$sum" : "$e" }, "i" : { "$sum" : "$i" }, "a" : { "$sum" : "$a" }, "b" : { "$sum" : "$b" }, "l" : { "$sum" : "$l" }, "j" : { "$sum" : "$j" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "f" : 61, "g" : "$j" } }, { "$addFields" : { "f" : 55, "i" : 62, "y" : "$y" } }, { "$project" : { "f" : 1, "k" : "$k", "b" : 1, "j" : 1, "a" : 1, "l" : 1, "e" : 1, "i" : 1, "g" : 1, "x" : 1, "w.b" : 1, "w.c" : 1 } }, { "$addFields" : { "a" : 35, "d" : 36, "x" : "$y" } }, { "$group" : { "_id" : "$i", "i" : { "$sum" : "$i" }, "l" : { "$sum" : "$l" }, "k" : { "$sum" : "$k" }, "g" : { "$sum" : "$g" }, "e" : { "$sum" : "$e" }, "b" : { "$sum" : "$b" }, "h" : { "$sum" : "$h" }, "j" : { "$sum" : "$j" }, "c" : { "$sum" : "$c" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" } } }, { "$project" : { "i" : 0, "e" : 0 } } ]
+
+{_id: 62, l: 0, k: 0, g: 0, b: 414, h: 0, j: 0, c: 0, y: null, w: null, x: null}
+
+Query 61 (with useIndex=true): [ { "$addFields" : { "e" : 45, "k" : "$t", "a" : 41, "x" : "$w" } }, { "$addFields" : { "l" : 60 } }, { "$addFields" : { "a" : 55, "y.a" : 18 } }, { "$addFields" : { "b" : 70 } }, { "$addFields" : { "c" : "$q", "x.b" : 15 } }, { "$addFields" : { "h" : 41, "b" : 53, "e" : "$n", "w" : "$y" } }, { "$match" : { "y.b" : { "$gte" : 11 } } }, { "$project" : { "f" : 0, "d" : 0, "w" : 0 } }, { "$match" : { "b" : { "$gte" : 16 } } } ]
+
+
+Query 62 (with useIndex=true): [ { "$sort" : { "g" : -1, "b" : -1 } }, { "$addFields" : { "k" : 27 } }, { "$addFields" : { "g" : 99, "i" : "$l" } }, { "$project" : { "b" : 0, "w" : 0 } }, { "$addFields" : { "i" : 80, "h" : 49 } }, { "$addFields" : { "j" : 55 } } ]
+
+{_id: 1, e: 95, a: 32, h: 49, d: 10, x: {a: 4, b: 40, c: 0}, g: 99, c: 60, f: 85, i: 80, k: 27, j: 55},
+{_id: 2, e: 13, d: 94, i: 80, c: 32, h: 49, g: 99, a: 85, f: 98, x: {a: 8, b: 71, c: 40}, k: 27, j: 55},
+{_id: 3, a: 27, h: 49, d: 93, x: {a: 19, b: 99, c: 77}, g: 99, c: 77, f: 49, i: 80, e: 40, k: 27, j: 55},
+{_id: 4, a: 29, h: 49, d: 34, x: {a: 81, b: 68, c: 20}, g: 99, c: 87, f: 50, i: 80, e: 82, k: 27, j: 55},
+{_id: 5, d: 7, x: {a: 75, b: 5, c: 70}, i: 80, g: 99, e: 87, c: 49, a: 89, h: 49, f: 69, k: 27, j: 55},
+{_id: 6, f: 41, e: 55, d: 54, c: 94, a: 85, x: {a: 59, b: 36, c: 59}, i: 80, h: 49, g: 99, k: 27, j: 55},
+{_id: 7, h: 49, f: 18, d: 65, x: {a: 47, b: 88, c: 40}, i: 80, g: 99, e: 78, c: 11, a: 85, k: 27, j: 55},
+{_id: 8, g: 99, c: 24, f: 4, i: 80, e: 63, a: 75, h: 49, d: 92, x: {a: 9, b: 4, c: 79}, k: 27, j: 55}
+
+Query 63 (with useIndex=true): [ { "$project" : { "h" : 0, "y.c" : 0, "y.a" : 0 } }, { "$addFields" : { "f" : 52, "a" : 20, "x.c" : 49, "x.b" : 5 } }, { "$match" : { "e" : { "$lt" : 94 } } }, { "$project" : { "k" : 0, "e" : 0, "y.c" : 0 } }, { "$addFields" : { "d" : "$m", "a" : 99, "l" : 26, "x" : "$w" } }, { "$addFields" : { "h" : 31, "l" : 94, "y.a" : 57, "y.b" : 34 } }, { "$addFields" : { "b" : 14, "x" : "$x" } }, { "$sort" : { "i" : -1, "c" : -1 } }, { "$project" : { "c" : 0, "y.a" : 0 } } ]
+
+{_id: 2, w: {a: 94, b: 32, c: 58}, i: 42, b: 14, g: 2, a: 99, f: 52, x: {a: 94, b: 32, c: 58}, l: 94, h: 31, y: {b: 34}},
+{_id: 3, a: 99, x: {a: 11, b: 3, c: 9}, g: 8, w: {a: 11, b: 3, c: 9}, f: 52, b: 14, i: 67, l: 94, h: 31, y: {b: 34}},
+{_id: 4, a: 99, x: {a: 86, b: 75, c: 3}, g: 16, w: {a: 86, b: 75, c: 3}, f: 52, b: 14, i: 38, l: 94, h: 31, y: {b: 34}},
+{_id: 5, b: 14, x: {a: 44, b: 19, c: 96}, i: 93, g: 15, a: 99, w: {a: 44, b: 19, c: 96}, f: 52, l: 94, h: 31, y: {b: 34}},
+{_id: 6, f: 52, b: 14, a: 99, x: {a: 10, b: 66, c: 62}, w: {a: 10, b: 66, c: 62}, i: 84, g: 16, l: 94, h: 31, y: {b: 34}},
+{_id: 7, w: {a: 48, b: 63, c: 47}, f: 52, b: 14, x: {a: 48, b: 63, c: 47}, i: 44, g: 66, a: 99, l: 94, h: 31, y: {b: 34}},
+{_id: 8, g: 62, w: {a: 15, b: 23, c: 89}, f: 52, b: 14, i: 43, a: 99, x: {a: 15, b: 23, c: 89}, l: 94, h: 31, y: {b: 34}}
+
+Query 64 (with useIndex=true): [ { "$addFields" : { "j" : 53, "h" : 18, "b" : "$m" } }, { "$match" : { "y.a" : { "$lte" : 82 } } }, { "$addFields" : { "j" : "$j", "y" : "$w" } }, { "$addFields" : { "g" : 79, "k" : 47, "j" : 98 } }, { "$project" : { "f" : 1, "b" : "$i", "c" : 1, "g" : 1, "d" : "$g", "l" : "$a", "a" : 1, "e" : "$h", "j" : 1, "k" : { "$literal" : 67 }, "i" : "$c", "y" : 1, "x" : 1 } }, { "$addFields" : { "i" : 15, "x" : "$y" } }, { "$sort" : { "d" : -1 } }, { "$addFields" : { "j" : 94, "w.a" : 51, "w.b" : 53 } }, { "$sort" : { "j" : -1, "k" : -1 } }, { "$project" : { "c" : 0, "a" : 0, "w.b" : 0, "w.a" : 0 } } ]
+
+
+Query 65 (with useIndex=true): [ { "$match" : { "d" : { "$lt" : 81 } } }, { "$addFields" : { "f" : "$p" } }, { "$addFields" : { "j" : 39, "e" : "$m", "x" : "$w" } }, { "$addFields" : { "k" : 96, "a" : 68 } }, { "$addFields" : { "c" : "$q" } }, { "$project" : { "g" : 1, "i" : 1, "d" : 1, "j" : 1, "k" : 1, "a" : 1, "l" : 1, "e" : 1, "b" : 1, "c" : "$c", "f" : 1, "x" : 1 } }, { "$addFields" : { "h" : 36, "g" : "$g", "y.a" : 54, "y.c" : 95 } }, { "$addFields" : { "a" : 75 } } ]
+
+{_id: 1, d: 10, g: 26, b: 64, i: 65, j: 39, x: {a: 18, b: 25, c: 26}, k: 96, a: 75, h: 36, y: {a: 54, c: 95}},
+{_id: 4, d: 34, g: 16, b: 76, i: 38, j: 39, x: {a: 86, b: 75, c: 3}, k: 96, a: 75, h: 36, y: {a: 54, c: 95}},
+{_id: 5, d: 7, b: 4, i: 93, g: 15, j: 39, x: {a: 44, b: 19, c: 96}, k: 96, a: 75, h: 36, y: {a: 54, c: 95}},
+{_id: 6, d: 54, b: 71, i: 84, g: 16, j: 39, x: {a: 10, b: 66, c: 62}, k: 96, a: 75, h: 36, y: {a: 54, c: 95}},
+{_id: 7, d: 65, b: 40, i: 44, g: 66, j: 39, x: {a: 48, b: 63, c: 47}, k: 96, a: 75, h: 36, y: {a: 54, c: 95}}
+
+Query 66 (with useIndex=true): [ { "$sort" : { "f" : 1 } }, { "$project" : { "b" : 0 } }, { "$project" : { "g" : 0 } }, { "$sort" : { "d" : -1, "e" : -1 } }, { "$limit" : 6 }, { "$project" : { "b" : 0, "g" : 0, "w.c" : 0 } }, { "$sort" : { "i" : -1, "g" : 1 } }, { "$project" : { "b" : 1, "k" : 1, "j" : "$b", "i" : 1, "e" : "$k", "d" : 1, "g" : 1, "f" : 1, "w.a" : 1, "y" : 1 } }, { "$project" : { "l" : 0 } }, { "$project" : { "d" : "$l", "h" : 1, "b" : { "$literal" : 73 }, "i" : 1, "a" : "$f", "f" : "$d", "c" : "$a", "e" : 1, "l" : "$f", "x" : 1 } }, { "$addFields" : { "h" : "$k" } } ]
+
+{_id: 2, i: 42, b: 73, a: 98, f: 94, l: 98},
+{_id: 3, i: 67, b: 73, a: 49, f: 93, l: 49},
+{_id: 4, i: 38, b: 73, a: 50, f: 34, l: 50},
+{_id: 6, i: 84, b: 73, a: 41, f: 54, l: 41},
+{_id: 7, i: 44, b: 73, a: 18, f: 65, l: 18},
+{_id: 8, i: 43, b: 73, a: 4, f: 92, l: 4}
+
+Query 67 (with useIndex=true): [ { "$addFields" : { "j" : "$l", "i" : 6, "k" : 6, "y.b" : 17, "y.a" : 25 } }, { "$project" : { "a" : 0 } }, { "$match" : { "y.b" : { "$lt" : 88 } } }, { "$addFields" : { "a" : 52 } }, { "$addFields" : { "h" : 22, "g" : 72, "b" : "$e" } }, { "$addFields" : { "c" : 63, "k" : 84 } }, { "$group" : { "_id" : "$a", "e" : { "$sum" : "$e" }, "g" : { "$sum" : "$g" }, "l" : { "$sum" : "$l" }, "k" : { "$sum" : "$k" }, "i" : { "$sum" : "$i" }, "b" : { "$sum" : "$b" }, "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "c" : { "$sum" : "$c" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" }, "y" : { "$min" : "$y" } } }, { "$addFields" : { "f" : "$p", "a" : "$r", "l" : 38, "x.b" : 89, "x.a" : 82 } }, { "$project" : { "j" : 0, "g" : 0, "x.c" : 0, "x.b" : 0 } }, { "$addFields" : { "k" : "$j", "b" : 99, "g" : "$n", "w.c" : 12 } }, { "$group" : { "_id" : "$k", "e" : { "$sum" : "$e" }, "b" : { "$sum" : "$b" }, "i" : { "$sum" : "$i" }, "d" : { "$sum" : "$d" }, "a" : { "$sum" : "$a" }, "f" : { "$sum" : "$f" }, "k" : { "$sum" : "$k" }, "g" : { "$sum" : "$g" }, "y" : { "$min" : "$y" }, "x" : { "$min" : "$x" }, "w" : { "$min" : "$w" } } } ]
+
+{_id: null, e: 513, b: 99, i: 48, d: 0, a: 0, f: 0, k: 0, g: 0, y: {b: 17, a: 25}, x: {a: 82}, w: {a: 10, b: 66, c: 12}}
+
+Query 68 (with useIndex=true): [ { "$addFields" : { "k" : "$d", "x" : "$y" } }, { "$match" : { "w.a" : { "$gte" : 19 } } }, { "$sort" : { "e" : -1, "j" : -1 } }, { "$limit" : 8 }, { "$project" : { "j" : 0, "a" : 0, "x.b" : 0 } }, { "$project" : { "c" : 0, "f" : 0 } }, { "$project" : { "j" : 0, "w.a" : 0, "w.b" : 0 } } ]
+
+{_id: 2, e: 13, w: {c: 58}, d: 94, i: 42, h: 50, b: 21, g: 2, k: 94},
+{_id: 4, h: 83, d: 34, g: 16, w: {c: 3}, b: 76, i: 38, e: 82, k: 34},
+{_id: 5, d: 7, b: 4, i: 93, g: 15, e: 87, w: {c: 96}, h: 75, k: 7},
+{_id: 7, w: {c: 47}, h: 86, d: 65, b: 40, i: 44, g: 66, e: 78, k: 65}
+
+Query 69 (with useIndex=true): [ { "$addFields" : { "f" : "$t", "a" : 70 } }, { "$sort" : { "b" : 1, "j" : 1 } }, { "$limit" : 6 }, { "$addFields" : { "d" : 95, "k" : "$m", "e" : 85 } }, { "$addFields" : { "f" : 24, "l" : 49, "i" : "$q", "x" : "$w" } }, { "$project" : { "b" : 0, "a" : 0 } }, { "$match" : { "f" : { "$lt" : 78 } } }, { "$sort" : { "c" : -1 } }, { "$limit" : 9 } ]
+
+{_id: 1, e: 85, h: 71, d: 95, x: {a: 18, b: 25, c: 26}, g: 26, c: 60, w: {a: 18, b: 25, c: 26}, f: 24, l: 49},
+{_id: 2, e: 85, w: {a: 94, b: 32, c: 58}, d: 95, c: 32, h: 50, g: 2, f: 24, x: {a: 94, b: 32, c: 58}, l: 49},
+{_id: 3, h: 72, d: 95, x: {a: 11, b: 3, c: 9}, g: 8, c: 77, w: {a: 11, b: 3, c: 9}, f: 24, e: 85, l: 49},
+{_id: 5, d: 95, x: {a: 44, b: 19, c: 96}, g: 15, e: 85, c: 49, w: {a: 44, b: 19, c: 96}, h: 75, f: 24, l: 49},
+{_id: 6, f: 24, e: 85, d: 95, c: 94, x: {a: 10, b: 66, c: 62}, w: {a: 10, b: 66, c: 62}, h: 71, g: 16, l: 49},
+{_id: 7, w: {a: 48, b: 63, c: 47}, h: 86, f: 24, d: 95, x: {a: 48, b: 63, c: 47}, g: 66, e: 85, c: 11, l: 49}
+
+Query 70 (with useIndex=true): [ { "$group" : { "_id" : "$g", "f" : { "$sum" : "$f" }, "l" : { "$sum" : "$l" }, "c" : { "$sum" : "$c" }, "e" : { "$sum" : "$e" }, "k" : { "$sum" : "$k" }, "a" : { "$sum" : "$a" }, "i" : { "$sum" : "$i" }, "d" : { "$sum" : "$d" }, "j" : { "$sum" : "$j" }, "h" : { "$sum" : "$h" }, "g" : { "$sum" : "$g" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" }, "x" : { "$min" : "$x" } } }, { "$match" : { "x.b" : { "$lte" : 82 } } }, { "$match" : { "w.b" : { "$gt" : 11 } } }, { "$sort" : { "k" : -1, "h" : 1 } }, { "$addFields" : { "c" : 68, "l" : 56, "h" : 18 } }, { "$addFields" : { "k" : 53, "i" : "$s", "b" : 83 } }, { "$match" : { "a" : { "$lte" : 98 } } }, { "$project" : { "k" : 0, "l" : 0 } }, { "$match" : { "x.c" : { "$gte" : 19 } } } ]
+
+{_id: 15, f: 69, c: 68, e: 87, a: 89, d: 7, j: 0, h: 18, g: 15, y: null, w: {a: 44, b: 19, c: 96}, x: {a: 75, b: 5, c: 70}, b: 83},
+{_id: 2, f: 98, c: 68, e: 13, a: 85, d: 94, j: 0, h: 18, g: 2, y: null, w: {a: 94, b: 32, c: 58}, x: {a: 8, b: 71, c: 40}, b: 83},
+{_id: 62, f: 4, c: 68, e: 63, a: 75, d: 92, j: 0, h: 18, g: 62, y: null, w: {a: 15, b: 23, c: 89}, x: {a: 9, b: 4, c: 79}, b: 83}
+
+Query 71 (with useIndex=true): [ { "$project" : { "l" : 1, "b" : "$k", "a" : 1, "h" : "$a", "k" : "$e", "e" : 1, "f" : 1, "g" : "$g", "x" : 1 } }, { "$project" : { "j" : 0, "l" : 0 } }, { "$project" : { "b" : 0, "g" : 0 } }, { "$addFields" : { "j" : 58, "c" : 12, "f" : "$j", "w.b" : 31 } }, { "$addFields" : { "c" : 23, "f" : 85 } } ]
+
+{_id: 1, x: {a: 4, b: 40, c: 0}, f: 85, e: 95, a: 32, h: 32, k: 95, j: 58, c: 23, w: {b: 31}},
+{_id: 2, x: {a: 8, b: 71, c: 40}, f: 85, e: 13, a: 85, h: 85, k: 13, j: 58, c: 23, w: {b: 31}},
+{_id: 3, x: {a: 19, b: 99, c: 77}, f: 85, e: 40, a: 27, h: 27, k: 40, j: 58, c: 23, w: {b: 31}},
+{_id: 4, x: {a: 81, b: 68, c: 20}, f: 85, e: 82, a: 29, h: 29, k: 82, j: 58, c: 23, w: {b: 31}},
+{_id: 5, x: {a: 75, b: 5, c: 70}, f: 85, e: 87, a: 89, h: 89, k: 87, j: 58, c: 23, w: {b: 31}},
+{_id: 6, x: {a: 59, b: 36, c: 59}, f: 85, e: 55, a: 85, h: 85, k: 55, j: 58, c: 23, w: {b: 31}},
+{_id: 7, x: {a: 47, b: 88, c: 40}, f: 85, e: 78, a: 85, h: 85, k: 78, j: 58, c: 23, w: {b: 31}},
+{_id: 8, x: {a: 9, b: 4, c: 79}, f: 85, e: 63, a: 75, h: 75, k: 63, j: 58, c: 23, w: {b: 31}}
+
+Query 72 (with useIndex=true): [ { "$project" : { "j" : 0, "l" : 0, "x.a" : 0, "x.b" : 0 } }, { "$match" : { "x.a" : { "$gt" : 5 } } }, { "$project" : { "i" : 0, "y.b" : 0, "y.c" : 0 } }, { "$sort" : { "i" : -1, "f" : -1 } }, { "$lookup" : { "from" : "complex_pipelines_foreign", "localField" : "_id", "foreignField" : "_id", "as" : "y" } }, { "$unwind" : "$y" }, { "$group" : { "_id" : "$p", "j" : { "$sum" : "$j" }, "f" : { "$sum" : "$f" }, "i" : { "$sum" : "$i" }, "a" : { "$sum" : "$a" }, "b" : { "$sum" : "$b" }, "g" : { "$sum" : "$g" }, "c" : { "$sum" : "$c" }, "k" : { "$sum" : "$k" }, "e" : { "$sum" : "$e" }, "l" : { "$sum" : "$l" }, "h" : { "$sum" : "$h" }, "x" : { "$min" : "$x" }, "y" : { "$min" : "$y" }, "w" : { "$min" : "$w" } } } ]
+
+

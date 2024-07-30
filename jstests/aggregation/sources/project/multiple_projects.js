@@ -4,15 +4,30 @@
 const coll = db.multiple_projects;
 coll.drop();
 
+const indexSpec = {
+    _id: 1,
+    j: 1,
+    i: 1,
+    h: 1,
+    g: 1,
+    f: 1,
+    e: 1,
+    d: 1,
+    c: 1,
+    b: 1,
+    a: 1
+};
+
 function runTest(doCoveredProjection, expected, pipeline) {
     if (doCoveredProjection) {
-        let coveredProjection = {a: 1, b: 1, c: 1, d: 1, e: 1, f: 1, g: 1, h: 1, i: 1, j: 1};
-        pipeline = [].concat([{$project: coveredProjection}], pipeline);
+        pipeline = [{$project: indexSpec}].concat(pipeline);
     }
 
-    pipeline = pipeline.concat([{$match: {_id: {$mod: [2, 1]}}}]);
+    const options = doCoveredProjection ? {hint: indexSpec} : {};
 
-    assert.docEq(expected, coll.aggregate(pipeline).toArray()[0]);
+    let results = coll.aggregate(pipeline, options).toArray().filter(x => x._id == 1);
+
+    assert.docEq(expected, results[0]);
 }
 
 function runTests(doCoveredProjection) {
@@ -40,6 +55,31 @@ function runTests(doCoveredProjection) {
         {$addFields: {e: 18}},
     ]);
 
+    runTest(doCoveredProjection, {_id: 1, j: 10, g: 8, f: 13, c: {p: 14, q: 16}, b: 11, e: 18}, [
+        {$addFields: {b: 11, f: 12}},
+        {$project: {d: 0, e: 0}},
+        {$addFields: {f: 13, g: '$h'}},
+        {
+            $project: {
+                _id: 1,
+                a: 1,
+                b: 1,
+                "c.p": {$literal: 14},
+                d: 1,
+                e: 1,
+                f: 1,
+                g: 1,
+                h: 1,
+                i: 1,
+                j: 1
+            }
+        },
+        {$project: {h: 0, i: 0}},
+        {$addFields: {a: '$e', "c.q": 16}},
+        {$project: {d: 0}},
+        {$addFields: {e: 18}},
+    ]);
+
     runTest(
         doCoveredProjection, {_id: 1, j: 15, g: 7, f: 16, e: 14, d: 4, c: 8, b: 13, i: 12, a: 0}, [
             {$addFields: {a: '$b', c: 11}},
@@ -54,6 +94,22 @@ function runTests(doCoveredProjection) {
             {$project: {h: 0}},
             {$addFields: {f: 16}},
         ]);
+
+    runTest(doCoveredProjection,
+            {_id: 1, j: 16, g: 7, e: 13, d: 4, c: 8, a: {p: 11, r: 14}, b: 14, f: 15, i: 15},
+            [
+                {$addFields: {"a.p": 11, c: 12}},
+                {$sort: {a: 1}},
+                {$addFields: {e: 13}},
+                {$addFields: {f: '$b', g: '$g'}},
+                {$project: {"a.q": 0, i: 0}},
+                {$addFields: {b: 14, c: '$h'}},
+                {$sort: {f: 1}},
+                {$addFields: {f: 15}},
+                {$sort: {h: 1}},
+                {$addFields: {i: '$f', j: 16, "a.r": {$ifNull: ['$b', 0]}}},
+                {$project: {h: 0}},
+            ]);
 
     let subObj1 = {_id: 1, j: 10, i: 9, h: 8, g: 8, f: 13, c: 12, b: 11};
 
@@ -121,16 +177,14 @@ function runTests(doCoveredProjection) {
     }
 }
 
-let indexSpec = {_id: 1, j: 1, i: 1, h: 1, g: 1, f: 1, e: 1, d: 1, c: 1, b: 1, a: 1};
-
 assert.commandWorked(coll.insert({_id: 0, j: 10, i: 9, h: 8, g: 7, f: 6, e: 5, d: 4, c: 3, a: 1}));
 assert.commandWorked(coll.insert({_id: 1, j: 10, i: 9, h: 8, g: 7, f: 6, e: 5, d: 4, c: 3, a: 1}));
 assert.commandWorked(coll.insert({_id: 2, j: 10, i: 9, h: 8, g: 7, f: 6, e: 5, d: 4, c: 3, a: 1}));
 
-assert.commandWorked(coll.createIndex(indexSpec));
-
 let doCoveredProjection = false;
 runTests(doCoveredProjection);
+
+assert.commandWorked(coll.createIndex(indexSpec));
 
 doCoveredProjection = true;
 runTests(doCoveredProjection);

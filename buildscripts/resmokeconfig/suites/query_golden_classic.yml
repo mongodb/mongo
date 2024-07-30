@@ -19,7 +19,8 @@ executor:
         // Keep in sync with query_golden_cqf.yml.
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
         await import("jstests/libs/override_methods/golden_overrides.js");
-        _openGoldenData(jsTestName(), {relativePath: "jstests/query_golden/expected_output"});
+        import {beginGoldenTest} from "jstests/libs/begin_golden_test.js";
+        beginGoldenTest("jstests/query_golden/expected_output");
   hooks:
     - class: ValidateCollections
       shell_options:
