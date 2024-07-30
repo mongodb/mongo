@@ -7,41 +7,12 @@
 buildvariants:
   # Note that this task is currently optional;
   # This will eventually become suggested, then required.
-  - name: &macos-amd64-bazel-compile macos-amd64-bazel-compile
-    display_name: "MacOS AMD64 Bazel Compile"
-    tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    run_on:
-      - macos-1100
-    expansions:
-      test_flags: >-
-        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
-        --enableEnterpriseTests=off
-      compiling_for_test: true
-      push_path: osx
-      push_name: macos
-      push_arch: x86_64
-      compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-      compile_flags: >-
-        --ssl
-        -j$(sysctl -n hw.logicalcpu)
-        --libc++
-        --variables-files=etc/scons/xcode_macosx.vars
-        --modules=
-      resmoke_jobs_max: 6
-      compile_variant: *macos-amd64-bazel-compile
-    tasks:
-      - name: compile_bazel_macos_TG
-      - name: compile_bazel_ninja_TG
-
-  # Note that this task is currently optional;
-  # This will eventually become suggested, then required.
   - name: &macos-arm64-bazel-compile macos-arm64-bazel-compile
     display_name: "MacOS ARM64 Bazel Compile"
     tags: ["bazel_check"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - macos-1100-arm64
+      - macos-14-arm64
     expansions:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
@@ -50,7 +21,7 @@ buildvariants:
       push_path: osx
       push_name: macos
       push_arch: arm64
-      compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+      compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
       compile_flags: >-
         --ssl
         -j$(sysctl -n hw.logicalcpu)
@@ -67,11 +38,11 @@ buildvariants:
     display_name: "~ Enterprise macOS arm64"
     tags: ["bazel_check"]
     run_on:
-      - macos-1100-arm64
+      - macos-14-arm64
     expansions:
       compile_variant: *enterprise-macos-arm64
       test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
-      compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+      compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
       compile_flags: >-
         --ssl
         -j$(sysctl -n hw.logicalcpu)

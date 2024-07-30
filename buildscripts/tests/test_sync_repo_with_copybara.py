@@ -7,7 +7,10 @@ from unittest.mock import patch
 from buildscripts import sync_repo_with_copybara
 
 
-@unittest.skipIf(sys.platform == "win32", reason="NO need to run this unittest on windows")
+@unittest.skipIf(
+    sys.platform == "win32" or sys.platform == "darwin",
+    reason="No need to run this unittest on windows or macos",
+)
 class TestBranchFunctions(unittest.TestCase):
     @staticmethod
     def create_mock_repo_git_config(mongodb_mongo_dir, config_content):

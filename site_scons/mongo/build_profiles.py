@@ -335,7 +335,7 @@ MACOS_BUILD_PROFILES = {
         ninja="enabled",
         variables_files=[
             "./etc/scons/developer_versions.vars",
-            "./etc/scons/xcode_macosx.vars",
+            "./etc/scons/xcode_macosx_arm.vars",
         ],
         allocator="auto",
         sanitize=None,
@@ -356,7 +356,7 @@ MACOS_BUILD_PROFILES = {
         ninja="enabled",
         variables_files=[
             "./etc/scons/developer_versions.vars",
-            "./etc/scons/xcode_macosx.vars",
+            "./etc/scons/xcode_macosx_arm.vars",
         ],
         allocator="auto",
         sanitize=None,
@@ -381,7 +381,7 @@ MACOS_BUILD_PROFILES = {
         ninja="disabled",
         variables_files=[
             "./etc/scons/developer_versions.vars",
-            "./etc/scons/xcode_macosx.vars",
+            "./etc/scons/xcode_macosx_arm.vars",
         ],
         allocator="auto",
         sanitize=None,
@@ -401,7 +401,7 @@ MACOS_BUILD_PROFILES = {
     BuildProfileType.RELEASE: BuildProfile(
         ninja="enabled",
         variables_files=[
-            "./etc/scons/xcode_macosx.vars",
+            "./etc/scons/xcode_macosx_arm.vars",
         ],
         allocator="auto",
         sanitize=None,
