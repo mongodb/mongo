@@ -14,6 +14,10 @@
  *   requires_capped,
  * ]
  */
+
+// TODO SERVER-92452: This test fails in burn-in with the 'inMemory' engine with the 'WT_CACHE_FULL'
+// error. This is a known issue and can be ignored. Remove this comment once SERVER-92452 is fixed.
+
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/agg_base.js";

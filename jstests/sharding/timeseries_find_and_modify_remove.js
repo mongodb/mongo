@@ -4,8 +4,6 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # To avoid burn-in tests in in-memory build variants
- *   requires_persistence,
  *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
  *   # flag can be removed.
  *   multiversion_incompatible,

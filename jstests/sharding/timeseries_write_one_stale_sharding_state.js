@@ -3,8 +3,6 @@
  *
  * @tags: [
  *   featureFlagTimeseriesUpdatesSupport,
- *   # To avoid burn-in tests in in-memory build variants
- *   requires_persistence,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.

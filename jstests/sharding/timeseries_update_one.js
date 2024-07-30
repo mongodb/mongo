@@ -3,8 +3,6 @@
  *
  * @tags: [
  *   featureFlagTimeseriesUpdatesSupport,
- *   # To avoid burn-in tests in in-memory build variants
- *   requires_persistence,
  * ]
  */
 

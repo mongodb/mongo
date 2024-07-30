@@ -4,8 +4,6 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # To avoid burn-in tests in in-memory build variants
- *   requires_persistence,
  *   featureFlagTimeseriesUpdatesSupport,
  *   # TODO SERVER-76583: Remove following two tags.
  *   does_not_support_retryable_writes,

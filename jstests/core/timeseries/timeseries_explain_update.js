@@ -5,8 +5,6 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   featureFlagTimeseriesUpdatesSupport,
- *   # To avoid burn-in tests in in-memory build variants
- *   requires_persistence,
  *   # TODO SERVER-78683: Remove this tag.
  *   # Internal transaction api might not handle stepdowns correctly and time-series retryable
  *   # updates use internal transaction api.

@@ -3,8 +3,6 @@
  * cases included in 'jstests/sharding/timeseries_update_multi.js'.
  *
  * @tags: [
- *   # To avoid burn-in tests in in-memory build variants
- *   requires_persistence,
  *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */

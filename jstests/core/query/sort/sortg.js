@@ -6,6 +6,10 @@
 // ]
 
 // Test that a memory exception is triggered for in memory sorts, but not for indexed sorts.
+
+// TODO SERVER-92452: This test fails in burn-in with the 'inMemory' engine with the 'WT_CACHE_FULL'
+// error. This is a known issue and can be ignored. Remove this comment once SERVER-92452 is fixed.
+
 const t = db.jstests_sortg;
 t.drop();
 

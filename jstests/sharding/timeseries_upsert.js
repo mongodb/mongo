@@ -2,8 +2,6 @@
  * Verifies upserts on sharded timeseries collection.
  *
  * @tags: [
- *   # To avoid burn-in tests in in-memory build variants
- *   requires_persistence,
  *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */
