@@ -7,6 +7,7 @@
 
 import {
     runCommandAndValidateQueryStats,
+    withQueryStatsEnabled
 } from "jstests/libs/query_stats_utils.js";
 
 const collName = jsTestName();
@@ -39,22 +40,15 @@ const countKeyFields = [
     "comment",
 ];
 
-const options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
-};
-const conn = MongoRunner.runMongod(options);
-const testDB = conn.getDB("test");
-const collection = testDB[collName];
+withQueryStatsEnabled(collName, (coll) => {
+    // Have to create an index for the hint not to fail.
+    assert.commandWorked(coll.createIndex({v: 1}));
 
-// Have to create an index for the hint not to fail.
-assert.commandWorked(collection.createIndex({v: 1}));
-
-runCommandAndValidateQueryStats({
-    coll: collection,
-    commandName: "count",
-    commandObj: countCommand,
-    shapeFields: queryShapeCountFields,
-    keyFields: countKeyFields,
+    runCommandAndValidateQueryStats({
+        coll: coll,
+        commandName: "count",
+        commandObj: countCommand,
+        shapeFields: queryShapeCountFields,
+        keyFields: countKeyFields,
+    });
 });
-
-MongoRunner.stopMongod(conn);

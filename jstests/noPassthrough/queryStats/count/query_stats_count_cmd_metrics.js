@@ -8,12 +8,14 @@
 import {
     assertDropAndRecreateCollection,
 } from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertAggregatedMetricsSingleExec,
     assertExpectedResults,
     getLatestQueryStatsEntry,
     getQueryStats,
-    resetQueryStatsStore
+    resetQueryStatsStore,
+    withQueryStatsEnabled
 } from "jstests/libs/query_stats_utils.js";
 
 /**
@@ -39,6 +41,7 @@ function testDefaultCountCommand(db, collName) {
     // Check that query stats metrics are properly updated.
     const firstEntry = getLatestQueryStatsEntry(db.getMongo(), {collname: collName});
     assert.eq("count", firstEntry.key.queryShape.command);
+    // TODO SERVER-90656: Remove this if-statement when metrics are properly updated.
     assertAggregatedMetricsSingleExec(firstEntry, {
         keysExamined: 0,
         // docsExamined is 0 because empty query object means collection scan is unnecessary;
@@ -78,14 +81,26 @@ function testCountCommandWithQuery(db, collName) {
     // Check that query stats metrics are properly updated.
     const firstEntry = getLatestQueryStatsEntry(db.getMongo(), {collname: collName});
     assert.eq("count", firstEntry.key.queryShape.command);
-    assertAggregatedMetricsSingleExec(firstEntry, {
-        keysExamined: 0,
-        docsExamined: 4,
-        hasSortStage: false,
-        usedDisk: false,
-        fromMultiPlanner: false,
-        fromPlanCache: false
-    });
+    // TODO SERVER-90656: Remove this if-statement when metrics are properly updated.
+    if (FixtureHelpers.isMongos(db)) {
+        assertAggregatedMetricsSingleExec(firstEntry, {
+            keysExamined: 0,
+            docsExamined: 0,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+            fromPlanCache: false
+        });
+    } else {
+        assertAggregatedMetricsSingleExec(firstEntry, {
+            keysExamined: 0,
+            docsExamined: 4,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+            fromPlanCache: false
+        });
+    }
     assertExpectedResults(firstEntry,
                           firstEntry.key,
                           /* expectedExecCount */ 1,
@@ -116,14 +131,26 @@ function testCountCommandWithIndex(db, collName) {
     // Check that query stats metrics are properly updated.
     const firstEntry = getLatestQueryStatsEntry(db.getMongo(), {collname: collName});
     assert.eq("count", firstEntry.key.queryShape.command, firstEntry);
-    assertAggregatedMetricsSingleExec(firstEntry, {
-        keysExamined: 4,
-        docsExamined: 0,
-        hasSortStage: false,
-        usedDisk: false,
-        fromMultiPlanner: false,
-        fromPlanCache: false
-    });
+    // TODO SERVER-90656: Remove this if-statement when metrics are properly updated.
+    if (FixtureHelpers.isMongos(db)) {
+        assertAggregatedMetricsSingleExec(firstEntry, {
+            keysExamined: 0,
+            docsExamined: 0,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+            fromPlanCache: false
+        });
+    } else {
+        assertAggregatedMetricsSingleExec(firstEntry, {
+            keysExamined: 4,
+            docsExamined: 0,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+            fromPlanCache: false
+        });
+    }
     assertExpectedResults(firstEntry,
                           firstEntry.key,
                           /* expectedExecCount */ 1,
@@ -152,16 +179,9 @@ function runTests(db, collName) {
     testCountCommandWithIndex(db, collName);
 }
 
-{
-    const options = {
-        setParameter: {internalQueryStatsRateLimit: -1},
-    };
-    const conn = MongoRunner.runMongod(options);
-    const testDB = conn.getDB("test");
-    const collName = jsTestName();
+withQueryStatsEnabled(jsTestName(), (coll) => {
+    const testDB = coll.getDB();
+    const collName = coll.getName();
     initializeCollection(testDB, collName);
     runTests(testDB, collName);
-    MongoRunner.stopMongod(conn);
-}
-
-// TODO SERVER-90655: Add test for queryStats metrics on mongos
+});

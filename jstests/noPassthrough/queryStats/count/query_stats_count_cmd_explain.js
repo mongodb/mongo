@@ -4,14 +4,12 @@
  * @tags: [featureFlagQueryStatsCountDistinct]
  */
 
-import {getQueryStats} from "jstests/libs/query_stats_utils.js";
+import {getQueryStats, withQueryStatsEnabled} from "jstests/libs/query_stats_utils.js";
 
-const options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
-};
-const conn = MongoRunner.runMongod(options);
-const testDB = conn.getDB("test");
-assert.commandWorked(testDB.runCommand({explain: {count: jsTestName()}}));
-const stats = getQueryStats(conn);
-assert.eq(0, stats.length, stats);
-MongoRunner.stopMongod(conn);
+withQueryStatsEnabled(jsTestName(), (coll) => {
+    const testDB = coll.getDB();
+    const collName = jsTestName();
+    assert.commandWorked(testDB.runCommand({explain: {count: collName}}));
+    const stats = getQueryStats(testDB, {collName: collName});
+    assert.eq(0, stats.length, stats);
+});

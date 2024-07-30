@@ -38,6 +38,8 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/query/count_command_as_aggregation_command.h"
 #include "mongo/db/query/count_command_gen.h"
+#include "mongo/db/query/query_stats/count_key.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/overflow_arithmetic.h"
@@ -47,11 +49,19 @@
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+namespace {
+
+// The # of documents returned is always 1 for the count command.
+static constexpr long long kNReturned = 1;
+
+}  // namespace
 
 /**
  * Implements the find command on mongos.
@@ -127,6 +137,35 @@ public:
                 CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
             }
 
+            const auto cri = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            const auto collation = countRequest.getCollation().get_value_or(BSONObj());
+
+            const auto expCtx =
+                makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                             nss,
+                                                             cri,
+                                                             collation,
+                                                             boost::none /*explainVerbosity*/,
+                                                             boost::none /*letParameters*/,
+                                                             boost::none /*runtimeConstants*/);
+
+            const auto parsedFind = uassertStatusOK(parsed_find_command::parseFromCount(
+                expCtx, countRequest, ExtensionsCallbackNoop(), nss));
+
+            if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                query_stats::registerRequest(opCtx, nss, [&]() {
+                    return std::make_unique<query_stats::CountKey>(
+                        expCtx,
+                        *parsedFind,
+                        countRequest.getLimit().has_value(),
+                        countRequest.getSkip().has_value(),
+                        countRequest.getReadConcern(),
+                        countRequest.getMaxTimeMS().has_value());
+                });
+            }
+
             // We only need to factor in the skip value when sending to the shards if we
             // have a value for limit, otherwise, we apply it only once we have collected all
             // counts.
@@ -145,22 +184,6 @@ public:
                 }
             }
             countRequest.setSkip(boost::none);
-            const auto cri = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-            const auto collation = countRequest.getCollation().get_value_or(BSONObj());
-
-            auto expCtx =
-                makeExpressionContextWithDefaultsForTargeter(opCtx,
-                                                             nss,
-                                                             cri,
-                                                             collation,
-                                                             boost::none /*explainVerbosity*/,
-                                                             boost::none /*letParameters*/,
-                                                             boost::none /*runtimeConstants*/);
-
-            // TODO SERVER-90655: Register command for query stats on mongos.
-            auto parsedFind = uassertStatusOK(parsed_find_command::parseFromCount(
-                expCtx, countRequest, ExtensionsCallbackNoop(), nss));
 
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 expCtx,
@@ -232,6 +255,12 @@ public:
         shardSubTotal.doneFast();
         total = applySkipLimit(total, cmdObj);
         result.appendNumber("n", total);
+
+        auto* curOp = CurOp::get(opCtx);
+        curOp->setEndOfOpMetrics(kNReturned);
+
+        collectQueryStatsMongos(opCtx, std::move(curOp->debug().queryStatsInfo.key));
+
         return true;
     }
 
