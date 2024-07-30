@@ -84,7 +84,8 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx, std::function<in
         // choose to abort our transaction and retry instead of blocking. It's possible that we can
         // be blocking on a prepared update that requires replication to make progress, creating a
         // stall in the MDB cluster.
-        throwWriteConflictException("Holding a resource (oplog slot).");
+        throwWriteConflictException(
+            "Hit a prepare conflict while holding a resource on the oplog slot.");
     }
 
     auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
