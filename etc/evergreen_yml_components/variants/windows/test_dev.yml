@@ -90,7 +90,7 @@ buildvariants:
   - &enterprise-windows-all-feature-flags-required-template
     <<: *windows_compile_variant_dependency
     name: &enterprise-windows-all-feature-flags-required enterprise-windows-all-feature-flags-required
-    display_name: "! Enterprise Windows Server 2022 (all feature flags)"
+    display_name: "! Enterprise Windows Server 2022 (all feature flags) essential tasks"
     tags: ["required"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
@@ -98,6 +98,56 @@ buildvariants:
     expansions:
       <<: *windows_expansions
       burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
+      exe: ".exe"
+      content_type: application/zip
+      python: "/cygdrive/c/python/python310/python.exe"
+      ext: zip
+      multiversion_platform: windows
+      multiversion_edition: enterprise
+      jstestfuzz_num_generated_files: 35
+      target_resmoke_time: 20
+      max_sub_suites: 5
+      large_distro_name: windows-2022-large
+      # To force disable feature flags even on the all feature flags variant, please use this file:
+      # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --excludeWithAnyTags=incompatible_with_windows_tls
+      external_auth_jobs_max: 1
+      # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
+      # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
+      # run too long and hit execution timeouts.
+      # burn_in_task_name: jsCore
+    tasks:
+      # - name: burn_in_tasks_gen
+      #   depends_on:
+      #   - name: version_burn_in_gen
+      #     variant: generate-tasks-for-version
+      #     omit_generated_tasks: true
+      #   - name: archive_dist_test_debug
+      #     variant: *windows_compile_variant_name
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-large
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-large
+
+  # This Windows build variant exists to run all tasks that have been excluded from running on the required Windows build variant.
+  # See SERVER-79037 for how the essential set of tasks was computed.
+  - &enterprise-windows-all-feature-flags-required-template
+    <<: *windows_compile_variant_dependency
+    name: &enterprise-windows-all-feature-flags-non-essential enterprise-windows-all-feature-flags-non-essential
+    display_name: "* Enterprise Windows Server 2022 (all feature flags) non-essential tasks"
+    tags: ["suggested"]
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - windows-2022-small
+    expansions:
+      <<: *windows_expansions
+      burn_in_tests_build_variant: enterprise-windows-all-feature-flags-non-essential
       exe: ".exe"
       content_type: application/zip
       python: "/cygdrive/c/python/python310/python.exe"

@@ -75,6 +75,8 @@ overrides:
   enterprise-windows-all-feature-flags-required:
     - task: buildscripts_test
       exec_timeout: 15
+
+  enterprise-windows-all-feature-flags-non-essential:
     - task: aggregation_read_concern_majority_passthrough
       exec_timeout: 180 # 3 hours
     - task: aggregation_sharded_collections_passthrough

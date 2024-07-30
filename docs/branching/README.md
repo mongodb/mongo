@@ -59,6 +59,7 @@ The reason they should be pushed as separate commits is in the case of needing t
   - Build variant names:
 
     - `enterprise-windows-all-feature-flags-required`
+    - `enterprise-windows-all-feature-flags-non-essential`
     - `rhel8-debug-aubsan-lite-all-feature-flags-required`
 
   - Actions:

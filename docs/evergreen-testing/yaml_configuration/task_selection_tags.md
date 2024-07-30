@@ -28,7 +28,7 @@ This is enforced by linter. YAML linter configuration could be found [here](../.
 - `non_deterministic` - these tasks depend significantly on randomization and we expect to see some unique failures, e.g. fuzzers etc.
   We run these tasks on non-required development variants.
 
-- `experimental` - these tasks are not runing anywhere regularly.
+- `experimental` - these tasks are not running anywhere regularly.
   We do not use this tag for selecting tasks to run on variants.
   This tag could be used for tasks that you would like to run on your own custom variants.
 
@@ -63,3 +63,5 @@ Every task could be tagged with any number of the following tags:
 - `requires_large_host_debug_mode` - the task requires a large host to run on Debug Mode variants.
 - `requires_large_host_commit_queue` - the task requires a large host to run on in the commit-queue.
 - `requires_all_feature_flags` - the task can only run on variants that has all-feature-flags configuration.
+- `requires_execution_on_windows_patch_build` - the task should be run on the required Windows build variant on each patch
+  build. See [SERVER-79037](https://jira.mongodb.org/browse/SERVER-79037) for how this was calculated.

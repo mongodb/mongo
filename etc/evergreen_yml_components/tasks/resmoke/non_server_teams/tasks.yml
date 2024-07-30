@@ -132,6 +132,7 @@ tasks:
         "assigned_to_jira_team_devprod_correctness",
         "release_critical",
         "requires_compile_variant",
+        "requires_execution_on_windows_patch_build",
       ]
     depends_on: []
     commands:
@@ -240,6 +241,7 @@ tasks:
         "assigned_to_jira_team_devprod_correctness",
         "release_critical",
         "requires_compile_variant",
+        "requires_execution_on_windows_patch_build",
       ]
     commands:
       - func: "generate resmoke tasks"

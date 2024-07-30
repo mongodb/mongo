@@ -49,6 +49,9 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
     ],
     "enterprise-windows-all-feature-flags-required": [{"task": "noPassthrough", "factor": 0.5}],
+    "enterprise-windows-all-feature-flags-non-essential": [
+        {"task": "noPassthrough", "factor": 0.5}
+    ],
     "enterprise-windows": [{"task": "noPassthrough", "factor": 0.5}],
     "windows-debug-suggested": [{"task": "noPassthrough", "factor": 0.5}],
     "windows": [{"task": "noPassthrough", "factor": 0.5}],

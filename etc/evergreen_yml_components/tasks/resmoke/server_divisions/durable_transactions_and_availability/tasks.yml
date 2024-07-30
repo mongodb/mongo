@@ -2270,6 +2270,7 @@ tasks:
         "incompatible_s390x",
         "incompatible_debug_mode",
         "misc_js",
+        "requires_execution_on_windows_patch_build",
       ]
     commands:
       - func: "generate resmoke tasks"

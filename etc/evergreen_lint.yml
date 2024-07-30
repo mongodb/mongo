@@ -127,6 +127,7 @@ rules:
           - requires_large_host_debug_mode
           - requires_large_host_commit_queue
           - requires_all_feature_flags
+          - requires_execution_on_windows_patch_build
 
   - rule: "enforce-tags-for-variants"
     tags:
