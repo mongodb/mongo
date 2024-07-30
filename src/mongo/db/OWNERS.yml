@@ -85,3 +85,6 @@ filters:
   - "update_index_data*":
     approvers:
       - 10gen/query-execution
+  - "startup_recovery*":
+    approvers:
+      - 10gen/server-storage-execution

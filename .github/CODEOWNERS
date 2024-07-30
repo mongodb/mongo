@@ -100,6 +100,10 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/concurrency/fsm_workloads/**/*transaction* @10gen/server-cluster-scalability
 /jstests/concurrency/fsm_workloads/**/*txn* @10gen/server-cluster-scalability
 /jstests/concurrency/fsm_workloads/**/*write_without_shard_key* @10gen/server-cluster-scalability
+/jstests/concurrency/fsm_workloads/**/timeseries* @10gen/server-storage-execution
+/jstests/concurrency/fsm_workloads/**/timeseries_agg* @10gen/query-integration
+/jstests/concurrency/fsm_workloads/**/timeseries_deletes_and_inserts.js @10gen/query-integration
+/jstests/concurrency/fsm_workloads/**/CRUD_clustered_collection.js @10gen/server-storage-execution
 
 # The following patterns are parsed from ./jstests/core/OWNERS.yml
 /jstests/core/**/connection_string_validation.js @10gen/server-service-architecture
@@ -108,6 +112,9 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/core/**/latch_analyzer.js @10gen/server-service-architecture
 /jstests/core/**/diagdata.js @10gen/server-service-architecture
 /jstests/core/**/hostinfo.js @10gen/server-service-architecture
+/jstests/core/capped/* @10gen/server-storage-execution
+/jstests/core/clustered/* @10gen/server-storage-execution
+/jstests/core/timeseries/* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./jstests/fail_point/OWNERS.yml
 /jstests/fail_point/**/* @10gen/server-service-architecture
@@ -122,8 +129,17 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/multiVersion/**/migration* @10gen/server-cluster-scalability
 /jstests/multiVersion/**/rs_endpoint* @10gen/server-cluster-scalability
 
+# The following patterns are parsed from ./jstests/noPassthrough/admission/OWNERS.yml
+/jstests/noPassthrough/admission/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./jstests/noPassthrough/queryStats/OWNERS.yml
+/jstests/noPassthrough/queryStats/**/* @10gen/query-integration
+
 # The following patterns are parsed from ./jstests/noPassthrough/rs_endpoint/OWNERS.yml
 /jstests/noPassthrough/rs_endpoint/**/* @10gen/server-cluster-scalability
+
+# The following patterns are parsed from ./jstests/noPassthrough/timeseries/OWNERS.yml
+/jstests/noPassthrough/timeseries/**/* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./jstests/noPassthroughWithMongod/OWNERS.yml
 /jstests/noPassthroughWithMongod/**/connections_opened.js @10gen/server-service-architecture
@@ -134,6 +150,9 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/noPassthroughWithMongod/**/tcmalloc.js @10gen/server-service-architecture
 /jstests/noPassthroughWithMongod/**/ftdc_params.js @10gen/server-service-architecture
 /jstests/noPassthroughWithMongod/**/log_component_helpers.js @10gen/server-service-architecture
+
+# The following patterns are parsed from ./jstests/replsets/OWNERS.yml
+/jstests/replsets/**/*capped* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./jstests/sharding/OWNERS.yml
 /jstests/sharding/**/*fsync_lock* @10gen/server-cluster-scalability
@@ -227,6 +246,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/**/generic_cursor* @10gen/query-execution
 /src/mongo/db/**/profile_filter* @10gen/query-execution
 /src/mongo/db/**/update_index_data* @10gen/query-execution
+/src/mongo/db/**/startup_recovery* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./src/mongo/db/auth/OWNERS.yml
 /src/mongo/db/auth/**/* @10gen/server-security
@@ -309,6 +329,9 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/docs/testing/OWNERS.yml
 /src/mongo/db/modules/enterprise/docs/testing/**/* @10gen/devprod-correctness
 
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/hot_backups/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/hot_backups/**/* @10gen/server-rss-sydney
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/streams/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/streams/**/* @10gen/streams-engine
 
@@ -354,6 +377,7 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/op_observer/OWNERS.yml
 /src/mongo/db/op_observer/**/user_write_block_mode* @10gen/server-security
+/src/mongo/db/op_observer/**/batched_write* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./src/mongo/db/ops/OWNERS.yml
 /src/mongo/db/ops/**/write_ops_exec* @10gen/query-execution
