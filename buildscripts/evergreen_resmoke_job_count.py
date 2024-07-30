@@ -36,7 +36,11 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         {"task": "multi_stmt_txn_jscore_passthrough_with_migration", "factor": 0.3},
     ],
     "enterprise-rhel8-debug-tsan": [
-        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125}
+        # Lower the default resmoke_jobs_factor for TSAN to reduce memory pressure for this suite,
+        # as otherwise TSAN variants occasionally run out of memory
+        # Non-TSAN variants don't need this adjustment as they have a reasonable free memory margin
+        {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough.*", "factor": 0.27},
+        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125},
     ],
     "rhel8-debug-aubsan-classic-engine": [
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
