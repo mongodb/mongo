@@ -37,15 +37,11 @@
 #include <set>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/catalog/health_log.h"
-#include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -62,7 +58,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -89,56 +84,11 @@ MONGO_FAIL_POINT_DEFINE(WTCompactIndexEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
 MONGO_FAIL_POINT_DEFINE(WTIndexPauseAfterSearchNear);
 MONGO_FAIL_POINT_DEFINE(WTValidateIndexStructuralDamage);
-MONGO_FAIL_POINT_DEFINE(WTIndexUassertDuplicateRecordForIdIndex);
-MONGO_FAIL_POINT_DEFINE(WTIndexUassertDuplicateRecordForKeyOnIdUnindex);
 
 using std::string;
 using std::vector;
 
 static const WiredTigerItem emptyItem(nullptr, 0);
-
-/**
- * Add a data corruption entry to the health log.
- */
-void addDataCorruptionEntryToHealthLog(OperationContext* opCtx,
-                                       const NamespaceString& nss,
-                                       StringData operation,
-                                       StringData message,
-                                       const BSONObj& key,
-                                       StringData indexName,
-                                       StringData uri) {
-    HealthLogEntry entry;
-    entry.setNss(nss);
-    entry.setTimestamp(Date_t::now());
-    entry.setSeverity(SeverityEnum::Error);
-    entry.setScope(ScopeEnum::Index);
-    entry.setOperation(operation);
-    entry.setMsg(message);
-
-    BSONObjBuilder bob;
-    bob.append("key", key);
-    bob.append("indexName", indexName);
-    bob.append("uri", uri);
-    bob.appendElements(getStackTrace().getBSONRepresentation());
-    entry.setData(bob.obj());
-
-    HealthLog::get(opCtx)->log(entry);
-}
-
-/**
- * Returns the logv2::LogOptions controlling the behaviour after logging a data corruption
- * error. When the TestingProctor is enabled we will fatally assert. When the testing proctor is
- * disabled or when 'forceUassert' is specified (for instance because a failpoint is enabled),
- * we should log and throw DataCorruptionDetected.
- */
-logv2::LogOptions getLogOptionsForDataCorruption(bool forceUassert = false) {
-    if (!TestingProctor::instance().isEnabled() || forceUassert) {
-        return logv2::LogOptions{logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)};
-    } else {
-        return logv2::LogOptions(logv2::LogComponent::kAutomaticDetermination);
-    }
-}
-
 }  // namespace
 
 
@@ -1456,24 +1406,14 @@ private:
         _typeBits.resetFromBuffer(&br);
 
         if (!br.atEof()) {
-            const auto bsonKey = redact(curr(kWantKey)->key);
-            const auto collectionNamespace = _idx.getCollectionNamespace(_opCtx);
-            addDataCorruptionEntryToHealthLog(
-                _opCtx,
-                collectionNamespace,
-                "WiredTigerIndexUniqueCursor::_updateIdAndTypeBitsFromValue",
-                "Unique index cursor seeing multiple records for key in index",
-                bsonKey,
-                _idx.indexName(),
-                _idx.uri());
-
-            LOGV2_ERROR_OPTIONS(7623202,
-                                getLogOptionsForDataCorruption(),
-                                "Unique index cursor seeing multiple records for key in index",
-                                "key"_attr = bsonKey,
-                                "index"_attr = _idx.indexName(),
-                                "uri"_attr = _idx.uri(),
-                                logAttrs(collectionNamespace));
+            LOGV2_FATAL(28608,
+                        "Unique index cursor seeing multiple records for key {key} in index "
+                        "{index} ({uri}) belonging to collection {collection}",
+                        "Unique index cursor seeing multiple records for key in index",
+                        "key"_attr = redact(curr(kWantKey)->key),
+                        "index"_attr = _idx.indexName(),
+                        "uri"_attr = _idx.uri(),
+                        "collection"_attr = _idx.getCollectionNamespace(_opCtx));
         }
     }
 };
@@ -1497,29 +1437,13 @@ public:
         _id = KeyString::decodeRecordIdLong(&br);
         _typeBits.resetFromBuffer(&br);
 
-        const auto failWithDataCorruptionForTest =
-            WTIndexUassertDuplicateRecordForIdIndex.shouldFail();
-
-        if (!br.atEof() || MONGO_unlikely(failWithDataCorruptionForTest)) {
-            const auto bsonKey = redact(curr(kWantKey)->key);
-            const auto collectionNamespace = _idx.getCollectionNamespace(_opCtx);
-
-            addDataCorruptionEntryToHealthLog(
-                _opCtx,
-                collectionNamespace,
-                "WiredTigerIdIndexCursor::updateIdAndTypeBits",
-                "Index cursor seeing multiple records for key in _id index",
-                bsonKey,
-                _idx.indexName(),
-                _idx.uri());
-
-            LOGV2_ERROR_OPTIONS(5176200,
-                                getLogOptionsForDataCorruption(failWithDataCorruptionForTest),
-                                "Index cursor seeing multiple records for key in _id index",
-                                "key"_attr = bsonKey,
-                                "index"_attr = _idx.indexName(),
-                                "uri"_attr = _idx.uri(),
-                                logAttrs(collectionNamespace));
+        if (!br.atEof()) {
+            LOGV2_FATAL(5176200,
+                        "Index cursor seeing multiple records for key in _id index",
+                        "key"_attr = redact(curr(kWantKey)->key),
+                        "index"_attr = _idx.indexName(),
+                        "uri"_attr = _idx.uri(),
+                        "collection"_attr = _idx.getCollectionNamespace(_opCtx));
         }
     }
 };
@@ -1791,11 +1715,9 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 
-    const auto failWithDataCorruptionForTest =
-        WTIndexUassertDuplicateRecordForKeyOnIdUnindex.shouldFail();
     // On the _id index, the RecordId is stored in the value of the index entry. If the dupsAllowed
     // flag is not set, we blindly delete using only the key without checking the RecordId.
-    if (!dupsAllowed && MONGO_likely(!failWithDataCorruptionForTest)) {
+    if (!dupsAllowed) {
         int ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
         if (ret == WT_NOTFOUND) {
             return;
@@ -1827,25 +1749,14 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
 
     RecordId idInIndex = KeyString::decodeRecordIdLong(&br);
     KeyString::TypeBits typeBits = KeyString::TypeBits::fromBuffer(getKeyStringVersion(), &br);
-    if (!br.atEof() || MONGO_unlikely(failWithDataCorruptionForTest)) {
+    if (!br.atEof()) {
         auto bsonKey = KeyString::toBson(keyString, _ordering);
-        const auto collectionNamespace = getCollectionNamespace(opCtx);
-
-        addDataCorruptionEntryToHealthLog(opCtx,
-                                          collectionNamespace,
-                                          "WiredTigerIdIndex::_unindex",
-                                          "Un-index seeing multiple records for key",
-                                          bsonKey,
-                                          _indexName,
-                                          _uri);
-
-        LOGV2_ERROR_OPTIONS(5176201,
-                            getLogOptionsForDataCorruption(failWithDataCorruptionForTest),
-                            "Un-index seeing multiple records for key",
-                            "key"_attr = bsonKey,
-                            "index"_attr = _indexName,
-                            "uri"_attr = _uri,
-                            logAttrs(collectionNamespace));
+        LOGV2_FATAL(5176201,
+                    "Un-index seeing multiple records for key",
+                    "key"_attr = bsonKey,
+                    "index"_attr = _desc->indexName(),
+                    "uri"_attr = _uri,
+                    "collection"_attr = getCollectionNamespace(opCtx));
     }
 
     // The RecordId matches, so remove the entry.
