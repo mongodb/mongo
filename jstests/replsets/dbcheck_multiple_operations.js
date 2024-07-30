@@ -222,6 +222,14 @@ function testQueuedDbCheckStepDown(docSuffix) {
     runDbCheck(replSet, primaryDB, collName5, dbCheckParametersMissingKeysCheck);
     runDbCheck(replSet, primaryDB, collName6, dbCheckParametersExtraKeysCheck);
 
+    // Check that an error health log entry is generated for having too many dbchecks in queue. This
+    // makes sure that the dbcheck for collection 6 will not be added to the queue as the node steps
+    // down and as the dbchecks get popped off the queue after logging stepdown warning entry.
+    checkHealthLog(
+        primaryHealthlog,
+        {...logQueries.tooManyDbChecksInQueue, $expr: {$eq: [{$size: "$data.dbCheckQueue"}, 5]}},
+        1);
+
     // Step down the primary and wait for a new primary.
     assert.commandWorked(primaryDB.adminCommand({"replSetStepDown": 60}));
     replSet.awaitNodesAgreeOnPrimary();
