@@ -1531,7 +1531,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_repl",
-        "default",
+        "non_deterministic",
         "rollbackfuzzer",
         "require_npm",
         "random_name",
@@ -1579,7 +1579,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_repl",
-        "default",
+        "non_deterministic",
         "rollbackfuzzer",
         "require_npm",
         "random_name",
