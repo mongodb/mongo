@@ -387,7 +387,7 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
 
     if running_in_evergreen and not os.path.exists("./engflow.cert"):
         print(
-            "ERROR: ./engflow.cert not found, which is required to build in evergreen without BAZEL_FLAGS=--config=local set. Please reach out to #server-dev-platform for help."
+            "ERROR: ./engflow.cert not found, which is required to build in evergreen without BAZEL_FLAGS=--config=local set. Please reach out to #ask-devprod-build for help."
         )
         return False
 
@@ -439,7 +439,7 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
         else:
             public_hostname = "{{REPLACE_WITH_WORKSTATION_HOST_NAME}}"
         print(
-            f"""\nERROR: ~/.engflow/creds/engflow.crt not found. Please reach out to #server-dev-platform if you need help with the steps below.
+            f"""\nERROR: ~/.engflow/creds/engflow.crt not found. Please reach out to #ask-devprod-build if you need help with the steps below.
 
 (If the below steps are not working, remote execution can be disabled by passing BAZEL_FLAGS=--config=local at the end of your scons.py invocation)
 
