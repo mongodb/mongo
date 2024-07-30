@@ -98,8 +98,10 @@ MemberData::HeartbeatChanges MemberData::setUpValues(Date_t now,
         advanceLastDurableOpTimeAndWallTime(durableOpTimeAndWallTime, now) || opTimeAdvanced;
 
     bool configChanged = (getConfigVersionAndTerm() < hbResponse.getConfigVersionAndTerm());
-    _configTerm = hbResponse.getConfigTerm();
-    _configVersion = hbResponse.getConfigVersion();
+    if (configChanged) {
+        _configTerm = hbResponse.getConfigTerm();
+        _configVersion = hbResponse.getConfigVersion();
+    }
 
     _lastResponse = std::move(hbResponse);
 
