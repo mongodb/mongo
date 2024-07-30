@@ -79,9 +79,11 @@ if get_option("ssl") == "on":
         ],
     )
 
-saslClientEnv = env.Clone()
-saslLibs = []
-saslClientSource = [
+# Client-side SASL source necessary for native client SASL session.
+# Includes base types and OIDC, PLAIN, SCRAM, and AWS (only if TLS configured)
+# client mechs.
+nativeSaslClientEnv = env.Clone()
+nativeSaslClientSource = [
     "native_sasl_client_session.cpp",
     "sasl_client_authenticate.cpp",
     "sasl_client_authenticate_impl.cpp",
@@ -94,33 +96,16 @@ saslClientSource = [
 ]
 
 if get_option("ssl") == "on":
-    saslClientSource.extend(
+    nativeSaslClientSource.extend(
         [
             "sasl_aws_client_conversation.cpp",
             "sasl_aws_client_options.idl",
         ]
     )
 
-# Add in actual sasl dependencies if sasl is enabled, otherwise
-# leave library empty so other targets can link to it unconditionally
-# without needing to first test MONGO_BUILD_SASL_CLIENT.
-if env["MONGO_BUILD_SASL_CLIENT"]:
-    saslClientSource.extend(
-        [
-            "cyrus_sasl_client_session.cpp",
-            "sasl_sspi.cpp",
-            "sasl_sspi_options.cpp",
-            "sasl_sspi_options.idl",
-        ]
-    )
-
-    saslLibs.extend(["sasl2"])
-    if env.TargetOSIs("windows"):
-        saslLibs.extend(["secur32"])
-
-saslClientEnv.Library(
-    target="sasl_client",
-    source=saslClientSource,
+nativeSaslClientEnv.Library(
+    target="native_sasl_client",
+    source=nativeSaslClientSource,
     LIBDEPS=[
         "$BUILD_DIR/mongo/base/secure_allocator",
         "$BUILD_DIR/mongo/bson/util/bson_extract",
@@ -141,8 +126,38 @@ saslClientEnv.Library(
         "$BUILD_DIR/mongo/util/net/http_client",
         "connection_string",
     ],
-    SYSLIBDEPS=saslLibs,
 )
+
+if env["MONGO_BUILD_SASL_CLIENT"]:
+    # Client-side SASL source necessary for mongo shell.
+    # Includes Cyrus SASL, OIDC, PLAIN, and AWS (if TLS support is on)
+    # support. Depends on sasl_client_native.
+    cyrusSaslClientEnv = env.Clone()
+
+    saslLibs = ["sasl2"]
+    if env.TargetOSIs("windows"):
+        saslLibs.extend(["secur32"])
+
+    cyrusSaslClientEnv.Library(
+        target="cyrus_sasl_client",
+        source=[
+            "cyrus_sasl_client_session.cpp",
+            "sasl_sspi.cpp",
+            "sasl_sspi_options.cpp",
+            "sasl_sspi_options.idl",
+        ],
+        LIBDEPS=[
+            "native_sasl_client",
+        ],
+        SYSLIBDEPS=saslLibs,
+        LIBDEPS_DEPENDENTS=[
+            "$BUILD_DIR/mongo/shell/mongo_initializers",
+        ],
+        LIBDEPS_TAGS=[
+            "lint-allow-nonprivate-on-deps-dependents",
+            "lint-allow-bidirectional-edges",
+        ],
+    )
 
 env.Library(
     target="authentication",
@@ -153,7 +168,7 @@ env.Library(
         "$BUILD_DIR/mongo/bson/util/bson_extract",
         "$BUILD_DIR/mongo/executor/remote_command",
         "internal_auth",
-        "sasl_client",
+        "native_sasl_client",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/auth/auth",

@@ -134,10 +134,10 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/client/native_sasl_client",
         "shell_options_storage",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/sasl_client",
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
     ],
 )

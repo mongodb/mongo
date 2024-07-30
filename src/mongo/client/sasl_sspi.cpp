@@ -474,7 +474,8 @@ int sspiClientPluginInit(const sasl_utils_t* utils,
  * created.
  */
 MONGO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin,
-                                     ("CyrusSaslAllocatorsAndMutexes", "CyrusSaslClientContext"))
+                                     ("CyrusSaslAllocatorsAndMutexesClient",
+                                      "CyrusSaslClientContext"))
 (InitializerContext*) {
     int ret = sasl_client_add_plugin(sspiPluginName, sspiClientPluginInit);
     if (SASL_OK != ret) {
@@ -485,7 +486,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin,
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SaslPlainClientPlugin,
-                                     ("CyrusSaslAllocatorsAndMutexes", "CyrusSaslClientContext"))
+                                     ("CyrusSaslAllocatorsAndMutexesClient",
+                                      "CyrusSaslClientContext"))
 (InitializerContext*) {
     int ret = sasl_client_add_plugin("PLAIN", plain_client_plug_init);
     if (SASL_OK != ret) {
