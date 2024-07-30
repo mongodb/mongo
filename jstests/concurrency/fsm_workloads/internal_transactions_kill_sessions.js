@@ -84,10 +84,20 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.teardown = function teardown(db, collName, cluster) {
         $super.teardown.apply(this, arguments);
 
-        // If a client session is killed and the transaction API is running a non-retryable
-        // transaction on that session, the API may be killed and unable to abort the transaction,
-        // leaving it open, which can block later tasks like CheckReplDBHash.
-        this.killAllSessions(cluster);
+        let currOps = db.getSiblingDB("admin")
+                          .aggregate([
+                              {
+                                  "$currentOp": {
+                                      "allUsers": true,
+                                      "idleConnections": true,
+                                      "idleSessions": true,
+                                  }
+                              },
+                              {$match: {transaction: {$exists: true}}},
+                          ])
+                          .toArray();
+
+        jsTest.log(`Current ops with transactions:\n${tojson(currOps)}`);
     };
 
     $config.transitions = {
