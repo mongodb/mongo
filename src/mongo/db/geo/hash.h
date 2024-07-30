@@ -174,6 +174,7 @@ private:
 class GeoHashConverter {
 public:
     static double const kMachinePrecision;  // = 1.1e-16
+    static double const kNumBuckets;        // = 4 * 1024 * 1024 * 1024
 
     struct Parameters {
         // How many bits to use for the hash?
