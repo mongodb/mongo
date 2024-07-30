@@ -1,0 +1,72 @@
+# MongoDB Third Party Dependencies
+
+MongoDB depends on third party libraries to implement some
+functionality. This document describes which libraries are depended
+upon, and how. It is maintained by and for humans, and so while it is a
+best effort attempt to describe the server's dependencies, it is subject
+to change as libraries are added or removed.
+
+## Server Vendored Libraries
+
+This is the list of third party libraries vendored into the server
+codebase, and the upstream source where updates may be obtained. These
+sources are periodically consulted, and the existence of new versions is
+reflected in this list. A ticket is filed in Jira if a determination is
+made to upgrade a vendored library.
+
+Whenever a vendored library is included in released binary artifacts, is
+not authored by MongoDB, and has a license which requires reproduction,
+a notice will be included in
+`THIRD-PARTY-NOTICES`.
+
+{{ component_chart }}
+
+{{ component_links }}
+
+## WiredTiger Vendored Test Libraries
+
+The following Python libraries are transitively included by WiredTiger,
+and are used by that component for testing. They don't appear in
+released binary artifacts.
+
+{{ wiredtiger_chart }}
+
+## Dynamically Linked Libraries
+
+Sometimes MongoDB needs to load libraries provided and managed by the
+runtime environment. These libraries are not vendored into the MongoDB
+source directory, and are not compiled into release artifacts. Because
+they are provided by the runtime environment, the precise versions of
+these libraries cannot be known in advance. Further, these libraries may
+themselves load other libraries. The full set of transitively linked
+libraries will depend on the runtime environment, and cannot be outlined
+here. On Windows and Mac OS, other libraries and components provided by
+the Operating System may be loaded.
+
+For Windows Enterprise, we may ship precompiled DLLs containing some of
+these libraries. Releases prepared in this fashion will include a copy
+of these libraries' license in a file named
+`THIRD-PARTY-NOTICES.windows`.
+
+| Name       | Enterprise Only |                    Has Windows DLLs                     |
+| :--------- | :-------------: | :-----------------------------------------------------: |
+| Cyrus SASL |       Yes       |                           Yes                           |
+| libldap    |       Yes       |                           No                            |
+| net-snmp   |       Yes       |                           Yes                           |
+| OpenSSL    |       No        | Yes<sup>\[<a href="#note_ssl" id="ref_ssl">3</a>]</sup> |
+| libcurl    |       No        |                           No                            |
+
+## Notes:
+
+1. <a id="note_vg" href="#ref_vg">^</a>
+   The majority of Valgrind is licensed under the GPL, with the exception of a single
+   header file which is licensed under a BSD license. This BSD licensed header is the only
+   file from Valgrind which is vendored and consumed by MongoDB.
+
+2. <a id="note_wt" href="#ref_wt">^</a>
+   WiredTiger is maintained by MongoDB in a separate repository. As a part of our
+   development process, we periodically ingest the latest snapshot of that repository.
+
+3. <a id="note_ssl" href="#ref_ssl">^</a>
+   OpenSSL is only shipped as a dependency of the MongoDB tools written in Go. The MongoDB
+   shell and server binaries use Windows' cryptography APIs.

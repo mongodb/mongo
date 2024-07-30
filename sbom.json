@@ -36,6 +36,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/abseil/abseil-cpp"
         }
       ],
       "type": "library",
@@ -66,6 +74,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Execution"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/arximboldi/immer"
         }
       ],
       "type": "library",
@@ -98,6 +114,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/chriskohlhoff/asio"
         }
       ],
       "type": "library",
@@ -129,6 +153,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/google/benchmark"
         }
       ],
       "type": "library",
@@ -160,6 +192,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "http://www.boost.org/"
         }
       ],
       "type": "library",
@@ -191,6 +231,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://c-ares.org/"
         }
       ],
       "type": "library",
@@ -222,6 +270,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Engines"
+        },
+        {
+          "name": "info_link",
+          "value": "https://pypi.org/project/concurrencytest/"
         }
       ],
       "type": "library",
@@ -253,6 +305,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Build"
+        },
+        {
+          "name": "info_link",
+          "value": "https://www.cyrusimap.org/sasl/"
         }
       ],
       "type": "library",
@@ -277,6 +333,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/dcleblanc/SafeInt"
         }
       ],
       "type": "library",
@@ -307,6 +371,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Query Execution"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/derickr/timelib"
         }
       ],
       "type": "library",
@@ -339,6 +411,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Engines"
+        },
+        {
+          "name": "info_link",
+          "value": "https://pypi.org/project/discover/"
         }
       ],
       "type": "library",
@@ -370,6 +446,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Server Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "http://fmtlib.net/"
         }
       ],
       "type": "library",
@@ -401,6 +485,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/google/re2"
         }
       ],
       "type": "library",
@@ -431,6 +523,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Query Integration"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/google/s2geometry"
         }
       ],
       "type": "library",
@@ -463,6 +563,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/google/snappy/releases"
         }
       ],
       "type": "library",
@@ -494,6 +602,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/gperftools/gperftools"
         }
       ],
       "type": "library",
@@ -525,6 +641,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/grpc/grpc"
         }
       ],
       "type": "library",
@@ -571,6 +695,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Query Execution"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "http://site.icu-project.org/download/"
         }
       ],
       "type": "library",
@@ -601,6 +733,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Execution"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://software.intel.com/en-us/articles/intel-decimal-floating-point-math-library"
         }
       ],
       "type": "library",
@@ -633,6 +773,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Server Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/jbeder/yaml-cpp/releases"
         }
       ],
       "type": "library",
@@ -663,6 +811,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Query Optimization"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/json-schema-org/JSON-Schema-Test-Suite"
         }
       ],
       "type": "library",
@@ -695,6 +851,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Server Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/mongodb/libmongocrypt"
         }
       ],
       "type": "library",
@@ -761,6 +925,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Atlas Streams"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/confluentinc/librdkafka"
         }
       ],
       "type": "library",
@@ -797,6 +969,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Server Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/libtom/libtomcrypt/releases"
         }
       ],
       "type": "library",
@@ -828,6 +1008,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "http://www.nongnu.org/libunwind/"
         }
       ],
       "type": "library",
@@ -858,6 +1046,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Build"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/antirez/linenoise"
         }
       ],
       "type": "library",
@@ -893,6 +1089,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Server Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/mongodb/mongo-c-driver"
         }
       ],
       "type": "library",
@@ -924,6 +1128,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Query Integration"
+        },
+        {
+          "name": "info_link",
+          "value": "https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr"
         }
       ],
       "type": "library",
@@ -955,6 +1163,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Engines"
+        },
+        {
+          "name": "info_link",
+          "value": "https://www.nuget.org/packages/nlohmann.json.decomposed"
         }
       ],
       "type": "library",
@@ -986,6 +1198,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Workload Scheduling"
+        },
+        {
+          "name": "info_link",
+          "value": "https://nodejs.org/en/blog/release"
         }
       ],
       "type": "library",
@@ -1017,6 +1233,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Server Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/wbond/ocspbuilder"
         }
       ],
       "type": "library",
@@ -1048,6 +1272,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Server Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/threema-ch/ocspresponder"
         }
       ],
       "type": "library",
@@ -1084,6 +1316,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Query Execution"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "http://www.pcre.org/"
         }
       ],
       "type": "library",
@@ -1115,6 +1355,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/protocolbuffers/protobuf"
         }
       ],
       "type": "library",
@@ -1146,6 +1394,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Engines"
+        },
+        {
+          "name": "info_link",
+          "value": "https://pypi.org/project/iso8601/"
         }
       ],
       "type": "library",
@@ -1177,6 +1429,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Query Execution"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/RoaringBitmap/CRoaring"
         }
       ],
       "type": "library",
@@ -1207,6 +1467,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Query Optimization"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://www.schemastore.org/json/"
         }
       ],
       "type": "library",
@@ -1239,6 +1507,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Build"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/SCons/scons"
         }
       ],
       "type": "library",
@@ -1269,6 +1545,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Execution"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/aappleby/smhasher/blob/a6bd3ce/"
         }
       ],
       "type": "library",
@@ -1300,6 +1580,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Query Integration"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/snowballstem/snowball"
         }
       ],
       "type": "library",
@@ -1337,6 +1621,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Engines"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/testing-cabal/subunit"
         }
       ],
       "type": "library",
@@ -1368,6 +1656,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/google/tcmalloc"
         }
       ],
       "type": "library",
@@ -1399,6 +1695,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Engines"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/testing-cabal/extras"
         }
       ],
       "type": "library",
@@ -1435,6 +1735,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Engines"
+        },
+        {
+          "name": "info_link",
+          "value": "https://pypi.org/project/testscenarios/"
         }
       ],
       "type": "library",
@@ -1466,6 +1770,10 @@
         {
           "name": "internal:team_responsible",
           "value": "Storage Engines"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/testing-cabal/testtools"
         }
       ],
       "type": "library",
@@ -1496,6 +1804,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Query Execution"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "http://www.unicode.org/versions/enumeratedversions.html"
         }
       ],
       "type": "library",
@@ -1527,6 +1843,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Build"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "http://valgrind.org/downloads/current.html"
         }
       ],
       "type": "library",
@@ -1559,6 +1883,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "https://zlib.net/"
         }
       ],
       "type": "library",
@@ -1595,6 +1927,14 @@
         {
           "name": "internal:team_responsible",
           "value": "Service Arch"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/facebook/zstd"
         }
       ],
       "type": "library",
