@@ -248,6 +248,103 @@ TEST_F(WriteOpsRetryability, PerformInsertsSuccess) {
     ASSERT_TRUE(result.results[1].isOK());
 }
 
+TEST_F(WriteOpsRetryability, OpCountersInsertSuccess) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    auto globalDeletesCountBeforeInsert = globalOpCounters.getDelete()->load();
+    auto globalInsertsCountBeforeInsert = globalOpCounters.getInsert()->load();
+    auto globalUpdatesCountBeforeInsert = globalOpCounters.getUpdate()->load();
+    auto globalCommandsCountBeforeInsert = globalOpCounters.getCommand()->load();
+    auto opCtxRaii = makeOperationContext();
+    // Use an unreplicated write block to avoid setting up more structures.
+    repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
+    setUpReplication(getServiceContext());
+
+    // Test that the insert operation will only increase the insert count.
+    write_ops::InsertCommandRequest insertOp(nss);
+    insertOp.getWriteCommandRequestBase().setOrdered(true);
+    insertOp.setDocuments({BSON("_id" << 0), BSON("_id" << 1)});
+    write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
+
+    ASSERT_EQ(2, result.results.size());
+    ASSERT_TRUE(result.results[0].isOK());
+    ASSERT_TRUE(result.results[1].isOK());
+    auto globalCommandsCountAfterInsert = globalOpCounters.getCommand()->load();
+    auto globalDeletesCountAfterInsert = globalOpCounters.getDelete()->load();
+    auto globalInsertsCountAfterInsert = globalOpCounters.getInsert()->load();
+    auto globalUpdatesCountAfterInsert = globalOpCounters.getUpdate()->load();
+    ASSERT_EQ(2, globalInsertsCountAfterInsert - globalInsertsCountBeforeInsert);
+    ASSERT_EQ(0, globalDeletesCountAfterInsert - globalDeletesCountBeforeInsert);
+    ASSERT_EQ(0, globalCommandsCountAfterInsert - globalCommandsCountBeforeInsert);
+    ASSERT_EQ(0, globalUpdatesCountAfterInsert - globalUpdatesCountBeforeInsert);
+}
+
+TEST_F(WriteOpsRetryability, OpCountersUpdateSuccess) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    auto globalDeletesCountBeforeUpdate = globalOpCounters.getDelete()->load();
+    auto globalInsertsCountBeforeUpdate = globalOpCounters.getInsert()->load();
+    auto globalUpdatesCountBeforeUpdate = globalOpCounters.getUpdate()->load();
+    auto globalCommandsCountBeforeUpdate = globalOpCounters.getCommand()->load();
+    auto opCtxRaii = makeOperationContext();
+    // Use an unreplicated write block to avoid setting up more structures.
+    repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
+    setUpReplication(getServiceContext());
+
+    // Test that the update operation will only increase the update count.
+    write_ops::UpdateCommandRequest updateOp(nss);
+    updateOp.setUpdates({[&] {
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON("_id" << 1));
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << 1)));
+        entry.setUpsert(true);
+        return entry;
+    }()});
+    write_ops_exec::WriteResult result = write_ops_exec::performUpdates(opCtxRaii.get(), updateOp);
+    auto globalCommandsCountAfterUpdate = globalOpCounters.getCommand()->load();
+    auto globalDeletesCountAfterUpdate = globalOpCounters.getDelete()->load();
+    auto globalInsertsCountAfterUpdate = globalOpCounters.getInsert()->load();
+    auto globalUpdatesCountAfterUpdate = globalOpCounters.getUpdate()->load();
+    ASSERT_EQ(0, globalInsertsCountAfterUpdate - globalInsertsCountBeforeUpdate);
+    ASSERT_EQ(0, globalDeletesCountAfterUpdate - globalDeletesCountBeforeUpdate);
+    ASSERT_EQ(0, globalCommandsCountAfterUpdate - globalCommandsCountBeforeUpdate);
+    ASSERT_EQ(1, globalUpdatesCountAfterUpdate - globalUpdatesCountBeforeUpdate);
+}
+
+TEST_F(WriteOpsRetryability, OpCountersDeleteSuccess) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    auto opCtxRaii = makeOperationContext();
+
+    // Use an unreplicated write block to avoid setting up more structures.
+    repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
+    setUpReplication(getServiceContext());
+
+    // An insert operation is needed for the delete
+    write_ops::InsertCommandRequest insertOp(nss);
+    insertOp.setDocuments({BSON("_id" << 1)});
+    write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
+
+    // Test that the delete operation will only increase the delete count.
+    auto globalDeletesCountBeforeDelete = globalOpCounters.getDelete()->load();
+    auto globalInsertsCountBeforeDelete = globalOpCounters.getInsert()->load();
+    auto globalUpdatesCountBeforeDelete = globalOpCounters.getUpdate()->load();
+    auto globalCommandsCountBeforeDelete = globalOpCounters.getCommand()->load();
+    write_ops::DeleteCommandRequest deleteOp(nss);
+    deleteOp.setDeletes({[&] {
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(BSON("_id" << 1));
+        entry.setMulti(false);
+        return entry;
+    }()});
+    result = write_ops_exec::performDeletes(opCtxRaii.get(), deleteOp);
+    auto globalCommandsCountAfterDelete = globalOpCounters.getCommand()->load();
+    auto globalDeletesCountAfterDelete = globalOpCounters.getDelete()->load();
+    auto globalInsertsCountAfterDelete = globalOpCounters.getInsert()->load();
+    auto globalUpdatesCountAfterDelete = globalOpCounters.getUpdate()->load();
+    ASSERT_EQ(0, globalInsertsCountAfterDelete - globalInsertsCountBeforeDelete);
+    ASSERT_EQ(1, globalDeletesCountAfterDelete - globalDeletesCountBeforeDelete);
+    ASSERT_EQ(0, globalCommandsCountAfterDelete - globalCommandsCountBeforeDelete);
+    ASSERT_EQ(0, globalUpdatesCountAfterDelete - globalUpdatesCountBeforeDelete);
+}
+
 TEST_F(WriteOpsRetryability, PerformRetryableInsertsSuccess) {
     auto opCtxRaii = makeOperationContext();
     opCtxRaii->setLogicalSessionId({UUID::gen(), {}});
