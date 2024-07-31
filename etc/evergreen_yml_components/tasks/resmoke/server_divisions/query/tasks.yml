@@ -665,7 +665,18 @@ tasks:
 ## jstestfuzz standalone update generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "updatefuzzer", "require_npm", "random_name", "multiversion"]
+  tags:
+    [
+      "assigned_to_jira_team_server_query_execution",
+      "non_deterministic",
+      "updatefuzzer",
+      "require_npm",
+      "random_name",
+      "multiversion",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -684,7 +695,19 @@ tasks:
 ## jstestfuzz replication update generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_fuzzer_replication_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "updatefuzzer", "require_npm", "random_name", "multiversion", "no_debug_mode"]
+  tags:
+    [
+      "assigned_to_jira_team_server_query_execution",
+      "non_deterministic",
+      "updatefuzzer",
+      "require_npm",
+      "random_name",
+      "multiversion",
+      "no_debug_mode",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -821,7 +844,17 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized change stream pipelines ##
 - <<: *jstestfuzz_template
   name: change_stream_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "change_stream_fuzzer", "require_npm", "random_name"]
+  tags:
+    [
+      "assigned_to_jira_team_server_query_optimization",
+      "non_deterministic",
+      "change_stream_fuzzer",
+      "require_npm",
+      "random_name",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -835,7 +868,17 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: change_stream_serverless_no_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "change_stream_fuzzer", "require_npm", "random_name"]
+  tags:
+    [
+      "assigned_to_jira_team_server_query_optimization",
+      "non_deterministic",
+      "change_stream_fuzzer",
+      "require_npm",
+      "random_name",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
     - func: "generate resmoke tasks"
       vars:
@@ -849,7 +892,17 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: change_stream_serverless_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "change_stream_fuzzer", "require_npm", "random_name"]
+  tags:
+    [
+      "assigned_to_jira_team_server_query_optimization",
+      "non_deterministic",
+      "change_stream_fuzzer",
+      "require_npm",
+      "random_name",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
     - func: "generate resmoke tasks"
       vars:

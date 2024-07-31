@@ -1182,7 +1182,16 @@ tasks:
 
 - <<: *gen_task_template
   name: config_fuzzer_concurrency_replication_gen
-  tags: ["assigned_to_jira_team_server_execution", "default", "config_fuzzer", "large"]
+  tags:
+    [
+      "assigned_to_jira_team_server_execution",
+      "default",
+      "config_fuzzer",
+      "large",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1194,7 +1203,17 @@ tasks:
 
 - <<: *gen_task_template
   name: config_fuzzer_concurrency_sharded_replication_gen
-  tags: ["assigned_to_jira_team_server_execution", "default", "config_fuzzer", "large", "sharded"]
+  tags:
+    [
+      "assigned_to_jira_team_server_execution",
+      "default",
+      "config_fuzzer",
+      "large",
+      "sharded",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1208,7 +1227,16 @@ tasks:
 
 - <<: *gen_task_template
   name: config_fuzzer_concurrency_simultaneous_replication_gen
-  tags: ["assigned_to_jira_team_server_execution", "default", "config_fuzzer", "large"]
+  tags:
+    [
+      "assigned_to_jira_team_server_execution",
+      "default",
+      "config_fuzzer",
+      "large",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1232,7 +1260,16 @@ tasks:
 
 - <<: *gen_task_template
   name: config_fuzzer_replica_sets_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_execution", "default", "config_fuzzer", "large"]
+  tags:
+    [
+      "assigned_to_jira_team_server_execution",
+      "default",
+      "config_fuzzer",
+      "large",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1244,7 +1281,16 @@ tasks:
 
 - <<: *gen_task_template
   name: config_fuzzer_sharding_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_execution", "default", "config_fuzzer", "large"]
+  tags:
+    [
+      "assigned_to_jira_team_server_execution",
+      "default",
+      "config_fuzzer",
+      "large",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1257,7 +1303,17 @@ tasks:
 
 - <<: *gen_task_template
   name: config_fuzzer_simulate_crash_concurrency_replication_gen
-  tags: ["assigned_to_jira_team_server_execution", "default", "config_fuzzer", "large", "linux_only"]
+  tags:
+    [
+      "assigned_to_jira_team_server_execution",
+      "default",
+      "config_fuzzer",
+      "large",
+      "linux_only",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1269,7 +1325,15 @@ tasks:
 
 - <<: *gen_task_template
   name: config_fuzzer_stress_concurrency_replication_gen
-  tags: ["assigned_to_jira_team_server_execution", "default", "config_fuzzer_stress"]
+  tags:
+    [
+      "assigned_to_jira_team_server_execution",
+      "default",
+      "config_fuzzer_stress",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1283,7 +1347,15 @@ tasks:
 
 - <<: *gen_task_template
   name: config_fuzzer_stress_concurrency_sharded_replication_gen
-  tags: ["assigned_to_jira_team_server_execution", "default", "config_fuzzer_stress"]
+  tags:
+    [
+      "assigned_to_jira_team_server_execution",
+      "default",
+      "config_fuzzer_stress",
+      "incompatible_tsan",
+      "incompatible_aubsan",
+      "incompatible_debug_mode",
+    ]
   commands:
   - func: "generate resmoke tasks"
     vars:
