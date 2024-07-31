@@ -13,17 +13,23 @@ definitions:
 variables:
   - &amazon2_x86_compile_variant_dependency
     depends_on:
-      - name: package_new_compile
+      - name: archive_dist_test
+        variant: amazon2-x86-compile
+      - name: package_supplementary_data
         variant: amazon2-x86-compile
 
   - &amazon_linux2_arm64_compile_variant_dependency
     depends_on:
-      - name: package_new_compile
+      - name: archive_dist_test
+        variant: amazon2-arm64-compile
+      - name: package_supplementary_data
         variant: amazon2-arm64-compile
 
   - &amazon_linux2_arm64_mongocrypt_compile_variant_dependency
     depends_on:
-      - name: package_new_compile
+      - name: archive_dist_test
+        variant: amazon2-arm64-compile
+      - name: package_supplementary_data
         variant: amazon2-arm64-compile
       - name: crypt_create_lib
         variant: amazon2-arm64-mongocrypt-shlib-compile
@@ -126,11 +132,13 @@ variables:
     storageEngine: inMemory
     project_dir: *perf_project_dir
     compile_variant: amazon2-arm64-compile
+    use_supplementary_data: true
 
   - &standalone-intel-expansions
     <<: *standalone-arm-expansions
     infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
     compile_variant: amazon2-x86-compile
+    use_supplementary_data: true
 
 buildvariants:
   - <<: *amazon_linux2_arm64_compile_variant_dependency
@@ -151,6 +159,7 @@ buildvariants:
       project_dir: *perf_project_dir
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
+      use_supplementary_data: true
     run_on:
       - "rhel94-perf-atlas-large"
     tasks:
@@ -193,6 +202,7 @@ buildvariants:
       platform: linux
       project_dir: *perf_project_dir
       storageEngine: wiredTiger
+      use_supplementary_data: true
     run_on:
       - "rhel94-perf-atlas-large"
     tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
@@ -234,6 +244,7 @@ buildvariants:
       compile_variant: amazon2-arm64-compile
       shlib_compile_variant: amazon2-arm64-mongocrypt-shlib-compile
       mongocrypt_shlib_required: true
+      use_supplementary_data: true
     run_on:
       - "rhel94-perf-shard-lite"
     tasks:
@@ -262,6 +273,7 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
+      use_supplementary_data: true
     run_on:
       - "rhel94-perf-shard"
     tasks: *linux_3_shard_tasks
@@ -282,6 +294,7 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
+      use_supplementary_data: true
     run_on:
       - "rhel94-perf-replset"
     tasks:
@@ -367,6 +380,7 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: amazon2-x86-compile
+      use_supplementary_data: true
     run_on:
       - "rhel94-perf-replset"
     tasks: *3node-intel-tasks
@@ -387,6 +401,7 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
+      use_supplementary_data: true
     run_on:
       - "rhel94-perf-replset"
     tasks:
@@ -457,6 +472,7 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
+      use_supplementary_data: true
     run_on:
       - "rhel94-perf-replset"
     tasks:
@@ -505,8 +521,6 @@ buildvariants:
       - name: tpcc_majority_small
         cron: *high-value-workload-cron
 
-  # On PERF-730 we changed the initial sync tests to use two nodes instead of three. To avoid
-  # losing history, the name remains unchanged, but the display_name reflects the change to 2-Node.
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-2-node-replSet-initialsync.arm.aws.2023-11
     display_name: Initial Sync 2-Node ReplSet ARM AWS 2023-11
@@ -522,6 +536,7 @@ buildvariants:
       authentication: disabled
       storageEngine: wiredTiger
       compile_variant: amazon2-arm64-compile
+      use_supplementary_data: true
       project_dir: *perf_project_dir
     run_on:
       - "rhel94-perf-replset"
