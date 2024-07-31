@@ -165,6 +165,11 @@ Status CanonicalQuery::init(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
 
     if (parsedFind->proj) {
+        // The projection will be optimized only if the query is not compatible with SBE or there's
+        // no user-specified "let" variable. This is to prevent the user-defined variable being
+        // optimized out. We will optimize the projection later after we are certain that the query
+        // is ineligible for SBE.
+        bool shouldOptimizeProj = !expCtx->sbeCompatible || !_findCommand->getLet();
         if (parsedFind->proj->requiresMatchDetails()) {
             // Sadly, in some cases the match details cannot be generated from the unoptimized
             // MatchExpression. For example, a rooted-$or of equalities won't work to produce the
@@ -177,10 +182,12 @@ Status CanonicalQuery::init(boost::intrusive_ptr<ExpressionContext> expCtx,
                                                           _root.get(),
                                                           _findCommand->getFilter(),
                                                           *parsedFind->savedProjectionPolicies,
-                                                          true /* optimize */));
+                                                          shouldOptimizeProj));
         } else {
             _proj.emplace(std::move(*parsedFind->proj));
-            _proj->optimize();
+            if (shouldOptimizeProj) {
+                _proj->optimize();
+            }
         }
     }
     if (parsedFind->sort) {

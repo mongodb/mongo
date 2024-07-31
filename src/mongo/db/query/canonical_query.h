@@ -257,6 +257,12 @@ public:
         return _pipeline;
     }
 
+    void optimizeProjection() {
+        if (_proj) {
+            _proj->optimize();
+        }
+    }
+
 private:
     Status init(boost::intrusive_ptr<ExpressionContext> expCtx,
                 std::unique_ptr<ParsedFindCommand> parsedFind,

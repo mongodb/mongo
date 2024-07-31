@@ -1439,6 +1439,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         }
     }
 
+    // There's a special case of the projection optimization being skipped when a query has any
+    // user-defined "let" variable and the query may be run with SBE. Here we make sure the
+    // projection is optimized for the classic engine.
+    canonicalQuery->optimizeProjection();
+
     return getClassicExecutor(
         opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
 }
