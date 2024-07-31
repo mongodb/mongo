@@ -541,10 +541,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         serviceContext->setPeriodicRunner(std::move(runner));
     }
 
-    // When starting the server with --queryableBackupMode or --recoverFromOplogAsStandalone, we are
-    // in read-only mode and don't allow user-originating operations to perform writes
+    // When starting the server with --queryableBackupMode, --recoverFromOplogAsStandalone or
+    // --magicRestore, we are in read-only mode and don't allow user-originating operations to
+    // perform writes
     if (storageGlobalParams.queryableBackupMode ||
-        repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone() ||
+        storageGlobalParams.magicRestore) {
         serviceContext->disallowUserWrites();
     }
 
@@ -887,6 +889,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                               << "startupRecoveryForRestore at the same time",
                 !repl::startupRecoveryForRestore);
 
+        // This uassert will also cover if we are running magic restore.
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Cannot use queryableBackupMode in a replica set",
                 !replCoord->getSettings().isReplSet());

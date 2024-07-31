@@ -281,6 +281,8 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
         return;
     }
 
+    // In magic restore we finish in-progress index builds unlike in standalone recovery, so we
+    // should not halt execution for magic restore.
     if (replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
         // Writes to the 'config.system.indexBuilds' collection are replicated and the index entry
         // will be removed when the delete oplog entry is replayed at a later time.
@@ -1351,7 +1353,8 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
     if (replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
         // Unfinished index builds are not restarted in standalone mode. That means there will be no
         // index builder threads to abort. Instead, we should drop the unfinished indexes that were
-        // aborted.
+        // aborted. In magic restore we do restart unfinished index builds so we do not need to
+        // worry about this.
         AutoGetCollection autoColl{opCtx, nss, MODE_X};
 
         WriteUnitOfWork wuow(opCtx);

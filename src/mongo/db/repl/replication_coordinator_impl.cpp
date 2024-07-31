@@ -990,6 +990,8 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) 
 void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
                                          StorageEngine::LastShutdownState lastShutdownState) {
     if (!_settings.isReplSet()) {
+        // We do not need to check for magic restore since magic restore always runs in a replica
+        // set.
         if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Cannot set parameter 'recoverToOplogTimestamp' "
