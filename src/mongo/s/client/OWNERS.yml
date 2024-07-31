@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "shard_registry*":
+    approvers:
+      - 10gen/server-catalog-and-routing

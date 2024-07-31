@@ -36,3 +36,15 @@ filters:
     approvers:
       - 10gen/server-storage-execution
       - 10gen/server-rss-sydney
+  - "create*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "database*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "drop*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "rename*":
+    approvers:
+      - 10gen/server-catalog-and-routing

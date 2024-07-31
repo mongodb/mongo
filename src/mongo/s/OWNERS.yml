@@ -24,3 +24,72 @@ filters:
   - "*unshard*collection*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "cannot_implicitly_create_collection_info.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "catalog_cache*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "chunk*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_commands_helpers.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_ddl.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_routing_info_targeter*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_uuid_mismatch.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "comparable_*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*catalog_cache_loader*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "database_version*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "index_version*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "resource_yielders*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "router_role*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "routing_*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_cannot_refresh_due_to_locks_held_exception*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_key_pattern*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_version*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_index_catalog_cache*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_state*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_types.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "stale_exception*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "stale_shard_version_helpers*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "type_collection_common_types.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing

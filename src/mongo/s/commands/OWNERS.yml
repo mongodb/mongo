@@ -18,3 +18,57 @@ filters:
   - "*transition_to_dedicated*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "cluster_add_shard_*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_change_primary_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_check_metadata_consistency_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_coll_stats_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_collection_mod_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_command_test_fixture.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_commands.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_convert_to_capped_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_create*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_drop_*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_enable_sharding_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_get_*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_list_*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_lock_info_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_merge_*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_refine_collection_shard_key_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_remove_*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*placement_history*":
+    approvers:
+      - 10gen/server-catalog-and-routing

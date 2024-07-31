@@ -40,3 +40,15 @@ filters:
   - "profile*":
     approvers:
       - 10gen/query-execution
+  - "create*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "list*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "rename*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "set_cluster*":
+    approvers:
+      - 10gen/server-catalog-and-routing

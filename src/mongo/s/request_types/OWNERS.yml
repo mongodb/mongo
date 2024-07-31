@@ -3,3 +3,54 @@ filters:
   - "coordinate_multi_update.idl":
     approvers:
       - 10gen/server-cluster-scalability
+  - "add_shard*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "clone_catalog_data.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "drop_collection_if_uuid_not_matching.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "ensure_chunk_version_is_greater_than.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "flush_database_cache_updates.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "flush_resharding_state_change.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "flush_routing_table_cache_updates.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "get_database_version.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "merge_chunk_request*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "merge_chunks_request*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "placement_history_commands.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "remove_shard*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "reset_placement_history.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "set_allow_migrations.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharded_ddl_commands.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shardsvr_join_*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "update_zone_key_range_request_*":
+    approvers:
+      - 10gen/server-catalog-and-routing

@@ -79,6 +79,12 @@ filters:
   - "update_index_data*":
     approvers:
       - 10gen/query-execution
+  - "create*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "drop*idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "startup_recovery*":
     approvers:
       - 10gen/server-storage-execution

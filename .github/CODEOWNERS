@@ -250,6 +250,8 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/**/generic_cursor* @10gen/query-execution
 /src/mongo/db/**/profile_filter* @10gen/query-execution
 /src/mongo/db/**/update_index_data* @10gen/query-execution
+/src/mongo/db/**/create* @10gen/server-catalog-and-routing
+/src/mongo/db/**/drop*idl @10gen/server-catalog-and-routing
 /src/mongo/db/**/startup_recovery* @10gen/server-storage-execution
 /src/mongo/db/**/explain.idl @10gen/query-optimization
 /src/mongo/db/**/explain_test.cpp @10gen/query-optimization
@@ -274,6 +276,10 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/catalog/**/multi_index_block* @10gen/server-storage-execution
 /src/mongo/db/catalog/**/throttle_cursor* @10gen/server-storage-execution
 /src/mongo/db/catalog/**/validate* @10gen/server-rss-sydney @10gen/server-storage-execution
+/src/mongo/db/catalog/**/create* @10gen/server-catalog-and-routing
+/src/mongo/db/catalog/**/database* @10gen/server-catalog-and-routing
+/src/mongo/db/catalog/**/drop* @10gen/server-catalog-and-routing
+/src/mongo/db/catalog/**/rename* @10gen/server-catalog-and-routing
 
 # The following patterns are parsed from ./src/mongo/db/commands/OWNERS.yml
 /src/mongo/db/commands/**/authentication_commands.* @10gen/server-security
@@ -289,6 +295,10 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/commands/**/vote*index_build* @10gen/server-storage-execution
 /src/mongo/db/commands/**/rotate_certificates* @10gen/server-security
 /src/mongo/db/commands/**/profile* @10gen/query-execution
+/src/mongo/db/commands/**/create* @10gen/server-catalog-and-routing
+/src/mongo/db/commands/**/list* @10gen/server-catalog-and-routing
+/src/mongo/db/commands/**/rename* @10gen/server-catalog-and-routing
+/src/mongo/db/commands/**/set_cluster* @10gen/server-catalog-and-routing
 
 # The following patterns are parsed from ./src/mongo/db/concurrency/OWNERS.yml
 /src/mongo/db/concurrency/**/exception_util* @10gen/server-service-architecture
@@ -522,20 +532,91 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/s/**/*analyze_shard_key* @10gen/server-cluster-scalability
 /src/mongo/db/s/**/cluster_*cmd_d* @10gen/server-cluster-scalability
 /src/mongo/db/s/**/migration* @10gen/server-cluster-scalability
-/src/mongo/db/s/**/*move_primary* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*move_primary* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability
 /src/mongo/db/s/**/*move_range* @10gen/server-cluster-scalability
 /src/mongo/db/s/**/*range*deleter* @10gen/server-cluster-scalability
 /src/mongo/db/s/**/*range*deletion* @10gen/server-cluster-scalability
-/src/mongo/db/s/**/*refine_collection_shard_key* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/*refine_collection_shard_key* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability
 /src/mongo/db/s/**/*reshard* @10gen/server-cluster-scalability
 /src/mongo/db/s/**/session_catalog_migration* @10gen/server-cluster-scalability
 /src/mongo/db/s/**/*transaction* @10gen/server-cluster-scalability
 /src/mongo/db/s/**/*txn* @10gen/server-cluster-scalability
+/src/mongo/db/s/**/balancer_stats_registry* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/chunk_operation_precondition_checks* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/clone_catalog_data_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/collection_* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*collmod* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*convert_to_capped* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*create* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*collection_creation* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/database_sharding_state* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/operation_sharding_state* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/flush*updates* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/get*version*command* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*user_write* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*metadata* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/namespace_metadata_change_notifications* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*participant_block* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*consistency* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*placement_history* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/remove* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*rename* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*reshard*coordinator* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*shardsvr_reshard_collection* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*sessions_collection* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*set_allow* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*set_cluster* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*logging* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*ddl* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*cluster_param* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*catalog_client* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*sharding_recovery* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*critical_section* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*drop* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*create* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*merge* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*split_chunk* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*untrack* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/shardsvr_set* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*stats_for_balancing* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*add_shard* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*change_primary* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*topology_time* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*type* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*vector_clock* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*join* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/README_sharding_catalog.md @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/clone_catalog_data_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*catalog_cache* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*catalog*idl @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*catalog_client* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/*index*catalog* @10gen/server-catalog-and-routing
+/src/mongo/db/s/**/shardsvr_delete_global_index_key_command.cpp @10gen/server-catalog-and-routing
 
 # The following patterns are parsed from ./src/mongo/db/s/config/OWNERS.yml
 /src/mongo/db/s/config/**/*chunk_migration_command* @10gen/server-cluster-scalability
 /src/mongo/db/s/config/**/*transition_from_dedicated* @10gen/server-cluster-scalability
 /src/mongo/db/s/config/**/*transition_to_dedicated* @10gen/server-cluster-scalability
+/src/mongo/db/s/config/**/configsvr_add_* @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_check_* @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_commit* @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_coordinator* @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_create_database_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_drop_index_catalog_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_ensure_chunk_version_is_greater_than_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_get_historical_placement_info.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_merge_all_chunks_on_shard_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_merge_chunks_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_refine_collection_shard_key_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_remove* @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_repair_sharded_collection_chunks_history_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_reset_placement_history_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_set* @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_split_chunk_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/configsvr_update_zone_key_range_command.cpp @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/placement_history* @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/set_cluster* @10gen/server-catalog-and-routing
+/src/mongo/db/s/config/**/sharding_catalog_* @10gen/server-catalog-and-routing
 
 # The following patterns are parsed from ./src/mongo/db/s/global_index/OWNERS.yml
 /src/mongo/db/s/global_index/**/* @10gen/server-cluster-scalability
@@ -643,6 +724,35 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/s/**/*reshard* @10gen/server-cluster-scalability
 /src/mongo/s/**/*transaction* @10gen/server-cluster-scalability
 /src/mongo/s/**/*unshard*collection* @10gen/server-cluster-scalability
+/src/mongo/s/**/cannot_implicitly_create_collection_info.* @10gen/server-catalog-and-routing
+/src/mongo/s/**/catalog_cache* @10gen/server-catalog-and-routing
+/src/mongo/s/**/chunk* @10gen/server-catalog-and-routing
+/src/mongo/s/**/cluster_commands_helpers.* @10gen/server-catalog-and-routing
+/src/mongo/s/**/cluster_ddl.* @10gen/server-catalog-and-routing
+/src/mongo/s/**/collection_routing_info_targeter* @10gen/server-catalog-and-routing
+/src/mongo/s/**/collection_uuid_mismatch.* @10gen/server-catalog-and-routing
+/src/mongo/s/**/comparable_* @10gen/server-catalog-and-routing
+/src/mongo/s/**/*catalog_cache_loader* @10gen/server-catalog-and-routing
+/src/mongo/s/**/database_version* @10gen/server-catalog-and-routing
+/src/mongo/s/**/index_version* @10gen/server-catalog-and-routing
+/src/mongo/s/**/resource_yielders* @10gen/server-catalog-and-routing
+/src/mongo/s/**/router_role* @10gen/server-catalog-and-routing
+/src/mongo/s/**/routing_* @10gen/server-catalog-and-routing
+/src/mongo/s/**/shard_cannot_refresh_due_to_locks_held_exception* @10gen/server-catalog-and-routing
+/src/mongo/s/**/shard_key_pattern* @10gen/server-catalog-and-routing
+/src/mongo/s/**/shard_version* @10gen/server-catalog-and-routing
+/src/mongo/s/**/sharding_index_catalog_cache* @10gen/server-catalog-and-routing
+/src/mongo/s/**/sharding_state* @10gen/server-catalog-and-routing
+/src/mongo/s/**/sharding_types.idl @10gen/server-catalog-and-routing
+/src/mongo/s/**/stale_exception* @10gen/server-catalog-and-routing
+/src/mongo/s/**/stale_shard_version_helpers* @10gen/server-catalog-and-routing
+/src/mongo/s/**/type_collection_common_types.idl @10gen/server-catalog-and-routing
+
+# The following patterns are parsed from ./src/mongo/s/catalog/OWNERS.yml
+/src/mongo/s/catalog/**/* @10gen/server-catalog-and-routing
+
+# The following patterns are parsed from ./src/mongo/s/client/OWNERS.yml
+/src/mongo/s/client/**/shard_registry* @10gen/server-catalog-and-routing
 
 # The following patterns are parsed from ./src/mongo/s/commands/OWNERS.yml
 /src/mongo/s/commands/**/cluster_user_management_commands.cpp @10gen/server-security
@@ -651,6 +761,24 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/s/commands/**/*fsync_unlock* @10gen/server-cluster-scalability
 /src/mongo/s/commands/**/*transition_from_dedicated* @10gen/server-cluster-scalability
 /src/mongo/s/commands/**/*transition_to_dedicated* @10gen/server-cluster-scalability
+/src/mongo/s/commands/**/cluster_add_shard_* @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_change_primary_cmd.cpp @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_check_metadata_consistency_cmd.cpp @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_coll_stats_cmd.cpp @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_collection_mod_cmd.cpp @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_command_test_fixture.* @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_commands.idl @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_convert_to_capped_cmd.cpp @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_create* @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_drop_* @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_enable_sharding_cmd.cpp @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_get_* @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_list_* @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_lock_info_cmd.cpp @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_merge_* @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_refine_collection_shard_key_cmd.cpp @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/cluster_remove_* @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/*placement_history* @10gen/server-catalog-and-routing
 
 # The following patterns are parsed from ./src/mongo/s/migration_blocking_operation/OWNERS.yml
 /src/mongo/s/migration_blocking_operation/**/* @10gen/server-cluster-scalability
@@ -664,6 +792,23 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/s/request_types/OWNERS.yml
 /src/mongo/s/request_types/**/coordinate_multi_update.idl @10gen/server-cluster-scalability
+/src/mongo/s/request_types/**/add_shard* @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/clone_catalog_data.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/drop_collection_if_uuid_not_matching.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/ensure_chunk_version_is_greater_than.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/flush_database_cache_updates.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/flush_resharding_state_change.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/flush_routing_table_cache_updates.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/get_database_version.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/merge_chunk_request* @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/merge_chunks_request* @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/placement_history_commands.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/remove_shard* @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/reset_placement_history.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/set_allow_migrations.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/sharded_ddl_commands.idl @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/shardsvr_join_* @10gen/server-catalog-and-routing
+/src/mongo/s/request_types/**/update_zone_key_range_request_* @10gen/server-catalog-and-routing
 
 # The following patterns are parsed from ./src/mongo/s/resharding/OWNERS.yml
 /src/mongo/s/resharding/**/* @10gen/server-cluster-scalability
