@@ -378,7 +378,9 @@ export class QuerySettingsIndexHintsTests {
         this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
             const winningPlanWithoutCursorHint = getWinningPlansForQuery(query);
             const winningPlanWithCursorHint = getWinningPlansForQuery(queryWithHint);
-            assert.eq(winningPlanWithCursorHint, winningPlanWithoutCursorHint);
+            // In sharded explain, the winning plans on the shards aren't guaranteed to be returned
+            // in a particular order, so check that the elements of the explain output are equal.
+            assert.sameMembers(winningPlanWithCursorHint, winningPlanWithoutCursorHint);
         });
     }
 
@@ -406,8 +408,10 @@ export class QuerySettingsIndexHintsTests {
             return winningPlans;
         };
 
-        assert.eq(getWinningPlansForQuery(query, settingsOnBoth),
-                  getWinningPlansForQuery(queryWithHint, settingsOnSecondary));
+        // In sharded explain, the winning plans on the shards aren't guaranteed to be returned in a
+        // particular order, so check that the elements of the explain output are equal.
+        assert.sameMembers(getWinningPlansForQuery(query, settingsOnBoth),
+                           getWinningPlansForQuery(queryWithHint, settingsOnSecondary));
     }
 
     /**
@@ -423,21 +427,19 @@ export class QuerySettingsIndexHintsTests {
 
         // It's not guaranteed for all the queries to preserve the order of the stages when
         // replanning (namely in the case of subplanning with $or statements). Flatten the plan tree
-        // & sort the stages according to 'bsonWoCompare()' to accommodate this behavior and avoid
-        // potential failures.
+        // & check that the plans' elements are equal using `assert.sameMembers` to accommodate this
+        // behavior and avoid potential failures.
         const explainCmd = getExplainCommand(query);
         const explainWithoutQuerySettings = assert.commandWorked(
             this.db.runCommand(explainCmd),
             `Failed running ${tojson(explainCmd)} before setting query settings`);
         const winningStagesWithoutQuerySettings = getWinningStages(explainWithoutQuerySettings);
-        winningStagesWithoutQuerySettings.sort(bsonWoCompare);
         this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
             const explainWithQuerySettings = assert.commandWorked(
                 this.db.runCommand(explainCmd),
                 `Failed running ${tojson(explainCmd)} after settings query settings`);
             const winningStagesWithQuerySettings = getWinningStages(explainWithQuerySettings);
-            winningStagesWithQuerySettings.sort(bsonWoCompare);
-            assert.eq(
+            assert.sameMembers(
                 winningStagesWithQuerySettings,
                 winningStagesWithoutQuerySettings,
                 "Expected the query without query settings and the one with settings to have " +
