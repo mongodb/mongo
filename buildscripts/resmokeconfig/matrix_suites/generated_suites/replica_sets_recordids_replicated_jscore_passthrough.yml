@@ -45,8 +45,8 @@ selector:
   - jstests/core/fsync.js
   - jstests/core/txns/prepare_conflict.js
   - jstests/core/txns/prepare_conflict_aggregation_behavior.js
-  - jstests/core/timeseries/*.*
-  - jstests/core/txns/timeseries/*.*
+  - jstests/core/timeseries/*.js
+  - jstests/core/txns/timeseries/*.js
   - jstests/core/administrative/validate_db_metadata_command.js
   - jstests/core/catalog/list_catalog.js
   - jstests/core/write/bulk/bulk_write_timeseries_basic.js
@@ -55,7 +55,7 @@ selector:
   - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
   - jstests/core/version_api_v1_command_coverage.js
   - jstests/core/api/*.js
-  - jstests/core/query/distinct/*.*
+  - jstests/core/query/distinct/*.js
   - jstests/core/query/cursor/cursora.js
   - jstests/core/write/delete/removeb.js
   - jstests/core/write/delete/removec.js
@@ -65,7 +65,7 @@ selector:
   - jstests/core/write/update/updatef.js
   - jstests/core/loadserverscripts.js
   - jstests/core/shell/shellstartparallel.js
-  - jstests/core/txns/*.*
+  - jstests/core/txns/*.js
   - jstests/core/latch_analyzer.js
   - jstests/core/administrative/current_op/currentop_waiting_for_latch.js
   - jstests/core/query/mr/mr_killop.js
