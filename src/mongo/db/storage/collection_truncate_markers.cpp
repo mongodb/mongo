@@ -52,8 +52,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
-// TODO SERVER-74250: Change to slowCollectionSamplingReads once 7.0 is released.
-MONGO_FAIL_POINT_DEFINE(slowOplogSamplingReads);
+MONGO_FAIL_POINT_DEFINE(slowCollectionSamplingReads);
 
 namespace {
 
@@ -317,7 +316,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
         auto nextRandom = collectionIterator.getNextRandom();
         const auto [rId, doc] = *nextRandom;
         auto samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
-        slowOplogSamplingReads.execute(
+        slowCollectionSamplingReads.execute(
             [&](const BSONObj& dataObj) { sleepsecs(dataObj["delay"].numberInt()); });
         if (!nextRandom) {
             // This shouldn't really happen unless the size storer values are far off from reality.

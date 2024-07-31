@@ -3,6 +3,7 @@
  * support OplogTruncateMarkers.
  * @tags: [
  *   requires_persistence,
+ *   multiversion_incompatible,
  * ]
  */
 const kOplogDocs = 47500;
@@ -27,8 +28,7 @@ const replSet = new ReplSetTest({
         setParameter: {
             "maxOplogTruncationPointsDuringStartup": 10,
             "oplogSamplingLogIntervalSeconds": kLoggingIntervalSeconds,
-            // TODO SERVER-74250: Change to slowCollectionSamplingReads when 7.0 releases
-            "failpoint.slowOplogSamplingReads":
+            "failpoint.slowCollectionSamplingReads":
                 tojson({mode: "alwaysOn", data: {"delay": kOplogSampleReadDelay}}),
             logComponentVerbosity: tojson({storage: {verbosity: 2}}),
         }
