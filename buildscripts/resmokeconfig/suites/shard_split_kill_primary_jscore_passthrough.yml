@@ -109,8 +109,6 @@ selector:
     - requires_profiling
     # capped collections are banned in Serverless
     - requires_capped
-    # emptycapped command is blocked during shard split.
-    - requires_emptycapped
     # Multi-updates that conflict with shard split are not retried by simulate_atlas_proxy.js.
     - requires_multi_updates
     - tenant_migration_incompatible

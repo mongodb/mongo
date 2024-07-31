@@ -5163,20 +5163,6 @@ TEST_F(OplogApplierImplTxnTableTest, NonMigrateNoOpEntriesShouldNotUpdateTxnTabl
         BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON())));
 }
 
-TEST_F(IdempotencyTest, EmptyCappedNamespaceNotFound) {
-    // Create a BSON "emptycapped" command.
-    auto emptyCappedCmd = BSON("emptycapped" << _nss.coll());
-
-    // Create an "emptycapped" oplog entry.
-    auto emptyCappedOp = makeCommandOplogEntry(nextOpTime(), _nss, emptyCappedCmd);
-
-    // Ensure that NamespaceNotFound is acceptable.
-    ASSERT_OK(runOpInitialSync(emptyCappedOp));
-
-    AutoGetCollectionForReadCommand autoColl(_opCtx.get(), _nss);
-    ASSERT_FALSE(autoColl);
-}
-
 TEST_F(IdempotencyTest, UpdateTwoFields) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
@@ -5204,15 +5190,15 @@ typedef SetSteadyStateConstraints<IdempotencyTest, true>
     IdempotencyTestEnableSteadyStateConstraints;
 
 TEST_F(IdempotencyTestDisableSteadyStateConstraints, AcceptableErrorsRecordedInSteadyStateMode) {
-    // Create a BSON "emptycapped" command.
-    auto emptyCappedCmd = BSON("emptycapped" << _nss.coll());
+    // Create a BSON "collMod" command.
+    auto collModCmd = BSON("collMod" << _nss.coll());
 
-    // Create a "emptycapped" oplog entry.
-    auto emptyCappedOp = makeCommandOplogEntry(nextOpTime(), _nss, emptyCappedCmd);
+    // Create a "collMod" oplog entry.
+    auto collModOp = makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, UUID::gen());
 
     // Ensure that NamespaceNotFound is "acceptable" but counted.
     int prevAcceptableError = replOpCounters.getAcceptableErrorInCommand()->load();
-    ASSERT_OK(runOpSteadyState(emptyCappedOp));
+    ASSERT_OK(runOpSteadyState(collModOp));
 
     auto postAcceptableError = replOpCounters.getAcceptableErrorInCommand()->load();
     ASSERT_EQ(1, postAcceptableError - prevAcceptableError);
@@ -5226,14 +5212,14 @@ TEST_F(IdempotencyTestDisableSteadyStateConstraints, AcceptableErrorsRecordedInS
 
 TEST_F(IdempotencyTestEnableSteadyStateConstraints,
        AcceptableErrorsNotAcceptableInSteadyStateMode) {
-    // Create a BSON "emptycapped" command.
-    auto emptyCappedCmd = BSON("emptycapped" << _nss.coll());
+    // Create a BSON "collMod" command.
+    auto collModCmd = BSON("collMod" << _nss.coll());
 
-    // Create a "emptyCapped" oplog entry.
-    auto emptyCappedOp = makeCommandOplogEntry(nextOpTime(), _nss, emptyCappedCmd);
+    // Create a "collMod" oplog entry.
+    auto collModOp = makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, UUID::gen());
 
     // Ensure that NamespaceNotFound is returned.
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, runOpSteadyState(emptyCappedOp));
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, runOpSteadyState(collModOp));
 }
 
 class IdempotencyTestTxns : public IdempotencyTest {};

@@ -491,14 +491,6 @@ public:
                 opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
     }
 
-    void onEmptyCapped(OperationContext* const opCtx,
-                       const NamespaceString& collectionName,
-                       const UUID& uuid) override {
-        ReservedTimes times{opCtx};
-        for (auto& o : _observers)
-            o->onEmptyCapped(opCtx, collectionName, uuid);
-    }
-
     void onTransactionStart(OperationContext* opCtx) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {

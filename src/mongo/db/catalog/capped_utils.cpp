@@ -83,59 +83,6 @@
 
 namespace mongo {
 
-Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) {
-    AutoGetDb autoDb(opCtx, collectionName.dbName(), MODE_X);
-
-    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName);
-
-    if (userInitiatedWritesAndNotPrimary) {
-        return Status(ErrorCodes::NotWritablePrimary,
-                      str::stream() << "Not primary while truncating collection: "
-                                    << collectionName.toStringForErrorMsg());
-    }
-
-    Database* db = autoDb.getDb();
-    uassert(ErrorCodes::NamespaceNotFound, "no such database", db);
-
-    CollectionWriter collection(opCtx, collectionName);
-    uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "emptycapped not supported on view: "
-                          << collectionName.toStringForErrorMsg(),
-            collection || !CollectionCatalog::get(opCtx)->lookupView(opCtx, collectionName));
-    uassert(ErrorCodes::NamespaceNotFound, "no such collection", collection);
-
-    if (collectionName.isSystem() && !collectionName.isSystemDotProfile()) {
-        return Status(ErrorCodes::IllegalOperation,
-                      str::stream() << "Cannot truncate a system collection: "
-                                    << collectionName.toStringForErrorMsg());
-    }
-
-    if ((repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) &&
-        collectionName.isOplog()) {
-        return Status(ErrorCodes::OplogOperationUnsupported,
-                      str::stream() << "Cannot truncate a live oplog while replicating: "
-                                    << collectionName.toStringForErrorMsg());
-    }
-
-    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collection->uuid());
-
-    WriteUnitOfWork wuow(opCtx);
-
-    auto writableCollection = collection.getWritableCollection(opCtx);
-    Status status = writableCollection->truncate(opCtx);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    const auto service = opCtx->getServiceContext();
-    service->getOpObserver()->onEmptyCapped(opCtx, collection->ns(), collection->uuid());
-
-    wuow.commit();
-
-    return Status::OK();
-}
-
 void cloneCollectionAsCapped(OperationContext* opCtx,
                              Database* db,
                              const NamespaceString& fromNss,

@@ -38,11 +38,6 @@ class NamespaceString;
 class OperationContext;
 
 /**
- * Drops all documents contained in the capped collection, "collectionName".
- */
-Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionName);
-
-/**
  * Clones the collection "shortFrom" to the capped collection "shortTo" with a size of "size".
  * If targetUUID is provided, then the newly capped collection will get that UUID. Otherwise, the
  * UUID for the newly capped collection will be randomly generated.

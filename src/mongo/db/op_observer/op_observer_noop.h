@@ -211,11 +211,6 @@ public:
                               const boost::optional<UUID>& dropTargetUUID,
                               bool stayTemp) override {}
 
-
-    void onEmptyCapped(OperationContext* opCtx,
-                       const NamespaceString& collectionName,
-                       const UUID& uuid) override {}
-
     void onTransactionStart(OperationContext* opCtx) override {}
 
     void onUnpreparedTransactionCommit(

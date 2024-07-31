@@ -16,7 +16,6 @@ selector:
     - jstests/replsets/buildindexes_false_with_system_indexes.js
     - jstests/replsets/db_reads_while_recovering_all_commands.js
     - jstests/replsets/disable_cluster_time_gossiping_in_unreadable_state.js
-    - jstests/replsets/emptycapped.js
     - jstests/replsets/localhostAuthBypass.js
     - jstests/replsets/rollback_auth.js
     - jstests/replsets/user_management_wc.js

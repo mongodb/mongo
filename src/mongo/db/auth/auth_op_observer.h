@@ -151,11 +151,6 @@ public:
                               const boost::optional<UUID>& dropTargetUUID,
                               bool stayTemp) final;
 
-
-    void onEmptyCapped(OperationContext* opCtx,
-                       const NamespaceString& collectionName,
-                       const UUID& uuid) final;
-
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 };
 

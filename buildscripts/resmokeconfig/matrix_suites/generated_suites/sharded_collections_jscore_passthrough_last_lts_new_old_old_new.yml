@@ -46,7 +46,6 @@ selector:
   - jstests/core/**/awaitdata_getmore_cmd.js
   - jstests/core/**/bypass_doc_validation.js
   - jstests/core/**/check_shard_index.js
-  - jstests/core/**/collection_truncate.js
   - jstests/core/**/compact_keeps_indexes.js
   - jstests/core/**/currentop.js
   - jstests/core/**/dbhash.js

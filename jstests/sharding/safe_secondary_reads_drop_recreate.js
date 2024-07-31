@@ -227,7 +227,6 @@ let testCases = {
     dropSearchIndex: {skip: "primary only"},
     dropUser: {skip: "primary only"},
     echo: {skip: "does not return user data"},
-    emptycapped: {skip: "primary only"},
     enableSharding: {skip: "primary only"},
     endSessions: {skip: "does not return user data"},
     explain: {skip: "test case to be added"},

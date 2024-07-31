@@ -97,7 +97,7 @@ enums:
            dropRole :  "dropRole"
            dropSearchIndex : "dropSearchIndex"
            dropUser :  "dropUser"
-           emptycapped :  "emptycapped"
+           emptycapped :  "emptycapped"  # Deprecated (backwards compatibility)
            enableProfiler :  "enableProfiler"
            enableSharding :  "enableSharding"
            exportCollection :  "exportCollection"

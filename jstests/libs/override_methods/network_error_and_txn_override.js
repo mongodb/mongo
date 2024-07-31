@@ -99,7 +99,6 @@ const kNonRetryableCommands = new Set([
     "dropIndexes",
     "dropRole",
     "dropUser",
-    "emptycapped",
     "godinsert",
     "internalRenameIfOptionsAndIndexesMatch",
     "updateRole",

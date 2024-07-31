@@ -265,7 +265,6 @@ const allCommands = {
     dropSearchIndex: {skip: isNotAUserDataRead},
     dropUser: {skip: isPrimaryOnly},
     echo: {skip: isNotAUserDataRead},
-    emptycapped: {skip: isPrimaryOnly},
     endSessions: {skip: isNotAUserDataRead},
     explain: {
         command: {count: collName},

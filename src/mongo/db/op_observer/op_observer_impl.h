@@ -220,9 +220,6 @@ public:
                             const BSONObj& catalogEntry,
                             const BSONObj& storageMetadata,
                             bool isDryRun) final;
-    void onEmptyCapped(OperationContext* opCtx,
-                       const NamespaceString& collectionName,
-                       const UUID& uuid) final;
     void onTransactionStart(OperationContext* opCtx) final;
     void onUnpreparedTransactionCommit(
         OperationContext* opCtx,

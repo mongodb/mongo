@@ -721,16 +721,6 @@ const allCommands = {
         command: {dropUser: "foo"},
     },
     echo: {command: {echo: 1}},
-    emptycapped: {
-        command: {emptycapped: collName},
-        setUp: function(conn) {
-            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
-        },
-        teardown: function(conn) {
-            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        },
-        doesNotRunOnMongos: true,
-    },
     enableSharding: {
         isShardedOnly: true,
         isAdminCommand: true,

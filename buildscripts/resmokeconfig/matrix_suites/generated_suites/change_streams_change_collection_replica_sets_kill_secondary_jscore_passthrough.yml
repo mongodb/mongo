@@ -92,7 +92,6 @@ selector:
   - requires_profiling
   - requires_auth
   - uses_transactions
-  - requires_emptycapped
   roots:
   - jstests/core/**/*.js
 test_kind: js_test

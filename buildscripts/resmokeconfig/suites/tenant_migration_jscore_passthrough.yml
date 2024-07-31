@@ -35,8 +35,6 @@ selector:
     - requires_profiling
     # capped collections are banned in Serverless
     - requires_capped
-    # emptycapped command is blocked during tenant migration.
-    - requires_emptycapped
     # Multi-updates that conflict with tenant migration are not retried by simulate_atlas_proxy.js.
     - requires_multi_updates
     # Full validation can cause ongoing queries to fail. This can affect the tenant migration

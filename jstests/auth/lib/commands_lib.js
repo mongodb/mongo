@@ -5280,7 +5280,7 @@ export const authCommandsLib = {
               }
           },
           teardown: function(db) {
-              assert.commandWorked(db.oplog.rs.runCommand('emptycapped'));
+              assert.commandWorked(db.oplog.rs.deleteMany({}));
           },
           testcases: [
               {

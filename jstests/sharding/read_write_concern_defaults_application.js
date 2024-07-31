@@ -514,7 +514,6 @@ let testCases = {
         useLogs: true,
     },
     echo: {skip: "does not accept read or write concern"},
-    emptycapped: {skip: "test command"},
     enableSharding: {skip: "does not accept read or write concern"},
     endSessions: {skip: "does not accept read or write concern"},
     explain: {skip: "TODO SERVER-45478"},
@@ -954,8 +953,9 @@ function createProfileFilterForTestCase(test, targetId, explicitRWC) {
 function runScenario(
     desc, conn, regularCheckConn, configSvrCheckConn, {explicitRWC, explicitProvenance = false}) {
     let runCommandTest = function(cmdName, test) {
-        // These commands were removed but break this test in multiversion
-        if (cmdName === "getFreeMonitoringStatus" || cmdName === "setFreeMonitoring") {
+        // The emptycapped command was removed but breaks this test in multiversion.
+        // TODO (SERVER-92950): Remove this check.
+        if (cmdName == "emptycapped") {
             return;
         }
 

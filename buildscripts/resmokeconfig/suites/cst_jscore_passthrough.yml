@@ -85,7 +85,6 @@ selector:
     - jstests/core/**/collation_find_and_modify.js
     - jstests/core/**/collation_plan_cache.js
     - jstests/core/**/collation_update.js
-    - jstests/core/**/collection_truncate.js
     - jstests/core/**/command_json_schema_field.js
     - jstests/core/**/command_let_variables.js
     - jstests/core/**/computed_projections.js

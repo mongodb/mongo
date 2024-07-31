@@ -2355,20 +2355,6 @@ TEST_F(RollbackImplObserverInfoTest,
     ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsFailsOnUnsupportedOplogEntry) {
-    // 'emptycapped' is not supported in rollback.
-    auto emptycappedOp =
-        makeCommandOp(Timestamp(2, 2),
-                      boost::none,
-                      NamespaceString::createNamespaceString_forTest("test", "$cmd"),
-                      BSON("emptycapped" << 1),
-                      2);
-
-    auto status =
-        _rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(emptycappedOp.first)).getStatus();
-    ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status);
-}
-
 DEATH_TEST_F(RollbackImplObserverInfoTest,
              NamespacesForOpsInvariantsOnApplyOpsOplogEntry,
              "_namespacesAndUUIDsForOp does not handle 'applyOps' oplog entries.") {

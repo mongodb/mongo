@@ -38,8 +38,5 @@ assert.commandWorked(primaryDB.foo.insert({}));
 op = getLatestOp();
 assert.commandWorked(primaryDB.runCommand({profile: 0}));
 
-// emptycapped the collection
-assert.commandWorked(primaryDB.runCommand({emptycapped: "system.profile"}));
-assert.eq(op, getLatestOp(), "oplog entry created when system.profile was emptied via emptycapped");
 assert(primaryDB.system.profile.drop());
 rst.stopSet();

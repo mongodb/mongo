@@ -243,37 +243,6 @@ public:
 
 MONGO_REGISTER_COMMAND(CapTrunc).testOnly().forShard();
 
-class EmptyCapped : public BasicCommand {
-public:
-    EmptyCapped() : BasicCommand("emptycapped") {}
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    // No auth needed because it only works when enabled via command line.
-    Status checkAuthForOperation(OperationContext*,
-                                 const DatabaseName&,
-                                 const BSONObj&) const override {
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
-
-        uassertStatusOK(emptyCapped(opCtx, nss));
-        return true;
-    }
-};
-
-MONGO_REGISTER_COMMAND(EmptyCapped).testOnly().forShard();
-
 class DurableHistoryReplicatedTestCmd : public BasicCommand {
 public:
     DurableHistoryReplicatedTestCmd() : BasicCommand("pinHistoryReplicated") {}

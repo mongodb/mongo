@@ -57,8 +57,6 @@ selector:
     - requires_profiling
     # capped collections are banned in Serverless
     - requires_capped
-    # emptycapped command is blocked during tenant migration.
-    - requires_emptycapped
     - tenant_migration_incompatible
     ##
     # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js

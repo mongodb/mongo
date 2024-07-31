@@ -5,7 +5,6 @@
 //   assumes_unsharded_collection,
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
-//   requires_emptycapped,
 //   requires_fastcount,
 //   requires_getmore,
 //   requires_non_retryable_commands,
@@ -410,10 +409,7 @@ let viewsCommandTests = {
     dropSearchIndex: {skip: isUnrelated},
     dropUser: {skip: isUnrelated},
     echo: {skip: isUnrelated},
-    emptycapped: {
-        command: {emptycapped: "view"},
-        expectFailure: true,
-    },
+    emptycapped: {skip: "removed"},  // TODO (SERVER-92950): Remove this case.
     enableSharding: {skip: "Tested as part of shardCollection"},
     endSessions: {skip: isUnrelated},
     explain: {command: {explain: {count: "view"}}},

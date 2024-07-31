@@ -234,8 +234,6 @@ selector:
     - requires_profiling
     # capped collections are banned in Serverless
     - requires_capped
-    # emptycapped command is blocked during tenant migration.
-    - requires_emptycapped
     - tenant_migration_incompatible
     # "Cowardly refusing to override read concern of command: ..."
     - assumes_read_concern_unchanged

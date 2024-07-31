@@ -489,10 +489,6 @@ public:
                                     const BSONObj& storageMetadata,
                                     bool isDryRun) = 0;
 
-    virtual void onEmptyCapped(OperationContext* opCtx,
-                               const NamespaceString& collectionName,
-                               const UUID& uuid) = 0;
-
     /**
      * The onTransaction Start method is called at the beginning of a multi-document transaction.
      * It must not be called when the transaction is already in progress.

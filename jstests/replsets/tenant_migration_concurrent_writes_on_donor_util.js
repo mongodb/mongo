@@ -503,7 +503,6 @@ export const TenantMigrationConcurrentWriteUtil = {
         dropRole: {skip: isAuthCommand},
         dropUser: {skip: isAuthCommand},
         echo: {skip: isNotRunOnUserDatabase},
-        emptycapped: {skip: isNotSupportedInServerless},
         endSessions: {skip: isNotRunOnUserDatabase},
         explain: {skip: isNotRunOnUserDatabase},
         features: {skip: isNotRunOnUserDatabase},

@@ -7,7 +7,6 @@ export const testOnlyCommands = [
     'sleep',
     'cpuload',
     'captrunc',
-    'emptycapped',
     'sysprofile',
     '_dropConnectionsToMongot',
     '_mongotConnPoolStats'

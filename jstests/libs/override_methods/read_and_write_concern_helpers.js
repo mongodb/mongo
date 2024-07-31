@@ -68,7 +68,6 @@ export var kCommandsSupportingWriteConcern = new Set([
     "dropIndexes",
     "dropRole",
     "dropUser",
-    "emptycapped",
     "findAndModify",
     "findandmodify",
     "godinsert",

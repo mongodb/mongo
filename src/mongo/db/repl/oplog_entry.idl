@@ -87,7 +87,6 @@ enums:
             kCollMod: "collMod"
             kApplyOps: "applyOps"
             kDropDatabase: "dropDatabase"
-            kEmptyCapped: "emptycapped"
             kCreateIndexes: "createIndexes"
             kStartIndexBuild: "startIndexBuild"
             kCommitIndexBuild: "commitIndexBuild"

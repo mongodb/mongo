@@ -18,7 +18,6 @@ parameter for testing.
 Some often-used commands that are test-only:
 
 - [configureFailPoint][fail_point_cmd]
-- [emptyCapped][empty_capped_cmd]
 - [replSetTest][repl_set_test_cmd]
 - [sleep][sleep_cmd]
 

@@ -146,7 +146,6 @@ selector:
     - jstests/core/query/plan_cache/query_solution_hash.js # locking
     - jstests/core/sbe_plan_cache_autoparameterize_collscan.js # locking
     - jstests/core/slice1.js # $slice
-    - jstests/core/write/collection_truncate.js # emptycapped
     - jstests/core/write/find_and_modify/find_and_modify_server6865.js # $elemMatch
     # Time-series collections are views which don't support map-reduce
     - jstests/core/commands_namespace_parsing.js

@@ -79,6 +79,8 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/repl/oplog.h"
@@ -116,6 +118,15 @@ void insertOplogDocument(OperationContext* opCtx, Timestamp ts, StringData ns) {
         std::cout << "Failed to insert oplog document: " << status.toString() << std::endl;
     }
     wuow.commit();
+}
+
+void deleteAll(OperationContext& opCtx, const NamespaceString& ns) {
+    // Delete one-at-a-time because deleting all at once may used a batched delete which will fail
+    // upon encountering a document that does not contain an _id.
+    DBDirectClient client{&opCtx};
+    while (client.count(ns)) {
+        write_ops::checkWriteErrors(client.remove({ns, {{{}, false}}}));
+    }
 }
 
 using std::endl;
@@ -777,11 +788,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            BSONObj info;
-            _client.runCommand(_nss.dbName(),
-                               BSON("emptycapped"
-                                    << "oplog.querytests.OplogScanWithGtTimstampPred"),
-                               info);
+            deleteAll(_opCtx, _nss);
         }
         const auto ns = _nss.ns_forTest();
         insertOplogDocument(&_opCtx, Timestamp(1000, 0), ns);
@@ -829,11 +836,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            BSONObj info;
-            _client.runCommand(_nss.dbName(),
-                               BSON("emptycapped"
-                                    << "oplog.querytests.OplogScanGtTsExplain"),
-                               info);
+            deleteAll(_opCtx, _nss);
         }
 
         const auto ns = _nss.ns_forTest();
@@ -1624,10 +1627,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            _client.runCommand(DatabaseName::kLocal,
-                               BSON("emptycapped"
-                                    << "oplog.querytests.findingstart"),
-                               info);
+            deleteAll(_opCtx, NamespaceString::createNamespaceString_forTest(ns()));
         }
 
         unsigned i = 0;
@@ -1694,10 +1694,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            _client.runCommand(DatabaseName::kLocal,
-                               BSON("emptycapped"
-                                    << "oplog.querytests.findingstart"),
-                               info);
+            deleteAll(_opCtx, NamespaceString::createNamespaceString_forTest(ns()));
         }
 
         unsigned i = 0;
@@ -1765,10 +1762,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            _client.runCommand(DatabaseName::kLocal,
-                               BSON("emptycapped"
-                                    << "oplog.querytests.findingstart"),
-                               info);
+            deleteAll(_opCtx, NamespaceString::createNamespaceString_forTest(ns()));
         }
 
         // Check oplog replay mode with empty collection.

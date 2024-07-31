@@ -1541,24 +1541,6 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
 }
 
-
-void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
-                                   const NamespaceString& collectionName,
-                                   const UUID& uuid) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
-        return;
-    }
-
-    MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-
-    oplogEntry.setTid(collectionName.tenantId());
-    oplogEntry.setNss(collectionName.getCommandNS());
-    oplogEntry.setUuid(uuid);
-    oplogEntry.setObject(BSON("emptycapped" << collectionName.coll()));
-    logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
-}
-
 namespace {
 
 

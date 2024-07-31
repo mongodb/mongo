@@ -224,17 +224,6 @@ void AuthOpObserver::onImportCollection(OperationContext* opCtx,
         ->logOp(opCtx, "m", nss, catalogEntry, &storageMetadata);
 }
 
-
-void AuthOpObserver::onEmptyCapped(OperationContext* opCtx,
-                                   const NamespaceString& collectionName,
-                                   const UUID& uuid) {
-    const auto cmdNss = collectionName.getCommandNS();
-    const auto cmdObj = BSON("emptycapped" << collectionName.coll());
-
-    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
-    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
-}
-
 void AuthOpObserver::onReplicationRollback(OperationContext* opCtx,
                                            const RollbackObserverInfo& rbInfo) {
     // Invalidate any in-memory auth data if necessary.

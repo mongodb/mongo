@@ -597,16 +597,6 @@ const allCommands = {
         shouldFail: false
     },
     echo: {command: {echo: 1}, shouldFail: false},
-    emptycapped: {
-        setUp: function(mongoS) {
-            assert.commandWorked(mongoS.getDB(dbName).runCommand({create: collName}));
-        },
-        command: {emptycapped: collName},
-        shouldFail: true,
-        teardown: function(mongoS) {
-            assert.commandWorked(mongoS.getDB(dbName).runCommand({drop: collName}));
-        },
-    },
     enableSharding: {
         skip: requiresMongoS,
     },

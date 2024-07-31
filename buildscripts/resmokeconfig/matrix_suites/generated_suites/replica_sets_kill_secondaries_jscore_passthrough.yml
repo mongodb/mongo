@@ -55,7 +55,6 @@ selector:
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - requires_profiling
-  - requires_emptycapped
   roots:
   - jstests/core/**/*.js
 test_kind: js_test
