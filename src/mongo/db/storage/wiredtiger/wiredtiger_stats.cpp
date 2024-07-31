@@ -29,7 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 
-#include "mongo/util/debug_util.h"
 #include <cstdint>
 #include <utility>
 
@@ -47,21 +46,6 @@
 namespace mongo {
 
 namespace {
-
-uint64_t getNextStat(WT_CURSOR* c, int32_t key_id) {
-
-    int32_t key;
-    invariant(c->next(c) == 0);
-    if (kDebugBuild) {
-        invariant(c->get_key(c, &key) == 0);
-        invariant(key == key_id);
-    }
-
-    uint64_t value;
-    fassert(51035, c->get_value(c, nullptr, nullptr, &value) == 0);
-
-    return WiredTigerUtil::castStatisticsValue<long long>(value);
-}
 
 void appendIfNonZero(StringData fieldName, int64_t value, BSONObjBuilder* builder) {
     if (value != 0) {
@@ -83,22 +67,48 @@ WiredTigerStats::WiredTigerStats(WT_SESSION* session) {
         c->close(c);
     }};
 
-
     // Get all the stats
-    // Take advantage of the fact that WT returns in fixed order to elide some function calls.
-    bytes_read = getNextStat(c, WT_STAT_SESSION_BYTES_READ);
-    bytes_write = getNextStat(c, WT_STAT_SESSION_BYTES_WRITE);
-    lock_dhandle_wait = getNextStat(c, WT_STAT_SESSION_LOCK_DHANDLE_WAIT);
-    txn_bytes_dirty = getNextStat(c, WT_STAT_SESSION_TXN_BYTES_DIRTY);
-    read_time = getNextStat(c, WT_STAT_SESSION_READ_TIME);
-    write_time = getNextStat(c, WT_STAT_SESSION_WRITE_TIME);
-    lock_schema_wait = getNextStat(c, WT_STAT_SESSION_LOCK_SCHEMA_WAIT);
-    cache_time = getNextStat(c, WT_STAT_SESSION_CACHE_TIME);
+    while (c->next(c) == 0) {
+        int32_t key;
+        invariant(c->get_key(c, &key) == 0);
 
+        uint64_t value;
+        fassert(51035, c->get_value(c, nullptr, nullptr, &value) == 0);
 
-    // Assert we have reached the end of the list of stats. If this assert triggers, it means WT
-    // added a new one.
-    dassert(c->next(c) != 0);
+        updateCounter(key, WiredTigerUtil::castStatisticsValue<long long>(value));
+    }
+}
+
+void WiredTigerStats::updateCounter(int32_t key_id, uint64_t value) {
+    switch (key_id) {
+        case WT_STAT_SESSION_BYTES_READ:
+            bytes_read = value;
+            break;
+        case WT_STAT_SESSION_BYTES_WRITE:
+            bytes_write = value;
+            break;
+        case WT_STAT_SESSION_LOCK_DHANDLE_WAIT:
+            lock_dhandle_wait = value;
+            break;
+        case WT_STAT_SESSION_TXN_BYTES_DIRTY:
+            txn_bytes_dirty = value;
+            break;
+        case WT_STAT_SESSION_READ_TIME:
+            read_time = value;
+            break;
+        case WT_STAT_SESSION_WRITE_TIME:
+            write_time = value;
+            break;
+        case WT_STAT_SESSION_LOCK_SCHEMA_WAIT:
+            lock_schema_wait = value;
+            break;
+        case WT_STAT_SESSION_CACHE_TIME:
+            cache_time = value;
+            break;
+        default:
+            // Ignore unknown counters that WT may add.
+            break;
+    }
 }
 
 BSONObj WiredTigerStats::toBSON() const {

@@ -65,7 +65,10 @@ public:
 
     WiredTigerStats& operator-=(const WiredTigerStats&);
 
-protected:
+private:
+    void updateCounter(int32_t key_id, uint64_t value);
+
+private:
     // See src/third_party/wiredtiger/src/include/stat.h
     // which is derived from src/third_party/wiredtiger/dist/stat_data.py
     int64_t bytes_read{0};
