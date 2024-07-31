@@ -55,9 +55,11 @@ jsTest.log("Testing replSetStepDown and replSetStepUp");
         st.rs0.awaitNodesAgreeOnPrimary();
         st.rs0.awaitSecondaryNodes();
     });
-    // {replSetStepDown: 0} defaults to 60 seconds rather than 0, so specify 1 here and unfreeze the
-    // node later in the test if it will be stepped up to primary.
-    assert.commandWorked(secondaryConn.adminCommand({replSetStepDown: 1, force: true}));
+    assert.soonNoExcept(() => {
+        // {replSetStepDown: 0} defaults to 60 seconds rather than 0, so specify 1 here and unfreeze
+        // the node later in the test if it will be stepped up to primary.
+        return secondaryConn.adminCommand({replSetStepDown: 1, force: true}).ok;
+    }, `failed attempt to step down node ${secondaryConn.host}`);
     authutil.asCluster(st.rs0.nodes, "jstests/libs/key1", function() {
         st.rs0.awaitNodesAgreeOnPrimary();
         st.rs0.awaitSecondaryNodes();
