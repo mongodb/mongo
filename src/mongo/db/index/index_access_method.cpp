@@ -318,6 +318,13 @@ void AbstractIndexAccessMethod::removeOneKey(OperationContext* opCtx,
     try {
         _newInterface->unindex(opCtx, keyString, dupsAllowed);
     } catch (AssertionException& e) {
+        if (e.code() == ErrorCodes::DataCorruptionDetected) {
+            // DataCorruptionDetected errors are expected to have logged an error and added an entry
+            // to the health log with the stack trace at the location where the error was initially
+            // thrown. No need to do so again.
+            throw;
+        }
+
         NamespaceString ns = _indexCatalogEntry->getNSSFromCatalog(opCtx);
         LOGV2(20683,
               "Assertion failure: _unindex failed on: {namespace} for index: {indexName}. "
