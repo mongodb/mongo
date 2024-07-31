@@ -73,7 +73,7 @@ const gracefulIndexBuildFlag = FeatureFlagUtil.isEnabled(testDB, "IndexBuildGrac
 if (!gracefulIndexBuildFlag) {
     // We expect this to crash the secondary because this error is not recoverable
     assert.soon(function() {
-        return rawMongoProgramOutput().search(/Fatal assertion.*(51101|7329407|7329407)/) >= 0;
+        return rawMongoProgramOutput().search(/Fatal assertion.*(51101|7329403|7329407)/) >= 0;
     });
 } else {
     // Expect the secondary to crash. Depending on timing, this can be either because the secondary
