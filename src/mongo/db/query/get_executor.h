@@ -121,21 +121,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
     std::unique_ptr<executor::TaskExecutorCursor> metadataCursor);
 
 /**
- * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
- * to provide results for the distinct command.
- *
- * When 'strictDistinctOnly' is false, any resulting QuerySolution will limit the number of
- * documents that need to be examined to compute the results of a distinct command, but it may not
- * guarantee that there are no duplicate values for the distinct field.
- *
- * If the provided solution could be mutated successfully, returns true, otherwise returns
- * false.
- */
-bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
-                                  const std::string& field,
-                                  bool strictDistinctOnly);
-
-/**
  * Attempts to get a query solution that uses a DISTINCT_SCAN, intended for either a "distinct"
  * command or an aggregation pipeline that uses a $group stage with distinct-like semantics. If a
  * DISTINCT_SCAN cannot be created for the given arguments, returns

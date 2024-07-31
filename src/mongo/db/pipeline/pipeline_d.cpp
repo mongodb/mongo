@@ -1200,6 +1200,14 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
     if (sortPattern) {
         cq->resetSortPattern();
     }
+
+    // If the transition to a DISTINCT_SCAN failed for aggregation, we don't want to try it again
+    // for the find fallback, because if we failed to generate a distinct scan earlier, we don't
+    // want to try again, and instead should fall back to a different plan.
+    //
+    // TODO SERVER-92615: Remove this.
+    cq->resetDistinct();
+
     return StatusWith{std::move(cq)};
 }
 

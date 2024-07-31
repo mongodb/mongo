@@ -89,6 +89,11 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
         return false;
     }
 
+    // Distinct-like queries are not eligible for SBE yet.
+    if (cq->getDistinct()) {
+        return false;
+    }
+
     const auto* proj = cq->getProj();
     if (proj && (proj->requiresMatchDetails() || proj->containsElemMatch())) {
         return false;

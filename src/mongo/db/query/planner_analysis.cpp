@@ -62,6 +62,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_hint.h"
@@ -1443,6 +1444,20 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     QueryPlannerAnalysis::removeImpreciseInternalExprFilters(params, *solnRoot);
 
     soln->setRoot(std::move(solnRoot));
+
+    // Try to convert the query solution to have a DISTINCT_SCAN.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (feature_flags::gFeatureFlagShardFilteringDistinctScan
+            .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot) &&
+        query.getDistinct()) {
+        const bool strictDistinctOnly =
+            (params.mainCollectionInfo.options & QueryPlannerParams::STRICT_DISTINCT_ONLY);
+        turnIxscanIntoDistinctIxscan(soln.get(),
+                                     query.getDistinct()->getKey(),
+                                     strictDistinctOnly,
+                                     params.flipDistinctScanDirection);
+    }
+
     return soln;
 }
 

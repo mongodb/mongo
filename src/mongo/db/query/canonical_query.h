@@ -164,6 +164,10 @@ public:
         _sortPattern = boost::none;
     }
 
+    void resetDistinct() {
+        _distinct = boost::none;
+    }
+
     const boost::optional<CanonicalDistinct>& getDistinct() const {
         return _distinct;
     }

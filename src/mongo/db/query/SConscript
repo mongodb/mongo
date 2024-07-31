@@ -73,6 +73,7 @@ env.Library(
 env.Library(
     target="query_planner",
     source=[
+        "distinct_access.cpp",
         "expression_index_knobs_gen.cpp",
         "expression_index.cpp",
         "index_bounds_builder.cpp",
@@ -436,6 +437,7 @@ env.CppUnitTest(
         "query_planner_array_test.cpp",
         "query_planner_collation_test.cpp",
         "query_planner_columnar_test.cpp",
+        "query_planner_distinct_test.cpp",
         "query_planner_geo_test.cpp",
         "query_planner_hashed_index_test.cpp",
         "query_planner_index_test.cpp",

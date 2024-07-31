@@ -827,6 +827,53 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         return Status::OK();
+    } else if (StageType::STAGE_DISTINCT_SCAN == trueSoln->getType()) {
+        // {distinct: {key: <...>, indexPattern: <...>, direction: <...>}}
+        const DistinctNode* node = static_cast<const DistinctNode*>(trueSoln);
+        BSONElement el = testSoln["distinct"];
+        if (el.eoo() || !el.isABSONObj()) {
+            return {ErrorCodes::Error{9261601},
+                    "found a distinct stage in the solution but no "
+                    "corresponding 'distinct' object in the provided JSON"};
+        }
+
+        BSONObj distinctObj = el.Obj();
+
+        BSONElement key = distinctObj["key"];
+        if (!key.eoo()) {
+            std::vector<BSONElement> fields;
+            node->index.keyPattern.elems(fields);
+            if (node->fieldNo < 0 || static_cast<size_t>(node->fieldNo) >= fields.size() ||
+                key.String() != fields[node->fieldNo].fieldNameStringData()) {
+                return {ErrorCodes::Error{9261602},
+                        str::stream()
+                            << "Provided JSON gave a 'distinct' stage with a different 'key' field"
+                            << key};
+            }
+        }
+
+        BSONElement indexPattern = distinctObj["indexPattern"];
+        if (!indexPattern.eoo()) {
+            if (!SimpleBSONObjComparator::kInstance.evaluate(indexPattern.Obj() ==
+                                                             node->index.keyPattern)) {
+                return {ErrorCodes::Error{9261603},
+                        str::stream() << "Provided JSON gave a 'distinct' stage with a different "
+                                         "'indexPattern' field"
+                                      << indexPattern};
+            }
+        }
+
+        BSONElement direction = distinctObj["direction"];
+        if (!direction.eoo()) {
+            if (direction.String() != std::to_string(node->direction)) {
+                return {ErrorCodes::Error{9261604},
+                        str::stream() << "Provided JSON gave a 'distinct' stage with a different "
+                                         "'direction' field"
+                                      << direction};
+            }
+        }
+
+        return Status::OK();
     }
 
     //
