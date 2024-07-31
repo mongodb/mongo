@@ -649,7 +649,7 @@ connection_runtime_config = [
                 current eviction load''',
                 min=1, max=20),
             Config('evict_sample_inmem', 'true', r'''
-                If no in-memory ref is found on the root page, attempt to locate a random 
+                If no in-memory ref is found on the root page, attempt to locate a random
                 in-memory page by examining all entries on the root page.''',
                 type='boolean'),
             ]),
@@ -853,7 +853,7 @@ connection_runtime_config = [
         'checkpoint_handle', 'checkpoint_slow', 'checkpoint_stop', 'commit_transaction_slow',
         'compact_slow', 'evict_reposition', 'failpoint_eviction_split',
         'failpoint_history_store_delete_key_from_ts', 'history_store_checkpoint_delay',
-        'history_store_search', 'history_store_sweep_race', 'prefetch_1', 'prefetch_2', 
+        'history_store_search', 'history_store_sweep_race', 'prefetch_1', 'prefetch_2',
         'prefetch_3', 'prefix_compare', 'prepare_checkpoint_delay', 'prepare_resolution_1',
         'prepare_resolution_2', 'sleep_before_read_overflow_onpage','split_1', 'split_2',
         'split_3', 'split_4', 'split_5', 'split_6', 'split_7', 'split_8','tiered_flush_finish']),
@@ -1714,7 +1714,7 @@ methods = {
 'WT_SESSION.verify' : Method([
     Config('do_not_clear_txn_id', 'false', r'''
         Turn off transaction id clearing, intended for debugging and better diagnosis of crashes
-        or failures. Note: History store validation is disabled when the configuration is set as 
+        or failures. Note: History store validation is disabled when the configuration is set as
         visibility rules may not work correctly because the transaction ids are not cleared.''',
         type='boolean'),
     Config('dump_address', 'false', r'''
@@ -1737,6 +1737,10 @@ methods = {
         type='boolean'),
     Config('dump_layout', 'false', r'''
         Display the layout of the files as they are verified, using the application's message
+        handler, intended for debugging; requires optional support from the block manager''',
+        type='boolean'),
+    Config('dump_tree_shape', 'false', r'''
+        Display the btree shapes as they are verified, using the application's message
         handler, intended for debugging; requires optional support from the block manager''',
         type='boolean'),
     Config('dump_offsets', '', r'''

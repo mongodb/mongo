@@ -26,7 +26,8 @@ usage(void)
       "-?", "show this message", NULL, NULL};
 
     util_usage(
-      "verify [-ackSstu] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# "
+      "verify [-ackSstu] [-d dump_address | dump_blocks | dump_layout | dump_tree_shape | "
+      "dump_offsets=#,# "
       "| dump_pages] [uri]",
       "options:", options);
 
@@ -64,10 +65,11 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
     int ch;
     char *config, *dump_offsets, *key, *uri;
     bool abort_on_error, do_not_clear_txn_id, dump_address, dump_all_data, dump_key_data,
-      dump_blocks, dump_layout, dump_pages, read_corrupt, stable_timestamp, strict;
+      dump_blocks, dump_layout, dump_tree_shape, dump_pages, read_corrupt, stable_timestamp, strict;
 
     abort_on_error = do_not_clear_txn_id = dump_address = dump_all_data = dump_key_data =
-      dump_blocks = dump_layout = dump_pages = read_corrupt = stable_timestamp = strict = false;
+      dump_blocks = dump_layout = dump_tree_shape = dump_pages = read_corrupt = stable_timestamp =
+        strict = false;
     config = dump_offsets = uri = NULL;
 
     while ((ch = __wt_getopt(progname, argc, argv, "acd:kSstu?")) != EOF)
@@ -85,6 +87,8 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
                 dump_blocks = true;
             else if (strcmp(__wt_optarg, "dump_layout") == 0)
                 dump_layout = true;
+            else if (strcmp(__wt_optarg, "dump_tree_shape") == 0)
+                dump_tree_shape = true;
             else if (WT_PREFIX_MATCH(__wt_optarg, "dump_offsets=")) {
                 if (dump_offsets != NULL) {
                     fprintf(
@@ -128,22 +132,23 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
     argv += __wt_optind;
 
     if (do_not_clear_txn_id || dump_address || dump_all_data || dump_blocks || dump_key_data ||
-      dump_layout || dump_offsets != NULL || dump_pages || read_corrupt || stable_timestamp ||
-      strict) {
+      dump_layout || dump_tree_shape || dump_offsets != NULL || dump_pages || read_corrupt ||
+      stable_timestamp || strict) {
         size = strlen("do_not_clear_txn_id,") + strlen("dump_address,") + strlen("dump_all_data,") +
           strlen("dump_blocks,") + strlen("dump_key_data,") + strlen("dump_layout,") +
-          strlen("dump_pages,") + strlen("dump_offsets[],") +
+          strlen("dump_tree_shape,") + strlen("dump_pages,") + strlen("dump_offsets[],") +
           (dump_offsets == NULL ? 0 : strlen(dump_offsets)) + strlen("history_store") +
           strlen("read_corrupt,") + strlen("stable_timestamp,") + strlen("strict") + 20;
         if ((config = util_malloc(size)) == NULL) {
             ret = util_err(session, errno, NULL);
             goto err;
         }
-        if ((ret = __wt_snprintf(config, size, "%s%s%s%s%s%s%s%s%s%s%s%s%s",
+        if ((ret = __wt_snprintf(config, size, "%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
                do_not_clear_txn_id ? "do_not_clear_txn_id," : "",
                dump_address ? "dump_address," : "", dump_all_data ? "dump_all_data," : "",
                dump_blocks ? "dump_blocks," : "", dump_key_data ? "dump_key_data," : "",
-               dump_layout ? "dump_layout," : "", dump_offsets != NULL ? "dump_offsets=[" : "",
+               dump_layout ? "dump_layout," : "", dump_tree_shape ? "dump_tree_shape," : "",
+               dump_offsets != NULL ? "dump_offsets=[" : "",
                dump_offsets != NULL ? dump_offsets : "", dump_offsets != NULL ? "]," : "",
                dump_pages ? "dump_pages," : "", read_corrupt ? "read_corrupt," : "",
                stable_timestamp ? "stable_timestamp," : "", strict ? "strict," : "")) != 0) {

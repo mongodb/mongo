@@ -40,6 +40,10 @@ __wt_block_verify_start(
     WT_RET(__wt_config_gets(session, cfg, "dump_layout", &cval));
     block->verify_layout = cval.val != 0;
 
+    /* Configuration: dump the file's layout. */
+    WT_RET(__wt_config_gets(session, cfg, "dump_tree_shape", &cval));
+    block->dump_tree_shape = cval.val != 0;
+
     /*
      * Find the last checkpoint in the list: if there are none, or the only checkpoint we have is
      * fake, there's no work to do. Don't complain, that's not our problem to solve.

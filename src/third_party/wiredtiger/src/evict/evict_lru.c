@@ -1820,42 +1820,22 @@ __evict_skip_dirty_candidate(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __evict_walk_tree --
- *     Get a few page eviction candidates from a single underlying file.
+ * __evict_get_target_pages --
+ *     Calculate the target pages to add to the queue.
  */
-static int
-__evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_entries, u_int *slotp)
+static WT_INLINE uint32_t
+__evict_get_target_pages(WT_SESSION_IMPL *session, u_int max_entries, uint32_t slot)
 {
     WT_BTREE *btree;
-    WT_CACHE *cache;
-    WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
-    WT_EVICT_ENTRY *end, *evict, *start;
-    WT_PAGE *last_parent, *page;
-    WT_REF *ref;
-    WT_TXN *txn;
-    uint64_t internal_pages_already_queued, internal_pages_queued, internal_pages_seen;
-    uint64_t min_pages, pages_already_queued, pages_queued, pages_seen, refs_walked;
-    uint32_t evict_walk_period, read_flags, remaining_slots, target_pages, walk_flags;
-    int restarts;
-    bool give_up, modified, urgent_queued, want_page;
+    uint32_t remaining_slots, target_pages;
 
-    conn = S2C(session);
     btree = S2BT(session);
-    cache = conn->cache;
-    last_parent = NULL;
-    restarts = 0;
-    give_up = urgent_queued = false;
-    txn = session->txn;
-
-    WT_ASSERT_SPINLOCK_OWNED(session, &cache->evict_walk_lock);
 
     /*
      * Figure out how many slots to fill from this tree. Note that some care is taken in the
      * calculation to avoid overflow.
      */
-    start = queue->evict_queue + *slotp;
-    remaining_slots = max_entries - *slotp;
+    remaining_slots = max_entries - slot;
 
     /*
      * For this handle, calculate the number of target pages to evict. If the number of target pages
@@ -1888,34 +1868,46 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
         }
     }
 
-    /* If we don't want any pages from this tree, move on. */
-    if (target_pages == 0)
-        return (0);
-
-    /*
-     * These statistics generate a histogram of the number of pages targeted for eviction each
-     * round. The range of values here start at MIN_PAGES_PER_TREE as this is the smallest number of
-     * pages we can target, unless there are fewer slots available. The aim is to cover the likely
-     * ranges of target pages in as few statistics as possible to reduce the overall overhead.
-     */
-    if (target_pages < MIN_PAGES_PER_TREE) {
-        WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt10);
-        WT_STAT_DSRC_INCR(session, cache_eviction_target_page_lt10);
-    } else if (target_pages < 32) {
-        WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt32);
-        WT_STAT_DSRC_INCR(session, cache_eviction_target_page_lt32);
-    } else if (target_pages < 64) {
-        WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt64);
-        WT_STAT_DSRC_INCR(session, cache_eviction_target_page_lt64);
-    } else if (target_pages < 128) {
-        WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt128);
-        WT_STAT_DSRC_INCR(session, cache_eviction_target_page_lt128);
-    } else {
-        WT_STAT_CONN_INCR(session, cache_eviction_target_page_ge128);
-        WT_STAT_DSRC_INCR(session, cache_eviction_target_page_ge128);
+    if (target_pages != 0) {
+        /*
+         * These statistics generate a histogram of the number of pages targeted for eviction each
+         * round. The range of values here start at MIN_PAGES_PER_TREE as this is the smallest
+         * number of pages we can target, unless there are fewer slots available. The aim is to
+         * cover the likely ranges of target pages in as few statistics as possible to reduce the
+         * overall overhead.
+         */
+        if (target_pages < MIN_PAGES_PER_TREE) {
+            WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt10);
+            WT_STAT_DSRC_INCR(session, cache_eviction_target_page_lt10);
+        } else if (target_pages < 32) {
+            WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt32);
+            WT_STAT_DSRC_INCR(session, cache_eviction_target_page_lt32);
+        } else if (target_pages < 64) {
+            WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt64);
+            WT_STAT_DSRC_INCR(session, cache_eviction_target_page_lt64);
+        } else if (target_pages < 128) {
+            WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt128);
+            WT_STAT_DSRC_INCR(session, cache_eviction_target_page_lt128);
+        } else {
+            WT_STAT_CONN_INCR(session, cache_eviction_target_page_ge128);
+            WT_STAT_DSRC_INCR(session, cache_eviction_target_page_ge128);
+        }
     }
 
-    end = start + target_pages;
+    return (target_pages);
+}
+
+/*
+ * __evict_get_min_pages --
+ *     Calculate the minimum pages to visit.
+ */
+static WT_INLINE uint64_t
+__evict_get_min_pages(WT_SESSION_IMPL *session, uint32_t target_pages)
+{
+    WT_CACHE *cache;
+    uint64_t min_pages;
+
+    cache = S2C(session)->cache;
 
     /*
      * Examine at least a reasonable number of pages before deciding whether to give up. When we are
@@ -1930,6 +1922,22 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
     } else
         WT_STAT_CONN_INCR(session, cache_eviction_target_strategy_both_clean_and_dirty);
 
+    return (min_pages);
+}
+
+/*
+ * __evict_walk_prepare --
+ *     Choose the walk direction and descend to the initial walk point.
+ */
+static WT_INLINE int
+__evict_walk_prepare(WT_SESSION_IMPL *session, uint32_t *walk_flagsp)
+{
+    WT_BTREE *btree;
+    WT_DECL_RET;
+    uint32_t read_flags;
+
+    btree = S2BT(session);
+
     if (btree->evict_ref == NULL) {
         WT_STAT_CONN_INCR(session, cache_eviction_walk_from_root);
         WT_STAT_DSRC_INCR(session, cache_eviction_walk_from_root);
@@ -1938,9 +1946,9 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
         WT_STAT_DSRC_INCR(session, cache_eviction_walk_saved_pos);
     }
 
-    walk_flags = WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
+    *walk_flagsp = WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
     if (!F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
-        walk_flags |= WT_READ_VISIBLE_ALL;
+        FLD_SET(*walk_flagsp, WT_READ_VISIBLE_ALL);
 
     /*
      * Choose a random point in the tree if looking for candidates in a tree with no starting point
@@ -1957,11 +1965,11 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
         /* Each time when evict_ref is null, alternate between linear and random walk */
         if (btree->evict_ref == NULL && (++btree->linear_walk_restarts) & 1)
             goto rand_prev;
-        FLD_SET(walk_flags, WT_READ_PREV);
+        FLD_SET(*walk_flagsp, WT_READ_PREV);
         break;
     case WT_EVICT_WALK_RAND_PREV:
 rand_prev:
-        FLD_SET(walk_flags, WT_READ_PREV);
+        FLD_SET(*walk_flagsp, WT_READ_PREV);
     /* FALLTHROUGH */
     case WT_EVICT_WALK_RAND_NEXT:
 rand_next:
@@ -1986,6 +1994,230 @@ rand_next:
         }
         break;
     }
+
+    return (ret);
+}
+
+/*
+ * __evict_should_give_up_walk --
+ *     Check if we should give up on the current walk.
+ */
+static WT_INLINE bool
+__evict_should_give_up_walk(WT_SESSION_IMPL *session, uint64_t pages_seen, uint64_t pages_queued,
+  uint64_t min_pages, uint32_t target_pages)
+{
+    WT_BTREE *btree;
+    bool give_up;
+
+    btree = S2BT(session);
+
+    /*
+     * Check whether we're finding a good ratio of candidates vs pages seen. Some workloads create
+     * "deserts" in trees where no good eviction candidates can be found. Abandon the walk if we get
+     * into that situation.
+     */
+    give_up = !__wt_cache_aggressive(session) && !WT_IS_HS(btree->dhandle) &&
+      pages_seen > min_pages &&
+      (pages_queued == 0 || (pages_seen / pages_queued) > (min_pages / target_pages));
+    if (give_up) {
+        /*
+         * Try a different walk start point next time if a walk gave up.
+         */
+        switch (btree->evict_start_type) {
+        case WT_EVICT_WALK_NEXT:
+            btree->evict_start_type = WT_EVICT_WALK_PREV;
+            break;
+        case WT_EVICT_WALK_PREV:
+            btree->evict_start_type = WT_EVICT_WALK_RAND_PREV;
+            break;
+        case WT_EVICT_WALK_RAND_PREV:
+            btree->evict_start_type = WT_EVICT_WALK_RAND_NEXT;
+            break;
+        case WT_EVICT_WALK_RAND_NEXT:
+            btree->evict_start_type = WT_EVICT_WALK_NEXT;
+            break;
+        }
+
+        /*
+         * We differentiate the reasons we gave up on this walk and increment the stats accordingly.
+         */
+        if (pages_queued == 0) {
+            WT_STAT_CONN_INCR(session, cache_eviction_walks_gave_up_no_targets);
+            WT_STAT_DSRC_INCR(session, cache_eviction_walks_gave_up_no_targets);
+        } else {
+            WT_STAT_CONN_INCR(session, cache_eviction_walks_gave_up_ratio);
+            WT_STAT_DSRC_INCR(session, cache_eviction_walks_gave_up_ratio);
+        }
+    }
+
+    return (give_up);
+}
+
+/*
+ * __evict_try_queue_page --
+ *     Check if we should queue the page for eviction. Queue it to the urgent queue or the regular
+ *     queue.
+ */
+static WT_INLINE void
+__evict_try_queue_page(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, WT_REF *ref,
+  WT_PAGE *last_parent, WT_EVICT_ENTRY *evict, bool *urgent_queuedp, bool *queuedp)
+{
+    WT_BTREE *btree;
+    WT_CACHE *cache;
+    WT_CONNECTION_IMPL *conn;
+    WT_PAGE *page;
+    bool modified, want_page;
+
+    btree = S2BT(session);
+    conn = S2C(session);
+    cache = conn->cache;
+    page = ref->page;
+    modified = __wt_page_is_modified(page);
+    *queuedp = false;
+
+    /* Don't queue dirty pages in trees during checkpoints. */
+    if (modified && WT_BTREE_SYNCING(btree)) {
+        WT_STAT_CONN_INCR(session, cache_eviction_server_skip_dirty_pages_during_checkpoint);
+        return;
+    }
+
+    /*
+     * It's possible (but unlikely) to visit a page without a read generation, if we race with the
+     * read instantiating the page. Set the page's read generation here to ensure a bug doesn't
+     * somehow leave a page without a read generation.
+     */
+    if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_NOTSET)
+        __wt_cache_read_gen_new(session, page);
+
+    /* Pages being forcibly evicted go on the urgent queue. */
+    if (modified &&
+      (__wt_atomic_load64(&page->read_gen) == WT_READGEN_OLDEST ||
+        __wt_atomic_loadsize(&page->memory_footprint) >= btree->splitmempage)) {
+        WT_STAT_CONN_INCR(session, cache_eviction_pages_queued_oldest);
+        if (__wt_page_evict_urgent(session, ref))
+            *urgent_queuedp = true;
+        return;
+    }
+
+    /*
+     * If history store dirty content is dominating the cache, we want to prioritize evicting
+     * history store pages over other btree pages. This helps in keeping cache contents below the
+     * configured cache size during checkpoints where reconciling non-HS pages can generate a
+     * significant amount of HS dirty content very quickly.
+     */
+    if (WT_IS_HS(btree->dhandle) && __wt_cache_hs_dirty(session)) {
+        WT_STAT_CONN_INCR(session, cache_eviction_pages_queued_urgent_hs_dirty);
+        if (__wt_page_evict_urgent(session, ref))
+            *urgent_queuedp = true;
+        return;
+    }
+
+    /* Pages that are empty or from dead trees are fast-tracked. */
+    if (__wt_page_is_empty(page) || F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
+        goto fast;
+
+    /* Skip pages we don't want. */
+    want_page = (F_ISSET(cache, WT_CACHE_EVICT_CLEAN) && !modified) ||
+      (F_ISSET(cache, WT_CACHE_EVICT_DIRTY) && modified) ||
+      (F_ISSET(cache, WT_CACHE_EVICT_UPDATES) && page->modify != NULL);
+    if (!want_page) {
+        WT_STAT_CONN_INCR(session, cache_eviction_server_skip_unwanted_pages);
+        return;
+    }
+
+    /*
+     * Do not evict a clean metadata page that contains historical data needed to satisfy a reader.
+     * Since there is no history store for metadata, we won't be able to serve an older reader if we
+     * evict this page.
+     */
+    if (WT_IS_METADATA(session->dhandle) && F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD) &&
+      F_ISSET(ref, WT_REF_FLAG_LEAF) && !modified && page->modify != NULL &&
+      !__wt_txn_visible_all(session, page->modify->rec_max_txn, page->modify->rec_max_timestamp)) {
+        WT_STAT_CONN_INCR(session, cache_eviction_server_skip_metatdata_with_history);
+        return;
+    }
+
+    /*
+     * Don't attempt eviction of internal pages with children in cache (indicated by seeing an
+     * internal page that is the parent of the last page we saw).
+     *
+     * Also skip internal page unless we get aggressive, the tree is idle (indicated by the tree
+     * being skipped for walks), or we are in eviction debug mode. The goal here is that if trees
+     * become completely idle, we eventually push them out of cache completely.
+     */
+    if (!FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE) &&
+      F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
+        if (page == last_parent) {
+            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_intl_page_with_active_child);
+            return;
+        }
+        if (__wt_atomic_load32(&btree->evict_walk_period) == 0 && !__wt_cache_aggressive(session))
+            return;
+    }
+
+    /* Evaluate dirty page candidacy, when eviction is not aggressive. */
+    if (!__wt_cache_aggressive(session) && modified && __evict_skip_dirty_candidate(session, page))
+        return;
+
+fast:
+    /* If the page can't be evicted, give up. */
+    if (!__wt_page_can_evict(session, ref, NULL))
+        return;
+
+    WT_ASSERT(session, evict->ref == NULL);
+    if (!__evict_push_candidate(session, queue, evict, ref))
+        return;
+
+    *queuedp = true;
+    __wt_verbose(session, WT_VERB_EVICTSERVER, "walk select: %p, size %" WT_SIZET_FMT, (void *)page,
+      __wt_atomic_loadsize(&page->memory_footprint));
+
+    return;
+}
+
+/*
+ * __evict_walk_tree --
+ *     Get a few page eviction candidates from a single underlying file.
+ */
+static int
+__evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_entries, u_int *slotp)
+{
+    WT_BTREE *btree;
+    WT_CACHE *cache;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    WT_EVICT_ENTRY *end, *evict, *start;
+    WT_PAGE *last_parent, *page;
+    WT_REF *ref;
+    WT_TXN *txn;
+    uint64_t internal_pages_already_queued, internal_pages_queued, internal_pages_seen;
+    uint64_t min_pages, pages_already_queued, pages_queued, pages_seen, refs_walked;
+    uint32_t evict_walk_period, target_pages, walk_flags;
+    int restarts;
+    bool give_up, queued, urgent_queued;
+
+    conn = S2C(session);
+    btree = S2BT(session);
+    cache = conn->cache;
+    last_parent = NULL;
+    restarts = 0;
+    give_up = urgent_queued = false;
+    txn = session->txn;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &cache->evict_walk_lock);
+
+    start = queue->evict_queue + *slotp;
+    target_pages = __evict_get_target_pages(session, max_entries, *slotp);
+
+    /* If we don't want any pages from this tree, move on. */
+    if (target_pages == 0)
+        return (0);
+
+    end = start + target_pages;
+
+    min_pages = __evict_get_min_pages(session, target_pages);
+
+    WT_RET_NOTFOUND_OK(__evict_walk_prepare(session, &walk_flags));
 
     /*
      * Get some more eviction candidate pages, starting at the last saved point. Clear the saved
@@ -2018,46 +2250,8 @@ rand_next:
          evict < end && (ret == 0 || ret == WT_NOTFOUND);
          last_parent = ref == NULL ? NULL : ref->home,
         ret = __wt_tree_walk_count(session, &ref, &refs_walked, walk_flags)) {
-        /*
-         * Check whether we're finding a good ratio of candidates vs pages seen. Some workloads
-         * create "deserts" in trees where no good eviction candidates can be found. Abandon the
-         * walk if we get into that situation.
-         */
-        give_up = !__wt_cache_aggressive(session) && !WT_IS_HS(btree->dhandle) &&
-          pages_seen > min_pages &&
-          (pages_queued == 0 || (pages_seen / pages_queued) > (min_pages / target_pages));
-        if (give_up) {
-            /*
-             * Try a different walk start point next time if a walk gave up.
-             */
-            switch (btree->evict_start_type) {
-            case WT_EVICT_WALK_NEXT:
-                btree->evict_start_type = WT_EVICT_WALK_PREV;
-                break;
-            case WT_EVICT_WALK_PREV:
-                btree->evict_start_type = WT_EVICT_WALK_RAND_PREV;
-                break;
-            case WT_EVICT_WALK_RAND_PREV:
-                btree->evict_start_type = WT_EVICT_WALK_RAND_NEXT;
-                break;
-            case WT_EVICT_WALK_RAND_NEXT:
-                btree->evict_start_type = WT_EVICT_WALK_NEXT;
-                break;
-            }
-
-            /*
-             * We differentiate the reasons we gave up on this walk and increment the stats
-             * accordingly.
-             */
-            if (pages_queued == 0) {
-                WT_STAT_CONN_INCR(session, cache_eviction_walks_gave_up_no_targets);
-                WT_STAT_DSRC_INCR(session, cache_eviction_walks_gave_up_no_targets);
-            } else {
-                WT_STAT_CONN_INCR(session, cache_eviction_walks_gave_up_ratio);
-                WT_STAT_DSRC_INCR(session, cache_eviction_walks_gave_up_ratio);
-            }
+        if (__evict_should_give_up_walk(session, pages_seen, pages_queued, min_pages, target_pages))
             break;
-        }
 
         if (ref == NULL) {
             WT_STAT_CONN_INCR(session, cache_eviction_walks_ended);
@@ -2079,7 +2273,6 @@ rand_next:
             continue;
 
         page = ref->page;
-        modified = __wt_page_is_modified(page);
         page->evict_pass_gen = __wt_atomic_load64(&cache->evict_pass_gen);
 
         /* Count internal pages seen. */
@@ -2094,113 +2287,17 @@ rand_next:
             continue;
         }
 
-        /* Don't queue dirty pages in trees during checkpoints. */
-        if (modified && WT_BTREE_SYNCING(btree)) {
-            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_dirty_pages_during_checkpoint);
-            continue;
+        __evict_try_queue_page(session, queue, ref, last_parent, evict, &urgent_queued, &queued);
+
+        if (queued) {
+            ++evict;
+            ++pages_queued;
+            ++btree->evict_walk_progress;
+
+            /* Count internal pages queued. */
+            if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+                internal_pages_queued++;
         }
-
-        /*
-         * It's possible (but unlikely) to visit a page without a read generation, if we race with
-         * the read instantiating the page. Set the page's read generation here to ensure a bug
-         * doesn't somehow leave a page without a read generation.
-         */
-        if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_NOTSET)
-            __wt_cache_read_gen_new(session, page);
-
-        /* Pages being forcibly evicted go on the urgent queue. */
-        if (modified &&
-          (__wt_atomic_load64(&page->read_gen) == WT_READGEN_OLDEST ||
-            __wt_atomic_loadsize(&page->memory_footprint) >= btree->splitmempage)) {
-            WT_STAT_CONN_INCR(session, cache_eviction_pages_queued_oldest);
-            if (__wt_page_evict_urgent(session, ref))
-                urgent_queued = true;
-            continue;
-        }
-
-        /*
-         * If history store dirty content is dominating the cache, we want to prioritize evicting
-         * history store pages over other btree pages. This helps in keeping cache contents below
-         * the configured cache size during checkpoints where reconciling non-HS pages can generate
-         * significant amount of HS dirty content very quickly.
-         */
-        if (WT_IS_HS(btree->dhandle) && __wt_cache_hs_dirty(session)) {
-            WT_STAT_CONN_INCR(session, cache_eviction_pages_queued_urgent_hs_dirty);
-            if (__wt_page_evict_urgent(session, ref))
-                urgent_queued = true;
-            continue;
-        }
-
-        /* Pages that are empty or from dead trees are fast-tracked. */
-        if (__wt_page_is_empty(page) || F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
-            goto fast;
-
-        /*
-         * Do not evict a clean metadata page that contains historical data needed to satisfy a
-         * reader. Since there is no history store for metadata, we won't be able to serve an older
-         * reader if we evict this page.
-         */
-        if (WT_IS_METADATA(session->dhandle) && F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD) &&
-          F_ISSET(ref, WT_REF_FLAG_LEAF) && !modified && page->modify != NULL &&
-          !__wt_txn_visible_all(
-            session, page->modify->rec_max_txn, page->modify->rec_max_timestamp)) {
-            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_metatdata_with_history);
-            continue;
-        }
-
-        /* Skip pages we don't want. */
-        want_page = (F_ISSET(cache, WT_CACHE_EVICT_CLEAN) && !modified) ||
-          (F_ISSET(cache, WT_CACHE_EVICT_DIRTY) && modified) ||
-          (F_ISSET(cache, WT_CACHE_EVICT_UPDATES) && page->modify != NULL);
-        if (!want_page) {
-            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_unwanted_pages);
-            continue;
-        }
-
-        /*
-         * Don't attempt eviction of internal pages with children in cache (indicated by seeing an
-         * internal page that is the parent of the last page we saw).
-         *
-         * Also skip internal page unless we get aggressive, the tree is idle (indicated by the tree
-         * being skipped for walks), or we are in eviction debug mode. The goal here is that if
-         * trees become completely idle, we eventually push them out of cache completely.
-         */
-        if (!FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE) &&
-          F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
-            if (page == last_parent) {
-                WT_STAT_CONN_INCR(session, cache_eviction_server_skip_intl_page_with_active_child);
-                continue;
-            }
-            if (__wt_atomic_load32(&btree->evict_walk_period) == 0 &&
-              !__wt_cache_aggressive(session))
-                continue;
-        }
-
-        /* If eviction gets aggressive, anything else is fair game. */
-        if (__wt_cache_aggressive(session))
-            goto fast;
-
-        if (modified && __evict_skip_dirty_candidate(session, page))
-            continue;
-
-fast:
-        /* If the page can't be evicted, give up. */
-        if (!__wt_page_can_evict(session, ref, NULL))
-            continue;
-
-        WT_ASSERT(session, evict->ref == NULL);
-        if (!__evict_push_candidate(session, queue, evict, ref))
-            continue;
-        ++evict;
-        ++pages_queued;
-        ++btree->evict_walk_progress;
-
-        /* Count internal pages queued. */
-        if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
-            internal_pages_queued++;
-
-        __wt_verbose(session, WT_VERB_EVICTSERVER, "walk select: %p, size %" WT_SIZET_FMT,
-          (void *)page, __wt_atomic_loadsize(&page->memory_footprint));
     }
     if (F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
         __wt_txn_release_snapshot(session);
@@ -2212,9 +2309,7 @@ fast:
     __wt_verbose_debug2(session, WT_VERB_EVICTSERVER, "%s walk: seen %" PRIu64 ", queued %" PRIu64,
       session->dhandle->name, pages_seen, pages_queued);
 
-    /*
-     * If we couldn't find the number of pages we were looking for, skip the tree next time.
-     */
+    /* If we couldn't find the number of pages we were looking for, skip the tree next time. */
     evict_walk_period = __wt_atomic_load32(&btree->evict_walk_period);
     if (pages_queued < target_pages / 2 && !urgent_queued)
         __wt_atomic_store32(

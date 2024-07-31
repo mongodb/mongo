@@ -4266,8 +4266,8 @@ tasks:
             # Set the cyclomatic complexity limit to 20
             python3 "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:20
 
-            # Fail if there are functions with cyclomatic complexity larger than 98
-            python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:98 > $t
+            # Fail if there are functions with cyclomatic complexity larger than 89
+            python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:89 > $t
             if grep -q 'exceeds' $t; then
                 echo "[ERROR]:complexity:cyclomatic: Complexity limit exceeded."
                 cat $t

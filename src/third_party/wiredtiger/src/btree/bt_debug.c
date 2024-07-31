@@ -396,7 +396,8 @@ err:
  *     Read and dump a disk page in debugging mode, using a file offset.
  */
 int
-__wti_debug_offset_blind(WT_SESSION_IMPL *session, wt_off_t offset, const char *ofile)
+__wti_debug_offset_blind(WT_SESSION_IMPL *session, wt_off_t offset, const char *ofile,
+  bool dump_all_data, bool dump_key_data)
 {
     uint32_t checksum, size;
 
@@ -407,7 +408,8 @@ __wti_debug_offset_blind(WT_SESSION_IMPL *session, wt_off_t offset, const char *
      * of a file offset, length, and checksum. This is for debugging only.
      */
     WT_RET(__wt_block_read_off_blind(session, S2BT(session)->bm->block, offset, &size, &checksum));
-    return (__wt_debug_offset(session, offset, size, checksum, ofile));
+    return (
+      __wt_debug_offset(session, offset, size, checksum, ofile, dump_all_data, dump_key_data));
 }
 
 /*
@@ -415,8 +417,8 @@ __wti_debug_offset_blind(WT_SESSION_IMPL *session, wt_off_t offset, const char *
  *     Read and dump a disk page in debugging mode, using a file offset/size/checksum triplet.
  */
 int
-__wt_debug_offset(
-  WT_SESSION_IMPL *session, wt_off_t offset, uint32_t size, uint32_t checksum, const char *ofile)
+__wt_debug_offset(WT_SESSION_IMPL *session, wt_off_t offset, uint32_t size, uint32_t checksum,
+  const char *ofile, bool dump_all_data, bool dump_key_data)
 {
     WT_BLOCK *block;
     WT_DECL_ITEM(buf);
@@ -443,7 +445,7 @@ __wt_debug_offset(
      */
     WT_RET(__wt_scr_alloc(session, 0, &buf));
     WT_ERR(__wt_blkcache_read(session, buf, addr, WT_PTRDIFF(endp, addr)));
-    ret = __wti_debug_disk(session, buf->mem, ofile, false, false);
+    ret = __wti_debug_disk(session, buf->mem, ofile, dump_all_data, dump_key_data);
 
 err:
     __wt_scr_free(session, &buf);
