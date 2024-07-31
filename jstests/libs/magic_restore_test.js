@@ -34,7 +34,24 @@ export class MagicRestoreUtils {
         this.backupId = undefined;
         this.checkpointTimestamp = undefined;
         this.pointInTimeTimestamp = undefined;
+        // When we perform a selective restore, we need to store a list of collections to restore to
+        // pass into the restore configuration.
         this.collectionsToRestore = [];
+
+        // Store dbhashes for each db and collection prior to restore. After magic restore
+        // completes, we compare the post-restore hashes with this object to check for consistency.
+        this.preRestoreDbHashes = {};
+        // Store the oplog entries after we open the backup cursor, as we need to pass these entries
+        // into a PIT restore.
+        this.entriesAfterBackup = [];
+        // Store the expected stable timestamp so we can check a replica set after a restore
+        // completes. For replica set nodes, this will be either the checkpointTimestamp or
+        // pointInTimeTimestamp, depending on if the restore is PIT or not. For a PIT sharded
+        // cluster restore, the expected stable timestamp may differ from the cluster-wide
+        // point-in-time timestamp. This is because while each shard is consistent up to this point,
+        // the stable timestamp is set to the last entry in the oplog. For certain shards, their
+        // last oplog entry might be before the cluster-wide point-in-time timestamp.
+        this.expectedStableTimestamp = undefined;
     }
 
     /**
@@ -106,7 +123,8 @@ export class MagicRestoreUtils {
     }
 
     /**
-     * Copies data files from the source dbpath to the backup dbpath.
+     * Copies data files from the source dbpath to the backup dbpath. 'namespacesToSkip' is used to
+     * test selective restore.
      */
     copyFiles(namespacesToSkip = []) {
         resetDbpath(this.backupDbPath);
@@ -144,14 +162,18 @@ export class MagicRestoreUtils {
     /**
      * Extends the backup cursor, copies the extend files and closes the backup cursor.
      */
-    extendAndCloseBackup(mongo, maxCheckpointTs) {
-        backupUtils.extendBackupCursor(mongo, this.backupId, maxCheckpointTs);
+    extendAndCloseBackup(node, maxCheckpointTs) {
+        backupUtils.extendBackupCursor(node, this.backupId, maxCheckpointTs);
         backupUtils.copyBackupCursorExtendFiles(this.backupCursor,
                                                 [] /*namespacesToSkip*/,
                                                 this.backupSource.dbpath,
                                                 this.backupDbPath,
                                                 false /*async*/);
         this.backupCursor.close();
+        this.restoreDbPaths.forEach((restoreDbPath) => {
+            resetDbpath(restoreDbPath);
+            MagicRestoreUtils.copyBackupFilesToDir(this.backupDbPath, restoreDbPath);
+        });
     }
 
     // Copies backup cursor data files from directory to another. Makes the destination directory if
@@ -229,56 +251,65 @@ export class MagicRestoreUtils {
     }
 
     /**
-     * Helper function that lists databases on the given ShardingTest, calls dbHash for each and
-     * returns those as a dbName-to-shardIdx-to-nodeIdx-to-dbHash dictionary.
+     * Helper function that retrieves collection dbhashes for each database on the given node.
+     * Produces an object with the shape:
+     * {
+     *     "db0": {
+     *         "coll0": <hash>,
+     *         "coll1": <hash>,
+     *         ...
+     *     },
+     *     "db1": {
+     *         "coll0": <hash>,
+     *         "coll1": <hash>,
+     *         ...
+     *     }
+     *     ...
+     * }
+     *
      */
-    static getDbHashes(st, numShards, numNodes, expectedDBCount) {
+    _getDbHashes(node) {
         const dbHashes = {};
-        const res = assert.commandWorked(st.s.adminCommand({"listDatabases": 1, "nameOnly": true}));
-        assert.eq(res["databases"].length, expectedDBCount);
-
-        const allNodes = this.getAllNodes(numShards + 1, numNodes);
-        for (let dbEntry of res["databases"]) {
-            const dbName = dbEntry["name"];
-            dbHashes[dbName] = {};
-            for (const [rsIndex, nodeIndex] of allNodes) {
-                const node = rsIndex < numShards ? st["rs" + rsIndex].nodes[nodeIndex]
-                                                 : st.configRS.nodes[nodeIndex];
-                const dbHash = node.getDB(dbName).runCommand({dbHash: 1});
-                if (dbHashes[dbName][rsIndex] == undefined) {
-                    dbHashes[dbName][rsIndex] = {};
-                }
-                dbHashes[dbName][rsIndex][nodeIndex] = dbHash;
-            }
+        const listDbs =
+            assert.commandWorked(node.adminCommand({"listDatabases": 1, "nameOnly": true}));
+        for (let db of listDbs["databases"]) {
+            const dbName = db["name"];
+            const dbHashRes = node.getDB(dbName).runCommand({dbHash: 1});
+            dbHashes[dbName] = dbHashRes.collections;
         }
-
         return dbHashes;
     }
 
-    /**
-     * Helper function that compares outputs of dbHash on the given replicaSets against the output
-     * of a previous getDbHashes call. The config server replica set can be passed in replicaSets
-     * too. Collection names in excludedCollections are excluded from the comparison.
-     */
-    static checkDbHashes(dbHashes, replicaSets, excludedCollections, numShards, numNodes) {
-        for (const [rsIndex, nodeIndex] of this.getAllNodes(numShards + 1, numNodes)) {
-            for (const dbName in dbHashes) {
-                if (dbHashes[dbName][rsIndex] != undefined) {
-                    let dbhash =
-                        replicaSets[rsIndex].nodes[nodeIndex].getDB(dbName).runCommand({dbHash: 1});
-                    for (let collectionName in dbhash["collections"]) {
-                        if (excludedCollections.includes(collectionName)) {
-                            continue;
-                        }
-                        assert.eq(
-                            dbhash["collections"][collectionName],
-                            dbHashes[dbName][rsIndex][nodeIndex]["collections"][collectionName],
-                            `Comparing ${collectionName} in ${dbName} on replicaSets[${
-                                rsIndex}], node ${nodeIndex} failed`);
+    storePreRestoreDbHashes() {
+        this.preRestoreDbHashes = this._getDbHashes(this.backupSource);
+    }
+
+    checkPostRestoreDbHashes(excludedCollections) {
+        this.rst.nodes.forEach((node) => {
+            const pre = this.preRestoreDbHashes;
+            const post = this._getDbHashes(node);
+            for (const dbName in pre) {
+                jsTestLog(`Checking dbhashes for ${dbName} db`);
+                assert(post.hasOwnProperty(dbName),
+                       `Restored node is missing db ${dbName} in post-restore hashes`);
+                const preDb = pre[dbName];
+                const postDb = post[dbName];
+                for (let collName in preDb) {
+                    jsTestLog(`Checking dbhashes for ns ${dbName}.${collName}`);
+                    if (excludedCollections.includes(collName)) {
+                        continue;
                     }
+                    assert(postDb.hasOwnProperty(collName),
+                           `Restored node is missing dbhash for ${dbName}.${
+                               collName} ns in post-restore hashes`);
+                    assert.eq(
+                        preDb[collName],
+                        postDb[collName],
+                        `Dbhash values are not equal for ${dbName}.${collName}. pre-restore hash: ${
+                            preDb[collName]}, post-restore hash: ${postDb[collName]}`);
                 }
             }
-        }
+        });
     }
 
     /**
@@ -294,12 +325,13 @@ export class MagicRestoreUtils {
      * Returns an object with the timestamp of the last oplog entry, as well as the oplog
      * entry array
      */
-    getEntriesAfterBackup(sourceNode, namespacesToSkip = []) {
+    getEntriesAfterBackup(sourceNode = this.backupSource, namespacesToSkip = []) {
         let oplog = sourceNode.getDB("local").getCollection('oplog.rs');
         const entriesAfterBackup = oplog.find({ts: {$gt: this.checkpointTimestamp}})
                                        .sort({ts: 1})
                                        .toArray()
                                        .filter((entry) => !namespacesToSkip.includes(entry.ns));
+        this.entriesAfterBackup = entriesAfterBackup;
         return {
             lastOplogEntryTs: entriesAfterBackup[entriesAfterBackup.length - 1].ts,
             entriesAfterBackup
@@ -320,7 +352,6 @@ export class MagicRestoreUtils {
         rolesCollUuid,
         userCollUuid,
         logPath,
-        shardLastOplogEntryTs
     }) {
         node.setSecondaryOk();
         const restoredConfig =
@@ -329,7 +360,7 @@ export class MagicRestoreUtils {
         this.assertOplogCountForNamespace(
             node, {ns: dbName + "." + collName, op: opFilter}, expectedOplogCountForNs);
         this._assertMinValidIsCorrect(node);
-        this._assertStableCheckpointIsCorrectAfterRestore(node, shardLastOplogEntryTs);
+        this._assertStableCheckpointIsCorrectAfterRestore(node);
         this._assertCannotDoSnapshotRead(
             node, expectedNumDocsSnapshot /* expectedNumDocsSnapshot */, dbName, collName);
         if (rolesCollUuid && userCollUuid) {
@@ -367,6 +398,9 @@ export class MagicRestoreUtils {
      */
     writeObjsAndRunMagicRestore(restoreConfiguration, entriesAfterBackup, options) {
         this.pointInTimeTimestamp = restoreConfiguration.pointInTimeTimestamp;
+        if (!this.expectedStableTimestamp) {
+            this.expectedStableTimestamp = this.pointInTimeTimestamp;
+        }
         if (this.pointInTimeTimestamp) {
             assert(entriesAfterBackup.length > 0);
             this.isPit = true;
@@ -407,16 +441,13 @@ export class MagicRestoreUtils {
      * inserts a no-op oplog entry with a higher term, the stable checkpoint timestamp should be
      * equal to the timestamp of that entry.
      */
-    _assertStableCheckpointIsCorrectAfterRestore(restoreNode, lastOplogEntryTs = undefined) {
-        let lastStableCheckpointTs =
-            this.isPit ? this.pointInTimeTimestamp : this.checkpointTimestamp;
-
+    _assertStableCheckpointIsCorrectAfterRestore(restoreNode) {
         // For a PIT restore on a sharded cluster, the lastStableCheckpointTs of a given shard might
-        // be behind the global pointInTimeTimestamp. This allows the caller to specify
-        // lastOplogEntryTs instead.
-        if (lastOplogEntryTs != undefined) {
-            lastStableCheckpointTs = lastOplogEntryTs;
-        }
+        // be behind the global pointInTimeTimestamp, as it is set to the top of the oplog for a
+        // given shard. To continue with this check, we store the expected stable timestamp after
+        // the restore.
+        let lastStableCheckpointTs =
+            this.isPit ? this.expectedStableTimestamp : this.checkpointTimestamp;
 
         if (this.insertHigherTermOplogEntry) {
             const oplog = restoreNode.getDB("local").getCollection('oplog.rs');
@@ -497,5 +528,165 @@ export class MagicRestoreUtils {
                        .filter(json => json.c === 'RESTORE');
         assert.eq(logs[0].msg, "Beginning magic restore");
         assert.eq(logs[logs.length - 1].msg, "Finished magic restore");
+    }
+}
+
+/**
+ * This class implements helpers for testing the magic restore process with a sharded cluster. It
+ * wraps a ShardingTest object and maintains a MagicRestoreUtils object per replica set. It handles
+ * the logic to extend backup cursors as well as running restore on each replica set in the shard.
+ */
+export class ShardedMagicRestoreTest {
+    constructor({st, pipeDir, insertHigherTermOplogEntry}) {
+        this.st = st;
+        this.pipeDir = pipeDir;
+        this.insertHigherTermOplogEntry = insertHigherTermOplogEntry;
+        this.numShards = this.st._rs.length;
+        this.clusterId = st.s.getCollection('config.version').findOne().clusterId;
+
+        jsTestLog("Creating MagicRestoreUtil fixture for config replica set");
+        let configDir = `${MongoRunner.dataDir}/config`;
+        this.mkdirAndResetPath(configDir);
+        this.configRestoreTest = new MagicRestoreUtils({
+            rst: this.st.configRS,
+            pipeDir: configDir,
+            insertHigherTermOplogEntry: insertHigherTermOplogEntry
+        });
+        this.shardRestoreTests = [];
+        for (let i = 0; i < this.numShards; i++) {
+            jsTestLog(`Creating MagicRestoreUtil fixture for shard replica set ${i}`);
+            let shardDir = `${MongoRunner.dataDir}/shard${i}`;
+            this.mkdirAndResetPath(shardDir);
+            const magicRestoreUtil = new MagicRestoreUtils({
+                rst: this.st["rs" + i],
+                pipeDir: shardDir,
+                insertHigherTermOplogEntry: insertHigherTermOplogEntry
+            });
+            this.shardRestoreTests.push(magicRestoreUtil);
+        }
+        this.magicRestoreUtils = [this.configRestoreTest, ...this.shardRestoreTests];
+        // shardingRename is a list of objects.
+        this.shardingRename = undefined;
+        this.shardIdentityDocuments = undefined;
+        this.maxCheckpointTs = undefined;
+        this.pointInTimeTimestamp = undefined;
+    }
+
+    mkdirAndResetPath(path) {
+        const {exists, created} = mkdir(path);
+        exists ? resetDbpath(path) : assert(created);
+    }
+
+    takeCheckpointsAndOpenBackups() {
+        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
+            magicRestoreUtil.takeCheckpointAndOpenBackup();
+        });
+    }
+
+    getConfigRestoreTest() {
+        return this.configRestoreTest;
+    }
+
+    getShardRestoreTests() {
+        return this.shardRestoreTests;
+    }
+
+    findMaxCheckpointTsAndExtendBackupCursors() {
+        this.maxCheckpointTs = Timestamp(0, 0);
+        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
+            magicRestoreUtil.copyFiles();
+            const ts = magicRestoreUtil.getCheckpointTimestamp();
+            if (timestampCmp(ts, this.maxCheckpointTs) > 0) {
+                this.maxCheckpointTs = ts;
+            }
+        });
+
+        jsTestLog("Computed maxCheckpointTs: " + tojson(this.maxCheckpointTs));
+
+        jsTestLog("Extending backup cursors");
+        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
+            magicRestoreUtil.extendAndCloseBackup(magicRestoreUtil.backupSource,
+                                                  this.maxCheckpointTs);
+        });
+    }
+
+    setPointInTimeTimestamp() {
+        this.pointInTimeTimestamp = Timestamp(0, 0);
+        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
+            let {lastOplogEntryTs} = magicRestoreUtil.getEntriesAfterBackup();
+            if (timestampCmp(lastOplogEntryTs, this.pointInTimeTimestamp) > 0) {
+                // Store the last oplog entry for each replica set. This is used to check the stable
+                // timestamp at the end of restore.
+                magicRestoreUtil.expectedStableTimestamp = lastOplogEntryTs;
+                this.pointInTimeTimestamp = lastOplogEntryTs;
+            }
+        });
+        jsTestLog(
+            `Computed point-in-time timestamp ${tojson(this.pointInTimeTimestamp)} for cluster`);
+    }
+
+    runMagicRestore() {
+        this.magicRestoreUtils.forEach((magicRestoreUtil, idx) => {
+            let restoreConfiguration = {
+                "nodeType": idx > 0 ? "shard" : "configServer",
+                "replicaSetConfig": magicRestoreUtil.getExpectedConfig(),
+                "maxCheckpointTs": this.maxCheckpointTs
+            };
+
+            if (this.pointInTimeTimestamp) {
+                restoreConfiguration.pointInTimeTimestamp = this.pointInTimeTimestamp;
+            }
+            if (this.shardingRename) {
+                restoreConfiguration.shardingRename = this.shardingRename;
+            }
+            if (this.shardIdentityDocuments) {
+                restoreConfiguration.shardIdentityDocument = this.shardIdentityDocuments[idx];
+            }
+            restoreConfiguration =
+                magicRestoreUtil.appendRestoreToHigherTermThanIfNeeded(restoreConfiguration);
+
+            magicRestoreUtil.writeObjsAndRunMagicRestore(restoreConfiguration,
+                                                         magicRestoreUtil.entriesAfterBackup,
+                                                         {"replSet": magicRestoreUtil.rst.name});
+        });
+    }
+
+    storePreRestoreDbHashes() {
+        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
+            magicRestoreUtil.storePreRestoreDbHashes();
+        });
+    }
+
+    checkPostRestoreDbHashes(excludedCollections) {
+        jsTestLog("Running dbhash checks for sharded cluster magic restore test");
+        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
+            magicRestoreUtil.checkPostRestoreDbHashes(excludedCollections);
+        });
+    }
+
+    setUpShardingRenamesAndIdentityDocs() {
+        jsTestLog("Generating sharding renames list");
+        this.shardIdentityDocuments = [];
+        this.shardingRename = [];
+        this.shardIdentityDocuments.push({
+            clusterId: this.clusterId,
+            shardName: "config",
+            configsvrConnectionString: this.st.configRS.getURL()
+        });
+
+        for (let i = 0; i < this.numShards; i++) {
+            const shard = this.st["shard" + i];
+            this.shardingRename.push({
+                sourceShardName: shard.shardName,
+                destinationShardName: shard.shardName.replace("-rs", "-dst-rs"),
+                destinationShardConnectionString: shard.host.replace("-rs", "-dst-rs")
+            });
+
+            this.shardIdentityDocuments.push({
+                clusterId: this.clusterId,
+                shardName: this.shardingRename[i].destinationShardName,
+                configsvrConnectionString: this.st.configRS.getURL()
+            });
+        }
     }
 }
