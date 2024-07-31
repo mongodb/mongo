@@ -636,6 +636,88 @@ TEST(SerializeBasic, ExpressionRegexWithValueAndOptionsSerializesCorrectly) {
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
 }
 
+TEST(SerializeBasic, ExpressionJsonSchemaWithDollarFieldSerializesShapeCorrectly) {
+    auto query = fromjson(R"({$jsonSchema: {properties: {$stdDevPop: {type: 'array'}}}})");
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+
+    // Serialization is correct upon the first parse.
+    auto serialized = objMatch.getValue()->serialize(opts);
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "$and":[{
+                "$and":[{
+                    "$or":[
+                        {"$nor": [{"$_internalPath": {"$stdDevPop":{"$exists": true}}}]},
+                        {"$and":[{"$_internalPath":{"$stdDevPop":{"$_internalSchemaType":[4]}}}]}
+                    ]
+                }]
+            }]
+        })",
+        serialized);
+
+    // Confirm that round trip serialization (reparsing) works correctly for query stats.
+    auto roundTrip = MatchExpressionParser::parse(serialized, expCtx).getValue()->serialize(opts);
+    ASSERT_BSONOBJ_EQ(roundTrip, serialized);
+}
+
+TEST(SerializeBasic, ExpressionJsonSchemaWithKeywordDollarFieldSerializesShapeCorrectly) {
+    auto query = fromjson(R"({$jsonSchema: {properties: {$or: {type: 'array'}}}})");
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+
+    // Serialization is correct upon the first parse.
+    auto serialized = objMatch.getValue()->serialize(opts);
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "$and":[{
+                "$and":[{
+                    "$or":[
+                        {"$nor": [{"$_internalPath": {"$or":{"$exists": true}}}]},
+                        {"$and":[{"$_internalPath":{"$or":{"$_internalSchemaType":[4]}}}]}
+                    ]
+                }]
+            }]
+        })",
+        serialized);
+
+    // Confirm that round trip serialization (reparsing) works correctly for query stats.
+    auto roundTrip = MatchExpressionParser::parse(serialized, expCtx).getValue()->serialize(opts);
+    ASSERT_BSONOBJ_EQ(roundTrip, serialized);
+}
+
+TEST(SerializeBasic, NonLeafDollarPrefixedPathSerializesShapeCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    auto baseOperandVal = BSON("$gt" << 5);
+    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperandVal["$gt"]);
+    auto elemMatchValExpr = std::make_unique<ElemMatchValueMatchExpression>("$a"_sd);
+    elemMatchValExpr->add(std::move(gt));
+
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+
+    // Serialization is correct upon the first parse.
+    BSONObjBuilder bob;
+    elemMatchValExpr->serialize(&bob, opts);
+    auto serialized = bob.obj();
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"$_internalPath": {"$a":{"$elemMatch": {"$gt": 1}}}})", serialized);
+
+    // Confirm that round trip serialization (reparsing) works correctly for query stats.
+    auto roundTrip = MatchExpressionParser::parse(serialized, expCtx).getValue()->serialize(opts);
+    ASSERT_BSONOBJ_EQ(roundTrip, serialized);
+}
+
 TEST(SerializeBasic, ExpressionRegexWithoutOptionsSerializesShapeCorrectly) {
     auto query = fromjson(R"({x: {$regex: ".*"}})");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -1212,6 +1294,68 @@ TEST(SerializeBasic, ExpressionNotWithoutPathChildrenSerializesCorrectly) {
     ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
 
     obj = fromjson("{foo: 'acbdf'}");
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionJsonSchemaWithDollarFieldSerializesCorrectly) {
+    BSONObj query = fromjson("{$jsonSchema: {properties: {$stdDevPop: {type: 'array'}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expression = unittest::assertGet(MatchExpressionParser::parse(query, expCtx));
+
+    Matcher reserialized(serialize(expression.get()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{$and: ["
+                               "  {$and: ["
+                               "    {$or: ["
+                               "      {$nor: [{$_internalPath:{$stdDevPop: {$exists: true}}}]},"
+                               "      {$and: ["
+                               "        {$_internalPath:"
+                               "          {$stdDevPop: {$_internalSchemaType: [4]}}"
+                               "        }"
+                               "      ]}"
+                               "    ]}"
+                               "  ]}"
+                               "]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{$stdDevPop: [1, 2, 3]}");
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
+
+    obj = fromjson("{$stdDevPop: []}");
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionJsonSchemaWithKeywordDollarFieldSerializesCorrectly) {
+    BSONObj query = fromjson("{$jsonSchema: {properties: {$or: {type: 'string'}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expression = unittest::assertGet(MatchExpressionParser::parse(query, expCtx));
+
+    Matcher reserialized(serialize(expression.get()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{$and: ["
+                               "  {$and: ["
+                               "    {$or: ["
+                               "      {$nor: [{$_internalPath:{$or: {$exists: true}}}]},"
+                               "      {$and: ["
+                               "        {$_internalPath: {$or: {$_internalSchemaType: [2]}}}"
+                               "      ]}"
+                               "    ]}"
+                               "  ]}"
+                               "]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{$or: 'abcd'}");
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
+
+    obj = fromjson("{$or: ''}");
     ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
 }
 

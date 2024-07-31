@@ -59,6 +59,14 @@ PathMatchExpression* getEligiblePathMatchForNotSerialization(MatchExpression* ex
     // This version below is less obviously exhaustive, but because this is just a legibility
     // optimization, and this function also gets called on the query shape stats recording hot path,
     // we think it is worth it.
+    //
+    // This function will return nullptr if the field path contains special characters like a "$"
+    // prefix. We will serialize to a $nor and delegate the path serialization to lower in the tree,
+    // which has special handlers for those characters.
+    if (expr->path().startsWith("$")) {
+        return nullptr;
+    }
+
     switch (expr->matchType()) {
         // leaf types
         case MatchExpression::EQ:

@@ -292,7 +292,24 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             auto name = e.fieldNameStringData().substr(1);
             auto parseExpressionMatchFunction = retrievePathlessParser(name);
 
-            if (!parseExpressionMatchFunction) {
+            if (parseExpressionMatchFunction) {
+                auto parsedExpression = parseExpressionMatchFunction(
+                    name, e, expCtx, extensionsCallback, allowedFeatures, currentLevel);
+                if (parsedExpression.isOK()) {
+                    // A nullptr for 'parsedExpression' indicates that the particular operator
+                    // should not be added to 'root', because it is handled outside of the
+                    // MatchExpressionParser library. The following operators currently follow this
+                    // convention:
+                    //    - $comment  has no action associated with the operator.
+                    if (auto&& expr = parsedExpression.getValue())
+                        root->add(std::move(expr));
+
+                    expCtx->incrementMatchExprCounter(e.fieldNameStringData());
+                    continue;
+                } else {
+                    return parsedExpression;
+                }
+            } else {
                 std::string hint = "";
                 if (name == "not") {
                     hint = ". If you are trying to negate an entire expression, use $nor.";
@@ -305,23 +322,6 @@ StatusWithMatchExpression parse(const BSONObj& obj,
                                str::stream() << "unknown top level operator: "
                                              << e.fieldNameStringData() << hint)};
             }
-
-            auto parsedExpression = parseExpressionMatchFunction(
-                name, e, expCtx, extensionsCallback, allowedFeatures, currentLevel);
-
-            if (!parsedExpression.isOK()) {
-                return parsedExpression;
-            }
-
-            // A nullptr for 'parsedExpression' indicates that the particular operator should not
-            // be added to 'root', because it is handled outside of the MatchExpressionParser
-            // library. The following operators currently follow this convention:
-            //    - $comment  has no action associated with the operator.
-            if (auto&& expr = parsedExpression.getValue())
-                root->add(std::move(expr));
-
-            expCtx->incrementMatchExprCounter(e.fieldNameStringData());
-            continue;
         }
 
         // Ensure the path length does not exceed the maximum allowed depth.
@@ -475,6 +475,42 @@ StatusWithMatchExpression parseDBRef(StringData name,
     eq->setCollator("id"_sd == name ? expCtx->getCollator() : nullptr);
 
     return {std::move(eq)};
+}
+
+/**
+ * Handles the "$_internalPath" special parser keyword by calling the corresponding
+ * PathMatchExpression parser on its embedded object. This keyword exists because dollar-prefixed
+ * fields, which are allowed under $jsonSchema, are wrapped by a $_internalPath keyword during
+ * serialization so that they will be correctly handled upon query stats reparsing.
+ *
+ * Given: {$_internalDollarField: {<path>: <right-hand side>}}
+ * Parse: {<path>: <right-hand side>}
+ */
+StatusWithMatchExpression parseInternalPath(
+    StringData name,
+    BSONElement elem,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExtensionsCallback* extensionsCallback,
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+    DocumentParseLevel currentLevel) {
+    auto root = std::make_unique<AndMatchExpression>(
+        doc_validation_error::createAnnotation(expCtx, "$and", BSONObj()));
+    auto escapedElt = elem.Obj().firstElement();
+
+    auto s = parseSub(escapedElt.fieldNameStringData(),
+                      escapedElt.Obj(),
+                      root.get(),
+                      expCtx,
+                      extensionsCallback,
+                      allowedFeatures,
+                      currentLevel);
+    if (!s.isOK())
+        return s;
+
+    // Since $_internalPath wraps only a single object with a dollar-prefixed fieldname, there will
+    // only ever be one child.
+    tassert(8984400, "Expected $_internalPath to have one child.", root->numChildren() == 1);
+    return {std::move((*root->getChildVector())[0])};
 }
 
 StatusWithMatchExpression parseJSONSchema(StringData name,
@@ -2158,6 +2194,7 @@ MONGO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
                                                     MatchExpressionParser::AllowedFeatureSet,
                                                     DocumentParseLevel)>>{
             {"_internalBucketGeoWithin", &parseInternalBucketGeoWithinMatchExpression},
+            {"_internalPath", &parseInternalPath},
             {"_internalSchemaAllowedProperties", &parseInternalSchemaAllowedProperties},
             {"_internalSchemaCond",
              &parseInternalSchemaFixedArityArgument<InternalSchemaCondMatchExpression>},

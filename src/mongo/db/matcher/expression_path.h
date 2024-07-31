@@ -220,9 +220,22 @@ public:
                    const SerializationOptions& opts = {},
                    bool includePath = true) const override {
         if (includePath) {
-            BSONObjBuilder subObj(out->subobjStart(opts.serializeFieldPathFromString(path())));
-            appendSerializedRightHandSide(&subObj, opts, includePath);
-            subObj.doneFast();
+            auto maybeDollarPath = path();
+
+            auto appendUnescapedPred = [&](BSONObjBuilder* bob) {
+                BSONObjBuilder subObj(
+                    bob->subobjStart(opts.serializeFieldPathFromString(maybeDollarPath)));
+                appendSerializedRightHandSide(&subObj, opts, includePath);
+                subObj.doneFast();
+            };
+
+            if (maybeDollarPath.startsWith("$")) {
+                BSONObjBuilder dollarFieldObj(out->subobjStart("$_internalPath"));
+                appendUnescapedPred(&dollarFieldObj);
+                dollarFieldObj.doneFast();
+            } else {
+                appendUnescapedPred(out);
+            }
         } else {
             appendSerializedRightHandSide(out, opts, includePath);
         }
