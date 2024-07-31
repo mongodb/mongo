@@ -37,11 +37,13 @@ export var FeatureFlagUtil = (function() {
             }
 
             // For sharded cluster get a connection to the first replicaset through a Mongo
-            // object. We may fail to connect if we are in a stepdown/terminate passthrough
-            // suite. However, ReplSetTest will retry on network errors when making its initial
-            // connection to the cluster, and all subsequent operations on the connection should
-            // use runCommand, which should be overriden to retry on network errors in such suites.
-            conn = FixtureHelpers.getAllReplicas(db)[0].getPrimary();
+            // object. We may fail to connect if we are in a stepdown/terminate passthrough, so
+            // retry on retryable errors. After the connection is established, runCommand overrides
+            // should guarantee that subsequent operations on the connection are retried in the
+            // event of network errors in suites where that possibility exists.
+            retryOnRetryableError(() => {
+                conn = new Mongo(FixtureHelpers.getAllReplicas(db)[0].getURL());
+            });
         };
         try {
             setConn(db);
