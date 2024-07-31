@@ -122,11 +122,7 @@ void JournalFlusher::run() {
             // Signal the waiters that a round completed.
             _currentSharedPromise->emplaceValue();
         } catch (const AssertionException& e) {
-            invariant(ErrorCodes::isShutdownError(e.code()) ||
-                          e.code() == ErrorCodes::InterruptedDueToReplStateChange ||
-                          e.code() == ErrorCodes::Interrupted,  // Can be caused by killOp.
-                      e.toString());
-
+            // Can be caused by killOp.
             if (e.code() == ErrorCodes::Interrupted) {
                 // This thread should not be affected by killOp. Therefore, the thread will
                 // immediately restart the journal flush without sending errors to waiting callers.
@@ -138,6 +134,12 @@ void JournalFlusher::run() {
                       "JournalFlusherError"_attr = e.toString());
                 continue;
             }
+
+            // We want to log errors for debugability.
+            LOGV2_WARNING(
+                6148401,
+                "The JournalFlusher encountered an error attempting to flush data to disk",
+                "JournalFlusherError"_attr = e.toString());
 
             // Signal the waiters that the fsync was interrupted.
             _currentSharedPromise->setError(e.toStatus());
