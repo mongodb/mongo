@@ -54,13 +54,19 @@ const secondaryDB2 = secondary2.getDB(dbName);
 // Verify that the existing nodes detect invalid index options, but the new node has the repaired
 // index spec.
 let validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
-assert(!validateRes.valid, "validate should fail: " + tojson(validateRes));
+assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+assert.eq(validateRes.errors.length, 0, "validate should not error: " + tojson(validateRes));
+assert.eq(validateRes.warnings.length, 1, "validate should warn: " + tojson(validateRes));
 
 validateRes = assert.commandWorked(secondaryDB1.runCommand({validate: collName}));
-assert(!validateRes.valid, "validate should fail: " + tojson(validateRes));
+assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+assert.eq(validateRes.errors.length, 0, "validate should not error: " + tojson(validateRes));
+assert.eq(validateRes.warnings.length, 1, "validate should warn: " + tojson(validateRes));
 
 validateRes = assert.commandWorked(secondaryDB2.runCommand({validate: collName}));
 assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+assert.eq(validateRes.errors.length, 0, "validate should not error: " + tojson(validateRes));
+assert.eq(validateRes.warnings.length, 0, "validate should not warn: " + tojson(validateRes));
 
 // Use collMod to fix the invalid index options in the collection.
 assert.commandWorked(primaryDB.runCommand({collMod: collName}));
@@ -74,12 +80,18 @@ assert.commandWorked(primaryDB.runCommand({listIndexes: collName}));
 
 validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
 assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+assert.eq(validateRes.errors.length, 0, "validate should not error: " + tojson(validateRes));
+assert.eq(validateRes.warnings.length, 0, "validate should not warn: " + tojson(validateRes));
 
 validateRes = assert.commandWorked(secondaryDB1.runCommand({validate: collName}));
 assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+assert.eq(validateRes.errors.length, 0, "validate should not error: " + tojson(validateRes));
+assert.eq(validateRes.warnings.length, 0, "validate should not warn: " + tojson(validateRes));
 
 validateRes = assert.commandWorked(secondaryDB2.runCommand({validate: collName}));
 assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+assert.eq(validateRes.errors.length, 0, "validate should not error: " + tojson(validateRes));
+assert.eq(validateRes.warnings.length, 0, "validate should not warn: " + tojson(validateRes));
 
 rst.stopSet();
 })();

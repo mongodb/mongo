@@ -21,8 +21,11 @@ assert.commandWorked(db.runCommand(
 let res = assert.commandWorked(coll.validate());
 assert(res.valid);
 
-// Even though there are two documents violating the collection schema rules, the warning should
-// only be shown once.
+// Even though there are two documents violating the collection schema rules, the message about
+// non-compliant documents should only be shown once. Regardless of the validation level, it
+// should be reported as a warning.
+assert(res.valid);
+assert.eq(res.errors.length, 0);
 assert.eq(res.warnings.length, 1);
 
 checkLog.containsJson(conn, 5363500, {recordId: "2"});

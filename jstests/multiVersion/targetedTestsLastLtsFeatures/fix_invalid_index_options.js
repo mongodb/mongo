@@ -40,10 +40,14 @@ secondaryDB = secondary.getDB(dbName);
 
 // Verify that the primary and secondary in 6.0 detect invalid index options.
 let validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
-assert(!validateRes.valid, "validate should fail: " + tojson(validateRes));
+assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+assert.eq(validateRes.errors.length, 0, "validate should not error: " + tojson(validateRes));
+assert.eq(validateRes.warnings.length, 1, "validate should warn: " + tojson(validateRes));
 
 validateRes = assert.commandWorked(secondaryDB.runCommand({validate: collName}));
-assert(!validateRes.valid, "validate should fail: " + tojson(validateRes));
+assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+assert.eq(validateRes.errors.length, 0, "validate should not error: " + tojson(validateRes));
+assert.eq(validateRes.warnings.length, 1, "validate should warn: " + tojson(validateRes));
 
 // Use collMod to fix the invalid index options in the collection.
 assert.commandWorked(primaryDB.runCommand({collMod: collName}));
@@ -57,9 +61,13 @@ assert.commandWorked(primaryDB.runCommand({listIndexes: collName}));
 
 validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
 assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+assert.eq(validateRes.errors.length, 0, "validate should not error: " + tojson(validateRes));
+assert.eq(validateRes.warnings.length, 0, "validate should not warn: " + tojson(validateRes));
 
 validateRes = assert.commandWorked(secondaryDB.runCommand({validate: collName}));
 assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+assert.eq(validateRes.errors.length, 0, "validate should not error: " + tojson(validateRes));
+assert.eq(validateRes.warnings.length, 0, "validate should not warn: " + tojson(validateRes));
 
 rst.stopSet();
 })();
