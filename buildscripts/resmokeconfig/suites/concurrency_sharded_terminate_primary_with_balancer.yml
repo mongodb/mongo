@@ -205,6 +205,7 @@ executor:
         enableElectionHandoff: 0
         roleGraphInvalidationIsFatal: 1
         queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
         defaultConfigCommandTimeoutMS: 90000
         skipDroppingHashedShardKeyIndex: true
         # Delay orphan cleanup to get around SERVER-87673.

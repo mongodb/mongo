@@ -148,6 +148,7 @@ executor:
         enableTestCommands: 1
         roleGraphInvalidationIsFatal: 1
         queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
         defaultConfigCommandTimeoutMS: 90000
         skipDroppingHashedShardKeyIndex: true
         reshardingMinimumOperationDurationMillis: 0
