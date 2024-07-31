@@ -111,6 +111,9 @@ selector:
   # concurrency_sharded_replication_with_balancer_and_config_transitions suite.
   - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
 
+  # TODO SERVER-92349: Re-enable this test once completed.
+  - jstests/concurrency/fsm_workloads/indexed_insert_ttl.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - assumes_balancer_off

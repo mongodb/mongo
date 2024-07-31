@@ -99,6 +99,9 @@ selector:
   # TODO SERVER-91413: Enable test.
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
 
+  # TODO SERVER-92349: Re-enable this test once completed.
+  - jstests/concurrency/fsm_workloads/indexed_insert_ttl.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - assumes_balancer_off
