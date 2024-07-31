@@ -207,8 +207,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
  * the _id field
  */
 bool checkIdIndexExists(OperationContext* opCtx, const Collection* coll) {
-    auto indexCount = coll->getTotalIndexCount();
-    auto indexNames = std::vector<std::string>(indexCount);
+    auto indexNames = std::vector<std::string>();
     coll->getAllIndexes(&indexNames);
 
     for (const auto& name : indexNames) {
