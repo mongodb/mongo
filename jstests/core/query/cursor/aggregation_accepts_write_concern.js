@@ -11,6 +11,17 @@ const testDB = db.getSiblingDB("aggregation_accepts_write_concern");
 assert.commandWorked(testDB.dropDatabase());
 const collName = "test";
 
+if (TestData.runningWithBalancer) {
+    const paramRes = testDB.adminCommand({getParameter: 1, balancerMigrationsThrottlingMs: 1});
+    if (paramRes.ok) {
+        // Reduce the frequency of the balancer as a best effort to avoid QueryPlanKilled errors
+        // when aggregation and moveCollection run concurrently.
+        // TODO (SERVER-88275): Remove this parameter change when the issue is resolved.
+        assert.commandWorked(
+            testDB.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 500}));
+    }
+}
+
 assert.commandWorked(
     testDB.runCommand({insert: collName, documents: [{_id: 1}], writeConcern: {w: "majority"}}));
 
