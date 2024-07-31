@@ -55,6 +55,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -91,9 +92,10 @@ LogicalSessionCacheImpl::LogicalSessionCacheImpl(std::unique_ptr<ServiceLiaison>
     _stats.setLastSessionsCollectionJobTimestamp(_service->now());
     _stats.setLastTransactionReaperJobTimestamp(_service->now());
 
-    // Skip initializing this background thread when using 'recoverFromOplogAsStandalone=true' as
-    // the server is put in read-only mode after oplog recovery.
-    if (repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+    // Skip initializing this background thread when using 'recoverFromOplogAsStandalone=true' or
+    // --magicRestore as the server is put in read-only mode after oplog recovery.
+    if (repl::ReplSettings::shouldRecoverFromOplogAsStandalone() ||
+        storageGlobalParams.magicRestore) {
         return;
     }
 

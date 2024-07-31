@@ -556,6 +556,13 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                               "Setting mongod to readOnly mode as a result of specifying "
                               "'recoverFromOplogAsStandalone'");
     }
+
+    if (storageParams.magicRestore) {
+        LOGV2_OPTIONS(8892401,
+                      {logv2::LogTag::kStartupWarnings},
+                      "Running with --magicRestore. This should only be used when restoring from a "
+                      "backup using magic restore.");
+    }
 }
 
 }  // namespace mongo
