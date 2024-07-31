@@ -415,6 +415,7 @@ env.Library(
         'index_key_validate',
         'index_repair',
         'local_oplog_info',
+        'storage_engine_collection_options_flags_parser',
         'throttle_cursor',
         'validate_idl',
         'validate_state',
@@ -499,6 +500,7 @@ env.Library(
 env.Library(
     target='catalog_helpers',
     source=[
+        'backwards_compatible_collection_options_util.cpp',
         'capped_utils.cpp',
         'collection_catalog_helper.cpp',
         'coll_mod.cpp',
@@ -658,9 +660,11 @@ if wiredtiger:
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/auth/authmocks',
+            '$BUILD_DIR/mongo/db/commands/create_command',
             '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
             '$BUILD_DIR/mongo/db/concurrency/lock_manager',
             '$BUILD_DIR/mongo/db/db_raii',
+            '$BUILD_DIR/mongo/db/dbhelpers',
             '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
             '$BUILD_DIR/mongo/db/matcher/expressions',
             '$BUILD_DIR/mongo/db/multitenancy',
@@ -671,6 +675,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/query/query_test_service_context',
             '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
             '$BUILD_DIR/mongo/db/repl/oplog',
+            '$BUILD_DIR/mongo/db/repl/oplog_application',
             '$BUILD_DIR/mongo/db/repl/optime',
             '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
             '$BUILD_DIR/mongo/db/repl/replmocks',
@@ -679,6 +684,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
             '$BUILD_DIR/mongo/db/service_context_test_fixture',
             '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
+            '$BUILD_DIR/mongo/db/timeseries/timeseries_collmod',
             '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
             '$BUILD_DIR/mongo/unittest/unittest',
             '$BUILD_DIR/mongo/util/clock_source_mock',

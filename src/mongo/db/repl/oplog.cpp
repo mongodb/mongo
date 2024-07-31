@@ -45,6 +45,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/backwards_compatible_collection_options_util.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
@@ -987,7 +988,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
       {ErrorCodes::NamespaceNotFound}}},
     {"collMod",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-          const auto& cmd = entry.getObject();
+          const auto cmd =
+              backwards_compatible_collection_options::parseCollModCmdFromOplogEntry(entry);
           auto opMsg = OpMsgRequest::fromDBAndBody(entry.getNss().db(), cmd);
           auto collModCmd = CollMod::parse(IDLParserErrorContext("collModOplogEntry"), opMsg);
           const auto nssOrUUID([&collModCmd, &entry, mode]() -> NamespaceStringOrUUID {
