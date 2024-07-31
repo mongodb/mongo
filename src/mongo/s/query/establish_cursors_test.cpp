@@ -55,6 +55,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/query/establish_cursors.h"
+#include "mongo/s/resource_yielders.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
@@ -145,6 +146,23 @@ public:
                 return BSON("ok" << 1);
             });
         }
+    }
+
+    void onCommandThrowStaleConifg(ShardId shardId) {
+        onCommand([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+            BSONObjBuilder builder;
+            StaleConfigInfo staleConfigExtraInfo(
+                NamespaceString::createNamespaceString_forTest("test.testcoll"),
+                {},  // shardVersion
+                boost::none,
+                shardId);
+            staleConfigExtraInfo.serialize(&builder);
+
+            return createErrorCursorResponse(
+                Status(ErrorCodes::StaleConfig, "fake stale config", builder.obj()));
+        });
     }
 
 protected:
@@ -964,6 +982,156 @@ TEST_F(EstablishCursorsTest, InterruptedWithDanglingRemoteRequest) {
     // Now ARS::next should check that the opCtx has been marked killed, and return a
     // failing response to establishCursors, which should clean up by sending kill commands.
     expectKillOperations(2);
+
+    future.default_timed_get();
+}
+
+TEST_F(EstablishCursorsTest, InterruptedAfterErrorResponse) {
+    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
+    std::vector<AsyncRequestsSender::Request> remotes{
+        {kTestShardIds[0], cmdObj},
+        {kTestShardIds[1], cmdObj},
+    };
+    unittest::Barrier barrier(2);
+
+    // Hang in ARS::next when there is exactly 1 remote that hasn't replied yet.
+    // This failpoint is important to ensure establishCursors' check for _interruptStatus.isOK()
+    // happens after this unittest does opCtx->killOperation().
+    auto fpNext = globalFailPointRegistry().find("hangBeforePollResponse");
+    invariant(fpNext);
+    auto timesHitNext = fpNext->setMode(FailPoint::alwaysOn, 0, BSON("remotesLeft" << 1));
+
+    auto future = launchAsync([&] {
+        ScopeGuard guard([&] { barrier.countDownAndWait(); });
+        // Make sure we get CursorKilled and not StaleConfig.
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       false),  // allowPartialResults
+                      ExceptionFor<ErrorCodes::CursorKilled>);
+    });
+
+    // First remote responds StaleConfig.
+    onCommandThrowStaleConifg(kTestShardIds[0]);
+
+    // Wait until we hit the hangBeforePollResponse failpoint with remotesLeft 1.
+    // This ensures the first response has been processed.
+    fpNext->waitForTimesEntered(timesHitNext + 1);
+    // Now allow the thread calling ARS::next to continue.
+    fpNext->setMode(FailPoint::off);
+
+    // Now we're processing the request for the second remote. Kill the opCtx
+    // instead of responding.
+    onCommand([&](auto&&) {
+        ClientLock lk(operationContext()->getClient());
+        operationContext()->getServiceContext()->killOperation(
+            lk, operationContext(), ErrorCodes::CursorKilled);
+        CursorResponse cursorResponse(_nss, CursorId(123), {});
+        // Wait until the kill takes.
+        barrier.countDownAndWait();
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    // We didn't get a cursor back from the first response so we should only kill for the second
+    // response.
+    expectKillOperations(1);
+
+    future.default_timed_get();
+}
+
+TEST_F(EstablishCursorsTest, FailedUnyieldAfterErrorResponse) {
+    struct MockResourceYielder : public ResourceYielder {
+        void yield(OperationContext*) override {}
+        void unyield(OperationContext*) override {
+            if (_count++) {
+                uasserted(ErrorCodes::LockTimeout, "Simulated error");
+            }
+        }
+        int _count = 0;
+    };
+    struct MockResourceYielderFactory : public ResourceYielderFactory {
+        std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
+                                              StringData cmdName) const override {
+            return std::make_unique<MockResourceYielder>();
+        }
+    };
+    ResourceYielderFactory::set(*getService(), std::make_unique<MockResourceYielderFactory>());
+
+    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
+    std::vector<AsyncRequestsSender::Request> remotes{
+        {kTestShardIds[0], cmdObj},
+        {kTestShardIds[1], cmdObj},
+    };
+
+    // Hang in ARS::next when there is exactly 1 remote that hasn't replied yet.
+    // This failpoint is important to ensure establishCursors' check for _interruptStatus.isOK()
+    // happens after this unittest does opCtx->killOperation().
+    auto fpNext = globalFailPointRegistry().find("hangBeforePollResponse");
+    invariant(fpNext);
+    auto timesHitNext = fpNext->setMode(FailPoint::alwaysOn, 0, BSON("remotesLeft" << 1));
+
+    auto future = launchAsync([&] {
+        // Make sure we get LockTimeout and not StaleConfig.
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       false),  // allowPartialResults
+                      ExceptionFor<ErrorCodes::LockTimeout>);
+    });
+
+    // First remote responds StaleConfig.
+    onCommandThrowStaleConifg(kTestShardIds[0]);
+
+    // Wait until we hit the hangBeforePollResponse failpoint with remotesLeft 1.
+    // This ensures the first response has been processed.
+    fpNext->waitForTimesEntered(timesHitNext + 1);
+    // Now allow the thread calling ARS::next to continue.
+    fpNext->setMode(FailPoint::off);
+
+    onCommand([&](auto&&) {
+        // MSARS will get a second response so it won't get interrupted while waiting, but will
+        // subsequently fail to unyield, so this cursor will get thrown away. CursorEstablisher
+        // should still send a kill command.
+        CursorResponse cursorResponse(_nss, CursorId(123), {});
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    // We didn't get a cursor back from the first response so we should only kill for the second
+    // response.
+    expectKillOperations(1);
+
+    future.default_timed_get();
+}
+
+TEST_F(EstablishCursorsTest, MultipleRemotesMultipleDifferentErrors) {
+    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj},
+                                                      {kTestShardIds[1], cmdObj}};
+
+    // Prefer throwing LockTimeout.
+    auto future = launchAsync([&] {
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       false),  // allowPartialResults
+                      ExceptionFor<ErrorCodes::LockTimeout>);
+    });
+
+    // First remote responds with stale config error.
+    onCommandThrowStaleConifg(kTestShardIds[0]);
+
+    // Second remote responds encounters simulated yield error.
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+        return createErrorCursorResponse(
+            Status(ErrorCodes::LockTimeout, "fake unable to acquire ticket2"));
+    });
 
     future.default_timed_get();
 }

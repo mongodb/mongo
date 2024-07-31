@@ -135,8 +135,8 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
         if (_failedUnyield && response.swResponse != _interruptStatus) {
             // If the interrupt was caused by an unyield error, every subsequent response must
             // also have that unyield error.
-            AsyncRequestsSender::Response failedResponse{.shardId = response.shardId,
-                                                         .swResponse = _interruptStatus};
+            auto failedResponse = response;
+            failedResponse.swResponse = _interruptStatus;
             return failedResponse;
         }
         return response;
