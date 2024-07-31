@@ -49,7 +49,7 @@
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"

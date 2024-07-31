@@ -37,7 +37,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/columnar.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/framework.h"
 
 namespace mongo::sbe {

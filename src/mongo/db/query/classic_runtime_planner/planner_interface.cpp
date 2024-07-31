@@ -37,7 +37,7 @@
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
-#include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/query/stage_builder/stage_builder_util.h"
 
 namespace mongo::classic_runtime_planner {
 

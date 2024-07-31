@@ -41,8 +41,8 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_cache.h"
-#include "mongo/db/query/sbe_stage_builder_plan_data.h"
-#include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_plan_data.h"
+#include "mongo/db/query/stage_builder/stage_builder_util.h"
 
 namespace mongo::classic_runtime_planner_for_sbe {
 

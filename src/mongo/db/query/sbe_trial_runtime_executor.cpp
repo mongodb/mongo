@@ -39,7 +39,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/plan_executor_sbe.h"
-#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/assert_util.h"
 

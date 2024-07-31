@@ -34,7 +34,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
-#include "mongo/db/query/sbe_stage_builder_plan_data.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_plan_data.h"
 
 namespace mongo::input_params {
 /**

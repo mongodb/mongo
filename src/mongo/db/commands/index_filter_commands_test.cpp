@@ -63,7 +63,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/sbe_plan_cache.h"
-#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"

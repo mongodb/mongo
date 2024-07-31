@@ -40,8 +40,8 @@
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
-#include "mongo/db/query/sbe_stage_builder_plan_data.h"
-#include "mongo/db/query/sbe_stage_builder_state.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_plan_data.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_state.h"
 #include "mongo/unittest/golden_test.h"
 
 namespace mongo::sbe {

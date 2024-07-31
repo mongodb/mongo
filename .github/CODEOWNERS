@@ -521,6 +521,12 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/query/search/OWNERS.yml
 /src/mongo/db/query/search/**/* @10gen/query-integration
 
+# The following patterns are parsed from ./src/mongo/db/query/stage_builder/OWNERS.yml
+/src/mongo/db/query/stage_builder/**/* @10gen/query-execution
+
+# The following patterns are parsed from ./src/mongo/db/query/stage_builder/sbe/OWNERS.yml
+/src/mongo/db/query/stage_builder/sbe/**/* @10gen/query-execution
+
 # The following patterns are parsed from ./src/mongo/db/query/stats/OWNERS.yml
 /src/mongo/db/query/stats/**/* @10gen/query-optimization
 

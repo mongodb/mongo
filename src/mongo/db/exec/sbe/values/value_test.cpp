@@ -40,7 +40,7 @@
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/sbe_stage_builder_test_fixture.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 

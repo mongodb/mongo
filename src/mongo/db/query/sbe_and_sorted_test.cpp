@@ -38,10 +38,10 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
-#include "mongo/db/query/sbe_stage_builder_test_fixture.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 

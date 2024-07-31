@@ -30,7 +30,7 @@
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 
 #include "mongo/db/query/plan_executor_factory.h"
-#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder.h"
 
 namespace mongo::classic_runtime_planner_for_sbe {
 

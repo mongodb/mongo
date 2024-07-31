@@ -32,8 +32,8 @@
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder.h"
+#include "mongo/db/query/stage_builder/stage_builder_util.h"
 
 namespace mongo {
 

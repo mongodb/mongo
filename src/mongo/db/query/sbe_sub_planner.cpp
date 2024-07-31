@@ -42,7 +42,7 @@
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_sub_planner.h"
-#include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"

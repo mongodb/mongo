@@ -42,7 +42,7 @@
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/sbe_stage_builder_plan_data.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_plan_data.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo::sbe::plan_ranker {

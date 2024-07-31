@@ -40,7 +40,7 @@
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
