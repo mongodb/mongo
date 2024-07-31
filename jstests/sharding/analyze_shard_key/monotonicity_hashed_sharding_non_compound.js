@@ -52,7 +52,9 @@ for (let orderType0 of kOrderTypes) {
         });
     }
 }
-
+// Need testProbability to cut down on test duration, but still have good coverage in aggregate due
+// to number of times tests is ran.
+const testProbability = 0.2;
 // This test requires the collection to contain at least a few thousands of documents to smooth out
 // the insertion order noise caused by parallel oplog application on secondaries.
 const numDocsRange = {
@@ -63,8 +65,8 @@ const numDocsRange = {
 {
     const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS}});
 
-    testAnalyzeShardKeysUnshardedCollection(st.s, testCases, numDocsRange);
-    testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRange);
+    testAnalyzeShardKeysUnshardedCollection(st.s, testCases, testProbability, numDocsRange);
+    testAnalyzeShardKeysShardedCollection(st, testCases, testProbability, numDocsRange);
 
     st.stop();
 }
@@ -75,7 +77,7 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove 
     rst.initiate();
     const primary = rst.getPrimary();
 
-    testAnalyzeShardKeysUnshardedCollection(primary, testCases, numDocsRange);
+    testAnalyzeShardKeysUnshardedCollection(primary, testCases, testProbability, numDocsRange);
 
     rst.stopSet();
 }

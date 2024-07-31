@@ -210,10 +210,16 @@ export function makeDocuments(numDocs, fieldOpts) {
     return docs;
 }
 
-export function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, numDocsRange) {
+export function testMonotonicity(conn,
+                                 dbName,
+                                 collName,
+                                 currentShardKey,
+                                 testCases,
+                                 testProbability,
+                                 numDocsRange,
+                                 setupCollection) {
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
-    const coll = db.getCollection(collName);
 
     const correlationCoefficientThreshold =
         assert
@@ -222,6 +228,9 @@ export function testMonotonicity(conn, dbName, collName, currentShardKey, testCa
             .analyzeShardKeyMonotonicityCorrelationCoefficientThreshold;
 
     testCases.forEach(testCase => {
+        if (Math.random() > testProbability) {
+            return;
+        }
         const numDocs = AnalyzeShardKeyUtil.getRandInteger(numDocsRange.min, numDocsRange.max);
         for (let i = 0; i < testCase.fieldOpts.length; i++) {
             const order = testCase.fieldOpts[i].order;
@@ -241,13 +250,7 @@ export function testMonotonicity(conn, dbName, collName, currentShardKey, testCa
         jsTest.log(`Testing metrics for ${
             tojson({dbName, collName, currentShardKey, numDocs, testCase})}`);
 
-        // Waiting for the index to be created on all nodes is necessary since mongos runs
-        // the analyzeShardKey command with readPreference "secondaryPreferred".
-        assert.commandWorked(db.runCommand({
-            createIndexes: collName,
-            indexes: [{key: testCase.indexKey, name: JSON.stringify(testCase.indexKey)}],
-            writeConcern: {w: numNodesPerRS}
-        }));
+        setupCollection();
 
         // To reduce the insertion order noise caused by parallel oplog application on
         // secondaries, insert the documents in multiple batches.
@@ -263,6 +266,14 @@ export function testMonotonicity(conn, dbName, collName, currentShardKey, testCa
             }));
             currIndex = endIndex;
         }
+
+        // Waiting for the index to be created on all nodes is necessary since mongos runs
+        // the analyzeShardKey command with readPreference "secondaryPreferred".
+        assert.commandWorked(db.runCommand({
+            createIndexes: collName,
+            indexes: [{key: testCase.indexKey, name: JSON.stringify(testCase.indexKey)}],
+            writeConcern: {w: numNodesPerRS}
+        }));
 
         const res = assert.commandWorked(conn.adminCommand({
             analyzeShardKey: ns,
@@ -293,42 +304,57 @@ export function testMonotonicity(conn, dbName, collName, currentShardKey, testCa
             }
         }
 
-        assert.commandWorked(coll.remove({}));
-        assert.commandWorked(coll.dropIndex(testCase.indexKey));
+        assert.commandWorked(db.dropDatabase());
         for (let i = 0; i < testCase.fieldOpts.length; i++) {
             delete testCase.fieldOpts[i].maxFrequency;
         }
     });
 }
 
-export function testAnalyzeShardKeysUnshardedCollection(conn, testCases, numDocsRange) {
+export function testAnalyzeShardKeysUnshardedCollection(
+    conn, testCases, testProbability, numDocsRange) {
     const dbName = "testDb";
     const collName = "testCollUnsharded";
-    const db = conn.getDB(dbName);
 
     jsTest.log(`Testing analyzing a shard key for an unsharded collection: ${
         tojsononeline({dbName, collName})}`);
 
-    testMonotonicity(conn, dbName, collName, null /* currentShardKey */, testCases, numDocsRange);
-    assert.commandWorked(db.dropDatabase());
+    let setUpCollection = () => {};
+    testMonotonicity(conn,
+                     dbName,
+                     collName,
+                     null /* currentShardKey */,
+                     testCases,
+                     testProbability,
+                     numDocsRange,
+                     setUpCollection);
 }
 
-export function testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRange) {
+export function testAnalyzeShardKeysShardedCollection(
+    st, testCases, testProbability, numDocsRange) {
     const dbName = "testDb";
     const collName = "testCollSharded";
     const ns = dbName + "." + collName;
     const currentShardKey = {skey: 1};
     const currentShardKeySplitPoint = {skey: 0};
-    const db = st.s.getDB(dbName);
 
     jsTest.log(`Testing analyzing a shard key for a sharded collection: ${
         tojsononeline({dbName, collName})}`);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentShardKey}));
-    assert.commandWorked(st.s.adminCommand({split: ns, middle: currentShardKeySplitPoint}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}));
-    testMonotonicity(st.s, dbName, collName, currentShardKey, testCases, numDocsRange);
-    assert.commandWorked(db.dropDatabase());
+    let setUpCollection = () => {
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+        assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentShardKey}));
+        assert.commandWorked(st.s.adminCommand({split: ns, middle: currentShardKeySplitPoint}));
+        assert.commandWorked(st.s.adminCommand(
+            {moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}));
+    };
+    testMonotonicity(st.s,
+                     dbName,
+                     collName,
+                     currentShardKey,
+                     testCases,
+                     testProbability,
+                     numDocsRange,
+                     setUpCollection);
 }

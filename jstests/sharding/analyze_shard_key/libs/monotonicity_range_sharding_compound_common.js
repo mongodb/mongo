@@ -60,10 +60,12 @@ export const rangeShardingCompoundTestCases = (() => {
 
     return testCases;
 })();
-
-// This test requires the collection to contain at least a few thousands of documents to smooth
+// Need testProbability to cut down on test duration, but still have good coverage in aggregate due
+// to number of times tests is ran.
+export const testProbability = 0.15;
+// This test requires the collection to contain a large number of documents to smooth
 // out the insertion order noise caused by parallel oplog application on secondaries.
 export const numDocsRange = {
-    min: 15000,
-    max: 20000
+    min: 45000,
+    max: 50000
 };
