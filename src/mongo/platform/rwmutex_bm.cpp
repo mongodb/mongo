@@ -206,7 +206,11 @@ public:
         while (threads--) {
             _threads.emplace_back([&] { _workerBody(threads <= readers); });
         }
-        _pendingThreads.wait(0);
+
+        auto pending = _pendingThreads.load();
+        while (pending > 0) {
+            pending = _pendingThreads.wait(pending);
+        }
     }
 
     void TearDown(benchmark::State&) override {
@@ -229,7 +233,7 @@ private:
         // Initialize thread-local state for all worker threads, regardless of what they do next.
         { auto readLock = _rwMutex.readLock(); }
 
-        if (_pendingThreads.subtractAndFetch(1)) {
+        if (_pendingThreads.subtractAndFetch(1) == 0) {
             _pendingThreads.notifyAll();
         }
 
