@@ -37,7 +37,15 @@ function countAuthInLog(conn) {
     return logCounts;
 }
 
-const rst = new ReplSetTest({nodes: 1, keyFile: 'jstests/libs/key1'});
+const rst = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {
+        setParameter: {
+            "failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"}),
+        }
+    },
+    keyFile: 'jstests/libs/key1',
+});
 rst.startSet();
 rst.initiate();
 rst.awaitReplication();
