@@ -148,68 +148,6 @@ const checkClusterParameters =
         fp.off();
     }
 
-    {
-        jsTestLog('Check that addShard serializes with setClusterParameter.');
-
-        const newShardName = 'newShard';
-        const newShard = new ReplSetTest({name: newShardName, nodes: 1});
-        newShard.startSet({shardsvr: ''});
-        newShard.initiate();
-
-        let shardsvrSetClusterParameterFailPoint =
-            configureFailPoint(st.rs0.getPrimary(), 'hangInShardsvrSetClusterParameter');
-
-        let setClusterParameterThread = new Thread((mongosConnString, clusterParameter) => {
-            let mongos = new Mongo(mongosConnString);
-            assert.commandWorked(mongos.adminCommand({setClusterParameter: clusterParameter}));
-        }, st.s.host, clusterParameter3);
-        setClusterParameterThread.start();
-
-        shardsvrSetClusterParameterFailPoint.wait();
-
-        assert.commandFailedWithCode(
-            st.s.adminCommand({addShard: newShard.getURL(), name: newShardName, maxTimeMS: 1000}),
-            ErrorCodes.MaxTimeMSExpired);
-
-        shardsvrSetClusterParameterFailPoint.off();
-        setClusterParameterThread.join();
-
-        jsTestLog('Check that the config server will push all parameters when adding a new shard.');
-
-        assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: newShardName}));
-
-        checkClusterParameters(clusterParameter1Name,
-                               clusterParameter1Value,
-                               st.configRS.getPrimary(),
-                               newShard.getPrimary());
-        checkClusterParameters(clusterParameter2Name,
-                               clusterParameter2Value,
-                               st.configRS.getPrimary(),
-                               newShard.getPrimary());
-        checkClusterParameters(clusterParameter3Name,
-                               clusterParameter3Value,
-                               st.configRS.getPrimary(),
-                               newShard.getPrimary());
-
-        removeShard(st, newShardName);
-
-        newShard.stopSet();
-
-        // Final check, the initial shard has all the cluster parameters
-        checkClusterParameters(clusterParameter1Name,
-                               clusterParameter1Value,
-                               st.configRS.getPrimary(),
-                               st.rs0.getPrimary());
-        checkClusterParameters(clusterParameter2Name,
-                               clusterParameter2Value,
-                               st.configRS.getPrimary(),
-                               st.rs0.getPrimary());
-        checkClusterParameters(clusterParameter3Name,
-                               clusterParameter3Value,
-                               st.configRS.getPrimary(),
-                               st.rs0.getPrimary());
-    }
-
     st.stop();
 }
 
@@ -338,6 +276,56 @@ if (!TestData.configShard) {
         newShard4.stopSet();
 
         st3.stop();
+    }
+
+    {
+        jsTestLog('Check that addShard serializes with setClusterParameter.');
+
+        const st4 = new ShardingTest({shards: 1, rs: {nodes: 3}});
+
+        const newShardName = 'newShard';
+        const newShard = new ReplSetTest({name: newShardName, nodes: 1});
+        newShard.startSet({shardsvr: ''});
+        newShard.initiate();
+
+        let shardsvrSetClusterParameterFailPoint =
+            configureFailPoint(st4.rs0.getPrimary(), 'hangInShardsvrSetClusterParameter');
+
+        let setClusterParameterThread = new Thread((mongosConnString, clusterParameter) => {
+            let mongos = new Mongo(mongosConnString);
+            assert.commandWorked(mongos.adminCommand({setClusterParameter: clusterParameter}));
+        }, st4.s.host, clusterParameter3);
+        setClusterParameterThread.start();
+
+        shardsvrSetClusterParameterFailPoint.wait();
+
+        assert.commandFailedWithCode(
+            st4.s.adminCommand({addShard: newShard.getURL(), name: newShardName, maxTimeMS: 1000}),
+            ErrorCodes.MaxTimeMSExpired);
+
+        shardsvrSetClusterParameterFailPoint.off();
+        setClusterParameterThread.join();
+
+        jsTestLog('Check that the config server will push all parameters when adding a new shard.');
+
+        assert.commandWorked(st4.s.adminCommand({addShard: newShard.getURL(), name: newShardName}));
+
+        checkClusterParameters(clusterParameter3Name,
+                               clusterParameter3Value,
+                               st4.configRS.getPrimary(),
+                               newShard.getPrimary());
+
+        removeShard(st4, newShardName);
+
+        newShard.stopSet();
+
+        // Final check, the initial shard has all the cluster parameters
+        checkClusterParameters(clusterParameter3Name,
+                               clusterParameter3Value,
+                               st4.configRS.getPrimary(),
+                               st4.rs0.getPrimary());
+
+        st4.stop();
     }
 } else {
     // In config shard mode

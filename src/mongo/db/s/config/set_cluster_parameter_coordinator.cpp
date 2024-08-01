@@ -155,6 +155,10 @@ void SetClusterParameterCoordinator::_sendSetClusterParameterToAllShards(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     auto shards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
+    // In case the config server acts as a config shard, there is no need to send the update because
+    // it will be handled in the _commit phase.
+    shards.erase(std::remove(shards.begin(), shards.end(), ShardId::kConfigServerId), shards.end());
+
     LOGV2_DEBUG(6387001, 1, "Sending setClusterParameter to shards:", "shards"_attr = shards);
 
     ShardsvrSetClusterParameter request(_doc.getParameter());
