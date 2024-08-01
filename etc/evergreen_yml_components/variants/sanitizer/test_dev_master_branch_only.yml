@@ -495,7 +495,7 @@ buildvariants:
     large_distro_name: rhel80-build
   tasks:
   - name: compile_and_archive_dist_test_TG
-  - name: .concurrency !.no_txns !.repl !.kill_terminate
+  - name: .concurrency !.no_txns !.kill_terminate
   - name: disk_wiredtiger
   - name: generate_buildid_to_debug_symbols_mapping
 
