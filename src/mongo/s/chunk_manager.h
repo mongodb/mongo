@@ -909,7 +909,7 @@ public:
         return _rt->optRt->getReshardingFields();
     }
 
-    const RoutingTableHistory& getRoutingTableHistory_ForTest() const {
+    const RoutingTableHistory& getRoutingTableHistory_forTest() const {
         tassert(7626417, "Expected routing table to be initialized", _rt->optRt);
         return *_rt->optRt;
     }

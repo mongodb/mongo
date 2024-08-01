@@ -59,15 +59,15 @@ public:
     explicit BackupBlock(OperationContext* opCtx,
                          boost::optional<NamespaceString> nss,
                          boost::optional<UUID> uuid,
-                         std::string filePath,
+                         std::string absoluteFilePath,
                          std::uint64_t offset = 0,
                          std::uint64_t length = 0,
                          std::uint64_t fileSize = 0);
 
     ~BackupBlock() = default;
 
-    std::string filePath() const {
-        return _filePath;
+    std::string absoluteFilePath() const {
+        return _absoluteFilePath.string();
     }
 
     boost::optional<NamespaceString> ns() const {
@@ -96,7 +96,7 @@ public:
     bool isRequired() const;
 
 private:
-    const std::string _filePath;
+    const boost::filesystem::path _absoluteFilePath;
     const std::uint64_t _offset;
     const std::uint64_t _length;
     const std::uint64_t _fileSize;

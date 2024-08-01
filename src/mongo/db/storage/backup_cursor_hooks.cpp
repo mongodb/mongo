@@ -97,11 +97,11 @@ bool BackupCursorHooks::isBackupCursorOpen() const {
     return false;
 }
 
-bool BackupCursorHooks::isFileReturnedByCursor(const UUID& backupId, std::string filename) {
+bool BackupCursorHooks::isFileReturnedByCursor(const UUID& backupId, std::string filePath) {
     MONGO_UNREACHABLE;
 }
 
-void BackupCursorHooks::addFilename(const UUID& backupId, std::string filename) {
+void BackupCursorHooks::addFile(const UUID& backupId, std::string filePath) {
     MONGO_UNREACHABLE;
 }
 
