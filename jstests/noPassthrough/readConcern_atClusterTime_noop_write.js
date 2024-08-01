@@ -56,24 +56,46 @@ const st = new ShardingTest({
     }
 });
 
-// Create database "test0" on shard 0.
-const testDB0 = st.s.getDB("test0");
-assert.commandWorked(testDB0.adminCommand({enableSharding: testDB0.getName()}));
-st.ensurePrimaryShard(testDB0.getName(), st.shard0.shardName);
-assert.commandWorked(testDB0.createCollection("coll0"));
+/*
+ * Create one unsharded collection per shard
+ * SHARD0 : "test0.coll0"
+ * SHARD1 : "test1.coll1"
+ */
+var collectionMap = {};
+collectionMap[st.shard0.shardName] = {
+    rs: st.rs0,
+    dbName: "test0",
+    collName: "coll0"
+};
+collectionMap[st.shard1.shardName] = {
+    rs: st.rs1,
+    dbName: "test1",
+    collName: "coll1"
+};
 
-// Create a database "test1" on shard 1.
-const testDB1 = st.s.getDB("test1");
-assert.commandWorked(testDB1.adminCommand({enableSharding: testDB1.getName()}));
-st.ensurePrimaryShard(testDB1.getName(), st.shard1.shardName);
-assert.commandWorked(testDB1.createCollection("coll1"));
+// Create an unsharded collection per shard.
+function createCollectionOnShard(shard) {
+    var dbName = collectionMap[shard.shardName].dbName;
+    var collName = collectionMap[shard.shardName].collName;
 
-const PropagationPreferenceOptions = Object.freeze({kShard: 0, kConfig: 1});
+    assert.commandWorked(
+        st.s.getDB(dbName).adminCommand({enableSharding: dbName, primaryShard: shard.shardName}));
+    assert.commandWorked(st.s.getDB(dbName).createCollection(collName));
+}
 
-let testNoopWrite = (fromDbName, fromColl, toRS, toDbName, toColl, propagationPreference) => {
-    const fromDBFromMongos = st.s.getDB(fromDbName);
-    const toDBFromMongos = st.s.getDB(toDbName);
-    const configFromMongos = st.s.getDB("config");
+createCollectionOnShard(st.shard0);
+createCollectionOnShard(st.shard1);
+
+let testNoopWrite = (sourceShardName, destinationShardName) => {
+    var fromDbName = collectionMap[sourceShardName].dbName;
+    var fromCollName = collectionMap[sourceShardName].collName;
+
+    var toDbName = collectionMap[destinationShardName].dbName;
+    var toCollName = collectionMap[destinationShardName].collName;
+    var toRS = collectionMap[destinationShardName].rs;
+
+    jsTest.log(
+        `Testing source shard ${sourceShardName}, destination shard ${destinationShardName}`);
 
     const oplog = toRS.getPrimary().getCollection("local.oplog.rs");
     let findRes = oplog.findOne({o: {$eq: {"noop write for afterClusterTime read concern": 1}}});
@@ -81,57 +103,57 @@ let testNoopWrite = (fromDbName, fromColl, toRS, toDbName, toColl, propagationPr
 
     // Perform a write on the fromDB and get its op time.
     let res = assert.commandWorked(
-        fromDBFromMongos.runCommand({insert: fromColl, documents: [{_id: 0}]}));
+        st.s.getDB(fromDbName).runCommand({insert: fromCollName, documents: [{_id: 0}]}));
     assert(res.hasOwnProperty("operationTime"), tojson(res));
-    let clusterTime = res.operationTime;
+    let fromRSOpTime = res.operationTime;
 
-    // Propagate 'clusterTime' to toRS or the config server. This ensures that its next
-    // write will be at time >= 'clusterTime'. We cannot use toDBFromMongos to propagate
-    // 'clusterTime' to the config server, because mongos only routes to the config server
-    // for the 'config' and 'admin' databases.
-    if (propagationPreference == PropagationPreferenceOptions.kConfig) {
-        configFromMongos.coll1.find().itcount();
-    } else {
-        toDBFromMongos.coll1.find().itcount();
+    let toRSOpTime = getLastOpTime(toRS.getPrimary()).ts;
+    // In case 'to' shard has a clock already ahead of the 'from' shard, the entire test can be
+    // skipped as the no-op write won't be executed.
+    if (timestampCmp(toRSOpTime, fromRSOpTime) >= 0) {
+        jsTest.log(`Skipping check for source shard ${sourceShardName}, destination shard ${
+            destinationShardName}. Destination shard's clock ${
+            tojson(toRSOpTime)} >= Source shard's clock ${tojson(fromRSOpTime)}`);
+        return;
     }
 
-    // Attempt a snapshot read at 'clusterTime' on toRS. Test that it performs a noop write
-    // to advance its lastApplied optime past 'clusterTime'. The snapshot read itself may
-    // fail if the noop write advances the node's majority commit point past 'clusterTime'
+    // Propagate 'fromRSOpTime' to toRS. This ensures that its next write will be at time >=
+    // 'clusterTime'.
+    st.s.getDB(toDbName).getCollection(toCollName).find().itcount();
+
+    // Attempt a snapshot read at 'fromRSOpTime' on toRS. Test that it performs a noop write
+    // to advance its lastApplied optime past 'fromRSOpTime'. The snapshot read itself may
+    // fail if the noop write advances the node's majority commit point past 'fromRSOpTime'
     // and it releases that snapshot.
     const toRSSession =
-        toRS.getPrimary().getDB(toDBFromMongos).getMongo().startSession({causalConsistency: false});
+        toRS.getPrimary().getDB(toDbName).getMongo().startSession({causalConsistency: false});
 
-    toRSSession.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
-    res = toRSSession.getDatabase(toDBFromMongos).runCommand({find: toColl});
+    jsTest.log(`Running transaction with snapshot read concern ${tojson(fromRSOpTime)}`);
+
+    // In case the shard does not advance its lastOpTime, the transaction would hang indefinitely.
+    toRSSession.startTransaction({readConcern: {level: "snapshot", atClusterTime: fromRSOpTime}});
+    res = toRSSession.getDatabase(toDbName).runCommand({find: toCollName, maxTimeMS: 60 * 1000});
+    assert.neq(res.code,
+        ErrorCodes.MaxTimeMSExpired,
+        `Transaction with read concern snapshot at clusterTime ${tojson(fromRSOpTime)} did not complete on time. The shard might not have advanced its lastOpTime before executing.`);
     if (res.ok === 0) {
         assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld);
         assert.commandFailedWithCode(toRSSession.abortTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
-    } else {
-        assert.commandWorked(toRSSession.commitTransaction_forTesting());
+        return;
     }
 
-    const toRSOpTime = getLastOpTime(toRS.getPrimary()).ts;
-
-    assert.gte(toRSOpTime, clusterTime);
-
-    findRes = oplog.findOne({o: {$eq: {"noop write for afterClusterTime read concern": 1}}});
-    assert(findRes);
+    assert.commandWorked(toRSSession.commitTransaction_forTesting());
+    // Check the lastOpTime advanced. This should happen either because of another operation, or
+    // because of a no-op in the oplog performed by the transaction itself.
+    toRSOpTime = getLastOpTime(toRS.getPrimary()).ts;
+    assert.gte(toRSOpTime, fromRSOpTime);
 };
 
-//
-// Test noop write. Read from the destination shard.
-//
-
-testNoopWrite("test0", "coll0", st.rs1, "test1", "coll1", PropagationPreferenceOptions.kShard);
-
-//
-// Test noop write. Read from the config server's primary.
-//
-
-testNoopWrite(
-    "test0", "coll2", st.configRS, "test1", "coll3", PropagationPreferenceOptions.kConfig);
+// The test requires the "to" shard to have its clock ahead the "from" shard, otherwise it early
+// exits. Run the test both sides to make sure to execute the test at least once.
+testNoopWrite(st.shard0.shardName, st.shard1.shardName);
+testNoopWrite(st.shard1.shardName, st.shard0.shardName);
 
 st.stop();
 }());
