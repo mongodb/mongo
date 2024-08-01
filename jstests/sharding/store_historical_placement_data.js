@@ -55,7 +55,7 @@ function getLatestPlacementInfoFor(namespace) {
     return placementQueryResults[0];
 }
 
-function getValidatedPlacementInfoForDB(dbName) {
+function getValidatedPlacementInfoForDB(dbName, compareTimestamps = true) {
     const configDBInfo = getInfoFromConfigDatabases(dbName);
     const dbPlacementInfo = getLatestPlacementInfoFor(dbName);
     assert.neq(null, configDBInfo);
@@ -64,7 +64,9 @@ function getValidatedPlacementInfoForDB(dbName) {
     // config.databases.
     assert.sameMembers([configDBInfo.primary], dbPlacementInfo.shards);
 
-    assert(timestampCmp(configDBInfo.version.timestamp, dbPlacementInfo.timestamp) === 0);
+    if (compareTimestamps) {
+        assert(timestampCmp(configDBInfo.version.timestamp, dbPlacementInfo.timestamp) === 0);
+    }
 
     // No UUID field for DB namespaces
     assert.eq(undefined, dbPlacementInfo.uuid);
@@ -196,7 +198,9 @@ function testMovePrimary(dbName, fromPrimaryShardName, toPrimaryShardName) {
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: toPrimaryShardName}));
 
     // Verify that the new primary shard is the one specified in the command.
-    const newDbInfo = getValidatedPlacementInfoForDB(dbName);
+    // Suppress comparing timestamp assertion in v7.0. The issue is not severe and placementInfo has
+    // no practical use in v7.0. See SERVER-92842.
+    const newDbInfo = getValidatedPlacementInfoForDB(dbName, false /*compareTimestamps*/);
     assert.sameMembers(newDbInfo.shards, [toPrimaryShardName]);
 }
 
