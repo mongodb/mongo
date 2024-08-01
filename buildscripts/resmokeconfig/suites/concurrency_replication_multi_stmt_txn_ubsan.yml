@@ -54,6 +54,7 @@ selector:
   - catches_command_failures
   # time-series collections do not support write transactions
   - requires_timeseries
+  - does_not_support_transactions
 
 executor:
   archive:

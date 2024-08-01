@@ -180,7 +180,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.no_txns !.repl !.kill_terminate
+  - name: .concurrency !.no_txns !.kill_terminate
   - name: disk_wiredtiger
   - name: .encrypt
   - name: initial_sync_fuzzer_gen
