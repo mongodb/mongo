@@ -136,7 +136,7 @@ UpdateCommittedSnapshot(i, newCommittedSnapshot) ==
 
 \* If lastApplied = lastDurable = committedSnapshot, restart won't help 
 \* verify anything, so we optimize not doing restart at that time.                                                              
-RestartIsUnncessary(i) ==
+RestartIsUnnecessary(i) ==
     /\ lastApplied[i].term = lastDurable[i].term
     /\ lastApplied[i].index = lastDurable[i].index
     /\ lastApplied[i].term = committedSnapshot[i].curr.term
@@ -230,8 +230,8 @@ BecomePrimaryByMagic(i, ayeVoters) ==
 \* Restart node i, throwing every log that is not durable and setting lastApplied to 
 \* stableTimestamp, which is assumed to be the same as committedSnapshot in this spec.
 Restart(i) ==
-    /\ state' = [state EXCEPT ![i] = "Follwer"]
-    /\ ~RestartIsUnncessary(i)
+    /\ state' = [state EXCEPT ![i] = "Follower"]
+    /\ ~RestartIsUnnecessary(i)
     /\ restartTimes' = [restartTimes EXCEPT ![i] = restartTimes[i] + 1]
     /\ LET newLastDurable == MaxTimestamp({lastDurable[i], committedSnapshot[i].curr})
            newLog == [index2 \in 1..(newLastDurable.index) |-> log[i][index2]]
