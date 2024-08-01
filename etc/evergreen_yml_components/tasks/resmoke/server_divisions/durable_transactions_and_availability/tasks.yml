@@ -682,9 +682,10 @@ tasks:
           # historical data. We manually increase the timeout above the historical timeout to avoid this
           exec_timeout_secs: 900 # 15 mins
 
-  ## initial sync generational fuzzer ##
+  ## initial sync generational fuzzer to ensure stability in patch builds ##
   - <<: *jstestfuzz_template
-    name: initial_sync_fuzzer_gen
+    name: initial_sync_fuzzer_sanity_patch_gen
+    patch_only: true
     tags:
       [
         "assigned_to_jira_team_server_repl",
@@ -694,14 +695,31 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
-        vars:
+        vars: &initial_sync_fuzzer_sanity_patch_config
           <<: *jstestfuzz_config_vars
-          num_files: 10
-          num_tasks: 5
+          num_files: 2
+          num_tasks: 1
           jstestfuzz_vars: --useEsModules
           npm_command: initsync-fuzzer
           suite: initial_sync_fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  ## initial sync generational fuzzer ##
+  - <<: *jstestfuzz_template
+    name: initial_sync_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "non_deterministic",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *initial_sync_fuzzer_sanity_patch_config
+          num_files: 10
+          num_tasks: 5
 
   ## initial sync multiversion fuzzer ##
   - <<: *jstestfuzz_template
@@ -1549,9 +1567,10 @@ tasks:
           # index build commit quorum.
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
 
-  ## rollback generational fuzzer ##
+  ## rollback generational fuzzer to ensure stability in patch builds ##
   - <<: *jstestfuzz_template
-    name: rollback_fuzzer_gen
+    name: rollback_fuzzer_sanity_patch_gen
+    patch_only: true
     tags:
       [
         "assigned_to_jira_team_server_repl",
@@ -1562,16 +1581,34 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
-        vars:
+        vars: &rollback_fuzzer_sanity_patch_config
           <<: *jstestfuzz_config_vars
-          num_files: 3
-          num_tasks: 5
+          num_files: 2
+          num_tasks: 1
           jstestfuzz_vars: --useEsModules
           npm_command: rollback-fuzzer
           suite: rollback_fuzzer
           # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
           # index build commit quorum.
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
+
+  ## rollback generational fuzzer ##
+  - <<: *jstestfuzz_template
+    name: rollback_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "non_deterministic",
+        "rollbackfuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *rollback_fuzzer_sanity_patch_config
+          num_files: 3
+          num_tasks: 5
 
   ## rollback generational fuzzer with unclean shutdowns ##
   - <<: *jstestfuzz_template
