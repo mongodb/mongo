@@ -1591,8 +1591,9 @@ tasks:
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - command: manifest.load
-      - func: "git get project"
+      - func: "git get shallow project"
       - func: "f_expansions_write"
+      - func: "restore git history and tags"
       - func: "add git tag"
       - func: "kill processes"
       - func: "cleanup environment"
@@ -1606,8 +1607,9 @@ tasks:
     priority: 10
     commands:
       - command: manifest.load
-      - func: "git get project"
+      - func: "git get shallow project"
       - func: "f_expansions_write"
+      - func: "restore git history and tags"
       - func: "add git tag"
       - func: "kill processes"
       - func: "cleanup environment"
@@ -1624,8 +1626,9 @@ tasks:
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - command: manifest.load
-      - func: "git get project"
+      - func: "git get shallow project"
       - func: "f_expansions_write"
+      - func: "restore git history and tags"
       - func: "add git tag"
       - func: "kill processes"
       - func: "cleanup environment"
@@ -1642,8 +1645,9 @@ tasks:
       ]
     commands:
       - command: manifest.load
-      - func: "git get project"
+      - func: "git get shallow project"
       - func: "f_expansions_write"
+      - func: "restore git history and tags"
       - func: "add git tag"
       - func: "kill processes"
       - func: "cleanup environment"

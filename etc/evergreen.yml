@@ -44,7 +44,8 @@
 # 2. If your task does not depend on 'archive_dist_test'/'archive_dist_test_debug' task use the following functions
 # call sequence
 # - command: manifest.load
-# - func: "git get project" (clone the entire mongo and enterprise repos)
+# - func: "git get shallow project" (clone the entire mongo and enterprise repos)
+# - func: "restore git history and tags"
 # - func: "f_expansions_write"
 # - func: "kill processes"
 # - func: "cleanup environment"

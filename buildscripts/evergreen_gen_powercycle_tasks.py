@@ -79,7 +79,8 @@ def get_skip_compile_setup_commands() -> Tuple[List[FunctionCall], set]:
     """Return skip compile setup commands."""
     return [
         BuiltInCommand("manifest.load", {}),
-        FunctionCall("git get project"),
+        FunctionCall("git get shallow project"),
+        FunctionCall("restore git history and tags"),
         FunctionCall("f_expansions_write"),
         FunctionCall("kill processes"),
         FunctionCall("cleanup environment"),
