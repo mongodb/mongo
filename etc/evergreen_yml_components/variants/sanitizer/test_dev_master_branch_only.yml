@@ -144,6 +144,7 @@ buildvariants:
       compile_variant: *enterprise-rhel-8-64-bit-dynamic-debug-mode
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --excludeWithAnyTags=incompatible_slow_machine
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=rhel88
