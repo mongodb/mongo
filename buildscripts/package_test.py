@@ -356,8 +356,18 @@ def get_tools_package(arch_name: str, os_name: str) -> Optional[str]:
     if arch_name == "aarch64" and not os_name.startswith("amazon") and not os_name.startswith(
             "rhel"):
         arch_name = "arm64"
+
+    # Tools packages are only published to the latest RHEL version supported on master, but
+    # the tools binaries are cross compatible with other RHEL versions
+    # (see https://jira.mongodb.org/browse/SERVER-92939)
+    def major_version_matches(download_name: str) -> bool:
+        if (os_name.startswith("rhel") and download_name.startswith("rhel")
+                and os_name[4] == download_name[4]):
+            return True
+        return download_name == os_name
+
     for download in current_tools_releases["versions"][0]["downloads"]:
-        if download["name"] == os_name and download["arch"] == arch_name:
+        if major_version_matches(download["name"]) and download["arch"] == arch_name:
             return download["package"]["url"]
     return None
 
