@@ -39,6 +39,7 @@
 #include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
@@ -73,12 +74,14 @@ void appendBuffer(Buffer& buffer, Iterator begin, Iterator end) {
 template <typename Buffer,
           typename SingleByteHandler,
           typename InvalidByteHandler,
-          typename TwoByteEscaper>
+          typename TwoByteEscaper,
+          typename IsValidCodePoint>
 void escape(Buffer& buffer,
             StringData str,
             SingleByteHandler singleHandler,
             InvalidByteHandler invalidByteHandler,
             TwoByteEscaper twoEscaper,
+            IsValidCodePoint isValidCodePoint,
             size_t maxLength,
             size_t* wouldWrite) {
     // The range [inFirst, it) contains input that does not need to be escaped and that has not been
@@ -124,11 +127,6 @@ void escape(Buffer& buffer,
         boundedWrite(escapeSequence.data(), escapeSequence.data() + escapeSequence.size(), false);
     };
 
-    auto isValidCodePoint = [&](auto pos, int len) {
-        return std::distance(pos, inLast) >= len &&
-            std::all_of(pos + 1, pos + len, [](uint8_t c) { return (c >> 6) == 0b10; });
-    };
-
     // Helper function to write a valid one byte UTF-8 sequence from the input stream
     auto writeValid1Byte = [&]() {
         singleHandler(flushAndWrite, *it);
@@ -171,7 +169,7 @@ void escape(Buffer& buffer,
         bool bit5 = (c >> 5) & 1;
         if (!bit5) {
             // 2 byte sequence
-            if (MONGO_likely(isValidCodePoint(it, 2))) {
+            if (MONGO_likely(isValidCodePoint(it, 2, inLast))) {
                 writeValid2Byte();
                 it += 2;
             } else {
@@ -185,7 +183,7 @@ void escape(Buffer& buffer,
         bool bit4 = (c >> 4) & 1;
         if (!bit4) {
             // 3 byte sequence
-            if (MONGO_likely(isValidCodePoint(it, 3))) {
+            if (MONGO_likely(isValidCodePoint(it, 3, inLast))) {
                 it += 3;
             } else {
                 writeInvalid(c);
@@ -202,7 +200,7 @@ void escape(Buffer& buffer,
         }
 
         // 4 byte sequence
-        if (MONGO_likely(isValidCodePoint(it, 4))) {
+        if (MONGO_likely(isValidCodePoint(it, 4, inLast))) {
             it += 4;
         } else {
             writeInvalid(c);
@@ -216,6 +214,64 @@ void escape(Buffer& buffer,
     }
 }
 }  // namespace
+
+bool exceedsMaxUTF8Byte(uint8_t byte) {
+    return static_cast<int>(byte) > 0xF4;
+}
+
+bool isSurrogatePairFromUTF8(unsigned int firstByte,
+                             unsigned int secondByte,
+                             unsigned int thirdByte = 0,
+                             unsigned int fourthByte = 0) {
+    // Use bytes assigned in the above if-statement to check if we have a surrogate pair.
+    // More information about surrogate pairs:
+    // https://en.wikipedia.org/wiki/UTF-16#U+D800_to_U+DFFF_(surrogates)
+    uint16_t upperBytes = (static_cast<uint16_t>(firstByte) << 8) | secondByte;
+    uint16_t lowerBytes = (static_cast<uint16_t>(thirdByte) << 8) | fourthByte;
+    return ((0xD800 <= upperBytes && upperBytes <= 0xDBFF) ||
+            (0xDC00 <= lowerBytes && lowerBytes <= 0xDFFF));
+}
+
+auto isValidCodePointUTF8 = [](auto pos, int len, const char* inLast) {
+    if (std::distance(pos, inLast) < len) {
+        return false;
+    }
+    bool isOverlongEncoding = 0;
+    bool isSurrogatePair = 0;
+
+    // Assign the the byte values based on the len and check if there is an overlong encoding.
+    // More information about overlong encodings:
+    // https://en.wikipedia.org/wiki/UTF-8#Overlong_encodings
+    if (len == 2) {
+        const auto firstByte = static_cast<unsigned int>(*pos);
+        const auto secondByte = static_cast<unsigned int>(*(pos + 1));
+        uint32_t codePoint = ((firstByte & 0x1F) << 6) | (secondByte & 0x3F);
+        isOverlongEncoding = (codePoint < 0x80 || codePoint > 0x7FF);
+        isSurrogatePair = isSurrogatePairFromUTF8(firstByte, secondByte);
+    } else if (len == 3) {
+        unsigned int firstByte = static_cast<unsigned int>(*pos);
+        const auto secondByte = static_cast<unsigned int>(*(pos + 1));
+        const auto thirdByte = static_cast<unsigned int>(*(pos + 2));
+        uint32_t codePoint =
+            ((firstByte & 0x0F) << 12) | ((secondByte & 0x3F) << 6) | (thirdByte & 0x3F);
+        isOverlongEncoding = (codePoint < 0x800 || codePoint > 0xFFFF);
+        isSurrogatePair = isSurrogatePairFromUTF8(firstByte, secondByte, thirdByte);
+    } else if (len == 4) {
+        const auto firstByte = static_cast<unsigned int>(*pos);
+        const auto secondByte = static_cast<unsigned int>(*(pos + 1));
+        const auto thirdByte = static_cast<unsigned int>(*(pos + 2));
+        const auto fourthByte = static_cast<unsigned int>(*(pos + 3));
+        uint32_t codePoint = ((firstByte & 0x07) << 18) | ((secondByte & 0x3F) << 12) |
+            ((thirdByte & 0x3F) << 6) | (fourthByte & 0x3F);
+        isOverlongEncoding = (codePoint < 0x10000 || codePoint > 0x10FFFF);
+        isSurrogatePair = isSurrogatePairFromUTF8(firstByte, secondByte, thirdByte, fourthByte);
+    }
+
+    return std::all_of(pos + 1,
+                       pos + len,
+                       [](uint8_t c) { return (c >> 6) == 0B10 && !exceedsMaxUTF8Byte(c); }) &&
+        !(exceedsMaxUTF8Byte(*pos) || isOverlongEncoding || isSurrogatePair);
+};
 
 template <typename Buffer>
 void escapeForTextCommon(Buffer& buffer, StringData str, size_t maxLength, size_t* wouldWrite) {
@@ -342,11 +398,13 @@ void escapeForTextCommon(Buffer& buffer, StringData str, size_t maxLength, size_
                                       kHexChar[second & 0xf]};
         writer(2, StringData(buffer.data(), buffer.size()));
     };
+
     return escape(buffer,
                   str,
                   std::move(singleByteHandler),
                   std::move(invalidByteHandler),
                   std::move(twoByteEscaper),
+                  std::move(isValidCodePointUTF8),
                   maxLength,
                   wouldWrite);
 }
@@ -492,11 +550,16 @@ void escapeForJSONCommon(Buffer& buffer, StringData str, size_t maxLength, size_
                                       kHexChar[codepoint & 0b0000'1111]};
         writer(2, StringData(buffer.data(), buffer.size()));
     };
+    auto isValidCodePoint = [&](auto pos, int len, const char* inLast) {
+        return std::distance(pos, inLast) >= len &&
+            std::all_of(pos + 1, pos + len, [](uint8_t c) { return (c >> 6) == 0b10; });
+    };
     return escape(buffer,
                   str,
                   std::move(singleByteHandler),
                   std::move(invalidByteHandler),
                   std::move(twoByteEscaper),
+                  std::move(isValidCodePoint),
                   maxLength,
                   wouldWrite);
 }
@@ -533,6 +596,7 @@ bool validUTF8(StringData str) {
                std::move(singleByteHandler),
                std::move(invalidByteHandler),
                std::move(twoByteEscaper),
+               std::move(isValidCodePointUTF8),
                std::string::npos,
                nullptr);
         return true;
