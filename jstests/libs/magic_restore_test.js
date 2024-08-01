@@ -504,7 +504,18 @@ export class MagicRestoreUtils {
             readConcern: {level: "snapshot", atClusterTime: lastStableRecoveryTimestamp}
         });
         assert.commandWorked(res);
-        assert.eq(res.cursor.firstBatch.length, expectedNumDocsSnapshot);
+
+        // With large documents or a large number of documents, there might be more than one batch.
+        let documents = [];
+        documents = documents.concat(res.cursor.firstBatch);
+
+        while (res.cursor.id != 0) {
+            res = assert.commandWorked(
+                restoreNode.getDB(db).runCommand({getMore: res.cursor.id, collection: coll}));
+            documents = documents.concat(res.cursor.nextBatch);
+        }
+
+        assert.eq(documents.length, expectedNumDocsSnapshot);
     }
 
     /**
