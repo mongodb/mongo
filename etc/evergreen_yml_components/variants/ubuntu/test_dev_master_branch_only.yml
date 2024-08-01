@@ -10,7 +10,7 @@ buildvariants:
     tags: ["required", "bazel_check"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - ubuntu2204-arm64-small
+      - ubuntu2204-arm64-large
     stepback: false
     expansions:
       scons_cache_scope: shared
@@ -28,7 +28,7 @@ buildvariants:
     tags: ["bazel_check"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - ubuntu2204-small
+      - ubuntu2204-large
     stepback: false
     expansions:
       compile_variant: *ubuntu2204-x86-64-bazel-compile

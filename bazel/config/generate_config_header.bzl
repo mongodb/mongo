@@ -22,6 +22,11 @@ def generate_config_header_impl(ctx):
         action_name = ACTION_NAMES.cpp_compile,
         variables = compile_variables,
     )
+    env_flags = cc_common.get_environment_variables(
+        feature_configuration = feature_configuration,
+        action_name = ACTION_NAMES.cpp_compile,
+        variables = compile_variables,
+    )
 
     python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
     generator_script = ctx.attr.generator_script.files.to_list()[0].path
@@ -64,6 +69,8 @@ def generate_config_header_impl(ctx):
                     [
                         "--compiler-args",
                         " ".join(compiler_flags),
+                        "--env-vars",
+                        json.encode(env_flags),
                     ],
     )
 

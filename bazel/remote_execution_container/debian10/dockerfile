@@ -2,8 +2,11 @@
 
 FROM debian:10
 
-RUN apt-get update && apt-get install -y build-essential libfl2
-
-RUN apt-get install -y libxml2-dev
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    build-essential \
+    libfl2 \
+    libxml2-dev \
+    libssl-dev
 
 CMD ["/bin/bash"]

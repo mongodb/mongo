@@ -58,7 +58,6 @@ else:
 # now we are ready to build all bazel buildable files
 targets_to_build = ["//src/..."]
 if args.verbose:
-    print(f"{' '.join(ninja_build_info['bazel_cmd'] + targets_to_build)}")
     extra_args = []
 else:
     extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]

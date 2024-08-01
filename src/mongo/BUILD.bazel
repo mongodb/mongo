@@ -1,4 +1,5 @@
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -44,7 +45,7 @@ generate_config_header(
         },
         "//conditions:default": {},
     }) | select({
-        "//bazel/config:use_diagnostic_latches_enabled": {
+        "//bazel/config:use_diagnostic_latches_disabled": {
             "MONGO_CONFIG_USE_RAW_LATCHES": "1",
         },
         "//conditions:default": {},
@@ -54,17 +55,24 @@ generate_config_header(
         },
         "//conditions:default": {},
     }) | select({
-        "//bazel/config:ssl_enabled_windows": {
+        "//bazel/config:ssl_enabled": {
             "MONGO_CONFIG_SSL": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "@platforms//os:windows": {
             "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_WINDOWS",
         },
-        "//bazel/config:ssl_enabled_macos": {
-            "MONGO_CONFIG_SSL": "1",
+        "@platforms//os:macos": {
             "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_APPLE",
         },
         "//bazel/config:ssl_enabled_linux": {
-            "MONGO_CONFIG_SSL": "1",
             "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_OPENSSL",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:use_ocsp_stapling_enabled": {
+            "MONGO_CONFIG_OCSP_STAPLING_ENABLED": "1",
         },
         "//conditions:default": {},
     }),

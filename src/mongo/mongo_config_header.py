@@ -1,7 +1,9 @@
 # run various configure checks. This script is intended to be
 # imported and run in the context of generate_config_header.py
+import os
 import platform
 import subprocess
+import tempfile
 import threading
 from typing import Dict
 import json
@@ -20,6 +22,7 @@ def log_check(message):
 class CompilerSettings:
     compiler_path: str = ""
     compiler_args: str = ""
+    env_vars: dict = {}
 
 
 class HeaderDefinition:
@@ -28,23 +31,54 @@ class HeaderDefinition:
         self.value = value
 
 
+def macos_get_sdk_path():
+    result = subprocess.run(["xcrun", "--show-sdk-path"], capture_output=True, text=True)
+    return result.stdout.strip()
+
+
 def compile_check(source_text: str) -> bool:
-    command = [
-        CompilerSettings.compiler_path,
-        "-C",  # only compile and assemble, don't link since we don't want to have to pass in all of the libs of the dependencies
-        "-E",
-        "-x",
-        "c++",
-        *CompilerSettings.compiler_args.split(" "),
-        "-",
-    ]
-    log_check(" ".join(command + [source_text]))
-    result = subprocess.run(command, input=source_text, capture_output=True, text=True)
+    temp = None
+    if platform.system() == "Windows":
+        temp = tempfile.NamedTemporaryFile(suffix=".cpp", delete=False)
+        temp.write(source_text.encode())
+        temp.close()
+        command = [
+            CompilerSettings.compiler_path,
+            "/c",  # only compile and assemble, don't link since we don't want to have to pass in all of the libs of the dependencies
+            temp.name,
+            *CompilerSettings.compiler_args.split(" "),
+        ]
+        log_check(" ".join(command[:-1] + [source_text]))
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            env={**os.environ.copy(), **CompilerSettings.env_vars},
+        )
+    else:
+        command = [
+            CompilerSettings.compiler_path,
+            "-c",  # only compile and assemble, don't link since we don't want to have to pass in all of the libs of the dependencies
+            "-x",
+            "c++",
+            *CompilerSettings.compiler_args.split(" "),
+            "-",
+        ]
+        log_check(" ".join(command + [source_text]))
+        result = subprocess.run(
+            command,
+            input=source_text,
+            capture_output=True,
+            text=True,
+            env={**os.environ.copy(), **CompilerSettings.env_vars},
+        )
     if result.returncode != 0:
         log_check(f"stdout:\n{result.stdout}")
         log_check(f"stderr:\n{result.stderr}")
     log_check(f"Exit code:\n{result.returncode}")
     log_check("--------------------------------------------------\n\n")
+    if temp:
+        os.unlink(temp.name)
     return result.returncode == 0
 
 
@@ -94,6 +128,10 @@ def memset_s_present_flag() -> list[HeaderDefinition]:
 
 
 def strnlen_present_flag() -> list[HeaderDefinition]:
+    if platform.system() == "Windows":
+        # Match SCons behavior
+        return []
+
     log_check("[MONGO_CONFIG_HAVE_STRNLEN] Checking for strnlen...")
 
     if func_check("strnlen", "<string.h>"):
@@ -137,7 +175,7 @@ def fips_mode_set_present_flag() -> list[HeaderDefinition]:
     if compile_check("""
         #include <openssl/crypto.h>
         #include <openssl/evp.h>
-        int main(void) { return 0; }
+        int main(void) { (void)FIPS_mode_set; return 0; }
         """):
         return [HeaderDefinition("MONGO_CONFIG_HAVE_FIPS_MODE_SET")]
     else:
@@ -149,7 +187,7 @@ def asn1_present_flag() -> list[HeaderDefinition]:
 
     if compile_check("""
         #include <openssl/asn1.h>
-        int main(void) { return 0; }
+        int main(void) { (void)d2i_ASN1_SEQUENCE_ANY; return 0; }
         """):
         return [HeaderDefinition("MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS")]
     else:
@@ -349,6 +387,23 @@ def altivec_vbpermq_output_flag() -> list[HeaderDefinition]:
     return []
 
 
+def usdt_provider_flags() -> list[HeaderDefinition]:
+    if platform.system() == "Darwin":
+        # Match SCons behavior
+        return []
+
+    log_check("[MONGO_CONFIG_USDT_PROVIDER] Checking if SDT usdt provider is available...")
+    if compile_check("""
+        #include <sys/sdt.h>
+        int main(void) { return 0; }
+        """):
+        return [
+            HeaderDefinition("MONGO_CONFIG_USDT_ENABLED"),
+            HeaderDefinition("MONGO_CONFIG_USDT_PROVIDER", "SDT"),
+        ]
+    return []
+
+
 def get_config_header_substs():
     config_header_substs = (
         (
@@ -388,12 +443,22 @@ def get_config_header_substs():
 
 
 def generate_config_header(
-    compiler_path, compiler_args, logpath, additional_inputs=[], extra_definitions={}
+    compiler_path, compiler_args, env_vars, logpath, additional_inputs=[], extra_definitions={}
 ) -> Dict[str, str]:
     global logfile_path
     CompilerSettings.compiler_path = compiler_path
     CompilerSettings.compiler_args = compiler_args
+    CompilerSettings.env_vars = {
+        **json.loads(env_vars),
+        **(
+            {"DEVELOPER_DIR": "/Applications/Xcode13.app", "SDKROOT": macos_get_sdk_path()}
+            if platform.system() == "Darwin"
+            else {}
+        ),
+    }
     logfile_path = logpath
+
+    extra_definitions_dict = json.loads(extra_definitions)
 
     definitions: list[HeaderDefinition] = []
 
@@ -402,25 +467,30 @@ def generate_config_header(
     definitions += strnlen_present_flag()
     definitions += explicit_bzero_present_flag()
     definitions += pthread_setname_np_present_flag()
-    definitions += fips_mode_set_present_flag()
-    definitions += asn1_present_flag()
-    definitions += ssl_set_ecdh_auto_present_flag()
-    definitions += ssl_ec_key_new_present_flag()
+    if (
+        extra_definitions_dict.get("MONGO_CONFIG_SSL_PROVIDER")
+        == "MONGO_CONFIG_SSL_PROVIDER_OPENSSL"
+    ):
+        definitions += fips_mode_set_present_flag()
+        definitions += asn1_present_flag()
+        definitions += ssl_set_ecdh_auto_present_flag()
+        definitions += ssl_ec_key_new_present_flag()
     definitions += posix_monotonic_clock_present_flag()
     definitions += execinfo_backtrace_present_flag()
     definitions += extended_alignment_flag()
     definitions += altivec_vbpermq_output_flag()
+    definitions += usdt_provider_flags()
     # New checks can be added here
 
-    for key, value in json.loads(extra_definitions).items():
+    for key, value in extra_definitions_dict.items():
         definitions.append(HeaderDefinition(key, value))
 
-    define_map = {definition.key: definition.value or "" for definition in definitions}
+    define_map = {definition.key: definition.value or "1" for definition in definitions}
     subst_map = {}
     for subst, define in get_config_header_substs():
         if define not in define_map:
             log_check(f"{define} was unchecked and is unused.")
-            subst_map[subst] = f"// # undef {define}"
+            subst_map[subst] = f"// #undef {define}"
         else:
             subst_map[subst] = f"#define {define} {define_map[define]}"
     return subst_map

@@ -16,7 +16,7 @@ def write_config_header(input_path: str, output_path: str, definitions: Dict[str
     with open(input_path) as in_file:
         content = in_file.read()
 
-    with open(output_path, "w") as file:
+    with open(output_path, "w", newline="\n") as file:
         output_content = content
 
         for key, value in definitions.items():
@@ -28,6 +28,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a config header file")
     parser.add_argument("--compiler-path", help="Path to the compiler executable", required=True)
     parser.add_argument("--compiler-args", help="Extra compiler arguments", required=True)
+    parser.add_argument("--env-vars", help="Extra environment variables", required=True)
     parser.add_argument(
         "--output-path", help="Path to the output config header file", required=True
     )
@@ -50,6 +51,7 @@ if __name__ == "__main__":
     definitions = generate_config_header(
         args.compiler_path,
         args.compiler_args,
+        args.env_vars,
         args.log_path,
         args.additional_input,
         args.extra_definitions,

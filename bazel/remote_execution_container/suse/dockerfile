@@ -2,6 +2,9 @@
 
 FROM opensuse/leap:15.2
 
-RUN zypper install -y glibc-devel libfl2
+RUN zypper install -y \
+    glibc-devel \
+    libfl2 \
+    libopenssl-devel
 
 CMD ["/bin/bash"]

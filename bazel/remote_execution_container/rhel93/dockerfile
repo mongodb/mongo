@@ -2,6 +2,9 @@
 
 FROM redhat/ubi9:9.3
 
-RUN yum install -y glibc-devel
+RUN yum install -y \
+    glibc-devel \
+    openssl-devel \
+    systemtap-sdt-devel
 
 CMD ["/bin/bash"]

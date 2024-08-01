@@ -101,28 +101,29 @@ Your docker images, volumes and containers will be purged if you continue. Enter
         print(f"Finished updating {distro}")
         print("************************************\n")
 
-    with open(container_file_path, "w") as f:
-        print(f"Writing remote execution container map to {container_file_path}...")
-        print(
-            "# Use bazel/platforms/remote_execution_containers_generator.py to generate this mapping for a given patch build.\n",
-            file=f,
-        )
+        with open(container_file_path, "w") as f:
+            print(f"Writing remote execution container map to {container_file_path}...")
+            print(
+                "# Use bazel/platforms/remote_execution_containers_generator.py to generate this mapping for a given patch build.\n",
+                file=f,
+            )
 
-        # Manually print out the dict to maintain the trailing comma in each last element to satisfy the buildifier lint rules and
-        # avoid reformating.
-        print("REMOTE_EXECUTION_CONTAINERS = {", file=f)
-        for key, value in sorted(
-            remote_execution_containers["REMOTE_EXECUTION_CONTAINERS"].items(), key=lambda x: x[0]
-        ):
-            print(f'    "{key}": {{', file=f)
-            for subkey, subvalue in sorted(value.items(), key=lambda x: x[0]):
-                print(f'        "{subkey}": "{subvalue}",', file=f)
-            print("    },", file=f)
-        print("}", file=f)
+            # Manually print out the dict to maintain the trailing comma in each last element to satisfy the buildifier lint rules and
+            # avoid reformating.
+            print("REMOTE_EXECUTION_CONTAINERS = {", file=f)
+            for key, value in sorted(
+                remote_execution_containers["REMOTE_EXECUTION_CONTAINERS"].items(),
+                key=lambda x: x[0],
+            ):
+                print(f'    "{key}": {{', file=f)
+                for subkey, subvalue in sorted(value.items(), key=lambda x: x[0]):
+                    print(f'        "{subkey}": "{subvalue}",', file=f)
+                print("    },", file=f)
+            print("}", file=f)
 
-    with open(container_file_path, "r") as f:
-        print(f"Finished writing to {container_file_path}:")
-        print(f.read())
+        with open(container_file_path, "r") as f:
+            print(f"Finished writing to {container_file_path}:")
+            print(f.read())
 
     return 0
 

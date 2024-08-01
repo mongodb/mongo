@@ -1503,13 +1503,32 @@ selects.config_setting_group(
     ],
 )
 
+# The streams_release_build flag is effectively a guard to assure streams are not
+# built on release builds. For non-release builds, it's not required.
 selects.config_setting_group(
-    name = "streams_release_build_required_setting",
+    name = "_streams_for_release_build",
     match_all = [
         ":release_enabled",
         ":streams_release_build_enabled",
         ":platform_for_streaming_build",
         ":ssl_enabled_linux",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_streams_for_non_release_build",
+    match_all = [
+        ":release_disabled",
+        ":platform_for_streaming_build",
+        ":ssl_enabled_linux",
+    ],
+)
+
+selects.config_setting_group(
+    name = "streams_release_build_required_setting",
+    match_any = [
+        ":_streams_for_release_build",
+        ":_streams_for_non_release_build",
     ],
 )
 

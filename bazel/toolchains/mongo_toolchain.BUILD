@@ -27,6 +27,7 @@ COMMON_LINK_FLAGS = [
 
 COMMON_INCLUDE_DIRECTORIES = [
     "/usr/include",
+    "/usr/include/openssl",
     # See undocumented %package() syntax: https://cs.opensource.google/bazel/bazel/+/6d448136d13ddab92da8bb29ea6e8387821369d9:src/main/java/com/google/devtools/build/lib/rules/cpp/CcToolchainProviderHelper.java;l=309-329
     "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0)%",
     "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0/{arch}-mongodb-linux)%",

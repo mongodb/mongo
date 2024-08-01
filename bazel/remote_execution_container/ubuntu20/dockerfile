@@ -2,8 +2,11 @@
 
 FROM ubuntu:20.04
 
-RUN apt-get update && apt-get install -y build-essential
-
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y libxml2-dev
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    build-essential \
+    libxml2-dev \
+    libssl-dev \
+    systemtap-sdt-dev
 
 CMD ["/bin/bash"]
