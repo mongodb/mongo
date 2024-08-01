@@ -414,10 +414,6 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
                 // client, so allow the error to be thrown if the client is talking to a mongos.
                 if (res.code == ErrorCodes.TransactionParticipantFailedUnyield &&
                     !isMongos(txnDb)) {
-                    // If the original error code is from Interruption, we retry the command.
-                    if (res.originalError.code == ErrorCodes.Interrupted) {
-                        runFunc();
-                    }
                     res = res.originalError;
                 }
                 assert.commandWorked(res);
