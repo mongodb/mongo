@@ -202,7 +202,6 @@ MONGO_FAIL_POINT_DEFINE(hangAfterSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSettingTxnInterruptFlag);
 MONGO_FAIL_POINT_DEFINE(hangAfterCheckingWritabilityForMultiDocumentTransactions);
 MONGO_FAIL_POINT_DEFINE(failWithErrorCodeAfterSessionCheckOut);
-MONGO_FAIL_POINT_DEFINE(skipTicketAcquisitionForOperationAgainstCollection);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not primary error resulted in network disconnection.
@@ -1924,21 +1923,6 @@ void ExecCommandDatabase::_commandExec() {
     if (OperationShardingState::isComingFromRouter(opCtx)) {
         ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
     }
-
-    // We force certain operations to skip ticket acquisition during testing to avoid ticket
-    // exhaustion that leads to a generalised server deadlock. FSync locks are such an example since
-    // they will impede global lock acquisition.
-    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
-    skipTicketAcquisitionForOperationAgainstCollection.executeIf(
-        [&](const auto&) { admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt); },
-        [&](const BSONObj& payload) {
-            const auto& nss = CurOp::get(opCtx)->getNSS().toStringForResourceId();
-            const auto& exemptNssArray = payload.getField("nss").Array();
-            return std::any_of(
-                exemptNssArray.begin(), exemptNssArray.end(), [&](const BSONElement& elem) {
-                    return elem.valueStringData() == nss;
-                });
-        });
 
     try {
         _runCommandOpTimes.emplace(opCtx);

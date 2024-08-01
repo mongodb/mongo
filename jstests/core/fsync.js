@@ -14,8 +14,6 @@
  *   uses_parallel_shell,
  * ]
  */
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-
 function waitUntilOpCountIs(opFilter, num) {
     assert.soon(() => {
         let ops = db.getSiblingDB('admin')
@@ -32,13 +30,6 @@ function waitUntilOpCountIs(opFilter, num) {
         return true;
     });
 }
-
-// We skip ticket acquisition for this test since performing an fsync lock can lead to ticket
-// exhaustion due to background tasks getting executed. As a result the test would not make forward
-// progress and never unlock the server.
-const fp = configureFailPoint(db,
-                              "skipTicketAcquisitionForOperationAgainstCollection",
-                              {nss: ["fsyncLockTestDB.coll", "fsyncLockTestDB.multipleLock"]});
 
 // Start with a clean DB.
 var fsyncLockDB = db.getSiblingDB('fsyncLockTestDB');
@@ -144,5 +135,3 @@ assert(fsyncUnlockRes.lockCount == 0, tojson(fsyncLockRes));
 shellHandle1();
 shellHandle2();
 assert.eq(2, fsyncLockDB.multipleLock.find({}).itcount());
-
-fp.off();
