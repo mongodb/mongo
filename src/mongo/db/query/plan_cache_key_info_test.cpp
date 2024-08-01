@@ -428,6 +428,13 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyCollationIndex) {
               makeKey(*inContainsStringHasCollation, indexCores));
     ASSERT_EQ(makeKey(*inNoStrings, indexCores).getIndexabilityDiscriminators(),
               makeKey(*inContainsStringHasCollation, indexCores).getIndexabilityDiscriminators());
+
+    unique_ptr<CanonicalQuery> elemMatchString(canonicalize("{a: {$elemMatch: {$eq: 'abc'}}}"));
+    unique_ptr<CanonicalQuery> elemMatchNoString(canonicalize("{a: {$elemMatch: {$eq: 5}}}"));
+
+    // 'elemMatchString' and 'elemMatchNoString' should have different discriminators.
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*elemMatchString, indexCores),
+                                                  makeKey(*elemMatchNoString, indexCores));
 }
 
 TEST_F(PlanCacheKeyInfoTest, ComputeKeyWildcardIndex) {
