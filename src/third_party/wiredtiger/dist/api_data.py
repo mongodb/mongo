@@ -632,6 +632,10 @@ connection_runtime_config = [
         Config('update_restore_evict', 'false', r'''
             if true, control all dirty page evictions through forcing update restore eviction.''',
             type='boolean'),
+        Config('eviction_checkpoint_ts_ordering', 'false', r'''
+            if true, act as if eviction is being run in parallel to checkpoint. We should return 
+            EBUSY in eviction if we detect any timestamp ordering issue.''',
+            type='boolean'),
         ]),
     Config('error_prefix', '', r'''
         prefix string for error messages'''),

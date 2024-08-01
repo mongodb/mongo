@@ -406,16 +406,22 @@ __checkpoint_cleanup_page_skip(
      * FIXME: Read internal pages from non-logged tables when the remove/truncate
      * operation is performed using no timestamp.
      */
+    if (addr.type == WT_ADDR_LEAF_NO)
+        *skipp = true;
+    else if (addr.ta.newest_stop_durable_ts == WT_TS_NONE) {
+        /* Only process logged tables when checkpoint cleanup is configured to be aggressive. */
+        *skipp = !F_ISSET(S2C(session), WT_CONN_CKPT_CLEANUP_RECLAIM_SPACE) ||
+          !F_ISSET(S2BT(session), WT_BTREE_LOGGED);
+        if (!*skipp)
+            WT_STAT_CONN_DSRC_INCR(session, checkpoint_cleanup_pages_read_reclaim_space);
+    }
 
-    if (addr.type == WT_ADDR_LEAF_NO ||
-      (addr.ta.newest_stop_durable_ts == WT_TS_NONE &&
-        (F_ISSET(S2C(session), WT_CONN_CKPT_CLEANUP_SKIP_INT) ||
-          !F_ISSET(S2BT(session), WT_BTREE_LOGGED)))) {
+    if (*skipp) {
         __wt_verbose_debug2(
           session, WT_VERB_CHECKPOINT_CLEANUP, "%p: page walk skipped", (void *)ref);
         WT_STAT_CONN_DSRC_INCR(session, checkpoint_cleanup_pages_walk_skipped);
-        *skipp = true;
     }
+
     return (0);
 }
 
@@ -733,7 +739,7 @@ __wt_checkpoint_cleanup_create(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_RET(__wt_config_gets(session, cfg, "checkpoint_cleanup.method", &cval));
     if (WT_CONFIG_LIT_MATCH("reclaim_space", cval))
-        F_SET(conn, WT_CONN_CKPT_CLEANUP_SKIP_INT);
+        F_SET(conn, WT_CONN_CKPT_CLEANUP_RECLAIM_SPACE);
 
     WT_RET(__wt_config_gets(session, cfg, "checkpoint_cleanup.wait", &cval));
     conn->cc_cleanup.interval = (uint64_t)cval.val;

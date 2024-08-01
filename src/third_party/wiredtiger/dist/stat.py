@@ -12,6 +12,7 @@ from common_functions import filter_if_fast
 
 if not [f for f in filter_if_fast([
             "../dist/dist.py",
+            "../dist/stat_data.py",
             "../src/include/stat.h",
             "../src/include/wiredtiger.in",
             "../src/support/stat.c",
@@ -19,7 +20,7 @@ if not [f for f in filter_if_fast([
     sys.exit(0)
 
 # Read the source files.
-from stat_data import groups, dsrc_stats, conn_stats, conn_dsrc_stats, join_stats, \
+from stat_data import dsrc_stats, conn_stats, conn_dsrc_stats, join_stats, \
     session_stats
 
 ##########################################

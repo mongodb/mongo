@@ -47,14 +47,6 @@ class test_cc07(test_cc_base):
 
     scenarios = make_scenarios(conn_config_values)
 
-    def populate(self, uri, start_key, num_keys, value_size=1024):
-        c = self.session.open_cursor(uri, None)
-        for k in range(start_key, num_keys):
-            self.session.begin_transaction()
-            c[k] = 'k' * value_size
-            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(k + 1))
-        c.close()
-
     def test_cc07(self):
         if self.runningHook('tiered'):
             self.skipTest("checkpoint cleanup cannot remove obsolete pages from tiered tables")
@@ -62,12 +54,13 @@ class test_cc07(test_cc_base):
         create_params = 'key_format=i,value_format=S'
         nrows = 1000
         uri = 'table:cc07'
+        value = 'k' * 1024
 
         self.session.create(uri, create_params)
 
         for i in range(10):
             # Append some data.
-            self.populate(uri, nrows * (i), nrows * (i + 1))
+            self.populate(uri, nrows * (i), nrows * (i + 1), value)
 
             # Checkpoint.
             self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(nrows * (i + 1)))

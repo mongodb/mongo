@@ -2246,6 +2246,12 @@ __wti_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
         FLD_SET(conn->debug_flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT);
     else
         FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT);
+
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.eviction_checkpoint_ts_ordering", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
+    else
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
     return (0);
 }
 
