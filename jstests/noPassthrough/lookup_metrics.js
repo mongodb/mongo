@@ -45,7 +45,8 @@ const lookupStrategy = {
 };
 
 // Create an object with the correct lookup counter values after the specified type of query.
-function generateExpectedCounters(joinStrategy = lookupStrategy.nonSbe, spillToDisk = 0) {
+function generateExpectedCounters(
+    joinStrategy = lookupStrategy.nonSbe, spillToDisk = 0, spillToDiskBytes = 0) {
     let counters = db.serverStatus().metrics.query.lookup;
     assert(counters, "counters did not exist");
     let expected = Object.assign(counters);
@@ -60,6 +61,8 @@ function generateExpectedCounters(joinStrategy = lookupStrategy.nonSbe, spillToD
             expected.hashLookup = NumberLong(expected.hashLookup + 1);
             expected.hashLookupSpillToDisk =
                 NumberLong(expected.hashLookupSpillToDisk + spillToDisk);
+            expected.hashLookupSpillToDiskBytes =
+                NumberLong(expected.hashLookupSpillToDiskBytes + spillToDiskBytes);
             break;
     }
     return expected;
@@ -126,7 +129,8 @@ assert.commandWorked(db.adminCommand({
     internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1,
 }));
 expectedCounters = generateExpectedCounters(lookupStrategy.hashLookup,
-                                            16 /* 2 spills per foreign collection row */);
+                                            16 /* 2 spills per foreign collection row */,
+                                            851 /* spillToDiskBytes */);
 assert.eq(
     db.people
         .aggregate([

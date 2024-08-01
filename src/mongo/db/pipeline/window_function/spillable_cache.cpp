@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/window_function/spillable_cache.h"
 
 #include "mongo/db/record_id.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/record_data.h"
 
 namespace mongo {
@@ -130,6 +131,8 @@ void SpillableCache::spillToDisk() {
     std::vector<BSONObj> ownedObjs;
     // Batch our writes to reduce pressure on the storage engine's cache.
     size_t batchSize = 0;
+    int64_t spilledBytes = 0;
+    int64_t spilledRecords = 0;
     for (auto& memoryTokenWithDoc : _memCache) {
         auto bsonDoc = memoryTokenWithDoc.value().toBson();
         size_t objSize = bsonDoc.objsize();
@@ -143,14 +146,18 @@ void SpillableCache::spillToDisk() {
         records.emplace_back(Record{RecordId(_diskWrittenIndex + 1),
                                     RecordData(ownedObjs.back().objdata(), objSize)});
         batchSize += objSize;
+        spilledBytes += objSize;
+        ++spilledRecords;
         ++_diskWrittenIndex;
     }
     _memCache.clear();
-    if (records.size() == 0) {
-        return;
-    }
     // Write final batch.
-    writeBatchToDisk(records);
+    if (records.size() != 0) {
+        writeBatchToDisk(records);
+    }
+
+    setWindowFieldsCounters.incrementSetWindowFieldsCountersPerSpilling(
+        1 /* spills */, spilledBytes, spilledRecords);
 }
 
 Document SpillableCache::readDocumentFromDiskById(int desired) {

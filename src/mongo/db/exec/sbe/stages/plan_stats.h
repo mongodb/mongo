@@ -323,6 +323,8 @@ struct HashAggStats : public SpecificStats {
     long long spills{0};
     // The number of individual records spilled to disk.
     long long spilledRecords{0};
+    // The number of total bytes spilled to disk.
+    long long spilledBytes{0};
     // An estimate, in bytes, of the size of the final spill table after all spill events have taken
     // place.
     long long spilledDataStorageSize{0};

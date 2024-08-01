@@ -68,8 +68,9 @@ void recordCurOpMetrics(OperationContext* opCtx) {
     if (auto n = debug.additiveMetrics.writeConflicts.load(); n > 0)
         writeConflictsCounter.increment(n);
 
-    lookupPushdownCounters.incrementLookupCounters(CurOp::get(opCtx)->debug());
-    sortCounters.incrementSortCounters(debug);
+    lookupPushdownCounters.incrementLookupCountersPerQuery(
+        debug.nestedLoopJoin, debug.indexedLoopJoin, debug.hashLookup);
+    sortCounters.incrementSortCountersPerQuery(debug.sortTotalDataSizeBytes, debug.keysSorted);
     queryFrameworkCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
 }
 

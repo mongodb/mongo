@@ -393,19 +393,25 @@ class LookupPushdownCounters {
 public:
     LookupPushdownCounters() = default;
 
-    void incrementLookupCounters(OpDebug& debug) {
-        nestedLoopJoin.increment(debug.nestedLoopJoin);
-        indexedLoopJoin.increment(debug.indexedLoopJoin);
-        hashLookup.increment(debug.hashLookup);
-        hashLookupSpillToDisk.increment(debug.hashLookupSpillToDisk);
+    void incrementLookupCountersPerQuery(int nestedLoopJoin, int indexedLoopJoin, int hashLookup) {
+        nestedLoopJoinCounter.increment(nestedLoopJoin);
+        indexedLoopJoinCounter.increment(indexedLoopJoin);
+        hashLookupCounter.increment(hashLookup);
+    }
+
+    void incrementLookupCountersPerSpilling(int64_t spillToDisk, int64_t spillToDiskBytes) {
+        hashLookupSpillToDisk.increment(spillToDisk);
+        hashLookupSpillToDiskBytes.increment(spillToDiskBytes);
     }
 
     // Counters for lookup join strategies.
-    CounterMetric nestedLoopJoin{"query.lookup.nestedLoopJoin"};
-    CounterMetric indexedLoopJoin{"query.lookup.indexedLoopJoin"};
-    CounterMetric hashLookup{"query.lookup.hashLookup"};
+    CounterMetric nestedLoopJoinCounter{"query.lookup.nestedLoopJoin"};
+    CounterMetric indexedLoopJoinCounter{"query.lookup.indexedLoopJoin"};
+    CounterMetric hashLookupCounter{"query.lookup.hashLookup"};
     // Counter tracking hashLookup spills in lookup stages that get pushed down.
     CounterMetric hashLookupSpillToDisk{"query.lookup.hashLookupSpillToDisk"};
+    // Counter tracking hashLookup spilled bytes in lookup stages that get pushed down.
+    CounterMetric hashLookupSpillToDiskBytes{"query.lookup.hashLookupSpillToDiskBytes"};
 };
 extern LookupPushdownCounters lookupPushdownCounters;
 
@@ -413,15 +419,21 @@ class SortCounters {
 public:
     SortCounters() = default;
 
-    void incrementSortCounters(const OpDebug& debug) {
-        sortSpillsCounter.increment(debug.sortSpills);
-        sortTotalBytesCounter.increment(debug.sortTotalDataSizeBytes);
-        sortTotalKeysCounter.increment(debug.keysSorted);
+    void incrementSortCountersPerQuery(int64_t bytesSorted, int64_t keysSorted) {
+        sortTotalBytesCounter.increment(bytesSorted);
+        sortTotalKeysCounter.increment(keysSorted);
+    }
+
+    void incrementSortCountersPerSpilling(int64_t sortSpills, int64_t sortSpillBytes) {
+        sortSpillsCounter.increment(sortSpills);
+        sortSpillBytesCounter.increment(sortSpillBytes);
     }
 
     // Counters tracking sort stats across all engines
-    // The total number of spills to disk from sort stages
+    // The total number of spills from sort stages
     CounterMetric sortSpillsCounter{"query.sort.spillToDisk"};
+    // The total bytes spilled. This is the storage size after compression.
+    CounterMetric sortSpillBytesCounter{"query.sort.spillToDiskBytes"};
     // The number of keys that we've sorted.
     CounterMetric sortTotalKeysCounter{"query.sort.totalKeysSorted"};
     // The amount of data we've sorted in bytes
@@ -433,24 +445,54 @@ class GroupCounters {
 public:
     GroupCounters() = default;
 
-    void incrementGroupCounters(uint64_t spills,
-                                uint64_t spilledDataStorageSize,
-                                uint64_t spilledRecords) {
+    void incrementGroupCountersPerSpilling(int64_t spills,
+                                           int64_t spilledBytes,
+                                           int64_t spilledRecords) {
         groupSpills.increment(spills);
-        groupSpilledDataStorageSize.increment(spilledDataStorageSize);
+        groupSpilledBytes.increment(spilledBytes);
         groupSpilledRecords.increment(spilledRecords);
     }
 
-    // Counters tracking group stats across all execution engines.
-    CounterMetric groupSpills{
-        "query.group.spills"};  // The total number of spills to disk from group stages.
-    CounterMetric groupSpilledDataStorageSize{
-        "query.group.spilledDataStorageSize"};  // The size of the file or RecordStore spilled to
-                                                // disk.
-    CounterMetric groupSpilledRecords{
-        "query.group.spilledRecords"};  // The number of records spilled to disk.
+    void incrementGroupCountersPerQuery(int64_t spilledDataStorageSize) {
+        groupSpilledDataStorageSize.increment(spilledDataStorageSize);
+    }
+
+    // The total number of spills from group stages.
+    CounterMetric groupSpills{"query.group.spills"};
+    // The total number of bytes spilled from group stages. The spilled stroage size after
+    // compression might be different from the bytes spilled.
+    CounterMetric groupSpilledBytes{"query.group.spilledBytes"};
+    // The number of records spilled.
+    CounterMetric groupSpilledRecords{"query.group.spilledRecords"};
+    // The size of the file or RecordStore spilled to disk, updated after all spilling happened.
+    CounterMetric groupSpilledDataStorageSize{"query.group.spilledDataStorageSize"};
 };
 extern GroupCounters groupCounters;
+
+/** Counters tracking setWindowFields stats across all execution engines. */
+class SetWindowFieldsCounters {
+public:
+    SetWindowFieldsCounters() = default;
+    SetWindowFieldsCounters(SetWindowFieldsCounters&) = delete;
+    SetWindowFieldsCounters& operator=(const SetWindowFieldsCounters&) = delete;
+
+    void incrementSetWindowFieldsCountersPerSpilling(int64_t spills,
+                                                     int64_t spilledBytes,
+                                                     int64_t spilledRecords) {
+        setWindowFieldsSpills.increment(spills);
+        setWindowFieldsSpilledBytes.increment(spilledBytes);
+        setWindowFieldsSpilledRecords.increment(spilledRecords);
+    }
+
+    // Counter tracking setWindowFields spills.
+    CounterMetric setWindowFieldsSpills{"query.setWindowFields.spills"};
+    // Counter tracking setWindowFields spilled bytes. The spilled storage size after compression
+    // might be different from the bytes spilled.
+    CounterMetric setWindowFieldsSpilledBytes{"query.setWindowFields.spilledBytes"};
+    // Counter tracking setWindowFields spilled record number.
+    CounterMetric setWindowFieldsSpilledRecords{"query.setWindowFields.spilledRecords"};
+};
+extern SetWindowFieldsCounters setWindowFieldsCounters;
 
 /**
  * A common class which holds various counters related to Classic and SBE plan caches.

@@ -56,6 +56,7 @@
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -1431,9 +1432,10 @@ void SortedFileWriter<Key, Value>::writeChunk() {
     }
 
     // Negative size means compressed.
-    size = shouldCompress ? -size : size;
-    _file->write(reinterpret_cast<const char*>(&size), sizeof(size));
-    _file->write(outBuffer, std::abs(size));
+    int32_t signedSize = shouldCompress ? -size : size;
+    _file->write(reinterpret_cast<const char*>(&signedSize), sizeof(signedSize));
+    _file->write(outBuffer, size);
+    sortCounters.incrementSortCountersPerSpilling(1 /* sortSpills */, sizeof(signedSize) + size);
 
     _buffer.reset();
 }

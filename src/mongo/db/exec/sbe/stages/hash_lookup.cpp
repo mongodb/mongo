@@ -32,6 +32,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 #include "mongo/db/exec/sbe/stages/stage_visitors.h"
+#include "mongo/db/stats/counters.h"
 
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -339,8 +340,14 @@ void HashLookupStage::spillBufferedValueToDisk(OperationContext* opCtx,
 
     _specificStats.spilledBuffRecords++;
     // Add size of record ID + size of buffer.
-    _specificStats.spilledBuffBytesOverAllRecords += sizeof(size_t) + buf.len();
-    return;
+    int64_t spillToDiskBytes = sizeof(size_t) + buf.len();
+    _specificStats.spilledBuffBytesOverAllRecords += spillToDiskBytes;
+
+    auto& opDebug = CurOp::get(_opCtx)->debug();
+    opDebug.hashLookupSpillToDisk += 1;
+    opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
+    lookupPushdownCounters.incrementLookupCountersPerSpilling(1 /* spillToDisk */,
+                                                              spillToDiskBytes);
 }
 
 size_t HashLookupStage::bufferValueOrSpill(value::MaterializedRow& value) {
@@ -455,11 +462,11 @@ void HashLookupStage::accumulateFromValueIndices(const C& bufferIndices) {
     }
 }
 
-void HashLookupStage::writeIndicesToRecordStore(SpillingStore* rs,
-                                                value::TypeTags tagKey,
-                                                value::Value valKey,
-                                                const std::vector<size_t>& value,
-                                                bool update) {
+int64_t HashLookupStage::writeIndicesToRecordStore(SpillingStore* rs,
+                                                   value::TypeTags tagKey,
+                                                   value::Value valKey,
+                                                   const std::vector<size_t>& value,
+                                                   bool update) {
     BufBuilder buf;
     buf.appendNum(value.size());  // number of indices
     for (auto& idx : value) {
@@ -479,7 +486,9 @@ void HashLookupStage::writeIndicesToRecordStore(SpillingStore* rs,
             rid.memUsage() + typeBits.getSize() + sizeof(size_t);
     }
     // Add the size of indices vector used in the hash-table value to the accounting.
-    _specificStats.spilledHtBytesOverAllRecords += value.size() * sizeof(size_t);
+    int64_t spilledBytes = value.size() * sizeof(size_t);
+    _specificStats.spilledHtBytesOverAllRecords += spilledBytes;
+    return spilledBytes;
 }
 
 boost::optional<std::vector<size_t>> HashLookupStage::readIndicesFromRecordStore(
@@ -524,7 +533,14 @@ void HashLookupStage::spillIndicesToRecordStore(SpillingStore* rs,
         valFromRs = value;
     }
 
-    writeIndicesToRecordStore(rs, tagKeyColl, valKeyColl, *valFromRs, update);
+    auto spillToDiskBytes =
+        writeIndicesToRecordStore(rs, tagKeyColl, valKeyColl, *valFromRs, update);
+
+    auto& opDebug = CurOp::get(_opCtx)->debug();
+    opDebug.hashLookupSpillToDisk += 1;
+    opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
+    lookupPushdownCounters.incrementLookupCountersPerSpilling(1 /* spillToDisk */,
+                                                              spillToDiskBytes);
 }
 
 PlanState HashLookupStage::getNext() {

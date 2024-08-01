@@ -64,6 +64,7 @@ public:
         _summary.hasSortStage = true;
         _summary.usedDisk = _summary.usedDisk || stats->spills > 0;
         _summary.sortSpills += stats->spills;
+        _summary.sortSpillBytes += stats->spilledDataStorageSize;
         _summary.sortTotalDataSizeBytes += stats->totalDataSizeBytes;
         _summary.keysSorted += stats->keysSorted;
     }
@@ -103,6 +104,7 @@ private:
         _summary.hasSortStage |= statsIn.hasSortStage;
         _summary.usedDisk |= statsIn.usedDisk;
         _summary.sortSpills += statsIn.sortSpills;
+        _summary.sortSpillBytes += statsIn.sortSpillBytes;
         _summary.sortTotalDataSizeBytes += statsIn.sortTotalDataSizeBytes;
         _summary.keysSorted += statsIn.keysSorted;
         _summary.planFailed |= statsIn.planFailed;

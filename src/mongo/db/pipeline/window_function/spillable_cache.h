@@ -151,6 +151,8 @@ private:
 
     // Be able to report that disk was used after the cache has been finalized.
     bool _usedDisk = false;
+    // Total data storage size used with spilling.
+    int64_t _spilledDataStorageSize = 0;
 };
 
 }  // namespace mongo

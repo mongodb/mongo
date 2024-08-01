@@ -41,6 +41,10 @@
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
 
+namespace {
+MONGO_FAIL_POINT_DEFINE(hangScanGetNext);
+}  // namespace
+
 namespace mongo {
 namespace sbe {
 ScanStage::ScanStage(UUID collectionUuid,
@@ -415,6 +419,10 @@ value::OwnedValueAccessor* ScanStage::getFieldAccessor(StringData name, size_t o
 }
 
 PlanState ScanStage::getNext() {
+    if (MONGO_unlikely(hangScanGetNext.shouldFail())) {
+        hangScanGetNext.pauseWhileSet();
+    }
+
     auto optTimer(getOptTimer(_opCtx));
 
     if (_lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&

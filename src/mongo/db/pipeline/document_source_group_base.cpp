@@ -83,8 +83,7 @@ using std::shared_ptr;
 using std::vector;
 
 DocumentSourceGroupBase::~DocumentSourceGroupBase() {
-    groupCounters.incrementGroupCounters(
-        _stats.spills, _stats.spilledDataStorageSize, _stats.spilledRecords);
+    groupCounters.incrementGroupCountersPerQuery(_stats.spilledDataStorageSize);
 }
 
 Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const {
@@ -636,20 +635,23 @@ void DocumentSourceGroupBase::spill() {
             }
             break;
     }
+    _sortedFiles.emplace_back(writer.done());
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(pExpCtx->opCtx);
     metricsCollector.incrementKeysSorted(ptrs.size());
     metricsCollector.incrementSorterSpills(1);
 
+    int64_t spilledBytes = 0;
+    if (_spillStats) {
+        spilledBytes = _spillStats->bytesSpilled() - _stats.spilledDataStorageSize;
+        _stats.spilledDataStorageSize = _spillStats->bytesSpilled();
+    }
+    groupCounters.incrementGroupCountersPerSpilling(1 /* spills */, spilledBytes, _groups->size());
+
     _groups->clear();
     // Zero out the current per-accumulation statement memory consumption, as the memory has been
     // freed by spilling.
     _memoryTracker.resetCurrent();
-
-    _sortedFiles.emplace_back(writer.done());
-    if (_spillStats) {
-        _stats.spilledDataStorageSize = _spillStats->bytesSpilled();
-    }
 }
 
 Value DocumentSourceGroupBase::computeId(const Document& root) {

@@ -137,11 +137,11 @@ private:
                                                                     value::TypeTags tagKey,
                                                                     value::Value valKey);
 
-    void writeIndicesToRecordStore(SpillingStore* rs,
-                                   value::TypeTags tagKey,
-                                   value::Value valKey,
-                                   const std::vector<size_t>& value,
-                                   bool update);
+    int64_t writeIndicesToRecordStore(SpillingStore* rs,
+                                      value::TypeTags tagKey,
+                                      value::Value valKey,
+                                      const std::vector<size_t>& value,
+                                      bool update);
 
     void spillIndicesToRecordStore(SpillingStore* rs,
                                    value::TypeTags tagKey,

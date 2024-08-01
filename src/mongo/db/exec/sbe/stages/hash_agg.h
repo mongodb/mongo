@@ -102,8 +102,6 @@ public:
                  bool participateInTrialRunTracking = true,
                  bool forceIncreasedSpilling = false);
 
-    virtual ~HashAggStage();
-
     std::unique_ptr<PlanStage> clone() const final;
 
     void prepare(CompileCtx& ctx) final;
@@ -183,7 +181,7 @@ private:
      * but are not necessary for comparison purposes. Therefore, we carry the type bits separately
      * from the record id, instead appending them to the end of the serialized 'val' buffer.
      */
-    void spillRowToDisk(const value::MaterializedRow& key, const value::MaterializedRow& val);
+    int64_t spillRowToDisk(const value::MaterializedRow& key, const value::MaterializedRow& val);
 
     void checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd);
     void spill(MemoryCheckData& mcd);
