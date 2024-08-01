@@ -87,9 +87,6 @@ rst.start(secondary.nodeId, undefined, true /* restart */);
 secondary = rst.getSecondary();
 secondaryDB = secondary.getDB(testDB.getName());
 
-// Wait for the restarted secondary node to reach SECONDARY state again.
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
-
 // Wait for the index build to complete on all nodes.
 rst.awaitReplication();
 
@@ -98,6 +95,9 @@ rst.awaitReplication();
 createIdx();
 
 IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
+
+// Wait for the secondary node to complete its recovery.
+rst.awaitSecondaryNodes();
 
 // Check that index was created on the secondary despite the attempted killOp().
 const secondaryColl = secondaryDB.getCollection(coll.getName());
