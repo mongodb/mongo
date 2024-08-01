@@ -555,20 +555,67 @@ class WtTxnPrinter(object):
                 yield (field.name, field_val)
 
 
-def absl_container_size(val):
-    return val["settings_"]["value"]["compressed_tuple_"]["value"]
+def absl_insert_version_after_absl(cpp_name):
+    """Insert version inline namespace after the first `absl` namespace found in the given string."""
+    # See more:
+    # https://github.com/abseil/abseil-cpp/blob/929c17cf481222c35ff1652498994871120e832a/absl/base/options.h#L203
+    ABSL_OPTION_INLINE_NAMESPACE_NAME = "lts_20230802"
+
+    absl_ns_str = "absl::"
+    absl_ns_start = cpp_name.find(absl_ns_str)
+    if absl_ns_start == -1:
+        raise ValueError("No `absl` namespace found in " + cpp_name)
+
+    absl_ns_end = absl_ns_start + len(absl_ns_str)
+
+    return (
+        cpp_name[:absl_ns_end] + ABSL_OPTION_INLINE_NAMESPACE_NAME + "::" + cpp_name[absl_ns_end:]
+    )
+
+
+def absl_get_settings(val):
+    """Gets the settings_ field for abseil (flat/node)_hash_(map/set)."""
+    try:
+        common_fields_storage_type = gdb.lookup_type(
+            absl_insert_version_after_absl(
+                "absl::container_internal::internal_compressed_tuple::Storage"
+            )
+            + absl_insert_version_after_absl("<absl::container_internal::CommonFields, 0, false>")
+        )
+    except gdb.error as err:
+        if not err.args[0].startswith("No type named "):
+            raise
+
+        # Abseil uses `inline namespace lts_20230802 { ... }` for its container types. This
+        # can inhibit GDB from resolving type names when the inline namespace appears within
+        # a template argument.
+        common_fields_storage_type = gdb.lookup_type(
+            absl_insert_version_after_absl(
+                "absl::container_internal::internal_compressed_tuple::Storage"
+                "<absl::container_internal::CommonFields, 0, false>"
+            )
+        )
+
+    # The Hash, Eq, or Alloc functors may not be zero-sized objects.
+    # mongo::LogicalSessionIdHash is one such example. An explicit cast is needed to
+    # disambiguate which `value` member variable of the CompressedTuple is to be accessed.
+    return val["settings_"].cast(common_fields_storage_type)["value"]
+
+
+def absl_container_size(settings):
+    return settings["compressed_tuple_"]["value"]
 
 
 def absl_get_nodes(val):
     """Return a generator of every node in absl::container_internal::raw_hash_set and derived classes."""
-    size = absl_container_size(val)
+    settings = absl_get_settings(val)
 
+    size = absl_container_size(settings)
     if size == 0:
         return
 
-    table = val
-    capacity = int(table["settings_"]["value"]["capacity_"])
-    ctrl = table["settings_"]["value"]["control_"]
+    capacity = int(settings["capacity_"])
+    ctrl = settings["control_"]
 
     # Derive the underlying type stored in the container.
     slot_type = lookup_type(str(val.type.strip_typedefs()) + "::slot_type").strip_typedefs()
@@ -578,7 +625,7 @@ def absl_get_nodes(val):
     for item in range(capacity):
         ctrl_t = int(ctrl[item])
         if ctrl_t >= 0:
-            yield table["settings_"]["value"]["slots_"].cast(slot_type.pointer())[item]
+            yield settings["slots_"].cast(slot_type.pointer())[item]
 
 
 class AbslHashSetPrinterBase(object):
@@ -599,7 +646,7 @@ class AbslHashSetPrinterBase(object):
         return "absl::%s_hash_set<%s> with %s elems " % (
             self.to_str,
             self.val.type.template_argument(0),
-            absl_container_size(self.val),
+            absl_container_size(absl_get_settings(self.val)),
         )
 
 
@@ -652,7 +699,7 @@ class AbslHashMapPrinterBase(object):
             self.to_str,
             self.val.type.template_argument(0),
             self.val.type.template_argument(1),
-            absl_container_size(self.val),
+            absl_container_size(absl_get_settings(self.val)),
         )
 
 
@@ -1065,10 +1112,30 @@ def build_pretty_printer():
     pp.add("Status", "mongo::Status", False, StatusPrinter)
     pp.add("StatusWith", "mongo::StatusWith", True, StatusWithPrinter)
     pp.add("StringData", "mongo::StringData", False, StringDataPrinter)
-    pp.add("node_hash_map", "absl::lts_20230802::node_hash_map", True, AbslNodeHashMapPrinter)
-    pp.add("node_hash_set", "absl::lts_20230802::node_hash_set", True, AbslNodeHashSetPrinter)
-    pp.add("flat_hash_map", "absl::lts_20230802::flat_hash_map", True, AbslFlatHashMapPrinter)
-    pp.add("flat_hash_set", "absl::lts_20230802::flat_hash_set", True, AbslFlatHashSetPrinter)
+    pp.add(
+        "node_hash_map",
+        absl_insert_version_after_absl("absl::node_hash_map"),
+        True,
+        AbslNodeHashMapPrinter,
+    )
+    pp.add(
+        "node_hash_set",
+        absl_insert_version_after_absl("absl::node_hash_set"),
+        True,
+        AbslNodeHashSetPrinter,
+    )
+    pp.add(
+        "flat_hash_map",
+        absl_insert_version_after_absl("absl::flat_hash_map"),
+        True,
+        AbslFlatHashMapPrinter,
+    )
+    pp.add(
+        "flat_hash_set",
+        absl_insert_version_after_absl("absl::flat_hash_set"),
+        True,
+        AbslFlatHashSetPrinter,
+    )
     pp.add("RecordId", "mongo::RecordId", False, RecordIdPrinter)
     pp.add("UUID", "mongo::UUID", False, UUIDPrinter)
     pp.add("OID", "mongo::OID", False, OIDPrinter)
