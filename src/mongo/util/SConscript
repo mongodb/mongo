@@ -898,7 +898,6 @@ icuEnv.CppUnitTest(
         "secure_zero_memory_test.cpp",
         "signal_handlers_synchronous_test.cpp" if not env.TargetOSIs("windows") else [],
         "static_immortal_test.cpp",
-        "str_escape_test.cpp",
         "str_test.cpp",
         "string_map_test.cpp",
         "strong_weak_finish_line_test.cpp",
