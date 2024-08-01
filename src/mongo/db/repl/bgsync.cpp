@@ -98,7 +98,7 @@ namespace repl {
 namespace {
 const int kSleepToAllowBatchingMillis = 2;
 const int kSmallBatchLimitBytes = 40000;
-const Milliseconds kRollbackOplogSocketTimeout(10 * 60 * 1000);
+const Milliseconds kRollbackOplogSocketTimeout(5 * 60 * 1000);
 
 // The number of times a node attempted to choose a node to sync from among the available sync
 // source options. This occurs if we re-evaluate our sync source, receive an error from the source,
