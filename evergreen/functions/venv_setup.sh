@@ -40,7 +40,7 @@ export POETRY_DATA_DIR="$poetry_dir/data"
 export POETRY_CACHE_DIR="$poetry_dir/cache"
 export PIP_CACHE_DIR="$poetry_dir/pip_cache"
 for i in {1..5}; do
-  $POETRY_VENV_PYTHON -m pip install -vvv "poetry==1.8.3" ${EXTRA_IBM_ARGS} && RET=0 && break || RET=$? && sleep 1
+  $POETRY_VENV_PYTHON -m pip install "poetry==1.8.3" ${EXTRA_IBM_ARGS} && RET=0 && break || RET=$? && sleep 1
   echo "Python failed to install poetry, retrying..."
 done
 
@@ -104,7 +104,7 @@ echo "Upgrading pip to 21.0.1"
 # We have seen weird network errors that can sometimes mess up the pip install
 # By retrying we would like to only see errors that happen consistently
 for i in {1..5}; do
-  python -m pip --disable-pip-version-check install -vvv "pip==21.0.1" "wheel==0.37.0" && RET=0 && break || RET=$? && sleep 1
+  python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" && RET=0 && break || RET=$? && sleep 1
   echo "Python failed to install pip and wheel, retrying..."
 done
 
@@ -122,7 +122,7 @@ count=0
 for i in {1..5}; do
   $POETRY_VENV_PYTHON -m poetry cache clear . --all
   rm -rf $poetry_dir/*
-  $POETRY_VENV_PYTHON -m poetry -vvv install --no-root --sync && RET=0 && break || RET=$? && sleep 1
+  $POETRY_VENV_PYTHON -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
   echo "Python failed install required deps with poetry, retrying..."
   sleep $((count * count * 20))
   count=$((count + 1))
