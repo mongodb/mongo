@@ -81,6 +81,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_version_factory.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
@@ -99,7 +100,7 @@ const std::string kShardKey = "_id";
 const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
 
 class CollectionShardingRuntimeTest : public ShardServerTestFixture {
-protected:
+public:
     static CollectionMetadata makeShardedMetadata(OperationContext* opCtx,
                                                   UUID uuid = UUID::gen()) {
         const OID epoch = OID::gen();
@@ -618,5 +619,56 @@ TEST_F(CollectionShardingRuntimeWithCatalogTest, TestShardingIndexesCatalogCache
     ASSERT_EQ(true, csr()->getIndexes(opCtx).is_initialized());
     ASSERT_EQ(CollectionIndexes(uuid(), indexVersion), *csr()->getCollectionIndexes(opCtx));
 }
+
+// Test the CSR before and after the initialization of the ShardingState with ClusterRole::None.
+TEST_F(ShardingMongoDTestFixture, ShardingStateDisabledReturnsUntrackedVersion) {
+    OperationContext* opCtx = operationContext();
+    const auto metadata = CollectionShardingRuntimeTest::makeShardedMetadata(opCtx);
+    auto receivedShardVersion =
+        ShardVersionFactory::make(metadata, boost::optional<CollectionIndexes>(boost::none));
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx, kTestNss, receivedShardVersion, boost::none /* databaseVersion */};
+
+    // While the ShardingState has not yet been recovered, we expect the CollectionShardingRuntime
+    // to present all collections as UNTRACKED.
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    ASSERT_DOES_NOT_THROW(csr.getCollectionDescription(opCtx));
+    ASSERT_DOES_NOT_THROW(csr.checkShardVersionOrThrow(opCtx));
+
+    // Setting the recovery completed as ClusterRole::None is also equilvament to initialize a
+    // standalone replica-set. The CollectionShardingState should continue to present collections as
+    // UNTRACKED.
+    ShardingState::RecoveredClusterRole rcr;
+    rcr.role = ClusterRole::None;
+    auto shardingState = ShardingState::get(opCtx);
+    shardingState->setRecoveryCompleted(rcr);
+    ASSERT_DOES_NOT_THROW(csr.getCollectionDescription(opCtx));
+    ASSERT_DOES_NOT_THROW(csr.checkShardVersionOrThrow(opCtx));
+}
+
+// Test the CSR before and after the initialization of the ShardingState with shard server role.
+TEST_F(ShardingMongoDTestFixture, ShardingStateEnabledReturnsTrackedVersion) {
+    OperationContext* opCtx = operationContext();
+    const auto metadata = CollectionShardingRuntimeTest::makeShardedMetadata(opCtx);
+    auto receivedShardVersion =
+        ShardVersionFactory::make(metadata, boost::optional<CollectionIndexes>(boost::none));
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx, kTestNss, receivedShardVersion, boost::none /* databaseVersion */};
+
+    // While the ShardingState has not yet been recovered, we expect the CollectionShardingRuntime
+    // to present all collections as UNTRACKED.
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    ASSERT_DOES_NOT_THROW(csr.getCollectionDescription(opCtx));
+    ASSERT_DOES_NOT_THROW(csr.checkShardVersionOrThrow(opCtx));
+
+    // After completing the ShardingState recovery as a ClusterRole::ShardServer,
+    // CollectionShardingRuntime will throw StaleConfig because the metadata needs to be recovered.
+    ShardingState::RecoveredClusterRole rcr;
+    rcr.role = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    ShardingState::get(opCtx)->setRecoveryCompleted(rcr);
+    ASSERT_THROWS_CODE(csr.getCollectionDescription(opCtx), DBException, ErrorCodes::StaleConfig);
+    ASSERT_THROWS_CODE(csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::StaleConfig);
+}
+
 }  // namespace
 }  // namespace mongo
