@@ -820,6 +820,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/s/resharding/**/* @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./src/mongo/s/write_ops/OWNERS.yml
+/src/mongo/s/write_ops/**/* @10gen/query-execution
 /src/mongo/s/write_ops/**/coordinate_multi_update* @10gen/server-cluster-scalability
 /src/mongo/s/write_ops/**/pause_migrations_during_multi_update* @10gen/server-cluster-scalability
 /src/mongo/s/write_ops/**/write_without_shard_key* @10gen/server-cluster-scalability

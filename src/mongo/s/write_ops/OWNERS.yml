@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution
   - "coordinate_multi_update*":
     approvers:
       - 10gen/server-cluster-scalability
