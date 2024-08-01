@@ -4,6 +4,7 @@
 //
 // @tags: [
 //   requires_persistence,
+//   incompatible_with_windows_tls,
 // ]
 var rst = new ReplSetTest({
     nodes: 1,
