@@ -21,9 +21,6 @@ filters:
   - "user_management_commands*":
     approvers:
       - 10gen/server-security
-  - "profile*":
-    approvers:
-      - 10gen/query-integration
   - "search_*":
     approvers:
       - 10gen/query-integration
@@ -52,3 +49,6 @@ filters:
   - "set_cluster*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "set_profiling_filter_globally_cmd*":
+    approvers:
+      - 10gen/query-integration

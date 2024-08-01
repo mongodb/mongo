@@ -49,7 +49,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/basic_types.h"
-#include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"

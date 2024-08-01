@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/bulk_write_parser.h"
+#include "mongo/db/commands/query_cmd/bulk_write_parser.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include <boost/cstdint.hpp>
@@ -60,8 +60,8 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/basic_types.h"
-#include "mongo/db/commands/bulk_write_crud_op.h"
-#include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
+#include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/service_context.h"

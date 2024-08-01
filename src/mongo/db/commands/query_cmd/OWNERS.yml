@@ -1,0 +1,34 @@
+version: 1.0.0
+filters:
+  # The top-level command implementations are neither clearly QE or QO, so files in this directory
+  # are owned by the entire query team by default.
+  - "*":
+    approvers:
+      - 10gen/query
+  - "analyze_cmd*":
+    approvers:
+      - 10gen/query-optimization
+  - "change_stream_state_command.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "cst_command.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "index_filter_commands.*":
+    approvers:
+      - 10gen/query-optimization
+  - "explain.idl":
+    approvers:
+      - 10gen/query-optimization
+  - "explain_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "plan_cache*":
+    approvers:
+      - 10gen/query-optimization
+  - "query_settings_cmds.*":
+    approvers:
+      - 10gen/query-execution
+  - "search_index_commands.*":
+    approvers:
+      - 10gen/query-integration

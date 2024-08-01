@@ -44,7 +44,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/commands/write_commands_common.h"
+#include "mongo/db/commands/query_cmd/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"

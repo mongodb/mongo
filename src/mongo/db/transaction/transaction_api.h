@@ -43,7 +43,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/logical_time.h"

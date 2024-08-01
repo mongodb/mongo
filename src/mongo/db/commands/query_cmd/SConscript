@@ -1,0 +1,218 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target="update_metrics",
+    source=[
+        "update_metrics.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/commands/server_status_core",
+        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
+    ],
+)
+
+env.Library(
+    target="write_commands_common",
+    source=[
+        "write_commands_common.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/db/auth/authprivilege",
+        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
+        "$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source",
+        "update_metrics",
+    ],
+)
+
+env.Library(
+    target="bulk_write_common",
+    source=[
+        "bulk_write_common.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/auth/authprivilege",
+        "$BUILD_DIR/mongo/db/ops/delete_request_idl",
+        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
+        "$BUILD_DIR/mongo/db/query_expressions",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/logv2/logv2_options",
+        "bulk_write_parser",
+        "update_metrics",
+        "write_commands_common",
+    ],
+)
+
+env.Library(
+    target="bulk_write_parser",
+    source=[
+        "bulk_write.idl",
+        "bulk_write_parser.cpp",
+        "bulk_write_crud_op.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/crypto/fle_fields",
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/s/common_s",
+    ],
+)
+
+env.Library(
+    target="bulk_write_command",
+    source=[
+        "bulk_write.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/crypto/fle_fields",
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/db/auth/authprivilege",
+        "$BUILD_DIR/mongo/db/catalog/document_validation",
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/concurrency/exception_util",
+        "$BUILD_DIR/mongo/db/curop_metrics",
+        "$BUILD_DIR/mongo/db/fle_crud_mongod",
+        "$BUILD_DIR/mongo/db/introspect",
+        "$BUILD_DIR/mongo/db/not_primary_error_tracker",
+        "$BUILD_DIR/mongo/db/ops/write_ops",
+        "$BUILD_DIR/mongo/db/ops/write_ops_exec",
+        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
+        "$BUILD_DIR/mongo/db/pipeline/process_interface/mongod_process_interfaces",
+        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/db/s/analyze_shard_key_util",
+        "$BUILD_DIR/mongo/db/s/query_analysis_writer",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/session/logical_session_id_helpers",
+        "$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics",
+        "$BUILD_DIR/mongo/db/stats/top",
+        "$BUILD_DIR/mongo/db/storage/storage_options",
+        "$BUILD_DIR/mongo/db/transaction/transaction",
+        "$BUILD_DIR/mongo/logv2/logv2_options",
+        "$BUILD_DIR/mongo/s/grid",
+        "$BUILD_DIR/mongo/s/query_analysis_sampler",
+        "$BUILD_DIR/mongo/util/log_and_backoff",
+        "bulk_write_common",
+        "bulk_write_parser",
+        "update_metrics",
+        "write_commands_common",
+    ],
+)
+
+env.Library(
+    target="query_settings_cmds",
+    source=[
+        # This document source has been re-located here from 'pipeline' to avoid the
+        # 'pipeline' -> 'query_settings_utils' -> 'pipeline' cyclic dependency.
+        # Generating the Debug Query Shape requires re-parsing the query instance via
+        # `query_settings::utils::createRepresentativeInfo()`, which internally uses
+        # `Pipeline::parse()`.
+        "$BUILD_DIR/mongo/db/pipeline/document_source_query_settings.cpp",
+        "query_settings_cmds.idl",
+        "query_settings_cmds.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/client/clientdriver_minimal",
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/commands/cluster_server_parameter_cmds_idl",
+        "$BUILD_DIR/mongo/db/commands/set_cluster_parameter_impl",
+        "$BUILD_DIR/mongo/db/dbdirectclient",
+        "$BUILD_DIR/mongo/db/query/canonical_query",
+        "$BUILD_DIR/mongo/db/query/query_plan_cache",
+        "$BUILD_DIR/mongo/db/query/query_settings/manager",
+        "$BUILD_DIR/mongo/db/query/query_settings/utils",
+        "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
+        "$BUILD_DIR/mongo/db/repl/repl_settings",
+    ],
+)
+
+env.Library(
+    target="current_op_common",
+    source=[
+        "current_op_common.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
+        "$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper",
+        "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+    ],
+)
+
+env.Library(
+    target="map_reduce_parser",
+    source=[
+        "map_reduce_out_options.cpp",
+        "map_reduce.idl",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/server_base",
+    ],
+)
+
+env.Library(
+    target="map_reduce_agg",
+    source=[
+        "map_reduce_agg.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands/servers",
+        "$BUILD_DIR/mongo/db/index/index_access_method",
+        "$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface",
+        "$BUILD_DIR/mongo/db/pipeline/process_interface/mongod_process_interface_factory",
+        "$BUILD_DIR/mongo/db/query/map_reduce_output_format",
+        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/db/shard_role",
+        "$BUILD_DIR/mongo/db/storage/storage_options",
+        "map_reduce_parser",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/server_base",
+    ],
+)
+
+env.CppUnitTest(
+    target="map_reduce_agg_test",
+    source=[
+        "map_reduce_agg_test.cpp",
+        "map_reduce_parse_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
+        "$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl",
+        "map_reduce_agg",
+    ],
+)
+
+env.Library(
+    target="search_index_commands",
+    source=[
+        "search_index_commands.idl",
+        "search_index_commands.cpp",
+        "search_test_cmds.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/auth/auth_checks",
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/query/search/search_index_common",
+        "$BUILD_DIR/mongo/db/query/search/search_index_options",
+        "$BUILD_DIR/mongo/db/query/search/search_index_process_interface",
+        "$BUILD_DIR/mongo/db/query/search/search_task_executors",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+    ],
+)

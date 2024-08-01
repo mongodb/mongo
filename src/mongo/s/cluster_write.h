@@ -34,8 +34,8 @@
 #include <vector>
 
 #include "mongo/bson/oid.h"
-#include "mongo/db/commands/bulk_write_gen.h"
-#include "mongo/db/commands/bulk_write_parser.h"
+#include "mongo/db/commands/query_cmd/bulk_write_gen.h"
+#include "mongo/db/commands/query_cmd/bulk_write_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/write_ops/batch_write_exec.h"

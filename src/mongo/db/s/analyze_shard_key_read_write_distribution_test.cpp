@@ -45,7 +45,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/basic_types_gen.h"
-#include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"

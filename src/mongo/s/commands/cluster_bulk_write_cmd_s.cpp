@@ -30,7 +30,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/commands/cluster_bulk_write_cmd.h"
 
-#include "mongo/db/commands/bulk_write_common.h"
+#include "mongo/db/commands/query_cmd/bulk_write_common.h"
 
 namespace mongo {
 namespace {

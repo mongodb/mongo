@@ -85,7 +85,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/run_aggregate.h"
+#include "mongo/db/commands/query_cmd/run_aggregate.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/commands/user_management_commands_gen.h"

@@ -47,7 +47,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/update_metrics.h"
+#include "mongo/db/commands/query_cmd/update_metrics.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
