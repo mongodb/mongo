@@ -22,6 +22,9 @@ selector:
 
   exclude_with_any_tags:
     - requires_sharding
+    # Workloads that kill random sessions may interrupt the $operationMetrics aggregation
+    # run in the background.
+    - kills_random_sessions
 
 executor:
   archive:
