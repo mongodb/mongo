@@ -166,3 +166,34 @@ testDateTimeExpression("$isoDayOfWeek",
                        {idBasedTzExpected: 7, offsetBasedTzExpected: 6, noTzExpected: 1});
 testDateTimeExpression("$isoWeek",
                        {idBasedTzExpected: 2, offsetBasedTzExpected: 52, noTzExpected: 3});
+
+// Make sure the data type returned by the date/time expressions is correct
+function testDateTimeExpressionType(exprName, exprType) {
+    let expr = {};
+    let type = {};
+    type["$type"] = exprType;
+    let pipeline = [{$addFields: {"tp": expr}}, {$match: {"tp": type}}, {$project: {"_id": 1}}];
+
+    // without timezone
+    expr[exprName] = "$date";
+    assert.eq([{_id: 0}], coll.aggregate(pipeline).toArray());
+
+    // with timezone
+    expr[exprName] = {date: "$date", timezone: "America/Sao_Paulo"};
+    assert.eq([{_id: 0}], coll.aggregate(pipeline).toArray());
+}
+assert(coll.drop());
+assert.commandWorked(coll.insert({_id: 0, date: ISODate("2017-01-16T01:02:03.456Z")}));
+testDateTimeExpressionType("$dayOfWeek", "int");
+testDateTimeExpressionType("$dayOfMonth", "int");
+testDateTimeExpressionType("$dayOfYear", "int");
+testDateTimeExpressionType("$year", "int");
+testDateTimeExpressionType("$month", "int");
+testDateTimeExpressionType("$hour", "int");
+testDateTimeExpressionType("$minute", "int");
+testDateTimeExpressionType("$second", "int");
+testDateTimeExpressionType("$millisecond", "int");
+testDateTimeExpressionType("$week", "int");
+testDateTimeExpressionType("$isoWeekYear", "long");
+testDateTimeExpressionType("$isoDayOfWeek", "int");
+testDateTimeExpressionType("$isoWeek", "int");

@@ -62,6 +62,15 @@ public:
         ASSERT_EQUALS(value::TypeTags::NumberInt32, runTag);
         ASSERT_EQUALS(expectedResult, value::bitcastTo<int32_t>(runVal));
     }
+
+    void runAndAssertIsoWeekYearExpression(const vm::CodeFragment* compiledExpr,
+                                           int64_t expectedResult) {
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
+        value::ValueGuard guard(runTag, runVal);
+
+        ASSERT_EQUALS(value::TypeTags::NumberInt64, runTag);
+        ASSERT_EQUALS(expectedResult, value::bitcastTo<int64_t>(runVal));
+    }
 };
 
 TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfYear) {
@@ -685,7 +694,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeekYear) {
                                .toMillisSinceEpoch()));
     auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
     timezoneAccessor.reset(timezoneTag, timezoneVal);
-    runAndAssertExpression(compiledISOWeekYear.get(), 1996);
+    runAndAssertIsoWeekYearExpression(compiledISOWeekYear.get(), static_cast<int64_t>(1996));
 
     // Test $isoWeekYear returns Nothing with invalid date.
     dateAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
@@ -715,7 +724,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeekYear) {
     auto timezone = tzdb->utcZone();
     timezoneObjAccessor.reset(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
-    runAndAssertExpression(compiledISOWeekYear.get(), 1996);
+    runAndAssertIsoWeekYearExpression(compiledISOWeekYear.get(), static_cast<int64_t>(1996));
 }
 
 TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISODayOfWeek) {

@@ -245,7 +245,14 @@ FastTuple<bool, value::TypeTags, value::Value> genericDateExpressionAcceptingTim
     int32_t result;
     Op::doOperation(date, timezone, result);
 
-    return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(result)};
+    if constexpr (std::is_same<Op, ISOWeekYear>::value) {
+        // convert type to long to be compatible with classic
+        return {false,
+                value::TypeTags::NumberInt64,
+                value::bitcastFrom<int64_t>(static_cast<int64_t>(result))};
+    } else {
+        return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(result)};
+    }
 }
 
 /**
@@ -273,7 +280,14 @@ FastTuple<bool, value::TypeTags, value::Value> genericDateExpressionAcceptingTim
     int32_t result;
     Op::doOperation(date, timezone, result);
 
-    return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(result)};
+    if constexpr (std::is_same<Op, ISOWeekYear>::value) {
+        // convert type to long to be compatible with classic
+        return {false,
+                value::TypeTags::NumberInt64,
+                value::bitcastFrom<int64_t>(static_cast<int64_t>(result))};
+    } else {
+        return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(result)};
+    }
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericDayOfYear(
