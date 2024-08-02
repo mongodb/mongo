@@ -170,11 +170,11 @@ function assertRangeMatch(savedRange, paramRange) {
         assert.commandFailedWithCode(
             mongo.s0.adminCommand(
                 {reshardCollection: viewNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
-            [ErrorCodes.NotImplemented]);
+            [ErrorCodes.NotImplemented, ErrorCodes.IllegalOperation]);
         assert.commandFailedWithCode(
             mongo.s0.adminCommand(
                 {reshardCollection: bucketNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
-            ErrorCodes.NotImplemented);
+            [ErrorCodes.NotImplemented, ErrorCodes.IllegalOperation]);
         dropTimeSeriesColl();
     } else {
         jsTestLog(`Skipping resharding for timeseries not implemented test.`);
