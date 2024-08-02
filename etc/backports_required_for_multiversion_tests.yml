@@ -219,6 +219,8 @@ last-continuous:
       ticket: SERVER-92930
     - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js
       ticket: SERVER-92806
+    - test_file: jstests/core/index/index_creation_on_different_collations.js
+      ticket: SERVER-93112
   suites: null
 last-lts:
   all:
@@ -450,4 +452,6 @@ last-lts:
       ticket: SERVER-92930
     - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js
       ticket: SERVER-92806
+    - test_file: jstests/core/index/index_creation_on_different_collations.js
+      ticket: SERVER-93112
   suites: null
