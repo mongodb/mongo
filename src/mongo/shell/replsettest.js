@@ -3945,6 +3945,17 @@ var ReplSetTest = function ReplSetTest(opts) {
             rst.ports = Array.from({length: numNodes}, rst._allocatePortForNode);
         }
 
+        for (let i = 0; i < numNodes; i++) {
+            const nodeOpts = rst.nodeOptions["n" + i];
+            if (nodeOpts && nodeOpts.hasOwnProperty("port")) {
+                if (rst._useBridge) {
+                    rst._unbridgedPorts[i] = nodeOpts.port;
+                } else {
+                    rst.ports[i] = nodeOpts.port;
+                }
+            }
+        }
+
         if (rst.isRouterServer) {
             rst.routerPorts = Array.from({length: numNodes}, rst._allocatePortForNode);
         }
