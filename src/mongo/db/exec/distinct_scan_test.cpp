@@ -71,7 +71,8 @@ public:
 
     static void validateOutput(const WorkingSet& ws,
                                const WorkingSetID wsid,
-                               const BSONObj& expectedKeyData) {
+                               const BSONObj& expectedKeyData,
+                               bool shouldFetch) {
         // For some reason (at least under OS X clang), we cannot refer to INVALID_ID
         // inside the test assertion macro.
         WorkingSetID invalid = WorkingSet::INVALID_ID;
@@ -79,26 +80,31 @@ public:
 
         auto member = ws.get(wsid);
 
-        // Distinct hack execution is always covered.
-        // Key value is retrieved from working set key data
-        // instead of RecordId.
-        ASSERT_FALSE(member->hasObj());
-        ASSERT_EQ(member->keyData.size(), 1);
-        ASSERT_BSONOBJ_EQ(expectedKeyData, member->keyData[0].keyData);
+        if (shouldFetch) {
+            ASSERT_TRUE(member->hasObj());
+            ASSERT_BSONOBJ_EQ(expectedKeyData, member->doc.value().toBson());
+        } else {
+            // Key value is retrieved from working set key data
+            // instead of RecordId.
+            ASSERT_FALSE(member->hasObj());
+            ASSERT_EQ(member->keyData.size(), 1);
+            ASSERT_BSONOBJ_EQ(expectedKeyData, member->keyData[0].keyData);
+        }
     }
 
     using DoWorkResult = std::variant<PlanStage::StageState, BSONObj>;
     static void doWorkAndValidate(DistinctScan& scan,
                                   WorkingSet& ws,
                                   WorkingSetID& wsid,
-                                  const std::vector<DoWorkResult>& expectedWorkPattern) {
+                                  const std::vector<DoWorkResult>& expectedWorkPattern,
+                                  bool shouldFetch) {
         for (const auto& nextExpectedWork : expectedWorkPattern) {
             const auto nextState = scan.work(&wsid);
             visit(OverloadedVisitor{
                       [&nextState](PlanStage::StageState state) { ASSERT_EQ(nextState, state); },
-                      [&nextState, &ws, &wsid](const BSONObj& expectedKeyData) {
+                      [shouldFetch, &nextState, &ws, &wsid](const BSONObj& expectedKeyData) {
                           ASSERT_EQ(nextState, PlanStage::ADVANCED);
-                          validateOutput(ws, wsid, expectedKeyData);
+                          validateOutput(ws, wsid, expectedKeyData, shouldFetch);
                       }},
                   nextExpectedWork);
         }
@@ -216,7 +222,8 @@ public:
         int scanDirection;
         int fieldNo;
         IndexBounds bounds;
-        bool shouldFilter;
+        bool shouldShardFilter;
+        bool shouldFetch;
 
         // Expected output of distinct scan (from repeated calls to work()).
         const std::vector<DoWorkResult>& expectedWorkPattern;
@@ -249,7 +256,7 @@ public:
                 metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
             boost::none /* databaseVersion */};
         auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns);
-        auto sfi = testParams.shouldFilter
+        auto sfi = testParams.shouldShardFilter
             ? std::make_unique<ShardFiltererImpl>(scopedCss->getOwnershipFilter(
                   opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup))
             : nullptr;
@@ -257,8 +264,14 @@ public:
         // Construct distinct, and verify its expected execution pattern on the given data.
         WorkingSet ws;
         WorkingSetID wsid;
-        DistinctScan distinct(expressionContext(), &coll, std::move(params), &ws, std::move(sfi));
-        doWorkAndValidate(distinct, ws, wsid, testParams.expectedWorkPattern);
+        DistinctScan distinct(expressionContext(),
+                              &coll,
+                              std::move(params),
+                              &ws,
+                              std::move(sfi),
+                              testParams.shouldFetch);
+        doWorkAndValidate(
+            distinct, ws, wsid, testParams.expectedWorkPattern, testParams.shouldFetch);
     }
 
 private:
@@ -311,7 +324,8 @@ TEST_F(DistinctScanTest, NoShardFilteringTest) {
          .scanDirection = 1,
          .fieldNo = 0,
          .bounds = makeIndexBounds({{"b", {IndexBoundsBuilder::allValues()}}}),
-         .shouldFilter = false,
+         .shouldShardFilter = false,
+         .shouldFetch = false,
          .expectedWorkPattern = {BSON("" << false), BSON("" << true), PlanStage::IS_EOF}});
 }
 
@@ -326,8 +340,49 @@ TEST_F(DistinctScanTest, NoShardFilteringReverseScanTest) {
          .scanDirection = -1,
          .fieldNo = 0,
          .bounds = makeIndexBounds({{"b", {IndexBoundsBuilder::allValues().reverseClone()}}}),
-         .shouldFilter = false,
+         .shouldShardFilter = false,
+         .shouldFetch = false,
          .expectedWorkPattern = {BSON("" << true), BSON("" << false), PlanStage::IS_EOF}});
+}
+
+TEST_F(DistinctScanTest, NoShardFilteringFetchTest) {
+    const ShardKeyPattern shardKeyPattern(BSON("b" << 1));
+    const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
+    verifyDistinctScanExecution(
+        {.shardKey = shardKey,
+         .docsOnShard = kDataset,
+         .chunks = {{{shardKey.globalMin(), shardKey.globalMax()}, true /* isOnCurShard */}},
+         .idxKey = shardKey.toBSON(),
+         .scanDirection = 1,
+         .fieldNo = 0,
+         .bounds = makeIndexBounds({{"b", {IndexBoundsBuilder::allValues()}}}),
+         .shouldShardFilter = false,
+         .shouldFetch = true,
+         .expectedWorkPattern = {BSON("_id" << 2 << "a" << 5 << "b" << false << "c"
+                                            << "apple"),
+                                 BSON("_id" << 1 << "a" << 5 << "b" << true << "c"
+                                            << "apple"),
+                                 PlanStage::IS_EOF}});
+}
+
+TEST_F(DistinctScanTest, NoShardFilteringReverseScanFetchTest) {
+    const ShardKeyPattern shardKeyPattern(BSON("b" << 1));
+    const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
+    verifyDistinctScanExecution(
+        {.shardKey = shardKey,
+         .docsOnShard = kDataset,
+         .chunks = {{{shardKey.globalMin(), shardKey.globalMax()}, true /* isOnCurShard */}},
+         .idxKey = shardKey.toBSON(),
+         .scanDirection = -1,
+         .fieldNo = 0,
+         .bounds = makeIndexBounds({{"b", {IndexBoundsBuilder::allValues().reverseClone()}}}),
+         .shouldShardFilter = false,
+         .shouldFetch = true,
+         .expectedWorkPattern = {BSON("_id" << 13 << "a" << 25 << "b" << true << "c"
+                                            << "ananas"),
+                                 BSON("_id" << 14 << "a" << 35 << "b" << false << "c"
+                                            << "ANANAS"),
+                                 PlanStage::IS_EOF}});
 }
 
 TEST_F(DistinctScanTest, ShardFilteringNoOrphansTest) {
@@ -341,7 +396,8 @@ TEST_F(DistinctScanTest, ShardFilteringNoOrphansTest) {
          .scanDirection = -1,
          .fieldNo = 0,
          .bounds = makeIndexBounds({{"b", {IndexBoundsBuilder::allValues().reverseClone()}}}),
-         .shouldFilter = true,
+         .shouldShardFilter = true,
+         .shouldFetch = false,
          .expectedWorkPattern = {BSON("" << true), BSON("" << false), PlanStage::IS_EOF}});
 }
 
@@ -363,7 +419,8 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsIndexKeyTest) {
          .scanDirection = 1,
          .fieldNo = 0,
          .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}}}),
-         .shouldFilter = true,
+         .shouldShardFilter = true,
+         .shouldFetch = false,
          .expectedWorkPattern = {// See first unique value, not an orphan, so we seek.
                                  BSON("" << 5),
                                  // Same here.
@@ -398,7 +455,8 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsReverseOfIndexKeyReverseScanTes
          .scanDirection = -1,
          .fieldNo = 0,
          .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}}}),
-         .shouldFilter = true,
+         .shouldShardFilter = true,
+         .shouldFetch = false,
          // Same pattern as above.
          .expectedWorkPattern = {BSON("" << 5),
                                  BSON("" << 9),
@@ -432,7 +490,8 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsPrefixDistinctKeyPrefixTest) {
          .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}},
                                     {"b", {IndexBoundsBuilder::allValues()}},
                                     {"c", {IndexBoundsBuilder::allValues()}}}),
-         .shouldFilter = true,
+         .shouldShardFilter = true,
+         .shouldFetch = false,
          // Same pattern as above (but with more fields).
          .expectedWorkPattern = {BSON("" << 5 << "" << false << ""
                                          << "apple"),
@@ -470,7 +529,8 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsPrefixDistinctKeyMiddleTest) {
          .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}},
                                     {"b", {IndexBoundsBuilder::allValues()}},
                                     {"c", {IndexBoundsBuilder::allValues()}}}),
-         .shouldFilter = true,
+         .shouldShardFilter = true,
+         .shouldFetch = false,
          // Distinct is now on second field.
          .expectedWorkPattern = {BSON("" << 5 << "" << false << ""
                                          << "apple"),
@@ -512,7 +572,8 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsPrefixDistinctKeyEndTest) {
          .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}},
                                     {"b", {IndexBoundsBuilder::allValues()}},
                                     {"c", {IndexBoundsBuilder::allValues()}}}),
-         .shouldFilter = true,
+         .shouldShardFilter = true,
+         .shouldFetch = false,
          // Distinct is now on third field.
          .expectedWorkPattern = {BSON("" << 5 << "" << false << ""
                                          << "apple"),
@@ -557,7 +618,8 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyInMiddleDistinctKeyPrefixTest) {
          .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}},
                                     {"b", {IndexBoundsBuilder::allValues()}},
                                     {"c", {IndexBoundsBuilder::allValues()}}}),
-         .shouldFilter = true,
+         .shouldShardFilter = true,
+         .shouldFetch = false,
          // Only 'true" values f "b" are owned by this shard; note that 'false' always sorts first.
          .expectedWorkPattern = {PlanStage::NEED_TIME,
                                  BSON("" << 5 << "" << true << ""
@@ -596,7 +658,8 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyInMiddleDistinctKeySuffixTest) {
          .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}},
                                     {"b", {IndexBoundsBuilder::allValues()}},
                                     {"c", {IndexBoundsBuilder::allValues()}}}),
-         .shouldFilter = true,
+         .shouldShardFilter = true,
+         .shouldFetch = false,
          // Similar to above, only our distinct key is now the final field.
          .expectedWorkPattern = {PlanStage::NEED_TIME,
                                  BSON("" << 5 << "" << true << ""
@@ -651,7 +714,8 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyAtEndTest) {
                                      makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}},
                                                       {"b", {IndexBoundsBuilder::allValues()}},
                                                       {"c", {IndexBoundsBuilder::allValues()}}}),
-                                 .shouldFilter = true,
+                                 .shouldShardFilter = true,
+                                 .shouldFetch = false,
                                  .expectedWorkPattern = {PlanStage::NEED_TIME,
                                                          BSON("" << 5 << "" << true << ""
                                                                  << "AppLe"),
@@ -701,7 +765,8 @@ TEST_F(DistinctScanTest, ShardFilteringCompoundShardKeySubsetTest) {
                    BSON("" << 0 << "" << 19), BoundInclusion::kIncludeBothStartAndEndKeys)}},
               {"b", {IndexBoundsBuilder::allValues().reverseClone()}},
               {"c", {IndexBoundsBuilder::allValues().reverseClone()}}}),
-         .shouldFilter = true,
+         .shouldShardFilter = true,
+         .shouldFetch = false,
          .expectedWorkPattern = {PlanStage::NEED_TIME,
                                  PlanStage::NEED_TIME,
                                  PlanStage::NEED_TIME,
@@ -714,6 +779,103 @@ TEST_F(DistinctScanTest, ShardFilteringCompoundShardKeySubsetTest) {
                                  BSON("" << 19 << "" << false << ""
                                          << "PeAr"),
                                  PlanStage::IS_EOF}});
+}
+
+TEST_F(DistinctScanTest, ShardFilteringNoShardKeyInIndexKeyTest) {
+    const ShardKeyPattern shardKeyPattern(BSON("c" << 1));
+    const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
+    verifyDistinctScanExecution({.shardKey = shardKey,
+                                 .docsOnShard = kDataset,
+                                 .chunks =
+                                     {
+                                         {{shardKey.globalMin(),
+                                           BSON("c"
+                                                << "PEAR")},
+                                          true /* isOnCurShard */},
+                                         {{BSON("c"
+                                                << "PEAR"),
+                                           BSON("c"
+                                                << "banana")},
+                                          false /* isOnCurShard */},
+                                         {{BSON("c"
+                                                << "banana"),
+                                           shardKey.globalMax()},
+                                          true /* isOnCurShard */},
+                                     },
+                                 .idxKey = BSON("a" << 1),
+                                 .scanDirection = 1,
+                                 .fieldNo = 0,
+                                 .bounds =
+                                     makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}}}),
+                                 .shouldShardFilter = true,
+                                 .shouldFetch = true,
+                                 .expectedWorkPattern = {
+                                     PlanStage::NEED_TIME,
+                                     PlanStage::NEED_TIME,
+                                     BSON("_id" << 3 << "a" << 5 << "b" << true << "c"
+                                                << "AppLe"),
+                                     BSON("_id" << 4 << "a" << 9 << "b" << false << "c"
+                                                << "ApPlE"),
+                                     PlanStage::NEED_TIME,
+                                     BSON("_id" << 6 << "a" << 10 << "b" << false << "c"
+                                                << "pear"),
+                                     BSON("_id" << 7 << "a" << 15 << "b" << true << "c"
+                                                << "pEaR"),
+                                     PlanStage::NEED_TIME,
+                                     PlanStage::NEED_TIME,
+                                     BSON("_id" << 10 << "a" << 20 << "b" << false << "c"
+                                                << "BaNaNa"),
+                                     PlanStage::NEED_TIME,
+                                     BSON("_id" << 14 << "a" << 35 << "b" << false << "c"
+                                                << "ANANAS"),
+                                     PlanStage::IS_EOF}});
+}
+
+TEST_F(DistinctScanTest, ShardFilteringNoShardKeyInIndexKeyReverseScanTest) {
+    const ShardKeyPattern shardKeyPattern(BSON("c" << 1));
+    const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
+    verifyDistinctScanExecution({.shardKey = shardKey,
+                                 .docsOnShard = kDataset,
+                                 .chunks =
+                                     {
+                                         {{shardKey.globalMin(),
+                                           BSON("c"
+                                                << "PEAR")},
+                                          true /* isOnCurShard */},
+                                         {{BSON("c"
+                                                << "PEAR"),
+                                           BSON("c"
+                                                << "banana")},
+                                          false /* isOnCurShard */},
+                                         {{BSON("c"
+                                                << "banana"),
+                                           shardKey.globalMax()},
+                                          true /* isOnCurShard */},
+                                     },
+                                 .idxKey = BSON("a" << 1),
+                                 .scanDirection = -1,
+                                 .fieldNo = 0,
+                                 .bounds = makeIndexBounds(
+                                     {{"a", {IndexBoundsBuilder::allValues().reverseClone()}}}),
+                                 .shouldShardFilter = true,
+                                 .shouldFetch = true,
+                                 .expectedWorkPattern = {
+                                     BSON("_id" << 14 << "a" << 35 << "b" << false << "c"
+                                                << "ANANAS"),
+                                     PlanStage::NEED_TIME,
+                                     PlanStage::NEED_TIME,
+                                     BSON("_id" << 11 << "a" << 20 << "b" << true << "c"
+                                                << "BANANA"),
+                                     PlanStage::NEED_TIME,
+                                     BSON("_id" << 7 << "a" << 15 << "b" << true << "c"
+                                                << "pEaR"),
+                                     BSON("_id" << 6 << "a" << 10 << "b" << false << "c"
+                                                << "pear"),
+                                     BSON("_id" << 4 << "a" << 9 << "b" << false << "c"
+                                                << "ApPlE"),
+                                     BSON("_id" << 3 << "a" << 5 << "b" << true << "c"
+                                                << "AppLe"),
+                                     PlanStage::IS_EOF}});
 }
 
 }  // namespace

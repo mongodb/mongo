@@ -72,6 +72,7 @@
 				]
 			},
 			"indexName" : "a_1",
+			"isFetching" : false,
 			"isMultiKey" : false,
 			"isPartial" : false,
 			"isShardFiltering" : false,
@@ -125,6 +126,7 @@
 							]
 						},
 						"indexName" : "a_1",
+						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
@@ -178,6 +180,7 @@
 				]
 			},
 			"indexName" : "a_1",
+			"isFetching" : false,
 			"isMultiKey" : false,
 			"isPartial" : false,
 			"isShardFiltering" : false,
@@ -244,6 +247,7 @@
 							]
 						},
 						"indexName" : "a_1",
+						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
@@ -298,6 +302,7 @@
 				]
 			},
 			"indexName" : "a_1",
+			"isFetching" : false,
 			"isMultiKey" : false,
 			"isPartial" : false,
 			"isShardFiltering" : false,
@@ -362,6 +367,7 @@
 							]
 						},
 						"indexName" : "a_1",
+						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,

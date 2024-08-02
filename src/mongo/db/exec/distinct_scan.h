@@ -114,7 +114,8 @@ public:
                  VariantCollectionPtrOrAcquisition collection,
                  DistinctParams params,
                  WorkingSet* workingSet,
-                 std::unique_ptr<ShardFiltererImpl> _shardFilterer = nullptr);
+                 std::unique_ptr<ShardFiltererImpl> _shardFilterer = nullptr,
+                 bool needsFetch = false);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
@@ -137,6 +138,9 @@ protected:
     void doRestoreStateRequiresIndex() final;
 
 private:
+    // Helper method containing logic for fetching.
+    PlanStage::StageState doFetch(WorkingSetMember* member, WorkingSetID id, WorkingSetID* out);
+
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _workingSet;
 
@@ -163,6 +167,13 @@ private:
     // an entry, requiring the DistinctScan to examine other entries with the same value to
     // determine if one of them may be accepted.
     bool _needsSequentialScan = false;
+    // When set to true, performs a fetch before outputting.
+    bool _needsFetch;
+    // The cursor we use to fetch.
+    std::unique_ptr<SeekableRecordCursor> _fetchCursor;
+    // In case of a yield while fetching, this is the id of the working set entry that we need to
+    // retry fetching.
+    WorkingSetID _idRetrying = WorkingSet::INVALID_ID;
 
     // Stats
     DistinctScanStats _specificStats;

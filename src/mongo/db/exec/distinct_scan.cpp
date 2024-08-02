@@ -37,6 +37,9 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/plan_executor_impl.h"
@@ -58,7 +61,8 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
                            VariantCollectionPtrOrAcquisition collection,
                            DistinctParams params,
                            WorkingSet* workingSet,
-                           std::unique_ptr<ShardFiltererImpl> shardFilterer)
+                           std::unique_ptr<ShardFiltererImpl> shardFilterer,
+                           bool needsFetch)
     : RequiresIndexStage(kStageType, expCtx, collection, params.indexDescriptor, workingSet),
       _workingSet(workingSet),
       _keyPattern(std::move(params.keyPattern)),
@@ -66,7 +70,8 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
       _bounds(std::move(params.bounds)),
       _fieldNo(params.fieldNo),
       _checker(&_bounds, _keyPattern, _scanDirection),
-      _shardFilterer(std::move(shardFilterer)) {
+      _shardFilterer(std::move(shardFilterer)),
+      _needsFetch(needsFetch) {
     _specificStats.keyPattern = _keyPattern;
     _specificStats.indexName = params.name;
     _specificStats.indexVersion = static_cast<int>(params.indexDescriptor->version());
@@ -80,9 +85,47 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
                                    .getObjectField(IndexDescriptor::kCollationFieldName)
                                    .getOwned();
     _specificStats.isShardFiltering = _shardFilterer != nullptr;
+    _specificStats.isFetching = _needsFetch;
 
     // Set up our initial seek. If there is no valid data, just mark as EOF.
     _commonStats.isEOF = !_checker.getStartSeekPoint(&_seekPoint);
+}
+
+PlanStage::StageState DistinctScan::doFetch(WorkingSetMember* member,
+                                            WorkingSetID id,
+                                            WorkingSetID* out) {
+    if (_idRetrying != WorkingSet::INVALID_ID) {
+        id = _idRetrying;
+        _idRetrying = WorkingSet::INVALID_ID;
+    }
+
+    return handlePlanStageYield(
+        expCtx(),
+        "DistinctScan",
+        [&] {
+            if (!_fetchCursor) {
+                _fetchCursor = collectionPtr()->getCursor(opCtx());
+            }
+
+            if (!WorkingSetCommon::fetch(opCtx(),
+                                         _workingSet,
+                                         id,
+                                         _fetchCursor.get(),
+                                         collectionPtr(),
+                                         collectionPtr()->ns())) {
+                _workingSet->free(id);
+                return NEED_TIME;
+            }
+
+            return ADVANCED;
+        },
+        [&] {
+            // Ensure that the BSONObj underlying the WorkingSetMember is owned because it may be
+            // freed when we yield.
+            member->makeObjOwnedIfNeeded();
+            _idRetrying = id;
+            *out = WorkingSet::INVALID_ID;
+        } /* yieldHandler */);
 }
 
 PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
@@ -90,13 +133,16 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
 
     boost::optional<IndexKeyEntry> kv;
-
     const auto ret = handlePlanStageYield(
         expCtx(),
         "DistinctScan",
         [&] {
-            if (!_cursor)
+            if (!_cursor) {
                 _cursor = indexAccessMethod()->newCursor(opCtx(), _scanDirection == 1);
+            } else if (_needsFetch && _idRetrying != WorkingSet::INVALID_ID) {
+                // We're retrying a fetch! Don't call seek() or next().
+                return PlanStage::ADVANCED;
+            }
 
             if (_needsSequentialScan) {
                 kv = _cursor->next();
@@ -112,9 +158,8 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             return PlanStage::ADVANCED;
         },
         [&] {
-            // yieldHandler
             *out = WorkingSet::INVALID_ID;
-        });
+        } /* yieldHandler */);
 
     if (ret != PlanStage::ADVANCED) {
         return ret;
@@ -153,6 +198,13 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
                               shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId()));
             _workingSet->transitionToRecordIdAndIdx(id);
 
+            if (_needsFetch) {
+                const auto fetchRet = doFetch(member, id, out);
+                if (fetchRet != PlanStage::ADVANCED) {
+                    return fetchRet;
+                }
+            }
+
             // We need one last check before we can return the key if we've been initialized with a
             // shard filter. If this document is an orphan, we need to try the next one; otherwise,
             // we can proceed.
@@ -171,9 +223,18 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
                     return PlanStage::ADVANCED;
                 }
                 case ShardFilterer::DocumentBelongsResult::kNoShardKey: {
-                    // TODO SERVER-92454: If document has been fetched, only log warning/ don't
-                    // tassert.
-                    tasserted(9245300, "Covering index failed to provide shard key");
+                    tassert(9245300, "Covering index failed to provide shard key", _needsFetch);
+
+                    // Skip this working set member with a warning - no shard key should not be
+                    // possible unless manually inserting data into a shard.
+                    tassert(9245400, "Expected document to be fetched", member->hasObj());
+                    LOGV2_WARNING(
+                        9245401,
+                        "No shard key found in document, it may have been inserted manually "
+                        "into shard",
+                        "document"_attr = redact(member->doc.value().toBson()),
+                        "keyPattern"_attr = _shardFilterer->getKeyPattern());
+                    [[fallthrough]];
                 }
                 case ShardFilterer::DocumentBelongsResult::kDoesNotBelong: {
                     // We found an orphan; we need to try the next entry in the index in case its

@@ -482,6 +482,7 @@ struct DistinctScanStats : public SpecificStats {
     bool isSparse = false;
     bool isUnique = false;
     bool isShardFiltering = false;
+    bool isFetching = false;
 
     // >1 if we're traversing the index forwards and <1 if we're traversing it backwards.
     int direction = 1;
