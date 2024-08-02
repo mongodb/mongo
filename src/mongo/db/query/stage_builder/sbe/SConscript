@@ -5,9 +5,9 @@ Import("env")
 env = env.Clone()
 
 env.Benchmark(
-    target="sbe_stage_builder_bm",
+    target="builder_bm",
     source=[
-        "sbe_stage_builder_bm.cpp",
+        "sbe_builder_bm.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",

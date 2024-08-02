@@ -55,7 +55,7 @@
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy_remote_cursor.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder.h"
+#include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/recovery_unit.h"

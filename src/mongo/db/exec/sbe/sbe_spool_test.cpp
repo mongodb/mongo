@@ -46,7 +46,7 @@
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/assert.h"

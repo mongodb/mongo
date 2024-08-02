@@ -51,7 +51,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder.h"
+#include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"

@@ -43,8 +43,8 @@
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/sbe_shared_helpers.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_helpers.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_projection.h"
+#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/db/query/stage_builder/sbe/gen_projection.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

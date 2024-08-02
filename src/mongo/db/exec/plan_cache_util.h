@@ -50,7 +50,7 @@
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_plan_data.h"
+#include "mongo/db/query/stage_builder/sbe/builder_data.h"
 
 namespace mongo {
 class MultiPlanStage;

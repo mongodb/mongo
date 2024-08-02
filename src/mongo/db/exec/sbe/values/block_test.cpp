@@ -38,7 +38,7 @@
 #include "mongo/db/exec/sbe/values/scalar_mono_cell_block.h"
 #include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_test_fixture.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_builder_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"

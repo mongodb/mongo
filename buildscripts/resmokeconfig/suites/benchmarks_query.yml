@@ -15,7 +15,7 @@ selector:
     - build/install/bin/canonical_query_bm*
     - build/install/bin/query_planner_bm*
     - build/install/bin/plan_cache_classic_bm*
-    - build/install/bin/sbe_stage_builder_bm*
+    - build/install/bin/sbe_builder_bm*
 
 executor:
   config: {}

@@ -50,7 +50,7 @@
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_info.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_plan_data.h"
+#include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"

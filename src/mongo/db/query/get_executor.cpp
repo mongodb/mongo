@@ -155,7 +155,7 @@
 #include "mongo/db/query/sbe_planner_interfaces.h"
 #include "mongo/db/query/sbe_runtime_planner.h"
 #include "mongo/db/query/sbe_sub_planner.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder.h"
+#include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/make_data_structure.h"

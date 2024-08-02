@@ -38,7 +38,7 @@
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_builder_test_fixture.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_builder_test_fixture.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
