@@ -973,15 +973,21 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
 
     onCommit();
 
-    // Update the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag to false in order to
-    // allow subsequent index builds to skip checking bucket documents for mixed-schema data.
+    // We can't update the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag here as it
+    // requires the change to be driven by the router role. It means that subsequent index builds
+    // and other systems needs to treat this collection as-if it contains mixed-schema data even if
+    // it might not. We log a warning that can be used to initiate changing the flag. Note: just
+    // because this node doesn't contain mixed-schema it doesn't mean that other shards can't have
+    // mixed schema data. This flag needs to be consistent across the shards.
     if (_containsIndexBuildOnTimeseriesMeasurement && !_timeseriesBucketContainsMixedSchemaData) {
         boost::optional<bool> mayContainMixedSchemaData =
             collection->getTimeseriesBucketsMayHaveMixedSchemaData();
         invariant(mayContainMixedSchemaData);
 
         if (*mayContainMixedSchemaData) {
-            collection->setTimeseriesBucketsMayHaveMixedSchemaData(opCtx, false);
+            LOGV2_WARNING(9301400,
+                          "Index build finished for time-series collection marked as containing "
+                          "mixed schema buckets without detecting any buckets with mixed schema.");
         }
     }
 
