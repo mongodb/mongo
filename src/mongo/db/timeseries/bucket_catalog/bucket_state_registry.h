@@ -166,7 +166,7 @@ std::uint64_t getClearedSetsCount(const BucketStateRegistry& registry);
  * Retrieves the bucket state if it is tracked in the catalog. Modifies the bucket state if
  * the bucket is found to have been cleared.
  */
-boost::optional<std::variant<BucketState, DirectWriteCounter>> getBucketState(
+boost::optional<std::variant<BucketState, DirectWriteCounter>> materializeAndGetBucketState(
     BucketStateRegistry& registry, Bucket* bucket);
 
 /**

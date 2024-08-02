@@ -244,7 +244,7 @@ const Bucket* findBucket(BucketStateRegistry& registry,
             return it->second.get();
         }
 
-        if (auto state = getBucketState(registry, it->second.get());
+        if (auto state = materializeAndGetBucketState(registry, it->second.get());
             state && !conflictsWithInsertions(state.value())) {
             return it->second.get();
         }
@@ -307,7 +307,7 @@ Bucket* useBucket(OperationContext* opCtx,
             : nullptr;
     }
 
-    if (auto state = getBucketState(catalog.bucketStateRegistry, bucket);
+    if (auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, bucket);
         state && !conflictsWithInsertions(state.value())) {
         markBucketNotIdle(stripe, stripeLock, *bucket);
         return bucket;
@@ -355,7 +355,7 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
             continue;
         }
 
-        auto state = getBucketState(catalog.bucketStateRegistry, potentialBucket);
+        auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, potentialBucket);
         invariant(state);
         if (!conflictsWithInsertions(state.value())) {
             invariant(!potentialBucket->idleListEntry.has_value());
@@ -616,7 +616,7 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
     // If we have an existing bucket, passing the Bucket* will let us check if the bucket was
     // cleared as part of a set since the last time it was used. If we were to just check by OID, we
     // may miss if e.g. there was a move chunk operation.
-    auto state = getBucketState(catalog.bucketStateRegistry, &existingBucket);
+    auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, &existingBucket);
     invariant(state);
     if (isBucketStateCleared(state.value()) || isBucketStateFrozen(state.value())) {
         abort(catalog,
@@ -1060,7 +1060,7 @@ void expireIdleBuckets(OperationContext* opCtx,
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
         Bucket* bucket = stripe.idleBuckets.back();
 
-        auto state = getBucketState(catalog.bucketStateRegistry, bucket);
+        auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, bucket);
         if (state && !conflictsWithInsertions(state.value())) {
             // Can archive a bucket if it's still eligible for insertions.
             archiveBucket(opCtx, catalog, stripe, stripeLock, *bucket, closedBuckets);

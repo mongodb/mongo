@@ -76,7 +76,7 @@ public:
     }
 
     bool hasBeenCleared(Bucket& bucket) {
-        auto state = getBucketState(bucketStateRegistry, &bucket);
+        auto state = materializeAndGetBucketState(bucketStateRegistry, &bucket);
         if (!state.has_value()) {
             return false;
         }

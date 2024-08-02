@@ -159,7 +159,7 @@ std::uint64_t getClearedSetsCount(const BucketStateRegistry& registry) {
     return registry.clearedSets.size();
 }
 
-boost::optional<std::variant<BucketState, DirectWriteCounter>> getBucketState(
+boost::optional<std::variant<BucketState, DirectWriteCounter>> materializeAndGetBucketState(
     BucketStateRegistry& registry, Bucket* bucket) {
     stdx::lock_guard catalogLock{registry.mutex};
 
