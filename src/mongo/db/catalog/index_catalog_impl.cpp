@@ -506,18 +506,16 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
 
     auto validatedSpec = swValidatedAndFixed.getValue();
 
-    // Normalise the spec
-    const auto normalSpec = IndexCatalog::normalizeIndexSpecs(opCtx, collection, validatedSpec);
-
     // Check whether this is a non-_id index and there are any settings disallowing this server
     // from building non-_id indexes.
-    Status status = _isNonIDIndexAndNotAllowedToBuild(opCtx, normalSpec);
+    Status status = _isNonIDIndexAndNotAllowedToBuild(opCtx, validatedSpec);
     if (!status.isOK()) {
         return status;
     }
 
     // First check against only the ready indexes for conflicts.
-    status = _doesSpecConflictWithExisting(opCtx, collection, normalSpec, InclusionPolicy::kReady);
+    status =
+        _doesSpecConflictWithExisting(opCtx, collection, validatedSpec, InclusionPolicy::kReady);
     if (!status.isOK()) {
         return status;
     }
@@ -535,7 +533,7 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
     // checking against all indexes occurred due to an in-progress index.
     status = _doesSpecConflictWithExisting(opCtx,
                                            collection,
-                                           normalSpec,
+                                           validatedSpec,
                                            IndexCatalog::InclusionPolicy::kReady |
                                                IndexCatalog::InclusionPolicy::kUnfinished |
                                                IndexCatalog::InclusionPolicy::kFrozen);
@@ -567,14 +565,12 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
 
         // _doesSpecConflictWithExisting currently does more work than we require here: we are only
         // interested in the index already exists error.
-        // Normalise the spec
-        const auto normalSpec = IndexCatalog::normalizeIndexSpecs(opCtx, collection, spec);
 
         auto inclusionPolicy = removeInProgressIndexBuilds
             ? IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished
             : IndexCatalog::InclusionPolicy::kReady;
         if (ErrorCodes::IndexAlreadyExists ==
-            _doesSpecConflictWithExisting(opCtx, collection, normalSpec, inclusionPolicy)) {
+            _doesSpecConflictWithExisting(opCtx, collection, spec, inclusionPolicy)) {
             continue;
         }
 
@@ -1098,11 +1094,9 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
 
         if (desc) {
             // Index already exists with same name. Check whether the options are the same as well.
-            auto normalizedEntry = getEntry(desc)->getNormalizedEntry(opCtx, collection);
-
+            auto entry = getEntry(desc);
             IndexDescriptor candidate(_getAccessMethodName(key), spec);
-            auto indexComparison =
-                candidate.compareIndexOptions(opCtx, collection->ns(), normalizedEntry.get());
+            auto indexComparison = candidate.compareIndexOptions(opCtx, collection->ns(), entry);
 
             // Key pattern or another uniquely-identifying option differs. We can build this index,
             // but not with the specified (duplicate) name. User must specify another index name.
@@ -1130,7 +1124,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
 
             // If an identical index exists, but it is frozen, return an error with a different
             // error code to the user, forcing the user to drop before recreating the index.
-            if (normalizedEntry->isFrozen()) {
+            if (entry->isFrozen()) {
                 return Status(ErrorCodes::CannotCreateIndex,
                               str::stream()
                                   << "An identical, unfinished index '" << name
@@ -1160,11 +1154,10 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
             // Index already exists with a different name. Check whether the options are identical.
             // We will return an error in either case, but this check allows us to generate a more
             // informative error message.
-            auto normalizedEntry = getEntry(desc)->getNormalizedEntry(opCtx, collection);
+            auto entry = getEntry(desc);
 
             IndexDescriptor candidate(_getAccessMethodName(key), spec);
-            auto indexComparison =
-                candidate.compareIndexOptions(opCtx, collection->ns(), normalizedEntry.get());
+            auto indexComparison = candidate.compareIndexOptions(opCtx, collection->ns(), entry);
 
             // The candidate's key and uniquely-identifying options are equivalent to an existing
             // index, but some other options are not identical. Return a message to that effect.

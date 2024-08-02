@@ -741,6 +741,8 @@ last-continuous:
     ticket: SERVER-92193
   - test_file: jstests/core/ddl/collmod.js
     ticket: SERVER-84531
+  - test_file: jstests/core/index/index_creation_on_different_collations.js
+    ticket: SERVER-93112
   suites: null
 last-lts:
   all:
@@ -1542,4 +1544,6 @@ last-lts:
     ticket: SERVER-92419
   - test_file: jstests/core/ddl/collmod.js
     ticket: SERVER-84531
+  - test_file: jstests/core/index/index_creation_on_different_collations.js
+    ticket: SERVER-93112
   suites: null
