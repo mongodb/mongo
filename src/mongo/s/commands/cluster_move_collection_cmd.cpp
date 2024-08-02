@@ -74,7 +74,7 @@ public:
             auto catalogCache = Grid::get(opCtx)->catalogCache();
             const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
 
-            auto cmdResponse = executeCommandAgainstDatabasePrimary(
+            auto cmdResponse = executeDDLCoordinatorCommandAgainstDatabasePrimary(
                 opCtx,
                 DatabaseName::kAdmin,
                 dbInfo,
