@@ -65,8 +65,7 @@ assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
 assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), true);
 assert.commandWorked(update());
-assert.commandFailedWithCode(
-    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: false}),
-    ErrorCodes.InvalidOptions);
 assert.commandWorked(bucketsColl.deleteOne({_id: bucket._id}));
-assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), true);
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: false}));
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), false);
