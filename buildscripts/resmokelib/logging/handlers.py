@@ -167,7 +167,7 @@ class BufferedFileHandler(BufferedHandler):
     def __init__(self, filename, capacity=2000, interval_secs=600):
         """Initialize the handler with the filename and buffer capacity and flush interval."""
         super().__init__(capacity, interval_secs)
-        self.file = open(filename, "a")
+        self.file = open(filename, "a", encoding="utf-8")
 
     def process_record(self, record):
         """Return the formatted record message appended with a newline."""
