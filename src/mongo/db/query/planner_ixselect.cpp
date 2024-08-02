@@ -680,8 +680,8 @@ bool QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(const MatchExpression* q
     // equality-to-null semantics are that only literal nulls match. Sparse indexes contain
     // index keys for literal nulls, but not for missing elements.
     const auto typ = queryExpr->matchType();
-    if (typ == MatchExpression::EQ) {
-        const auto* queryExprEquality = static_cast<const EqualityMatchExpression*>(queryExpr);
+    if (typ == MatchExpression::EQ || typ == MatchExpression::GTE || typ == MatchExpression::LTE) {
+        const auto* queryExprEquality = static_cast<const ComparisonMatchExpression*>(queryExpr);
         // Equality to null inside an $elemMatch implies a match on literal 'null'.
         return isInElemMatch || !queryExprEquality->getData().isNull();
     } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {

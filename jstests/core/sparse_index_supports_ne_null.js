@@ -27,13 +27,22 @@ function checkQuery({query, shouldUseIndex, nResultsExpected, indexKeyPattern}) 
         assert.eq(ixScans.length, 0, explain);
     }
 
-    assert.eq(coll.find(query).itcount(), nResultsExpected);
+    assert.eq(coll.find(query).itcount(), nResultsExpected, explain);
 }
 
 // Non compound case.
 (function() {
 const query = {
     a: {$ne: null}
+};
+const eqNullQuery = {
+    a: {$eq: null}
+};
+const gteQuery = {
+    a: {$gte: null}
+};
+const lteQuery = {
+    a: {$lte: null}
 };
 const elemMatchQuery = {
     a: {$elemMatch: {$ne: null}}
@@ -58,6 +67,11 @@ checkQuery({
     indexKeyPattern: keyPattern
 });
 
+// Be sure the index is not used.
+checkQuery({query: eqNullQuery, shouldUseIndex: false, nResultsExpected: 2});
+checkQuery({query: gteQuery, shouldUseIndex: false, nResultsExpected: 2});
+checkQuery({query: lteQuery, shouldUseIndex: false, nResultsExpected: 2});
+
 // When the index becomes multikey, it cannot support {$ne: null} queries.
 assert.commandWorked(coll.insert({a: [1, 2, 3]}));
 checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 3, indexKeyPattern: keyPattern});
@@ -74,6 +88,15 @@ checkQuery({
 (function() {
 const query = {
     a: {$ne: null}
+};
+const eqNullQuery = {
+    a: {$eq: null}
+};
+const gteQuery = {
+    a: {$gte: null}
+};
+const lteQuery = {
+    a: {$lte: null}
 };
 const elemMatchQuery = {
     a: {$elemMatch: {$ne: null}}
@@ -99,6 +122,11 @@ checkQuery({
     nResultsExpected: 0,
     indexKeyPattern: keyPattern
 });
+
+// Be sure the index is not used.
+checkQuery({query: eqNullQuery, shouldUseIndex: false, nResultsExpected: 2});
+checkQuery({query: gteQuery, shouldUseIndex: false, nResultsExpected: 2});
+checkQuery({query: lteQuery, shouldUseIndex: false, nResultsExpected: 2});
 
 // When the index becomes multikey on the second field, it should still be usable.
 assert.commandWorked(coll.insert({a: 1, b: [1, 2, 3]}));

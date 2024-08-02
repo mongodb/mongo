@@ -547,6 +547,8 @@ last-continuous:
     ticket: SERVER-91195
   - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
     ticket: SERVER-91195
+  - test_file: jstests/core/sparse_index_supports_ne_null.js
+    ticket: SERVER-37164
   suites: null
 last-lts:
   all:
@@ -1146,4 +1148,6 @@ last-lts:
     ticket: SERVER-91195
   - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
     ticket: SERVER-91195
+  - test_file: jstests/core/sparse_index_supports_ne_null.js
+    ticket: SERVER-37164
   suites: null
