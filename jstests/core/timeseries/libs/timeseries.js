@@ -32,6 +32,20 @@ var TimeseriesTest = class {
         }
     }
 
+    static bucketsMayHaveMixedSchemaData(coll) {
+        const catalog = coll.aggregate([{$listCatalog: {}}]).toArray()[0];
+        const tsMixedSchemaOptionNewFormat = catalog.md.options.storageEngine &&
+            catalog.md.options.storageEngine.wiredTiger &&
+            catalog.md.options.storageEngine.wiredTiger.configString;
+        // TODO SERVER-92533 Simplify once SERVER-91195 is backported to all supported branches
+        if (tsMixedSchemaOptionNewFormat !== undefined) {
+            return tsMixedSchemaOptionNewFormat ==
+                "app_metadata=(timeseriesBucketsMayHaveMixedSchemaData=true)";
+        } else {
+            return catalog.md.timeseriesBucketsMayHaveMixedSchemaData;
+        }
+    }
+
     /**
      * Returns whether time-series scalability improvements (like bucket reopening) are enabled.
      * TODO SERVER-66438 remove this helper.

@@ -4,6 +4,7 @@
 (function() {
 "use strict";
 
+load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 load("jstests/libs/fail_point_util.js");
 
 const conn = MongoRunner.runMongod();
@@ -20,12 +21,6 @@ assert.commandWorked(
     testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
 const coll = testDB[collName];
 const bucketsColl = testDB["system.buckets." + collName];
-
-const timeseriesBucketsMayHaveMixedSchemaData = function() {
-    return bucketsColl.aggregate([{$listCatalog: {}}])
-        .toArray()[0]
-        .md.timeseriesBucketsMayHaveMixedSchemaData;
-};
 
 const bucket = {
     _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
@@ -61,7 +56,7 @@ const bucket = {
 
 assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
-assert.eq(timeseriesBucketsMayHaveMixedSchemaData(), true);
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), true);
 
 // There should be no reason to have validation errors in the empty collection.
 let res = assert.commandWorked(coll.validate());
