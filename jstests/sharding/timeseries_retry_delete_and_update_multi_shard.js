@@ -39,12 +39,15 @@ runTimeseriesRetryDeleteAndUpdateTest(
 
         // On sharded clusters, retriedCommandsCount is the same as retriedStatementsCount because
         // each statement is executed on the shard individually as its own command.
-        assert.eq(retriedCommandsCount + statementsRetried,
-                  transactionsServerStatusShard0.retriedCommandsCount +
-                      transactionsServerStatusShard1.retriedCommandsCount,
-                  'Incorrect value for retriedCommandsCount in serverStatus, shard0: ' +
-                      tojson(transactionsServerStatusShard0) +
-                      ', shard1: ' + tojson(transactionsServerStatusShard1));
+        // We check that the actual server counts for these stats is at least the expected value, if
+        // not more - it would be more if the server actually encountered aborted and retried
+        // transactions outside of the ones we simulate in this test.
+        assert.lte(retriedCommandsCount + statementsRetried,
+                   transactionsServerStatusShard0.retriedCommandsCount +
+                       transactionsServerStatusShard1.retriedCommandsCount,
+                   'Incorrect value for retriedCommandsCount in serverStatus, shard0: ' +
+                       tojson(transactionsServerStatusShard0) +
+                       ', shard1: ' + tojson(transactionsServerStatusShard1));
 
         return statementsRetried;
     },
@@ -54,12 +57,12 @@ runTimeseriesRetryDeleteAndUpdateTest(
         const transactionsServerStatusShard1 =
             st.shard1.getDB(db.getName()).serverStatus().transactions;
 
-        assert.eq(retriedStatementsCount + statementsRetried,
-                  transactionsServerStatusShard0.retriedStatementsCount +
-                      transactionsServerStatusShard1.retriedStatementsCount,
-                  'Incorrect value for retriedStatementsCount in serverStatus, shard0: ' +
-                      tojson(transactionsServerStatusShard0) +
-                      ', shard1: ' + tojson(transactionsServerStatusShard1));
+        assert.lte(retriedStatementsCount + statementsRetried,
+                   transactionsServerStatusShard0.retriedStatementsCount +
+                       transactionsServerStatusShard1.retriedStatementsCount,
+                   'Incorrect value for retriedStatementsCount in serverStatus, shard0: ' +
+                       tojson(transactionsServerStatusShard0) +
+                       ', shard1: ' + tojson(transactionsServerStatusShard1));
 
         return statementsRetried;
     });
