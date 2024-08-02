@@ -606,7 +606,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      * Verifies that the metrics about the read and write distribution are within acceptable ranges.
      */
     $config.data.assertReadWriteDistributionMetrics = function assertReadWriteDistributionMetrics(
-        res, isFinal) {
+        res, isFinal, duration) {
         AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(res);
 
         let assertReadMetricsDiff = (actual, expected) => {
@@ -650,7 +650,17 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
                                   this.readDistribution.percentageOfMultiShardReads);
             assertReadMetricsDiff(res.readDistribution.percentageOfScatterGatherReads,
                                   this.readDistribution.percentageOfScatterGatherReads);
-            assert.eq(res.readDistribution.numReadsByRange.length, this.analyzeShardKeyNumRanges);
+            try {
+                assert.eq(res.readDistribution.numReadsByRange.length,
+                          this.analyzeShardKeyNumRanges);
+            } catch (e) {
+                if (duration <= this.splitPointExpirationSecs) {
+                    // Ignore errors if the duration of analyzeShardKey is greater than
+                    // splitPointExpirationSecs because the TTL monitor may have deleted split point
+                    // documents before numReadsByRange metrics were calculated.
+                    throw (e);
+                }
+            }
         }
 
         if (this.shouldValidateWriteDistribution(res.writeDistribution.sampleSize)) {
@@ -666,7 +676,17 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
                                    this.writeDistribution.percentageOfSingleWritesWithoutShardKey);
             assertWriteMetricsDiff(res.writeDistribution.percentageOfMultiWritesWithoutShardKey,
                                    this.writeDistribution.percentageOfMultiWritesWithoutShardKey);
-            assert.eq(res.writeDistribution.numWritesByRange.length, this.analyzeShardKeyNumRanges);
+            try {
+                assert.eq(res.writeDistribution.numWritesByRange.length,
+                          this.analyzeShardKeyNumRanges);
+            } catch (e) {
+                if (duration <= this.splitPointExpirationSecs) {
+                    // Ignore errors if the duration of analyzeShardKey is greater than
+                    // splitPointExpirationSecs because the TTL monitor may have deleted split point
+                    // documents before numReadsByRange metrics were calculated.
+                    throw (e);
+                }
+            }
         }
     };
 
@@ -992,9 +1012,10 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             db[this.metricsCollName].find({_id: new UUID(this.metricsDocIdString)}).toArray();
         assert.eq(res.length, 1, res);
         const metrics = res[0].metrics;
+        const duration = res[0].duration;
         print("Doing final validation of read and write distribution metrics " +
               tojson(this.truncateAnalyzeShardKeyResponseForLogging(metrics)));
-        this.assertReadWriteDistributionMetrics(metrics, true /* isFinal */);
+        this.assertReadWriteDistributionMetrics(metrics, true /* isFinal */, duration);
 
         print("Listing sampled queries " +
               tojsononeline({lastNumSampledQueries: this.previousNumSampledQueries}));
@@ -1038,18 +1059,20 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             cmdObj.hasOwnProperty("sampleRate") || cmdObj.hasOwnProperty("sampleSize");
 
         print("Starting analyzeShardKey state " + tojsononeline(cmdObj));
+        const startTime = Date.now();
         const res = db.adminCommand(cmdObj);
+        const elapsedTime = Date.now() - startTime;
         try {
             assert.commandWorked(res);
             print("Metrics: " +
                   tojsononeline({res: this.truncateAnalyzeShardKeyResponseForLogging(res)}));
             this.assertKeyCharacteristicsMetrics(res, isSampling);
-            this.assertReadWriteDistributionMetrics(res, false /* isFinal */);
+            this.assertReadWriteDistributionMetrics(res, false /* isFinal */, elapsedTime);
             // Persist the metrics so we can do the final validation during teardown.
-            assert.commandWorked(
-                db[this.metricsCollName].update({_id: this.metricsDocId},
-                                                {_id: this.metricsDocId, collName, metrics: res},
-                                                true /* upsert */));
+            assert.commandWorked(db[this.metricsCollName].update(
+                {_id: this.metricsDocId},
+                {_id: this.metricsDocId, collName, metrics: res, duration: elapsedTime},
+                true /* upsert */));
         } catch (e) {
             if (!this.isAcceptableAnalyzeShardKeyError(res)) {
                 throw e;
