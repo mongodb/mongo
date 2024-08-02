@@ -35,10 +35,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/const_element.h"
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -52,7 +52,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

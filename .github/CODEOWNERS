@@ -259,9 +259,6 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/auth/OWNERS.yml
 /src/mongo/db/auth/**/* @10gen/server-security
 
-# The following patterns are parsed from ./src/mongo/db/bson/OWNERS.yml
-/src/mongo/db/bson/**/* @10gen/query
-
 # The following patterns are parsed from ./src/mongo/db/catalog/OWNERS.yml
 /src/mongo/db/catalog/**/capped* @10gen/server-storage-execution
 /src/mongo/db/catalog/**/collection_validation* @10gen/server-rss-sydney @10gen/server-storage-execution
@@ -494,6 +491,9 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/query/boolean_simplification/OWNERS.yml
 /src/mongo/db/query/boolean_simplification/**/* @10gen/query-optimization
+
+# The following patterns are parsed from ./src/mongo/db/query/bson/OWNERS.yml
+/src/mongo/db/query/bson/**/* @10gen/query
 
 # The following patterns are parsed from ./src/mongo/db/query/ce/OWNERS.yml
 /src/mongo/db/query/ce/**/* @10gen/query-optimization

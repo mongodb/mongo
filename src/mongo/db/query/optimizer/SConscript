@@ -120,8 +120,8 @@ env.Library(
     ],
     LIBDEPS=[
         # We do not depend on the entire pipeline target.
-        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/pipeline/abt_utils",
+        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/query/ce/query_ce_heuristic",
         "$BUILD_DIR/mongo/db/query/ce/query_ce_hinted",
         "$BUILD_DIR/mongo/db/query/cost_model/query_cost_model",

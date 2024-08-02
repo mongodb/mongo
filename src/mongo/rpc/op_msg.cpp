@@ -43,9 +43,9 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"

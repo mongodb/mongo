@@ -22,7 +22,7 @@ env.Library(
     source=["geoparser.cpp", "geometry_container.cpp"],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
         "$BUILD_DIR/third_party/s2/s2",
         "geometry",
     ],

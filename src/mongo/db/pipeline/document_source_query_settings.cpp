@@ -32,11 +32,11 @@
 #include <algorithm>
 #include <iterator>
 
-#include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/pipeline/document_source_query_settings_gen.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/bson/bson_helper.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 

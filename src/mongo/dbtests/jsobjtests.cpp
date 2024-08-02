@@ -65,8 +65,8 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/bson/bson_helper.h"
-#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/bson_helper.h"
+#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

@@ -34,7 +34,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/ce/hinted_estimator.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"

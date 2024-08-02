@@ -40,7 +40,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"

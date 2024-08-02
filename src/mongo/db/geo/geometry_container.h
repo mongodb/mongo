@@ -44,8 +44,8 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/db/query/bson/dotted_path_support.h"
 
 
 namespace mongo {

@@ -63,7 +63,7 @@ sbeEnv.Library(
         "$BUILD_DIR/third_party/shim_snappy",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/query/sort_pattern",
         "$BUILD_DIR/mongo/db/query/str_trim_utils",
         "$BUILD_DIR/mongo/db/shard_role_api",
@@ -120,9 +120,9 @@ sbeEnv.Library(
         "query_sbe_plan_stats",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/sorter/sorter_base",
         "$BUILD_DIR/mongo/db/sorter/sorter_stats",

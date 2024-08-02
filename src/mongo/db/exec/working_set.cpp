@@ -34,7 +34,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/data_type_endian.h"
-#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

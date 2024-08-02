@@ -410,7 +410,6 @@ pipelineEnv.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/clientdriver_minimal",
         "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/curop_failpoint_helpers",
         "$BUILD_DIR/mongo/db/exec/bucket_unpacker",
         "$BUILD_DIR/mongo/db/exec/document_value/document_value",
@@ -419,6 +418,7 @@ pipelineEnv.Library(
         "$BUILD_DIR/mongo/db/exec/sort_executor",
         "$BUILD_DIR/mongo/db/generic_cursor",
         "$BUILD_DIR/mongo/db/index/index_access_method",
+        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/query/bucket_predicate_generator",
         "$BUILD_DIR/mongo/db/query/collation/collator_factory_interface",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface",
