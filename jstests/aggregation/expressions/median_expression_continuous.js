@@ -4,8 +4,6 @@
  * @tags: [
  *   requires_fcv_81,
  *   featureFlagAccuratePercentiles,
- *   # TODO SERVER-91582: Support sharding
- *   assumes_against_mongod_not_mongos,
  * ]
  */
 import {testWithProjectMedian} from "jstests/aggregation/libs/percentiles_util.js";

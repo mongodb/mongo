@@ -1,9 +1,11 @@
 /**
  * Tests that $percentile is computed correctly for sharded collections.
  * @tags: [
- *   requires_fcv_70,
+ *   requires_fcv_81,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ShardTargetingTest} from "jstests/libs/shard_targeting_util.js";
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -32,8 +34,6 @@ assert.commandWorked(
     db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
 assert.commandWorked(
     db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
-
-// TODO SERVER-91582: Add sharding tests for discrete and continuous percentiles
 
 function runTest({testName}) {
     const p = 0.9;
@@ -109,7 +109,135 @@ function runTest({testName}) {
         assert.commandWorked(collUnsharded.insert({_id: i, x: "val" + i}));
     }
 
-    runTest("testMergingOneShardNonNumeric");
+    runTest("testMergingAllDataNonNumeric");
 })();
+
+// Tests that the shardStages and mergingStages of the pipeline are as intended.
+// Setup for ShardTargetingTest().
+const shardProfileDBMap = {
+    [st.shard0.shardName]: st.shard0.getDB(jsTestName()),
+    [st.shard1.shardName]: st.shard1.getDB(jsTestName())
+};
+const shardTargetingTest = new ShardTargetingTest(db, shardProfileDBMap);
+
+// Add data to test.
+const kShardedCollName = "sharded1";
+const kShardedCollDocs = [{_id: -1, a: 20, x: 0}, {_id: 0, a: 47, x: 1}, {_id: 1, a: -12, x: 2}];
+const kShardedCollChunkList = [
+    {min: {x: MinKey}, max: {x: 1}, shard: st.shard0.shardName},
+    {min: {x: 1}, max: {x: MaxKey}, shard: st.shard1.shardName}
+];
+shardTargetingTest.setupColl({
+    collName: kShardedCollName,
+    indexList: [{x: 1}],
+    docs: kShardedCollDocs,
+    collType: "sharded",
+    shardKey: {x: 1},
+    chunkList: kShardedCollChunkList
+});
+
+// $percentile with the approximate method should allow parallel computation on the shards,
+// therefore the $group will be pushed down. On a small dataset approximate will match discrete
+// solution.
+let pipeline =
+    [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "approximate"}}}}];
+let expectedResults = [{"_id": null, "p": [2]}];
+
+shardTargetingTest.assertShardTargeting({
+    pipeline: pipeline,
+    targetCollName: kShardedCollName,
+    explainAssertionObj: {
+        expectMongos: true,
+        expectedShardStages: ["$group"],
+        expectedMergingStages: ["$mergeCursors", "$group"]
+    },
+    expectedResults: expectedResults,
+    comment: "approximate_percentile_sharded"
+});
+
+pipeline = [{$group: {_id: null, p: {$median: {input: "$x", method: "approximate"}}}}];
+expectedResults = [{"_id": null, "p": 1}];
+
+shardTargetingTest.assertShardTargeting({
+    pipeline: pipeline,
+    targetCollName: kShardedCollName,
+    explainAssertionObj: {
+        expectMongos: true,
+        expectedShardStages: ["$group"],
+        expectedMergingStages: ["$mergeCursors", "$group"]
+    },
+    expectedResults: expectedResults,
+    comment: "approximate_median_sharded"
+});
+
+if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
+    // $percentile with the discrete method should not allow parallel computation on the shards,
+    // therefore the $group cannot be pushed down. $project on the fields required by percentile can
+    // be pushed down to reduce memory usage.
+    pipeline =
+        [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "discrete"}}}}];
+    expectedResults = [{"_id": null, "p": [2]}];
+
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kShardedCollName,
+        explainAssertionObj: {
+            expectMongos: true,
+            expectedShardStages: ["$project"],
+            expectedMergingStages: ["$mergeCursors", "$group"]
+        },
+        expectedResults: expectedResults,
+        comment: "discrete_percentile_sharded"
+    });
+
+    pipeline = [{$group: {_id: null, p: {$median: {input: "$x", method: "discrete"}}}}];
+    expectedResults = [{"_id": null, "p": 1}];
+
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kShardedCollName,
+        explainAssertionObj: {
+            expectMongos: true,
+            expectedShardStages: ["$project"],
+            expectedMergingStages: ["$mergeCursors", "$group"]
+        },
+        expectedResults: expectedResults,
+        comment: "discrete_median_sharded"
+    });
+
+    // $percentile with the continuous method should not allow parallel computation on the shards,
+    // therefore the $group cannot be pushed down. $project on the fields required by percentile can
+    // be pushed down to reduce memory usage.
+    pipeline =
+        [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "continuous"}}}}];
+    expectedResults = [{"_id": null, "p": [1.8]}];
+
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kShardedCollName,
+        explainAssertionObj: {
+            expectMongos: true,
+            expectedShardStages: ["$project"],
+            expectedMergingStages: ["$mergeCursors", "$group"]
+        },
+        expectedResults: expectedResults,
+        comment: "continuous_percentile_sharded"
+    });
+
+    pipeline = [{$group: {_id: null, p: {$median: {input: "$x", method: "continuous"}}}}];
+    expectedResults = [{"_id": null, "p": 1}];
+
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kShardedCollName,
+        explainAssertionObj: {
+            expectMongos: true,
+            expectedShardStages: ["$project"],
+            expectedMergingStages: ["$mergeCursors", "$group"]
+        },
+        expectedResults: expectedResults,
+        comment: "continuous_median_sharded"
+    });
+}
 
 st.stop();

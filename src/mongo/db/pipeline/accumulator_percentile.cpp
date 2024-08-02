@@ -311,7 +311,7 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
     return {ExpressionConstant::create(expCtx, Value(BSONNULL)) /*initializer*/,
             std::move(input) /*argument*/,
             std::move(factory),
-            "$ median"_sd /*name*/};
+            "$median"_sd /*name*/};
 }
 
 std::pair<std::vector<double> /*ps*/, PercentileMethod> AccumulatorMedian::parsePercentileAndMethod(

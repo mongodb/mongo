@@ -3,8 +3,6 @@
  * @tags: [
  *   requires_fcv_81,
  *   featureFlagAccuratePercentiles,
- *   # TO DO SERVER-91582
- *   assumes_against_mongod_not_mongos,
  * ]
  */
 import {

@@ -5,8 +5,6 @@
  *   featureFlagAccuratePercentiles,
  *   # TODO SERVER-91581: Support spilling
  *   incompatible_aubsan,
- *   # TODO SERVER-91582: Support sharding
- *   assumes_against_mongod_not_mongos,
  * ]
  */
 import {

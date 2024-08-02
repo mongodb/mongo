@@ -2,8 +2,6 @@
  * Tests for the $percentile accumulator syntax.
  * @tags: [
  *   requires_fcv_81,
- *   # TODO SERVER-91582: Support sharding
- *   assumes_against_mongod_not_mongos,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

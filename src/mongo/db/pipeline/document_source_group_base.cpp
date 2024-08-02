@@ -50,6 +50,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_group_base.h"
 #include "mongo/db/pipeline/expression.h"
@@ -521,6 +522,21 @@ DocumentSourceGroupBase::distributedPlanLogic() {
         auto copiedAccumulatedField = accumulatedField;
         copiedAccumulatedField.expr.argument = ExpressionFieldPath::parse(
             pExpCtx.get(), "$$ROOT." + copiedAccumulatedField.fieldName, vps);
+
+        // For the accurate (discrete and continuous) $percentile and $median accumulators we cannot
+        // push down computation to be done in parallel on the shards.  The presence of an accurate
+        // percentile in a $group prevents the entire $group from being pushed down.
+        if (copiedAccumulatedField.expr.name == "$percentile" ||
+            copiedAccumulatedField.expr.name == "$median") {
+            auto accumState = copiedAccumulatedField.expr.factory();
+            auto accumPercentile = dynamic_cast<AccumulatorPercentile*>(accumState.get());
+            tassert(9158201,
+                    "casting AccumulatorState* to AccumulatorPercentile* failed",
+                    accumPercentile);
+            if (accumPercentile->getMethod() != PercentileMethod::Approximate) {
+                return DistributedPlanLogic{nullptr, this, boost::none};
+            }
+        }
         mergerAccumulators.emplace_back(std::move(copiedAccumulatedField));
     }
 

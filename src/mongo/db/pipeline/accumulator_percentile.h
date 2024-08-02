@@ -107,8 +107,11 @@ public:
 
     /**
      * Serializes this accumulator to a valid MQL accumulation statement that would be legal
-     * inside a $group. When executing on a sharded cluster, the result of this function will be
-     * sent to each individual shard.
+     * inside a $group. When executing on a sharded cluster for approximate percentiles,
+     * the result of this function will be sent to each individual shard. When executing on a
+     * sharded cluster for accurate percentiles, the current implementation prevents the $group from
+     * executing on the shards, but allows a $project on the fields specified for $percentile to be
+     * pushed down to the shards.
      *
      * The implementation in 'AccumulatorState' assumes the accumulator has the simple syntax {
      * <name>: <argument> }, such as { $sum: <argument> }. Because $percentile's syntax is more
@@ -128,6 +131,13 @@ public:
                                 std::vector<double> percentiles,
                                 PercentileMethod method,
                                 MutableDocument& md);
+
+    /**
+     * Getter for method
+     */
+    PercentileMethod getMethod() const {
+        return _method;
+    }
 
 protected:
     std::vector<double> _percentiles;
