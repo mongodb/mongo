@@ -4,10 +4,17 @@ load("//bazel/toolchains:mongo_toolchain.bzl", "toolchain_download")
 
 http_archive(
     name = "bazel_clang_tidy",
-    # Note: strip_prefix is necessary to refer to the `@bazel_clang_tidy` package
-    strip_prefix = "bazel_clang_tidy-1.1",
-    # TODO(80396): Figure out how to get the sha256 of the release tarball
-    url = "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.1.tar.gz",
+    sha256 = "8453e35f399c97bbf95f268dc479d825dc70872554cd778b9d4a555939cb76c3",
+    strip_prefix = "bazel_clang_tidy-1.3",
+    urls = [
+        # Implements retry by relisting each url multiple times to be used as a failover.
+        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.3.tar.gz",
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.3.tar.gz",
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.3.tar.gz",
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.3.tar.gz",
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.3.tar.gz",
+    ],
 )
 
 setup_local_config_platform(name = "local_config_platform")
