@@ -28,6 +28,7 @@ executor:
       set_parameters:
         defaultConfigCommandTimeoutMS: 90000
         enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
         queryAnalysisWriterIntervalSecs: 1
         roleGraphInvalidationIsFatal: 1
     mongos_options:

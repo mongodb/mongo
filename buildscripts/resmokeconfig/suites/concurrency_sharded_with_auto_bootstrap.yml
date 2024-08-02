@@ -101,6 +101,7 @@ executor:
         enableTestCommands: 1
         roleGraphInvalidationIsFatal: 1
         queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
         defaultConfigCommandTimeoutMS: 90000
         # TODO SERVER-89498 Re-enable.
         # featureFlagAllMongodsAreSharded: 1
