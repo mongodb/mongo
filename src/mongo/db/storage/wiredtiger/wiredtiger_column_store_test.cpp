@@ -37,7 +37,7 @@ namespace mongo {
 namespace {
 
 TEST(WiredTigerColumnStoreTest, MakeKey) {
-    std::string out = WiredTigerColumnStore::makeKey_forTest("a.b", 66 /* RowId */);
+    std::string out = WiredTigerColumnStore::makeKey_ForTest("a.b", 66 /* RowId */);
 
     //                     a  .  b  \0
     //                                 < Big Endian encoding of the number 27 in uint 64>
@@ -46,7 +46,7 @@ TEST(WiredTigerColumnStoreTest, MakeKey) {
 }
 
 TEST(WiredTigerColumnStoreTest, MakeKeyRIDColumn) {
-    std::string out = WiredTigerColumnStore::makeKey_forTest("\xFF", 256 /* RowId */);
+    std::string out = WiredTigerColumnStore::makeKey_ForTest("\xFF", 256 /* RowId */);
 
     // For the special path 0xff, we do not encode a NUL terminator.
 

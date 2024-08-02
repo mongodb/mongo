@@ -49,7 +49,7 @@ struct BackupCursorState {
 };
 
 struct BackupCursorExtendState {
-    std::deque<std::string> absoluteFilePaths;
+    std::deque<std::string> filenames;
 };
 
 }  // namespace mongo

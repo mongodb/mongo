@@ -52,21 +52,21 @@ const std::set<std::string> kRequiredMDBFiles = {"_mdb_catalog.wt", "sizeStorer.
 BackupBlock::BackupBlock(OperationContext* opCtx,
                          boost::optional<NamespaceString> nss,
                          boost::optional<UUID> uuid,
-                         std::string absoluteFilePath,
+                         std::string filePath,
                          std::uint64_t offset,
                          std::uint64_t length,
                          std::uint64_t fileSize)
-    : _absoluteFilePath(absoluteFilePath),
+    : _filePath(filePath),
       _offset(offset),
       _length(length),
       _fileSize(fileSize),
       _nss(nss),
-      _uuid(uuid) {
-    fassert(6355400, _absoluteFilePath.is_absolute());
-}
+      _uuid(uuid) {}
 
 bool BackupBlock::isRequired() const {
-    const std::string filename = _absoluteFilePath.filename().string();
+    // Extract the filename from the path.
+    boost::filesystem::path path(_filePath);
+    const std::string filename = path.filename().string();
 
     // Check whether this is a required WiredTiger file.
     if (kRequiredWTFiles.find(filename) != kRequiredWTFiles.end()) {
@@ -86,7 +86,7 @@ bool BackupBlock::isRequired() const {
     // All files for the encrypted storage engine are required.
     boost::filesystem::path basePath(storageGlobalParams.dbpath);
     boost::filesystem::path keystoreBasePath(basePath / "key.store");
-    if (StringData(_absoluteFilePath.string()).startsWith(keystoreBasePath.string())) {
+    if (StringData(path.string()).startsWith(keystoreBasePath.string())) {
         return true;
     }
 

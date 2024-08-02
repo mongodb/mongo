@@ -246,7 +246,7 @@ TEST(MemberConfig, ParseArbiterOnly) {
 }
 }  // namespace
 
-void setNewlyAdded_forTest(MemberConfig* mc, boost::optional<bool> newlyAdded) {
+void setNewlyAdded_ForTest(MemberConfig* mc, boost::optional<bool> newlyAdded) {
     mc->setNewlyAdded(newlyAdded);
 }
 
@@ -260,7 +260,7 @@ TEST(MemberConfig, ParseAndSetNewlyAddedField) {
         // Verify that the 'newlyAdded' field is not added by default.
         ASSERT_FALSE(mc.isNewlyAdded());
 
-        setNewlyAdded_forTest(&mc, true);
+        setNewlyAdded_ForTest(&mc, true);
         ASSERT_TRUE(mc.isNewlyAdded());
     }
     {

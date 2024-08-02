@@ -154,7 +154,7 @@ MONGO_COMPILER_NOINLINE auto makeChunkManagerWithOptimalBalancedDistribution(int
 
 MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
                                                   const std::vector<ChunkType>& newChunks) {
-    auto rt = cm.getChunkManager()->getRoutingTableHistory_forTest().makeUpdated(
+    auto rt = cm.getChunkManager()->getRoutingTableHistory_ForTest().makeUpdated(
         boost::none /* timeseriesFields */,
         boost::none /* reshardingFields */,
         true /* allowMigration */,

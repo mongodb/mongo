@@ -159,7 +159,7 @@ protected:
                                  kOtherShard);
 
         auto rt =
-            cm->getRoutingTableHistory_forTest().makeUpdated(boost::none /* timeseriesFields */,
+            cm->getRoutingTableHistory_ForTest().makeUpdated(boost::none /* timeseriesFields */,
                                                              boost::none /* reshardingFields */,
                                                              true,
                                                              false, /* unsplittable */
@@ -187,7 +187,7 @@ protected:
         auto chunkVersion = cm->getVersion();
         chunkVersion.incMajor();
 
-        auto rt = cm->getRoutingTableHistory_forTest().makeUpdated(
+        auto rt = cm->getRoutingTableHistory_ForTest().makeUpdated(
             boost::none /* timeseriesFields */,
             boost::none /* reshardingFields */,
             true,
