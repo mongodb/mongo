@@ -604,7 +604,7 @@ LIBCXX_DEFINES = select({
 }, no_match_error = LIBCXX_ERROR_MESSAGE)
 
 DEBUG_DEFINES = select({
-    "//bazel/config:dbg_enabled": ["MONGO_CONFIG_DEBUG_BUILD"],
+    "//bazel/config:dbg_enabled": [],
     "//conditions:default": ["NDEBUG"],
 })
 
@@ -632,12 +632,6 @@ REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE = (
 # (libunwind == on && os == linux) || libunwind == off || libunwind == auto
 LIBUNWIND_DEPS = select({
     "//bazel/config:libunwind_enabled": ["//src/third_party/unwind:unwind"],
-    "//bazel/config:_libunwind_off": [],
-    "//bazel/config:_libunwind_disabled_by_auto": [],
-}, no_match_error = REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE)
-
-LIBUNWIND_DEFINES = select({
-    "//bazel/config:libunwind_enabled": ["MONGO_CONFIG_USE_LIBUNWIND"],
     "//bazel/config:_libunwind_off": [],
     "//bazel/config:_libunwind_disabled_by_auto": [],
 }, no_match_error = REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE)
@@ -1231,7 +1225,6 @@ def mongo_cc_library(
 
     if "libunwind" not in skip_global_deps:
         deps += LIBUNWIND_DEPS
-        local_defines += LIBUNWIND_DEFINES
 
     if "allocator" not in skip_global_deps:
         deps += TCMALLOC_DEPS
@@ -1433,7 +1426,7 @@ def mongo_cc_binary(
         tags = tags,
         linkopts = MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + linkopts + rpath_flags,
         linkstatic = LINKSTATIC_ENABLED,
-        local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
+        local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         defines = defines,
         includes = includes,
         features = MONGO_GLOBAL_FEATURES + ["pie"] + features,

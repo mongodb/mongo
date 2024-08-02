@@ -313,24 +313,7 @@ def perform_non_tty_bazel_build(bazel_cmd: str) -> None:
         raise subprocess.CalledProcessError(bazel_proc.returncode, bazel_cmd, stdout, stderr)
 
 
-def bazel_build_thread_func(env, log_dir: str, verbose: bool) -> None:
-    """This thread runs the bazel build up front."""
-
-    if verbose:
-        extra_args = []
-    else:
-        extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
-
-    bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
-    bazel_debug(f"BAZEL_COMMAND: {' '.join(bazel_cmd)}")
-    if env.GetOption("coverity-build"):
-        print(
-            "--coverity-build selected, assuming bazel targets were built in a previous coverity run. Not running bazel build."
-        )
-        return
-
-    print("Starting bazel build thread...")
-
+def run_bazel_command(env, bazel_cmd):
     try:
         tty_import_fail = False
         try:
@@ -363,6 +346,27 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool) -> None:
             print(ex.output)
 
         raise ex
+
+
+def bazel_build_thread_func(env, log_dir: str, verbose: bool) -> None:
+    """This thread runs the bazel build up front."""
+
+    if verbose:
+        extra_args = []
+    else:
+        extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
+
+    bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
+    bazel_debug(f"BAZEL_COMMAND: {' '.join(bazel_cmd)}")
+    if env.GetOption("coverity-build"):
+        print(
+            "--coverity-build selected, assuming bazel targets were built in a previous coverity run. Not running bazel build."
+        )
+        return
+
+    print("Starting bazel build thread...")
+
+    run_bazel_command(env, bazel_cmd)
 
 
 def create_bazel_builder(builder: SCons.Builder.Builder) -> SCons.Builder.Builder:
@@ -481,6 +485,10 @@ def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
     # that bazel will need to construct the correct command line for any given targets
     ninja_bazel_build_json = {
         "bazel_cmd": Globals.bazel_base_build_command,
+        "compiledb_cmd": [Globals.bazel_executable, "run"]
+        + env["BAZEL_FLAGS_STR"]
+        + ["//:compiledb", "--"]
+        + env["BAZEL_FLAGS_STR"],
         "defaults": [str(t) for t in SCons.Script.DEFAULT_TARGETS],
         "targets": Globals.scons2bazel_targets,
     }
@@ -988,6 +996,7 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         env.AddMethod(wait_for_bazel, "WaitForBazel")
 
+    env.AddMethod(run_bazel_command, "RunBazelCommand")
     env.AddMethod(add_libdeps_time, "AddLibdepsTime")
     env.AddMethod(generate_bazel_info_for_ninja, "GenerateBazelInfoForNinja")
     env.AddMethod(bazel_deps_check_query_cache, "CheckBazelDepsCache")

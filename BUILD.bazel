@@ -1,4 +1,5 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -34,4 +35,15 @@ genrule(
     sed -i 's|@MONGO_BUILD_DIR@|$(RULEDIR)/src/mongo|g' $@
     """,
     visibility = ["//visibility:public"],
+)
+
+load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
+
+refresh_compile_commands(
+    name = "compiledb",
+    exclude_external_sources = True,
+    exclude_headers = "all",  # not using "all" adds headers as sources to compile_commands.json which is never what we want
+    targets = {
+        "//src/...": "",
+    },
 )

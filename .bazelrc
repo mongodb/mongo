@@ -12,7 +12,7 @@ build --incompatible_strict_action_env=true
 
 # allows us to use python rules. This is needed because of the bug:
 # https://github.com/bazelbuild/bazel/issues/4327
-build --nobuild_runfile_links
+build --experimental_inprocess_symlink_creation
 
 # cc_library transitively propagates link opts. The build uses cc_shared_library to avoid this when linking
 # dynamically.

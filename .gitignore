@@ -205,6 +205,8 @@ local.properties
 .clangd/
 
 compile_commands.json
+compile_commands_scons.json
+compile_commands_ninja.json
 generated_resmoke_config
 selected_tests_config
 

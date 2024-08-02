@@ -64,7 +64,7 @@ if env.GetOption("ninja") == "disabled":
     test_objs = []
     compilation_dbs = []
     for test in tests:
-        test_env = mongo_tidy_test_env.Clone()
+        test_env = mongo_tidy_test_env.Clone(COMPDB_IGNORE_BAZEL=True)
         compilation_dbs += test_env.CompilationDatabase(
             os.path.splitext(os.path.basename(test))[0] + "/compile_commands.json"
         )

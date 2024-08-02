@@ -108,6 +108,7 @@ Checks:          '-*,
                   -cert-err52-cpp,
                   -cert-err60-cpp,
                   -cert-flp30-c,
+                  -clang-diagnostic-builtin-macro-redefined,
                   -cppcoreguidelines-avoid-goto,
                   -cppcoreguidelines-c-copy-assignment-signature,
                   -cppcoreguidelines-interfaces-global-init,
@@ -151,7 +152,7 @@ Checks:          '-*,
                   -readability-string-compare,
                   -readability-uniqueptr-delete-release
                   '
-WarningsAsErrors: '*'
+WarningsAsErrors: '*,-clang-diagnostic-builtin-macro-redefined'
 HeaderFilterRegex: '(mongo/.*|@MONGO_BUILD_DIR@)'
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros

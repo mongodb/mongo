@@ -24,6 +24,9 @@ import json
 import SCons
 import itertools
 import shlex
+import sys
+import os
+import subprocess
 
 # Implements the ability for SCons to emit a compilation database for the MongoDB project. See
 # http://clang.llvm.org/docs/JSONCompilationDatabase.html for details on what a compilation
@@ -170,8 +173,9 @@ def WriteCompilationDb(target, source, env):
 
     for s in __COMPILATION_DB_ENTRIES[target[0].abspath]:
         entries.append(s.read())
-
-    with open(str(target[0]), "w") as target_file:
+    file, ext = os.path.splitext(str(target[0]))
+    scons_compdb = f"{file}_scons{ext}"
+    with open(scons_compdb, "w") as target_file:
         json.dump(
             entries,
             target_file,
@@ -179,6 +183,30 @@ def WriteCompilationDb(target, source, env):
             indent=4,
             separators=(",", ": "),
         )
+
+    adjust_script_out = env.File("#site_scons/site_tools/compdb_adjust.py").path
+    if env.get("COMPDB_IGNORE_BAZEL"):
+        bazel_compdb = []
+    else:
+        bazel_compdb = ["--bazel-compdb", "compile_commands.json"]
+        env.RunBazelCommand(
+            [env["SCONS2BAZEL_TARGETS"].bazel_executable, "run"]
+            + env["BAZEL_FLAGS_STR"]
+            + ["//:compiledb", "--"]
+            + env["BAZEL_FLAGS_STR"]
+        )
+    print(f"BAZEL COMDB: {bazel_compdb}")
+    subprocess.run(
+        [
+            sys.executable,
+            adjust_script_out,
+            "--input-compdb",
+            scons_compdb,
+            "--output-compdb",
+            str(target[0]),
+        ]
+        + bazel_compdb
+    )
 
 
 def ScanCompilationDb(node, env, path):

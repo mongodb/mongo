@@ -57,24 +57,6 @@ COMMAND_TYPES = (
     SCons.Action.CommandGeneratorAction,
 )
 
-ninja_compdb_adjust = """\
-import json
-import sys
-
-compdb = {}
-with open(sys.argv[1]) as f:
-    compdb = json.load(f)
-
-for command in compdb:
-    if command['output'].endswith('.compdb'):
-        command['output'] = command['output'][:-(len('.compdb'))]
-    else:
-        print(f"compdb entry does not contain '.compdb': {command['output']}")
-
-with open(sys.argv[1], 'w') as f:
-    json.dump(compdb, f, indent=2)
-"""
-
 
 def _install_action_function(_env, node):
     """Install files using the install or copy commands"""
@@ -840,28 +822,23 @@ class NinjaState:
         # If we ever change the name/s of the rules that include
         # compile commands (i.e. something like CC) we will need to
         # update this build to reflect that complete list.
-        compile_commands = "compile_commands.json"
+        compile_commands = "compile_commands_ninja.json"
         compdb_expand = "-x " if self.env.get("NINJA_COMPDB_EXPAND") else ""
-        adjust_script_out = os.path.join(
-            get_path(self.env["NINJA_BUILDDIR"]), "ninja_compdb_adjust.py"
-        )
-        os.makedirs(os.path.dirname(adjust_script_out), exist_ok=True)
-        with open(adjust_script_out, "w") as f:
-            f.write(ninja_compdb_adjust)
+        adjust_script_out = self.env.File("#site_scons/site_tools/compdb_adjust.py").path
         self.builds[compile_commands] = {
-            "rule": "CMD",
-            "outputs": [compile_commands],
+            "rule": "CMD_PRECIOUS",
+            "outputs": ["compile_commands.json", "compdb_always_rebuild"],
             "pool": "console",
-            "implicit": [ninja_file],
+            "implicit": [ninja_file, "bazel_run_first"],
             "variables": {
-                "cmd": f"ninja -f {ninja_file} -t compdb {compdb_expand}COMPDB_CC COMPDB_CXX > {compile_commands};"
-                + f"{sys.executable} {adjust_script_out} {compile_commands}"
+                "cmd": f"ninja -f {ninja_file} -t compdb {compdb_expand}COMPDB_CC COMPDB_CXX > {compile_commands} && "
+                + f"{sys.executable} {adjust_script_out} --ninja --input-compdb {compile_commands} --output-compdb compile_commands.json --bazel-compdb compile_commands.json"
             },
         }
         self.builds["compiledb"] = {
             "rule": "phony",
             "outputs": ["compiledb"],
-            "implicit": [compile_commands],
+            "implicit": ["compile_commands.json"],
         }
 
         # Now for all build nodes, we want to select the precious rule or not.

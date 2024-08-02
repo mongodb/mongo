@@ -28,6 +28,20 @@ else:
         pass
 
 
+# our ninja python module intercepts the command lines and
+# prints out the targets everytime ninja is executed
+ninja_command_line_targets = []
+try:
+    ninja_last_cmd_file = ".ninja_last_command_line_targets.txt"
+    with open(ninja_last_cmd_file) as f:
+        ninja_command_line_targets = [target.strip() for target in f.readlines() if target.strip()]
+except OSError as exc:
+    print(
+        f"Failed to open {ninja_last_cmd_file}, this is expected to be generated on ninja execution by the mongo-ninja-python module."
+    )
+    raise exc
+
+
 # Our ninja generation process generates all the build info related to
 # the specific ninja file
 ninja_build_info = dict()
@@ -64,3 +78,8 @@ else:
 bazel_proc = subprocess.run(
     ninja_build_info["bazel_cmd"] + extra_args + targets_to_build, check=True
 )
+if (
+    "compiledb" in ninja_command_line_targets
+    or "compile_commands.json" in ninja_command_line_targets
+):
+    bazel_proc = subprocess.run(ninja_build_info["compiledb_cmd"], check=True)
