@@ -3,6 +3,8 @@
 // @tags: [
 //   requires_scripting,
 // ]
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 const makeBinData = () => BinData(4, "gf1UcxdHTJ2HQ/EGQrO7mQ==");
 const makeUUID = () => UUID("81fd5473-1747-4c9d-8743-f10642b3bb99");
 const makeHexData = () => new HexData(4, "81fd547317474c9d8743f10642b3bb99");
@@ -62,10 +64,29 @@ function runTests(db, collectionName, recursiveFn) {
     assertThrowsInfiniteRecursion(recursiveFn(db, collectionName, makeHexData));
 }
 
-const collectionName = 'agg_infinite_recursion';
-const collection = db[collectionName];
-collection.drop();
-assert.commandWorked(collection.insert({name: "Mo"}));
+const setJsTimeout = function(timeout) {
+    const commandResArr = FixtureHelpers.runCommandOnEachPrimary({
+        db: db.getSiblingDB("admin"),
+        cmdObj: {
+            setParameter: 1,
+            internalQueryJavaScriptFnTimeoutMillis: timeout,
+        }
+    });
+    assert.gt(commandResArr.length,
+              0,
+              "Setting internalQueryJavaScriptFnTimeoutMillis on primaries failed");
+    return assert.commandWorked(commandResArr[0]).was;
+};
 
-runTests(db, collectionName, recursiveFindWhere);
-runTests(db, collectionName, recursiveAggregateFunction);
+const previousJsTimeout = setJsTimeout(600 * 1000);
+try {
+    const collectionName = 'agg_infinite_recursion';
+    const collection = db[collectionName];
+    collection.drop();
+    assert.commandWorked(collection.insert({name: "Mo"}));
+
+    runTests(db, collectionName, recursiveFindWhere);
+    runTests(db, collectionName, recursiveAggregateFunction);
+} finally {
+    setJsTimeout(previousJsTimeout);
+}
