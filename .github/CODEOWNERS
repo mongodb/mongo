@@ -7,7 +7,7 @@
 # https://github.com/10gen/mongo/blob/master/docs/owners/owners_format.md
 
 # The following patterns are parsed from ./OWNERS.yml
-OWNERS.yml @IamXander
+OWNERS.yml @IamXander @anna-wawrzyniak @dhly-etc @kaloianm @markbenvenuto @mbroadst @visemet
 .bazelignore @10gen/devprod-build
 .bazelrc @10gen/devprod-build
 .bazelversion @10gen/devprod-build
