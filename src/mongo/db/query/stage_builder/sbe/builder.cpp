@@ -2293,6 +2293,84 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return buildOnlyUnwind(un, reqs, stage, outputs, childResultSlot, getFieldSlot);
 }  // buildUnwind
 
+namespace {
+/**
+ * This function produces an updated document expression by taking an input document ('docExpr')
+ * and applying '{$addFields: {<outputPath>: <outputExpr>}}' to it with traversalDepth=0.
+ */
+SbExpr projectUnwindOutputs(StageBuilderState& state,
+                            SbExpr docExpr,
+                            std::string outputPath,
+                            SbExpr outputExpr) {
+    constexpr int32_t traversalDepth = 0;
+
+    std::vector<std::string> paths;
+    std::vector<ProjectNode> nodes;
+
+    paths.emplace_back(std::move(outputPath));
+    nodes.emplace_back(std::move(outputExpr));
+
+    return generateProjection(state,
+                              projection_ast::ProjectType::kAddition,
+                              std::move(paths),
+                              std::move(nodes),
+                              std::move(docExpr),
+                              nullptr,
+                              traversalDepth);
+}
+
+/**
+ * This function produces an updated document expression by taking an input document ('docExpr'),
+ * applying '{$addFields: {<firstOutputPath>: <firstOutputExpr>}}' to it with traversalDepth=0,
+ * and then applying '{$addFields: {<secondOutputPath>: <secondOutputExpr>}}' to it with
+ * traversalDepth=0.
+ *
+ * As an optimization, if the two ouput paths do not conflict with each other, then the two
+ * $addFields operations will be combined into a single $addFields operation like so:
+ *   {$addFields: {<firstOutputPath>: <firstOutputExpr>, <secondOutputPath>: <secondOutputExpr>}}
+ */
+SbExpr projectUnwindOutputs(StageBuilderState& state,
+                            SbExpr docExpr,
+                            std::string firstOutputPath,
+                            SbExpr firstOutputExpr,
+                            std::string secondOutputPath,
+                            SbExpr secondOutputExpr) {
+    constexpr int32_t traversalDepth = 0;
+
+    bool hasConflictingPaths = pathsAreConflicting(firstOutputPath, secondOutputPath);
+
+    if (!hasConflictingPaths) {
+        // If the first path and second path don't conflict with each other, then we can do a
+        // single projection to update both paths.
+        std::vector<std::string> paths;
+        std::vector<ProjectNode> nodes;
+
+        paths.emplace_back(std::move(firstOutputPath));
+        nodes.emplace_back(std::move(firstOutputExpr));
+
+        paths.emplace_back(std::move(secondOutputPath));
+        nodes.emplace_back(std::move(secondOutputExpr));
+
+        docExpr = generateProjection(state,
+                                     projection_ast::ProjectType::kAddition,
+                                     std::move(paths),
+                                     std::move(nodes),
+                                     std::move(docExpr),
+                                     nullptr,
+                                     traversalDepth);
+    } else {
+        // If the first path and second path conflict, then we do 2 projections: one projection
+        // to update the first path, and another projection to update the second path.
+        docExpr = projectUnwindOutputs(
+            state, std::move(docExpr), std::move(firstOutputPath), std::move(firstOutputExpr));
+        docExpr = projectUnwindOutputs(
+            state, std::move(docExpr), std::move(secondOutputPath), std::move(secondOutputExpr));
+    }
+
+    return docExpr;
+}
+}  // namespace
+
 /**
  * Builds only the unwind and project results part of an $unwind stage, allowing an $LU stage to
  * invoke just these parts of building its absorbed $unwind. For stand-alone $unwind this method is
@@ -2307,7 +2385,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     PlanStageSlots& outputs,
     const sbe::value::SlotId childResultSlot,
     const sbe::value::SlotId getFieldSlot) {
-    const FieldPath& fp = un->fieldPath;
+    using namespace std::literals::string_literals;
 
     //
     // Build the unwind execution node itself. This will unwind the value in 'getFieldSlot' into
@@ -2333,83 +2411,43 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // was requested or not, so we can wire only the relevant combinations.
     //
 
-    // Paths in result document to project to.
-    std::vector<std::string> fieldPaths;
-
-    // Variables whose values are to be projected into the result document.
-    std::vector<ProjectNode> projectionNodes;
-
     // The projection expression that adds the index and/or unwind values to the result doc.
     std::unique_ptr<sbe::EExpression> finalProjectExpr;
 
-    if (un->indexPath) {
+    bool hasIndexPath = un->indexPath.has_value();
+    const std::string& unwindPath = un->fieldPath.fullPath();
+    const std::string& indexOutputPath = hasIndexPath ? un->indexPath->fullPath() : ""s;
+
+    if (hasIndexPath) {
         // "includeArrayIndex" option (Cases 1-3). The index is always projected in these.
 
-        // If our parent wants the array index field, set our outputs to point it to that slot.
-        if (reqs.has({PlanStageSlots::SlotType::kField, un->indexPath->fullPath()})) {
-            outputs.set(PlanStageSlots::OwnedSlotName{PlanStageSlots::SlotType::kField,
-                                                      un->indexPath->fullPath()},
-                        arrayIndexSlot);
-        }
-
         // Case 1: index Null, unwind val //////////////////////////////////////////////////////////
-        // We need two copies of the Case 1 expression as it is used twice, but the copy constructor
-        // is deleted so we are forced to std::move it.
         SbExpr indexNullUnwindValProjExpr[2];
 
         for (int copy = 0; copy < 2; ++copy) {
-            fieldPaths.clear();
-            projectionNodes.clear();
-
-            // Index output
-            fieldPaths.emplace_back(un->indexPath->fullPath());
-            projectionNodes.emplace_back(SbExpr{makeConstant(sbe::value::TypeTags::Null, 0)});
-
-            // Unwind output
-            fieldPaths.emplace_back(fp.fullPath());
-            projectionNodes.emplace_back(SbExpr{unwindSlot});
-
-            indexNullUnwindValProjExpr[copy] = generateProjection(
-                _state,
-                projection_ast::ProjectType::kAddition,
-                std::move(fieldPaths),
-                std::move(projectionNodes),
-                SbExpr{childResultSlot});  // current result doc: updated by the projection
+            indexNullUnwindValProjExpr[copy] =
+                projectUnwindOutputs(_state,
+                                     SbExpr{childResultSlot},
+                                     unwindPath,
+                                     SbExpr{unwindSlot},
+                                     indexOutputPath,
+                                     SbExpr{makeConstant(sbe::value::TypeTags::Null, 0)});
         }
 
         // Case 2: index val, unwind val ///////////////////////////////////////////////////////////
-        fieldPaths.clear();
-        projectionNodes.clear();
-
-        // Index output
-        fieldPaths.emplace_back(un->indexPath->fullPath());
-        projectionNodes.emplace_back(SbExpr{arrayIndexSlot});
-
-        // Unwind output
-        fieldPaths.emplace_back(fp.fullPath());
-        projectionNodes.emplace_back(SbExpr{unwindSlot});
-
-        SbExpr indexValUnwindValProjExpr = generateProjection(
-            _state,
-            projection_ast::ProjectType::kAddition,
-            std::move(fieldPaths),
-            std::move(projectionNodes),
-            SbExpr{childResultSlot});  // current result doc: updated by the projection
+        SbExpr indexValUnwindValProjExpr = projectUnwindOutputs(_state,
+                                                                SbExpr{childResultSlot},
+                                                                unwindPath,
+                                                                SbExpr{unwindSlot},
+                                                                indexOutputPath,
+                                                                SbExpr{arrayIndexSlot});
 
         // Case 3: index Null //////////////////////////////////////////////////////////////////////
-        fieldPaths.clear();
-        projectionNodes.clear();
-
-        // Index output
-        fieldPaths.emplace_back(un->indexPath->fullPath());
-        projectionNodes.emplace_back(SbExpr{makeConstant(sbe::value::TypeTags::Null, 0)});
-
-        SbExpr indexNullProjExpr = generateProjection(
-            _state,
-            projection_ast::ProjectType::kAddition,
-            std::move(fieldPaths),
-            std::move(projectionNodes),
-            SbExpr{childResultSlot});  // current result document: updated by the projection
+        SbExpr indexNullProjExpr =
+            projectUnwindOutputs(_state,
+                                 SbExpr{childResultSlot},
+                                 indexOutputPath,
+                                 SbExpr{makeConstant(sbe::value::TypeTags::Null, 0)});
 
         // Wrap the above projection subexpressions in conditionals that correctly handle quirky MQL
         // edge cases:
@@ -2443,19 +2481,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // No "includeArrayIndex" option (Cases 4-5). The index is never projected in these.
 
         // Case 4: unwind val //////////////////////////////////////////////////////////////////////
-        fieldPaths.clear();
-        projectionNodes.clear();
-
-        // Unwind output
-        fieldPaths.emplace_back(fp.fullPath());
-        projectionNodes.emplace_back(SbExpr{unwindSlot});
-
-        SbExpr unwindValProjExpr = generateProjection(
-            _state,
-            projection_ast::ProjectType::kAddition,
-            std::move(fieldPaths),
-            std::move(projectionNodes),
-            SbExpr{childResultSlot});  // current result document: updated by the projection
+        SbExpr unwindValProjExpr =
+            projectUnwindOutputs(_state, SbExpr{childResultSlot}, unwindPath, SbExpr{unwindSlot});
 
         // Case 5: NO-OP - original doc ////////////////////////////////////////////////////////////
         // Does not need a generateProjection() call as it will be handled in the wrapper logic.
@@ -2481,6 +2508,30 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                              un->nodeId(),
                              resultSlot.slotId,  // output result document
                              std::move(finalProjectExpr));
+
+    // Clear the kField slots affected by our updates to 'unwindPath' and 'indexOutputPath'.
+    outputs.clearAffectedFields(unwindPath);
+    if (hasIndexPath) {
+        outputs.clearAffectedFields(indexOutputPath);
+    }
+
+    // If we didn't project the index or if 'unwindPath' and 'indexOutputPath' don't conflict with
+    // each other, then update the kField slots in 'outputs' for 'unwindPath' and 'indexOutputPath'
+    // if our parent requested them. Otherwise, don't set the kField slots for 'unwindPath' and
+    // 'indexOutputPath' and let our parent just retrieve them from the result object if needed.
+    if (!hasIndexPath || !pathsAreConflicting(unwindPath, indexOutputPath)) {
+        auto unwindFieldName = std::make_pair(PlanStageSlots::kField, unwindPath);
+        if (reqs.has(unwindFieldName)) {
+            outputs.set(std::move(unwindFieldName), unwindSlot);
+        }
+
+        if (hasIndexPath) {
+            auto indexOutputFieldName = std::make_pair(PlanStageSlots::kField, indexOutputPath);
+            if (reqs.has(indexOutputFieldName)) {
+                outputs.set(std::move(indexOutputFieldName), arrayIndexSlot);
+            }
+        }
+    }
 
     outputs.setResultObj(resultSlot);
     return {std::move(stage), std::move(outputs)};
@@ -5315,7 +5366,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Update the kField slots in 'outputs' to reflect the effects of this stage.
     for (auto&& windowField : windowFields) {
-        outputs.clearFieldAndAllPrefixes(windowField);
+        outputs.clearAffectedFields(windowField);
     }
     for (const auto& [field, slot] : outputPathMap) {
         outputs.set(std::make_pair(PlanStageSlots::kField, field), slot);

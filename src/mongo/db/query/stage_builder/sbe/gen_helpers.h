@@ -613,6 +613,14 @@ std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyIncl
     return {std::move(indexKeyBitset), std::move(keyFieldNames)};
 }
 
+inline bool pathIsPrefixOf(StringData lhs, StringData rhs) {
+    return lhs.size() < rhs.size() ? rhs.starts_with(lhs) && rhs[lhs.size()] == '.' : lhs == rhs;
+}
+
+inline bool pathsAreConflicting(StringData lhs, StringData rhs) {
+    return lhs.size() < rhs.size() ? pathIsPrefixOf(lhs, rhs) : pathIsPrefixOf(rhs, lhs);
+}
+
 /**
  * A tree of nodes arranged based on field path. PathTreeNode can be used to represent index key
  * patterns, projections, etc. A PathTreeNode can also optionally hold a value of type T.

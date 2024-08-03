@@ -439,7 +439,8 @@ SbExpr evaluateProjection(StageBuilderState& state,
                           std::vector<ProjectNode> nodes,  // SlotIds w/ values for 'paths'
                           SbExpr inputExpr,                // SlotId of result doc to project into
                           const sbe::MakeObjInputPlan* inputPlan,
-                          const PlanStageSlots* slots) {
+                          const PlanStageSlots* slots,
+                          boost::optional<int32_t> traversalDepth) {
     using Node = PathTreeNode<boost::optional<ProjectNode>>;
 
     boost::optional<SbSlot> rootSlot =
@@ -483,7 +484,7 @@ SbExpr evaluateProjection(StageBuilderState& state,
             }
         }
 
-        postVisitCommon(node, context);
+        postVisitCommon(node, context, traversalDepth);
     };
 
     const bool invokeCallbacksForRootNode = true;
@@ -558,14 +559,20 @@ SbExpr evaluateSliceOps(StageBuilderState& state,
 SbExpr generateProjection(StageBuilderState& state,
                           const projection_ast::Projection* projection,
                           SbExpr inputExpr,
-                          const PlanStageSlots* slots) {
+                          const PlanStageSlots* slots,
+                          boost::optional<int32_t> traversalDepth) {
     const auto projType = projection->type();
 
     // Do a DFS on the projection AST and populate 'paths' and 'nodes'.
     auto [paths, nodes] = getProjectNodes(*projection);
 
-    return generateProjection(
-        state, projType, std::move(paths), std::move(nodes), std::move(inputExpr), slots);
+    return generateProjection(state,
+                              projType,
+                              std::move(paths),
+                              std::move(nodes),
+                              std::move(inputExpr),
+                              slots,
+                              traversalDepth);
 }
 
 SbExpr generateProjection(StageBuilderState& state,
@@ -573,7 +580,8 @@ SbExpr generateProjection(StageBuilderState& state,
                           std::vector<std::string> paths,
                           std::vector<ProjectNode> nodes,
                           SbExpr inputExpr,
-                          const PlanStageSlots* slots) {
+                          const PlanStageSlots* slots,
+                          boost::optional<int32_t> traversalDepth) {
     const bool isInclusion = projType == projection_ast::ProjectType::kInclusion;
 
     // Check for 'Slice' operators. If 'nodes' doesn't have any $slice operators, we just
@@ -617,8 +625,14 @@ SbExpr generateProjection(StageBuilderState& state,
 
     // If this is an inclusion projection or if 'nodes' is not empty, call evaluateProjection().
     if (isInclusion || !nodes.empty()) {
-        expr = evaluateProjection(
-            state, projType, std::move(paths), std::move(nodes), std::move(expr), nullptr, slots);
+        expr = evaluateProjection(state,
+                                  projType,
+                                  std::move(paths),
+                                  std::move(nodes),
+                                  std::move(expr),
+                                  nullptr,
+                                  slots,
+                                  traversalDepth);
     }
 
     // If 'sliceNodes' is not empty, then we need to call evaluateSliceOps() to evaluate the
@@ -635,7 +649,8 @@ SbExpr generateProjectionWithInputFields(StageBuilderState& state,
                                          const projection_ast::Projection* projection,
                                          SbExpr inputExpr,
                                          const sbe::MakeObjInputPlan& inputPlan,
-                                         const PlanStageSlots* slots) {
+                                         const PlanStageSlots* slots,
+                                         boost::optional<int32_t> traversalDepth) {
     const auto projType = projection->type();
 
     // Do a DFS on the projection AST and populate 'paths' and 'nodes'.
@@ -647,7 +662,8 @@ SbExpr generateProjectionWithInputFields(StageBuilderState& state,
                                              std::move(nodes),
                                              std::move(inputExpr),
                                              inputPlan,
-                                             slots);
+                                             slots,
+                                             traversalDepth);
 }
 
 SbExpr generateProjectionWithInputFields(StageBuilderState& state,
@@ -656,7 +672,8 @@ SbExpr generateProjectionWithInputFields(StageBuilderState& state,
                                          std::vector<ProjectNode> nodes,
                                          SbExpr inputExpr,
                                          const sbe::MakeObjInputPlan& inputPlan,
-                                         const PlanStageSlots* slots) {
+                                         const PlanStageSlots* slots,
+                                         boost::optional<int32_t> traversalDepth) {
     const bool isInclusion = projType == projection_ast::ProjectType::kInclusion;
 
     // Check for 'Slice' operators. If 'nodes' doesn't have any $slice operators, we just
@@ -702,7 +719,8 @@ SbExpr generateProjectionWithInputFields(StageBuilderState& state,
                                    std::move(nodes),
                                    std::move(inputExpr),
                                    &inputPlan,
-                                   slots);
+                                   slots,
+                                   traversalDepth);
 
     // If 'sliceNodes' is not empty, then we need to call evaluateSliceOps() to evaluate the
     // $slice ops.

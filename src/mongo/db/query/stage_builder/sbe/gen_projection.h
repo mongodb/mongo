@@ -48,20 +48,23 @@ class PlanStageSlots;
 SbExpr generateProjection(StageBuilderState& state,
                           const projection_ast::Projection* projection,
                           SbExpr inputExpr,
-                          const PlanStageSlots* slots = nullptr);
+                          const PlanStageSlots* slots = nullptr,
+                          boost::optional<int32_t> traversalDepth = boost::none);
 
 SbExpr generateProjection(StageBuilderState& state,
                           projection_ast::ProjectType type,
                           std::vector<std::string> paths,
                           std::vector<ProjectNode> nodes,
                           SbExpr inputExpr,
-                          const PlanStageSlots* slots = nullptr);
+                          const PlanStageSlots* slots = nullptr,
+                          boost::optional<int32_t> traversalDepth = boost::none);
 
 SbExpr generateProjectionWithInputFields(StageBuilderState& state,
                                          const projection_ast::Projection* projection,
                                          SbExpr inputExpr,
                                          const sbe::MakeObjInputPlan& inputPlan,
-                                         const PlanStageSlots* slots);
+                                         const PlanStageSlots* slots,
+                                         boost::optional<int32_t> traversalDepth = boost::none);
 
 SbExpr generateProjectionWithInputFields(StageBuilderState& state,
                                          projection_ast::ProjectType type,
@@ -69,5 +72,6 @@ SbExpr generateProjectionWithInputFields(StageBuilderState& state,
                                          std::vector<ProjectNode> nodes,
                                          SbExpr inputExpr,
                                          const sbe::MakeObjInputPlan& inputPlan,
-                                         const PlanStageSlots* slots);
+                                         const PlanStageSlots* slots,
+                                         boost::optional<int32_t> traversalDepth = boost::none);
 }  // namespace mongo::stage_builder

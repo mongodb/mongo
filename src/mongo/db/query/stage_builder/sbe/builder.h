@@ -307,29 +307,19 @@ public:
 
     // Discards all mappings for names of the form '{kField, name}'.
     void clearAllFields() {
-        for (auto it = _data->slotNameToIdMap.begin(); it != _data->slotNameToIdMap.end();) {
-            if (it->first.first == kField) {
-                _data->slotNameToIdMap.erase(it++);
-                continue;
-            }
-            ++it;
-        }
+        absl::erase_if(_data->slotNameToIdMap, [](auto& elem) {
+            const auto& name = elem.first;
+            return name.first == kField;
+        });
     }
 
-    // If 'path' is a dotted path, this method will call 'clearField(path)' and then it will call
-    // clearField() on every prefix of 'path'. If 'path' is not a dotted path, this method will
-    // just call 'clearField(path)' and return.
-    void clearFieldAndAllPrefixes(StringData path) {
-        for (;;) {
-            clearField(path);
-
-            size_t pos = path.rfind('.');
-            if (pos == std::string::npos) {
-                break;
-            }
-
-            path = path.substr(0, pos);
-        }
+    // This method will clear all fields whose names conflict with 'path' (i.e. either the name
+    // equals 'path', or the name is a prefix of 'path', or 'path' is a prefix of the name).
+    void clearAffectedFields(StringData path) {
+        absl::erase_if(_data->slotNameToIdMap, [path](auto& elem) {
+            const auto& name = elem.first;
+            return name.first == kField && pathsAreConflicting(name.second, path);
+        });
     }
 
     /**
@@ -708,21 +698,12 @@ public:
         return clearAllOfType(kSortKey);
     }
 
-    // If 'path' is a dotted path, this method will call 'clearField(path)' and then it will call
-    // clearField() on every prefix of 'path'. If 'path' is not a dotted path, this method will
-    // just call 'clearField(path)' and return.
-    PlanStageReqs& clearFieldAndAllPrefixes(StringData path) {
-        for (;;) {
-            clearField(path);
-
-            size_t pos = path.rfind('.');
-            if (pos == std::string::npos) {
-                break;
-            }
-
-            path = path.substr(0, pos);
-        }
-
+    // This method will clear all field reqs whose names are conflict with 'path' (i.e. either the
+    // name equals 'path', or the name is a prefix of 'path', or 'path' is a prefix of the name).
+    PlanStageReqs& clearAffectedFields(StringData path) {
+        absl::erase_if(_data->slotNameSet, [path](auto& name) {
+            return name.first == kField && pathsAreConflicting(name.second, path);
+        });
         return *this;
     }
 
