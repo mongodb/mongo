@@ -267,7 +267,7 @@ function testInternalCollections({featureFlagReshardingForTimeseries}) {
         assert.commandFailedWithCode(
             st.s.adminCommand(
                 {moveCollection: dbName2 + "." + collName, toShard: st.shard1.shardName}),
-            ErrorCodes.NotImplemented);
+            ErrorCodes.IllegalOperation);
         assert.commandWorked(st.s.adminCommand({movePrimary: dbName2, to: st.shard1.shardName}));
     }
 

@@ -101,6 +101,35 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
+            {
+                FixedFCVRegion fixedFcvRegion{opCtx};
+                bool isReshardingForTimeseriesEnabled =
+                    mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(
+                        fixedFcvRegion->acquireFCVSnapshot());
+
+                // (SERVER-93135) Use an alternative client region to avoid shard version checking
+                // because v7.0 routers wrongly attach UNSHARDED shard version
+                auto newClient = opCtx->getServiceContext()
+                                     ->getService(ClusterRole::ShardServer)
+                                     ->makeClient("CheckForTimeseriesCollection");
+                AlternativeClientRegion acr(newClient);
+                auto newOpCtxPtr = cc().makeOperationContext();
+
+                AutoGetCollection collOrView{newOpCtxPtr.get(),
+                                             ns(),
+                                             MODE_IS,
+                                             AutoGetCollection::Options{}.viewMode(
+                                                 auto_get_collection::ViewMode::kViewsPermitted)};
+
+                bool isTimeseries = collOrView.getView()
+                    ? collOrView.getView()->timeseries()
+                    : *collOrView && collOrView->getTimeseriesOptions().has_value();
+
+                uassert(ErrorCodes::IllegalOperation,
+                        "Can't reshard a timeseries collection",
+                        !isTimeseries || isReshardingForTimeseriesEnabled);
+            }
+
             if (resharding::isMoveCollection(request().getProvenance())) {
                 bool clusterHasTwoOrMoreShards = [&]() {
                     auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
@@ -118,16 +147,7 @@ public:
                 uassert(ErrorCodes::IllegalOperation,
                         "Can't move an internal resharding collection",
                         !ns().isTemporaryReshardingCollection());
-                {
-                    FixedFCVRegion fixedFcvRegion{opCtx};
-                    bool isReshardingForTimeseriesEnabled =
-                        mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(
-                            fixedFcvRegion->acquireFCVSnapshot());
-                    uassert(ErrorCodes::IllegalOperation,
-                            "Can't move a timeseries collection",
-                            !ns().isTimeseriesBucketsCollection() ||
-                                isReshardingForTimeseriesEnabled);
-                }
+
                 // TODO (SERVER-88623): re-evalutate the need to track the collection before calling
                 // into moveCollection
                 ShardsvrCreateCollectionRequest trackCollectionRequest;
