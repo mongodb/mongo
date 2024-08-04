@@ -185,7 +185,7 @@ let currentParentTxnNumber = NumberLong(35);
             } catch (e) {
                 assert(ErrorCodes.isRetriableError(e.code) || isNetworkError(e));
                 assert(TransactionsUtil.isTransientTransactionError(e));
-                childTxnNumber2 += 1;
+                childTxnNumber2++;
             }
             return false;
         });
@@ -253,7 +253,7 @@ let currentParentTxnNumber = NumberLong(35);
             } catch (e) {
                 assert(ErrorCodes.isRetriableError(e.code) || isNetworkError(e));
                 assert(TransactionsUtil.isTransientTransactionError(e));
-                childTxnNumber1 += 1;
+                childTxnNumber1++;
             }
             return false;
         });
