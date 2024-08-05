@@ -14,8 +14,6 @@ const collName = "ts";
 
 testDB.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata"}});
 
-configureFailPoint(conn, "allowSetTimeseriesBucketsMayHaveMixedSchemaDataFalse");
-
 assert.commandWorked(testDB.runCommand({drop: collName}));
 assert.commandWorked(
     testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
