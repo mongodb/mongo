@@ -416,12 +416,8 @@ mongo_cc_library(
     includes = [
         "LIBRARY/src",
     ],
-    linkopts = select({
-        "@platforms//os:linux": [
-            "-lm",
-        ],
-        "//conditions:default": [],
-    }) + select({
+    local_defines = INTEL_RDFP_MATHLIB_DEFINES,
+    non_transitive_dyn_linkopts = select({
         "@platforms//os:linux": [
             "-Wl,--version-script=$(location :libintel_decimal128.version_script.lds)",
         ],
@@ -432,7 +428,6 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
-    local_defines = INTEL_RDFP_MATHLIB_DEFINES,
     deps = select({
         "@platforms//os:macos": [
             ":dpml_log1p_t",

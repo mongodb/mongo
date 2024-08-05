@@ -20,7 +20,11 @@ env.CppUnitTest(
         "unordered_map_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/third_party/shim_abseil",
+        "$BUILD_DIR/third_party/abseil-cpp/absl_city",
+        "$BUILD_DIR/third_party/abseil-cpp/absl_hash",
+        "$BUILD_DIR/third_party/abseil-cpp/absl_int128",
+        "$BUILD_DIR/third_party/abseil-cpp/absl_low_level_hash",
+        "$BUILD_DIR/third_party/abseil-cpp/absl_raw_hash_set",
     ],
 )
 

@@ -203,6 +203,17 @@ mongo_cc_library(
     features = [
         "no_warn_non_virtual_detour",
     ],
+    includes = select({
+        "@platforms//cpu:{}".format(cpu): ["platform/linux_{}/install/include".format(cpu)]
+        for cpu in [
+            "aarch64",
+            "x86_64",
+            "ppc64le",
+            "s390x",
+        ]
+    } | {
+        "//conditions:default": [],
+    }),
     local_defines = [
         # Skip autoconf preprocessing.
         "HAVE_CONFIG_H",

@@ -2,11 +2,8 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
-filegroup(
-    name = "exit_code",
-    srcs = [
-        "exit_code.h",
-    ],
+exports_files(
+    glob(["*.h"]) + glob(["*.cpp"]),
 )
 
 mongo_cc_library(
@@ -17,4 +14,39 @@ mongo_cc_library(
     hdrs = [
         "boost_assert_shim.h",
     ],
+)
+
+mongo_cc_library(
+    name = "debugger",
+    srcs = [
+        "debugger.cpp",
+    ],
+    hdrs = [
+        "debugger.h",
+    ],
+    local_defines = select({
+        "//bazel/config:use_gdbserver_enabled": ["USE_GDBSERVER"],
+        "//bazel/config:use_lldbserver_enabled": ["USE_LLDB_SERVER"],
+        "//bazel/config:use_wait_for_debugger_enabled": ["WAIT_FOR_DEBUGGER"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "quick_exit",
+    srcs = [
+        "quick_exit.cpp",
+    ],
+    hdrs = [
+        "exit_code.h",
+        "quick_exit.h",
+        "//src/mongo/platform:compiler.h",
+        "//src/mongo/stdx:mutex.h",
+        "//src/mongo/util:assert_util.h",
+        "//src/mongo/util:testing_proctor.h",
+    ],
+    local_defines = select({
+        "//bazel/config:gcov_enabled": ["MONGO_GCOV"],
+        "//conditions:default": [],
+    }),
 )

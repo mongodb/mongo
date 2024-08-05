@@ -1,0 +1,9 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "headers",
+    srcs = [
+        "SafeInt.hpp",
+    ],
+    visibility = ["//visibility:public"],
+)

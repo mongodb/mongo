@@ -162,7 +162,7 @@ env.Library(
         'dist/src/mongocrypt.c',
     ] + additional_sources,
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/third_party/shim_intel_decimal128',
+        '$BUILD_DIR/third_party/IntelRDFPMathLib20U1/intel_decimal128',
         '$BUILD_DIR/third_party/shim_libbson',
     ],
     LIBDEPS_TAGS=[

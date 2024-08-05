@@ -36,7 +36,11 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/third_party/shim_boost",
+        "$BUILD_DIR/third_party/boost/boost_filesystem",
+        "$BUILD_DIR/third_party/boost/boost_iostreams",
+        "$BUILD_DIR/third_party/boost/boost_log",
+        "$BUILD_DIR/third_party/boost/boost_program_options",
+        "$BUILD_DIR/third_party/boost/boost_system",
     ],
 )
 

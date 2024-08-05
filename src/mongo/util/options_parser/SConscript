@@ -37,7 +37,11 @@ optsEnv.Library(
         "$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}",
         "$BUILD_DIR/mongo/util/net/http_client",
         "$BUILD_DIR/mongo/util/net/network",
-        "$BUILD_DIR/third_party/shim_boost",
+        "$BUILD_DIR/third_party/boost/boost_filesystem",
+        "$BUILD_DIR/third_party/boost/boost_iostreams",
+        "$BUILD_DIR/third_party/boost/boost_log",
+        "$BUILD_DIR/third_party/boost/boost_program_options",
+        "$BUILD_DIR/third_party/boost/boost_system",
     ],
 )
 

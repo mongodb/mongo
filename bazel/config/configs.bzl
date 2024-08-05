@@ -513,3 +513,17 @@ thin_lto = rule(
     implementation = lambda ctx: thin_lto_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# gcov
+# =========
+
+gcov_provider = provider(
+    doc = "Choose if gcov should be used",
+    fields = ["enabled"],
+)
+
+gcov = rule(
+    implementation = lambda ctx: gcov_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)

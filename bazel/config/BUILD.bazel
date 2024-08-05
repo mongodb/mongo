@@ -11,6 +11,7 @@ load(
     "disable_warnings_as_errors",
     "dwarf_version",
     "fsan",
+    "gcov",
     "http_client",
     "libunwind",
     "linker",
@@ -1759,5 +1760,21 @@ config_setting(
     name = "thin_lto_enabled",
     flag_values = {
         "//bazel/config:thin_lto": "True",
+    },
+)
+
+# --------------------------------------
+# gdbserver options
+# --------------------------------------
+
+gcov(
+    name = "gcov",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "gcov_enabled",
+    flag_values = {
+        "//bazel/config:gcov": "True",
     },
 )

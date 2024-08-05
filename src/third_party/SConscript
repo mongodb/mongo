@@ -402,18 +402,6 @@ if use_libunwind:
 
     unwindEnv.ShimLibrary(name="unwind", NINJA_GENSOURCE_INDEPENDENT=True)
 
-fmtEnv = env.Clone()
-if use_system_version_of_library("fmt"):
-    fmtEnv = fmtEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_FMT_SYSLIBDEP'],
-    ])
-else:
-    fmtEnv = fmtEnv.Clone(LIBDEPS_INTERFACE=[
-        'fmt/fmt',
-    ])
-
-fmtEnv.ShimLibrary(name="fmt")
-
 pcre2Env = env.Clone()
 if use_system_version_of_library("pcre2"):
     pcre2Env = pcre2Env.Clone(SYSLIBDEPS=[
@@ -426,43 +414,6 @@ else:
     ])
 
 pcre2Env.ShimLibrary(name="pcre2")
-
-boostEnv = env.Clone()
-if use_system_version_of_library("boost"):
-    # On windows, we don't need the syslibdeps because autolib will select the right libraries
-    # for us automatically.
-    if not env.TargetOSIs('windows'):
-        boostEnv = boostEnv.Clone(SYSLIBDEPS=[
-            env['LIBDEPS_BOOST_PROGRAM_OPTIONS_SYSLIBDEP'],
-            env['LIBDEPS_BOOST_FILESYSTEM_SYSLIBDEP'],
-            env['LIBDEPS_BOOST_SYSTEM_SYSLIBDEP'],
-            env['LIBDEPS_BOOST_IOSTREAMS_SYSLIBDEP'],
-            env['LIBDEPS_BOOST_THREAD_SYSLIBDEP'],
-            env['LIBDEPS_BOOST_LOG_SYSLIBDEP'],
-        ])
-else:
-    boostDirectory = 'boost'
-    boostEnv = boostEnv.Clone(LIBDEPS_INTERFACE=[
-        boostDirectory + '/boost_filesystem',
-        boostDirectory + '/boost_iostreams',
-        boostDirectory + '/boost_log',
-        boostDirectory + '/boost_program_options',
-        boostDirectory + '/boost_system',
-    ])
-
-boostEnv.ShimLibrary(name="boost")
-
-abseilDirectory = 'abseil-cpp'
-abseilEnv = env.Clone()
-abseilEnv = abseilEnv.Clone(LIBDEPS_INTERFACE=[
-    abseilDirectory + '/absl_city',
-    abseilDirectory + '/absl_hash',
-    abseilDirectory + '/absl_int128',
-    abseilDirectory + '/absl_low_level_hash',
-    abseilDirectory + '/absl_raw_hash_set',
-])
-
-abseilEnv.ShimLibrary(name="abseil")
 
 snappyEnv = env.Clone()
 if use_system_version_of_library("snappy"):
@@ -664,24 +615,6 @@ else:
     ])
 
 asioEnv.ShimLibrary(name="asio")
-
-intelDecimal128Env = env.Clone()
-if use_system_version_of_library("intel_decimal128"):
-    intelDecimal128Env = intelDecimal128Env.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_INTEL_DECIMAL128_SYSLIBDEP'],
-    ])
-else:
-    intelDecimal128Env = intelDecimal128Env.Clone()
-    intelDecimal128Env.InjectThirdParty(libraries=['intel_decimal128'])
-    intelDecimal128Env.SConscript(
-        'IntelRDFPMathLib20U1/SConscript',
-        exports={'env': intelDecimal128Env},
-    )
-    intelDecimal128Env = intelDecimal128Env.Clone(LIBDEPS_INTERFACE=[
-        'IntelRDFPMathLib20U1/intel_decimal128',
-    ])
-
-intelDecimal128Env.ShimLibrary(name="intel_decimal128", )
 
 icuEnv = env.Clone()
 if use_system_version_of_library("icu"):
