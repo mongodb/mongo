@@ -119,6 +119,8 @@ BSONObj scaleIndividualShardStatistics(const BSONObj& shardStats, int scale) {
  * "clusterTimeseriesStats". All of the mongod "timeseries" collStats are numbers except for the
  * "bucketsNs" field, which we specially track in "timeseriesBucketsNs". We also track
  * "timeseriesTotalBucketSize" specially for calculating "avgBucketSize".
+ * "avgNumMeasurementsPerCommit" is specially calculated using "numMeasurementsCommitted" and
+ * "numCommits"
  *
  * Invariants that "shardTimeseriesStats" is non-empty.
  */
@@ -170,6 +172,11 @@ void aggregateTimeseriesStats(const BSONObj& shardTimeseriesStats,
     }
     (*clusterTimeseriesStats)["avgBucketSize"] = (*clusterTimeseriesStats)["bucketCount"]
         ? *timeseriesTotalBucketSize / (*clusterTimeseriesStats)["bucketCount"]
+        : 0;
+    (*clusterTimeseriesStats)["avgNumMeasurementsPerCommit"] =
+        (*clusterTimeseriesStats)["numCommits"]
+        ? (*clusterTimeseriesStats)["numMeasurementsCommitted"] /
+            (*clusterTimeseriesStats)["numCommits"]
         : 0;
 }
 

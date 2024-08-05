@@ -67,10 +67,13 @@ const timeField = 'tm';
 const metaField = 'mt';
 const viewNs = `${dbName}.${collName}`;
 const bucketNs = `${dbName}.system.buckets.${collName}`;
+const emptyCollName = 'testEmptyColl';
 
 // Create a timeseries collection.
 assert.commandWorked(mongosDB.createCollection(
     collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+assert.commandWorked(mongosDB.createCollection(
+    emptyCollName, {timeseries: {timeField: timeField, metaField: metaField}}));
 
 // Populate the timeseries collection with some data. More interesting test case, and populates the
 // statistics results.
@@ -106,6 +109,18 @@ assert.commandWorked(st.s.adminCommand({
     key: {[metaField]: 1},
 }));
 
+// Check that timeseries collStats are all 0 on an empty sharded collection
+clusterCollStatsResult = assert.commandWorked(mongosDB.runCommand({collStats: emptyCollName}));
+jsTestLog("Empty cluster collStats command result: " + tojson(clusterCollStatsResult));
+assert.eq(0, clusterCollStatsResult.timeseries.avgBucketSize);
+assert.eq(0, clusterCollStatsResult.timeseries.avgNumMeasurementsPerCommit);
+assert.eq(0, clusterCollStatsResult.timeseries.bucketCount);
+assert.eq(0, clusterCollStatsResult.timeseries.numBucketFetchesFailed);
+assert.eq(0, clusterCollStatsResult.timeseries.numBucketInserts);
+assert.eq(0, clusterCollStatsResult.timeseries.numBucketQueriesFailed);
+assert.eq(0, clusterCollStatsResult.timeseries.numBucketReopeningsFailed);
+assert.eq(0, clusterCollStatsResult.timeseries.numBucketUpdates);
+
 // Force splitting numShards chunks.
 const splitPoint = {
     meta: numberDoc / numShards
@@ -139,14 +154,14 @@ function assertTimeseriesAggregationCorrectness(total, shards) {
     assert(shards.every(x => x.bucketNs === total.bucketNs));
     assert.eq(total.bucketCount,
               shards.map(x => x.bucketCount).reduce((x, y) => x + y, 0 /* initial value */));
-    if (total.bucketCount > 0) {
-        assert.eq(total.avgBucketSize,
-                  Math.floor(shards.map(x => x.avgBucketSize * x.bucketCount)
-                                 .reduce((x, y) => x + y, 0 /* initial value */) /
-                             total.bucketCount));
-    } else {
-        assert.eq(total.avgBucketSize, 0);
-    }
+    assert.eq(total.avgBucketSize,
+              Math.floor(shards.map(x => x.avgBucketSize * x.bucketCount)
+                             .reduce((x, y) => x + y, 0 /* initial value */) /
+                         total.bucketCount));
+    assert.eq(
+        total.avgNumMeasurementsPerCommit,
+        shards.map(x => x.numMeasurementsCommitted).reduce((x, y) => x + y, 0 /* initial value */) /
+            shards.map(x => x.numCommits).reduce((x, y) => x + y, 0 /* initial value */));
     assert.eq(total.numBucketInserts,
               shards.map(x => x.numBucketInserts).reduce((x, y) => x + y, 0 /* initial value */));
     assert.eq(total.numBucketUpdates,
@@ -175,6 +190,7 @@ function assertTimeseriesAggregationCorrectness(total, shards) {
         shards.map(x => x.numMeasurementsCommitted).reduce((x, y) => x + y, 0 /* initial value */));
     assert(total.bucketCount > 0);
     assert(total.avgBucketSize > 0);
+    assert(total.avgNumMeasurementsPerCommit > 0);
     assert(total.numBucketInserts > 0);
     assert(total.numCommits > 0);
     assert(total.numMeasurementsCommitted > 0);
