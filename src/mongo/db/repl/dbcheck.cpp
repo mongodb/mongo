@@ -80,6 +80,7 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(SleepDbCheckInBatch);
 MONGO_FAIL_POINT_DEFINE(secondaryHangAfterExtraIndexKeysHashing);
+MONGO_FAIL_POINT_DEFINE(sleepToWaitForHealthLogWrite);
 
 namespace {
 
@@ -1235,6 +1236,11 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                 boost::none /*data*/);
             HealthLogInterface::get(Client::getCurrent()->getServiceContext())
                 ->log(*healthLogEntry);
+            if (MONGO_unlikely(sleepToWaitForHealthLogWrite.shouldFail()) &&
+                type == OplogEntriesEnum::Stop) {
+                LOGV2(8800900, "Sleeping due to failpoint 'sleepToWaitForHealthLogWrite'");
+                opCtx->sleepFor(Milliseconds(2000));
+            }
             return Status::OK();
     }
 
