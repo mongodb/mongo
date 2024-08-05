@@ -2032,6 +2032,9 @@ tasks:
       - func: "fetch artifacts"
       - func: "cppsuite perf test"
         vars:
+          # Configure checkpoint cleanup to run more often as the test only runs for 90 seconds
+          # and checkpoint cleanup is triggered every 300 seconds by default.
+          test_config: checkpoint_cleanup=(wait=60)
           test_config_filename: configs/hs_cleanup_default.txt
           test_name: hs_cleanup
 

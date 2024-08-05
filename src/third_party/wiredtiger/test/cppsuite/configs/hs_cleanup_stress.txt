@@ -4,6 +4,7 @@ duration_seconds=3600,
 # to hold these values.
 # 1.5 GB
 cache_size_mb=1536,
+enable_logging=true,
 compression_enabled=true,
 statistics_config=
 (
