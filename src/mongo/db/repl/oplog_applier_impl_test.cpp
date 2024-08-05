@@ -67,7 +67,6 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction_participant_gen.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -129,7 +128,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     NamespaceString otherNss("test.othername");
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, {});
     int prevDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, otherNss, false);
     auto postDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
     ASSERT_EQ(1, postDeleteFromMissing - prevDeleteFromMissing);
 
@@ -167,7 +166,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, kUuid);
     int prevDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     auto postDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
     ASSERT_EQ(1, postDeleteFromMissing - prevDeleteFromMissing);
 
@@ -211,7 +210,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     // implicitly create the collection.
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
     int prevDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
     auto postDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
     ASSERT_EQ(1, postDeleteFromMissing - prevDeleteFromMissing);
@@ -239,7 +238,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollec
     const NamespaceString nss("test.t");
     repl::createCollection(_opCtx.get(), nss, {});
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 }
 
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
@@ -248,7 +247,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     repl::createCollection(_opCtx.get(), nss, {});
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
     int prevDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     auto postDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
     ASSERT_EQ(1, postDeleteWasEmpty - prevDeleteWasEmpty);
 
@@ -274,7 +273,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollec
     createCollection(_opCtx.get(), nss, createRecordPreImageCollectionOptions());
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 }
 
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
@@ -284,7 +283,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, uuid);
     int prevInsertOnExistingDoc = replOpCounters.getInsertOnExistingDoc()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     auto postInsertOnExistingDoc = replOpCounters.getInsertOnExistingDoc()->load();
     ASSERT_EQ(1, postInsertOnExistingDoc - prevInsertOnExistingDoc);
 
@@ -301,7 +300,7 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, uuid);
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::DuplicateKey, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::DuplicateKey, op, nss, false);
 }
 
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
@@ -311,7 +310,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     auto op = makeOplogEntry(
         repl::OpTypeEnum::kUpdate, nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 0));
     int prevUpdateOnMissingDoc = replOpCounters.getUpdateOnMissingDoc()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
     auto postUpdateOnMissingDoc = replOpCounters.getUpdateOnMissingDoc()->load();
     ASSERT_EQ(1, postUpdateOnMissingDoc - prevUpdateOnMissingDoc);
 
@@ -328,7 +327,8 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = makeOplogEntry(
         repl::OpTypeEnum::kUpdate, nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 0));
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::UpdateOperationFailed, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(
+        ErrorCodes::UpdateOperationFailed, op, nss, false);
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollectionLockedByUUID) {
@@ -337,7 +337,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollec
     // Test that the collection to lock is determined by the UUID and not the 'ns' field.
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, uuid);
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 }
 
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
@@ -351,7 +351,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, options.uuid);
     int prevDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     auto postDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
     ASSERT_EQ(1, postDeleteWasEmpty - prevDeleteWasEmpty);
 
@@ -388,7 +388,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollec
     // Test that the collection to lock is determined by the UUID and not the 'ns' field.
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, options.uuid);
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {

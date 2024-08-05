@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 
@@ -202,6 +203,7 @@ protected:
 
     void _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::Error expectedError,
                                                            const OplogEntry& op,
+                                                           const NamespaceString& targetNss,
                                                            bool expectedApplyOpCalled);
 
     Status _applyOplogEntryOrGroupedInsertsWrapper(OperationContext* opCtx,
@@ -212,6 +214,11 @@ protected:
     std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;
     ServiceContext* serviceContext;
     OplogApplierImplOpObserver* _opObserver = nullptr;
+
+    template <typename T>
+    inline void setServerParameter(const std::string& name, T value) {
+        _serverParamControllers.push_back(ServerParameterControllerForTest(name, value));
+    }
 
     OpTime nextOpTime() {
         static long long lastSecond = 1;
@@ -232,6 +239,8 @@ protected:
     Status runOpsInitialSync(std::vector<OplogEntry> ops);
 
     UUID kUuid{UUID::gen()};
+
+    std::vector<ServerParameterControllerForTest> _serverParamControllers;
 };
 
 // Utility class to allow easily scanning a collection.  Scans in forward order, returns
