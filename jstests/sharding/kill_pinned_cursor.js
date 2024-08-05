@@ -118,7 +118,7 @@ function testShardedKillPinned(
         waitForCurOpByFailPoint(shard1DB, coll.getFullName(), kFailPointName, curOpFilter);
 
         // Use the function provided by the caller to kill the sharded query.
-        killFunc(cursorId);
+        killFunc(cursorId, sessionId);
 
         // The getMore should finish now that we've killed the cursor (even though the failpoint
         // is still enabled).
@@ -242,20 +242,10 @@ for (let useSession of [true, false]) {
 // Test that running killSessions on the session which is running the getMore causes the
 // cursor to be killed.
 testShardedKillPinned({
-    // This function ignores the mongos cursor id, since it instead uses listLocalSessions
-    // to obtain the session id of the session running the getMore.
-    killFunc: function() {
-        // Must sort by 'lastUse' because there may be sessions left over on the server from
-        // the previous runs. We will only call killSessions on the most recently used one.
-        const localSessions = mongosDB
-                                  .aggregate([
-                                      {$listLocalSessions: {allUsers: true}},
-                                      {$sort: {"lastUse": -1}},
-                                  ])
-                                  .toArray();
-
-        const sessionUUID = localSessions[0]._id.id;
-        assert.commandWorked(mongosDB.runCommand({killSessions: [{id: sessionUUID}]}));
+    // This function ignores the mongos cursor id, since it instead uses the session id of the
+    // original findCmd session as well as the session running getMore.
+    killFunc: function(cursorId, sessionId) {
+        assert.commandWorked(mongosDB.runCommand({killSessions: [sessionId]}));
     },
     // Killing a session on mongos kills all matching remote cursors (through KillCursors) then
     // all matching local operations (through KillOp), so the getMore can fail with either
