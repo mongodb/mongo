@@ -45,8 +45,8 @@ __hs_verbose_cache_stats(WT_SESSION_IMPL *session, WT_BTREE *btree)
     if (WT_VERBOSE_ISSET(session, WT_VERB_HS) ||
       (ckpt_gen_current > ckpt_gen_last &&
         __wt_atomic_casv64(&cache->hs_verb_gen_write, ckpt_gen_last, ckpt_gen_current))) {
-        WT_IGNORE_RET_BOOL(__wt_eviction_clean_needed(session, &pct_full));
-        WT_IGNORE_RET_BOOL(__wt_eviction_dirty_needed(session, &pct_dirty));
+        WT_IGNORE_RET(__wt_eviction_clean_needed(session, &pct_full));
+        WT_IGNORE_RET(__wt_eviction_dirty_needed(session, &pct_dirty));
 
         __wt_verbose_multi(session,
           WT_DECL_VERBOSE_MULTI_CATEGORY(

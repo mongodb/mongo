@@ -30,8 +30,7 @@
 #endif /* CODE_COVERAGE_MEASUREMENT */
 
 /*
- * Quiet compiler warnings about unused function parameters and variables, and unused function
- * return values.
+ * Explicitly suppress compiler warnings about unused variables, and function parameters.
  */
 #define WT_UNUSED(var) (void)(var)
 #define WT_NOT_READ(v, val) \
@@ -39,24 +38,17 @@
         (v) = (val);        \
         (void)(v);          \
     } while (0);
-#define WT_IGNORE_RET(call)                \
-    do {                                   \
-        uintmax_t __ignored_ret;           \
-        __ignored_ret = (uintmax_t)(call); \
-        WT_UNUSED(__ignored_ret);          \
-    } while (0)
-#define WT_IGNORE_RET_BOOL(call)  \
-    do {                          \
-        bool __ignored_ret;       \
-        __ignored_ret = (call);   \
-        WT_UNUSED(__ignored_ret); \
-    } while (0)
-#define WT_IGNORE_RET_PTR(call)    \
-    do {                           \
-        const void *__ignored_ret; \
-        __ignored_ret = (call);    \
-        WT_UNUSED(__ignored_ret);  \
-    } while (0)
+
+/*
+ * Explicitly suppress: warning unused result.
+ *
+ * Simply casting to void as in WT_UNUSED will not suppress this warning on the current version of
+ * gcc (11.3.0) used for the server build.
+ *
+ * This workaround works with every supported toolchain, and does not employ unused temporary values
+ * that are then detected by Coverity.
+ */
+#define WT_IGNORE_RET(call) ((void)!(call))
 
 #define WT_DIVIDER "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
