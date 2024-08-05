@@ -1,20 +1,26 @@
 variables:
 - &amazon2_x86_compile_variant_dependency
   depends_on:
-  - name: package_new_compile
-    variant: amazon2-x86-compile
+    - name: archive_dist_test
+      variant: amazon2-x86-compile
+    - name: package_supplementary_data
+      variant: amazon2-x86-compile
 
 - &amazon_linux2_arm64_compile_variant_dependency
   depends_on:
-  - name: package_new_compile
-    variant: amazon2-arm64-compile
+    - name: archive_dist_test
+      variant: amazon2-arm64-compile
+    - name: package_supplementary_data
+      variant: amazon2-arm64-compile
 
 - &amazon_linux2_arm64_mongocrypt_compile_variant_dependency
   depends_on:
-  - name: package_new_compile
-    variant: amazon2-arm64-compile
-  - name: crypt_create_lib
-    variant: compile-amazon-linux2-arm64-mongocrypt-shlib
+    - name: archive_dist_test
+      variant: amazon2-x86-compile
+    - name: package_supplementary_data
+      variant: amazon2-arm64-compile
+    - name: crypt_create_lib
+      variant: amazon2-arm64-mongocrypt-shlib-compile
 
 - &schedule_variant_auto_tasks_task
   name: schedule_variant_auto_tasks
@@ -62,6 +68,7 @@ buildvariants:
     project_dir: &perf_project_dir dsi
     storageEngine: wiredTiger
     compile_variant: amazon2-arm64-compile
+    use_supplementary_data: true
   run_on:
     - "rhel94-perf-atlas-large"
   tasks:
@@ -86,6 +93,7 @@ buildvariants:
     atlas_setup: M60-repl-azure
     use_custom_build_azure: true
     compile_variant: amazon2-x86-compile
+    use_supplementary_data: true
     infrastructure_provisioning: workload_client_intel.2023-11
     infrastructure_provisioning_release: 2023-09
     workload_setup: 2022-11
@@ -120,6 +128,7 @@ buildvariants:
     authentication: enabled
     storageEngine: wiredTiger
     compile_variant: amazon2-arm64-compile
+    use_supplementary_data: true
   run_on:
     - "rhel94-perf-shard"
   tasks:
@@ -159,6 +168,7 @@ buildvariants:
     authentication: enabled
     storageEngine: wiredTiger
     compile_variant: amazon2-arm64-compile
+    use_supplementary_data: true
   run_on:
     - "rhel94-perf-replset"
   tasks:
@@ -229,6 +239,7 @@ buildvariants:
     authentication: enabled
     storageEngine: wiredTiger
     compile_variant: amazon2-x86-compile
+    use_supplementary_data: true
   run_on:
     - "rhel94-perf-replset"
   tasks:
@@ -260,6 +271,7 @@ buildvariants:
     authentication: disabled
     storageEngine: wiredTiger
     compile_variant: amazon2-arm64-compile
+    use_supplementary_data: true
     project_dir: *perf_project_dir
   run_on:
     - "rhel94-perf-replset"
@@ -285,7 +297,8 @@ buildvariants:
     authentication: enabled
     storageEngine: wiredTiger
     compile_variant: amazon2-arm64-compile
-    shlib_compile_variant: compile-amazon-linux2-arm64-mongocrypt-shlib
+    use_supplementary_data: true
+    shlib_compile_variant: amazon2-arm64-mongocrypt-shlib-compile
     mongocrypt_shlib_required: true
   run_on:
     - "rhel94-perf-shard-lite"
@@ -312,6 +325,7 @@ buildvariants:
     storageEngine: inMemory
     project_dir: *perf_project_dir
     compile_variant: amazon2-arm64-compile
+    use_supplementary_data: true
   run_on:
   - "rhel94-perf-microbenchmarks"
   tasks:
@@ -360,6 +374,7 @@ buildvariants:
     storageEngine: inMemory
     project_dir: *perf_project_dir
     compile_variant: amazon2-x86-compile
+    use_supplementary_data: true
   run_on:
   - "rhel94-perf-microbenchmarks"
   tasks:
