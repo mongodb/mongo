@@ -9,7 +9,11 @@ export var KilledSessionUtil = (function() {
     }
 
     function hasKilledSessionError(errOrRes) {
-        return isKilledSessionCode(errOrRes.code) ||
+        let hasOriginalErrorKilledSessionCode =
+            errOrRes.code == ErrorCodes.TransactionParticipantFailedUnyield
+            ? isKilledSessionCode(errOrRes.originalError.code)
+            : false;
+        return hasOriginalErrorKilledSessionCode || isKilledSessionCode(errOrRes.code) ||
             (Array.isArray(errOrRes.writeErrors) &&
              errOrRes.writeErrors.every(writeError => isKilledSessionCode(writeError.code)));
     }
