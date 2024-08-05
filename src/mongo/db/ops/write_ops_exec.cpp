@@ -2939,11 +2939,10 @@ insertIntoBucketCatalog(OperationContext* opCtx,
     boost::optional<Status> rebuildOptionsError;
     try {
         rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsNs, timeSeriesOptions);
-    } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
-        // This could occur when the shard version attached to the request is for the time
-        // series namespace (unsharded), which is compared to the shard version of the
-        // bucket namespace. Consequently, every single entry fails but the whole operation
-        // succeeds.
+    } catch (const DBException& ex) {
+        if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
+            throw;
+        }
 
         rebuildOptionsError = ex.toStatus();
 
