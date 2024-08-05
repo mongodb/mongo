@@ -25,7 +25,7 @@ selector:
     # Mongos ClusteredKillCursors is async with mongod.
     - jstests/core/**/operation_latency_histogram.js
     # Different explain format
-    # TODO(SERVER-81158): Enable these tests.
+
     # These tests fails while DbCheck running in the background:
     # The DBCheck process continuously populates the currentOp, causing this test to time out while
     # waiting for empty 'getMore' requests.
