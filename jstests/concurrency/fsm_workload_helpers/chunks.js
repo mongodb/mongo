@@ -88,17 +88,9 @@ export var ChunkHelper = (function() {
         const runningWithStepdowns =
             TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
         const isSlowBuild = () => {
-            // The sanitizer checks require globalThis.db being set but it is null for fsm worker
-            // threads so temporarily set it to a real value.
-            const originalGlobalThisDb = globalThis.db;
-            globalThis.db = db;
-            try {
-                // Consider this a slow build on TSAN or if we're fuzzing mongod configs, which
-                // can intentionally slow the server.
-                return TestData.fuzzMongodConfigs || _isThreadSanitizerActive();
-            } finally {
-                globalThis.db = originalGlobalThisDb;
-            }
+            // Consider this a slow build on TSAN or if we're fuzzing mongod configs, which
+            // can intentionally slow the server.
+            return TestData.fuzzMongodConfigs || db.getServerBuildInfo().isThreadSanitizerActive();
         };
 
         return runCommandWithRetries(

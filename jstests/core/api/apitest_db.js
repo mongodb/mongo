@@ -99,7 +99,7 @@ assert.commandFailed(
 
 // Tests that a non-active storage engine can be configured so long as it is registered.
 var alternateStorageEngine =
-    db.serverBuildInfo().storageEngines.find(engine => engine !== storageEngineName);
+    db.getServerBuildInfo().rawData().storageEngines.find(engine => engine !== storageEngineName);
 if (alternateStorageEngine) {
     var indexOptions = {storageEngine: {[alternateStorageEngine]: {}}};
     assert.commandWorked(db.createCollection('idxOptions', {indexOptionDefaults: indexOptions}),

@@ -125,7 +125,7 @@ function testMaxDepth() {
     let fieldDepth = depth;
 
     // When ASAN is on, filtering on a long field exceeds the stack limit, causing a segfault.
-    if (_isAddressSanitizerActive()) {
+    if (db.getServerBuildInfo().isAddressSanitizerActive()) {
         fieldDepth = depth / 2;
         jsTestLog("Lowering the maximum depth from " + depth + " to " + fieldDepth +
                   " because the address sanitizer is active.");

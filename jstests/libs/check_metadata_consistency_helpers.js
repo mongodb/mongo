@@ -63,7 +63,9 @@ export var MetadataConsistencyChecker = (function() {
             if (isTransientError(e)) {
                 jsTest.log(`Aborted metadata consistency check due to retriable error: ${e}`);
             } else if (e.code === ErrorCodes.LockBusy) {
-                const slowBuild = _isAddressSanitizerActive() || _isThreadSanitizerActive();
+                const buildInfo = adminDB.getServerBuildInfo();
+                const slowBuild = buildInfo.isAddressSanitizerActive() ||
+                    buildInfo.isThreadSanitizerActive() || buildInfo.isDebug();
                 if (slowBuild) {
                     jsTest.log(
                         `Ignoring LockBusy error on checkMetadataConsistency because we are running with very slow build (e.g. ASAN enabled)`);

@@ -21,10 +21,11 @@ import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
 // Only run this test for debug=off opt=on without sanitizers active. With any of these activated,
 // the stack frames are larger and can more easily stack overflow.
-const debugBuild = db.adminCommand("buildInfo").debug;
-if (debugBuild || !_optimizationsEnabled() || _isAddressSanitizerActive() ||
-    _isLeakSanitizerActive() || _isThreadSanitizerActive() ||
-    _isUndefinedBehaviorSanitizerActive() || _isSpiderMonkeyDebugEnabled()) {
+const buildInfo = db.getServerBuildInfo();
+if (buildInfo.isDebug() || !buildInfo.isOptimizationsEnabled() ||
+    buildInfo.isAddressSanitizerActive() || buildInfo.isLeakSanitizerActive() ||
+    buildInfo.isThreadSanitizerActive() || buildInfo.isUndefinedBehaviorSanitizerActive() ||
+    _isSpiderMonkeyDebugEnabled()) {
     jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     return;
 }

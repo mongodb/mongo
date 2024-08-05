@@ -5,7 +5,7 @@ var baseName = "jstests_disk_too_many_fds";
 
 var m = MongoRunner.runMongod();
 var db = m.getDB("db");
-if (db.serverBuildInfo().bits != 64) {
+if (db.getServerBuildInfo().getBits() != 64) {
     print("Skipping.  Only run this test on 64bit builds");
     quit();
 }

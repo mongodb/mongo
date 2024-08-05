@@ -894,7 +894,7 @@ function printShardingStatus(configDB, verbose) {
         versionHasActionlog = true;
     }
     if (metaDataVersion == 5) {
-        var verArray = globalThis.db.serverBuildInfo().versionArray;
+        var verArray = globalThis.db.getServerBuildInfo().rawData().versionArray;
         if (verArray[0] == 2 && verArray[1] > 6) {
             versionHasActionlog = true;
         }

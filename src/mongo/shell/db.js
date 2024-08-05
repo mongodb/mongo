@@ -1040,6 +1040,7 @@ DB.prototype.printSecondaryReplicationInfo = function() {
 };
 
 // Checking the server buildinfo requires the client to be authenticated
+// This is the deprecated version used by the jstest fuzzer, prefer using the getServerBuildInfo.
 DB.prototype.serverBuildInfo = function() {
     return assert.commandWorked(
         this.getSiblingDB("admin")._runCommandWithoutApiStrict({buildinfo: 1}));
@@ -1095,12 +1096,12 @@ DB.prototype.serverCmdLineOpts = function() {
 
 // Throws if client connection is not authenticated.
 DB.prototype.version = function() {
-    return this.serverBuildInfo().version;
+    return this.getServerBuildInfo().getVersion();
 };
 
 // Throws if client connection is not authenticated.
 DB.prototype.serverBits = function() {
-    return this.serverBuildInfo().bits;
+    return this.getServerBuildInfo().getBits();
 };
 
 DB.prototype.listCommands = function() {
@@ -1741,3 +1742,60 @@ DB.prototype.getDatabasePrimaryShardId = function() {
     return x.primary;
 };
 }());
+
+// Checking the server buildinfo requires the client to be authenticated
+DB.prototype.getServerBuildInfo = function() {
+    let BuildInfo = function(buildInfo) {
+        let _sanitizeMatch = function(flag) {
+            const sanitizeMatch =
+                /-fsanitize=([^\s]+) /.exec(buildInfo["buildEnvironment"]["ccflags"]);
+            if (flag && sanitizeMatch && RegExp(flag).exec(sanitizeMatch[1])) {
+                return true;
+            } else {
+                return false;
+            }
+        };
+
+        return {
+            rawData: function() {
+                return buildInfo;
+            },
+
+            getVersion: function() {
+                return buildInfo.version;
+            },
+
+            getBits: function() {
+                return buildInfo.bits;
+            },
+
+            isOptimizationsEnabled: function() {
+                const optimizationsMatch =
+                    /(\s|^)-O2(\s|$)/.exec(buildInfo["buildEnvironment"]["ccflags"]);
+                return Boolean(optimizationsMatch);
+            },
+
+            isAddressSanitizerActive: function() {
+                return _sanitizeMatch("address");
+            },
+
+            isLeakSanitizerActive: function() {
+                return _sanitizeMatch("leak");
+            },
+
+            isThreadSanitizerActive: function() {
+                return _sanitizeMatch("thread");
+            },
+
+            isUndefinedBehaviorSanitizerActive: function() {
+                return _sanitizeMatch("undefined");
+            },
+
+            isDebug: function() {
+                return buildInfo.debug;
+            }
+        };
+    };
+
+    return new BuildInfo(assert.commandWorked(this._runCommandWithoutApiStrict({buildinfo: 1})));
+};

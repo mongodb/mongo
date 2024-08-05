@@ -370,38 +370,6 @@ if (typeof TestData == "undefined") {
     TestData = undefined;
 }
 
-function _optimizationsEnabled(flags) {
-    const buildInfo = globalThis.db._runCommandWithoutApiStrict({buildInfo: 1});
-    const optimizationsMatch = /(\s|^)-O2(\s|$)/.exec(buildInfo["buildEnvironment"]["ccflags"]);
-    return Boolean(optimizationsMatch);
-}
-
-function __sanitizeMatch(flag) {
-    const buildInfo = globalThis.db._runCommandWithoutApiStrict({buildInfo: 1});
-    const sanitizeMatch = /-fsanitize=([^\s]+) /.exec(buildInfo["buildEnvironment"]["ccflags"]);
-    if (flag && sanitizeMatch && RegExp(flag).exec(sanitizeMatch[1])) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-function _isAddressSanitizerActive() {
-    return __sanitizeMatch("address");
-}
-
-function _isLeakSanitizerActive() {
-    return __sanitizeMatch("leak");
-}
-
-function _isThreadSanitizerActive() {
-    return __sanitizeMatch("thread");
-}
-
-function _isUndefinedBehaviorSanitizerActive() {
-    return __sanitizeMatch("undefined");
-}
-
 // Enabling a custom JS_GC_ZEAL value for spidermonkey is a two step process:
 // 1) JS_GC_ZEAL preprocessor directive needs to be defined at compilation (spider-monkey-dbg=on).
 // 2) A valid JS_GC_ZEAL value needs to be provided as an environment variable at runtime.

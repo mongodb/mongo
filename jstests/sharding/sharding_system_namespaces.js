@@ -10,7 +10,7 @@ var coll = db.sharding_system_namespaces;
 // This test relies on the wiredTiger storage engine being compiled
 // into the server. Must check shard member for WT as it is not built into mongos.
 
-var storageEngines = st.shard0.getDB("local").serverBuildInfo().storageEngines;
+var storageEngines = st.shard0.getDB("local").getServerBuildInfo().rawData().storageEngines;
 
 print("Supported storage engines: " + storageEngines);
 
