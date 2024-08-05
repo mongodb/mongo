@@ -44,6 +44,11 @@ export const $config = (function() {
                 // In rare cases, it's possible the max number of retries is hit and eventually the
                 // router returns a StaleConfig error.
                 allowedErrorCodes.push(ErrorCodes.StaleConfig);
+                // Due to the above, in very rare cases, it is possible that the router has
+                // exhausted all but the last retry due to StaleConfig, and a suite which runs
+                // movePrimary causes a StaleDbVersion, which will surface to the client after the
+                // last retry.
+                allowedErrorCodes.push(ErrorCodes.StaleDbVersion);
             }
         },
         createView: (db, collName) => {
