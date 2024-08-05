@@ -88,10 +88,8 @@ function testReadCommittedLookup(db, secondary, rst) {
 
     // Run finds on the two collections to ensure that no background tasks can trigger refreshes on
     // the primary.
-    assert.commandWorked(secondary.getDB(db.getName())
-                             .runCommand({find: "local", $readPreference: {mode: "secondary"}}));
-    assert.commandWorked(secondary.getDB(db.getName())
-                             .runCommand({find: "foreign", $readPreference: {mode: "secondary"}}));
+    assert.commandWorked(db.runCommand({find: "local", $readPreference: {mode: "secondary"}}));
+    assert.commandWorked(db.runCommand({find: "foreign", $readPreference: {mode: "secondary"}}));
 
     // Stop oplog application on the secondary so that it won't acknowledge updates.
     pauseReplication(secondary);
