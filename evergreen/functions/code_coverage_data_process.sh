@@ -26,16 +26,18 @@ find ./build/debug -type f -name "*.gcno"
 
 activate_venv
 
-pipx install "cpp-coveralls==0.4.2" || exit 1
+pipx install "gcovr==7.2" || exit 1
 
-# Run coveralls and upload data.
-# View at https://coveralls.io/github/10gen/mongo
-cpp-coveralls \
-  --root . \
-  --build-root . \
-  --verbose \
-  --gcov ${GCOV_TOOL[@]} \
+# Process code coverage files (.gcno/.gcda) directly into coveralls format
+gcovr \
+  --output gcovr-coveralls.json \
+  --coveralls \
   --exclude src/third_party/ \
-  --exclude ./grammar.yy \
-  --exclude ./parser_gen.hpp \
-  --exclude ./parser_gen.cpp
+  --gcov-ignore-errors no_working_dir_found \
+  --gcov-ignore-parse-errors negative_hits.warn \
+  --gcov-exclude-directories build/debug/third_party \
+  --gcov-executable ${GCOV_TOOL[@]} \
+  build/debug
+
+# Upload json data; view at https://coveralls.io/github/10gen/mongo
+curl -X POST https://coveralls.io/api/v1/jobs -F 'json_file=@gcovr-coveralls.json'
