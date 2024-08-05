@@ -1,16 +1,12 @@
 /**
  * Tests validating a time-series collection with mixed schema buckets.
  */
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB(jsTestName());
 
 const collName = "ts";
 
 testDB.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata"}});
-
-configureFailPoint(conn, "allowSetTimeseriesBucketsMayHaveMixedSchemaDataFalse");
 
 assert.commandWorked(testDB.runCommand({drop: collName}));
 assert.commandWorked(
