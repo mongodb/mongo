@@ -9,6 +9,7 @@ filters:
       - anna-wawrzyniak
       - mbroadst
       - markbenvenuto
+      - dstorch
   - ".bazelignore":
     approvers:
       - 10gen/devprod-build
