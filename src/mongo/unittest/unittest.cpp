@@ -124,15 +124,13 @@ public:
         }
     };
 
-    Result(const std::string& name)
-        : _name(name), _rc(0), _tests(0), _fails(), _asserts(0), _millis(0) {}
+    Result(const std::string& name) : _name(name), _rc(0), _tests(0), _fails(), _millis(0) {}
 
     std::string toString() const {
         std::ostringstream ss;
         using namespace fmt::literals;
-        ss << "{:<40s} | tests: {:4d} | fails: {:4d} | "
-              "assert calls: {:10d} | time secs: {:6.3f}\n"
-              ""_format(_name, _tests, _fails.size(), _asserts, _millis * 1e-3);
+        ss << "{:<40s} | tests: {:4d} | fails: {:4d} | time secs: {:6.3f}\n"
+              ""_format(_name, _tests, _fails.size(), _millis * 1e-3);
 
         for (const auto& i : _messages) {
             ss << "\t" << i << '\n';
@@ -146,7 +144,6 @@ public:
         bob.append("name", _name);
         bob.append("tests", _tests);
         bob.appendNumber("fails", static_cast<long long>(_fails.size()));
-        bob.append("asserts", _asserts);
         bob.append("time", Milliseconds(_millis).toBSON());
         {
             auto arr = BSONArrayBuilder(bob.subarrayStart("failures"));
@@ -172,7 +169,6 @@ public:
     int _rc;
     int _tests;
     std::vector<std::string> _fails;
-    int _asserts;
     int _millis;
     std::vector<FailStatus> _messages;
 };
@@ -553,7 +549,6 @@ int Suite::run(const std::vector<std::string>& suites,
     int rc = 0;
 
     int tests = 0;
-    int asserts = 0;
     int millis = 0;
 
     Result totals("TOTALS");
@@ -571,11 +566,9 @@ int Suite::run(const std::vector<std::string>& suites,
                 totals._messages.push_back(r->_messages[i]);
             }
         }
-        asserts += r->_asserts;
         millis += r->_millis;
     }
     totals._tests = tests;
-    totals._asserts = asserts;
     totals._millis = millis;
 
     for (const auto& r : results) {
