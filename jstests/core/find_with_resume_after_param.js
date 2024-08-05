@@ -35,13 +35,16 @@ assertDropCollection(db, nonClusteredName);
 db.createCollection(clusteredName, {clusteredIndex: {key: {_id: 1}, unique: true}});
 db.createCollection(nonClusteredName);
 
+const docs = [{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}];
+const numDocs = docs.length;
+
 // Verify that we get a 'null' resume token when we request a resumeToken from an empty collection.
 let emptyRes = assert.commandWorked(db.runCommand({
     find: nonClusteredName,
     filter: {},
     $_requestResumeToken: true,
     hint: {$natural: 1},
-    limit: 3,
+    limit: numDocs,
 }));
 assert(emptyRes.hasOwnProperty('cursor'), emptyRes);
 assert.eq(emptyRes.cursor.postBatchResumeToken.$recordId, null, emptyRes);
@@ -51,20 +54,23 @@ emptyRes = assert.commandWorked(db.runCommand({
     filter: {},
     $_requestResumeToken: true,
     hint: {$natural: 1},
-    limit: 3,
+    limit: numDocs,
 }));
 assert(emptyRes.hasOwnProperty('cursor'), emptyRes);
 assert.eq(emptyRes.cursor.postBatchResumeToken.$recordId, null, emptyRes);
 
 // Insert some documents.
-const docs = [{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}];
 assert.commandWorked(clustered.insertMany(docs));
 assert.commandWorked(nonClustered.insertMany(docs));
 
+// All find commands will explicitly set a batchSize of numDocs + 1 since the config fuzzer may
+// change the default batchSize to be less than the size of the collection.
+
 // Obtain a null RecordId when we hit EOF and request a postBatchResumeToken.
-const nullRecord = assert.commandWorked(db.runCommand({
+let nullRecord = assert.commandWorked(db.runCommand({
     find: nonClusteredName,
     filter: {},
+    batchSize: numDocs + 1,
     $_requestResumeToken: true,
     hint: {$natural: 1},
 }));
@@ -72,14 +78,23 @@ const nullRecord = assert.commandWorked(db.runCommand({
 assert(nullRecord.hasOwnProperty('cursor'), nullRecord);
 assert.eq(nullRecord.cursor.postBatchResumeToken.$recordId, null, nullRecord);
 
+nullRecord = assert.commandWorked(db.runCommand({
+    find: clusteredName,
+    filter: {},
+    batchSize: numDocs + 1,
+    $_requestResumeToken: true,
+    hint: {$natural: 1},
+}));
+
 // Obtain the RecordId of the last record in the collection. Note that we avoid hitting EOF by
 // adding a 'limit: 3' in our query (if we hit EOF, our returned RecordId would be 'null').
 const lastRecord = assert.commandWorked(db.runCommand({
     find: nonClusteredName,
     filter: {},
+    batchSize: numDocs + 1,
     $_requestResumeToken: true,
     hint: {$natural: 1},
-    limit: 3,
+    limit: numDocs,
 }));
 
 assert(lastRecord.hasOwnProperty('cursor'), lastRecord);
@@ -90,6 +105,7 @@ assert.neq(lastRecord.cursor.postBatchResumeToken, null, lastRecord);
 const res = assert.commandWorked(db.runCommand({
     find: nonClusteredName,
     filter: {},
+    batchSize: numDocs + 1,
     $_requestResumeToken: true,
     $_resumeAfter: lastRecord.cursor.postBatchResumeToken,
     hint: {$natural: 1}
@@ -120,6 +136,7 @@ if (!sbeFullyEnabled) {
     let tailableRes = assert.commandWorked(db.runCommand({
         find: cappedNonClusteredName,
         filter: {},
+        batchSize: numDocs + 1,
         $_requestResumeToken: true,
         tailable: true,
         hint: {$natural: 1},
@@ -132,6 +149,7 @@ if (!sbeFullyEnabled) {
     tailableRes = assert.commandWorked(db.runCommand({
         find: cappedClusteredName,
         filter: {},
+        batchSize: numDocs + 1,
         $_requestResumeToken: true,
         tailable: true,
         hint: {$natural: 1},
@@ -149,6 +167,7 @@ function validateFailedResumeAfterInFind({collName, resumeAfterSpec, errorCode, 
     const spec = {
         find: collName,
         filter: {},
+        batchSize: numDocs + 1,
         $_requestResumeToken: true,
         $_resumeAfter: resumeAfterSpec,
         hint: {$natural: 1}
@@ -169,7 +188,7 @@ function validateFailedResumeAfterInAggregate({collName, resumeAfterSpec, errorC
         $_requestResumeToken: true,
         $_resumeAfter: resumeAfterSpec,
         hint: {$natural: 1},
-        cursor: {}
+        cursor: {batchSize: numDocs + 1}
     };
     assert.commandFailedWithCode(db.runCommand(spec), errorCode);
     // Run the same query under an explain.
