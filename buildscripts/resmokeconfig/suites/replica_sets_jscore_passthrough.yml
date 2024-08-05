@@ -16,7 +16,7 @@ selector:
   # server parameter.
   - jstests/core/**/set_param1.js
   # Different explain format
-  # TODO(SERVER-81158): Enable these tests.
+
   # These tests fails while DbCheck running in the background:
   # The DBCheck process continuously populates the currentOp, causing this test to time out while
   # waiting for empty 'getMore' requests.
@@ -37,9 +37,6 @@ selector:
   # in a prepared state for an extended period, it will result in a timeout for the dbcheck process.
   - jstests/core/txns/prepare_conflict.js
   - jstests/core/txns/prepare_conflict_aggregation_behavior.js
-
-  # TODO (SERVER-86917): Index DDL operations have concurrency issues with validate command
-  - jstests/core/ddl/collmod_convert_index_uniqueness.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

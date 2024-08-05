@@ -280,6 +280,7 @@ export const checkHealthLog = (healthlog, query, numExpected, timeout = 60 * 100
     let query_count;
     assert.soon(
         function() {
+            jsTestLog(tojson(healthlog.find({}).toArray()));
             query_count = healthlog.find(query).count();
             if (query_count != numExpected) {
                 jsTestLog("health log query returned " + query_count + " entries, expected " +

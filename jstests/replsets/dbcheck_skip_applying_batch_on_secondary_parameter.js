@@ -1,5 +1,9 @@
 /**
  * Tests the skipApplyingDbCheckBatchOnSecondary parameter.
+ *
+ * @tags: [
+ *   featureFlagSecondaryIndexChecksInDbCheck
+ * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {

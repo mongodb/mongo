@@ -172,6 +172,26 @@ buildvariants:
   - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
   - name: .default !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
 
+- &enterprise-rhel-8-64-bit-dynamic-dbcheck
+  <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel-8-64-bit-dynamic-dbcheck enterprise-rhel-8-64-bit-dynamic-dbcheck
+  display_name: "~ Shared Library Enterprise RHEL 8 with dbCheck"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - rhel8.8-small
+  expansions:
+    <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+    test_flags: >-
+      --additionalFeatureFlags "featureFlagSecondaryIndexChecksInDbCheck"
+  tasks:
+  - name: .concurrency !.large
+  - name: .concurrency .large
+  - name: jsCore
+  - name: multiversion_gen
+  - name: noPassthrough_gen
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough_gen
+
 # TODO (SERVER-75884): Remove this variant once we switch to config shard as the default.
 # This build variant is used to test suites that use sharded cluster fixture with config shard mode.
 - &enterprise-rhel-8-64-bit-dynamic-config-shard
