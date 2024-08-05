@@ -223,7 +223,8 @@ private:
     Future<HostAndShard> _targetHostAsync(
         const ShardId& shardId,
         const ReadPreferenceSetting& readPref,
-        OperationContextFn operationContextFn = [](OperationContext*) {});
+        OperationContextFn operationContextFn = [](OperationContext*) {},
+        BSONObj commandObj = BSONObj());
 
     /**
      * Returns true when all the registered child schedulers, op contexts and handles have joined.

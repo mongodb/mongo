@@ -148,7 +148,8 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
 
         assert.commandWorked(coordPrimary.adminCommand({
             configureFailPoint: failpointData.failpoint,
-            mode: {skip: (failpointData.skip ? failpointData.skip : 0)},
+            mode: "alwaysOn",
+            data: failpointData.data ? failpointData.data : {},
         }));
 
         // Run commitTransaction through a parallel shell.
@@ -159,15 +160,8 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
             awaitResult = runCommitThroughMongosInParallelShellExpectSuccess();
         }
 
-        var numTimesShouldBeHit = failpointData.numTimesShouldBeHit;
-        if ((failpointData.failpoint == "hangWhileTargetingLocalHost" &&
-             !failpointData.skip) &&  // We are testing the prepare phase
-            makeAParticipantAbort) {  // A remote participant will vote abort
-            // Wait for the abort to the local host to be scheduled as well.
-            numTimesShouldBeHit++;
-        }
-
-        waitForFailpoint("Hit " + failpointData.failpoint + " failpoint", numTimesShouldBeHit);
+        waitForFailpoint("Hit " + failpointData.failpoint + " failpoint",
+                         failpointData.numTimesShouldBeHit);
 
         // Induce the coordinator primary to step down.
         assert.commandWorked(
@@ -244,7 +238,8 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
         // a property of the coordinator only, and would be true even if a participant's
         // in-progress transaction could survive failover.
         let expectAbort = (failpointData.failpoint == "hangBeforeWritingParticipantList") ||
-            (failpointData.failpoint == "hangWhileTargetingLocalHost" && !failpointData.skip) ||
+            (failpointData.failpoint == "hangWhileTargetingLocalHost" &&
+             (failpointData.data.twoPhaseCommitStage == "prepare")) ||
             false;
         testCommitProtocolWithRetry(
             false /* make a participant abort */, failpointData, expectAbort);
