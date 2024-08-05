@@ -39,7 +39,7 @@ def get_generated_task_name(current_task_name: str, execution: str) -> str:
 
 
 def get_core_analyzer_commands(
-    task_id: str, execution: str, core_analyzer_results_url: str
+    task_id: str, execution: str, core_analyzer_results_url: str, gdb_index_cache: str
 ) -> List[FunctionCall]:
     """Return setup commands."""
     return [
@@ -62,6 +62,7 @@ def get_core_analyzer_commands(
                     "core-analyzer",
                     f"--task-id={task_id}",
                     f"--execution={execution}",
+                    f"--gdb-index-cache={gdb_index_cache}",
                     "--generate-report",
                 ],
                 "env": {
@@ -122,6 +123,7 @@ def generate(
     current_task_name = expansions.get("task_name")
     task_id = expansions.get("task_id")
     execution = expansions.get("execution")
+    gdb_index_cache = "off" if expansions.get("core_analyzer_gdb_index_cache") == "off" else "on"
     build_variant_name = expansions.get("build_variant")
     core_analyzer_results_url = expansions.get("core_analyzer_results_url")
 
@@ -188,7 +190,9 @@ def generate(
 
     # Make the evergreen variant that will be generated
     build_variant = BuildVariant(name=build_variant_name, activate=True)
-    commands = get_core_analyzer_commands(task_id, execution, core_analyzer_results_url)
+    commands = get_core_analyzer_commands(
+        task_id, execution, core_analyzer_results_url, gdb_index_cache
+    )
 
     sub_tasks = set([Task(get_generated_task_name(current_task_name, execution), commands)])
 

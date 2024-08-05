@@ -624,7 +624,12 @@ class GDBDumper(Dumper):
 
     @TRACER.start_as_current_span("core_analyzer.analyze_cores")
     def analyze_cores(
-        self, core_file_dir: str, install_dir: str, analysis_dir: str, multiversion_dir: str
+        self,
+        core_file_dir: str,
+        install_dir: str,
+        analysis_dir: str,
+        multiversion_dir: str,
+        gdb_index_cache: str,
     ) -> Report:
         core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
         analyze_cores_span = get_default_current_span()
@@ -657,6 +662,7 @@ class GDBDumper(Dumper):
                         tmp_dir=tmp_dir,
                         logger=logger,
                         multiversion_dir=multiversion_dir,
+                        gdb_index_cache=gdb_index_cache,
                     )
                 except Exception:
                     logger.exception("Exception occured while analyzing core")
@@ -702,6 +708,7 @@ class GDBDumper(Dumper):
         tmp_dir: str,
         multiversion_dir: str,
         logger: logging.Logger,
+        gdb_index_cache: str,
     ) -> Tuple[int, str]:  # returns (exit_code, test_status)
         cmds = []
         dbg = self._find_debugger()
@@ -737,7 +744,7 @@ class GDBDumper(Dumper):
         cmds += [
             f"set solib-search-path {lib_dir}",
             f"set index-cache directory {tmp_dir}",
-            "set index-cache enabled on",
+            f"set index-cache enabled {gdb_index_cache}",
             f"file {binary_path}",
             f"core-file {core_file_path}",
             "python import gdbmongo",
@@ -774,14 +781,6 @@ class GDBDumper(Dumper):
 
         current_span = trace.get_current_span()
         current_span.set_attribute("gdb_exit_code", exit_code)
-
-        # We do not fail when GDB has internal issues that are not our fault.
-        if exit_code == -11:
-            logger.warn(
-                "GDB returned exit code -11. This is often because of fatal errors internal to gdb."
-            )
-            logger.warn("Skipping core dump.")
-            return 0, "skip"
 
         if exit_code != 0:
             raise Exception("Bad exit code %d from %s" % (exit_code, " ".join(args)))
