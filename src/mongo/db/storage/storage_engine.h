@@ -200,6 +200,8 @@ public:
 
     /**
      * List the databases stored in this storage engine.
+     * This function doesn't return databases whose creation has committed durably but hasn't been
+     * published yet in the CollectionCatalog.
      */
     virtual std::vector<DatabaseName> listDatabases(
         boost::optional<TenantId> tenantId = boost::none) const = 0;

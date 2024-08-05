@@ -2,6 +2,9 @@
  * Tests for the listDatabasesForAllTenants command.
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 const kVTSKey = 'secret';
 
@@ -101,6 +104,56 @@ function runTestCheckMultitenantDatabases(primary, tokenConn, numDBs) {
     verifyDatabaseEntries(cmdRes, expectedDatabases);
 
     return [tenantIds, tokens];
+}
+
+// Check that a delay in publishing the database creation to the in-memory catalog doesn't prevent
+// the database from being visible.
+function runTestCheckSlowPublishMultitenantDb(primary, tenantId, tokenConn, token) {
+    const adminDB = primary.getDB("admin");
+
+    tokenConn._setSecurityToken(token);
+
+    const slowPublishDb = "slow_publish_multitenant_db";
+    const slowPublishColl = "coll";
+
+    // List database should reflect an implicitly created database that has been committed but not
+    // published into the local catalog yet. Use a failpoint to hang before publishing the catalog,
+    // simulating a slow catalog publish.
+    assert.commandWorked(adminDB.runCommand({
+        configureFailPoint: "hangBeforePublishingCatalogUpdates",
+        mode: "alwaysOn",
+        "$tenant": ObjectId(tenantId),
+        data: {collectionNS: slowPublishDb + '.' + slowPublishColl}
+    }));
+    const shellFn = (token, dbName, collName) => {
+        let shellConn = db.getSiblingDB("admin").getMongo();
+        shellConn._setSecurityToken(token);
+        db.getSiblingDB(dbName)[collName].createIndex({a: 1});
+    };
+    const waitDbCreate = startParallelShell(
+        funWithArgs(shellFn, token, slowPublishDb, slowPublishColl), primary.port);
+    assert.commandWorked(adminDB.runCommand({
+        waitForFailPoint: "hangBeforePublishingCatalogUpdates",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
+
+    // use to verify that the database entry is correct
+    const expectedDatabase =
+        [{"name": slowPublishDb, "tenantId": ObjectId(tenantId), "empty": true}];
+
+    let cmdRes = assert.commandWorked(adminDB.runCommand(
+        {listDatabasesForAllTenants: 1, filter: {$expr: {$eq: ["$name", slowPublishDb]}}}));
+    assert.eq(1, cmdRes.databases.length);
+    verifySizeSum(cmdRes);
+    verifyDatabaseEntries(cmdRes, expectedDatabase);
+
+    assert.commandWorked(adminDB.runCommand(
+        {configureFailPoint: "hangBeforePublishingCatalogUpdates", mode: "off"}));
+    waitDbCreate();
+
+    // Reset token
+    tokenConn._setSecurityToken(undefined);
 }
 
 // Test correctness of filter and nameonly options
@@ -258,6 +311,7 @@ function runTestsWithMultiTenancySupport() {
 
     const numDBs = 5;
     const [tenantIds, tokens] = runTestCheckMultitenantDatabases(primary, tokenConn, numDBs);
+    runTestCheckSlowPublishMultitenantDb(primary, tenantIds[0], tokenConn, tokens[0]);
     runTestCheckCmdOptions(primary, tenantIds, tokenConn, tokens);
     runTestInvalidCommands(primary);
 
