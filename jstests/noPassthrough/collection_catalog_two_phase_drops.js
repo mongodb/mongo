@@ -78,9 +78,17 @@ checkLog.containsJson(primary, 6825301, {
     }
 });
 
-// Perform an operation and take a checkpoint to advance the checkpoint timestamp. The ident reaper
-// will drop any drop pending idents earlier than the checkpoint timestamp.
-assert.commandWorked(db.adminCommand({appendOplogNote: 1, data: {msg: "advance timestamp"}}));
+// Advance the timestamp and wait for journaling, so that by completion, the stable timestamp will
+// include this command.
+assert.commandWorked(db.adminCommand({
+    appendOplogNote: 1,
+    data: {msg: "advance timestamp"},
+    writeConcern: {w: "majority", j: true}
+}));
+
+// Trigger a checkpoint. This will advance the checkpoint timestamp to the stable timestamp, and
+// allows for the timestamp monitor to notify the 2-phase drop that it can proceed with dropping
+// the table.
 assert.commandWorked(db.adminCommand({fsync: 1}));
 
 // "The ident was successfully dropped".
@@ -128,9 +136,17 @@ checkLog.containsJson(primary, 6825300, {
     }
 });
 
-// Perform an operation and take a checkpoint to advance the checkpoint timestamp. The ident reaper
-// will drop any drop pending idents earlier than the checkpoint timestamp.
-assert.commandWorked(db.adminCommand({appendOplogNote: 1, data: {msg: "advance timestamp"}}));
+// Advance the timestamp and wait for journaling, so that by completion, the stable timestamp will
+// include this command.
+assert.commandWorked(db.adminCommand({
+    appendOplogNote: 1,
+    data: {msg: "advance timestamp"},
+    writeConcern: {w: "majority", j: true}
+}));
+
+// Trigger a checkpoint. This will advance the checkpoint timestamp to the stable timestamp, and
+// allows for the timestamp monitor to notify the 2-phase drop that it can proceed with dropping
+// the table.
 assert.commandWorked(db.adminCommand({fsync: 1}));
 
 // "The ident was successfully dropped".
