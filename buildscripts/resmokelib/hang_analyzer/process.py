@@ -124,16 +124,6 @@ def signal_process(logger, pid, signalnum):
         logger.error("Cannot send signal to a process on Windows")
 
 
-def quit_process(logger, pname, pid):
-    """Sending sigquit to process."""
-
-    logger.info("Sending sigquit to process %s with PID %d", pname, pid)
-    try:
-        signal_process(logger, pid, signal.SIGQUIT)
-    except psutil.NoSuchProcess as err:
-        logger.error("Process not found: %s", err.msg)
-
-
 def pause_process(logger, pname, pid):
     """Pausing process."""
 
