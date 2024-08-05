@@ -24,6 +24,12 @@ selector:
   # status metrics, but the logical session cache refresh causes additional updates to be recorded.
   - jstests/core/**/find_and_modify_metrics.js
   - jstests/core/**/update_metrics.js
+  # The fsync.js test forcefully makes all operations wait due to an fsync lock. This can lead to
+  # ticket starvation which impedes the test from making forward progress and unlocking the fsync
+  # lock. As we refresh the logical session cache more often we can hit this state with relative
+  # ease since we may have a very low number of tickets available due to the throughput probing
+  # algorithm reducing the tickets to the bare minimum.
+  - jstests/core/fsync.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
