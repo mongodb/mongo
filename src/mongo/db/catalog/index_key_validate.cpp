@@ -497,6 +497,9 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                             << "' is only allowed when '" << IndexDescriptor::kKeyPatternFieldName
                             << "' is {\"$**\": ±1}"};
             }
+            if (key.nFields() != 1) {
+                return {ErrorCodes::CannotCreateIndex, "wildcard indexes do not allow compounding"};
+            }
 
             if (indexSpecElem.embeddedObject().isEmpty()) {
                 return {ErrorCodes::FailedToParse,

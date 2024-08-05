@@ -98,6 +98,18 @@ assert.commandFailedWithCode(coll.createIndex({"$**": "wildcard"}), ErrorCodes.C
 // Cannot create a compound wildcard index.
 assert.commandFailedWithCode(coll.createIndex({"$**": 1, "a": 1}), ErrorCodes.CannotCreateIndex);
 assert.commandFailedWithCode(coll.createIndex({"a": 1, "$**": 1}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(coll.createIndex({"obj.$**": 1, "a": 1}),
+                             ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(db.runCommand({
+    createIndexes: kCollectionName,
+    indexes: [{wildcardProjection: {a: 1, c: 1, d: 1}, key: {"$**": 1, b: 1}}]
+}),
+                             ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(db.runCommand({
+    createIndexes: kCollectionName,
+    indexes: [{key: {"$**": 1, b: 1}, wildcardProjection: {a: 1, c: 1, d: 1}}]
+}),
+                             ErrorCodes.CannotCreateIndex);
 
 // Cannot create an wildcard index with an invalid spec.
 assert.commandFailedWithCode(coll.createIndex({"a.$**.$**": 1}), ErrorCodes.CannotCreateIndex);
@@ -141,4 +153,9 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     createIndexHelper({"a.$**": 1}, {name: kIndexName, wildcardProjection: {b: 0}}),
     ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(db.runCommand({
+    createIndexes: kCollectionName,
+    indexes: [{wildcardProjection: {b: 1}, key: {"a.$**": 1}}]
+}),
+                             ErrorCodes.FailedToParse);
 })();
