@@ -867,13 +867,27 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
         // lookup's "foreignField" is the hashed field in this index.
         const BSONElement elt = index.keyPattern.getField(foreignFieldName.fullPath());
         if (elt.valueStringDataSafe() == IndexNames::HASHED) {
-            auto rawValueSlot = valueForIndexBounds;
+            SlotId rawValueSlot = valueForIndexBounds;
             valueForIndexBounds = slotIdGenerator.generate();
+            SlotId indexValueSlot = rawValueSlot;
+
+            if (collatorSlot) {
+                // For collated hashed indexes, apply collation before hashing.
+                SlotId collatedValueSlot = slotIdGenerator.generate();
+                valueGeneratorStage = makeProjectStage(std::move(valueGeneratorStage),
+                                                       nodeId,
+                                                       collatedValueSlot,
+                                                       makeFunction("collComparisonKey",
+                                                                    makeVariable(rawValueSlot),
+                                                                    makeVariable(*collatorSlot)));
+                indexValueSlot = collatedValueSlot;
+            }
+
             valueGeneratorStage =
                 makeProjectStage(std::move(valueGeneratorStage),
                                  nodeId,
                                  valueForIndexBounds,
-                                 makeFunction("shardHash", makeVariable(rawValueSlot)));
+                                 makeFunction("shardHash", makeVariable(indexValueSlot)));
         }
     }
 
