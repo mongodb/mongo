@@ -1,9 +1,11 @@
 /**
- * Test the behavior of the includeQueryStatsMetrics option for find, aggregate, and getMore.
+ * Test the behavior of the includeQueryStatsMetrics option for find, aggregate, distinct, and
+ * getMore.
  * @tags: [requires_fcv_80]
  *
  * TODO SERVER-84678: move this test into core once mongos supports includeQueryStatsMetrics
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function assertMetricEqual(metrics, name, expectedValue) {
     if (typeof expectedValue === 'undefined') {
@@ -165,5 +167,29 @@ function assertMetricsEqual(cursor, {
             usedDisk: false,
             fromMultiPlanner: false
         });
+    }
+
+    if (FeatureFlagUtil.isEnabled(testDB.getMongo(), "QueryStatsCountDistinct")) {
+        {
+            // Distinct command without metrics requested.
+            const result = testDB.runCommand(
+                {distinct: coll.getName(), key: "b", includeQueryStatsMetrics: false});
+            assert.commandWorked(result);
+            assert(!result.hasOwnProperty("metrics"));
+        }
+
+        {
+            // Distinct command with metrics requested.
+            const result = testDB.runCommand(
+                {distinct: coll.getName(), key: "b", includeQueryStatsMetrics: true});
+            assert.commandWorked(result);
+            assertMetricsEqual(result, {
+                keysExamined: 0,
+                docsExamined: 5,
+                hasSortStage: false,
+                usedDisk: false,
+                fromMultiPlanner: false
+            });
+        }
     }
 }

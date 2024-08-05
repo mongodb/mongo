@@ -307,8 +307,9 @@ public:
             return true;
         }
 
-        auto origValue = canonicalQuery->getFindCommandRequest().getIncludeQueryStatsMetrics();
-        bool requestQueryStats = origValue.value_or(false) ||
+        // Users cannot set 'includeQueryStatsMetrics' for distinct commands on mongos.
+        // We will decide if remote query stats metrics should be collected.
+        bool requestQueryStats =
             query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
 
         BSONObj distinctReadyForPassthrough = prepareDistinctForPassthrough(

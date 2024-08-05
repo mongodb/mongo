@@ -13,7 +13,6 @@ const collName = jsTestName();
 const distinctCommandObj = {
     distinct: collName,
     key: "v",
-    includeQueryStatsMetrics: true
 };
 
 function setUpCollection(coll) {
