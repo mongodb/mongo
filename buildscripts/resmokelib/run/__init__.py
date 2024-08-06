@@ -1580,24 +1580,6 @@ class RunPlugin(PluginInterface):
         )
 
         mongodb_server_options.add_argument(
-            "--flowControl",
-            action="store",
-            dest="flow_control",
-            choices=("on", "off"),
-            metavar="ON|OFF",
-            help=("Enable or disable flow control."),
-        )
-
-        mongodb_server_options.add_argument(
-            "--flowControlTicketOverride",
-            type=int,
-            action="store",
-            dest="flow_control_tickets",
-            metavar="TICKET_OVERRIDE",
-            help=("Number of tickets available for flow control."),
-        )
-
-        mongodb_server_options.add_argument(
             "--storageEngine",
             dest="storage_engine",
             metavar="ENGINE",

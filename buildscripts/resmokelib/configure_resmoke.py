@@ -363,8 +363,6 @@ be invoked as either:
     _config.REQUIRES_WORKLOAD_CONTAINER_SETUP = _config.EXTERNAL_SUT
 
     _config.FAIL_FAST = not config.pop("continue_on_failure")
-    _config.FLOW_CONTROL = config.pop("flow_control")
-    _config.FLOW_CONTROL_TICKETS = config.pop("flow_control_tickets")
 
     _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("include_with_any_tags"))
     _config.INCLUDE_TAGS = _tags_from_list(config.pop("include_with_all_tags"))

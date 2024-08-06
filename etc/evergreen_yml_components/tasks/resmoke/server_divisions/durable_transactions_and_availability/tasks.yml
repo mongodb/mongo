@@ -783,33 +783,6 @@ tasks:
         vars:
           suite: core_txns_large_txns_format
 
-  ## jstestfuzz concurrent replication continuous stepdown with flow control engaged ##
-  - <<: *jstestfuzz_template
-    name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_repl",
-        "non_deterministic",
-        "incompatible_debug_mode",
-        "jstestfuzz",
-        "repl",
-        "flow_control",
-        "stepdowns",
-        "require_npm",
-        "random_name",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          <<: *jstestfuzz_config_vars
-          num_files: 2
-          num_tasks: 1
-          jstestfuzz_vars: --jsTestsDir ../jstests
-          suite: jstestfuzz_replication_continuous_stepdown
-          resmoke_args: >-
-            --flowControlTicketOverride=10
-            --numClientsPerFixture=10
-
   ## jstestfuzz concurrent replica set ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_concurrent_replication_gen
@@ -883,33 +856,6 @@ tasks:
           jstestfuzz_vars: --jsTestsDir ../jstests
           suite: jstestfuzz_replication_write_conflicts
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}' --numClientsPerFixture=10"
-
-  # jstestfuzz replication continuous stepdown with flow control engaged #
-  - <<: *jstestfuzz_template
-    name: jstestfuzz_replication_continuous_stepdown_flow_control_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_repl",
-        "non_deterministic",
-        "incompatible_debug_mode",
-        "jstestfuzz",
-        "repl",
-        "flow_control",
-        "stepdowns",
-        "require_npm",
-        "random_name",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          <<: *jstestfuzz_config_vars
-          num_files: 2
-          num_tasks: 1
-          jstestfuzz_vars: --jsTestsDir ../jstests
-          suite: jstestfuzz_replication_continuous_stepdown
-          resmoke_args: >-
-            --flowControlTicketOverride=1
-            --mongodSetParameters="{logComponentVerbosity: {command: 2}}"
 
   ## jstestfuzz file copy based initial sync replica set ##
   - <<: *jstestfuzz_template
@@ -1895,35 +1841,6 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: concurrency_replication_wiredtiger_cursor_sweeps_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_execution",
-        "default",
-        "concurrency",
-        "repl",
-        "cursor_sweeps",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
-    name: concurrency_replication_wiredtiger_cursor_sweeps_with_replica_set_endpoint_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
     name: concurrency_simultaneous_gen
     tags:
       [
@@ -1940,35 +1857,6 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
-    name: concurrency_simultaneous_replication_wiredtiger_cursor_sweeps_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_execution",
-        "default",
-        "concurrency",
-        "large",
-        "repl",
-        "cursor_sweeps",
-        "random_name",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          resmoke_jobs_max: 1
-
-  - <<: *task_template
-    name: config_fuzzer_concurrency
-    tags: ["assigned_to_jira_team_server_execution", "default", "config_fuzzer"]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-        vars:
-          suite: concurrency
-          resmoke_args: >-
-            --fuzzMongodConfigs=normal
-            --excludeWithAnyTags=does_not_support_config_fuzzer
 
   - <<: *gen_task_template
     name: config_fuzzer_concurrency_replication_gen
@@ -1990,6 +1878,35 @@ tasks:
             --fuzzMongodConfigs=normal
             --excludeWithAnyTags=does_not_support_config_fuzzer
           use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: config_fuzzer_jstestfuzz_concurrent_replication_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "config_fuzzer",
+        "default",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_tsan",
+        "jstestfuzz",
+        "require_npm",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: ${jstestfuzz_concurrent_num_files|10}
+          num_tasks: 5
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_replication
+          resmoke_args: >-
+            --numClientsPerFixture=10
+            --fuzzMongodConfigs=normal
+            --excludeWithAnyTags=does_not_support_config_fuzzer
 
   - <<: *gen_task_template
     name: config_fuzzer_concurrency_sharded_replication_gen
@@ -2239,30 +2156,6 @@ tasks:
           jstestfuzz_vars: --jsTestsDir ../jstests
           suite: jstestfuzz_interrupt
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-  # jstestfuzz interrupt with flow control engaged #
-  - <<: *jstestfuzz_template
-    name: jstestfuzz_interrupt_replication_flow_control_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_execution",
-        "non_deterministic",
-        "incompatible_debug_mode",
-        "jstestfuzz",
-        "interrupt",
-        "flow_control",
-        "require_npm",
-        "random_name",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          <<: *jstestfuzz_config_vars
-          num_files: 2
-          num_tasks: 1
-          jstestfuzz_vars: --jsTestsDir ../jstests
-          suite: jstestfuzz_interrupt_replication
-          resmoke_args: "--flowControlTicketOverride=1 --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
   # jstestfuzz interrupt #
   - <<: *jstestfuzz_template

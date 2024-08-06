@@ -365,11 +365,6 @@ def mongo_shell_program(
         "logComponentVerbosity", mongod_launcher.get_default_log_component_verbosity_for_mongod()
     )
 
-    # If the 'enableFlowControl' setParameter for mongod was not already specified, we set its value
-    # to a default.
-    if config.FLOW_CONTROL is not None:
-        mongod_set_parameters.setdefault("enableFlowControl", config.FLOW_CONTROL == "on")
-
     mongos_launcher = shardedcluster.MongosLauncher(fixturelib)
     # If the 'logComponentVerbosity' setParameter for mongos was not already specified, we set its
     # value to a default.
@@ -542,9 +537,6 @@ def dbtest_program(
 
     if config.STORAGE_ENGINE is not None:
         kwargs["storageEngine"] = config.STORAGE_ENGINE
-
-    if config.FLOW_CONTROL is not None:
-        kwargs["flowControl"] = config.FLOW_CONTROL == "on"
 
     return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
 

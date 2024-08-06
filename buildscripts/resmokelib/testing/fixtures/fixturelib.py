@@ -163,8 +163,6 @@ class _FixtureConfig(object):
         self.USE_LEGACY_MULTIVERSION = config.USE_LEGACY_MULTIVERSION
         self.ENABLED_FEATURE_FLAGS = config.ENABLED_FEATURE_FLAGS
         self.EVERGREEN_TASK_ID = config.EVERGREEN_TASK_ID
-        self.FLOW_CONTROL = config.FLOW_CONTROL
-        self.FLOW_CONTROL_TICKETS = config.FLOW_CONTROL_TICKETS
         self.MAJORITY_READ_CONCERN = config.MAJORITY_READ_CONCERN
         self.NO_JOURNAL = config.NO_JOURNAL
         self.STORAGE_ENGINE = config.STORAGE_ENGINE

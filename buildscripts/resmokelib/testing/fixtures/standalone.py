@@ -461,18 +461,6 @@ class MongodLauncher(object):
         ) and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters:
             suite_set_parameters["shutdownTimeoutMillisForSignaledShutdown"] = 100
 
-        if "enableFlowControl" not in suite_set_parameters and self.config.FLOW_CONTROL is not None:
-            suite_set_parameters["enableFlowControl"] = self.config.FLOW_CONTROL == "on"
-
-        if (
-            "failpoint.flowControlTicketOverride" not in suite_set_parameters
-            and self.config.FLOW_CONTROL_TICKETS is not None
-        ):
-            suite_set_parameters["failpoint.flowControlTicketOverride"] = {
-                "mode": "alwaysOn",
-                "data": {"numTickets": self.config.FLOW_CONTROL_TICKETS},
-            }
-
         _add_testing_set_parameters(suite_set_parameters)
 
         shortcut_opts = {

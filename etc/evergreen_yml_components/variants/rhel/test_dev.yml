@@ -234,7 +234,7 @@ buildvariants:
           - rhel8.8-medium
       - name: .encrypt
       - name: .jscore .common !jsCore !.sbe_only
-      - name: .jstestfuzz !.feature_flag_guarded !.flow_control
+      - name: .jstestfuzz !.feature_flag_guarded
       - name: .misc_js
       - name: .multi_shard
       - name: .query_fuzzer

@@ -65,8 +65,6 @@ DEFAULTS = {
     "dbtest_executable": None,
     "dry_run": None,
     "exclude_with_any_tags": None,
-    "flow_control": None,
-    "flow_control_tickets": None,
     "force_excluded_tests": False,
     "fuzz_mongod_configs": None,
     "fuzz_runtime_params": None,
@@ -576,13 +574,6 @@ EXPORT_MONGOD_CONFIG = None
 
 # If true, run ReplicaSetFixture with linear chaining.
 LINEAR_CHAIN = None
-
-# If set to "on", it enables flow control. If set to "off", it disables flow control. If left as
-# None, the server's default will determine whether flow control is enabled.
-FLOW_CONTROL = None
-
-# If set, it ensures Flow Control only ever assigns this number of tickets in one second.
-FLOW_CONTROL_TICKETS = None
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine.
