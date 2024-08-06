@@ -186,6 +186,10 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss) const override;
 
+    boost::optional<mongo::DatabaseVersion> refreshAndGetDatabaseVersion(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DatabaseName& dbName) const override;
+
     boost::optional<ShardId> determineSpecificMergeShard(
         OperationContext* opCtx, const NamespaceString& nss) const override {
         return boost::none;

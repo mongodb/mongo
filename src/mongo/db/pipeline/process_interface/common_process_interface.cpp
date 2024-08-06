@@ -249,6 +249,15 @@ boost::optional<ShardVersion> CommonProcessInterface::refreshAndGetCollectionVer
     return cri.cm.isSharded() ? boost::make_optional(cri.getCollectionVersion()) : boost::none;
 }
 
+boost::optional<mongo::DatabaseVersion> CommonProcessInterface::refreshAndGetDatabaseVersion(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const DatabaseName& dbName) const {
+
+    auto db =
+        Grid::get(expCtx->opCtx)->catalogCache()->getDatabaseWithRefresh(expCtx->opCtx, dbName);
+
+    return db.isOK() ? boost::make_optional(db.getValue()->getVersion()) : boost::none;
+}
+
 std::vector<FieldPath> CommonProcessInterface::shardKeyToDocumentKeyFields(
     const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) {
     std::vector<FieldPath> result;

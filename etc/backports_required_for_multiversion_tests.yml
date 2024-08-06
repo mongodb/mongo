@@ -470,4 +470,6 @@ last-lts:
       ticket: SERVER-93099
     - test_file: jstests/core/index/index_creation_on_different_collations.js
       ticket: SERVER-93112
+    - test_file: jstests/sharding/write_with_movePartition.js
+      ticket: SERVER-92690
   suites: null
